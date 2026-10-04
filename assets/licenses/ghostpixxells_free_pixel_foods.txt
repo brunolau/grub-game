@@ -1,0 +1,21 @@
+Free Pixel foods
+================
+
+Author: ghostpixxells
+Source: https://ghostpixxells.itch.io/pixelfood
+Licence: CC0 1.0 (tier A)
+Used in Club & Grub for: seven giant bonus foods
+Staging folder: .tools/asset_candidates/items_ui_fx/ghostpixxells_free-pixel-foods
+
+---- Licence evidence recorded when the pack was downloaded ----
+
+# LICENSE_INFO - Free Pixel foods (ghostpixxells)
+
+- **Source URL:** https://ghostpixxells.itch.io/pixelfood
+- **Author:** ghostpixxells
+- **License:** CC0 1.0
+- **License tier:** A (CC0 / public domain - no attribution required)
+- **Exact wording on the source:** itch info panel: "Asset license Creative Commons Zero v1.0 Universal"; description: "You can use it anywhere, including commercial use."
+- **Evidence saved in this folder:** _itch_page.txt
+- **Download URL:** itch.io upload 3227529 'Ghostpixxells_pixelfood.zip'
+- **Date retrieved:** 2026-10-04

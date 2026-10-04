@@ -1,0 +1,38 @@
+Superpowers Asset Packs - Prehistoric Platformer
+================================================
+
+Author: Pixel-boy (Sparklin Labs)
+Source: https://github.com/sparklinlabs/superpowers-asset-packs/tree/master/prehistoric-platformer
+Licence: CC0 1.0 (tier A)
+Used in Club & Grub for: hero, enemies, bosses, NPCs, all terrain and props, parallax layers, native items, FX, HUD, bitmap fonts
+Staging folder: .tools/asset_candidates/environment/superpowers-prehistoric-platformer
+
+---- Licence evidence recorded when the pack was downloaded ----
+
+# LICENSE_INFO - superpowers-prehistoric-platformer
+
+- **Pack**: Superpowers Asset Packs - Prehistoric Platformer
+- **Author**: Pixel-boy (Sparklin Labs)
+- **License**: CC0 1.0 Universal
+- **License tier**: A
+- **Source page(s)**:
+  - https://github.com/sparklinlabs/superpowers-asset-packs/tree/master/prehistoric-platformer
+- **Download URL(s)**:
+  - git clone https://github.com/sparklinlabs/superpowers-asset-packs (commit e8674a03ab4456802f71f848c4df79eccca23f7a, 2019-09-21); zip: https://github.com/sparklinlabs/superpowers-asset-packs/archive/refs/heads/master.zip
+- **Date checked / downloaded**: 2026-10-04
+
+## Exact license wording (quoted)
+- repo README.md (saved as REPO_README.md):
+  > The assets in this repository are created at Sparklin Labs by Pixel-boy. They are released under the Creative Commons Zero (CC0) license. [...] You can use the assets found in this repository in your own games, even commercial ones. Attribution is not required but appreciated.
+- repo LICENSE.txt (saved as REPO_LICENSE_CC0.txt):
+  > CC0 1.0 Universal [full legal code]
+- pack README.md:
+  > Assets created by Pixel-boy for Superpowers supporters! See https://github.com/sparklinlabs/superpowers-asset-packs for license information and more assets!
+
+## Evidence saved in this folder
+- `REPO_README.md` (shipped by the author)
+- `REPO_LICENSE_CC0.txt` (shipped by the author)
+
+## Notes / flags
+- Whole pack staged (art + 7 music tracks + 12 sounds) - everything in the repo is CC0.
+- Attribution not required; courtesy credit suggested: 'Pixel-boy / Sparklin Labs (superpowers-html5.com)'.

@@ -1,0 +1,41 @@
+4 Chiptunes (Adventure) / Chiptune Adventures
+=============================================
+
+Author: Juhani Junkala (SubspaceAudio)
+Source: https://opengameart.org/content/4-chiptunes-adventure
+Licence: CC0 1.0 (tier A)
+Used in Club & Grub for: jungle, volcano, boss and bonus music
+Staging folder: .tools/asset_candidates/audio/juhani-junkala_4-chiptunes-adventure
+
+---- Licence evidence recorded when the pack was downloaded ----
+
+# LICENSE_INFO - Juhani Junkala - 4 Chiptunes (Adventure) / Chiptune Adventures
+
+- **Author:** Juhani Junkala (SubspaceAudio)
+- **License:** CC0 1.0  (tier A)
+- **Source page(s):**
+  - https://opengameart.org/content/4-chiptunes-adventure
+- **Download URL(s):**
+  - https://opengameart.org/sites/default/files/Juhani%20Junkala%20%5BChiptune%20Adventures%5D%20OGG.zip
+- **Date checked / downloaded:** 2026-10-04
+- **Saved copy of the page(s):** `../_pages/oga_4-chiptunes-adventure.html`
+
+## Exact licence wording (quoted from the source)
+
+> Licence field on the page: "License(s): CC0" (icon links to http://creativecommons.org/publicdomain/zero/1.0/)
+
+> Page description: "Beware, these are seriously catchy! Works especially well with lighthearted platformers. Seamlessly looping. Both OGG and WAV versions available!"
+
+> INFO.txt inside the zip: "These music tracks have been released under CC0 creative commons license. You can do anything you want with these tunes."
+
+---- INFO.txt (shipped by the author) ----
+
+Hi, I'm Juhani Junkala, the author of this music collection. I'm a classically trained composer, producer and a sound designer with over 20 years of experience.
+
+These music tracks have been released under CC0 creative commons license. You can do anything you want with these tunes.
+
+Check out my game audio portfolio: https://www.youtube.com/watch?v=tvY0FD_rCIo
+
+Homepage: https://juhanijunkala.com/
+
+If you need music or sound effects for your game, contact me: juhani.junkala@musician.org

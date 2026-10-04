@@ -1,0 +1,27 @@
+8bit Action Jingle & Mini Loop
+==============================
+
+Author: MintoDog
+Source: https://opengameart.org/content/8bit-action-jingle-mini-loop
+Licence: CC0 1.0 (tier A)
+Used in Club & Grub for: level complete, death, game over and feast-mode jingles
+Staging folder: .tools/asset_candidates/audio/mintodog_8bit-action-jingles
+
+---- Licence evidence recorded when the pack was downloaded ----
+
+# LICENSE_INFO - MintoDog - 8bit Action Jingle & Mini Loop
+
+- **Author:** MintoDog
+- **License:** CC0 1.0  (tier A)
+- **Source page(s):**
+  - https://opengameart.org/content/8bit-action-jingle-mini-loop
+- **Download URL(s):**
+  - https://opengameart.org/sites/default/files/ogg_8bit_action_jingle_mini_loop.zip
+- **Date checked / downloaded:** 2026-10-04
+- **Saved copy of the page(s):** `../_pages/oga_8bit-action-jingle-mini-loop.html`
+
+## Exact licence wording (quoted from the source)
+
+> Licence field on the page: "License(s): CC0" (icon links to http://creativecommons.org/publicdomain/zero/1.0/)
+
+> Description: "Jingle & Mini Loop for 8bit action game."

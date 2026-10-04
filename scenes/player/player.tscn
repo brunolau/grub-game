@@ -1,0 +1,26 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://scripts/player/player.gd" id="1_player"]
+[ext_resource type="Texture2D" uid="uid://c17npbhks3i3c" path="res://assets/sprites/player/hero.png" id="2_club"]
+[ext_resource type="Texture2D" uid="uid://rv4qoqj3ewav" path="res://assets/sprites/player/hero_hammer.png" id="3_hammer"]
+[ext_resource type="Texture2D" uid="uid://bsr4n47175ssr" path="res://assets/sprites/player/hero_axe.png" id="4_axe"]
+[ext_resource type="Texture2D" uid="uid://dduv313vctu0" path="res://assets/sprites/player/hero_boomerang.png" id="5_boomerang"]
+[ext_resource type="Texture2D" uid="uid://cyvjadbedlhc1" path="res://assets/sprites/objects/glider.png" id="6_glider"]
+
+[node name="Player" type="Node2D"]
+script = ExtResource("1_player")
+weapon_sheets = Array[Texture2D]([ExtResource("2_club"), ExtResource("3_hammer"), ExtResource("4_axe"), ExtResource("5_boomerang")])
+
+[node name="Sprite" type="Sprite2D" parent="."]
+texture = ExtResource("2_club")
+centered = false
+offset = Vector2(-88, -96)
+hframes = 8
+vframes = 7
+
+[node name="GliderSprite" type="Sprite2D" parent="."]
+visible = false
+position = Vector2(0, -50)
+texture = ExtResource("6_glider")
+centered = false
+offset = Vector2(-38, -50)

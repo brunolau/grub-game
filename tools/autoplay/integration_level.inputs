@@ -1,0 +1,40 @@
+# test_integration from '@' to the exit (ticks:KEYS, keys L R U D F K).
+# Meadow: walk to the inset spot and club it three times with low strikes.
+20:R,10:
+10:DF,4:,10:DF,4:,10:DF,6:
+# Jump onto the one-way platform where the spot's bonuses landed and walk along it.
+10:RU,6:R,10:,12:R,10:
+# The walker: club it.
+22:,8:F,6:
+# Over the hill and jump the pond.
+34:R,14:RU,8:R,10:
+# Club the crate open.
+4:R,10:,8:F,2:,4:R,4:,8:F,2:,8:F,2:,8:F,6:
+# Jump onto the spring: it throws the hero up onto the ledge with the treasure.
+5:R,10:RU,16:R,10:
+# Off the ledge, onto the big spot in the floor: three low strikes drop the giant bonus from above.
+8:R,14:,10:DF,4:,10:DF,4:,10:DF,20:
+# Catch the giant bonus when it comes down again, touch the checkpoint, club the rock (a scenery spot) twice.
+24:,6:R,8:,8:F,4:,8:F,10:
+# The snapper plant: step up and club it.
+6:R,8:F,4:,8:F,10:
+# Pick up what the spots threw, then walk into the spikes: the death toss, the curtain, back at the checkpoint.
+12:R,10:,12:R,70:
+# Again from the checkpoint: the snapper is back.
+10:R,8:F,4:,8:F,10:
+# Jump the spikes and land on the axe.
+12:R,16:RU,4:R,4:
+# The chasm: step onto the ride platform, ride it across, jump to the drop platform and on before it falls.
+5:R,36:,10:RU,6:R,6:
+8:,12:RU,6:R,8:
+# Under the floating rock: throw axes up at the dangler (high strikes throw high).
+8:UF,6:,8:UF,6:,8:UF,10:
+# The stinger dives at the hero: throw axes ahead while walking up to the breakable wall and the barrel.
+10:R,8:F,6:,8:F,6:,8:F,6:
+# Through the broken wall, up the ramp past the barrel, and down the shaft into the cavern.
+30:R,10:,30:R,16:
+# The cavern: axes for the lurker that drops from the roof and the dragon that leaps at the hero.
+6:R,8:F,6:,8:F,6:,6:R,8:F,6:,8:F,6:,6:R,8:F,6:,8:F,10:
+8:F,4:,8:UF,4:,8:F,4:,8:UF,4:,8:F,4:,8:UF,4:,8:F,4:,8:UF,4:,8:F,4:,8:F,10:
+# Jump the little pool, grab the treasure and walk into the exit totem.
+10:R,14:RU,40:R

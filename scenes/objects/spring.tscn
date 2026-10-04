@@ -1,0 +1,13 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/objects/spring.gd" id="1_spring"]
+[ext_resource type="Texture2D" path="res://assets/sprites/objects/spring.png" id="2_spring"]
+
+[node name="SpringPad" type="Node2D"]
+script = ExtResource("1_spring")
+
+[node name="Sprite" type="Sprite2D" parent="."]
+texture = ExtResource("2_spring")
+centered = false
+offset = Vector2(-32, -26)
+hframes = 5

@@ -1,0 +1,21 @@
+16x16 RPG Items (DB32)
+======================
+
+Author: ARoachIFoundOnMyPillow
+Source: https://opengameart.org/content/16x16-rpg-items-db32
+Licence: CC0 1.0 (tier A)
+Used in Club & Grub for: gems, rings, goblet, torch, bucket
+Staging folder: .tools/asset_candidates/items_ui_fx/oga_aroach_16x16-rpg-items-db32
+
+---- Licence evidence recorded when the pack was downloaded ----
+
+# LICENSE_INFO - 16x16 RPG Items (DB32) (ARoachIFoundOnMyPillow)
+
+- **Source URL:** https://opengameart.org/content/16x16-rpg-items-db32
+- **Author:** ARoachIFoundOnMyPillow
+- **License:** CC0 1.0
+- **License tier:** A (CC0 / public domain - no attribution required)
+- **Exact wording on the source:** OGA page "License(s):" field: "CC0"; description: "Some 16x16 fantasy RPG items. A bunch of weapons/tools in various materials, food, potions, books, gems, and some miscellaneous items. Uses DawnBringer32 palette."
+- **Evidence saved in this folder:** _oga_page.txt
+- **Download URL:** https://opengameart.org/sites/default/files/db32_rpg_items_0.zip
+- **Date retrieved:** 2026-10-04

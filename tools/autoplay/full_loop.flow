@@ -1,0 +1,123 @@
+# The whole game loop, played like a player would (docs/ARCHITECTURE.md 9.2, scripts/core/dev/autoplay_flow.gd):
+# boot -> title -> mode select -> world map -> level 1 (intro, walk, jump, strikes, food, hidden spots, damage,
+# death, respawn at the checkpoint, exit) -> tally -> world map -> level 2 (pause menu, boss fight, fire-starter,
+# exit) -> tally -> the end -> credits -> title.
+#   bash .tools/gd.sh play --flow=tools/autoplay/full_loop.flow --fast --fresh-user
+
+# --- Boot, title, mode select, world map --------------------------------------------------------------------------
+wait_until flow.current_screen == title 600
+wait_until flow.busy == false 600
+wait 40
+shot title
+expect save.has_progress() == false
+expect save.get_high_score() == 0
+press ui_accept
+wait_until flow.current_screen == mode_select 300
+wait_until flow.busy == false 600
+wait 30
+shot mode_select
+press ui_accept
+wait_until flow.current_screen == world_map 300
+wait_until flow.busy == false 600
+expect game.difficulty == 0
+expect game.lives == 2
+expect game.score == 0
+wait 60
+shot world_map_1
+press ui_accept
+
+# --- Level 1: test_integration ------------------------------------------------------------------------------------
+wait_until flow.current_screen == level 600
+wait_until flow.busy == false 600
+expect level.level_id == test_integration
+expect hero.dead == false
+expect hud.get_lives_text() == x2
+expect hud.shown_hearts == 3
+expect hud.get_score_text() == 0000000
+wait 2
+shot level_1_intro
+every 48 level1
+play_file tools/autoplay/integration_level.inputs
+every 0
+expect events.exit_reached == 1
+expect events.player_died == 1
+expect events.level_respawned == 1
+expect events.checkpoint_activated >= 1
+expect events.enemy_killed >= 8
+expect events.hidden_spot_opened >= 4
+expect events.item_collected >= 15
+expect game.lives == 1
+expect game.weapon == 2
+expect game.score >= 40000
+
+# --- Tally -> world map -> level 2 ---------------------------------------------------------------------------------
+wait_until flow.current_screen == tally 600
+wait_until flow.busy == false 600
+wait 40
+shot tally_1
+press ui_accept
+wait 40
+shot tally_1_paid
+press ui_accept
+wait_until flow.current_screen == world_map 600
+wait_until flow.busy == false 600
+expect save.is_level_unlocked(test_integration_boss,0) == true
+expect save.get_level_result(test_integration,0).percent >= 80
+wait 60
+shot world_map_2
+press ui_accept
+wait_until flow.current_screen == level 600
+wait_until flow.busy == false 600
+expect level.level_id == test_integration_boss
+expect game.weapon == 2
+expect hud.get_lives_text() == x1
+
+# --- Pause menu ------------------------------------------------------------------------------------------------------
+wait 20
+press pause
+wait 20
+expect tree.paused == true
+expect events.pause_changed == 1
+shot pause_menu
+press ui_cancel
+wait 10
+expect tree.paused == false
+
+# --- Level 2: corridor and the Brute (the hero takes hits here) ---------------------------------------------------
+reset_events
+every 48 level2
+play_file tools/autoplay/integration_boss.inputs
+every 0
+expect events.player_hurt >= 1
+expect events.boss_started == 1
+expect events.enemy_hit >= 2
+expect events.boss_defeated == 1
+expect events.exit_unlocked == 1
+expect events.exit_reached == 1
+
+# --- Tally -> the end -> credits -> title --------------------------------------------------------------------------
+wait_until flow.current_screen == tally 600
+wait_until flow.busy == false 600
+wait 40
+shot tally_2
+press ui_accept
+wait 30
+press ui_accept
+wait_until flow.current_screen == the_end 600
+wait_until flow.busy == false 600
+expect save.is_game_completed(0) == true
+expect save.get_high_score() >= 40000
+wait 60
+shot the_end
+press ui_accept
+wait_until flow.current_screen == credits 900
+wait_until flow.busy == false 600
+wait 120
+shot credits
+press ui_cancel
+wait_until flow.current_screen == title 900
+wait_until flow.busy == false 600
+wait 30
+shot title_again
+expect save.get_high_score() >= 40000
+expect events.screen_title >= 1

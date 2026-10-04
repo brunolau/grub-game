@@ -1,0 +1,15 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/fx/fx_anim.gd" id="1_fx_anim"]
+[ext_resource type="Texture2D" path="res://assets/sprites/fx/star_puff.png" id="2_star_puff"]
+
+[node name="StarPuff" type="Node2D"]
+script = ExtResource("1_fx_anim")
+frame_count = 5
+fps = 16
+
+[node name="Sprite" type="Sprite2D" parent="."]
+texture = ExtResource("2_star_puff")
+centered = false
+offset = Vector2(-22, -20)
+hframes = 5

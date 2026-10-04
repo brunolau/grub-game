@@ -1,0 +1,39 @@
+5 Chiptunes (Action) / Retro Game Music Pack
+============================================
+
+Author: Juhani Junkala (SubspaceAudio)
+Source: https://opengameart.org/content/5-chiptunes-action
+Licence: CC0 1.0 (tier A)
+Used in Club & Grub for: title, cave, ice, spare level and ending music
+Staging folder: .tools/asset_candidates/audio/juhani-junkala_5-chiptunes-action
+
+---- Licence evidence recorded when the pack was downloaded ----
+
+# LICENSE_INFO - Juhani Junkala - 5 Chiptunes (Action) / Retro Game Music Pack
+
+- **Author:** Juhani Junkala (SubspaceAudio)
+- **License:** CC0 1.0  (tier A)
+- **Source page(s):**
+  - https://opengameart.org/content/5-chiptunes-action
+- **Download URL(s):**
+  - https://opengameart.org/sites/default/files/5%20Action%20Chiptunes%20By%20Juhani%20Junkala.zip
+- **Date checked / downloaded:** 2026-10-04
+- **Saved copy of the page(s):** `../_pages/oga_5-chiptunes-action.html`
+
+## Exact licence wording (quoted from the source)
+
+> Licence field on the page: "License(s): CC0" (icon links to http://creativecommons.org/publicdomain/zero/1.0/)
+
+> Page description: "5 tracks, all seamlessly looping!"
+
+> INFO.txt inside the zip: "These music tracks have been released under CC0 creative commons license. You can do anything you want with these tunes."
+
+---- INFO.txt (shipped by the author) ----
+
+Hi, I'm Juhani Junkala, the author of this music collection. I'm a classically trained composer, producer and a sound designer with over 20 years of experience.
+
+These music tracks have been released under CC0 creative commons license. You can do anything you want with these tunes.
+
+Check out my game music portfolio: https://www.youtube.com/watch?v=dbACpSy9FWY
+
+If you need music or sound effects for your game, contact me: juhani.junkala@musician.org

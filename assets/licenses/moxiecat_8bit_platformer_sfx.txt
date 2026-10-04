@@ -1,0 +1,33 @@
+8-bit Platformer SFX
+====================
+
+Author: MoxieCat
+Source: https://opengameart.org/content/8-bit-platformer-sfx-0
+Licence: CC0 1.0 (tier A)
+Used in Club & Grub for: head bounce / spring
+Staging folder: .tools/asset_candidates/audio/moxiecat_8bit-platformer-sfx
+
+---- Licence evidence recorded when the pack was downloaded ----
+
+# LICENSE_INFO - MoxieCat - 8-bit Platformer SFX
+
+- **Author:** MoxieCat
+- **License:** CC0 1.0  (tier A)
+- **Source page(s):**
+  - https://opengameart.org/content/8-bit-platformer-sfx-0
+- **Download URL(s):**
+  - https://opengameart.org/sites/default/files/jump_1.wav
+  - https://opengameart.org/sites/default/files/spring.wav
+  - https://opengameart.org/sites/default/files/throw.wav
+  - https://opengameart.org/sites/default/files/playerhurt.wav
+  - (and 10 more single WAV files listed on the page)
+- **Date checked / downloaded:** 2026-10-04
+- **Saved copy of the page(s):** `../_pages/oga_8-bit-platformer-sfx-0.html`
+
+## Exact licence wording (quoted from the source)
+
+> Licence field on the page: "License(s): CC0" (icon links to http://creativecommons.org/publicdomain/zero/1.0/)
+
+> Copyright notice: "Use as you will!"
+
+> Description: "Includes .WAV files of each sound effect at their original volume, as well as the FamiTracker file they were exported from"

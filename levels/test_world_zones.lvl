@@ -1,0 +1,41 @@
+# Zone check of the world module: every zones/* id in one level (message, camera lock, secret, dark on / off,
+# kill pit, autoscroll stop, boss arena with its Brute).
+[meta]
+format = 1
+id = test_world_zones
+name = "World Zones"
+kind = test
+biome = jungle
+terrain_a = jungle/terrain
+background = jungle
+
+[legend]
+C = objects/checkpoint
+E = objects/exit locked=true
+
+[tiles]
+...............................................|
+...............................................|
+...............................................|
+...............................................|
+...............................................|
+...............................................|
+..............----.............................|
+...............................................|
+...............................................|
+...............................................|
+...............................................|
+.@........C..................................E.|
+######################...#######################
+######################...#######################
+
+[entities]
+zones/message 2 11 rect=0,8,6,4 text=ZONE_DEMO
+zones/camera_lock 9 11 rect=6,2,14,11
+zones/secret 15 5 name=high_ledge rect=14,3,4,3
+zones/dark 20 11 rect=20,0,2,12
+zones/kill 23 13 rect=22,12,3,2
+zones/dark 26 11 rect=26,0,2,12 on=false
+zones/autoscroll_stop 29 11 rect=28,0,4,12
+zones/arena 40 11 name=pit rect=32,2,15,11
+bosses/brute 41 11 arena=pit left=33 right=46

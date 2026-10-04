@@ -1,0 +1,13 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/items/bone.gd" id="1_bone"]
+[ext_resource type="Texture2D" path="res://assets/sprites/items/bone.png" id="2_bone"]
+
+[node name="Bone" type="Node2D"]
+script = ExtResource("1_bone")
+
+[node name="Sprite" type="Sprite2D" parent="."]
+texture = ExtResource("2_bone")
+centered = false
+offset = Vector2(-13, -26)
+hframes = 4

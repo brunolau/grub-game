@@ -1,0 +1,232 @@
+[
+ {
+  "pack": "antumdeluge_fire-crackling",
+  "file": "assets/licenses/antumdeluge_fire_crackling.txt",
+  "title": "Fire Crackling",
+  "author": "AntumDeluge",
+  "url": "https://opengameart.org/content/fire-crackling",
+  "license": "CC0 1.0",
+  "tier": "A",
+  "use": "campfire loop"
+ },
+ {
+  "pack": "basto_nes-sounds",
+  "file": "assets/licenses/basto_nes_sounds.txt",
+  "title": "NES Sounds",
+  "author": "Basto",
+  "url": "https://opengameart.org/content/nes-sounds",
+  "license": "CC0 1.0",
+  "tier": "A",
+  "use": "splash, exit chime"
+ },
+ {
+  "pack": "ignasd_ice-shatters",
+  "file": "assets/licenses/ignasd_ice_shatters.txt",
+  "title": "Ice breaking/shattering",
+  "author": "IgnasD",
+  "url": "https://opengameart.org/content/ice-breakingshattering",
+  "license": "CC0 1.0",
+  "tier": "A",
+  "use": "ice block smash"
+ },
+ {
+  "pack": "juhani-junkala_12-music-loops",
+  "file": "assets/licenses/juhani_junkala_12_music_loops.txt",
+  "title": "12 Music Loops",
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "url": "https://opengameart.org/content/12-music-loops",
+  "license": "CC0 1.0",
+  "tier": "A",
+  "use": "world map, level select, final boss, credits, spare level music"
+ },
+ {
+  "pack": "juhani-junkala_4-chiptunes-adventure",
+  "file": "assets/licenses/juhani_junkala_4_chiptunes_adventure.txt",
+  "title": "4 Chiptunes (Adventure) / Chiptune Adventures",
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "url": "https://opengameart.org/content/4-chiptunes-adventure",
+  "license": "CC0 1.0",
+  "tier": "A",
+  "use": "jungle, volcano, boss and bonus music"
+ },
+ {
+  "pack": "juhani-junkala_5-chiptunes-action",
+  "file": "assets/licenses/juhani_junkala_5_chiptunes_action.txt",
+  "title": "5 Chiptunes (Action) / Retro Game Music Pack",
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "url": "https://opengameart.org/content/5-chiptunes-action",
+  "license": "CC0 1.0",
+  "tier": "A",
+  "use": "title, cave, ice, spare level and ending music"
+ },
+ {
+  "pack": "juhani-junkala_512-retro-sfx",
+  "file": "assets/licenses/juhani_junkala_512_retro_sfx.txt",
+  "title": "The Essential Retro Video Game Sound Effects Collection [512 sounds]",
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "url": "https://opengameart.org/content/512-sound-effects-8-bit-style",
+  "license": "CC0 1.0",
+  "tier": "A",
+  "use": "most sound effects"
+ },
+ {
+  "pack": "mintodog_8bit-action-jingles",
+  "file": "assets/licenses/mintodog_8bit_action_jingles.txt",
+  "title": "8bit Action Jingle & Mini Loop",
+  "author": "MintoDog",
+  "url": "https://opengameart.org/content/8bit-action-jingle-mini-loop",
+  "license": "CC0 1.0",
+  "tier": "A",
+  "use": "level complete, death, game over and feast-mode jingles"
+ },
+ {
+  "pack": "misc-cc0-level-themes",
+  "file": "assets/licenses/misc_cc0_level_themes.txt",
+  "title": "Icy Heights (wind ambience)",
+  "author": "Ecrivain",
+  "url": "https://opengameart.org/content/icy-heights",
+  "license": "CC0 1.0",
+  "tier": "A",
+  "use": "blizzard wind loop (only ecrivain_icy-heights_wind.ogg is used from this staging folder)"
+ },
+ {
+  "pack": "moxiecat_8bit-platformer-sfx",
+  "file": "assets/licenses/moxiecat_8bit_platformer_sfx.txt",
+  "title": "8-bit Platformer SFX",
+  "author": "MoxieCat",
+  "url": "https://opengameart.org/content/8-bit-platformer-sfx-0",
+  "license": "CC0 1.0",
+  "tier": "A",
+  "use": "head bounce / spring"
+ },
+ {
+  "pack": "rubberduck_40-cc0-water-splash-slime-sfx",
+  "file": "assets/licenses/rubberduck_40_cc0_water_splash_slime_sfx.txt",
+  "title": "40 CC0 water / splash / slime SFX",
+  "author": "rubberduck",
+  "url": "https://opengameart.org/content/40-cc0-water-splash-slime-sfx",
+  "license": "CC0 1.0",
+  "tier": "A",
+  "use": "lava bubbling loop"
+ },
+ {
+  "pack": "rubberduck_80-cc0-creature-sfx",
+  "file": "assets/licenses/rubberduck_80_cc0_creature_sfx.txt",
+  "title": "80 CC0 creature SFX",
+  "author": "rubberduck",
+  "url": "https://opengameart.org/content/80-cc0-creature-sfx",
+  "license": "CC0 1.0",
+  "tier": "A",
+  "use": "feast-mode chomp"
+ },
+ {
+  "pack": "superpowers_asset-packs-audio",
+  "file": "assets/licenses/superpowers_asset_packs_audio.txt",
+  "title": "Superpowers Asset Packs - prehistoric-platformer sound effects",
+  "author": "Pixel-boy (Sparklin Labs)",
+  "url": "https://github.com/sparklinlabs/superpowers-asset-packs",
+  "license": "CC0 1.0",
+  "tier": "A",
+  "use": "dinosaur voices, wood knock, boss chest-beat"
+ },
+ {
+  "pack": "wolfgang_8bit-loops",
+  "file": "assets/licenses/wolfgang_8bit_loops.txt",
+  "title": "Bonus Round - 8bit / 8-Bit Victory Loop",
+  "author": "Wolfgang_ (Ted Kerr)",
+  "url": "https://opengameart.org/content/bonus-round-8bit",
+  "license": "CC0 1.0",
+  "tier": "A",
+  "use": "bonus stage alternate, tally loop"
+ },
+ {
+  "pack": "superpowers-prehistoric-platformer",
+  "file": "assets/licenses/superpowers_prehistoric_platformer.txt",
+  "title": "Superpowers Asset Packs - Prehistoric Platformer",
+  "author": "Pixel-boy (Sparklin Labs)",
+  "url": "https://github.com/sparklinlabs/superpowers-asset-packs/tree/master/prehistoric-platformer",
+  "license": "CC0 1.0",
+  "tier": "A",
+  "use": "hero, enemies, bosses, NPCs, all terrain and props, parallax layers, native items, FX, HUD, bitmap fonts"
+ },
+ {
+  "pack": "ansimuz_explosion-animations-pack",
+  "file": "assets/licenses/ansimuz_explosion_animations_pack.txt",
+  "title": "Explosion Animations Pack",
+  "author": "ansimuz (Luis Zuno)",
+  "url": "https://ansimuz.itch.io/explosion-animations-pack",
+  "license": "CC0 1.0",
+  "tier": "A",
+  "use": "explosion.png, explosion_big.png"
+ },
+ {
+  "pack": "ansimuz_sunny-land",
+  "file": "assets/licenses/ansimuz_sunny_land.txt",
+  "title": "Sunny Land",
+  "author": "ansimuz (Luis Zuno)",
+  "url": "https://ansimuz.itch.io/sunny-land-pixel-game-art",
+  "license": "CC0 1.0",
+  "tier": "A",
+  "use": "hit_stars.png"
+ },
+ {
+  "pack": "ghostpixxells_free-pixel-foods",
+  "file": "assets/licenses/ghostpixxells_free_pixel_foods.txt",
+  "title": "Free Pixel foods",
+  "author": "ghostpixxells",
+  "url": "https://ghostpixxells.itch.io/pixelfood",
+  "license": "CC0 1.0",
+  "tier": "A",
+  "use": "seven giant bonus foods"
+ },
+ {
+  "pack": "googlefonts_pixelifysans",
+  "file": "assets/licenses/googlefonts_pixelifysans.txt",
+  "title": "Pixelify Sans",
+  "author": "Stefie Justprince / The Pixelify Sans Project Authors",
+  "url": "https://fonts.google.com/specimen/Pixelify+Sans",
+  "license": "SIL Open Font License 1.1",
+  "tier": "B",
+  "use": "pixelify_sans.ttf"
+ },
+ {
+  "pack": "googlefonts_pressstart2p",
+  "file": "assets/licenses/googlefonts_pressstart2p.txt",
+  "title": "Press Start 2P",
+  "author": "CodeMan38 / The Press Start 2P Project Authors",
+  "url": "https://fonts.google.com/specimen/Press+Start+2P",
+  "license": "SIL Open Font License 1.1",
+  "tier": "B",
+  "use": "press_start_2p.ttf"
+ },
+ {
+  "pack": "oga_aroach_16x16-food",
+  "file": "assets/licenses/oga_aroach_16x16_food.txt",
+  "title": "16x16 Food",
+  "author": "ARoachIFoundOnMyPillow",
+  "url": "https://opengameart.org/content/16x16-food",
+  "license": "CC0 1.0",
+  "tier": "A",
+  "use": "40 food sprites, chili, coconut"
+ },
+ {
+  "pack": "oga_aroach_16x16-rpg-items-db32",
+  "file": "assets/licenses/oga_aroach_16x16_rpg_items_db32.txt",
+  "title": "16x16 RPG Items (DB32)",
+  "author": "ARoachIFoundOnMyPillow",
+  "url": "https://opengameart.org/content/16x16-rpg-items-db32",
+  "license": "CC0 1.0",
+  "tier": "A",
+  "use": "gems, rings, goblet, torch, bucket"
+ },
+ {
+  "pack": "pixelfrog_treasure-hunters",
+  "file": "assets/licenses/pixelfrog_treasure_hunters.txt",
+  "title": "Treasure Hunters",
+  "author": "Pixel Frog",
+  "url": "https://pixelfrog-assets.itch.io/treasure-hunters",
+  "license": "CC0 1.0",
+  "tier": "A",
+  "use": "carved-stone touch buttons"
+ }
+]

@@ -1,0 +1,349 @@
+# Club & Grub - English catalogue (the source language).
+# Owner: ui module. One file per language: copy this file to <locale>.po (for example de.po), set "Language"
+# and translate the msgstr lines. Every .po file of this folder is loaded at start (scripts/ui/ui_kit.gd) and
+# offered in Options > Language. msgid values are stable keys; {name} parts are filled in by the game.
+# Headings drawn with the carved-stone font (TITLE / HEADING keys, UI_GAME_OVER, UI_THE_END) only have the
+# letters A-Z, the digits and the space; keep them short.
+msgid ""
+msgstr ""
+"Project-Id-Version: Club & Grub\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+# --- Title screen ---
+msgid "UI_TITLE_START"
+msgstr "Start Game"
+
+msgid "UI_TITLE_CONTINUE"
+msgstr "Continue"
+
+msgid "UI_TITLE_OPTIONS"
+msgstr "Options"
+
+msgid "UI_TITLE_CREDITS"
+msgstr "Credits"
+
+msgid "UI_TITLE_QUIT"
+msgstr "Quit"
+
+msgid "UI_HIGH_SCORE"
+msgstr "Hi"
+
+# --- Prompt row ---
+msgid "UI_HINT_SELECT"
+msgstr "Select"
+
+msgid "UI_HINT_BACK"
+msgstr "Back"
+
+msgid "UI_HINT_CHANGE"
+msgstr "Change"
+
+msgid "UI_HINT_START"
+msgstr "Start"
+
+msgid "UI_HINT_TITLE"
+msgstr "Title"
+
+msgid "UI_HINT_SKIP"
+msgstr "Skip"
+
+msgid "UI_HINT_CONTINUE"
+msgstr "Continue"
+
+# --- Mode select ---
+msgid "UI_MODE_HEADING"
+msgstr "MODE"
+
+msgid "UI_MODE"
+msgstr "Mode"
+
+msgid "UI_MODE_BEGINNER"
+msgstr "Beginner"
+
+msgid "UI_MODE_EXPERT"
+msgstr "Expert"
+
+msgid "UI_MODE_BEGINNER_INFO"
+msgstr "Fewer enemies. The volcano stays closed."
+
+msgid "UI_MODE_EXPERT_INFO"
+msgstr "More enemies and the whole adventure."
+
+# --- Continue / level code ---
+msgid "UI_CONTINUE_HEADING"
+msgstr "CONTINUE"
+
+msgid "UI_CONTINUE_NONE"
+msgstr "No level reached yet. Start a new game or enter a level code."
+
+msgid "UI_CODE_HEADING"
+msgstr "Level code"
+
+msgid "UI_CODE_ENTER"
+msgstr "Enter"
+
+msgid "UI_CODE_WRONG"
+msgstr "Wrong code!"
+
+msgid "UI_LEVEL_LOCKED"
+msgstr "Not reached yet."
+
+# --- World map ---
+msgid "UI_MAP_WORLD_STAGE"
+msgstr "World {world} - Stage {stage}"
+
+msgid "UI_MAP_WORLD"
+msgstr "World {world}"
+
+msgid "UI_MAP_BONUS"
+msgstr "Bonus stage"
+
+msgid "UI_LIVES"
+msgstr "Lives"
+
+# --- HUD ---
+msgid "UI_HUD_STAGE"
+msgstr "Stage {number}"
+
+msgid "UI_HUD_TIME"
+msgstr "TIME {seconds}"
+
+# --- Tally ---
+msgid "UI_TALLY_HEADING"
+msgstr "LEVEL COMPLETE"
+
+msgid "UI_TALLY_SCORE"
+msgstr "Score"
+
+msgid "UI_TALLY_COMPLETED"
+msgstr "Level completed {percent}%"
+
+msgid "UI_TALLY_BONUS"
+msgstr "Bonus +{points}"
+
+# --- Game over, Beginner wall, ending ---
+msgid "UI_GAME_OVER"
+msgstr "GAME OVER"
+
+msgid "UI_NEW_HIGH_SCORE"
+msgstr "New high score!"
+
+msgid "UI_WALL_HEADING"
+msgstr "Halt, little caveman!"
+
+msgid "UI_WALL_TEXT"
+msgstr "To enter you must be an expert eater! Start a new game in Expert mode to see what lies beyond."
+
+msgid "UI_THE_END"
+msgstr "THE END"
+
+msgid "UI_THE_END_THANKS"
+msgstr "Home at last, with a full belly."
+
+# --- Credits ---
+msgid "UI_CREDITS_ART"
+msgstr "Art"
+
+msgid "UI_CREDITS_MUSIC"
+msgstr "Music"
+
+msgid "UI_CREDITS_SOUND"
+msgstr "Sound"
+
+msgid "UI_CREDITS_FONTS"
+msgstr "Fonts"
+
+msgid "UI_CREDITS_PACKS"
+msgstr "Asset packs"
+
+msgid "UI_CREDITS_ENGINE"
+msgstr "Engine"
+
+msgid "UI_CREDITS_THANKS"
+msgstr "Thank you for playing!"
+
+# --- Pause menu ---
+msgid "UI_PAUSE_HEADING"
+msgstr "PAUSE"
+
+msgid "UI_PAUSE_RESUME"
+msgstr "Resume"
+
+msgid "UI_PAUSE_CHECKPOINT"
+msgstr "Back to checkpoint"
+
+msgid "UI_PAUSE_RESTART"
+msgstr "Restart level"
+
+msgid "UI_PAUSE_OPTIONS"
+msgstr "Options"
+
+msgid "UI_PAUSE_QUIT"
+msgstr "Quit to title"
+
+msgid "UI_CONFIRM_CHECKPOINT"
+msgstr "Give up this life and start again at the last checkpoint?"
+
+msgid "UI_CONFIRM_RESTART"
+msgstr "Start this level again from the beginning?"
+
+msgid "UI_CONFIRM_QUIT"
+msgstr "Quit to the title screen? This run will end."
+
+msgid "UI_YES"
+msgstr "Yes"
+
+msgid "UI_NO"
+msgstr "No"
+
+# --- Options ---
+msgid "UI_OPTIONS_HEADING"
+msgstr "Options"
+
+msgid "UI_ON"
+msgstr "On"
+
+msgid "UI_OFF"
+msgstr "Off"
+
+msgid "UI_OPT_AUDIO"
+msgstr "Sound"
+
+msgid "UI_OPT_MASTER"
+msgstr "Volume"
+
+msgid "UI_OPT_MUSIC"
+msgstr "Music"
+
+msgid "UI_OPT_SFX"
+msgstr "Effects"
+
+msgid "UI_OPT_VIDEO"
+msgstr "Screen"
+
+msgid "UI_OPT_FULLSCREEN"
+msgstr "Fullscreen"
+
+msgid "UI_OPT_VSYNC"
+msgstr "V-Sync"
+
+msgid "UI_OPT_SHAKE"
+msgstr "Screen shake"
+
+msgid "UI_OPT_FLASH"
+msgstr "Flashes"
+
+msgid "UI_OPT_CAMERA"
+msgstr "Comfort camera"
+
+msgid "UI_OPT_CONTROLS"
+msgstr "Controls"
+
+msgid "UI_OPT_BINDINGS"
+msgstr "Buttons"
+
+msgid "UI_OPT_UP_JUMPS"
+msgstr "Up also jumps"
+
+msgid "UI_OPT_VIBRATION"
+msgstr "Vibration"
+
+msgid "UI_OPT_TOUCH"
+msgstr "Touch screen"
+
+msgid "UI_OPT_TOUCH_SHOW"
+msgstr "Touch buttons"
+
+msgid "UI_OPT_TOUCH_AUTO"
+msgstr "Auto"
+
+msgid "UI_OPT_TOUCH_ALWAYS"
+msgstr "Always"
+
+msgid "UI_OPT_TOUCH_OPACITY"
+msgstr "Opacity"
+
+msgid "UI_OPT_TOUCH_SIZE"
+msgstr "Size"
+
+msgid "UI_OPT_TOUCH_LAYOUT"
+msgstr "Layout"
+
+msgid "UI_OPT_TOUCH_STANDARD"
+msgstr "Right"
+
+msgid "UI_OPT_TOUCH_SWAPPED"
+msgstr "Left"
+
+msgid "UI_OPT_GAME"
+msgstr "Game"
+
+msgid "UI_OPT_LANGUAGE"
+msgstr "Language"
+
+msgid "UI_OPT_LANGUAGE_AUTO"
+msgstr "System"
+
+msgid "UI_OPT_RESET"
+msgstr "Reset options"
+
+msgid "UI_OPT_ERASE"
+msgstr "Erase progress"
+
+msgid "UI_OPT_BACK"
+msgstr "Back"
+
+msgid "UI_OPT_RESET_BINDINGS"
+msgstr "Reset buttons"
+
+msgid "UI_CONFIRM_RESET"
+msgstr "Reset every option to its default?"
+
+msgid "UI_CONFIRM_ERASE"
+msgstr "Erase all progress and records? This cannot be undone."
+
+msgid "UI_BIND_PRESS"
+msgstr "Press... {seconds}"
+
+msgid "UI_ACTION_LEFT"
+msgstr "Left"
+
+msgid "UI_ACTION_RIGHT"
+msgstr "Right"
+
+msgid "UI_ACTION_UP"
+msgstr "Up"
+
+msgid "UI_ACTION_DOWN"
+msgstr "Down"
+
+msgid "UI_ACTION_JUMP"
+msgstr "Jump"
+
+msgid "UI_ACTION_ATTACK"
+msgstr "Attack"
+
+msgid "UI_ACTION_LOOK"
+msgstr "Look"
+
+msgid "UI_ACTION_PAUSE"
+msgstr "Pause"
+
+# --- Level texts: signs (objects/sign) and hints (zones/message) of the level files ---
+msgid "SIGN_INTEGRATION_SPOTS"
+msgstr "Club the ground - bonuses hide everywhere!"
+
+msgid "SIGN_INTEGRATION_SPRING"
+msgstr "Land on the spring to reach the ledge."
+
+msgid "SIGN_INTEGRATION_BOSS"
+msgstr "The Brute guards the fire-starter. Hit its head!"
+
+msgid "SIGN_SHOWCASE"
+msgstr "Every object of the jungle, one after another."
+
+msgid "ZONE_DEMO"
+msgstr "A hint shown while you stand here."

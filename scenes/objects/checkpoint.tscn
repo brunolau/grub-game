@@ -1,0 +1,13 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/objects/checkpoint.gd" id="1_checkpoint"]
+[ext_resource type="Texture2D" path="res://assets/sprites/objects/checkpoint.png" id="2_checkpoint"]
+
+[node name="Checkpoint" type="Node2D"]
+script = ExtResource("1_checkpoint")
+
+[node name="Sprite" type="Sprite2D" parent="."]
+texture = ExtResource("2_checkpoint")
+centered = false
+offset = Vector2(-42, -55)
+hframes = 5

@@ -1,0 +1,136 @@
+# Robustness, played with the real (timed) transitions: a wrong level code then the right one, mashed menus and
+# pause, pause -> options -> pause, focus loss, wide / tall windows on the map, in the level and in the pause menu,
+# the restart rules (no points farmed, a death toss in progress still costs its life) and quitting to the title
+# while mashing. Each `wait_until <screen>` is followed by `wait_until flow.busy == false`: input is ignored while
+# a transition runs, as it must be.
+#   bash .tools/gd.sh play --flow=tools/autoplay/robustness.flow --fast --fresh-user --transitions
+
+wait_until flow.current_screen == title 600
+wait_until flow.busy == false 600
+
+# --- Continue: a wrong code, then the right one typed from the first slot again ------------------------------------
+press ui_down
+press ui_accept
+wait_until flow.current_screen == code_entry 300
+wait_until flow.busy == false 300
+key X Y Z Q
+wait 4
+expect flow.current_screen == code_entry
+shot wrong_code
+key M E A D
+wait_until flow.current_screen == world_map 600
+wait_until flow.busy == false 600
+expect flow.args.level_id == test_integration
+expect game.difficulty == 0
+
+# --- The map in a wide window, then mashed confirm -------------------------------------------------------------------
+window 1600 720
+wait 30
+shot map_wide
+window 1280 720
+press ui_accept 1
+press ui_accept 1
+press ui_accept 1
+press ui_accept 1
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait 4
+expect events.screen_level == 1
+expect game.lives == 2
+
+# --- Pause: mashed, options then the pause key, focus loss --------------------------------------------------------
+press pause 1
+press pause 1
+press pause 1
+press pause 1
+press pause 1
+wait 10
+expect tree.paused == true
+press pause 1
+wait 10
+expect tree.paused == false
+press pause
+wait 10
+press ui_down
+press ui_down
+press ui_down
+press ui_accept
+wait 10
+press pause
+wait 10
+expect tree.paused == false
+focus out
+wait 4
+expect tree.paused == true
+expect audio.is_suspended() == true
+focus in
+wait 4
+expect tree.paused == true
+expect audio.is_suspended() == false
+shot paused_by_focus_loss
+press ui_cancel
+wait 6
+expect tree.paused == false
+
+# --- Restart level: the items reappear, their points are taken back ----------------------------------------------
+play 20:R,10:,10:DF,4:,10:DF,4:,10:DF,6:,10:RU,6:R,10:,12:R,10:
+expect game.score > 0
+press pause
+wait 10
+press ui_down
+press ui_down
+press ui_accept
+wait 6
+press ui_accept
+wait_until flow.busy == false 600
+wait 4
+expect game.score == 0
+expect game.lives == 2
+expect game.items_collected == 0
+
+# --- Restart during the death toss: the life is still lost -------------------------------------------------------
+play 120:R
+expect hero.dead == true
+press pause
+wait 10
+press ui_down
+press ui_accept
+wait 6
+press ui_accept
+wait_until flow.busy == false 600
+wait 4
+expect game.lives == 1
+expect hero.dead == false
+expect hud.get_lives_text() == x1
+
+# --- A tall window in the level and in the pause menu --------------------------------------------------------------
+window 1364 1024
+wait 6
+shot level_tall
+press pause
+wait 10
+shot pause_tall
+press ui_cancel
+wait 6
+window 1280 720
+wait 6
+
+# --- Quit to the title, mashing cancel during the fade --------------------------------------------------------------
+press pause
+wait 10
+press ui_down
+press ui_down
+press ui_down
+press ui_down
+press ui_accept
+wait 6
+press ui_accept
+press ui_cancel 1
+press ui_cancel 1
+press ui_cancel 1
+wait_until flow.current_screen == title 600
+wait_until flow.busy == false 600
+wait 10
+expect tree.paused == false
+expect flow.current_screen == title
+shot title_again

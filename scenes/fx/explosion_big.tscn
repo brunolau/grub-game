@@ -1,0 +1,15 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/fx/fx_anim.gd" id="1_fx_anim"]
+[ext_resource type="Texture2D" path="res://assets/sprites/fx/explosion_big.png" id="2_explosion_bi"]
+
+[node name="ExplosionBig" type="Node2D"]
+script = ExtResource("1_fx_anim")
+frame_count = 12
+fps = 16
+
+[node name="Sprite" type="Sprite2D" parent="."]
+texture = ExtResource("2_explosion_bi")
+centered = false
+offset = Vector2(-64, -96)
+hframes = 12

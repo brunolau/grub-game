@@ -1,0 +1,71 @@
+# World showcase (volcano): every terrain piece of both sets, slopes, liquid, spikes, one-way floors,
+# back walls, overrides and the parallax set of the biome on 1.6 screens. Developer level of the world module.
+
+[meta]
+format = 1
+id = test_world_showcase_volcano
+name = "World Showcase: Volcano"
+kind = test
+biome = volcano
+terrain_a = volcano/terrain
+terrain_b = volcano/terrain_obsidian
+ice_a = 0
+liquid = lava
+background = volcano
+music = level_volcano
+
+[legend]
+C = objects/checkpoint
+E = objects/exit
+f = items/food index=3
+g = items/food index=21
+t = items/treasure index=5
+
+[tiles]
+########........................
+########........................
+#...!!..................t.......
+#...................../%%%\.....
+#....................%%%%%%%....
+#....................%%%%%%%....
+#..............====.............
+#.........f..g..................
+#........--_---...............E.
+#............................##.
+#..../\......................##.
+#@../##\.C........$12####34..##.
+##?#####*##^^##~~~##############
+###############~~~##############
+################################
+################################
+
+[entities]
+zones/secret 24 2 name=island rect=21,0,7,4
+props/volcano/skull_ribs 3 11
+props/volcano/dead_tree 23 10
+props/volcano/boulder_orange 27 11
+props/volcano/grave_cross 10 11
+props/volcano/tusk_b 23 2
+props/volcano/bone_big 8 11
+props/volcano/rocks_small 14 11 layer=front
+props/volcano/twigs 21.5 10 layer=front
+props/volcano/stalactite 2 2
+props/volcano/stalactite 7 2
+props/volcano/drip_cap 6 2
+
+[backwall]
+1 2 6 10 set=a deco=30
+
+[overrides]
+29 9 a 3
+30 9 a 4
+21 6 b 30
+22 6 b 31
+23 6 b 31
+24 6 b 31
+25 6 b 31
+26 6 b 33
+27 6 b 32
+28 11 a 34
+13 14 a 7
+14 14 a 15

@@ -1,0 +1,71 @@
+# World showcase (feast): every terrain piece of both sets, slopes, liquid, spikes, one-way floors,
+# back walls, overrides and the parallax set of the biome on 1.6 screens. Developer level of the world module.
+
+[meta]
+format = 1
+id = test_world_showcase_feast
+name = "World Showcase: Feast Land"
+kind = test
+biome = feast
+terrain_a = feast/terrain
+terrain_b = feast/terrain_icing
+ice_a = 0
+liquid = water
+background = feast
+music = bonus
+
+[legend]
+C = objects/checkpoint
+E = objects/exit
+f = items/food index=3
+g = items/food index=21
+t = items/treasure index=5
+
+[tiles]
+########........................
+########........................
+#...!!..................t.......
+#...................../%%%\.....
+#....................%%%%%%%....
+#....................%%%%%%%....
+#..............====.............
+#.........f..g..................
+#........--_---...............E.
+#............................##.
+#..../\......................##.
+#@../##\.C........$12####34..##.
+##?#####*##^^##~~~##############
+###############~~~##############
+################################
+################################
+
+[entities]
+zones/secret 24 2 name=island rect=21,0,7,4
+props/jungle/bush_light 3 11
+props/jungle/tree_trunk_small 23 10
+props/jungle/treetop_stack 23 9.25
+props/jungle/flower 27 11
+props/jungle/mound_leafy 10 11
+props/jungle/sprouts 23 2
+props/jungle/flower 8 11
+props/jungle/grass_b 14 11 layer=front
+props/jungle/leaf 21.5 10 layer=front
+props/jungle/vine_a 2 2
+props/jungle/vine_b 7 2
+
+[backwall]
+1 2 6 10 set=a deco=30
+
+[overrides]
+29 9 a 3
+30 9 a 4
+21 6 b 30
+22 6 b 31
+23 6 b 31
+24 6 b 31
+25 6 b 31
+26 6 b 33
+27 6 b 32
+28 11 a 34
+13 14 a 7
+14 14 a 15

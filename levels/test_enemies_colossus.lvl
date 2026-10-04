@@ -1,0 +1,33 @@
+# Colossus Hall: developer level of the enemies module (autoplay screenshots and visual QA).
+
+[meta]
+format = 1
+id = test_enemies_colossus
+name = "Colossus Hall"
+kind = test
+biome = volcano
+terrain_a = volcano/terrain
+terrain_b = volcano/terrain_obsidian
+background = volcano
+music = level_volcano
+
+[legend]
+A = items/weapon kind=axe
+
+[tiles]
+######################
+#...................##
+#...................##
+#...................##
+#...................##
+#...................##
+#...................##
+#...................##
+#...................##
+#.@.A...............##
+######################
+######################
+
+[entities]
+zones/arena 10 9 name=statue rect=0,0,22,12 music=boss_final
+bosses/colossus 19 9 arena=statue

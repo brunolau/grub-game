@@ -1,0 +1,19 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/fx/fx_dust.gd" id="1_fx_dust"]
+[ext_resource type="Texture2D" path="res://assets/sprites/fx/particles_smoke.png" id="2_particles_sm"]
+
+[node name="Dust" type="Node2D"]
+script = ExtResource("1_fx_dust")
+
+[node name="PuffLeft" type="Sprite2D" parent="."]
+texture = ExtResource("2_particles_sm")
+centered = false
+offset = Vector2(-14, -24)
+hframes = 4
+
+[node name="PuffRight" type="Sprite2D" parent="."]
+texture = ExtResource("2_particles_sm")
+centered = false
+offset = Vector2(-14, -24)
+hframes = 4

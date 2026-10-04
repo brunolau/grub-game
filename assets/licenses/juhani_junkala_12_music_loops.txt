@@ -1,0 +1,27 @@
+12 Music Loops
+==============
+
+Author: Juhani Junkala (SubspaceAudio)
+Source: https://opengameart.org/content/12-music-loops
+Licence: CC0 1.0 (tier A)
+Used in Club & Grub for: world map, level select, final boss, credits, spare level music
+Staging folder: .tools/asset_candidates/audio/juhani-junkala_12-music-loops
+
+---- Licence evidence recorded when the pack was downloaded ----
+
+# LICENSE_INFO - Juhani Junkala - 12 Music Loops
+
+- **Author:** Juhani Junkala (SubspaceAudio)
+- **License:** CC0 1.0  (tier A)
+- **Source page(s):**
+  - https://opengameart.org/content/12-music-loops
+- **Download URL(s):**
+  - https://opengameart.org/sites/default/files/12_indie_game_music_loops_0.zip
+- **Date checked / downloaded:** 2026-10-04
+- **Saved copy of the page(s):** `../_pages/oga_12-music-loops.html`
+
+## Exact licence wording (quoted from the source)
+
+> Licence field on the page: "License(s): CC0" (icon links to http://creativecommons.org/publicdomain/zero/1.0/)
+
+> Page description: "12 Indie game music loops for exciting and action packed games."

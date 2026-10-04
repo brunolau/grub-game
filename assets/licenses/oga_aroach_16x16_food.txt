@@ -1,0 +1,21 @@
+16x16 Food
+==========
+
+Author: ARoachIFoundOnMyPillow
+Source: https://opengameart.org/content/16x16-food
+Licence: CC0 1.0 (tier A)
+Used in Club & Grub for: 40 food sprites, chili, coconut
+Staging folder: .tools/asset_candidates/items_ui_fx/oga_aroach_16x16-food
+
+---- Licence evidence recorded when the pack was downloaded ----
+
+# LICENSE_INFO - 16x16 Food (ARoachIFoundOnMyPillow)
+
+- **Source URL:** https://opengameart.org/content/16x16-food
+- **Author:** ARoachIFoundOnMyPillow
+- **License:** CC0 1.0
+- **License tier:** A (CC0 / public domain - no attribution required)
+- **Exact wording on the source:** OGA page "License(s):" field: "CC0"; description: "188 16*16 food icons I created over the past few months."
+- **Evidence saved in this folder:** _oga_page.txt
+- **Download URL:** https://opengameart.org/sites/default/files/food_0.zip
+- **Date retrieved:** 2026-10-04

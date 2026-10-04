@@ -1,0 +1,21 @@
+Sunny Land
+==========
+
+Author: ansimuz (Luis Zuno)
+Source: https://ansimuz.itch.io/sunny-land-pixel-game-art
+Licence: CC0 1.0 (tier A)
+Used in Club & Grub for: hit_stars.png
+Staging folder: .tools/asset_candidates/items_ui_fx/ansimuz_sunny-land
+
+---- Licence evidence recorded when the pack was downloaded ----
+
+# LICENSE_INFO - SunnyLand (ansimuz) - items and FX only
+
+- **Source URL:** https://ansimuz.itch.io/sunny-land-pixel-game-art
+- **Author:** Luis Zuno (ansimuz)
+- **License:** CC0 1.0
+- **License tier:** A (CC0 / public domain - no attribution required)
+- **Exact wording on the source:** itch info panel: "Asset license Creative Commons Zero v1.0 Universal"; public-license.pdf in zip: "All assets included in this package are licensed under the Creative Commons Zero (CC0) license ... There are no restrictions on use, modification, or redistribution of these assets."
+- **Evidence saved in this folder:** _itch_page.txt, Sunny-land-files/public-license.pdf
+- **Download URL:** itch.io upload 18679034 'Sunny-land-files.zip' (full zip kept; extracted tree pruned to Assets/Misc)
+- **Date retrieved:** 2026-10-04

@@ -1,0 +1,39 @@
+# Club & Grub level file - format 1 (docs/ARCHITECTURE.md 7). Developer level of the player module: a short strip
+# with flat ground, a hill of 45 degree and gentle slopes, a one-way ledge, a 4-tile drop onto spikes and one walker to
+# strike, bounce on and get hurt by; the exit sits behind the spikes. Used for autoplay screenshots of the hero;
+# not part of the campaign.
+
+[meta]
+format = 1
+id = test_player_moves
+name = "Hero Moves"
+kind = test
+biome = jungle
+terrain_a = jungle/terrain_grass
+terrain_b = jungle/terrain
+background = jungle
+music = level_jungle
+
+[legend]
+E = objects/exit locked=false
+T = enemies/walker skin=turtle left=-2 right=2 speed=16 hp=100 score=0
+
+[tiles]
+|..............................................|
+|..............................................|
+|..............................................|
+|..............................................|
+|..............................................|
+|..............................................|
+|..............................................|
+|..............................................|
+|.....------...................................|
+|....................12##34....................|
+|.@................/########\....T.............|
+######################################.........|
+######################################.........|
+######################################.........|
+######################################........E|
+###########################################^^^##
+################################################
+################################################

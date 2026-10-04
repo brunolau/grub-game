@@ -1,0 +1,31 @@
+Bonus Round - 8bit / 8-Bit Victory Loop
+=======================================
+
+Author: Wolfgang_ (Ted Kerr)
+Source: https://opengameart.org/content/bonus-round-8bit
+Licence: CC0 1.0 (tier A)
+Used in Club & Grub for: bonus stage alternate, tally loop
+Staging folder: .tools/asset_candidates/audio/wolfgang_8bit-loops
+
+---- Licence evidence recorded when the pack was downloaded ----
+
+# LICENSE_INFO - Wolfgang_ - Bonus Round - 8bit / 8-Bit Victory Loop
+
+- **Author:** Wolfgang_ (file tags: Ted Kerr)
+- **License:** CC0 1.0  (tier A)
+- **Source page(s):**
+  - https://opengameart.org/content/bonus-round-8bit
+  - https://opengameart.org/content/8-bit-victory-loop
+- **Download URL(s):**
+  - https://opengameart.org/sites/default/files/bonusgame.wav
+  - https://opengameart.org/sites/default/files/8bitvictory_0.ogg
+- **Date checked / downloaded:** 2026-10-04
+- **Saved copy of the page(s):** `../_pages/oga_bonus-round-8bit.html`, `../_pages/oga_8-bit-victory-loop.html`
+
+## Exact licence wording (quoted from the source)
+
+> Licence field on the page: "License(s): CC0" (icon links to http://creativecommons.org/publicdomain/zero/1.0/) on both pages
+
+> Bonus Round description: "Bonus round/Minigame theme made with Famitracker"
+
+> Victory Loop description: "An 8-Bit victory loop (like for completing a level or something)."

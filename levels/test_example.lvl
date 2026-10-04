@@ -1,0 +1,81 @@
+# Club & Grub level file - format 1. The format is specified in docs/ARCHITECTURE.md section 7.
+# This tiny level exists to show (and test) every part of the format. It is not part of the campaign.
+
+[meta]
+format = 1
+id = test_example
+name = "Example Meadow"
+kind = test
+world = 1
+stage = 0
+biome = jungle
+terrain_a = jungle/terrain_grass
+terrain_b = jungle/terrain
+ice_a = 0
+ice_b = 0
+liquid = water
+background = jungle
+music = level_jungle
+time = 0
+password_beginner = "C1UB"
+password_expert = "6RUB"
+next =
+tally = true
+min_difficulty = beginner
+scroll = normal
+home_row = -1
+fast_vscroll = true
+dark = false
+bonus_tier = 0
+# Difficulty variant: any key may carry a .beginner / .expert suffix.
+time.expert = 0
+
+[legend]
+# <char> = <entity id> [key=value ...] [flag ...]      (letters; ? * $ may be redefined)
+T = enemies/walker skin=turtle left=-3 right=3 speed=16 hp=25 score=0
+H = enemies/hopper skin=mini_rex range=6 expert
+f = items/food index=0
+g = items/food index=13
+d = items/treasure index=8
+L = items/letter index=0
+C = objects/checkpoint
+E = objects/exit locked=false
+P = objects/platform dir=2 speed=2 travel=44 mode=always skin=wood
+S = objects/hidden_spot kind=small count=2 contents=food:3,food:17 prop=jungle/rock_grass
+b = props/jungle/bush_big layer=back
+? = objects/hidden_spot kind=small count=3 tile=#
+* = objects/hidden_spot kind=big hits=3 contents=giant:0 tile=#
+$ = objects/breakable_block hits=2 tile=;
+
+[tiles]
+....................................
+....................................
+....................................
+..................d.................
+.................---_...............
+....................................
+..........f.f..............L........
+.........-----.....P......===.......
+....................................
+...................../##\...........
+.@..b..S.T...g..C.../####\..H.$d..E.
+########?####*####~~################
+##################~~################
+####################################
+
+[entities]
+# <entity id> <col> <row> [key=value ...]   (col / row may be decimals; feet point = bottom-centre of the cell)
+zones/secret 17 3 name=sky_ledge rect=16,2,6,3
+props/jungle/tree_trunk 3 10 layer=back
+props/jungle/tree_canopy_light 3 8.5 layer=back
+props/jungle/vine_a 27 8 layer=front
+items/heart 18.5 2
+
+[backwall]
+# <col> <row> <w> <h> [set=a|b] [deco=<percent of decorated tiles>]
+21 9 4 2 set=a deco=25
+
+[overrides]
+# <col> <row> <set a|b> <atlas index> [layer=back|main|front]   (visual only, see ASSET_MANIFEST 10.1)
+22 9 a 3
+23 9 a 4

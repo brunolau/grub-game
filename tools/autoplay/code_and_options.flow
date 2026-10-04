@@ -1,0 +1,70 @@
+# Code entry and options, part 1 of 2: title -> Continue -> type the level code of the boss level -> world map ->
+# level -> pause menu "quit to title" (confirmed) -> Options: lower the music volume and switch the screen shake off
+# -> back (saves settings.cfg). Part 2 (options_persist.flow) runs as a new process on the same user folder.
+#   bash .tools/gd.sh play --flow=tools/autoplay/code_and_options.flow --fast --fresh-user
+#   bash .tools/gd.sh play --flow=tools/autoplay/options_persist.flow --fast
+
+wait_until flow.current_screen == title 600
+wait_until flow.busy == false 600
+expect settings.video/screen_shake == true
+expect settings.audio/music == 0.8
+press ui_down
+press ui_accept
+wait_until flow.current_screen == code_entry 300
+wait_until flow.busy == false 600
+wait 40
+shot code_entry
+key B R U
+wait 20
+shot code_typing
+key T
+wait_until flow.current_screen == world_map 600
+wait_until flow.busy == false 600
+expect flow.args.level_id == test_integration_boss
+expect game.difficulty == 0
+wait 40
+shot code_world_map
+press ui_accept
+wait_until flow.current_screen == level 600
+wait_until flow.busy == false 600
+expect level.level_id == test_integration_boss
+play 20:R
+
+# Quit to the title through the pause menu (Resume, Checkpoint, Restart, Options, Quit).
+press pause
+wait 6
+press ui_down
+press ui_down
+press ui_down
+press ui_down
+press ui_accept
+wait 6
+shot confirm_quit
+press ui_accept
+wait_until flow.current_screen == title 600
+wait_until flow.busy == false 600
+expect tree.paused == false
+
+# Options: music one step down, screen shake off, back.
+press ui_down
+press ui_down
+press ui_accept
+wait_until flow.current_screen == options 300
+wait_until flow.busy == false 600
+wait 30
+shot options_before
+press ui_down
+press ui_left
+press ui_left
+press ui_down
+press ui_down
+press ui_down
+press ui_down
+press ui_accept
+wait 10
+expect settings.video/screen_shake == false
+expect settings.audio/music < 0.8
+shot options_changed
+press ui_cancel
+wait_until flow.current_screen == title 300
+wait_until flow.busy == false 600

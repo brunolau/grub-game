@@ -1,0 +1,54 @@
+# Enemy Gallery: developer level of the enemies module (autoplay screenshots and visual QA).
+
+[meta]
+format = 1
+id = test_enemies_gallery
+name = "Enemy Gallery"
+kind = test
+biome = jungle
+terrain_a = jungle/terrain_grass
+terrain_b = jungle/terrain
+background = jungle
+music = level_jungle
+
+[legend]
+a = enemies/walker skin=turtle speed=0
+b = enemies/walker skin=turtle_b speed=0
+c = enemies/walker skin=mini_rex speed=0
+d = enemies/walker skin=mini_rex_b speed=0
+e = enemies/walker skin=rival speed=0
+f = enemies/walker skin=egg_kid speed=0
+g = enemies/walker skin=egg_kid_b speed=0
+h = enemies/walker skin=lizard speed=0
+i = enemies/walker skin=lizard_b speed=0
+j = enemies/walker skin=dragon speed=0
+k = enemies/walker skin=dragon_b speed=0
+l = enemies/walker skin=rex speed=0
+m = enemies/walker skin=rex_b speed=0
+n = enemies/flyer skin=bat speed=0
+o = enemies/flyer skin=bat_b speed=0
+p = enemies/flyer skin=insect speed=0
+q = enemies/flyer skin=insect_b speed=0
+r = enemies/flyer skin=pterodactyl speed=0
+s = enemies/flyer skin=pterodactyl_b speed=0
+t = enemies/snapper skin=plant
+u = enemies/snapper skin=plant_b
+v = enemies/decoration prop=jungle/vine_a
+w = enemies/decoration prop=jungle/fern
+x = enemies/decoration prop=cave/critter_shadow
+E = objects/exit
+
+[tiles]
+#..............................................................................................................#
+#..............................................................................................................#
+#..............................................................................................................#
+#..............................................................................................................#
+#..n..o..p..q..r...s...........................................................................................#
+#..............................................................................................................#
+#..............................................................................................................#
+#..a..b..c..d..e..f......................g..h..i..j..k...l........................m...t...u...w................#
+#.------------------------------------------------------------------------------------------------.............#
+#...................................................................................v..........................#
+#@......................................................................................x....................E.#
+################################################################################################################
+################################################################################################################

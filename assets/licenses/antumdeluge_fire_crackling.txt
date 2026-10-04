@@ -1,0 +1,28 @@
+Fire Crackling
+==============
+
+Author: AntumDeluge
+Source: https://opengameart.org/content/fire-crackling
+Licence: CC0 1.0 (tier A)
+Used in Club & Grub for: campfire loop
+Staging folder: .tools/asset_candidates/audio/antumdeluge_fire-crackling
+
+---- Licence evidence recorded when the pack was downloaded ----
+
+# LICENSE_INFO - AntumDeluge - Fire Crackling
+
+- **Author:** AntumDeluge
+- **License:** CC0 1.0  (tier A)
+- **Source page(s):**
+  - https://opengameart.org/content/fire-crackling
+- **Download URL(s):**
+  - https://opengameart.org/sites/default/files/fire-1_0.ogg
+  - https://opengameart.org/sites/default/files/fire-1.wav
+- **Date checked / downloaded:** 2026-10-04
+- **Saved copy of the page(s):** `../_pages/oga_fire-crackling.html`
+
+## Exact licence wording (quoted from the source)
+
+> Licence field on the page: "License(s): CC0" (icon links to http://creativecommons.org/publicdomain/zero/1.0/)
+
+> Description: "Licensing: Creative Commons Zero (CC0)"

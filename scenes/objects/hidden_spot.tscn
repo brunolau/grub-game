@@ -1,0 +1,10 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/objects/hidden_spot.gd" id="1_hidden_spot"]
+
+[node name="HiddenSpot" type="Node2D"]
+script = ExtResource("1_hidden_spot")
+
+[node name="Sprite" type="Sprite2D" parent="."]
+centered = false
+offset = Vector2(0, 0)

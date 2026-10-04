@@ -1,0 +1,27 @@
+NES Sounds
+==========
+
+Author: Basto
+Source: https://opengameart.org/content/nes-sounds
+Licence: CC0 1.0 (tier A)
+Used in Club & Grub for: splash, exit chime
+Staging folder: .tools/asset_candidates/audio/basto_nes-sounds
+
+---- Licence evidence recorded when the pack was downloaded ----
+
+# LICENSE_INFO - Basto - NES Sounds
+
+- **Author:** Baŝto
+- **License:** CC0 1.0  (tier A)
+- **Source page(s):**
+  - https://opengameart.org/content/nes-sounds
+- **Download URL(s):**
+  - https://opengameart.org/sites/default/files/sounds_5.zip
+- **Date checked / downloaded:** 2026-10-04
+- **Saved copy of the page(s):** `../_pages/oga_nes-sounds.html`
+
+## Exact licence wording (quoted from the source)
+
+> Licence field on the page: "License(s): CC0" (icon links to http://creativecommons.org/publicdomain/zero/1.0/)
+
+> Description: "I played a bit around with 0cc famitracker. All sounds are in .ogg format, .ftm source is also incuded."

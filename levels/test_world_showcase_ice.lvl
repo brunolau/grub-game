@@ -1,0 +1,72 @@
+# World showcase (ice): every terrain piece of both sets, slopes, liquid, spikes, one-way floors,
+# back walls, overrides and the parallax set of the biome on 1.6 screens. Developer level of the world module.
+
+[meta]
+format = 1
+id = test_world_showcase_ice
+name = "World Showcase: Ice"
+kind = test
+biome = ice
+terrain_a = ice/terrain
+terrain_b = ice/terrain_rock
+ice_a = 1
+liquid = ice_water
+background = ice
+music = level_ice
+
+[legend]
+C = objects/checkpoint
+E = objects/exit
+f = items/food index=3
+g = items/food index=21
+t = items/treasure index=5
+
+[tiles]
+########........................
+########........................
+#...!!..................t.......
+#...................../%%%\.....
+#....................%%%%%%%....
+#....................%%%%%%%....
+#..............====.............
+#.........f..g..................
+#........--_---...............E.
+#............................##.
+#..../\......................##.
+#@../##\.C........$12####34..##.
+##?#####*##^^##~~~##############
+###############~~~##############
+################################
+################################
+
+[entities]
+zones/secret 24 2 name=island rect=21,0,7,4
+props/ice/bush_big 3 11
+props/ice/tree_trunk 23 10
+props/ice/tree_canopy_dark 23 8.75
+props/ice/crystal_ice_b 27 11
+props/ice/sprouts 10 11
+props/ice/tusk_c 23 2
+props/ice/grass_a 8 11
+props/ice/rocks_small 14 11 layer=front
+props/ice/crystal_ice_d 21.5 10 layer=front
+props/ice/icicle 2 2
+props/ice/icicle 7 2
+props/ice/stalactite 6 2
+
+[backwall]
+1 2 6 10 set=a deco=30
+
+[overrides]
+29 9 a 3
+30 9 a 4
+21 6 b 30
+22 6 b 31
+23 6 b 31
+24 6 b 31
+25 6 b 31
+26 6 b 33
+27 6 b 32
+28 11 a 34
+13 14 a 7
+14 14 a 15

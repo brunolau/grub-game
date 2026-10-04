@@ -1,0 +1,14 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/items/heart.gd" id="1_heart"]
+[ext_resource type="Texture2D" path="res://assets/sprites/items/pickups.png" id="2_pickups"]
+
+[node name="Heart" type="Node2D"]
+script = ExtResource("1_heart")
+
+[node name="Sprite" type="Sprite2D" parent="."]
+texture = ExtResource("2_pickups")
+centered = false
+offset = Vector2(-24, -40)
+hframes = 8
+vframes = 2

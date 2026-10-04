@@ -1,0 +1,29 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# GDScript: tabs (Godot editor default). Never mix tabs and spaces in one file.
+[*.{gd,gdshader}]
+indent_style = tab
+indent_size = 4
+max_line_length = 120
+
+[*.{tscn,tres,godot,cfg,import}]
+indent_style = space
+trim_trailing_whitespace = false
+
+# Level files: the tile grid is whitespace-sensitive (a space is an air tile).
+[*.lvl]
+indent_style = space
+trim_trailing_whitespace = false
+
+[*.{md,json,py,yml,yaml}]
+indent_style = space
+indent_size = 4
+
+[*.md]
+trim_trailing_whitespace = false

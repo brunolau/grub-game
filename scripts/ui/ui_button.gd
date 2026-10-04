@@ -1,0 +1,74 @@
+class_name UiButton
+extends Button
+## A menu entry: outlined capitals, a bobbing arrow while focused, cursor and confirm sounds.
+##
+## Owner: ui. Works with keyboard and gamepad (focus + ui_accept), mouse (hover takes the focus) and touch (tap).
+
+const ARROW_GAP: int = 6
+const BOB_SPEED: float = 7.0
+const BOB_PX: float = 2.0
+
+## Sound played when the entry is pressed ("" = none).
+var press_sound: StringName = Sfx.MENU_SELECT
+
+var _arrow: Texture2D = UiKit.icon(UiKit.ICON_RIGHT)
+var _time: float = 0.0
+
+
+func _init(key: String = "") -> void:
+	text = key
+	flat = true
+	focus_mode = Control.FOCUS_ALL
+	custom_minimum_size = Vector2(0.0, float(UiKit.row_height()))
+	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	set_process(false)
+	mouse_entered.connect(_on_mouse_entered)
+	focus_entered.connect(_on_focus_entered)
+	focus_exited.connect(_on_focus_exited)
+	pressed.connect(_on_pressed)
+
+
+func _process(delta: float) -> void:
+	_time += delta
+	queue_redraw()
+
+
+func _draw() -> void:
+	if not has_focus() or _arrow == null:
+		return
+	var text_width: float = get_theme_font(&"font").get_string_size(
+		atr(text), HORIZONTAL_ALIGNMENT_LEFT, -1.0, get_theme_font_size(&"font_size")
+	).x
+	var bob: float = roundf(sin(_time * BOB_SPEED) * BOB_PX)
+	var arrow_size: Vector2 = _arrow.get_size()
+	var left: float = (size.x - text_width) * 0.5
+	if alignment == HORIZONTAL_ALIGNMENT_LEFT:
+		left = 0.0
+	elif alignment == HORIZONTAL_ALIGNMENT_RIGHT:
+		left = size.x - text_width
+	var pos: Vector2 = Vector2(
+		roundf(left - arrow_size.x - float(ARROW_GAP) + bob), roundf((size.y - arrow_size.y) * 0.5)
+	)
+	draw_texture(_arrow, pos)
+
+
+func _on_mouse_entered() -> void:
+	if not disabled and not has_focus():
+		grab_focus()
+
+
+func _on_focus_entered() -> void:
+	_time = 0.0
+	set_process(true)
+	UiKit.play_focus_sound()
+	queue_redraw()
+
+
+func _on_focus_exited() -> void:
+	set_process(false)
+	queue_redraw()
+
+
+func _on_pressed() -> void:
+	if press_sound != &"":
+		Audio.play_sfx(press_sound)

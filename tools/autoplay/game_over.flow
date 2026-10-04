@@ -1,0 +1,65 @@
+# Game over: a new run, then three lives given up through the pause menu ("back to checkpoint", with its
+# confirmation) -> the game-over screen -> title. Covers the pause menu's give-up path, the respawn curtain and
+# Flow.game_over().
+#   bash .tools/gd.sh play --flow=tools/autoplay/game_over.flow --fast --fresh-user
+
+wait_until flow.current_screen == title 600
+wait_until flow.busy == false 600
+press ui_accept
+wait_until flow.current_screen == mode_select 300
+wait_until flow.busy == false 600
+press ui_accept
+wait_until flow.current_screen == world_map 300
+wait_until flow.busy == false 600
+press ui_accept
+wait_until flow.current_screen == level 600
+wait_until flow.busy == false 600
+play 30:R
+expect game.lives == 2
+
+# Life 1: pause, "back to checkpoint", confirm.
+press pause
+wait 10
+press ui_down
+wait 4
+press ui_accept
+wait 10
+shot confirm_give_up
+press ui_accept
+wait_until events.level_respawned == 1 600
+expect events.player_died == 1
+expect game.lives == 1
+expect hero.dead == false
+expect tree.paused == false
+wait 10
+shot respawned
+
+# Life 2.
+press pause
+wait 6
+press ui_down
+press ui_accept
+wait 6
+press ui_accept
+wait_until events.level_respawned == 2 600
+expect game.lives == 0
+expect hud.get_lives_text() == x0
+
+# Life 3: no life left -> game over.
+press pause
+wait 6
+press ui_down
+press ui_accept
+wait 6
+press ui_accept
+wait_until flow.current_screen == game_over 900
+wait_until flow.busy == false 600
+expect events.game_over == 1
+expect events.player_died == 3
+wait 90
+shot game_over
+wait_until flow.current_screen == title 2400
+wait_until flow.busy == false 600
+expect game.lives == 0
+wait 30
+shot title_after_game_over

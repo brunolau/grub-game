@@ -1,0 +1,16 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/projectiles/hero_projectile.gd" id="1_projectile"]
+[ext_resource type="Texture2D" uid="uid://bqenw8sf7h2ab" path="res://assets/sprites/fx/projectile_boomerang.png" id="2_boomerang"]
+
+[node name="HeroBoomerang" type="Node2D"]
+script = ExtResource("1_projectile")
+hit_box = Vector3i(13, 13, 6)
+spin_frames = 4
+spin_fps = 16
+
+[node name="Sprite" type="Sprite2D" parent="."]
+texture = ExtResource("2_boomerang")
+centered = false
+offset = Vector2(-13, -26)
+hframes = 4

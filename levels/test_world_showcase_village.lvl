@@ -1,0 +1,68 @@
+# World showcase (village): every terrain piece of both sets, slopes, liquid, spikes, one-way floors,
+# back walls, overrides and the parallax set of the biome on 1.6 screens. Developer level of the world module.
+
+[meta]
+format = 1
+id = test_world_showcase_village
+name = "World Showcase: Village"
+kind = test
+biome = village
+terrain_a = jungle/terrain_grass
+terrain_b = feast/terrain_biscuit
+ice_a = 0
+liquid = water
+background = jungle
+music = ending
+
+[legend]
+C = objects/checkpoint
+E = objects/exit
+f = items/food index=3
+g = items/food index=21
+t = items/treasure index=5
+
+[tiles]
+########........................
+########........................
+#...!!..................t.......
+#...................../%%%\.....
+#....................%%%%%%%....
+#....................%%%%%%%....
+#..............====.............
+#.........f..g..................
+#........--_---...............E.
+#............................##.
+#..../\......................##.
+#@../##\.C........$12####34..##.
+##?#####*##^^##~~~##############
+###############~~~##############
+################################
+################################
+
+[entities]
+zones/secret 24 2 name=island rect=21,0,7,4
+props/village/stone_house 23 10
+props/village/fence 2.5 11
+props/village/barrel 10 11
+props/village/clay_pot 23 2
+props/village/signpost 8 11
+props/village/flower_pot 27 11
+props/village/crate 14 11 layer=front
+props/village/boulder_sand_small 21.5 10 layer=front
+
+[backwall]
+1 2 6 10 set=a deco=30
+
+[overrides]
+29 9 a 3
+30 9 a 4
+21 6 b 30
+22 6 b 31
+23 6 b 31
+24 6 b 31
+25 6 b 31
+26 6 b 33
+27 6 b 32
+28 11 a 34
+13 14 a 7
+14 14 a 15

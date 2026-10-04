@@ -1,0 +1,70 @@
+# Club & Grub level file - format 1 (docs/ARCHITECTURE.md 7).
+# Objects module showcase: every hidden-spot kind, breakable blocks, containers, the pick-ups, platforms, a rising
+# column, a gate, a spring, a sign, a checkpoint and a locked exit in one walk from left to right. No enemies.
+# Used for autoplay screenshots of the objects module; never part of the campaign.
+
+[meta]
+format = 1
+id = test_objects_showcase
+name = "Objects Showcase"
+kind = test
+world = 1
+biome = jungle
+terrain_a = jungle/terrain_grass
+terrain_b = jungle/terrain
+background = jungle
+music = level_jungle
+bonus_tier = 1
+
+[legend]
+S = objects/hidden_spot kind=small count=4 contents=food:19,food:27,treasure:9,food:35 prop=jungle/rock_grass
+? = objects/hidden_spot kind=small count=3 look=inset tile=#
+* = objects/hidden_spot kind=big hits=3 look=block tile=#
+$ = objects/breakable_block hits=2 tile=;
+K = objects/container skin=crate
+B = objects/container skin=barrel contents=heart,food:30,food:38
+p = objects/container skin=pot hits=2
+J = objects/spring
+C = objects/checkpoint
+t = items/treasure index=14
+m = items/giant_bonus index=2
+h = items/heart
+o = items/one_up
+q = items/water_bucket
+w = items/weapon kind=hammer
+u = items/feast_piece index=0
+l = items/letter index=1
+c = items/code_stone index=0
+r = items/random_bonus
+y = items/glider
+b = items/bone
+k = items/kill_all
+g = items/grenade
+P = objects/platform dir=2 speed=2 travel=30
+D = objects/drop_platform delay=4 skin=small
+G = objects/gate name=door dest=nook
+N = objects/sign text=SIGN_SHOWCASE
+F = items/fire_starter
+E = objects/exit locked=true
+
+[tiles]
+#...........#..............................................#
+#...........#..............................................#
+#...........#..............................................#
+#...........#..............................................#
+#...........#..............................................#
+#...........#........t..m..................................#
+#...........#......========................................#
+#...........#..................................P......D....#
+#...........$..............................................#
+#...........$..............................................#
+#.@..S......$..K.B.p..J.....C.hoqwulcrbkg...G.......N.yF.E.#
+#######?#*##################################################
+############################################################
+############################################################
+
+[entities]
+# A pillar of two cells rises out of the ground in front of the sign when the hero walks past the gate.
+objects/column 49 11 size=2,1 rise=2 trigger=45,6,4,5
+# Where the gate leads: up on the ledge with the treasures.
+objects/marker 20 5 name=nook

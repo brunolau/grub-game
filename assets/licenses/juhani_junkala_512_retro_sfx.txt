@@ -1,0 +1,29 @@
+The Essential Retro Video Game Sound Effects Collection [512 sounds]
+====================================================================
+
+Author: Juhani Junkala (SubspaceAudio)
+Source: https://opengameart.org/content/512-sound-effects-8-bit-style
+Licence: CC0 1.0 (tier A)
+Used in Club & Grub for: most sound effects
+Staging folder: .tools/asset_candidates/audio/juhani-junkala_512-retro-sfx
+
+---- Licence evidence recorded when the pack was downloaded ----
+
+# LICENSE_INFO - Juhani Junkala - The Essential Retro Video Game Sound Effects Collection [512 sounds]
+
+- **Author:** Juhani Junkala (OpenGameArt user SubspaceAudio)
+- **License:** CC0 1.0  (tier A)
+- **Source page(s):**
+  - https://opengameart.org/content/512-sound-effects-8-bit-style
+- **Download URL(s):**
+  - https://opengameart.org/sites/default/files/The%20Essential%20Retro%20Video%20Game%20Sound%20Effects%20Collection%20%5B512%20sounds%5D.zip
+- **Date checked / downloaded:** 2026-10-04
+- **Saved copy of the page(s):** `../_pages/oga_512-sound-effects-8-bit-style.html`
+
+## Exact licence wording (quoted from the source)
+
+> Licence field on the page: "License(s): CC0" (icon links to http://creativecommons.org/publicdomain/zero/1.0/)
+
+> INFO.txt inside the zip: "These sound effects have been released under CC0 creative commons license. You can do anything you want with these sounds."
+
+> INFO.txt: "All the sounds are at 44100hz 16bit mono .wav format and at -6db volume level." / "If the filename has a "loop" in it then the sound loops seamlessly."

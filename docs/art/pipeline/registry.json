@@ -1,0 +1,10323 @@
+{
+ "assets/audio/music/bonus_room_a.ogg": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 21.333,
+  "event": "bonus stages Feast Land (KOOL), short loop",
+  "kind": "music",
+  "license": "CC0",
+  "loop": true,
+  "source": "juhani-junkala_4-chiptunes-adventure/Juhani Junkala [Chiptune Adventures] 4. Stage Select.ogg",
+  "volume_db": 1.2
+ },
+ "assets/audio/music/bonus_room_b.ogg": {
+  "author": "Wolfgang_ (Ted Kerr)",
+  "duration": 42.677,
+  "event": "bonus stages, alternate longer loop / secret rooms",
+  "kind": "music",
+  "license": "CC0",
+  "loop": true,
+  "source": "wolfgang_8bit-loops/ogg_converted/bonusgame.ogg",
+  "volume_db": 3.4
+ },
+ "assets/audio/music/boss_a.ogg": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 71.724,
+  "event": "boss fights, starts when the boss energy bar appears (MONSTER)",
+  "kind": "music",
+  "license": "CC0",
+  "loop": true,
+  "source": "juhani-junkala_4-chiptunes-adventure/Juhani Junkala [Chiptune Adventures] 3. Boss Fight.ogg",
+  "volume_db": -2.6
+ },
+ "assets/audio/music/boss_final_a.ogg": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 97.959,
+  "event": "final boss: the Wall Colossus",
+  "kind": "music",
+  "license": "CC0",
+  "loop": true,
+  "source": "juhani-junkala_12-music-loops/373 [Misc Extras] bgm_gojira_battle_A.ogg",
+  "volume_db": -3.0
+ },
+ "assets/audio/music/credits_a.ogg": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 68.571,
+  "event": "credits roll / The End",
+  "kind": "music",
+  "license": "CC0",
+  "loop": true,
+  "source": "juhani-junkala_12-music-loops/399 [Misc Extras] bgm_storytime.ogg",
+  "volume_db": 1.5
+ },
+ "assets/audio/music/ending_a.ogg": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 44.651,
+  "event": "ending stage Way Home (FINAL)",
+  "kind": "music",
+  "license": "CC0",
+  "loop": true,
+  "source": "juhani-junkala_5-chiptunes-action/ogg_converted/Juhani Junkala [Retro Game Music Pack] Ending.ogg",
+  "volume_db": -3.8
+ },
+ "assets/audio/music/game_over_a.ogg": {
+  "author": "MintoDog",
+  "duration": 4.8,
+  "event": "game over jingle (BOULA)",
+  "kind": "music",
+  "license": "CC0",
+  "loop": false,
+  "source": "mintodog_8bit-action-jingles/GameOver (Jingle).ogg",
+  "volume_db": -5.2
+ },
+ "assets/audio/music/game_over_loop_a.ogg": {
+  "author": "MintoDog",
+  "duration": 15.36,
+  "event": "game over screen loop after the jingle",
+  "kind": "music",
+  "license": "CC0",
+  "loop": true,
+  "source": "mintodog_8bit-action-jingles/GameOver (Loop)_BPM125.ogg",
+  "volume_db": -3.9
+ },
+ "assets/audio/music/invincible_loop_a.ogg": {
+  "author": "MintoDog",
+  "duration": 12.387,
+  "event": "feast mode (660 ticks): replaces the level music",
+  "kind": "music",
+  "license": "CC0",
+  "loop": true,
+  "source": "mintodog_8bit-action-jingles/Invincible (Loop)_BPM155.ogg",
+  "volume_db": -3.4
+ },
+ "assets/audio/music/level_cave_a.ogg": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 74.254,
+  "event": "world 2 Cave levels (PRES role)",
+  "kind": "music",
+  "license": "CC0",
+  "loop": true,
+  "source": "juhani-junkala_5-chiptunes-action/ogg_converted/Juhani Junkala [Retro Game Music Pack] Level 1.ogg",
+  "volume_db": -7.6
+ },
+ "assets/audio/music/level_complete_a.ogg": {
+  "author": "MintoDog",
+  "duration": 6.545,
+  "event": "level-complete jingle when the iris closes (BRAVO)",
+  "kind": "music",
+  "license": "CC0",
+  "loop": false,
+  "source": "mintodog_8bit-action-jingles/Stage Clear Long (Jingle).ogg",
+  "volume_db": -3.2
+ },
+ "assets/audio/music/level_extra_a.ogg": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 72.796,
+  "event": "spare level theme: Cinder Shaft auto-scroll descent",
+  "kind": "music",
+  "license": "CC0",
+  "loop": true,
+  "source": "juhani-junkala_5-chiptunes-action/ogg_converted/Juhani Junkala [Retro Game Music Pack] Level 2.ogg",
+  "volume_db": -7.6
+ },
+ "assets/audio/music/level_extra_b.ogg": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 70.588,
+  "event": "spare level theme: Crystal Grotto / second stage of a world",
+  "kind": "music",
+  "license": "CC0",
+  "loop": true,
+  "source": "juhani-junkala_12-music-loops/006 [Heavy Metal Chiptunes] bgm_stage_F (faster).ogg",
+  "volume_db": -4.1
+ },
+ "assets/audio/music/level_ice_a.ogg": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 81.896,
+  "event": "world 3 Ice levels (GLACE)",
+  "kind": "music",
+  "license": "CC0",
+  "loop": true,
+  "source": "juhani-junkala_5-chiptunes-action/ogg_converted/Juhani Junkala [Retro Game Music Pack] Level 3.ogg",
+  "volume_db": -7.2
+ },
+ "assets/audio/music/level_jungle_a.ogg": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 41.143,
+  "event": "world 1 Jungle levels (MINES role)",
+  "kind": "music",
+  "license": "CC0",
+  "loop": true,
+  "source": "juhani-junkala_4-chiptunes-adventure/Juhani Junkala [Chiptune Adventures] 1. Stage 1.ogg",
+  "volume_db": -2.6
+ },
+ "assets/audio/music/level_volcano_a.ogg": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 56.104,
+  "event": "world 4 Volcano levels (MYSTERY)",
+  "kind": "music",
+  "license": "CC0",
+  "loop": true,
+  "source": "juhani-junkala_4-chiptunes-adventure/Juhani Junkala [Chiptune Adventures] 2. Stage 2.ogg",
+  "volume_db": -2.8
+ },
+ "assets/audio/music/password_screen_a.ogg": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 21.333,
+  "event": "mode select / level select screens (CODE)",
+  "kind": "music",
+  "license": "CC0",
+  "loop": true,
+  "source": "juhani-junkala_12-music-loops/384 [Misc Extras] bgm_menu_title_6_sporty.ogg",
+  "volume_db": -4.4
+ },
+ "assets/audio/music/player_death_a.ogg": {
+  "author": "MintoDog",
+  "duration": 2.743,
+  "event": "death jingle before the respawn curtain",
+  "kind": "music",
+  "license": "CC0",
+  "loop": false,
+  "source": "mintodog_8bit-action-jingles/Miss (Jingle).ogg",
+  "volume_db": -4.3
+ },
+ "assets/audio/music/tally_loop_a.ogg": {
+  "author": "Wolfgang_ (Ted Kerr)",
+  "duration": 53.333,
+  "event": "tally screen after the jingle",
+  "kind": "music",
+  "license": "CC0",
+  "loop": true,
+  "source": "wolfgang_8bit-loops/8bitvictory.ogg",
+  "volume_db": 2.2
+ },
+ "assets/audio/music/title_a.ogg": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 11.294,
+  "event": "title picture and main menu (the original's PRESENTA)",
+  "kind": "music",
+  "license": "CC0",
+  "loop": true,
+  "source": "juhani-junkala_5-chiptunes-action/ogg_converted/Juhani Junkala [Retro Game Music Pack] Title Screen.ogg",
+  "volume_db": -6.8
+ },
+ "assets/audio/music/title_b.ogg": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 54.857,
+  "event": "world map between levels (CARTE)",
+  "kind": "music",
+  "license": "CC0",
+  "loop": true,
+  "source": "juhani-junkala_12-music-loops/379 [Misc Extras] bgm_menu_title_1_relaxed.ogg",
+  "volume_db": -3.8
+ },
+ "assets/audio/sfx/bonus_reveal_a.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 0.608,
+  "event": "a = hidden spot used up / secret opened; b = giant bonus or jackpot chest appears",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/General Sounds/Positive Sounds/sfx_sounds_powerup12.wav",
+  "volume_db": -0.0
+ },
+ "assets/audio/sfx/bonus_reveal_b.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 1.028,
+  "event": "a = hidden spot used up / secret opened; b = giant bonus or jackpot chest appears",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/General Sounds/Weird Sounds/sfx_sound_bling.wav",
+  "volume_db": -0.0
+ },
+ "assets/audio/sfx/boss_hit_a.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 0.33,
+  "event": "boss hit by a weapon",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/General Sounds/Impacts/sfx_sounds_impact11.wav",
+  "volume_db": -0.0
+ },
+ "assets/audio/sfx/boss_roar_a.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 1.5,
+  "event": "a = boss appears / Colossus roars when hit; b = Brute chest-beat",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/Death Screams/Alien/sfx_deathscream_alien1.wav",
+  "volume_db": 0.1
+ },
+ "assets/audio/sfx/boss_roar_b.wav": {
+  "author": "Sparklin Labs / Pixel-boy (Superpowers asset packs)",
+  "duration": 0.77,
+  "event": "a = boss appears / Colossus roars when hit; b = Brute chest-beat",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "superpowers_asset-packs-audio/sound effects/prehistoric-platformer/dinosaur-3.wav",
+  "volume_db": -4.9
+ },
+ "assets/audio/sfx/breakable_smash_a.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 0.23,
+  "event": "breakable block destroyed (dirt, rock)",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/Explosions/Shortest/sfx_exp_shortest_hard6.wav",
+  "volume_db": 0.0
+ },
+ "assets/audio/sfx/breakable_smash_ice_a.ogg": {
+  "author": "IgnasD",
+  "duration": 0.592,
+  "event": "breakable ice block destroyed",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "ignasd_ice-shatters/IceShatters/LedasLuzta.ogg",
+  "volume_db": -4.2
+ },
+ "assets/audio/sfx/checkpoint_a.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 0.516,
+  "event": "a = restart point lit; b = exit totem unlocked / level exit touched",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/General Sounds/Fanfares/sfx_sounds_fanfare1.wav",
+  "volume_db": 1.7
+ },
+ "assets/audio/sfx/checkpoint_b.ogg": {
+  "author": "Basto",
+  "duration": 1.733,
+  "event": "a = restart point lit; b = exit totem unlocked / level exit touched",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "basto_nes-sounds/sounds/achieved.ogg",
+  "volume_db": 4.1
+ },
+ "assets/audio/sfx/club_hit_a.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 0.103,
+  "event": "weapon connects with an enemy; a = club, b = hammer / charged 4x hit",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/Weapons/Melee/sfx_wpn_punch2.wav",
+  "volume_db": 0.3
+ },
+ "assets/audio/sfx/club_hit_b.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 0.278,
+  "event": "weapon connects with an enemy; a = club, b = hammer / charged 4x hit",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/General Sounds/Impacts/sfx_sounds_impact12.wav",
+  "volume_db": -0.0
+ },
+ "assets/audio/sfx/club_hit_wood_a.wav": {
+  "author": "Sparklin Labs / Pixel-boy (Superpowers asset packs)",
+  "duration": 0.225,
+  "event": "weapon hits scenery / a hidden spot (with the star puff)",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "superpowers_asset-packs-audio/sound effects/prehistoric-platformer/wood-2.wav",
+  "volume_db": -6.0
+ },
+ "assets/audio/sfx/club_swing_a.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 0.111,
+  "event": "a = club swing (original slot 5); b = hammer swing (slot 0)",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/Weapons/Melee/sfx_wpn_sword1.wav",
+  "volume_db": 0.0
+ },
+ "assets/audio/sfx/club_swing_b.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 0.096,
+  "event": "a = club swing (original slot 5); b = hammer swing (slot 0)",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/Weapons/Melee/sfx_wpn_sword2.wav",
+  "volume_db": -0.0
+ },
+ "assets/audio/sfx/dino_voice_a.wav": {
+  "author": "Sparklin Labs / Pixel-boy (Superpowers asset packs)",
+  "duration": 1.315,
+  "event": "enemy alert / spawn voices (dropper lands, charger rushes, plant bites, pterodactyl dives)",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "superpowers_asset-packs-audio/sound effects/prehistoric-platformer/dinosaur-1.wav",
+  "volume_db": 7.7
+ },
+ "assets/audio/sfx/dino_voice_b.wav": {
+  "author": "Sparklin Labs / Pixel-boy (Superpowers asset packs)",
+  "duration": 0.454,
+  "event": "enemy alert / spawn voices (dropper lands, charger rushes, plant bites, pterodactyl dives)",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "superpowers_asset-packs-audio/sound effects/prehistoric-platformer/dinosaur-2.wav",
+  "volume_db": 3.1
+ },
+ "assets/audio/sfx/dino_voice_c.wav": {
+  "author": "Sparklin Labs / Pixel-boy (Superpowers asset packs)",
+  "duration": 0.535,
+  "event": "enemy alert / spawn voices (dropper lands, charger rushes, plant bites, pterodactyl dives)",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "superpowers_asset-packs-audio/sound effects/prehistoric-platformer/dinosaur-4.wav",
+  "volume_db": -4.9
+ },
+ "assets/audio/sfx/dino_voice_d.wav": {
+  "author": "Sparklin Labs / Pixel-boy (Superpowers asset packs)",
+  "duration": 0.229,
+  "event": "enemy alert / spawn voices (dropper lands, charger rushes, plant bites, pterodactyl dives)",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "superpowers_asset-packs-audio/sound effects/prehistoric-platformer/dinosaur-5.wav",
+  "volume_db": -0.4
+ },
+ "assets/audio/sfx/enemy_death_a.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 0.163,
+  "event": "enemy killed by a weapon (slot 2); alternate a / b",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/Explosions/Shortest/sfx_exp_shortest_soft7.wav",
+  "volume_db": 0.0
+ },
+ "assets/audio/sfx/enemy_death_b.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 0.283,
+  "event": "enemy killed by a weapon (slot 2); alternate a / b",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/Explosions/Shortest/sfx_exp_shortest_hard5.wav",
+  "volume_db": 0.0
+ },
+ "assets/audio/sfx/enemy_hurt_a.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 0.059,
+  "event": "enemy survives a hit (flash + knock-back)",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/General Sounds/Simple Damage Sounds/sfx_damage_hit1.wav",
+  "volume_db": -0.0
+ },
+ "assets/audio/sfx/energy_refill_a.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 0.695,
+  "event": "heart collected, sixth bone restores a heart",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/General Sounds/Positive Sounds/sfx_sounds_powerup16.wav",
+  "volume_db": -0.0
+ },
+ "assets/audio/sfx/explosion_a.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 1.243,
+  "event": "grenade / kill-all item (slot 0)",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/Explosions/Medium Length/sfx_exp_medium7.wav",
+  "volume_db": -3.0
+ },
+ "assets/audio/sfx/explosion_b.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 0.853,
+  "event": "boss projectile impact, boulder smash",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/Explosions/Short/sfx_exp_short_hard5.wav",
+  "volume_db": -3.0
+ },
+ "assets/audio/sfx/explosion_big_a.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 2.492,
+  "event": "boss defeated (bursts into bonus items)",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/Explosions/Clusters/sfx_exp_cluster8.wav",
+  "volume_db": -3.0
+ },
+ "assets/audio/sfx/fire_loop_a.ogg": {
+  "author": "AntumDeluge",
+  "duration": 3.545,
+  "event": "ambience loop near a lit checkpoint fire",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": true,
+  "source": "antumdeluge_fire-crackling/fire-1.ogg",
+  "volume_db": 0.4
+ },
+ "assets/audio/sfx/fireball_b.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 0.29,
+  "event": "Colossus spits a rock",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/Explosions/Shortest/sfx_exp_shortest_soft4.wav",
+  "volume_db": 0.0
+ },
+ "assets/audio/sfx/food_chomp_a.ogg": {
+  "author": "rubberduck",
+  "duration": 0.39,
+  "event": "feast mode: enemy eaten on touch",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "rubberduck_80-cc0-creature-sfx/eat_02.ogg",
+  "volume_db": -4.2
+ },
+ "assets/audio/sfx/food_pickup_a.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 0.171,
+  "event": "normal pick-up: food, bones, letters, feast kit, weapons, glider (slot 8); cycle a-d for variety",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/General Sounds/Coins/sfx_coin_single2.wav",
+  "volume_db": 0.0
+ },
+ "assets/audio/sfx/food_pickup_b.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 0.131,
+  "event": "normal pick-up: food, bones, letters, feast kit, weapons, glider (slot 8); cycle a-d for variety",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/General Sounds/Coins/sfx_coin_single5.wav",
+  "volume_db": -0.0
+ },
+ "assets/audio/sfx/food_pickup_c.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 0.131,
+  "event": "normal pick-up: food, bones, letters, feast kit, weapons, glider (slot 8); cycle a-d for variety",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/General Sounds/Coins/sfx_coin_single3.wav",
+  "volume_db": -0.0
+ },
+ "assets/audio/sfx/food_pickup_d.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 0.09,
+  "event": "normal pick-up: food, bones, letters, feast kit, weapons, glider (slot 8); cycle a-d for variety",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/General Sounds/Coins/sfx_coin_double7.wav",
+  "volume_db": -0.0
+ },
+ "assets/audio/sfx/footstep_a.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 0.049,
+  "event": "optional run steps, alternate a / b",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/Movement/Footsteps/sfx_movement_footsteps1a.wav",
+  "volume_db": 1.5
+ },
+ "assets/audio/sfx/footstep_b.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 0.05,
+  "event": "optional run steps, alternate a / b",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/Movement/Footsteps/sfx_movement_footsteps1b.wav",
+  "volume_db": 0.6
+ },
+ "assets/audio/sfx/gem_pickup_a.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 0.271,
+  "event": "a = big pick-up: treasure, giant bonus (slot 4); b = bonus letter / warp item",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/General Sounds/Coins/sfx_coin_double6.wav",
+  "volume_db": -0.0
+ },
+ "assets/audio/sfx/gem_pickup_b.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 0.469,
+  "event": "a = big pick-up: treasure, giant bonus (slot 4); b = bonus letter / warp item",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/General Sounds/Coins/sfx_coin_cluster3.wav",
+  "volume_db": -0.0
+ },
+ "assets/audio/sfx/ice_slide_a.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 0.279,
+  "event": "skid on slippery ground",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/Movement/Vehicles/sfx_vehicle_breaks.wav",
+  "volume_db": 0.0
+ },
+ "assets/audio/sfx/ice_wind_loop_a.ogg": {
+  "author": "Ecrivain",
+  "duration": 52.15,
+  "event": "blizzard ambience loop (ice level second half)",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": true,
+  "source": "misc-cc0-level-themes/ecrivain_icy-heights_wind.ogg",
+  "volume_db": 0.1
+ },
+ "assets/audio/sfx/jump_a.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 0.162,
+  "event": "hero jump (added cue, GAMEPLAY 12.4)",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/Movement/Jumping and Landing/sfx_movement_jump13.wav",
+  "volume_db": -0.0
+ },
+ "assets/audio/sfx/land_a.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 0.097,
+  "event": "hero lands after a fall of more than 10 ticks (dust puff)",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/Movement/Jumping and Landing/sfx_movement_jump13_landing.wav",
+  "volume_db": 7.4
+ },
+ "assets/audio/sfx/lava_bubble_loop_a.ogg": {
+  "author": "rubberduck",
+  "duration": 7.334,
+  "event": "ambience loop near lava",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": true,
+  "source": "rubberduck_40-cc0-water-splash-slime-sfx/loop_bubbles_02.ogg",
+  "volume_db": 1.5
+ },
+ "assets/audio/sfx/menu_back_a.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 0.236,
+  "event": "menu cancel",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/General Sounds/Interactions/sfx_sounds_interaction25.wav",
+  "volume_db": -0.0
+ },
+ "assets/audio/sfx/menu_move_a.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 0.039,
+  "event": "menu cursor",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/General Sounds/Menu Sounds/sfx_menu_move1.wav",
+  "volume_db": -0.0
+ },
+ "assets/audio/sfx/menu_select_a.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 0.351,
+  "event": "menu confirm",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/General Sounds/Menu Sounds/sfx_menu_select1.wav",
+  "volume_db": 1.9
+ },
+ "assets/audio/sfx/one_up_a.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 0.743,
+  "event": "extra life (item or every 250 000 points)",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/General Sounds/Positive Sounds/sfx_sounds_powerup2.wav",
+  "volume_db": -0.0
+ },
+ "assets/audio/sfx/password_accept_a.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 0.425,
+  "event": "save slot / level select accepted, code stone collected",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/General Sounds/Positive Sounds/sfx_sounds_powerup13.wav",
+  "volume_db": -0.0
+ },
+ "assets/audio/sfx/password_reject_a.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 0.299,
+  "event": "locked level, invalid action",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/General Sounds/Negative Sounds/sfx_sounds_error10.wav",
+  "volume_db": -0.9
+ },
+ "assets/audio/sfx/pause_in_a.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 0.271,
+  "event": "pause opened",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/General Sounds/Pause Sounds/sfx_sounds_pause4_in.wav",
+  "volume_db": 0.2
+ },
+ "assets/audio/sfx/pause_out_a.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 0.272,
+  "event": "pause closed",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/General Sounds/Pause Sounds/sfx_sounds_pause4_out.wav",
+  "volume_db": 0.1
+ },
+ "assets/audio/sfx/player_death_a.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 0.754,
+  "event": "hero death toss (slot 7)",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/Movement/Falling Sounds/sfx_sounds_falling11.wav",
+  "volume_db": -0.0
+ },
+ "assets/audio/sfx/player_hurt_a.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 0.173,
+  "event": "a = hero hurt by an enemy (slot 9); b = heavy hurt: skull item, boss hit, boss projectile, lights-off trigger (slot 1)",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/General Sounds/Negative Sounds/sfx_sounds_damage3.wav",
+  "volume_db": 0.0
+ },
+ "assets/audio/sfx/player_hurt_b.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 0.43,
+  "event": "a = hero hurt by an enemy (slot 9); b = heavy hurt: skull item, boss hit, boss projectile, lights-off trigger (slot 1)",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/Death Screams/Human/sfx_deathscream_human9.wav",
+  "volume_db": 0.1
+ },
+ "assets/audio/sfx/projectile_throw_b.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 0.187,
+  "event": "axe / boomerang throw (slot 10)",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/Movement/Jumping and Landing/sfx_movement_jump14.wav",
+  "volume_db": -0.0
+ },
+ "assets/audio/sfx/quake_a.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 2.23,
+  "event": "screen shake: rising columns, Brute ground pound, feast-end warning",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/Explosions/Long/sfx_exp_long2.wav",
+  "volume_db": -3.0
+ },
+ "assets/audio/sfx/splash_a.ogg": {
+  "author": "Basto",
+  "duration": 0.737,
+  "event": "something falls into water or lava",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "basto_nes-sounds/sounds/splash.ogg",
+  "volume_db": 2.9
+ },
+ "assets/audio/sfx/spring_bounce_a.wav": {
+  "author": "MoxieCat",
+  "duration": 0.334,
+  "event": "head bounce on an enemy or boss (slot 3); spring pad",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "moxiecat_8bit-platformer-sfx/spring.wav",
+  "volume_db": 8.4
+ },
+ "assets/audio/sfx/tally_end_a.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 0.325,
+  "event": "tally finished",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/General Sounds/Coins/sfx_coin_double2.wav",
+  "volume_db": 1.5
+ },
+ "assets/audio/sfx/tally_tick_a.wav": {
+  "author": "Juhani Junkala (SubspaceAudio)",
+  "duration": 0.043,
+  "event": "each item counted at the end-of-level tally",
+  "kind": "sfx",
+  "license": "CC0",
+  "loop": false,
+  "source": "juhani-junkala_512-retro-sfx/General Sounds/Simple Bleeps/sfx_sounds_Blip4.wav",
+  "volume_db": -0.0
+ },
+ "assets/backgrounds/cave/layer0_wall.png": {
+  "edits": "tiled 3 x 2, gradient-mapped to dark violet (720 px loop)",
+  "frame": [
+   720,
+   360
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "background",
+  "note": "",
+  "scroll": 0.1,
+  "size": [
+   720,
+   360
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/rock-1.png"
+ },
+ "assets/backgrounds/cave/layer1_rocks_far.png": {
+  "edits": "ceiling and floor bands moved closer together, gradient-mapped to violet, mirrored for a seamless loop",
+  "frame": [
+   1600,
+   360
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "background",
+  "note": "",
+  "scroll": 0.3,
+  "size": [
+   1600,
+   360
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/rock-2.png"
+ },
+ "assets/backgrounds/cave/layer2_ceiling_near.png": {
+  "edits": "positioned at the top, gradient-mapped to near-black violet, mirrored for a seamless loop",
+  "frame": [
+   1600,
+   360
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "background",
+  "note": "",
+  "scroll": 0.6,
+  "size": [
+   1600,
+   360
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/rock-3.png"
+ },
+ "assets/backgrounds/feast/layer0_sky.png": {
+  "edits": "cropped / positioned on a 360 px high canvas, mirrored copy appended for a seamless 1600 px loop; hue set to candy pink",
+  "frame": [
+   1600,
+   360
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "background",
+  "note": "",
+  "scroll": 0.0,
+  "size": [
+   1600,
+   360
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/sky-3.png"
+ },
+ "assets/backgrounds/feast/layer1_clouds.png": {
+  "edits": "cropped / positioned on a 360 px high canvas, mirrored copy appended for a seamless 1600 px loop; tinted cream",
+  "frame": [
+   1600,
+   360
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "background",
+  "note": "",
+  "scroll": 0.08,
+  "size": [
+   1600,
+   360
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/cloud-1.png"
+ },
+ "assets/backgrounds/feast/layer2_scoops.png": {
+  "edits": "cropped / positioned on a 360 px high canvas, mirrored copy appended for a seamless 1600 px loop; gradient-mapped to strawberry ice-cream scoops",
+  "frame": [
+   1600,
+   360
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "background",
+  "note": "",
+  "scroll": 0.25,
+  "size": [
+   1600,
+   360
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/mountain-2.png"
+ },
+ "assets/backgrounds/feast/layer3_meadow.png": {
+  "edits": "cropped / positioned on a 360 px high canvas, mirrored copy appended for a seamless 1600 px loop; gradient-mapped to mint",
+  "frame": [
+   1600,
+   360
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "background",
+  "note": "",
+  "scroll": 0.5,
+  "size": [
+   1600,
+   360
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/grass-2.png"
+ },
+ "assets/backgrounds/ice/layer0_sky.png": {
+  "edits": "cropped / positioned on a 360 px high canvas, mirrored copy appended for a seamless 1600 px loop; desaturated to a winter sky",
+  "frame": [
+   1600,
+   360
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "background",
+  "note": "",
+  "scroll": 0.0,
+  "size": [
+   1600,
+   360
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/sky-1.png"
+ },
+ "assets/backgrounds/ice/layer1_far_peaks.png": {
+  "edits": "cropped / positioned on a 360 px high canvas, mirrored copy appended for a seamless 1600 px loop; recoloured to snow white-blue",
+  "frame": [
+   1600,
+   360
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "background",
+  "note": "",
+  "scroll": 0.1,
+  "size": [
+   1600,
+   360
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/mountain-3.png"
+ },
+ "assets/backgrounds/ice/layer2_ridges.png": {
+  "edits": "cropped / positioned on a 360 px high canvas, mirrored copy appended for a seamless 1600 px loop; gradient-mapped to frosted rock",
+  "frame": [
+   1600,
+   360
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "background",
+  "note": "",
+  "scroll": 0.25,
+  "size": [
+   1600,
+   360
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/mountain-1.png"
+ },
+ "assets/backgrounds/ice/layer3_snow_forest.png": {
+  "edits": "cropped / positioned on a 360 px high canvas, mirrored copy appended for a seamless 1600 px loop; gradient-mapped to a snow-covered forest",
+  "frame": [
+   1600,
+   360
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "background",
+  "note": "",
+  "scroll": 0.5,
+  "size": [
+   1600,
+   360
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/forest-1.png"
+ },
+ "assets/backgrounds/jungle/layer0_sky.png": {
+  "edits": "cropped / positioned on a 360 px high canvas, mirrored copy appended for a seamless 1600 px loop",
+  "frame": [
+   1600,
+   360
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "background",
+  "note": "",
+  "scroll": 0.0,
+  "size": [
+   1600,
+   360
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/sky-1.png"
+ },
+ "assets/backgrounds/jungle/layer1_far_hills.png": {
+  "edits": "cropped / positioned on a 360 px high canvas, mirrored copy appended for a seamless 1600 px loop",
+  "frame": [
+   1600,
+   360
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "background",
+  "note": "",
+  "scroll": 0.1,
+  "size": [
+   1600,
+   360
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/mountain-3.png"
+ },
+ "assets/backgrounds/jungle/layer2_hills.png": {
+  "edits": "cropped / positioned on a 360 px high canvas, mirrored copy appended for a seamless 1600 px loop; slight hue shift toward green",
+  "frame": [
+   1600,
+   360
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "background",
+  "note": "",
+  "scroll": 0.25,
+  "size": [
+   1600,
+   360
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/mountain-2.png"
+ },
+ "assets/backgrounds/jungle/layer3_forest.png": {
+  "edits": "cropped / positioned on a 360 px high canvas, mirrored copy appended for a seamless 1600 px loop",
+  "frame": [
+   1600,
+   360
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "background",
+  "note": "",
+  "scroll": 0.5,
+  "size": [
+   1600,
+   360
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/forest-1.png"
+ },
+ "assets/backgrounds/volcano/layer0_sky.png": {
+  "edits": "cropped / positioned on a 360 px high canvas, mirrored copy appended for a seamless 1600 px loop; darkened and pushed toward red",
+  "frame": [
+   1600,
+   360
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "background",
+  "note": "",
+  "scroll": 0.0,
+  "size": [
+   1600,
+   360
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/sky-2.png"
+ },
+ "assets/backgrounds/volcano/layer1_far_cones.png": {
+  "edits": "cropped / positioned on a 360 px high canvas, mirrored copy appended for a seamless 1600 px loop; recoloured to a dark red silhouette",
+  "frame": [
+   1600,
+   360
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "background",
+  "note": "",
+  "scroll": 0.1,
+  "size": [
+   1600,
+   360
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/mountain-3.png"
+ },
+ "assets/backgrounds/volcano/layer2_basalt.png": {
+  "edits": "cropped / positioned on a 360 px high canvas, mirrored copy appended for a seamless 1600 px loop; gradient-mapped to basalt",
+  "frame": [
+   1600,
+   360
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "background",
+  "note": "",
+  "scroll": 0.25,
+  "size": [
+   1600,
+   360
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/mountain-1.png"
+ },
+ "assets/backgrounds/volcano/layer3_burnt_forest.png": {
+  "edits": "cropped / positioned on a 360 px high canvas, mirrored copy appended for a seamless 1600 px loop; gradient-mapped to a scorched, glowing forest",
+  "frame": [
+   1600,
+   360
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "background",
+  "note": "",
+  "scroll": 0.5,
+  "size": [
+   1600,
+   360
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/forest-1.png"
+ },
+ "assets/backgrounds/volcano/shaft_layer0_wall.png": {
+  "edits": "tiled 3 x 2, gradient-mapped to dark red (720 px loop)",
+  "frame": [
+   720,
+   360
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "background",
+  "note": "interior set for Cinder Shaft / Obsidian Keep",
+  "scroll": 0.1,
+  "size": [
+   720,
+   360
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/rock-1.png"
+ },
+ "assets/backgrounds/volcano/shaft_layer1_rocks.png": {
+  "edits": "ceiling and floor bands moved closer together, gradient-mapped to hot rock, mirrored",
+  "frame": [
+   1600,
+   360
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "background",
+  "note": "interior set",
+  "scroll": 0.3,
+  "size": [
+   1600,
+   360
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/rock-2.png"
+ },
+ "assets/backgrounds/volcano/shaft_layer2_ceiling_near.png": {
+  "edits": "gradient-mapped to near-black red, mirrored",
+  "frame": [
+   1600,
+   360
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "background",
+  "note": "interior set",
+  "scroll": 0.6,
+  "size": [
+   1600,
+   360
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/rock-3.png"
+ },
+ "assets/fonts/font_digits_big.png": {
+  "charset": "cells 0-9 = digits 0..9",
+  "edits": "none",
+  "frame": [
+   40,
+   40
+  ],
+  "grid": [
+   10,
+   1
+  ],
+  "kind": "font",
+  "note": "stone digits for the tally score, countdowns, world numbers",
+  "size": [
+   400,
+   40
+  ],
+  "source": "superpowers-prehistoric-platformer: font-number-40x40.png"
+ },
+ "assets/fonts/font_hud.png": {
+  "charset": "cells 0-94 = U+0020..U+007E (lower case is drawn as capitals); cell 95 unused; cells 96-119 = C7 FC E9 E2 E4 E0 E5 E7 EA EB E8 EF EE EC C4 C5 C9 E6 C6 F4 F6 F2 FB F9 (code page 437 order)",
+  "edits": "none",
+  "frame": [
+   20,
+   20
+  ],
+  "grid": [
+   15,
+   8
+  ],
+  "kind": "font",
+  "note": "white 16 px capitals with a 2 px dark outline; HUD text, score, pop-ups. Import as Godot 'Font Data (Image Font)', 15 columns x 8 rows, or draw by cell",
+  "size": [
+   300,
+   160
+  ],
+  "source": "superpowers-prehistoric-platformer: font-20x20.png"
+ },
+ "assets/fonts/font_title.png": {
+  "charset": "cells 0-25 = A..Z, cells 26-35 = 0..9",
+  "edits": "glyphs re-packed on a uniform 52x36 grid, bottom-centred (the source has variable spacing; glyph widths 18-49 px, height 35 px)",
+  "frame": [
+   52,
+   36
+  ],
+  "grid": [
+   12,
+   3
+  ],
+  "kind": "font",
+  "note": "carved-stone display capitals: logo, LEVEL COMPLETE, GAME OVER",
+  "size": [
+   624,
+   108
+  ],
+  "source": "superpowers-prehistoric-platformer: title-font.png"
+ },
+ "assets/fonts/pixelify_sans.ttf": {
+  "edits": "renamed",
+  "kind": "ttf",
+  "note": "proportional pixel sans with lower case, variable weight 400-700 (use at 11 / 22 px, antialiasing off): menus, options, credits",
+  "source": "googlefonts_pixelifysans: PixelifySans[wght].ttf"
+ },
+ "assets/fonts/press_start_2p.ttf": {
+  "edits": "renamed",
+  "kind": "ttf",
+  "note": "8 px bitmap-style TTF (use at 8 / 16 / 24 px, antialiasing off). Latin, Latin Extended-A, Cyrillic: localisation fallback for font_hud",
+  "source": "googlefonts_pressstart2p: PressStart2P-Regular.ttf"
+ },
+ "assets/icon.png": {
+  "edits": "composited on a rounded 256x256 tile",
+  "frame": [
+   256,
+   256
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "ui",
+  "note": "application icon",
+  "size": [
+   256,
+   256
+  ],
+  "source": "superpowers-prehistoric-platformer: hero victory frame (3x), sky-2.png (4x), jungle top tile (4x)"
+ },
+ "assets/splash.png": {
+  "edits": "composited on the outline colour #272018",
+  "frame": [
+   640,
+   360
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "ui",
+  "note": "boot splash (set as application/boot_splash/image, background colour #272018)",
+  "size": [
+   640,
+   360
+  ],
+  "source": "title font glyphs, club and roast (2x)"
+ },
+ "assets/sprites/bosses/brute.png": {
+  "anims": {
+   "attack": {
+    "fps": 12,
+    "frames": [
+     22,
+     23,
+     24,
+     25
+    ],
+    "loop": false
+   },
+   "crouch": {
+    "fps": 1,
+    "frames": [
+     21
+    ],
+    "loop": false
+   },
+   "death": {
+    "fps": 8,
+    "frames": [
+     28,
+     29,
+     30,
+     31,
+     32
+    ],
+    "loop": false
+   },
+   "hurt": {
+    "fps": 8,
+    "frames": [
+     26,
+     27
+    ],
+    "loop": true
+   },
+   "idle": {
+    "fps": 8,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5
+    ],
+    "loop": true
+   },
+   "jump": {
+    "fps": 10,
+    "frames": [
+     14,
+     15,
+     16
+    ],
+    "loop": false
+   },
+   "land": {
+    "fps": 1,
+    "frames": [
+     17
+    ],
+    "loop": false
+   },
+   "pound": {
+    "fps": 8,
+    "frames": [
+     37,
+     38,
+     39,
+     40
+    ],
+    "loop": true
+   },
+   "roll": {
+    "fps": 14,
+    "frames": [
+     18,
+     19,
+     20
+    ],
+    "loop": true
+   },
+   "taunt": {
+    "fps": 6,
+    "frames": [
+     33,
+     34,
+     35,
+     36
+    ],
+    "loop": true
+   },
+   "walk": {
+    "fps": 12,
+    "frames": [
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13
+    ],
+    "loop": true
+   }
+  },
+  "body_box_art": [
+   110,
+   122
+  ],
+  "body_box_logical": [
+   55,
+   61
+  ],
+  "edits": "re-packed on a uniform 288x176 grid; integer 2x nearest-neighbour upscale; taunt and pound loops assembled from existing frames",
+  "facing": "right",
+  "frame": [
+   288,
+   176
+  ],
+  "grid": [
+   8,
+   6
+  ],
+  "kind": "boss",
+  "note": "BOSS 1 'the Brute' (gorilla archetype, GAMEPLAY 6.1). Head = top 30 logical px of the body box (weak point); taunt = chest beating, roll = leap, pound = ground pound, attack = punch",
+  "pivot": [
+   144,
+   144
+  ],
+  "size": [
+   2304,
+   1056
+  ],
+  "source": "superpowers-prehistoric-platformer: characters/playable/lion.png"
+ },
+ "assets/sprites/bosses/brute_enraged.png": {
+  "anims": {
+   "attack": {
+    "fps": 12,
+    "frames": [
+     22,
+     23,
+     24,
+     25
+    ],
+    "loop": false
+   },
+   "crouch": {
+    "fps": 1,
+    "frames": [
+     21
+    ],
+    "loop": false
+   },
+   "death": {
+    "fps": 8,
+    "frames": [
+     28,
+     29,
+     30,
+     31,
+     32
+    ],
+    "loop": false
+   },
+   "hurt": {
+    "fps": 8,
+    "frames": [
+     26,
+     27
+    ],
+    "loop": true
+   },
+   "idle": {
+    "fps": 8,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5
+    ],
+    "loop": true
+   },
+   "jump": {
+    "fps": 10,
+    "frames": [
+     14,
+     15,
+     16
+    ],
+    "loop": false
+   },
+   "land": {
+    "fps": 1,
+    "frames": [
+     17
+    ],
+    "loop": false
+   },
+   "pound": {
+    "fps": 8,
+    "frames": [
+     37,
+     38,
+     39,
+     40
+    ],
+    "loop": true
+   },
+   "roll": {
+    "fps": 14,
+    "frames": [
+     18,
+     19,
+     20
+    ],
+    "loop": true
+   },
+   "taunt": {
+    "fps": 6,
+    "frames": [
+     33,
+     34,
+     35,
+     36
+    ],
+    "loop": true
+   },
+   "walk": {
+    "fps": 12,
+    "frames": [
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13
+    ],
+    "loop": true
+   }
+  },
+  "body_box_art": [
+   110,
+   122
+  ],
+  "body_box_logical": [
+   55,
+   61
+  ],
+  "edits": "re-packed on a uniform 288x176 grid; integer 2x nearest-neighbour upscale; taunt and pound loops assembled from existing frames",
+  "facing": "right",
+  "frame": [
+   288,
+   176
+  ],
+  "grid": [
+   8,
+   6
+  ],
+  "kind": "boss",
+  "note": "palette variant of the Brute for the tougher second encounter / low-health phase",
+  "pivot": [
+   144,
+   144
+  ],
+  "size": [
+   2304,
+   1056
+  ],
+  "source": "superpowers-prehistoric-platformer: characters/playable/lion-2.png"
+ },
+ "assets/sprites/bosses/colossus.png": {
+  "anims": {
+   "broken": {
+    "fps": 1,
+    "frames": [
+     16
+    ],
+    "loop": false
+   },
+   "hurt": {
+    "fps": 8,
+    "frames": [
+     12,
+     13
+    ],
+    "loop": true
+   },
+   "idle": {
+    "fps": 6,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5
+    ],
+    "loop": true
+   },
+   "rage": {
+    "fps": 8,
+    "frames": [
+     14,
+     15
+    ],
+    "loop": true
+   },
+   "slam": {
+    "fps": 6,
+    "frames": [
+     10,
+     11
+    ],
+    "loop": false
+   },
+   "spit": {
+    "fps": 8,
+    "frames": [
+     6,
+     7,
+     8,
+     9
+    ],
+    "loop": false
+   }
+  },
+  "body_box_art": [
+   208,
+   190
+  ],
+  "body_box_logical": [
+   104,
+   95
+  ],
+  "edits": "luminance gradient-mapped to stone / lava-glow / dead ramps (outline kept), body cropped at the wall line, wall rim column added from the obsidian left-edge tile, integer 2x upscale; NOT mirrored: it faces left",
+  "facing": "left",
+  "frame": [
+   260,
+   224
+  ],
+  "grid": [
+   6,
+   3
+  ],
+  "kind": "boss",
+  "note": "BOSS 2 'the Wall Colossus' (minotaur archetype, GAMEPLAY 6.3). Pivot = bottom-RIGHT corner of the cell (put it on the arena's right wall, floor level). Head rectangles per pose are listed below the table",
+  "pivot": [
+   260,
+   208
+  ],
+  "size": [
+   1560,
+   672
+  ],
+  "source": "superpowers-prehistoric-platformer: monsters/tyrannosaurus-2.png + assets/tiles/volcano/terrain_obsidian.png (tile 8)"
+ },
+ "assets/sprites/enemies/bat.png": {
+  "anims": {
+   "angry": {
+    "fps": 8,
+    "frames": [
+     7,
+     8
+    ],
+    "loop": true
+   },
+   "dead": {
+    "fps": 1,
+    "frames": [
+     12
+    ],
+    "loop": false
+   },
+   "fall": {
+    "fps": 8,
+    "frames": [
+     9,
+     10,
+     11
+    ],
+    "loop": true
+   },
+   "fly": {
+    "fps": 10,
+    "frames": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "loop": true
+   },
+   "hang": {
+    "fps": 1,
+    "frames": [
+     13
+    ],
+    "loop": false
+   },
+   "screech": {
+    "fps": 1,
+    "frames": [
+     4
+    ],
+    "loop": false
+   },
+   "swoop": {
+    "fps": 8,
+    "frames": [
+     5,
+     6
+    ],
+    "loop": true
+   }
+  },
+  "body_box_art": [
+   44,
+   46
+  ],
+  "body_box_logical": [
+   22,
+   23
+  ],
+  "edits": "re-packed on a uniform 56x72 grid; hang frame = squat frame flipped vertically",
+  "facing": "front",
+  "frame": [
+   56,
+   72
+  ],
+  "grid": [
+   8,
+   2
+  ],
+  "kind": "actor",
+  "note": "Dangler (yo-yo, archetype 2) and Swinger (pendulum, archetype 4) with hang (thread attaches at the top centre of the sprite); air Patroller with fly",
+  "pivot": [
+   28,
+   56
+  ],
+  "size": [
+   448,
+   144
+  ],
+  "source": "superpowers-prehistoric-platformer: monsters/bat-1.png"
+ },
+ "assets/sprites/enemies/bat_b.png": {
+  "anims": {
+   "angry": {
+    "fps": 8,
+    "frames": [
+     7,
+     8
+    ],
+    "loop": true
+   },
+   "dead": {
+    "fps": 1,
+    "frames": [
+     12
+    ],
+    "loop": false
+   },
+   "fall": {
+    "fps": 8,
+    "frames": [
+     9,
+     10,
+     11
+    ],
+    "loop": true
+   },
+   "fly": {
+    "fps": 10,
+    "frames": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "loop": true
+   },
+   "hang": {
+    "fps": 1,
+    "frames": [
+     13
+    ],
+    "loop": false
+   },
+   "screech": {
+    "fps": 1,
+    "frames": [
+     4
+    ],
+    "loop": false
+   },
+   "swoop": {
+    "fps": 8,
+    "frames": [
+     5,
+     6
+    ],
+    "loop": true
+   }
+  },
+  "body_box_art": [
+   44,
+   46
+  ],
+  "body_box_logical": [
+   22,
+   23
+  ],
+  "edits": "re-packed on a uniform 56x72 grid; hang frame = squat frame flipped vertically",
+  "facing": "front",
+  "frame": [
+   56,
+   72
+  ],
+  "grid": [
+   8,
+   2
+  ],
+  "kind": "actor",
+  "note": "Dangler (yo-yo, archetype 2) and Swinger (pendulum, archetype 4) with hang (thread attaches at the top centre of the sprite); air Patroller with fly",
+  "pivot": [
+   28,
+   56
+  ],
+  "size": [
+   448,
+   144
+  ],
+  "source": "superpowers-prehistoric-platformer: monsters/bat-2.png"
+ },
+ "assets/sprites/enemies/dragon.png": {
+  "anims": {
+   "attack": {
+    "fps": 10,
+    "frames": [
+     5,
+     6,
+     7,
+     8
+    ],
+    "loop": false
+   },
+   "dead": {
+    "fps": 1,
+    "frames": [
+     15
+    ],
+    "loop": false
+   },
+   "fall": {
+    "fps": 10,
+    "frames": [
+     12,
+     13,
+     14
+    ],
+    "loop": true
+   },
+   "glide": {
+    "fps": 8,
+    "frames": [
+     3,
+     4
+    ],
+    "loop": true
+   },
+   "hit": {
+    "fps": 8,
+    "frames": [
+     9,
+     10,
+     11
+    ],
+    "loop": false
+   },
+   "idle": {
+    "fps": 8,
+    "frames": [
+     0,
+     1,
+     2
+    ],
+    "loop": true
+   }
+  },
+  "body_box_art": [
+   70,
+   53
+  ],
+  "body_box_logical": [
+   35,
+   26
+  ],
+  "edits": "re-packed on a uniform 120x80 grid",
+  "facing": "right",
+  "frame": [
+   120,
+   80
+  ],
+  "grid": [
+   8,
+   2
+  ],
+  "kind": "actor",
+  "note": "Leaper (arc leaper, archetype 11): leap = sheet frames 7-8 (stretched lunge of attack), glide = glide",
+  "pivot": [
+   60,
+   64
+  ],
+  "size": [
+   960,
+   160
+  ],
+  "source": "superpowers-prehistoric-platformer: monsters/dragon-1.png"
+ },
+ "assets/sprites/enemies/dragon_b.png": {
+  "anims": {
+   "attack": {
+    "fps": 10,
+    "frames": [
+     5,
+     6,
+     7,
+     8
+    ],
+    "loop": false
+   },
+   "dead": {
+    "fps": 1,
+    "frames": [
+     15
+    ],
+    "loop": false
+   },
+   "fall": {
+    "fps": 10,
+    "frames": [
+     12,
+     13,
+     14
+    ],
+    "loop": true
+   },
+   "glide": {
+    "fps": 8,
+    "frames": [
+     3,
+     4
+    ],
+    "loop": true
+   },
+   "hit": {
+    "fps": 8,
+    "frames": [
+     9,
+     10,
+     11
+    ],
+    "loop": false
+   },
+   "idle": {
+    "fps": 8,
+    "frames": [
+     0,
+     1,
+     2
+    ],
+    "loop": true
+   }
+  },
+  "body_box_art": [
+   70,
+   53
+  ],
+  "body_box_logical": [
+   35,
+   26
+  ],
+  "edits": "re-packed on a uniform 120x80 grid",
+  "facing": "right",
+  "frame": [
+   120,
+   80
+  ],
+  "grid": [
+   8,
+   2
+  ],
+  "kind": "actor",
+  "note": "Leaper (arc leaper, archetype 11): leap = sheet frames 7-8 (stretched lunge of attack), glide = glide",
+  "pivot": [
+   60,
+   64
+  ],
+  "size": [
+   960,
+   160
+  ],
+  "source": "superpowers-prehistoric-platformer: monsters/dragon-2.png"
+ },
+ "assets/sprites/enemies/egg_kid.png": {
+  "anims": {
+   "attack": {
+    "fps": 12,
+    "frames": [
+     22,
+     23,
+     24,
+     25
+    ],
+    "loop": false
+   },
+   "climb": {
+    "fps": 6,
+    "frames": [
+     33,
+     34,
+     35,
+     36
+    ],
+    "loop": true
+   },
+   "crouch": {
+    "fps": 1,
+    "frames": [
+     21
+    ],
+    "loop": false
+   },
+   "death": {
+    "fps": 8,
+    "frames": [
+     28,
+     29,
+     30,
+     31,
+     32
+    ],
+    "loop": false
+   },
+   "hurt": {
+    "fps": 8,
+    "frames": [
+     26,
+     27
+    ],
+    "loop": true
+   },
+   "idle": {
+    "fps": 8,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5
+    ],
+    "loop": true
+   },
+   "jump": {
+    "fps": 10,
+    "frames": [
+     14,
+     15,
+     16
+    ],
+    "loop": false
+   },
+   "land": {
+    "fps": 1,
+    "frames": [
+     17
+    ],
+    "loop": false
+   },
+   "roll": {
+    "fps": 14,
+    "frames": [
+     18,
+     19,
+     20
+    ],
+    "loop": true
+   },
+   "walk": {
+    "fps": 12,
+    "frames": [
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13
+    ],
+    "loop": true
+   }
+  },
+  "body_box_art": [
+   52,
+   60
+  ],
+  "body_box_logical": [
+   26,
+   30
+  ],
+  "edits": "re-packed on a uniform 120x88 grid",
+  "facing": "right",
+  "frame": [
+   120,
+   88
+  ],
+  "grid": [
+   8,
+   5
+  ],
+  "kind": "actor",
+  "note": "Dropper (sky dropper, archetype 0): falls with roll (egg), lands with land, then walk",
+  "pivot": [
+   60,
+   72
+  ],
+  "size": [
+   960,
+   440
+  ],
+  "source": "superpowers-prehistoric-platformer: characters/playable/egg-shell.png"
+ },
+ "assets/sprites/enemies/egg_kid_b.png": {
+  "anims": {
+   "attack": {
+    "fps": 12,
+    "frames": [
+     22,
+     23,
+     24,
+     25
+    ],
+    "loop": false
+   },
+   "climb": {
+    "fps": 6,
+    "frames": [
+     33,
+     34,
+     35,
+     36
+    ],
+    "loop": true
+   },
+   "crouch": {
+    "fps": 1,
+    "frames": [
+     21
+    ],
+    "loop": false
+   },
+   "death": {
+    "fps": 8,
+    "frames": [
+     28,
+     29,
+     30,
+     31,
+     32
+    ],
+    "loop": false
+   },
+   "hurt": {
+    "fps": 8,
+    "frames": [
+     26,
+     27
+    ],
+    "loop": true
+   },
+   "idle": {
+    "fps": 8,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5
+    ],
+    "loop": true
+   },
+   "jump": {
+    "fps": 10,
+    "frames": [
+     14,
+     15,
+     16
+    ],
+    "loop": false
+   },
+   "land": {
+    "fps": 1,
+    "frames": [
+     17
+    ],
+    "loop": false
+   },
+   "roll": {
+    "fps": 14,
+    "frames": [
+     18,
+     19,
+     20
+    ],
+    "loop": true
+   },
+   "walk": {
+    "fps": 12,
+    "frames": [
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13
+    ],
+    "loop": true
+   }
+  },
+  "body_box_art": [
+   52,
+   60
+  ],
+  "body_box_logical": [
+   26,
+   30
+  ],
+  "edits": "re-packed on a uniform 120x88 grid",
+  "facing": "right",
+  "frame": [
+   120,
+   88
+  ],
+  "grid": [
+   8,
+   5
+  ],
+  "kind": "actor",
+  "note": "Dropper (sky dropper, archetype 0): falls with roll (egg), lands with land, then walk",
+  "pivot": [
+   60,
+   72
+  ],
+  "size": [
+   960,
+   440
+  ],
+  "source": "superpowers-prehistoric-platformer: characters/playable/egg-shell-2.png"
+ },
+ "assets/sprites/enemies/insect.png": {
+  "anims": {
+   "dead": {
+    "fps": 8,
+    "frames": [
+     7,
+     8,
+     9,
+     10
+    ],
+    "loop": false
+   },
+   "fly": {
+    "fps": 12,
+    "frames": [
+     5,
+     6
+    ],
+    "loop": true
+   },
+   "hang": {
+    "fps": 1,
+    "frames": [
+     11
+    ],
+    "loop": false
+   },
+   "idle": {
+    "fps": 2,
+    "frames": [
+     0,
+     1
+    ],
+    "loop": true
+   },
+   "walk": {
+    "fps": 10,
+    "frames": [
+     2,
+     3,
+     4
+    ],
+    "loop": true
+   }
+  },
+  "body_box_art": [
+   70,
+   36
+  ],
+  "body_box_logical": [
+   35,
+   18
+  ],
+  "edits": "re-packed on a uniform 88x88 grid; hang frame = idle frame flipped vertically",
+  "facing": "right",
+  "frame": [
+   88,
+   88
+  ],
+  "grid": [
+   8,
+   2
+  ],
+  "kind": "actor",
+  "note": "Lurker (ceiling dropper -> chaser, archetype 3): hang, then walk; Stinger (sentry diver, archetype 5) with fly",
+  "pivot": [
+   44,
+   72
+  ],
+  "size": [
+   704,
+   176
+  ],
+  "source": "superpowers-prehistoric-platformer: monsters/insect-1.png"
+ },
+ "assets/sprites/enemies/insect_b.png": {
+  "anims": {
+   "dead": {
+    "fps": 8,
+    "frames": [
+     7,
+     8,
+     9,
+     10
+    ],
+    "loop": false
+   },
+   "fly": {
+    "fps": 12,
+    "frames": [
+     5,
+     6
+    ],
+    "loop": true
+   },
+   "hang": {
+    "fps": 1,
+    "frames": [
+     11
+    ],
+    "loop": false
+   },
+   "idle": {
+    "fps": 2,
+    "frames": [
+     0,
+     1
+    ],
+    "loop": true
+   },
+   "walk": {
+    "fps": 10,
+    "frames": [
+     2,
+     3,
+     4
+    ],
+    "loop": true
+   }
+  },
+  "body_box_art": [
+   70,
+   36
+  ],
+  "body_box_logical": [
+   35,
+   18
+  ],
+  "edits": "re-packed on a uniform 88x88 grid; hang frame = idle frame flipped vertically",
+  "facing": "right",
+  "frame": [
+   88,
+   88
+  ],
+  "grid": [
+   8,
+   2
+  ],
+  "kind": "actor",
+  "note": "Lurker (ceiling dropper -> chaser, archetype 3): hang, then walk; Stinger (sentry diver, archetype 5) with fly",
+  "pivot": [
+   44,
+   72
+  ],
+  "size": [
+   704,
+   176
+  ],
+  "source": "superpowers-prehistoric-platformer: monsters/insect-2.png"
+ },
+ "assets/sprites/enemies/lizard.png": {
+  "anims": {
+   "attack": {
+    "fps": 10,
+    "frames": [
+     12,
+     13,
+     14,
+     15
+    ],
+    "loop": false
+   },
+   "dead": {
+    "fps": 1,
+    "frames": [
+     22
+    ],
+    "loop": false
+   },
+   "dizzy": {
+    "fps": 8,
+    "frames": [
+     18,
+     19,
+     20,
+     21
+    ],
+    "loop": true
+   },
+   "hit": {
+    "fps": 8,
+    "frames": [
+     16,
+     17
+    ],
+    "loop": false
+   },
+   "hop": {
+    "fps": 10,
+    "frames": [
+     6,
+     7,
+     8,
+     9,
+     10,
+     11
+    ],
+    "loop": true
+   },
+   "idle": {
+    "fps": 8,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5
+    ],
+    "loop": true
+   }
+  },
+  "body_box_art": [
+   63,
+   41
+  ],
+  "body_box_logical": [
+   32,
+   20
+  ],
+  "edits": "re-packed on a uniform 136x72 grid",
+  "facing": "right",
+  "frame": [
+   136,
+   72
+  ],
+  "grid": [
+   8,
+   3
+  ],
+  "kind": "actor",
+  "note": "Digger (burrower, archetype 10): reveal bottom-up with a clip rect; also a second Hopper skin",
+  "pivot": [
+   68,
+   56
+  ],
+  "size": [
+   1088,
+   216
+  ],
+  "source": "superpowers-prehistoric-platformer: monsters/lizard-1.png"
+ },
+ "assets/sprites/enemies/lizard_b.png": {
+  "anims": {
+   "attack": {
+    "fps": 10,
+    "frames": [
+     12,
+     13,
+     14,
+     15
+    ],
+    "loop": false
+   },
+   "dead": {
+    "fps": 1,
+    "frames": [
+     22
+    ],
+    "loop": false
+   },
+   "dizzy": {
+    "fps": 8,
+    "frames": [
+     18,
+     19,
+     20,
+     21
+    ],
+    "loop": true
+   },
+   "hit": {
+    "fps": 8,
+    "frames": [
+     16,
+     17
+    ],
+    "loop": false
+   },
+   "hop": {
+    "fps": 10,
+    "frames": [
+     6,
+     7,
+     8,
+     9,
+     10,
+     11
+    ],
+    "loop": true
+   },
+   "idle": {
+    "fps": 8,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5
+    ],
+    "loop": true
+   }
+  },
+  "body_box_art": [
+   63,
+   41
+  ],
+  "body_box_logical": [
+   32,
+   20
+  ],
+  "edits": "re-packed on a uniform 136x72 grid",
+  "facing": "right",
+  "frame": [
+   136,
+   72
+  ],
+  "grid": [
+   8,
+   3
+  ],
+  "kind": "actor",
+  "note": "Digger (burrower, archetype 10): reveal bottom-up with a clip rect; also a second Hopper skin",
+  "pivot": [
+   68,
+   56
+  ],
+  "size": [
+   1088,
+   216
+  ],
+  "source": "superpowers-prehistoric-platformer: monsters/lizard-2.png"
+ },
+ "assets/sprites/enemies/mini_rex.png": {
+  "anims": {
+   "attack": {
+    "fps": 10,
+    "frames": [
+     11,
+     12,
+     13
+    ],
+    "loop": false
+   },
+   "dead": {
+    "fps": 4,
+    "frames": [
+     20,
+     21
+    ],
+    "loop": false
+   },
+   "dizzy": {
+    "fps": 8,
+    "frames": [
+     16,
+     17,
+     18,
+     19
+    ],
+    "loop": true
+   },
+   "hit": {
+    "fps": 8,
+    "frames": [
+     14,
+     15
+    ],
+    "loop": false
+   },
+   "idle": {
+    "fps": 8,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5
+    ],
+    "loop": true
+   },
+   "walk": {
+    "fps": 10,
+    "frames": [
+     6,
+     7,
+     8,
+     9,
+     10
+    ],
+    "loop": true
+   }
+  },
+  "body_box_art": [
+   58,
+   47
+  ],
+  "body_box_logical": [
+   29,
+   24
+  ],
+  "edits": "re-packed on a uniform 104x80 grid",
+  "facing": "right",
+  "frame": [
+   104,
+   80
+  ],
+  "grid": [
+   8,
+   3
+  ],
+  "kind": "actor",
+  "note": "Hopper (archetype 8); jump = sheet frame 7 held, land = idle",
+  "pivot": [
+   52,
+   64
+  ],
+  "size": [
+   832,
+   240
+  ],
+  "source": "superpowers-prehistoric-platformer: monsters/mini-tyrannosaurus-1.png"
+ },
+ "assets/sprites/enemies/mini_rex_b.png": {
+  "anims": {
+   "attack": {
+    "fps": 10,
+    "frames": [
+     11,
+     12,
+     13
+    ],
+    "loop": false
+   },
+   "dead": {
+    "fps": 4,
+    "frames": [
+     20,
+     21
+    ],
+    "loop": false
+   },
+   "dizzy": {
+    "fps": 8,
+    "frames": [
+     16,
+     17,
+     18,
+     19
+    ],
+    "loop": true
+   },
+   "hit": {
+    "fps": 8,
+    "frames": [
+     14,
+     15
+    ],
+    "loop": false
+   },
+   "idle": {
+    "fps": 8,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5
+    ],
+    "loop": true
+   },
+   "walk": {
+    "fps": 10,
+    "frames": [
+     6,
+     7,
+     8,
+     9,
+     10
+    ],
+    "loop": true
+   }
+  },
+  "body_box_art": [
+   58,
+   47
+  ],
+  "body_box_logical": [
+   29,
+   24
+  ],
+  "edits": "re-packed on a uniform 104x80 grid",
+  "facing": "right",
+  "frame": [
+   104,
+   80
+  ],
+  "grid": [
+   8,
+   3
+  ],
+  "kind": "actor",
+  "note": "Hopper (archetype 8); jump = sheet frame 7 held, land = idle",
+  "pivot": [
+   52,
+   64
+  ],
+  "size": [
+   832,
+   240
+  ],
+  "source": "superpowers-prehistoric-platformer: monsters/mini-tyrannosaurus-2.png"
+ },
+ "assets/sprites/enemies/plant.png": {
+  "anims": {
+   "bite": {
+    "fps": 10,
+    "frames": [
+     9,
+     10,
+     11
+    ],
+    "loop": false
+   },
+   "dead": {
+    "fps": 6,
+    "frames": [
+     21,
+     22,
+     23
+    ],
+    "loop": false
+   },
+   "hit": {
+    "fps": 8,
+    "frames": [
+     12,
+     13,
+     14
+    ],
+    "loop": false
+   },
+   "idle": {
+    "fps": 8,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5
+    ],
+    "loop": true
+   },
+   "recover": {
+    "fps": 10,
+    "frames": [
+     15,
+     16,
+     17,
+     18,
+     19,
+     20
+    ],
+    "loop": false
+   },
+   "windup": {
+    "fps": 10,
+    "frames": [
+     6,
+     7,
+     8
+    ],
+    "loop": false
+   }
+  },
+  "body_box_art": [
+   59,
+   56
+  ],
+  "body_box_logical": [
+   30,
+   28
+  ],
+  "edits": "re-packed on a uniform 176x104 grid",
+  "facing": "right",
+  "frame": [
+   176,
+   104
+  ],
+  "grid": [
+   8,
+   3
+  ],
+  "kind": "actor",
+  "note": "stationary snapper hazard (the original's 'red snake' role); bite reaches 84 art px forward",
+  "pivot": [
+   88,
+   88
+  ],
+  "size": [
+   1408,
+   312
+  ],
+  "source": "superpowers-prehistoric-platformer: monsters/plant-1.png"
+ },
+ "assets/sprites/enemies/plant_b.png": {
+  "anims": {
+   "bite": {
+    "fps": 10,
+    "frames": [
+     9,
+     10,
+     11
+    ],
+    "loop": false
+   },
+   "dead": {
+    "fps": 6,
+    "frames": [
+     21,
+     22,
+     23
+    ],
+    "loop": false
+   },
+   "hit": {
+    "fps": 8,
+    "frames": [
+     12,
+     13,
+     14
+    ],
+    "loop": false
+   },
+   "idle": {
+    "fps": 8,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5
+    ],
+    "loop": true
+   },
+   "recover": {
+    "fps": 10,
+    "frames": [
+     15,
+     16,
+     17,
+     18,
+     19,
+     20
+    ],
+    "loop": false
+   },
+   "windup": {
+    "fps": 10,
+    "frames": [
+     6,
+     7,
+     8
+    ],
+    "loop": false
+   }
+  },
+  "body_box_art": [
+   59,
+   56
+  ],
+  "body_box_logical": [
+   30,
+   28
+  ],
+  "edits": "re-packed on a uniform 176x104 grid",
+  "facing": "right",
+  "frame": [
+   176,
+   104
+  ],
+  "grid": [
+   8,
+   3
+  ],
+  "kind": "actor",
+  "note": "stationary snapper hazard (the original's 'red snake' role); bite reaches 84 art px forward",
+  "pivot": [
+   88,
+   88
+  ],
+  "size": [
+   1408,
+   312
+  ],
+  "source": "superpowers-prehistoric-platformer: monsters/plant-2.png"
+ },
+ "assets/sprites/enemies/pterodactyl.png": {
+  "anims": {
+   "dead": {
+    "fps": 1,
+    "frames": [
+     15
+    ],
+    "loop": false
+   },
+   "dive": {
+    "fps": 10,
+    "frames": [
+     7,
+     8
+    ],
+    "loop": true
+   },
+   "fly": {
+    "fps": 8,
+    "frames": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "loop": true
+   },
+   "hit": {
+    "fps": 10,
+    "frames": [
+     11,
+     12,
+     13,
+     14
+    ],
+    "loop": false
+   },
+   "perch": {
+    "fps": 1,
+    "frames": [
+     4
+    ],
+    "loop": false
+   },
+   "rise": {
+    "fps": 8,
+    "frames": [
+     5,
+     6
+    ],
+    "loop": true
+   },
+   "screech": {
+    "fps": 8,
+    "frames": [
+     9,
+     10
+    ],
+    "loop": true
+   }
+  },
+  "body_box_art": [
+   103,
+   44
+  ],
+  "body_box_logical": [
+   52,
+   22
+  ],
+  "edits": "re-packed on a uniform 144x120 grid",
+  "facing": "right",
+  "frame": [
+   144,
+   120
+  ],
+  "grid": [
+   8,
+   2
+  ],
+  "kind": "actor",
+  "note": "Harrier (clever flyer, archetype 6) with fly; Dart (kamikaze diver, archetype 7) with dive",
+  "pivot": [
+   72,
+   104
+  ],
+  "size": [
+   1152,
+   240
+  ],
+  "source": "superpowers-prehistoric-platformer: monsters/pterodactyl-1.png"
+ },
+ "assets/sprites/enemies/pterodactyl_b.png": {
+  "anims": {
+   "dead": {
+    "fps": 1,
+    "frames": [
+     15
+    ],
+    "loop": false
+   },
+   "dive": {
+    "fps": 10,
+    "frames": [
+     7,
+     8
+    ],
+    "loop": true
+   },
+   "fly": {
+    "fps": 8,
+    "frames": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "loop": true
+   },
+   "hit": {
+    "fps": 10,
+    "frames": [
+     11,
+     12,
+     13,
+     14
+    ],
+    "loop": false
+   },
+   "perch": {
+    "fps": 1,
+    "frames": [
+     4
+    ],
+    "loop": false
+   },
+   "rise": {
+    "fps": 8,
+    "frames": [
+     5,
+     6
+    ],
+    "loop": true
+   },
+   "screech": {
+    "fps": 8,
+    "frames": [
+     9,
+     10
+    ],
+    "loop": true
+   }
+  },
+  "body_box_art": [
+   103,
+   44
+  ],
+  "body_box_logical": [
+   52,
+   22
+  ],
+  "edits": "re-packed on a uniform 144x120 grid",
+  "facing": "right",
+  "frame": [
+   144,
+   120
+  ],
+  "grid": [
+   8,
+   2
+  ],
+  "kind": "actor",
+  "note": "Harrier (clever flyer, archetype 6) with fly; Dart (kamikaze diver, archetype 7) with dive",
+  "pivot": [
+   72,
+   104
+  ],
+  "size": [
+   1152,
+   240
+  ],
+  "source": "superpowers-prehistoric-platformer: monsters/pterodactyl-2.png"
+ },
+ "assets/sprites/enemies/rex.png": {
+  "anims": {
+   "attack": {
+    "fps": 10,
+    "frames": [
+     14,
+     15,
+     16,
+     17,
+     18
+    ],
+    "loop": false
+   },
+   "dead": {
+    "fps": 6,
+    "frames": [
+     21,
+     22,
+     23
+    ],
+    "loop": false
+   },
+   "hit": {
+    "fps": 8,
+    "frames": [
+     19,
+     20
+    ],
+    "loop": false
+   },
+   "idle": {
+    "fps": 8,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5
+    ],
+    "loop": true
+   },
+   "walk": {
+    "fps": 12,
+    "frames": [
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13
+    ],
+    "loop": true
+   }
+  },
+  "body_box_art": [
+   116,
+   70
+  ],
+  "body_box_logical": [
+   58,
+   35
+  ],
+  "edits": "re-packed on a uniform 152x112 grid; mirrored to face right",
+  "facing": "right",
+  "frame": [
+   152,
+   112
+  ],
+  "grid": [
+   8,
+   3
+  ],
+  "kind": "actor",
+  "note": "heavy Charger (archetype 12) / mid-boss; 1x size",
+  "pivot": [
+   76,
+   96
+  ],
+  "size": [
+   1216,
+   336
+  ],
+  "source": "superpowers-prehistoric-platformer: monsters/tyrannosaurus-1.png"
+ },
+ "assets/sprites/enemies/rex_b.png": {
+  "anims": {
+   "attack": {
+    "fps": 10,
+    "frames": [
+     14,
+     15,
+     16,
+     17,
+     18
+    ],
+    "loop": false
+   },
+   "dead": {
+    "fps": 6,
+    "frames": [
+     21,
+     22,
+     23
+    ],
+    "loop": false
+   },
+   "hit": {
+    "fps": 8,
+    "frames": [
+     19,
+     20
+    ],
+    "loop": false
+   },
+   "idle": {
+    "fps": 8,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5
+    ],
+    "loop": true
+   },
+   "walk": {
+    "fps": 12,
+    "frames": [
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13
+    ],
+    "loop": true
+   }
+  },
+  "body_box_art": [
+   116,
+   70
+  ],
+  "body_box_logical": [
+   58,
+   35
+  ],
+  "edits": "re-packed on a uniform 152x112 grid; mirrored to face right",
+  "facing": "right",
+  "frame": [
+   152,
+   112
+  ],
+  "grid": [
+   8,
+   3
+  ],
+  "kind": "actor",
+  "note": "heavy Charger (archetype 12) / mid-boss; 1x size",
+  "pivot": [
+   76,
+   96
+  ],
+  "size": [
+   1216,
+   336
+  ],
+  "source": "superpowers-prehistoric-platformer: monsters/tyrannosaurus-2.png"
+ },
+ "assets/sprites/enemies/rival.png": {
+  "anims": {
+   "attack": {
+    "fps": 12,
+    "frames": [
+     25,
+     26,
+     27,
+     28
+    ],
+    "loop": false
+   },
+   "crouch": {
+    "fps": 1,
+    "frames": [
+     24
+    ],
+    "loop": false
+   },
+   "death": {
+    "fps": 8,
+    "frames": [
+     31,
+     32,
+     33,
+     34,
+     35
+    ],
+    "loop": false
+   },
+   "fall": {
+    "fps": 10,
+    "frames": [
+     17,
+     18,
+     19
+    ],
+    "loop": true
+   },
+   "hurt": {
+    "fps": 8,
+    "frames": [
+     29,
+     30
+    ],
+    "loop": true
+   },
+   "idle": {
+    "fps": 8,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5
+    ],
+    "loop": true
+   },
+   "jump": {
+    "fps": 10,
+    "frames": [
+     14,
+     15,
+     16
+    ],
+    "loop": false
+   },
+   "land": {
+    "fps": 1,
+    "frames": [
+     20
+    ],
+    "loop": false
+   },
+   "roll": {
+    "fps": 14,
+    "frames": [
+     21,
+     22,
+     23
+    ],
+    "loop": true
+   },
+   "walk": {
+    "fps": 12,
+    "frames": [
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13
+    ],
+    "loop": true
+   }
+  },
+  "body_box_art": [
+   45,
+   51
+  ],
+  "body_box_logical": [
+   22,
+   26
+  ],
+  "edits": "re-packed on a uniform 96x80 grid",
+  "facing": "right",
+  "frame": [
+   96,
+   80
+  ],
+  "grid": [
+   8,
+   5
+  ],
+  "kind": "actor",
+  "note": "Charger (edge rusher, archetype 12): rival caveman, walk at 16-20 fps for the rush",
+  "pivot": [
+   48,
+   64
+  ],
+  "size": [
+   768,
+   400
+  ],
+  "source": "superpowers-prehistoric-platformer: characters/playable/caverman-2.png"
+ },
+ "assets/sprites/enemies/turtle.png": {
+  "anims": {
+   "dead": {
+    "fps": 8,
+    "frames": [
+     16,
+     17,
+     18,
+     19,
+     20
+    ],
+    "loop": false
+   },
+   "hit": {
+    "fps": 12,
+    "frames": [
+     10,
+     11,
+     12,
+     13,
+     14,
+     15
+    ],
+    "loop": false
+   },
+   "idle": {
+    "fps": 6,
+    "frames": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "loop": true
+   },
+   "walk": {
+    "fps": 8,
+    "frames": [
+     4,
+     5,
+     6,
+     7,
+     8,
+     9
+    ],
+    "loop": true
+   }
+  },
+  "body_box_art": [
+   52,
+   30
+  ],
+  "body_box_logical": [
+   26,
+   15
+  ],
+  "edits": "re-packed on a uniform 64x56 grid; mirrored to face right",
+  "facing": "right",
+  "frame": [
+   64,
+   56
+  ],
+  "grid": [
+   8,
+   3
+  ],
+  "kind": "actor",
+  "note": "Walker (ground patroller, archetype 9)",
+  "pivot": [
+   32,
+   40
+  ],
+  "size": [
+   512,
+   168
+  ],
+  "source": "superpowers-prehistoric-platformer: monsters/turtle-1.png"
+ },
+ "assets/sprites/enemies/turtle_b.png": {
+  "anims": {
+   "dead": {
+    "fps": 8,
+    "frames": [
+     16,
+     17,
+     18,
+     19,
+     20
+    ],
+    "loop": false
+   },
+   "hit": {
+    "fps": 12,
+    "frames": [
+     10,
+     11,
+     12,
+     13,
+     14,
+     15
+    ],
+    "loop": false
+   },
+   "idle": {
+    "fps": 6,
+    "frames": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "loop": true
+   },
+   "walk": {
+    "fps": 8,
+    "frames": [
+     4,
+     5,
+     6,
+     7,
+     8,
+     9
+    ],
+    "loop": true
+   }
+  },
+  "body_box_art": [
+   52,
+   30
+  ],
+  "body_box_logical": [
+   26,
+   15
+  ],
+  "edits": "re-packed on a uniform 64x56 grid; mirrored to face right",
+  "facing": "right",
+  "frame": [
+   64,
+   56
+  ],
+  "grid": [
+   8,
+   3
+  ],
+  "kind": "actor",
+  "note": "Walker (ground patroller, archetype 9)",
+  "pivot": [
+   32,
+   40
+  ],
+  "size": [
+   512,
+   168
+  ],
+  "source": "superpowers-prehistoric-platformer: monsters/turtle-2.png"
+ },
+ "assets/sprites/fx/debris_rock.png": {
+  "edits": "re-packed on a uniform grid",
+  "frame": [
+   20,
+   20
+  ],
+  "grid": [
+   4,
+   1
+  ],
+  "kind": "fx",
+  "note": "debris of breakable blocks / hidden spots: cave, volcano",
+  "pivot": [
+   10,
+   10
+  ],
+  "size": [
+   80,
+   20
+  ],
+  "source": "superpowers-prehistoric-platformer: fx/particles/rock-particle-*.png"
+ },
+ "assets/sprites/fx/debris_wood.png": {
+  "edits": "re-packed on a uniform grid",
+  "frame": [
+   20,
+   20
+  ],
+  "grid": [
+   5,
+   1
+  ],
+  "kind": "fx",
+  "note": "debris: crates, barrels, jungle blocks",
+  "pivot": [
+   10,
+   10
+  ],
+  "size": [
+   100,
+   20
+  ],
+  "source": "superpowers-prehistoric-platformer: fx/particles/wood-particle-*.png"
+ },
+ "assets/sprites/fx/explosion.png": {
+  "anims": {
+   "explode": {
+    "fps": 16,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7
+    ],
+    "loop": false
+   }
+  },
+  "edits": "none",
+  "frame": [
+   64,
+   64
+  ],
+  "grid": [
+   8,
+   1
+  ],
+  "kind": "fx",
+  "note": "grenade / kill-all burst, breaking rocks",
+  "pivot": [
+   32,
+   32
+  ],
+  "size": [
+   512,
+   64
+  ],
+  "source": "ansimuz_explosion-animations-pack: explosion-1-b/spritesheet.png"
+ },
+ "assets/sprites/fx/explosion_big.png": {
+  "anims": {
+   "explode": {
+    "fps": 16,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11
+    ],
+    "loop": false
+   }
+  },
+  "edits": "none",
+  "frame": [
+   128,
+   128
+  ],
+  "grid": [
+   12,
+   1
+  ],
+  "kind": "fx",
+  "note": "boss defeat",
+  "pivot": [
+   64,
+   96
+  ],
+  "size": [
+   1536,
+   128
+  ],
+  "source": "ansimuz_explosion-animations-pack: explosion-1-d/spritsheet.png"
+ },
+ "assets/sprites/fx/falling_ember.png": {
+  "anims": {
+   "sway": {
+    "fps": 6,
+    "frames": [
+     0,
+     1
+    ],
+    "loop": true
+   }
+  },
+  "edits": "leaf gradient-mapped to ember colours, mirrored second frame",
+  "frame": [
+   22,
+   18
+  ],
+  "grid": [
+   2,
+   1
+  ],
+  "kind": "fx",
+  "note": "falling ember hazard in the volcano shaft",
+  "pivot": [
+   11,
+   9
+  ],
+  "size": [
+   44,
+   18
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/sprites/fx/falling_leaf.png": {
+  "anims": {
+   "sway": {
+    "fps": 4,
+    "frames": [
+     0,
+     1
+    ],
+    "loop": true
+   }
+  },
+  "edits": "mirrored second frame",
+  "frame": [
+   22,
+   18
+  ],
+  "grid": [
+   2,
+   1
+  ],
+  "kind": "fx",
+  "note": "falling leaf hazard (GAMEPLAY 6.2)",
+  "pivot": [
+   11,
+   9
+  ],
+  "size": [
+   44,
+   18
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/sprites/fx/hit_stars.png": {
+  "anims": {
+   "hit": {
+    "fps": 16,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5
+    ],
+    "loop": false
+   }
+  },
+  "edits": "none",
+  "frame": [
+   40,
+   41
+  ],
+  "grid": [
+   6,
+   1
+  ],
+  "kind": "fx",
+  "note": "club hit on an enemy (star burst)",
+  "pivot": [
+   20,
+   20
+  ],
+  "size": [
+   240,
+   41
+  ],
+  "source": "ansimuz_sunny-land: Misc/Sunnyland FX/Spritesheets/enemy-deadth.png"
+ },
+ "assets/sprites/fx/particles_leaf.png": {
+  "edits": "re-packed on a uniform grid",
+  "frame": [
+   20,
+   20
+  ],
+  "grid": [
+   4,
+   1
+  ],
+  "kind": "fx",
+  "note": "drifting leaves (jungle ambience, debris)",
+  "pivot": [
+   10,
+   10
+  ],
+  "size": [
+   80,
+   20
+  ],
+  "source": "superpowers-prehistoric-platformer: fx/particles/leaf-*.png"
+ },
+ "assets/sprites/fx/particles_rain.png": {
+  "edits": "re-packed on a uniform grid",
+  "frame": [
+   20,
+   20
+  ],
+  "grid": [
+   2,
+   1
+  ],
+  "kind": "fx",
+  "note": "rain streaks",
+  "pivot": [
+   10,
+   10
+  ],
+  "size": [
+   40,
+   20
+  ],
+  "source": "superpowers-prehistoric-platformer: fx/particles/rain-*.png"
+ },
+ "assets/sprites/fx/particles_smoke.png": {
+  "edits": "re-packed on a uniform grid",
+  "frame": [
+   28,
+   28
+  ],
+  "grid": [
+   4,
+   1
+  ],
+  "kind": "fx",
+  "note": "smoke / ash particles (volcano ambience)",
+  "pivot": [
+   14,
+   14
+  ],
+  "size": [
+   112,
+   28
+  ],
+  "source": "superpowers-prehistoric-platformer: fx/particles/smoke-particle-*.png"
+ },
+ "assets/sprites/fx/particles_snow.png": {
+  "edits": "re-packed on a uniform grid",
+  "frame": [
+   20,
+   20
+  ],
+  "grid": [
+   6,
+   1
+  ],
+  "kind": "fx",
+  "note": "snowfall / blizzard flakes and ice chips",
+  "pivot": [
+   10,
+   10
+  ],
+  "size": [
+   120,
+   20
+  ],
+  "source": "superpowers-prehistoric-platformer: fx/particles/snow-particle-*.png"
+ },
+ "assets/sprites/fx/poof.png": {
+  "anims": {
+   "poof": {
+    "fps": 16,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8
+    ],
+    "loop": false
+   }
+  },
+  "edits": "none",
+  "frame": [
+   57,
+   56
+  ],
+  "grid": [
+   9,
+   1
+  ],
+  "kind": "fx",
+  "note": "smoke poof: enemy defeated, item spawned from a hidden spot",
+  "pivot": [
+   28,
+   28
+  ],
+  "size": [
+   513,
+   56
+  ],
+  "source": "superpowers-prehistoric-platformer: fx/effects/2.png"
+ },
+ "assets/sprites/fx/projectile_axe.png": {
+  "anims": {
+   "spin": {
+    "fps": 16,
+    "frames": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "loop": true
+   }
+  },
+  "edits": "4 lossless 90 degree rotations",
+  "frame": [
+   32,
+   32
+  ],
+  "grid": [
+   4,
+   1
+  ],
+  "kind": "fx",
+  "note": "thrown axe projectile",
+  "pivot": [
+   16,
+   16
+  ],
+  "size": [
+   128,
+   32
+  ],
+  "source": "superpowers-prehistoric-platformer: items/14.png"
+ },
+ "assets/sprites/fx/projectile_boomerang.png": {
+  "anims": {
+   "spin": {
+    "fps": 16,
+    "frames": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "loop": true
+   }
+  },
+  "edits": "4 lossless 90 degree rotations",
+  "frame": [
+   26,
+   26
+  ],
+  "grid": [
+   4,
+   1
+  ],
+  "kind": "fx",
+  "note": "thrown boomerang projectile",
+  "pivot": [
+   13,
+   13
+  ],
+  "size": [
+   104,
+   26
+  ],
+  "source": "superpowers-prehistoric-platformer: items/20.png"
+ },
+ "assets/sprites/fx/projectile_rock.png": {
+  "anims": {
+   "spin": {
+    "fps": 12,
+    "frames": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "loop": true
+   }
+  },
+  "edits": "4 lossless 90 degree rotations",
+  "frame": [
+   22,
+   22
+  ],
+  "grid": [
+   4,
+   1
+  ],
+  "kind": "fx",
+  "note": "rock spat by the Wall Colossus",
+  "pivot": [
+   11,
+   11
+  ],
+  "size": [
+   88,
+   22
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/sprites/fx/projectile_stalactite.png": {
+  "edits": "recoloured to obsidian",
+  "frame": [
+   22,
+   40
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "fx",
+  "note": "ceiling drop of the Wall Colossus (the original's chandelier)",
+  "pivot": [
+   11,
+   40
+  ],
+  "size": [
+   22,
+   40
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/sprites/fx/ring.png": {
+  "anims": {
+   "ring": {
+    "fps": 18,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5
+    ],
+    "loop": false
+   }
+  },
+  "edits": "none",
+  "frame": [
+   50,
+   52
+  ],
+  "grid": [
+   6,
+   1
+  ],
+  "kind": "fx",
+  "note": "shock ring: head bounce, hard landing, boss stomp",
+  "pivot": [
+   25,
+   26
+  ],
+  "size": [
+   300,
+   52
+  ],
+  "source": "superpowers-prehistoric-platformer: fx/effects/4.png"
+ },
+ "assets/sprites/fx/slash.png": {
+  "anims": {
+   "slash": {
+    "fps": 20,
+    "frames": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "loop": false
+   }
+  },
+  "edits": "none",
+  "frame": [
+   33,
+   65
+  ],
+  "grid": [
+   4,
+   1
+  ],
+  "kind": "fx",
+  "note": "swing arc (already baked into the hero attack frames; use for enemy / boss swings)",
+  "pivot": [
+   16,
+   32
+  ],
+  "size": [
+   132,
+   65
+  ],
+  "source": "superpowers-prehistoric-platformer: fx/effects/1.png"
+ },
+ "assets/sprites/fx/smoke.png": {
+  "edits": "none",
+  "frame": [
+   41,
+   38
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "fx",
+  "note": "single smoke ball: run / skid dust (scale and fade in a particle emitter)",
+  "pivot": [
+   20,
+   19
+  ],
+  "size": [
+   41,
+   38
+  ],
+  "source": "superpowers-prehistoric-platformer: fx/effects/smoke.png"
+ },
+ "assets/sprites/fx/splash_lava.png": {
+  "anims": {
+   "splash": {
+    "fps": 14,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4
+    ],
+    "loop": false
+   }
+  },
+  "edits": "star puff gradient-mapped to lava colours",
+  "frame": [
+   45,
+   41
+  ],
+  "grid": [
+   5,
+   1
+  ],
+  "kind": "fx",
+  "note": "lava splash",
+  "pivot": [
+   22,
+   41
+  ],
+  "size": [
+   225,
+   41
+  ],
+  "source": "superpowers-prehistoric-platformer: fx/effects/3.png"
+ },
+ "assets/sprites/fx/splash_water.png": {
+  "anims": {
+   "splash": {
+    "fps": 14,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4
+    ],
+    "loop": false
+   }
+  },
+  "edits": "star puff gradient-mapped to water colours",
+  "frame": [
+   45,
+   41
+  ],
+  "grid": [
+   5,
+   1
+  ],
+  "kind": "fx",
+  "note": "water splash",
+  "pivot": [
+   22,
+   41
+  ],
+  "size": [
+   225,
+   41
+  ],
+  "source": "superpowers-prehistoric-platformer: fx/effects/3.png"
+ },
+ "assets/sprites/fx/star_puff.png": {
+  "anims": {
+   "puff": {
+    "fps": 16,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4
+    ],
+    "loop": false
+   }
+  },
+  "edits": "none",
+  "frame": [
+   45,
+   41
+  ],
+  "grid": [
+   5,
+   1
+  ],
+  "kind": "fx",
+  "note": "star puff shown on every club hit on scenery (GAMEPLAY 4.4), pick-up sparkle",
+  "pivot": [
+   22,
+   20
+  ],
+  "size": [
+   225,
+   41
+  ],
+  "source": "superpowers-prehistoric-platformer: fx/effects/3.png"
+ },
+ "assets/sprites/items/bone.png": {
+  "anims": {
+   "spin": {
+    "fps": 10,
+    "frames": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "loop": true
+   }
+  },
+  "edits": "4 lossless 90 degree rotations",
+  "frame": [
+   26,
+   26
+  ],
+  "grid": [
+   4,
+   1
+  ],
+  "kind": "item",
+  "note": "energy fragment: 6 bones = 1 heart (GAMEPLAY 4.2)",
+  "pivot": [
+   13,
+   13
+  ],
+  "size": [
+   104,
+   26
+  ],
+  "source": "superpowers-prehistoric-platformer: items/15.png"
+ },
+ "assets/sprites/items/food.png": {
+  "edits": "16 px icons scaled 2x nearest-neighbour; every sprite bottom-centred in a 32x32 cell",
+  "entries": [
+   {
+    "index": 0,
+    "name": "apple",
+    "score": 100
+   },
+   {
+    "index": 1,
+    "name": "banana",
+    "score": 100
+   },
+   {
+    "index": 2,
+    "name": "cherries",
+    "score": 100
+   },
+   {
+    "index": 3,
+    "name": "strawberry",
+    "score": 100
+   },
+   {
+    "index": 4,
+    "name": "orange",
+    "score": 100
+   },
+   {
+    "index": 5,
+    "name": "carrot",
+    "score": 100
+   },
+   {
+    "index": 6,
+    "name": "mushroom",
+    "score": 100
+   },
+   {
+    "index": 7,
+    "name": "grapes",
+    "score": 200
+   },
+   {
+    "index": 8,
+    "name": "pear",
+    "score": 200
+   },
+   {
+    "index": 9,
+    "name": "pineapple",
+    "score": 200
+   },
+   {
+    "index": 10,
+    "name": "watermelon_slice",
+    "score": 200
+   },
+   {
+    "index": 11,
+    "name": "corn",
+    "score": 200
+   },
+   {
+    "index": 12,
+    "name": "bread_roll",
+    "score": 200
+   },
+   {
+    "index": 13,
+    "name": "cheese",
+    "score": 300
+   },
+   {
+    "index": 14,
+    "name": "fried_egg",
+    "score": 300
+   },
+   {
+    "index": 15,
+    "name": "cookie",
+    "score": 300
+   },
+   {
+    "index": 16,
+    "name": "candy_cane",
+    "score": 300
+   },
+   {
+    "index": 17,
+    "name": "lollipop",
+    "score": 300
+   },
+   {
+    "index": 18,
+    "name": "popsicle",
+    "score": 300
+   },
+   {
+    "index": 19,
+    "name": "ice_cream",
+    "score": 500
+   },
+   {
+    "index": 20,
+    "name": "cupcake",
+    "score": 500
+   },
+   {
+    "index": 21,
+    "name": "doughnut",
+    "score": 500
+   },
+   {
+    "index": 22,
+    "name": "french_fries",
+    "score": 500
+   },
+   {
+    "index": 23,
+    "name": "hotdog",
+    "score": 500
+   },
+   {
+    "index": 24,
+    "name": "pizza_slice",
+    "score": 600
+   },
+   {
+    "index": 25,
+    "name": "taco",
+    "score": 600
+   },
+   {
+    "index": 26,
+    "name": "popcorn",
+    "score": 600
+   },
+   {
+    "index": 27,
+    "name": "burger",
+    "score": 700
+   },
+   {
+    "index": 28,
+    "name": "sandwich",
+    "score": 700
+   },
+   {
+    "index": 29,
+    "name": "pancakes",
+    "score": 750
+   },
+   {
+    "index": 30,
+    "name": "waffle",
+    "score": 750
+   },
+   {
+    "index": 31,
+    "name": "cake_slice",
+    "score": 800
+   },
+   {
+    "index": 32,
+    "name": "pie_slice",
+    "score": 800
+   },
+   {
+    "index": 33,
+    "name": "drumstick",
+    "score": 800
+   },
+   {
+    "index": 34,
+    "name": "sushi",
+    "score": 800
+   },
+   {
+    "index": 35,
+    "name": "steak",
+    "score": 1000
+   },
+   {
+    "index": 36,
+    "name": "ham",
+    "score": 1000
+   },
+   {
+    "index": 37,
+    "name": "honey_pot",
+    "score": 1000
+   },
+   {
+    "index": 38,
+    "name": "cake",
+    "score": 1000
+   },
+   {
+    "index": 39,
+    "name": "pizza",
+    "score": 1000
+   },
+   {
+    "index": 40,
+    "name": "roast",
+    "score": 1000
+   },
+   {
+    "index": 41,
+    "name": "dino_egg",
+    "score": 300
+   },
+   {
+    "index": 42,
+    "name": "honey_bun",
+    "score": 200
+   },
+   {
+    "index": 43,
+    "name": "rib_slab",
+    "score": 800
+   },
+   {
+    "index": 44,
+    "name": "rib_slab_rare",
+    "score": 800
+   },
+   {
+    "index": 45,
+    "name": "meat_orange",
+    "score": 600
+   },
+   {
+    "index": 46,
+    "name": "meat_blue",
+    "score": 600
+   },
+   {
+    "index": 47,
+    "name": "berry_red",
+    "score": 200
+   }
+  ],
+  "frame": [
+   32,
+   32
+  ],
+  "grid": [
+   8,
+   6
+  ],
+  "kind": "atlas",
+  "note": "small food 100-500, bigger food 600-1000 (GAMEPLAY 3.2); bob 3 px (6 art px) when placed in the map",
+  "pivot": [
+   16,
+   32
+  ],
+  "size": [
+   256,
+   192
+  ],
+  "source": "oga_aroach_16x16-food (indices 0-39, integer 2x) + superpowers-prehistoric-platformer items (40-47, native size)"
+ },
+ "assets/sprites/items/giant_bonus.png": {
+  "edits": "32 px sprites scaled 2x, 2 px dark outline added to match the anchor pack",
+  "entries": [
+   {
+    "index": 0,
+    "name": "giant_roast",
+    "score": 60000
+   },
+   {
+    "index": 1,
+    "name": "giant_burger",
+    "score": 20000
+   },
+   {
+    "index": 2,
+    "name": "giant_cake",
+    "score": 30000
+   },
+   {
+    "index": 3,
+    "name": "giant_donut",
+    "score": 10000
+   },
+   {
+    "index": 4,
+    "name": "giant_ice_cream",
+    "score": 10000
+   },
+   {
+    "index": 5,
+    "name": "giant_pizza",
+    "score": 20000
+   },
+   {
+    "index": 6,
+    "name": "giant_chocolate_cake",
+    "score": 30000
+   }
+  ],
+  "frame": [
+   72,
+   72
+  ],
+  "grid": [
+   7,
+   1
+  ],
+  "kind": "atlas",
+  "note": "giant bonuses that fall from the sky (GAMEPLAY 3.2 / 4.4)",
+  "pivot": [
+   36,
+   72
+  ],
+  "size": [
+   504,
+   72
+  ],
+  "source": "ghostpixxells_free-pixel-foods (integer 2x)"
+ },
+ "assets/sprites/items/glider_pickup.png": {
+  "edits": "padded to 40x40",
+  "frame": [
+   40,
+   40
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "item",
+  "note": "hang-glider pick-up",
+  "pivot": [
+   20,
+   40
+  ],
+  "size": [
+   40,
+   40
+  ],
+  "source": "superpowers-prehistoric-platformer: items/43.png"
+ },
+ "assets/sprites/items/letters.png": {
+  "edits": "five glyphs re-packed",
+  "entries": [
+   {
+    "index": 0,
+    "name": "letter_G"
+   },
+   {
+    "index": 1,
+    "name": "letter_R"
+   },
+   {
+    "index": 2,
+    "name": "letter_U"
+   },
+   {
+    "index": 3,
+    "name": "letter_B"
+   },
+   {
+    "index": 4,
+    "name": "letter_S"
+   }
+  ],
+  "frame": [
+   40,
+   40
+  ],
+  "grid": [
+   5,
+   1
+  ],
+  "kind": "atlas",
+  "note": "bonus word letters; the HUD shows the same sprites at half size or as dimmed placeholders",
+  "pivot": [
+   20,
+   40
+  ],
+  "size": [
+   200,
+   40
+  ],
+  "source": "superpowers-prehistoric-platformer: title-font.png"
+ },
+ "assets/sprites/items/pickups.png": {
+  "edits": "bottom-centred in 48x40 cells; 16 px icons scaled 2x",
+  "entries": [
+   {
+    "from": "superpowers-prehistoric-platformer: tileset-1.png icon strip (2x)",
+    "index": 0,
+    "meaning": "+1 heart",
+    "name": "heart"
+   },
+   {
+    "from": "superpowers-prehistoric-platformer: characters/playable/caverman.png (head crop)",
+    "index": 1,
+    "meaning": "+1 life (hero head)",
+    "name": "one_up"
+   },
+   {
+    "from": "superpowers-prehistoric-platformer: tileset-1.png icon strip (2x)",
+    "index": 2,
+    "meaning": "bad item: scatters all energy as bones",
+    "name": "skull"
+   },
+   {
+    "from": "oga_aroach_16x16-food (2x)",
+    "index": 3,
+    "meaning": "chili: every on-screen enemy dies",
+    "name": "kill_all"
+   },
+   {
+    "from": "oga_aroach_16x16-food (2x)",
+    "index": 4,
+    "meaning": "coconut bomb: on-screen enemies burst into bonus items",
+    "name": "grenade"
+   },
+   {
+    "from": "oga_aroach_16x16-rpg-items-db32 (2x)",
+    "index": 5,
+    "meaning": "torch: unlocks the exit totem (the original's lighter)",
+    "name": "fire_starter"
+   },
+   {
+    "from": "superpowers-prehistoric-platformer: items/3.png",
+    "index": 6,
+    "meaning": "feast kit piece 1 of 3 (the original's fork)",
+    "name": "feast_bowl"
+   },
+   {
+    "from": "superpowers-prehistoric-platformer: items/2.png",
+    "index": 7,
+    "meaning": "feast kit piece 2 of 3 (knife)",
+    "name": "feast_flint"
+   },
+   {
+    "from": "superpowers-prehistoric-platformer: items/4.png",
+    "index": 8,
+    "meaning": "feast kit piece 3 of 3 (spoon)",
+    "name": "feast_log"
+   },
+   {
+    "from": "oga_aroach_16x16-rpg-items-db32 (2x)",
+    "index": 9,
+    "meaning": "boss trophy: starts the ending",
+    "name": "trophy"
+   },
+   {
+    "from": "superpowers-prehistoric-platformer: items/19.png",
+    "index": 10,
+    "meaning": "spiral staff: warp to / from a bonus stage",
+    "name": "warp"
+   },
+   {
+    "from": "oga_aroach_16x16-rpg-items-db32 (2x)",
+    "index": 11,
+    "meaning": "washes off the flies (the original's tap)",
+    "name": "water_bucket"
+   },
+   {
+    "from": "superpowers-prehistoric-platformer: items/22.png",
+    "index": 12,
+    "meaning": "spare key icon",
+    "name": "key"
+   },
+   {
+    "from": "superpowers-prehistoric-platformer: tileset-1.png icon strip (2x)",
+    "index": 13,
+    "meaning": "editor marker (not drawn in game)",
+    "name": "marker_cross"
+   },
+   {
+    "from": "superpowers-prehistoric-platformer: tileset-1.png icon strip (2x)",
+    "index": 14,
+    "meaning": "spare orb icon",
+    "name": "amber_orb"
+   },
+   {
+    "from": "superpowers-prehistoric-platformer: tileset-1.png icon strip (2x)",
+    "index": 15,
+    "meaning": "spare flag icon",
+    "name": "flag_blue"
+   }
+  ],
+  "frame": [
+   48,
+   40
+  ],
+  "grid": [
+   8,
+   2
+  ],
+  "kind": "atlas",
+  "note": "special pick-ups (GAMEPLAY 4.1)",
+  "pivot": [
+   24,
+   40
+  ],
+  "size": [
+   384,
+   80
+  ],
+  "source": "mixed, see entries"
+ },
+ "assets/sprites/items/treasure.png": {
+  "edits": "16 px icons scaled 2x; bottom-centred in 32x32 cells",
+  "entries": [
+   {
+    "index": 0,
+    "name": "ruby",
+    "score": 2000
+   },
+   {
+    "index": 1,
+    "name": "sapphire",
+    "score": 2000
+   },
+   {
+    "index": 2,
+    "name": "emerald",
+    "score": 2000
+   },
+   {
+    "index": 3,
+    "name": "amethyst",
+    "score": 2000
+   },
+   {
+    "index": 4,
+    "name": "amber",
+    "score": 2000
+   },
+   {
+    "index": 5,
+    "name": "peridot",
+    "score": 2000
+   },
+   {
+    "index": 6,
+    "name": "quartz",
+    "score": 2000
+   },
+   {
+    "index": 7,
+    "name": "pearl",
+    "score": 2000
+   },
+   {
+    "index": 8,
+    "name": "diamond",
+    "score": 5000
+   },
+   {
+    "index": 9,
+    "name": "rough_diamond",
+    "score": 5000
+   },
+   {
+    "index": 10,
+    "name": "ring_red",
+    "score": 5000
+   },
+   {
+    "index": 11,
+    "name": "ring_blue",
+    "score": 5000
+   },
+   {
+    "index": 12,
+    "name": "ring_green",
+    "score": 5000
+   },
+   {
+    "index": 13,
+    "name": "necklace",
+    "score": 8000
+   },
+   {
+    "index": 14,
+    "name": "goblet",
+    "score": 8000
+   },
+   {
+    "index": 15,
+    "name": "orb",
+    "score": 8000
+   }
+  ],
+  "frame": [
+   32,
+   32
+  ],
+  "grid": [
+   8,
+   2
+  ],
+  "kind": "atlas",
+  "note": "treasures 2 000 / 5 000 / 8 000",
+  "pivot": [
+   16,
+   32
+  ],
+  "size": [
+   256,
+   64
+  ],
+  "source": "oga_aroach_16x16-rpg-items-db32 (integer 2x)"
+ },
+ "assets/sprites/items/weapon_axe.png": {
+  "edits": "padded to 32x40",
+  "frame": [
+   32,
+   40
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "item",
+  "note": "weapon pick-up: axe",
+  "pivot": [
+   16,
+   40
+  ],
+  "size": [
+   32,
+   40
+  ],
+  "source": "superpowers-prehistoric-platformer: items/14.png"
+ },
+ "assets/sprites/items/weapon_boomerang.png": {
+  "edits": "padded to 32x40",
+  "frame": [
+   32,
+   40
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "item",
+  "note": "weapon pick-up: boomerang",
+  "pivot": [
+   16,
+   40
+  ],
+  "size": [
+   32,
+   40
+  ],
+  "source": "superpowers-prehistoric-platformer: items/20.png"
+ },
+ "assets/sprites/items/weapon_club.png": {
+  "edits": "padded to 32x40",
+  "frame": [
+   32,
+   40
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "item",
+  "note": "weapon pick-up: club",
+  "pivot": [
+   16,
+   40
+  ],
+  "size": [
+   32,
+   40
+  ],
+  "source": "superpowers-prehistoric-platformer: items/1.png"
+ },
+ "assets/sprites/items/weapon_hammer.png": {
+  "edits": "padded to 32x40",
+  "frame": [
+   32,
+   40
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "item",
+  "note": "weapon pick-up: hammer",
+  "pivot": [
+   16,
+   40
+  ],
+  "size": [
+   32,
+   40
+  ],
+  "source": "superpowers-prehistoric-platformer: items/13.png"
+ },
+ "assets/sprites/npc/companion.png": {
+  "anims": {
+   "attack": {
+    "fps": 12,
+    "frames": [
+     22,
+     23,
+     24,
+     25
+    ],
+    "loop": false
+   },
+   "climb": {
+    "fps": 6,
+    "frames": [
+     33,
+     34,
+     35,
+     36
+    ],
+    "loop": true
+   },
+   "crouch": {
+    "fps": 1,
+    "frames": [
+     21
+    ],
+    "loop": false
+   },
+   "death": {
+    "fps": 8,
+    "frames": [
+     28,
+     29,
+     30,
+     31,
+     32
+    ],
+    "loop": false
+   },
+   "hurt": {
+    "fps": 8,
+    "frames": [
+     26,
+     27
+    ],
+    "loop": true
+   },
+   "idle": {
+    "fps": 8,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5
+    ],
+    "loop": true
+   },
+   "jump": {
+    "fps": 10,
+    "frames": [
+     14,
+     15,
+     16
+    ],
+    "loop": false
+   },
+   "land": {
+    "fps": 1,
+    "frames": [
+     17
+    ],
+    "loop": false
+   },
+   "roll": {
+    "fps": 14,
+    "frames": [
+     18,
+     19,
+     20
+    ],
+    "loop": true
+   },
+   "walk": {
+    "fps": 12,
+    "frames": [
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13
+    ],
+    "loop": true
+   }
+  },
+  "body_box_art": [
+   51,
+   60
+  ],
+  "body_box_logical": [
+   26,
+   30
+  ],
+  "edits": "re-packed on a uniform 112x88 grid",
+  "facing": "right",
+  "frame": [
+   112,
+   88
+  ],
+  "grid": [
+   8,
+   5
+  ],
+  "kind": "npc",
+  "note": "tally / game-over companion (GAMEPLAY 3.7): idle = waiting, hurt = crying on game over, attack = catching items",
+  "pivot": [
+   56,
+   72
+  ],
+  "size": [
+   896,
+   440
+  ],
+  "source": "superpowers-prehistoric-platformer: characters/playable/girl.png"
+ },
+ "assets/sprites/npc/elder.png": {
+  "anims": {
+   "idle": {
+    "fps": 5,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4
+    ],
+    "loop": true
+   }
+  },
+  "edits": "re-packed on a uniform grid",
+  "facing": "front",
+  "frame": [
+   64,
+   88
+  ],
+  "grid": [
+   5,
+   1
+  ],
+  "kind": "npc",
+  "note": "villager for the ending stage / title screen",
+  "pivot": [
+   32,
+   72
+  ],
+  "size": [
+   320,
+   88
+  ],
+  "source": "superpowers-prehistoric-platformer: characters/npc/old-man.png"
+ },
+ "assets/sprites/npc/kid.png": {
+  "anims": {
+   "idle": {
+    "fps": 5,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5
+    ],
+    "loop": true
+   }
+  },
+  "edits": "re-packed on a uniform grid",
+  "facing": "right",
+  "frame": [
+   48,
+   80
+  ],
+  "grid": [
+   6,
+   1
+  ],
+  "kind": "npc",
+  "note": "villager for the ending stage / title screen",
+  "pivot": [
+   24,
+   64
+  ],
+  "size": [
+   288,
+   80
+  ],
+  "source": "superpowers-prehistoric-platformer: characters/npc/boy-1.png"
+ },
+ "assets/sprites/npc/warrior.png": {
+  "anims": {
+   "idle": {
+    "fps": 5,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5
+    ],
+    "loop": true
+   }
+  },
+  "edits": "re-packed on a uniform grid",
+  "facing": "right",
+  "frame": [
+   72,
+   88
+  ],
+  "grid": [
+   6,
+   1
+  ],
+  "kind": "npc",
+  "note": "villager for the ending stage / title screen",
+  "pivot": [
+   36,
+   72
+  ],
+  "size": [
+   432,
+   88
+  ],
+  "source": "superpowers-prehistoric-platformer: characters/npc/warrior.png"
+ },
+ "assets/sprites/objects/barrel.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   31,
+   26
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "object",
+  "note": "breakable barrel (bonus container)",
+  "pivot": [
+   15,
+   26
+  ],
+  "size": [
+   31,
+   26
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/sprites/objects/bone_spikes.png": {
+  "edits": "cut out, padded to 128x32",
+  "frame": [
+   128,
+   32
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "object",
+  "note": "deadly spike bed, exactly 4 tiles wide (deadly from top and sides); can also be cut into four 32 px tiles",
+  "pivot": [
+   64,
+   32
+  ],
+  "size": [
+   128,
+   32
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/sprites/objects/boulder.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   64,
+   64
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "object",
+  "note": "rolling boulder / heavy projectile",
+  "pivot": [
+   32,
+   64
+  ],
+  "size": [
+   64,
+   64
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/sprites/objects/breakable_block.png": {
+  "anims": {
+   "break": {
+    "fps": 14,
+    "frames": [
+     4,
+     5,
+     6,
+     7
+    ],
+    "loop": false
+   },
+   "crack": {
+    "fps": 1,
+    "frames": [
+     1,
+     2,
+     3
+    ],
+    "loop": false
+   },
+   "idle": {
+    "fps": 1,
+    "frames": [
+     0
+    ],
+    "loop": false
+   }
+  },
+  "edits": "last empty frame dropped",
+  "frame": [
+   40,
+   44
+  ],
+  "grid": [
+   8,
+   1
+  ],
+  "kind": "object",
+  "note": "breakable block (GAMEPLAY 4.4), dirt look for jungle / cave / volcano; crack frames = hit feedback; the solid block is the 32x32 area at x 3..35, y 0..32 of the cell",
+  "pivot": [
+   19,
+   32
+  ],
+  "size": [
+   320,
+   44
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/fragile-block.png"
+ },
+ "assets/sprites/objects/breakable_block_cave.png": {
+  "anims": {
+   "break": {
+    "fps": 14,
+    "frames": [
+     4,
+     5,
+     6,
+     7
+    ],
+    "loop": false
+   },
+   "crack": {
+    "fps": 1,
+    "frames": [
+     1,
+     2,
+     3
+    ],
+    "loop": false
+   },
+   "idle": {
+    "fps": 1,
+    "frames": [
+     0
+    ],
+    "loop": false
+   }
+  },
+  "edits": "last empty frame dropped; recoloured",
+  "frame": [
+   40,
+   44
+  ],
+  "grid": [
+   8,
+   1
+  ],
+  "kind": "object",
+  "note": "breakable block, violet cave rock look; the solid block is the 32x32 area at x 3..35, y 0..32 of the cell",
+  "pivot": [
+   19,
+   32
+  ],
+  "size": [
+   320,
+   44
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/fragile-block.png"
+ },
+ "assets/sprites/objects/breakable_block_ice.png": {
+  "anims": {
+   "break": {
+    "fps": 14,
+    "frames": [
+     4,
+     5,
+     6,
+     7
+    ],
+    "loop": false
+   },
+   "crack": {
+    "fps": 1,
+    "frames": [
+     1,
+     2,
+     3
+    ],
+    "loop": false
+   },
+   "idle": {
+    "fps": 1,
+    "frames": [
+     0
+    ],
+    "loop": false
+   }
+  },
+  "edits": "last empty frame dropped; recoloured",
+  "frame": [
+   40,
+   44
+  ],
+  "grid": [
+   8,
+   1
+  ],
+  "kind": "object",
+  "note": "breakable block, ice look; the solid block is the 32x32 area at x 3..35, y 0..32 of the cell",
+  "pivot": [
+   19,
+   32
+  ],
+  "size": [
+   320,
+   44
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/fragile-block.png"
+ },
+ "assets/sprites/objects/breakable_block_obsidian.png": {
+  "anims": {
+   "break": {
+    "fps": 14,
+    "frames": [
+     4,
+     5,
+     6,
+     7
+    ],
+    "loop": false
+   },
+   "crack": {
+    "fps": 1,
+    "frames": [
+     1,
+     2,
+     3
+    ],
+    "loop": false
+   },
+   "idle": {
+    "fps": 1,
+    "frames": [
+     0
+    ],
+    "loop": false
+   }
+  },
+  "edits": "last empty frame dropped; recoloured",
+  "frame": [
+   40,
+   44
+  ],
+  "grid": [
+   8,
+   1
+  ],
+  "kind": "object",
+  "note": "breakable block, obsidian look; the solid block is the 32x32 area at x 3..35, y 0..32 of the cell",
+  "pivot": [
+   19,
+   32
+  ],
+  "size": [
+   320,
+   44
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/fragile-block.png"
+ },
+ "assets/sprites/objects/carved_block.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   32,
+   32
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "object",
+  "note": "carved stone block (totem piece)",
+  "pivot": [
+   16,
+   32
+  ],
+  "size": [
+   32,
+   32
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/sprites/objects/checkpoint.png": {
+  "anims": {
+   "off": {
+    "fps": 1,
+    "frames": [
+     0
+    ],
+    "loop": false
+   },
+   "on": {
+    "fps": 8,
+    "frames": [
+     1,
+     2,
+     3,
+     4
+    ],
+    "loop": true
+   }
+  },
+  "edits": "unlit spit padded into the 84x55 cell of the lit frames",
+  "frame": [
+   84,
+   55
+  ],
+  "grid": [
+   5,
+   1
+  ],
+  "kind": "object",
+  "note": "restart point (GAMEPLAY 7.6): off until touched, then on",
+  "pivot": [
+   42,
+   55
+  ],
+  "size": [
+   420,
+   55
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/fire.png + fire-meat.png"
+ },
+ "assets/sprites/objects/chest.png": {
+  "anims": {
+   "closed": {
+    "fps": 1,
+    "frames": [
+     0
+    ],
+    "loop": false
+   },
+   "open": {
+    "fps": 10,
+    "frames": [
+     1,
+     2,
+     3
+    ],
+    "loop": false
+   }
+  },
+  "edits": "none",
+  "frame": [
+   60,
+   36
+  ],
+  "grid": [
+   4,
+   1
+  ],
+  "kind": "object",
+  "note": "jackpot chest dropped when the bonus word is completed",
+  "pivot": [
+   24,
+   36
+  ],
+  "size": [
+   240,
+   36
+  ],
+  "source": "superpowers-prehistoric-platformer: items/chest.png"
+ },
+ "assets/sprites/objects/code_stone.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   30,
+   22
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "object",
+  "note": "collectible lore 'code stone' (GAMEPLAY 12.4)",
+  "pivot": [
+   15,
+   22
+  ],
+  "size": [
+   30,
+   22
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/sprites/objects/crate.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   32,
+   22
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "object",
+  "note": "breakable crate",
+  "pivot": [
+   16,
+   22
+  ],
+  "size": [
+   32,
+   22
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/sprites/objects/exit_totem.png": {
+  "anims": {
+   "cold": {
+    "fps": 1,
+    "frames": [
+     0
+    ],
+    "loop": false
+   },
+   "locked": {
+    "fps": 6,
+    "frames": [
+     1,
+     2
+    ],
+    "loop": true
+   },
+   "open": {
+    "fps": 6,
+    "frames": [
+     3,
+     4
+    ],
+    "loop": true
+   }
+  },
+  "edits": "two carved blocks stacked, kindling / flame placed on top; green flame = hue shift; flicker = mirrored flame",
+  "frame": [
+   40,
+   88
+  ],
+  "grid": [
+   5,
+   1
+  ],
+  "kind": "object",
+  "note": "level exit (the original's traffic light, GAMEPLAY 7.6): locked = red flame until the fire-starter is collected, open = green flame",
+  "pivot": [
+   20,
+   88
+  ],
+  "size": [
+   200,
+   88
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png (carved block, small fire, twigs)"
+ },
+ "assets/sprites/objects/gate_arch.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   80,
+   63
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "object",
+  "note": "gate / door: stand in front and press Down (GAMEPLAY 7.5)",
+  "pivot": [
+   40,
+   63
+  ],
+  "size": [
+   80,
+   63
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/sprites/objects/gate_hole.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   44,
+   48
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "object",
+  "note": "gate / secret passage opening",
+  "pivot": [
+   22,
+   48
+  ],
+  "size": [
+   44,
+   48
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/sprites/objects/glider.png": {
+  "edits": "wing mirrored into a pair, bamboo pole rotated 90 degrees and placed as the grip bar",
+  "frame": [
+   76,
+   50
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "object",
+  "note": "hang-glider overlay: draw above the hero's 'glide' frames with its pivot at the hero's raised hands (about 50 art px above the feet)",
+  "pivot": [
+   38,
+   50
+  ],
+  "size": [
+   76,
+   50
+  ],
+  "source": "superpowers-prehistoric-platformer: items/43.png (wing) + items/24.png (pole)"
+ },
+ "assets/sprites/objects/ladder_stone.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   31,
+   50
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "object",
+  "note": "stone ladder segment",
+  "pivot": [
+   15,
+   50
+  ],
+  "size": [
+   31,
+   50
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/sprites/objects/ladder_wood.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   32,
+   50
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "object",
+  "note": "wooden ladder segment; stack copies vertically with a 2 px overlap",
+  "pivot": [
+   16,
+   50
+  ],
+  "size": [
+   32,
+   50
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/sprites/objects/platform_ice.png": {
+  "edits": "cut out, padded to 96x16; recoloured",
+  "frame": [
+   96,
+   16
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "object",
+  "note": "moving / drop platform, ice; stand-on surface = top edge, 96 art px (48 logical) wide",
+  "pivot": [
+   48,
+   0
+  ],
+  "size": [
+   96,
+   16
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/sprites/objects/platform_small.png": {
+  "edits": "cut out, padded to 64x28",
+  "frame": [
+   64,
+   28
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "object",
+  "note": "small bracket platform (moving or static)",
+  "pivot": [
+   32,
+   0
+  ],
+  "size": [
+   64,
+   28
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/sprites/objects/platform_stone.png": {
+  "edits": "cut out, padded to 96x16; recoloured",
+  "frame": [
+   96,
+   16
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "object",
+  "note": "moving / drop platform, volcano; stand-on surface = top edge, 96 art px (48 logical) wide",
+  "pivot": [
+   48,
+   0
+  ],
+  "size": [
+   96,
+   16
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/sprites/objects/platform_wood.png": {
+  "edits": "cut out, padded to 96x16",
+  "frame": [
+   96,
+   16
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "object",
+  "note": "moving / drop platform, jungle + cave; stand-on surface = top edge, 96 art px (48 logical) wide",
+  "pivot": [
+   48,
+   0
+  ],
+  "size": [
+   96,
+   16
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/sprites/objects/pot.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   16,
+   27
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "object",
+  "note": "breakable pot",
+  "pivot": [
+   8,
+   27
+  ],
+  "size": [
+   16,
+   27
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/sprites/objects/sign_board.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   32,
+   24
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "object",
+  "note": "hint board",
+  "pivot": [
+   16,
+   24
+  ],
+  "size": [
+   32,
+   24
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/sprites/objects/signpost.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   44,
+   30
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "object",
+  "note": "direction sign",
+  "pivot": [
+   22,
+   30
+  ],
+  "size": [
+   44,
+   30
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/sprites/objects/spring.png": {
+  "anims": {
+   "bounce": {
+    "fps": 16,
+    "frames": [
+     1,
+     2,
+     3,
+     4,
+     0
+    ],
+    "loop": false
+   },
+   "idle": {
+    "fps": 1,
+    "frames": [
+     0
+    ],
+    "loop": false
+   }
+  },
+  "edits": "none",
+  "frame": [
+   64,
+   26
+  ],
+  "grid": [
+   5,
+   1
+  ],
+  "kind": "object",
+  "note": "optional spring pad (not in the original game)",
+  "pivot": [
+   32,
+   26
+  ],
+  "size": [
+   320,
+   26
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/bumper.png"
+ },
+ "assets/sprites/player/hero.png": {
+  "anims": {
+   "attack": {
+    "fps": 16,
+    "frames": [
+     27,
+     28,
+     29,
+     30
+    ],
+    "loop": false
+   },
+   "attack_air": {
+    "fps": 12,
+    "frames": [
+     35,
+     36
+    ],
+    "loop": false
+   },
+   "attack_crouch": {
+    "fps": 12,
+    "frames": [
+     33,
+     34
+    ],
+    "loop": false
+   },
+   "attack_up": {
+    "fps": 12,
+    "frames": [
+     31,
+     32
+    ],
+    "loop": false
+   },
+   "climb": {
+    "fps": 6,
+    "frames": [
+     44,
+     45,
+     46,
+     47
+    ],
+    "loop": true
+   },
+   "crawl": {
+    "fps": 6,
+    "frames": [
+     22,
+     23
+    ],
+    "loop": true
+   },
+   "crouch": {
+    "fps": 1,
+    "frames": [
+     21
+    ],
+    "loop": false
+   },
+   "death": {
+    "fps": 8,
+    "frames": [
+     39,
+     40,
+     41,
+     42,
+     43
+    ],
+    "loop": false
+   },
+   "fall": {
+    "fps": 10,
+    "frames": [
+     17,
+     18,
+     19
+    ],
+    "loop": true
+   },
+   "glide": {
+    "fps": 4,
+    "frames": [
+     50,
+     51
+    ],
+    "loop": true
+   },
+   "hurt": {
+    "fps": 8,
+    "frames": [
+     37,
+     38
+    ],
+    "loop": true
+   },
+   "idle": {
+    "fps": 8,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5
+    ],
+    "loop": true
+   },
+   "jump": {
+    "fps": 10,
+    "frames": [
+     14,
+     15,
+     16
+    ],
+    "loop": false
+   },
+   "land": {
+    "fps": 1,
+    "frames": [
+     20
+    ],
+    "loop": false
+   },
+   "roll": {
+    "fps": 14,
+    "frames": [
+     24,
+     25,
+     26
+    ],
+    "loop": true
+   },
+   "victory": {
+    "fps": 4,
+    "frames": [
+     48,
+     49
+    ],
+    "loop": true
+   },
+   "walk": {
+    "fps": 12,
+    "frames": [
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13
+    ],
+    "loop": true
+   }
+  },
+  "body_box_art": [
+   44,
+   56
+  ],
+  "body_box_logical": [
+   22,
+   28
+  ],
+  "edits": "re-packed 97x71 cells into 176x112; club composited behind the body in idle/walk/jump/fall/crouch (carried on the shoulder) and in the attack frames; attack_up / attack_crouch / attack_air / victory assembled from existing poses; slash arc added",
+  "facing": "right",
+  "frame": [
+   176,
+   112
+  ],
+  "grid": [
+   8,
+   7
+  ],
+  "kind": "actor",
+  "note": "weapon variant: club",
+  "pivot": [
+   88,
+   96
+  ],
+  "size": [
+   1408,
+   784
+  ],
+  "source": "superpowers-prehistoric-platformer: characters/playable/caverman.png + items/1.png + fx/effects/1.png"
+ },
+ "assets/sprites/player/hero_axe.png": {
+  "anims": {
+   "attack": {
+    "fps": 16,
+    "frames": [
+     27,
+     28,
+     29,
+     30
+    ],
+    "loop": false
+   },
+   "attack_air": {
+    "fps": 12,
+    "frames": [
+     35,
+     36
+    ],
+    "loop": false
+   },
+   "attack_crouch": {
+    "fps": 12,
+    "frames": [
+     33,
+     34
+    ],
+    "loop": false
+   },
+   "attack_up": {
+    "fps": 12,
+    "frames": [
+     31,
+     32
+    ],
+    "loop": false
+   },
+   "climb": {
+    "fps": 6,
+    "frames": [
+     44,
+     45,
+     46,
+     47
+    ],
+    "loop": true
+   },
+   "crawl": {
+    "fps": 6,
+    "frames": [
+     22,
+     23
+    ],
+    "loop": true
+   },
+   "crouch": {
+    "fps": 1,
+    "frames": [
+     21
+    ],
+    "loop": false
+   },
+   "death": {
+    "fps": 8,
+    "frames": [
+     39,
+     40,
+     41,
+     42,
+     43
+    ],
+    "loop": false
+   },
+   "fall": {
+    "fps": 10,
+    "frames": [
+     17,
+     18,
+     19
+    ],
+    "loop": true
+   },
+   "glide": {
+    "fps": 4,
+    "frames": [
+     50,
+     51
+    ],
+    "loop": true
+   },
+   "hurt": {
+    "fps": 8,
+    "frames": [
+     37,
+     38
+    ],
+    "loop": true
+   },
+   "idle": {
+    "fps": 8,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5
+    ],
+    "loop": true
+   },
+   "jump": {
+    "fps": 10,
+    "frames": [
+     14,
+     15,
+     16
+    ],
+    "loop": false
+   },
+   "land": {
+    "fps": 1,
+    "frames": [
+     20
+    ],
+    "loop": false
+   },
+   "roll": {
+    "fps": 14,
+    "frames": [
+     24,
+     25,
+     26
+    ],
+    "loop": true
+   },
+   "victory": {
+    "fps": 4,
+    "frames": [
+     48,
+     49
+    ],
+    "loop": true
+   },
+   "walk": {
+    "fps": 12,
+    "frames": [
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13
+    ],
+    "loop": true
+   }
+  },
+  "body_box_art": [
+   44,
+   56
+  ],
+  "body_box_logical": [
+   22,
+   28
+  ],
+  "edits": "re-packed 97x71 cells into 176x112; axe composited behind the body in idle/walk/jump/fall/crouch (carried on the shoulder) and in the attack frames; attack_up / attack_crouch / attack_air / victory assembled from existing poses; slash arc added (thrown weapon: release frames are bare-handed)",
+  "facing": "right",
+  "frame": [
+   176,
+   112
+  ],
+  "grid": [
+   8,
+   7
+  ],
+  "kind": "actor",
+  "note": "weapon variant: axe",
+  "pivot": [
+   88,
+   96
+  ],
+  "size": [
+   1408,
+   784
+  ],
+  "source": "superpowers-prehistoric-platformer: characters/playable/caverman.png + items/14.png + fx/effects/1.png"
+ },
+ "assets/sprites/player/hero_boomerang.png": {
+  "anims": {
+   "attack": {
+    "fps": 16,
+    "frames": [
+     27,
+     28,
+     29,
+     30
+    ],
+    "loop": false
+   },
+   "attack_air": {
+    "fps": 12,
+    "frames": [
+     35,
+     36
+    ],
+    "loop": false
+   },
+   "attack_crouch": {
+    "fps": 12,
+    "frames": [
+     33,
+     34
+    ],
+    "loop": false
+   },
+   "attack_up": {
+    "fps": 12,
+    "frames": [
+     31,
+     32
+    ],
+    "loop": false
+   },
+   "climb": {
+    "fps": 6,
+    "frames": [
+     44,
+     45,
+     46,
+     47
+    ],
+    "loop": true
+   },
+   "crawl": {
+    "fps": 6,
+    "frames": [
+     22,
+     23
+    ],
+    "loop": true
+   },
+   "crouch": {
+    "fps": 1,
+    "frames": [
+     21
+    ],
+    "loop": false
+   },
+   "death": {
+    "fps": 8,
+    "frames": [
+     39,
+     40,
+     41,
+     42,
+     43
+    ],
+    "loop": false
+   },
+   "fall": {
+    "fps": 10,
+    "frames": [
+     17,
+     18,
+     19
+    ],
+    "loop": true
+   },
+   "glide": {
+    "fps": 4,
+    "frames": [
+     50,
+     51
+    ],
+    "loop": true
+   },
+   "hurt": {
+    "fps": 8,
+    "frames": [
+     37,
+     38
+    ],
+    "loop": true
+   },
+   "idle": {
+    "fps": 8,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5
+    ],
+    "loop": true
+   },
+   "jump": {
+    "fps": 10,
+    "frames": [
+     14,
+     15,
+     16
+    ],
+    "loop": false
+   },
+   "land": {
+    "fps": 1,
+    "frames": [
+     20
+    ],
+    "loop": false
+   },
+   "roll": {
+    "fps": 14,
+    "frames": [
+     24,
+     25,
+     26
+    ],
+    "loop": true
+   },
+   "victory": {
+    "fps": 4,
+    "frames": [
+     48,
+     49
+    ],
+    "loop": true
+   },
+   "walk": {
+    "fps": 12,
+    "frames": [
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13
+    ],
+    "loop": true
+   }
+  },
+  "body_box_art": [
+   44,
+   56
+  ],
+  "body_box_logical": [
+   22,
+   28
+  ],
+  "edits": "re-packed 97x71 cells into 176x112; boomerang composited behind the body in idle/walk/jump/fall/crouch (carried on the shoulder) and in the attack frames; attack_up / attack_crouch / attack_air / victory assembled from existing poses; slash arc added (thrown weapon: release frames are bare-handed)",
+  "facing": "right",
+  "frame": [
+   176,
+   112
+  ],
+  "grid": [
+   8,
+   7
+  ],
+  "kind": "actor",
+  "note": "weapon variant: boomerang",
+  "pivot": [
+   88,
+   96
+  ],
+  "size": [
+   1408,
+   784
+  ],
+  "source": "superpowers-prehistoric-platformer: characters/playable/caverman.png + items/20.png + fx/effects/1.png"
+ },
+ "assets/sprites/player/hero_hammer.png": {
+  "anims": {
+   "attack": {
+    "fps": 16,
+    "frames": [
+     27,
+     28,
+     29,
+     30
+    ],
+    "loop": false
+   },
+   "attack_air": {
+    "fps": 12,
+    "frames": [
+     35,
+     36
+    ],
+    "loop": false
+   },
+   "attack_crouch": {
+    "fps": 12,
+    "frames": [
+     33,
+     34
+    ],
+    "loop": false
+   },
+   "attack_up": {
+    "fps": 12,
+    "frames": [
+     31,
+     32
+    ],
+    "loop": false
+   },
+   "climb": {
+    "fps": 6,
+    "frames": [
+     44,
+     45,
+     46,
+     47
+    ],
+    "loop": true
+   },
+   "crawl": {
+    "fps": 6,
+    "frames": [
+     22,
+     23
+    ],
+    "loop": true
+   },
+   "crouch": {
+    "fps": 1,
+    "frames": [
+     21
+    ],
+    "loop": false
+   },
+   "death": {
+    "fps": 8,
+    "frames": [
+     39,
+     40,
+     41,
+     42,
+     43
+    ],
+    "loop": false
+   },
+   "fall": {
+    "fps": 10,
+    "frames": [
+     17,
+     18,
+     19
+    ],
+    "loop": true
+   },
+   "glide": {
+    "fps": 4,
+    "frames": [
+     50,
+     51
+    ],
+    "loop": true
+   },
+   "hurt": {
+    "fps": 8,
+    "frames": [
+     37,
+     38
+    ],
+    "loop": true
+   },
+   "idle": {
+    "fps": 8,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5
+    ],
+    "loop": true
+   },
+   "jump": {
+    "fps": 10,
+    "frames": [
+     14,
+     15,
+     16
+    ],
+    "loop": false
+   },
+   "land": {
+    "fps": 1,
+    "frames": [
+     20
+    ],
+    "loop": false
+   },
+   "roll": {
+    "fps": 14,
+    "frames": [
+     24,
+     25,
+     26
+    ],
+    "loop": true
+   },
+   "victory": {
+    "fps": 4,
+    "frames": [
+     48,
+     49
+    ],
+    "loop": true
+   },
+   "walk": {
+    "fps": 12,
+    "frames": [
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13
+    ],
+    "loop": true
+   }
+  },
+  "body_box_art": [
+   44,
+   56
+  ],
+  "body_box_logical": [
+   22,
+   28
+  ],
+  "edits": "re-packed 97x71 cells into 176x112; hammer composited behind the body in idle/walk/jump/fall/crouch (carried on the shoulder) and in the attack frames; attack_up / attack_crouch / attack_air / victory assembled from existing poses; slash arc added",
+  "facing": "right",
+  "frame": [
+   176,
+   112
+  ],
+  "grid": [
+   8,
+   7
+  ],
+  "kind": "actor",
+  "note": "weapon variant: hammer",
+  "pivot": [
+   88,
+   96
+  ],
+  "size": [
+   1408,
+   784
+  ],
+  "source": "superpowers-prehistoric-platformer: characters/playable/caverman.png + items/13.png + fx/effects/1.png"
+ },
+ "assets/tiles/cave/props/bone_big.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   30,
+   27
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   15,
+   27
+  ],
+  "size": [
+   30,
+   27
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/cave/props/bone_pile.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   31,
+   16
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   15,
+   16
+  ],
+  "size": [
+   31,
+   16
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/cave/props/boulder_tan.png": {
+  "edits": "cut out of the tileset; gradient-mapped to the violet cave rock",
+  "frame": [
+   64,
+   36
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   32,
+   36
+  ],
+  "size": [
+   64,
+   36
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/cave/props/boulders.png": {
+  "edits": "cut out of the tileset; gradient-mapped to the violet cave rock",
+  "frame": [
+   64,
+   32
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   32,
+   32
+  ],
+  "size": [
+   64,
+   32
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/cave/props/cave_hole_a.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   44,
+   48
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   22,
+   48
+  ],
+  "size": [
+   44,
+   48
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/cave/props/cave_hole_b.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   44,
+   48
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   22,
+   48
+  ],
+  "size": [
+   44,
+   48
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/cave/props/cave_hole_c.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   44,
+   48
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   22,
+   48
+  ],
+  "size": [
+   44,
+   48
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/cave/props/cave_mouth.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   144,
+   80
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   72,
+   80
+  ],
+  "size": [
+   144,
+   80
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/cave/props/critter_shadow.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   22,
+   21
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   11,
+   21
+  ],
+  "size": [
+   22,
+   21
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/cave/props/crystal_cyan_a.png": {
+  "edits": "tusk prop gradient-mapped to a crystal ramp",
+  "frame": [
+   23,
+   33
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   11,
+   33
+  ],
+  "size": [
+   23,
+   33
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/cave/props/crystal_cyan_b.png": {
+  "edits": "tusk prop gradient-mapped to a crystal ramp",
+  "frame": [
+   25,
+   41
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   12,
+   41
+  ],
+  "size": [
+   25,
+   41
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/cave/props/crystal_cyan_c.png": {
+  "edits": "tusk prop gradient-mapped to a crystal ramp",
+  "frame": [
+   21,
+   32
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   10,
+   32
+  ],
+  "size": [
+   21,
+   32
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/cave/props/crystal_cyan_d.png": {
+  "edits": "tusk prop gradient-mapped to a crystal ramp",
+  "frame": [
+   15,
+   18
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   7,
+   18
+  ],
+  "size": [
+   15,
+   18
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/cave/props/crystal_violet_a.png": {
+  "edits": "tusk prop gradient-mapped to a crystal ramp",
+  "frame": [
+   23,
+   33
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   11,
+   33
+  ],
+  "size": [
+   23,
+   33
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/cave/props/crystal_violet_b.png": {
+  "edits": "tusk prop gradient-mapped to a crystal ramp",
+  "frame": [
+   25,
+   41
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   12,
+   41
+  ],
+  "size": [
+   25,
+   41
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/cave/props/crystal_violet_c.png": {
+  "edits": "tusk prop gradient-mapped to a crystal ramp",
+  "frame": [
+   21,
+   32
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   10,
+   32
+  ],
+  "size": [
+   21,
+   32
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/cave/props/crystal_violet_d.png": {
+  "edits": "tusk prop gradient-mapped to a crystal ramp",
+  "frame": [
+   15,
+   18
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   7,
+   18
+  ],
+  "size": [
+   15,
+   18
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/cave/props/drip_cap.png": {
+  "edits": "cut out of the tileset; gradient-mapped to the violet cave rock",
+  "frame": [
+   26,
+   16
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   13,
+   16
+  ],
+  "size": [
+   26,
+   16
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/cave/props/drips.png": {
+  "edits": "cut out of the tileset; gradient-mapped to the violet cave rock",
+  "frame": [
+   64,
+   16
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   32,
+   16
+  ],
+  "size": [
+   64,
+   16
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/cave/props/grave_cross.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   22,
+   23
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   11,
+   23
+  ],
+  "size": [
+   22,
+   23
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/cave/props/gravestone.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   22,
+   23
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   11,
+   23
+  ],
+  "size": [
+   22,
+   23
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/cave/props/mound_brown.png": {
+  "edits": "cut out of the tileset; gradient-mapped to the violet cave rock",
+  "frame": [
+   47,
+   27
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   23,
+   27
+  ],
+  "size": [
+   47,
+   27
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/cave/props/mound_small.png": {
+  "edits": "cut out of the tileset; gradient-mapped to the violet cave rock",
+  "frame": [
+   31,
+   15
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   15,
+   15
+  ],
+  "size": [
+   31,
+   15
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/cave/props/mushrooms.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   35,
+   16
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   17,
+   16
+  ],
+  "size": [
+   35,
+   16
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/cave/props/pebble.png": {
+  "edits": "cut out of the tileset; gradient-mapped to the violet cave rock",
+  "frame": [
+   26,
+   10
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   13,
+   10
+  ],
+  "size": [
+   26,
+   10
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/cave/props/rock_big.png": {
+  "edits": "cut out of the tileset; gradient-mapped to the violet cave rock",
+  "frame": [
+   64,
+   52
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   32,
+   52
+  ],
+  "size": [
+   64,
+   52
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/cave/props/rock_ridge.png": {
+  "edits": "cut out of the tileset; gradient-mapped to the violet cave rock",
+  "frame": [
+   154,
+   29
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   77,
+   29
+  ],
+  "size": [
+   154,
+   29
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/cave/props/rocks_small.png": {
+  "edits": "cut out of the tileset; gradient-mapped to the violet cave rock",
+  "frame": [
+   32,
+   37
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   16,
+   37
+  ],
+  "size": [
+   32,
+   37
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/cave/props/root_arch.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   80,
+   63
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   40,
+   63
+  ],
+  "size": [
+   80,
+   63
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/cave/props/skull_big.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   54,
+   47
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   27,
+   47
+  ],
+  "size": [
+   54,
+   47
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/cave/props/skull_buried.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   56,
+   24
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   28,
+   24
+  ],
+  "size": [
+   56,
+   24
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/cave/props/skull_ribs.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   65,
+   43
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   32,
+   43
+  ],
+  "size": [
+   65,
+   43
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/cave/props/stalactite.png": {
+  "edits": "cut out of the tileset; gradient-mapped to the violet cave rock",
+  "frame": [
+   22,
+   40
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   11,
+   40
+  ],
+  "size": [
+   22,
+   40
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/cave/props/tusk_a.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   23,
+   33
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   11,
+   33
+  ],
+  "size": [
+   23,
+   33
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/cave/props/tusk_b.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   25,
+   41
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   12,
+   41
+  ],
+  "size": [
+   25,
+   41
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/cave/props/tusk_c.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   21,
+   32
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   10,
+   32
+  ],
+  "size": [
+   21,
+   32
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/cave/props/tusk_d.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   15,
+   18
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   7,
+   18
+  ],
+  "size": [
+   15,
+   18
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/cave/props/twigs.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   32,
+   15
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   16,
+   15
+  ],
+  "size": [
+   32,
+   15
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/cave/terrain.png": {
+  "edits": "re-cut into the common 8x5 atlas of 32 px tiles; right-hand corners / edges / slopes mirrored from the left-hand art; one-way middle cut from the platform centre; back-wall and spike tiles appended",
+  "frame": [
+   32,
+   32
+  ],
+  "grid": [
+   8,
+   5
+  ],
+  "kind": "terrain",
+  "size": [
+   256,
+   160
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png (purple cave-rock set)",
+  "tiles": "TERRAIN_TILES"
+ },
+ "assets/tiles/cave/terrain_stone.png": {
+  "edits": "re-cut into the common 8x5 atlas of 32 px tiles; right-hand corners / edges / slopes mirrored from the left-hand art; one-way middle cut from the platform centre; back-wall and spike tiles appended",
+  "frame": [
+   32,
+   32
+  ],
+  "grid": [
+   8,
+   5
+  ],
+  "kind": "terrain",
+  "size": [
+   256,
+   160
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png (tan stone set)",
+  "tiles": "TERRAIN_TILES"
+ },
+ "assets/tiles/common/ice_water.png": {
+  "anims": {
+   "surface": {
+    "fps": 8,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5
+    ],
+    "loop": true
+   }
+  },
+  "edits": "water recoloured to deep cold blue",
+  "frame": [
+   32,
+   32
+  ],
+  "grid": [
+   8,
+   1
+  ],
+  "kind": "liquid",
+  "note": "deadly; ice biome (leaper pits)",
+  "size": [
+   256,
+   32
+  ],
+  "source": "superpowers-prehistoric-platformer: fx/effects/water.png + tileset-1.png water tile",
+  "tiles_inline": {
+   "0-5": "animated surface (top of a pool; the top 4 px are air)",
+   "6": "body, plain",
+   "7": "body with bubbles"
+  }
+ },
+ "assets/tiles/common/lava.png": {
+  "anims": {
+   "surface": {
+    "fps": 8,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5
+    ],
+    "loop": true
+   }
+  },
+  "edits": "water recoloured to lava (exact colour swap)",
+  "frame": [
+   32,
+   32
+  ],
+  "grid": [
+   8,
+   1
+  ],
+  "kind": "liquid",
+  "note": "deadly; volcano biome",
+  "size": [
+   256,
+   32
+  ],
+  "source": "superpowers-prehistoric-platformer: fx/effects/water.png + tileset-1.png water tile",
+  "tiles_inline": {
+   "0-5": "animated surface (top of a pool; the top 4 px are air)",
+   "6": "body, plain",
+   "7": "body with bubbles"
+  }
+ },
+ "assets/tiles/common/water.png": {
+  "anims": {
+   "surface": {
+    "fps": 8,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5
+    ],
+    "loop": true
+   }
+  },
+  "edits": "surface frames composited over the body colour",
+  "frame": [
+   32,
+   32
+  ],
+  "grid": [
+   8,
+   1
+  ],
+  "kind": "liquid",
+  "note": "deadly pit surface in jungle / cave",
+  "size": [
+   256,
+   32
+  ],
+  "source": "superpowers-prehistoric-platformer: fx/effects/water.png + tileset-1.png water tile",
+  "tiles_inline": {
+   "0-5": "animated surface (top of a pool; the top 4 px are air)",
+   "6": "body, plain",
+   "7": "body with bubbles"
+  }
+ },
+ "assets/tiles/feast/terrain.png": {
+  "edits": "re-cut into the common 8x5 atlas of 32 px tiles; right-hand corners / edges / slopes mirrored from the left-hand art; one-way middle cut from the platform centre; back-wall and spike tiles appended",
+  "frame": [
+   32,
+   32
+  ],
+  "grid": [
+   8,
+   5
+  ],
+  "kind": "terrain",
+  "size": [
+   256,
+   160
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png (yellow sand set (reads as sponge cake / cheese))",
+  "tiles": "TERRAIN_TILES"
+ },
+ "assets/tiles/feast/terrain_biscuit.png": {
+  "edits": "re-cut into the common 8x5 atlas of 32 px tiles; right-hand corners / edges / slopes mirrored from the left-hand art; one-way middle cut from the platform centre; back-wall and spike tiles appended",
+  "frame": [
+   32,
+   32
+  ],
+  "grid": [
+   8,
+   5
+  ],
+  "kind": "terrain",
+  "size": [
+   256,
+   160
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png (pale sand set (reads as biscuit))",
+  "tiles": "TERRAIN_TILES"
+ },
+ "assets/tiles/feast/terrain_icing.png": {
+  "edits": "re-cut into the common 8x5 atlas of 32 px tiles; right-hand corners / edges / slopes mirrored from the left-hand art; one-way middle cut from the platform centre; back-wall and spike tiles appended; gradient-mapped to strawberry icing",
+  "frame": [
+   32,
+   32
+  ],
+  "grid": [
+   8,
+   5
+  ],
+  "kind": "terrain",
+  "size": [
+   256,
+   160
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png (ice / snow set)",
+  "tiles": "TERRAIN_TILES"
+ },
+ "assets/tiles/ice/props/boulders.png": {
+  "edits": "cut out of the tileset; palette recoloured for the ice biome",
+  "frame": [
+   64,
+   32
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   32,
+   32
+  ],
+  "size": [
+   64,
+   32
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/ice/props/bush_big.png": {
+  "edits": "cut out of the tileset; palette recoloured for the ice biome",
+  "frame": [
+   62,
+   26
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   31,
+   26
+  ],
+  "size": [
+   62,
+   26
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/ice/props/bush_dark.png": {
+  "edits": "cut out of the tileset; palette recoloured for the ice biome",
+  "frame": [
+   52,
+   23
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   26,
+   23
+  ],
+  "size": [
+   52,
+   23
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/ice/props/cave_mouth.png": {
+  "edits": "cut out of the tileset; palette recoloured for the ice biome",
+  "frame": [
+   144,
+   80
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   72,
+   80
+  ],
+  "size": [
+   144,
+   80
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/ice/props/crystal_ice_a.png": {
+  "edits": "tusk prop gradient-mapped to a crystal ramp",
+  "frame": [
+   23,
+   33
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   11,
+   33
+  ],
+  "size": [
+   23,
+   33
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/ice/props/crystal_ice_b.png": {
+  "edits": "tusk prop gradient-mapped to a crystal ramp",
+  "frame": [
+   25,
+   41
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   12,
+   41
+  ],
+  "size": [
+   25,
+   41
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/ice/props/crystal_ice_c.png": {
+  "edits": "tusk prop gradient-mapped to a crystal ramp",
+  "frame": [
+   21,
+   32
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   10,
+   32
+  ],
+  "size": [
+   21,
+   32
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/ice/props/crystal_ice_d.png": {
+  "edits": "tusk prop gradient-mapped to a crystal ramp",
+  "frame": [
+   15,
+   18
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   7,
+   18
+  ],
+  "size": [
+   15,
+   18
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/ice/props/dead_tree.png": {
+  "edits": "cut out of the tileset; palette recoloured for the ice biome",
+  "frame": [
+   112,
+   96
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   56,
+   96
+  ],
+  "size": [
+   112,
+   96
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/ice/props/fern.png": {
+  "edits": "cut out of the tileset; palette recoloured for the ice biome",
+  "frame": [
+   32,
+   22
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   16,
+   22
+  ],
+  "size": [
+   32,
+   22
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/ice/props/grass_a.png": {
+  "edits": "cut out of the tileset; palette recoloured for the ice biome",
+  "frame": [
+   29,
+   21
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   14,
+   21
+  ],
+  "size": [
+   29,
+   21
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/ice/props/icicle.png": {
+  "edits": "stalactite gradient-mapped to ice",
+  "frame": [
+   22,
+   40
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "note": "hangs from the ceiling: pivot = top centre",
+  "pivot": [
+   11,
+   0
+  ],
+  "size": [
+   22,
+   40
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/ice/props/mound_brown.png": {
+  "edits": "cut out of the tileset; palette recoloured for the ice biome",
+  "frame": [
+   47,
+   27
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   23,
+   27
+  ],
+  "size": [
+   47,
+   27
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/ice/props/rock_big.png": {
+  "edits": "cut out of the tileset; palette recoloured for the ice biome",
+  "frame": [
+   64,
+   52
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   32,
+   52
+  ],
+  "size": [
+   64,
+   52
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/ice/props/rock_ridge.png": {
+  "edits": "cut out of the tileset; palette recoloured for the ice biome",
+  "frame": [
+   154,
+   29
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   77,
+   29
+  ],
+  "size": [
+   154,
+   29
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/ice/props/rocks_small.png": {
+  "edits": "cut out of the tileset; palette recoloured for the ice biome",
+  "frame": [
+   32,
+   37
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   16,
+   37
+  ],
+  "size": [
+   32,
+   37
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/ice/props/skull_buried.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   56,
+   24
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   28,
+   24
+  ],
+  "size": [
+   56,
+   24
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/ice/props/sprouts.png": {
+  "edits": "cut out of the tileset; palette recoloured for the ice biome",
+  "frame": [
+   27,
+   16
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   13,
+   16
+  ],
+  "size": [
+   27,
+   16
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/ice/props/stalactite.png": {
+  "edits": "cut out of the tileset; palette recoloured for the ice biome",
+  "frame": [
+   22,
+   40
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   11,
+   40
+  ],
+  "size": [
+   22,
+   40
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/ice/props/tree_canopy_dark.png": {
+  "edits": "cut out of the tileset; palette recoloured for the ice biome",
+  "frame": [
+   112,
+   78
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   56,
+   78
+  ],
+  "size": [
+   112,
+   78
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/ice/props/tree_trunk.png": {
+  "edits": "cut out of the tileset; palette recoloured for the ice biome",
+  "frame": [
+   78,
+   48
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   39,
+   48
+  ],
+  "size": [
+   78,
+   48
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/ice/props/tusk_a.png": {
+  "edits": "cut out of the tileset; palette recoloured for the ice biome",
+  "frame": [
+   23,
+   33
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   11,
+   33
+  ],
+  "size": [
+   23,
+   33
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/ice/props/tusk_b.png": {
+  "edits": "cut out of the tileset; palette recoloured for the ice biome",
+  "frame": [
+   25,
+   41
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   12,
+   41
+  ],
+  "size": [
+   25,
+   41
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/ice/props/tusk_c.png": {
+  "edits": "cut out of the tileset; palette recoloured for the ice biome",
+  "frame": [
+   21,
+   32
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   10,
+   32
+  ],
+  "size": [
+   21,
+   32
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/ice/terrain.png": {
+  "edits": "re-cut into the common 8x5 atlas of 32 px tiles; right-hand corners / edges / slopes mirrored from the left-hand art; one-way middle cut from the platform centre; back-wall and spike tiles appended; back wall recoloured to frozen blue",
+  "frame": [
+   32,
+   32
+  ],
+  "grid": [
+   8,
+   5
+  ],
+  "kind": "terrain",
+  "size": [
+   256,
+   160
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png (ice / snow set)",
+  "tiles": "TERRAIN_TILES"
+ },
+ "assets/tiles/ice/terrain_rock.png": {
+  "edits": "re-cut into the common 8x5 atlas of 32 px tiles; right-hand corners / edges / slopes mirrored from the left-hand art; one-way middle cut from the platform centre; back-wall and spike tiles appended; gradient-mapped to frost-blue rock",
+  "frame": [
+   32,
+   32
+  ],
+  "grid": [
+   8,
+   5
+  ],
+  "kind": "terrain",
+  "size": [
+   256,
+   160
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png (tan stone set)",
+  "tiles": "TERRAIN_TILES"
+ },
+ "assets/tiles/jungle/props/boulders.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   64,
+   32
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   32,
+   32
+  ],
+  "size": [
+   64,
+   32
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/jungle/props/bush_big.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   62,
+   26
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   31,
+   26
+  ],
+  "size": [
+   62,
+   26
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/jungle/props/bush_dark.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   52,
+   23
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   26,
+   23
+  ],
+  "size": [
+   52,
+   23
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/jungle/props/bush_light.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   52,
+   23
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   26,
+   23
+  ],
+  "size": [
+   52,
+   23
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/jungle/props/egg_nest.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   87,
+   62
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   43,
+   62
+  ],
+  "size": [
+   87,
+   62
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/jungle/props/egg_nest_broken.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   87,
+   40
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   43,
+   40
+  ],
+  "size": [
+   87,
+   40
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/jungle/props/fern.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   32,
+   22
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   16,
+   22
+  ],
+  "size": [
+   32,
+   22
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/jungle/props/flower.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   16,
+   14
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   8,
+   14
+  ],
+  "size": [
+   16,
+   14
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/jungle/props/foliage_block.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   32,
+   48
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   16,
+   48
+  ],
+  "size": [
+   32,
+   48
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/jungle/props/foliage_clump.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   32,
+   35
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   16,
+   35
+  ],
+  "size": [
+   32,
+   35
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/jungle/props/grass_a.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   29,
+   21
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   14,
+   21
+  ],
+  "size": [
+   29,
+   21
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/jungle/props/grass_b.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   29,
+   21
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   14,
+   21
+  ],
+  "size": [
+   29,
+   21
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/jungle/props/grass_strip_dark.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   62,
+   15
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   31,
+   15
+  ],
+  "size": [
+   62,
+   15
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/jungle/props/grass_strip_light.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   62,
+   15
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   31,
+   15
+  ],
+  "size": [
+   62,
+   15
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/jungle/props/leaf.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   22,
+   18
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   11,
+   18
+  ],
+  "size": [
+   22,
+   18
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/jungle/props/moss_fringe.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   93,
+   20
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   46,
+   20
+  ],
+  "size": [
+   93,
+   20
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/jungle/props/mound_grass.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   61,
+   20
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   30,
+   20
+  ],
+  "size": [
+   61,
+   20
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/jungle/props/mound_leafy.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   32,
+   22
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   16,
+   22
+  ],
+  "size": [
+   32,
+   22
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/jungle/props/rock_big.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   64,
+   52
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   32,
+   52
+  ],
+  "size": [
+   64,
+   52
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/jungle/props/rock_grass.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   32,
+   30
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   16,
+   30
+  ],
+  "size": [
+   32,
+   30
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/jungle/props/root_arch.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   80,
+   63
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   40,
+   63
+  ],
+  "size": [
+   80,
+   63
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/jungle/props/skull_big.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   54,
+   47
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   27,
+   47
+  ],
+  "size": [
+   54,
+   47
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/jungle/props/sprouts.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   27,
+   16
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   13,
+   16
+  ],
+  "size": [
+   27,
+   16
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/jungle/props/tree_canopy_dark.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   112,
+   78
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   56,
+   78
+  ],
+  "size": [
+   112,
+   78
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/jungle/props/tree_canopy_light.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   112,
+   70
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   56,
+   70
+  ],
+  "size": [
+   112,
+   70
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/jungle/props/tree_trunk.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   78,
+   48
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   39,
+   48
+  ],
+  "size": [
+   78,
+   48
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/jungle/props/tree_trunk_small.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   48,
+   32
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   24,
+   32
+  ],
+  "size": [
+   48,
+   32
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/jungle/props/treetop_stack.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   32,
+   48
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   16,
+   48
+  ],
+  "size": [
+   32,
+   48
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/jungle/props/vine_a.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   18,
+   88
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   9,
+   88
+  ],
+  "size": [
+   18,
+   88
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/jungle/props/vine_b.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   32,
+   96
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   16,
+   96
+  ],
+  "size": [
+   32,
+   96
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/jungle/props/vine_branch.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   75,
+   23
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   37,
+   23
+  ],
+  "size": [
+   75,
+   23
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/jungle/terrain.png": {
+  "edits": "re-cut into the common 8x5 atlas of 32 px tiles; right-hand corners / edges / slopes mirrored from the left-hand art; one-way middle cut from the platform centre; back-wall and spike tiles appended",
+  "frame": [
+   32,
+   32
+  ],
+  "grid": [
+   8,
+   5
+  ],
+  "kind": "terrain",
+  "size": [
+   256,
+   160
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png (dark-green jungle set)",
+  "tiles": "TERRAIN_TILES"
+ },
+ "assets/tiles/jungle/terrain_grass.png": {
+  "edits": "re-cut into the common 8x5 atlas of 32 px tiles; right-hand corners / edges / slopes mirrored from the left-hand art; one-way middle cut from the platform centre; back-wall and spike tiles appended",
+  "frame": [
+   32,
+   32
+  ],
+  "grid": [
+   8,
+   5
+  ],
+  "kind": "terrain",
+  "size": [
+   256,
+   160
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png (light-green grass set)",
+  "tiles": "TERRAIN_TILES"
+ },
+ "assets/tiles/village/props/barrel.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   31,
+   26
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   15,
+   26
+  ],
+  "size": [
+   31,
+   26
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/village/props/bench.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   54,
+   24
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   27,
+   24
+  ],
+  "size": [
+   54,
+   24
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/village/props/boulder_sand.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   28,
+   28
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   14,
+   28
+  ],
+  "size": [
+   28,
+   28
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/village/props/boulder_sand_small.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   14,
+   12
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   7,
+   12
+  ],
+  "size": [
+   14,
+   12
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/village/props/clay_pot.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   16,
+   27
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   8,
+   27
+  ],
+  "size": [
+   16,
+   27
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/village/props/crate.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   32,
+   22
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   16,
+   22
+  ],
+  "size": [
+   32,
+   22
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/village/props/fence.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   62,
+   28
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   31,
+   28
+  ],
+  "size": [
+   62,
+   28
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/village/props/flower_pot.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   27,
+   22
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   13,
+   22
+  ],
+  "size": [
+   27,
+   22
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/village/props/hut_bone.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   208,
+   128
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   104,
+   128
+  ],
+  "size": [
+   208,
+   128
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/village/props/hut_dome.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   208,
+   128
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   104,
+   128
+  ],
+  "size": [
+   208,
+   128
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/village/props/palisade.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   82,
+   69
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   41,
+   69
+  ],
+  "size": [
+   82,
+   69
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/village/props/sand_block.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   48,
+   48
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   24,
+   48
+  ],
+  "size": [
+   48,
+   48
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/village/props/sign_wood.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   32,
+   24
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   16,
+   24
+  ],
+  "size": [
+   32,
+   24
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/village/props/signpost.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   44,
+   30
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   22,
+   30
+  ],
+  "size": [
+   44,
+   30
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/village/props/stone_house.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   206,
+   86
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   103,
+   86
+  ],
+  "size": [
+   206,
+   86
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/village/props/stone_tablet.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   30,
+   22
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   15,
+   22
+  ],
+  "size": [
+   30,
+   22
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/village/props/watchtower.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   148,
+   128
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   74,
+   128
+  ],
+  "size": [
+   148,
+   128
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/volcano/props/bone_big.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   30,
+   27
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   15,
+   27
+  ],
+  "size": [
+   30,
+   27
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/volcano/props/bone_pile.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   31,
+   16
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   15,
+   16
+  ],
+  "size": [
+   31,
+   16
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/volcano/props/boulder_orange.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   64,
+   64
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   32,
+   64
+  ],
+  "size": [
+   64,
+   64
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/volcano/props/boulders.png": {
+  "edits": "cut out of the tileset; palette recoloured for the volcano biome",
+  "frame": [
+   64,
+   32
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   32,
+   32
+  ],
+  "size": [
+   64,
+   32
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/volcano/props/bush_dark.png": {
+  "edits": "cut out of the tileset; palette recoloured for the volcano biome",
+  "frame": [
+   52,
+   23
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   26,
+   23
+  ],
+  "size": [
+   52,
+   23
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/volcano/props/cave_hole_c.png": {
+  "edits": "cut out of the tileset; palette recoloured for the volcano biome",
+  "frame": [
+   44,
+   48
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   22,
+   48
+  ],
+  "size": [
+   44,
+   48
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/volcano/props/dead_tree.png": {
+  "edits": "cut out of the tileset; palette recoloured for the volcano biome",
+  "frame": [
+   112,
+   96
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   56,
+   96
+  ],
+  "size": [
+   112,
+   96
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/volcano/props/drip_cap.png": {
+  "edits": "cut out of the tileset; palette recoloured for the volcano biome",
+  "frame": [
+   26,
+   16
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   13,
+   16
+  ],
+  "size": [
+   26,
+   16
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/volcano/props/drips.png": {
+  "edits": "cut out of the tileset; palette recoloured for the volcano biome",
+  "frame": [
+   64,
+   16
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   32,
+   16
+  ],
+  "size": [
+   64,
+   16
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/volcano/props/grass_a.png": {
+  "edits": "cut out of the tileset; palette recoloured for the volcano biome",
+  "frame": [
+   29,
+   21
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   14,
+   21
+  ],
+  "size": [
+   29,
+   21
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/volcano/props/grave_cross.png": {
+  "edits": "cut out of the tileset; palette recoloured for the volcano biome",
+  "frame": [
+   22,
+   23
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   11,
+   23
+  ],
+  "size": [
+   22,
+   23
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/volcano/props/gravestone.png": {
+  "edits": "cut out of the tileset; palette recoloured for the volcano biome",
+  "frame": [
+   22,
+   23
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   11,
+   23
+  ],
+  "size": [
+   22,
+   23
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/volcano/props/mound_brown.png": {
+  "edits": "cut out of the tileset; palette recoloured for the volcano biome",
+  "frame": [
+   47,
+   27
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   23,
+   27
+  ],
+  "size": [
+   47,
+   27
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/volcano/props/mound_small.png": {
+  "edits": "cut out of the tileset; palette recoloured for the volcano biome",
+  "frame": [
+   31,
+   15
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   15,
+   15
+  ],
+  "size": [
+   31,
+   15
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/volcano/props/rock_big.png": {
+  "edits": "cut out of the tileset; palette recoloured for the volcano biome",
+  "frame": [
+   64,
+   52
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   32,
+   52
+  ],
+  "size": [
+   64,
+   52
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/volcano/props/rock_ridge.png": {
+  "edits": "cut out of the tileset; palette recoloured for the volcano biome",
+  "frame": [
+   154,
+   29
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   77,
+   29
+  ],
+  "size": [
+   154,
+   29
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/volcano/props/rocks_small.png": {
+  "edits": "cut out of the tileset; palette recoloured for the volcano biome",
+  "frame": [
+   32,
+   37
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   16,
+   37
+  ],
+  "size": [
+   32,
+   37
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/volcano/props/skull_big.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   54,
+   47
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   27,
+   47
+  ],
+  "size": [
+   54,
+   47
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/volcano/props/skull_buried.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   56,
+   24
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   28,
+   24
+  ],
+  "size": [
+   56,
+   24
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/volcano/props/skull_ribs.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   65,
+   43
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   32,
+   43
+  ],
+  "size": [
+   65,
+   43
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/volcano/props/stalactite.png": {
+  "edits": "cut out of the tileset; palette recoloured for the volcano biome",
+  "frame": [
+   22,
+   40
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   11,
+   40
+  ],
+  "size": [
+   22,
+   40
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/volcano/props/tusk_a.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   23,
+   33
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   11,
+   33
+  ],
+  "size": [
+   23,
+   33
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/volcano/props/tusk_b.png": {
+  "edits": "cut out of the tileset",
+  "frame": [
+   25,
+   41
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   12,
+   41
+  ],
+  "size": [
+   25,
+   41
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/volcano/props/twigs.png": {
+  "edits": "cut out of the tileset; palette recoloured for the volcano biome",
+  "frame": [
+   32,
+   15
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "prop",
+  "pivot": [
+   16,
+   15
+  ],
+  "size": [
+   32,
+   15
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png"
+ },
+ "assets/tiles/volcano/terrain.png": {
+  "edits": "re-cut into the common 8x5 atlas of 32 px tiles; right-hand corners / edges / slopes mirrored from the left-hand art; one-way middle cut from the platform centre; back-wall and spike tiles appended; back wall darkened",
+  "frame": [
+   32,
+   32
+  ],
+  "grid": [
+   8,
+   5
+  ],
+  "kind": "terrain",
+  "size": [
+   256,
+   160
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png (orange volcanic set)",
+  "tiles": "TERRAIN_TILES"
+ },
+ "assets/tiles/volcano/terrain_obsidian.png": {
+  "edits": "re-cut into the common 8x5 atlas of 32 px tiles; right-hand corners / edges / slopes mirrored from the left-hand art; one-way middle cut from the platform centre; back-wall and spike tiles appended; gradient-mapped to obsidian for the fortress level",
+  "frame": [
+   32,
+   32
+  ],
+  "grid": [
+   8,
+   5
+  ],
+  "kind": "terrain",
+  "size": [
+   256,
+   160
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/tileset-1.png (purple cave-rock set)",
+  "tiles": "TERRAIN_TILES"
+ },
+ "assets/ui/bar_back.png": {
+  "edits": "none",
+  "frame": [
+   128,
+   18
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "ui",
+  "note": "bar background",
+  "size": [
+   128,
+   18
+  ],
+  "source": "superpowers-prehistoric-platformer: hud/health-bar-backgound.png"
+ },
+ "assets/ui/bar_fill.png": {
+  "edits": "three pieces joined",
+  "frame": [
+   10,
+   18
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "ui",
+  "note": "nine-patch: left 3 px cap, 4 px stretchable middle, right 3 px cap",
+  "size": [
+   10,
+   18
+  ],
+  "source": "superpowers-prehistoric-platformer: hud/bar-start.png + bar-middle.png + bar-end.png"
+ },
+ "assets/ui/bar_frame_bone.png": {
+  "edits": "none",
+  "frame": [
+   152,
+   37
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "ui",
+  "note": "bone bar frame (boss bar alternative); inner window 128x18 at (12, 9)",
+  "size": [
+   152,
+   37
+  ],
+  "source": "superpowers-prehistoric-platformer: hud/health-bar-top-2.png"
+ },
+ "assets/ui/bar_frame_wood.png": {
+  "edits": "none",
+  "frame": [
+   148,
+   32
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "ui",
+  "note": "wooden bar frame; inner window 128x18 at (10, 7)",
+  "size": [
+   148,
+   32
+  ],
+  "source": "superpowers-prehistoric-platformer: hud/health-bar-top-1.png"
+ },
+ "assets/ui/hud_boss_pip.png": {
+  "edits": "two orb icons re-packed",
+  "entries": [
+   {
+    "index": 0,
+    "name": "full"
+   },
+   {
+    "index": 1,
+    "name": "empty"
+   }
+  ],
+  "frame": [
+   16,
+   16
+  ],
+  "grid": [
+   2,
+   1
+  ],
+  "kind": "ui",
+  "note": "boss energy: up to 8 pips, 10 art px apart",
+  "size": [
+   32,
+   16
+  ],
+  "source": "superpowers-prehistoric-platformer: tileset-1.png icon strip"
+ },
+ "assets/ui/hud_heart.png": {
+  "edits": "16 px icon scaled 2x; empty state = fill colours replaced by dark browns",
+  "entries": [
+   {
+    "index": 0,
+    "name": "full"
+   },
+   {
+    "index": 1,
+    "name": "empty"
+   }
+  ],
+  "frame": [
+   32,
+   32
+  ],
+  "grid": [
+   2,
+   1
+  ],
+  "kind": "ui",
+  "note": "energy: 3 heart slots (GAMEPLAY 2)",
+  "size": [
+   64,
+   32
+  ],
+  "source": "superpowers-prehistoric-platformer: tileset-1.png icon strip (2x)"
+ },
+ "assets/ui/hud_lives_icon.png": {
+  "edits": "head crop",
+  "frame": [
+   48,
+   36
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "ui",
+  "note": "lives counter icon",
+  "size": [
+   48,
+   36
+  ],
+  "source": "superpowers-prehistoric-platformer: characters/playable/caverman.png"
+ },
+ "assets/ui/icons.png": {
+  "edits": "16 px icons scaled 2x",
+  "entries": [
+   {
+    "index": 0,
+    "name": "arrow_up"
+   },
+   {
+    "index": 1,
+    "name": "arrow_right"
+   },
+   {
+    "index": 2,
+    "name": "arrow_down"
+   },
+   {
+    "index": 3,
+    "name": "arrow_left"
+   },
+   {
+    "index": 4,
+    "name": "cross"
+   },
+   {
+    "index": 5,
+    "name": "exclaim"
+   },
+   {
+    "index": 6,
+    "name": "question"
+   },
+   {
+    "index": 7,
+    "name": "sword"
+   },
+   {
+    "index": 8,
+    "name": "shield"
+   },
+   {
+    "index": 9,
+    "name": "heart"
+   },
+   {
+    "index": 10,
+    "name": "skull"
+   },
+   {
+    "index": 11,
+    "name": "fruit"
+   }
+  ],
+  "frame": [
+   32,
+   32
+  ],
+  "grid": [
+   12,
+   1
+  ],
+  "kind": "ui",
+  "note": "menu / prompt icons",
+  "size": [
+   384,
+   32
+  ],
+  "source": "superpowers-prehistoric-platformer: tileset-1.png icon strip (2x)"
+ },
+ "assets/ui/panel.png": {
+  "edits": "re-cut into a 48x48 nine-patch",
+  "frame": [
+   48,
+   48
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "ui",
+  "note": "NinePatchRect, margins 16 px: menu and dialog panels",
+  "size": [
+   48,
+   48
+  ],
+  "source": "superpowers-prehistoric-platformer: hud/inventory-left/middle/right.png"
+ },
+ "assets/ui/slot.png": {
+  "edits": "none",
+  "frame": [
+   49,
+   53
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "ui",
+  "note": "framed slot: weapon icon, level-select tile",
+  "size": [
+   49,
+   53
+  ],
+  "source": "superpowers-prehistoric-platformer: hud/inventory-case.png"
+ },
+ "assets/ui/title_background.png": {
+  "edits": "cropped to 640x360",
+  "frame": [
+   640,
+   360
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "ui",
+  "note": "title screen / main menu backdrop",
+  "size": [
+   640,
+   360
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/background-2.png"
+ },
+ "assets/ui/title_logo.png": {
+  "edits": "glyphs composed into the working title, club (2x, rotated) and roast (2x) added",
+  "frame": [
+   394,
+   75
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "ui",
+  "note": "title screen logo; draw at 1x or 2x",
+  "size": [
+   394,
+   75
+  ],
+  "source": "superpowers-prehistoric-platformer: title-font.png + items/1.png + items/8.png"
+ },
+ "assets/ui/touch_buttons.png": {
+  "edits": "integer 2x; gradient-mapped from blue-grey to warm sandstone; pressed row = darkened and moved 3 px down",
+  "entries": [
+   {
+    "index": 0,
+    "name": "left"
+   },
+   {
+    "index": 1,
+    "name": "right"
+   },
+   {
+    "index": 2,
+    "name": "up"
+   },
+   {
+    "index": 3,
+    "name": "down"
+   },
+   {
+    "index": 4,
+    "name": "a"
+   },
+   {
+    "index": 5,
+    "name": "b"
+   },
+   {
+    "index": 6,
+    "name": "x"
+   },
+   {
+    "index": 7,
+    "name": "y"
+   },
+   {
+    "index": 8,
+    "name": "left_pressed"
+   },
+   {
+    "index": 9,
+    "name": "right_pressed"
+   },
+   {
+    "index": 10,
+    "name": "up_pressed"
+   },
+   {
+    "index": 11,
+    "name": "down_pressed"
+   },
+   {
+    "index": 12,
+    "name": "a_pressed"
+   },
+   {
+    "index": 13,
+    "name": "b_pressed"
+   },
+   {
+    "index": 14,
+    "name": "x_pressed"
+   },
+   {
+    "index": 15,
+    "name": "y_pressed"
+   }
+  ],
+  "frame": [
+   56,
+   56
+  ],
+  "grid": [
+   8,
+   2
+  ],
+  "kind": "ui",
+  "note": "touch overlay: left / right / down (crouch) on the left side, A = jump, B = strike, X = look, Y = spare; draw at 1x (56 px) or 2x on phones",
+  "size": [
+   448,
+   112
+  ],
+  "source": "pixelfrog_treasure-hunters: Wood and Paper UI/Sprites/Mobile Buttons/1-8.png"
+ },
+ "assets/ui/touch_pause.png": {
+  "edits": "integer 2x, sandstone recolour",
+  "frame": [
+   56,
+   56
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "ui",
+  "note": "pause / menu button for the touch overlay (the X stone)",
+  "size": [
+   56,
+   56
+  ],
+  "source": "pixelfrog_treasure-hunters: Mobile Buttons/7.png"
+ },
+ "assets/ui/world_map_background.png": {
+  "edits": "sky, sea and island layers composited into a two-screen-wide panorama",
+  "frame": [
+   1280,
+   360
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "ui",
+  "note": "world map backdrop (GAMEPLAY 11.1 step 6); place level markers on the islands",
+  "size": [
+   1280,
+   360
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/sky-1.png + sea-1.png + island-1.png"
+ }
+}

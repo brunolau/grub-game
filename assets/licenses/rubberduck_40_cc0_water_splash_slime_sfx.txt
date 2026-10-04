@@ -1,0 +1,25 @@
+40 CC0 water / splash / slime SFX
+=================================
+
+Author: rubberduck
+Source: https://opengameart.org/content/40-cc0-water-splash-slime-sfx
+Licence: CC0 1.0 (tier A)
+Used in Club & Grub for: lava bubbling loop
+Staging folder: .tools/asset_candidates/audio/rubberduck_40-cc0-water-splash-slime-sfx
+
+---- Licence evidence recorded when the pack was downloaded ----
+
+# LICENSE_INFO - rubberduck - 40 CC0 water / splash / slime SFX
+
+- **Author:** rubberduck
+- **License:** CC0 1.0  (tier A)
+- **Source page(s):**
+  - https://opengameart.org/content/40-cc0-water-splash-slime-sfx
+- **Download URL(s):**
+  - https://opengameart.org/sites/default/files/water-splash-slime-sfx.zip
+- **Date checked / downloaded:** 2026-10-04
+- **Saved copy of the page(s):** `../_pages/oga_40-cc0-water-splash-slime-sfx.html`
+
+## Exact licence wording (quoted from the source)
+
+> Licence field on the page: "License(s): CC0" (icon links to http://creativecommons.org/publicdomain/zero/1.0/)

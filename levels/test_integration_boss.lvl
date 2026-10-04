@@ -1,0 +1,73 @@
+# Club & Grub level file - format 1 (docs/ARCHITECTURE.md 7).
+# Integration boss level: a cave corridor with a checkpoint ends above a walled one-screen pit (the arena) where
+# the Brute waits; beating it drops the fire-starter that opens the exit inside the pit. Second level of the
+# development campaign (kind = main, see test_integration); exports exclude levels/test_*.lvl.
+
+[meta]
+format = 1
+id = test_integration_boss
+name = "Integration Brute Pit"
+kind = main
+order = 20
+world = 1
+stage = 2
+biome = cave
+terrain_a = cave/terrain
+terrain_b = cave/terrain_stone
+background = cave
+music = level_cave
+password_beginner = "BRUT"
+password_expert = "K0NG"
+bonus_tier = 0
+author = integrator
+notes = "Development campaign level 2: a corridor with a checkpoint, then the Brute in a walled pit; it drops the fire-starter for the locked exit."
+
+[legend]
+? = objects/hidden_spot kind=small count=2 contents=food:8,heart look=inset tile=#
+C = objects/checkpoint
+E = objects/exit locked=true
+Y = items/heart
+W = items/weapon kind=axe
+f = items/food index=21
+g = items/food index=33
+h = items/treasure index=3
+T = enemies/walker skin=turtle_b left=-3 right=3 hp=10
+Z = bosses/brute arena=brute_pit left=42 right=59 hp=48
+
+[tiles]
+################################################################
+################################################################
+################################################################
+#########################################....................###
+#............................................................###
+#............................................................###
+#............................................................###
+#............................................................###
+#..@...f.g.........T....h....C.W..Y..........................###
+##############?##########################....................###
+#########################################....................###
+#########################################....................###
+#########################################....................###
+#########################################.....====...........###
+#########################################....................###
+#########################################.............Z....E.###
+################################################################
+################################################################
+
+[entities]
+zones/arena 50 15 name=brute_pit rect=41,6,20,11 music=boss
+objects/sign 26 8 text=SIGN_INTEGRATION_BOSS
+props/cave/stalactite 6 4
+props/cave/stalactite 17 4
+props/cave/drips 23 4
+props/cave/stalactite 35 4
+props/cave/bone_pile 12 8
+props/cave/mushrooms 21 8
+props/cave/skull_big 44 15
+props/cave/crystal_violet_a 57 15
+props/cave/stalactite 45 3
+props/cave/stalactite 56 3
+
+[backwall]
+1 4 40 5 set=a deco=15
+41 3 20 13 set=a deco=25

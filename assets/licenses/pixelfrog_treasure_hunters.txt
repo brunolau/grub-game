@@ -1,0 +1,21 @@
+Treasure Hunters
+================
+
+Author: Pixel Frog
+Source: https://pixelfrog-assets.itch.io/treasure-hunters
+Licence: CC0 1.0 (tier A)
+Used in Club & Grub for: carved-stone touch buttons
+Staging folder: .tools/asset_candidates/items_ui_fx/pixelfrog_treasure-hunters
+
+---- Licence evidence recorded when the pack was downloaded ----
+
+# LICENSE_INFO - Treasure Hunters (Pixel Frog)
+
+- **Source URL:** https://pixelfrog-assets.itch.io/treasure-hunters
+- **Author:** Pixel Frog
+- **License:** CC0 1.0
+- **License tier:** A (CC0 / public domain - no attribution required)
+- **Exact wording on the source:** "These assets are released under a Creative Commons Zero (CC0) license. You can distribute, remix, adapt, and build upon the material in any medium or format, even for commercial purposes. Attribution is not required." (page description) + itch info panel: "Asset license Creative Commons Zero v1.0 Universal"
+- **Evidence saved in this folder:** _itch_page.txt
+- **Download URL:** itch.io upload 2693455 'Treasure Hunters.zip'
+- **Date retrieved:** 2026-10-04

@@ -1,0 +1,224 @@
+class_name BossBase
+extends EnemyBase
+## Shared rules of bosses (GAMEPLAY.md 6): energy bar, hit cooldown, own weapon tests, defeat burst.
+##
+## CONTRACT FILE (docs/ARCHITECTURE.md 3.13). Owner: enemies (bodies may be replaced; public signatures frozen).
+## Bosses are NOT in the ordinary enemy list: the hero's weapon pass and contact pass skip them. A boss tests the
+## hero's club box and thrown weapons itself in the ENEMIES phase ([method poll_weapon_hit]) and decides itself
+## what a body contact does ([method touch_hero]).
+##
+## A boss is visible from the start, ticks its `_ai_tick()` every tick (asleep or fighting) and never despawns.
+## A defeated boss stays defeated when the hero later dies and respawns; an undefeated one is reset to full energy.
+
+const ITEM_PREFIX: String = "items/"
+const FX_DEFEAT: StringName = &"fx/explosion_big"
+## Short content tokens that name another item id (ARCHITECTURE.md 6.2).
+const TOKEN_ALIASES: Dictionary[String, String] = {"giant": "giant_bonus", "random": "random_bonus"}
+
+## Name of the `zones/arena` entity this boss belongs to (level parameter `arena`).
+var arena: StringName = &""
+## True once the fight has started (energy bar visible, boss music playing).
+var fighting: bool = false
+## Ticks until the next weapon hit can count (Tuning.BOSS_HIT_COOLDOWN).
+var hit_cooldown: int = 0
+## Hit points per energy-bar pip (the Brute: 8; the Colossus: 4).
+var hp_per_pip: int = 8
+## Music context of the fight.
+var music: StringName = Sfx.MUSIC_BOSS
+## When true only thrown weapons count and every hit removes exactly 1 hit point (the Wall Colossus).
+var thrown_only: bool = false
+## What the boss drops when defeated (level parameter `drops`): content tokens such as `fire_starter`, `trophy`,
+## `food:3`, `weapon:axe` (ARCHITECTURE.md 6.2) or full entity ids such as `items/heart`.
+var boss_drops: Array[StringName] = []
+
+
+func get_kind() -> int:
+	return Defs.Kind.BOSS
+
+
+func _init() -> void:
+	z_index = Defs.Z_ENEMIES
+	_hide_asleep = false
+
+
+func _apply_params(params: Dictionary) -> void:
+	super._apply_params(params)
+	arena = StringName(str(params.get("arena", "")))
+	if params.has("drops"):
+		boss_drops.clear()
+		for token: String in LevelText.to_list(params["drops"]):
+			boss_drops.append(StringName(token.strip_edges()))
+
+
+func _sim_tick(phase: int) -> void:
+	if phase != Defs.Phase.ENEMIES or _excluded_by_mode():
+		return
+	if flash > 0:
+		flash -= 1
+	_ai_tick()
+	_refresh_visual()
+	_anim_age += 1
+
+
+## Pips to draw on the energy bar: ceil(hp / hp_per_pip), at most Tuning.BOSS_BAR_MAX_PIPS.
+func get_pips() -> int:
+	if hp <= 0:
+		return 0
+	return clampi((hp + hp_per_pip - 1) / hp_per_pip, 0, Tuning.BOSS_BAR_MAX_PIPS)
+
+
+## Pips of the full bar.
+func get_max_pips() -> int:
+	return clampi((max_hp + hp_per_pip - 1) / hp_per_pip, 1, Tuning.BOSS_BAR_MAX_PIPS)
+
+
+## Start the fight: show the energy bar and switch to the boss music. Idempotent.
+func start_fight() -> void:
+	if fighting or dead:
+		return
+	fighting = true
+	wake()
+	Audio.push_music(music)
+	Audio.play_sfx(Sfx.BOSS_ROAR)
+	Events.boss_started.emit(self)
+	Events.boss_energy_changed.emit(self, get_pips(), get_max_pips())
+
+
+## Test the hero's weapons against `weak_point` (logical px) for this tick: first every thrown weapon in flight,
+## then the club box created on the previous tick. Returns the power of the first hit (0 = none) and consumes a
+## thrown weapon that hit. Honours `thrown_only` and the hit cooldown; a club hit makes the hero pogo.
+func poll_weapon_hit(weak_point: Rect2i) -> int:
+	if hit_cooldown > 0:
+		hit_cooldown -= 1
+	var level: LevelBase = Game.level
+	if level == null or dead or not fighting:
+		return 0
+	var projectiles: Array[SimEntity] = level.get_kind(Defs.Kind.HERO_PROJECTILE)
+	for i: int in range(projectiles.size() - 1, -1, -1):
+		var projectile: ProjectileBase = projectiles[i] as ProjectileBase
+		if projectile != null and not projectile.spent and Overlap.rects(projectile.get_box(), weak_point):
+			projectile.consume()
+			if hit_cooldown > 0:
+				return 0
+			return 1 if thrown_only else projectile.power
+	var hero: PlayerBase = level.player
+	if thrown_only or hero == null or not hero.club_box_active or hit_cooldown > 0:
+		return 0
+	if Overlap.rects(hero.club_box, weak_point):
+		hero.notify_weapon_hit()
+		return hero.club_power
+	return 0
+
+
+## Apply a weapon hit found by poll_weapon_hit(): lose `power` hit points, update the bar, die at zero.
+func apply_boss_hit(power: int) -> void:
+	if power <= 0 or dead:
+		return
+	hit_cooldown = Tuning.BOSS_HIT_COOLDOWN
+	hp = maxi(hp - power, 0)
+	flash = EnemyTuning.FLASH_TICKS
+	Audio.play_sfx(Sfx.BOSS_HIT)
+	Events.enemy_hit.emit(self, power)
+	Events.boss_energy_changed.emit(self, get_pips(), get_max_pips())
+	if hp <= 0:
+		_on_lethal_hit()
+
+
+## A body part touched the hero: costs one bone, throws him back, 44 ticks of immunity (GAMEPLAY.md 6).
+## Returns true when the hit was applied.
+func touch_hero(hero: PlayerBase) -> bool:
+	return hero.hurt(self, Defs.HurtKind.BOSS_BODY)
+
+
+## Defeat: drop `drops` (e.g. the fire-starter or the trophies; content tokens or entity ids), burst into
+## Tuning.BOSS_BURST_ITEMS random bonus items, return to the level music. The drops are thrown out first so that a
+## cap on dropped items can never swallow the fire-starter or a trophy.
+func defeat(drops: Array[StringName] = []) -> void:
+	if dead:
+		return
+	dead = true
+	fighting = false
+	sleep()
+	var origin: Vector2i = _burst_origin()
+	if Game.level != null:
+		for i: int in drops.size():
+			var entry: Dictionary = _drop_entry(drops[i])
+			var params: Dictionary = entry["params"]
+			params["dropped"] = true
+			params["fan"] = i
+			_spawn_optional(entry["id"], origin, params)
+		for i: int in Tuning.BOSS_BURST_ITEMS:
+			_spawn_optional(ITEM_RANDOM, origin, {"dropped": true, "fan": i})
+		_spawn_optional(FX_DEFEAT, origin)
+		Game.level.unlock_camera()
+	Audio.play_sfx(Sfx.BOSS_DEFEATED)
+	Audio.pop_music()
+	Events.boss_energy_changed.emit(self, 0, get_max_pips())
+	Events.boss_defeated.emit(self)
+	died.emit(self, &"weapon")
+	_on_defeated()
+
+
+func _on_level_reset() -> void:
+	if dead:
+		# A defeated boss stays defeated: its drops belong to the level now.
+		return
+	var was_fighting: bool = fighting
+	super._on_level_reset()
+	fighting = false
+	hit_cooldown = 0
+	if was_fighting:
+		Audio.pop_music()
+		Events.boss_energy_changed.emit(self, 0, get_max_pips())
+
+
+## Bosses never despawn.
+func _should_sleep() -> bool:
+	return false
+
+
+## Bosses are never drawn as food.
+func _shows_food() -> bool:
+	return false
+
+
+# =================================================================================================================
+# Hooks for the bosses
+# =================================================================================================================
+
+## The last hit point is gone. The default defeats at once; a boss with a death animation overrides it and calls
+## defeat(drops) itself when the animation is over.
+func _on_lethal_hit() -> void:
+	defeat(boss_drops)
+
+
+## Where the bonus burst and the drops come out (logical px).
+func _burst_origin() -> Vector2i:
+	return sim_pos + Vector2i(0, EnemyTuning.BOSS_DROP_DY)
+
+
+## Called at the end of defeat(): hide, show the broken pose ... Override.
+func _on_defeated() -> void:
+	visible = false
+
+
+# =================================================================================================================
+# Internals
+# =================================================================================================================
+
+## Entity id and parameters of a drop: a full id ("items/heart") or a content token ("food:3", "weapon:axe").
+static func _drop_entry(token: StringName) -> Dictionary:
+	var text: String = String(token)
+	var params: Dictionary = {}
+	if text.contains("/"):
+		return {"id": StringName(text), "params": params}
+	var colon: int = text.find(":")
+	var item: String = text if colon < 0 else text.substr(0, colon)
+	if colon >= 0:
+		var value: String = text.substr(colon + 1)
+		if value.is_valid_int():
+			params["index"] = value.to_int()
+		else:
+			params["kind"] = value
+	item = TOKEN_ALIASES.get(item, item)
+	return {"id": StringName(ITEM_PREFIX + item), "params": params}

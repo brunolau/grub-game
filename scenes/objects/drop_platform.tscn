@@ -1,0 +1,12 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/objects/drop_platform.gd" id="1_drop_platfor"]
+[ext_resource type="Texture2D" path="res://assets/sprites/objects/platform_wood.png" id="2_platform_woo"]
+
+[node name="DropPlatform" type="Node2D"]
+script = ExtResource("1_drop_platfor")
+
+[node name="Sprite" type="Sprite2D" parent="."]
+texture = ExtResource("2_platform_woo")
+centered = false
+offset = Vector2(-48, -16)

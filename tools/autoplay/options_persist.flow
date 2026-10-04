@@ -1,0 +1,15 @@
+# Code entry and options, part 2 of 2 (run after code_and_options.flow on the same user folder, without
+# --fresh-user): the options changed in part 1 were written to settings.cfg and are back after a restart.
+#   bash .tools/gd.sh play --flow=tools/autoplay/options_persist.flow --fast
+
+wait_until flow.current_screen == title 600
+wait_until flow.busy == false 600
+expect settings.video/screen_shake == false
+expect settings.audio/music < 0.8
+press ui_down
+press ui_down
+press ui_accept
+wait_until flow.current_screen == options 300
+wait_until flow.busy == false 600
+wait 30
+shot options_after_restart

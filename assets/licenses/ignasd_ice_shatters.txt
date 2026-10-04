@@ -1,0 +1,25 @@
+Ice breaking/shattering
+=======================
+
+Author: IgnasD
+Source: https://opengameart.org/content/ice-breakingshattering
+Licence: CC0 1.0 (tier A)
+Used in Club & Grub for: ice block smash
+Staging folder: .tools/asset_candidates/audio/ignasd_ice-shatters
+
+---- Licence evidence recorded when the pack was downloaded ----
+
+# LICENSE_INFO - IgnasD - Ice breaking/shattering
+
+- **Author:** IgnasD
+- **License:** CC0 1.0  (tier A)
+- **Source page(s):**
+  - https://opengameart.org/content/ice-breakingshattering
+- **Download URL(s):**
+  - https://opengameart.org/sites/default/files/IceShatters_0.zip
+- **Date checked / downloaded:** 2026-10-04
+- **Saved copy of the page(s):** `../_pages/oga_ice-breakingshattering.html`
+
+## Exact licence wording (quoted from the source)
+
+> Licence field on the page: "License(s): CC0" (icon links to http://creativecommons.org/publicdomain/zero/1.0/)

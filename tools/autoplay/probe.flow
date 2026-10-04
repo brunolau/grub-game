@@ -1,0 +1,19 @@
+# Probe: boot to the first level.
+wait_until flow.current_screen == title 600
+wait 30
+shot title
+press ui_accept
+wait_until flow.current_screen == mode_select 300
+wait 20
+shot mode_select
+press ui_accept
+wait_until flow.current_screen == world_map 300
+wait 30
+shot world_map
+wait_until flow.current_screen == level 600
+expect level.level_id == test_integration
+wait 5
+shot level_intro
+play 60:R,10:RU,40:R
+shot after_walk
+log hero.sim_pos game.score flow.current_screen
