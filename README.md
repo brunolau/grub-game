@@ -17,6 +17,19 @@ with entirely original levels, code and freely licensed (CC0 / OFL) art and audi
 > the owners of Prehistorik. It contains no graphics, audio, level data or code of that game or of any other
 > commercial game. All third-party material is listed in [CREDITS.md](CREDITS.md).
 
+## Download and install (Windows)
+
+Get the latest version from [Releases](https://github.com/brunolau/grub-game/releases/latest):
+
+- **`ClubAndGrub-<version>-setup.exe`** - the installer. Installs for your user account without administrator
+  rights (or for all users, if you choose so), adds Start menu and optional desktop shortcuts and an uninstaller
+  under *Settings > Apps*. Saved games and settings stay in `%APPDATA%\ClubAndGrub`; uninstalling asks whether to
+  delete them too.
+- **`ClubAndGrub-<version>-windows.zip`** - the portable version: unpack anywhere and run `ClubAndGrub.exe`.
+
+Windows 10 or 11 (64-bit) with an OpenGL 3.3 graphics driver. The files are not code-signed yet, so Windows
+SmartScreen may warn on first start: choose *More info > Run anyway*.
+
 ## Features
 
 - **Faithful feel**: the hero's weight, skids, jumps, head bounces and strike timing follow a frame-exact
@@ -118,9 +131,16 @@ powershell -ExecutionPolicy Bypass -File tools\build_windows.ps1
 
 The script checks Godot and the export templates, imports the project, runs the whole test suite, exports
 `build/windows/ClubAndGrub.exe`, starts it for a smoke check, puts the licence texts into `build/windows/licenses/`
-and packs `build/ClubAndGrub-<version>-windows.zip`; it stops with exit code 1 at the first problem. Every
-platform, the export templates and the signing placeholders: [docs/BUILD.md](docs/BUILD.md). Android, iOS and
-macOS status: [docs/PORTING.md](docs/PORTING.md).
+and packs `build/ClubAndGrub-<version>-windows.zip`; it stops with exit code 1 at the first problem.
+
+The installer (`build/ClubAndGrub-<version>-setup.exe`, Inno Setup 7, see [docs/BUILD.md](docs/BUILD.md) 3.4):
+
+```
+powershell -ExecutionPolicy Bypass -File tools\build_installer.ps1 -TestInstall
+```
+
+Every platform, the export templates and the signing placeholders: [docs/BUILD.md](docs/BUILD.md). Android, iOS
+and macOS status: [docs/PORTING.md](docs/PORTING.md).
 
 ## Project structure
 

@@ -11,6 +11,7 @@ credits roll is generated from it). Shipped licence texts: `assets/licenses/` (i
 |---|---|---|
 | Engine runtime | official Godot 4.7.2-stable export templates (Windows x86_64; macOS universal; Android arm64-v8a / armeabi-v7a; iOS arm64) | MIT + third-party notices (section 2.1) |
 | Game data (PCK, embedded in the Windows .exe) | `export_filter = all_resources` plus `levels/*.lvl`, `CREDITS.md`, `assets/licenses/*`; minus `tests/`, `tools/`, `docs/`, `build/`, test levels, `*/dev/*`, the debug level, `resources/ui/*.py` | our own code, scenes and levels; third-party art, fonts and audio (sections 2.2-2.4) |
+| Windows installer (`ClubAndGrub-<version>-setup.exe`) | Inno Setup 7.1 setup and uninstaller runtime wrapped around the files above | Inno Setup License (free, also commercial): keep its copyright notice and web address, which the setup program shows itself; no further obligation |
 | Not bundled on Windows | ANGLE (`application/export_angle=0`), Direct3D 12 Agility SDK (`application/export_d3d12=0`) | if either is switched on later, add its notice (ANGLE BSD-3-clause, Microsoft Agility SDK licence) |
 
 Checked on `build/release_check/pack_check.zip` (an export of the Windows preset, 1270 entries): `CREDITS.md` and all

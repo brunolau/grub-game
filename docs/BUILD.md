@@ -144,6 +144,41 @@ Graphics: the build uses the Compatibility renderer on OpenGL 3.3. ANGLE (OpenGL
 broken GPU drivers) is not shipped, because it needs two DLLs next to the exe; set `application/export_angle=1` if
 that fallback matters more than a single file.
 
+### 3.4 Installer
+
+`installer/club_and_grub.iss` packs `build\windows` (the exe and `licenses\`) into
+`build\ClubAndGrub-<version>-setup.exe` with [Inno Setup 7](https://jrsoftware.org/isinfo.php) (free, also for
+commercial use). It is not part of the repository; install it once, portable inside the project (no registry
+entries, no Start menu):
+
+```
+curl.exe -L -o is.exe https://github.com/jrsoftware/issrc/releases/download/is-7_1_0/innosetup-7.1.0-x64.exe
+.\is.exe /VERYSILENT /PORTABLE=1 /CURRENTUSER /NOICONS /DIR="%CD%\.tools\innosetup"
+```
+
+Then:
+
+```
+powershell -ExecutionPolicy Bypass -File tools\build_installer.ps1 -TestInstall
+```
+
+The script runs `tools\build_windows.ps1` first (`-SkipBuild` packs the existing export), takes the version from
+`project.godot`, compiles the installer and, with `-TestInstall`, installs it silently for the current user into
+`build\installer_test`, checks the files, the uninstall entry and the Start menu shortcut, smoke-checks the installed
+game with its own `APPDATA`, uninstalls it silently and checks that nothing is left. It stops with exit code 1 at
+the first problem. Close a running copy of the game first.
+
+What the installer does: per-user install into `%LOCALAPPDATA%\Programs\Club & Grub` by default (no administrator
+rights; the first page offers an all-users install into Program Files), Start menu entries for the game, the licence
+folder and the uninstaller, an optional desktop shortcut, an entry under *Settings > Apps*, upgrades in place (fixed
+`AppId` - never change it) and closes a running game before replacing it. Uninstalling keeps `%APPDATA%\ClubAndGrub`
+(saves and settings) unless the player answers yes to the question at the end. Silent installs:
+`ClubAndGrub-<version>-setup.exe /VERYSILENT /CURRENTUSER` (add `/MERGETASKS=desktopicon` for the desktop shortcut).
+
+The installer art (`installer/*.png`, `installer/club_and_grub.ico`) is generated from the game's sprites by
+`tools/make_installer_art.py`. To sign the installer as well, add a `SignTool` entry to the `[Setup]` section (see
+the Inno Setup help) with the same certificate as the exe.
+
 ## 4. macOS
 
 **Bundle name (Godot 4.7.2 workaround, applied):** the macOS export writes the executable name into `Info.plist`
@@ -248,7 +283,8 @@ no file sharing, and `ITSAppUsesNonExemptEncryption = false` (no export-complian
 
 1. `application/config/version` raised in `project.godot`; Android `version/code` raised.
 2. Import clean, `tests/run_tests.gd` green, level validator green.
-3. Windows: `tools\build_windows.ps1` ends with `BUILD OK`.
+3. Windows: `tools\build_windows.ps1` ends with `BUILD OK`, then `tools\build_installer.ps1 -SkipBuild -TestInstall`
+   ends with `INSTALLER OK`. Publish the setup exe and the zip together as GitHub release `v<version>`.
 4. Other platforms: export, install on the devices of `docs/PORTING.md` section 5, run the device checklist.
 5. `CREDITS.md` and `assets/licenses/` are inside the package (they are, through the include filter) and readable
    in the game (Credits > Licences); the Windows release zip also carries them as files in `licenses/` next to the
