@@ -13,6 +13,12 @@ extends BossBase
 ## hit makes it roar in the hurt pose; the 1st hit and every 4th after it start a rage: one rock and two stalactites
 ## in quick succession. Defeat: the broken pose stays, 4 trophies fly out with the bonus burst.
 ##
+## Fairness rules (tuned in wf4, numbers in EnemyTuning): every attack shows its pose for at least 10 ticks before
+## anything can reach the hero (the rearing open jaws before a rock, the red rage pose before its rock, the slam plus
+## the stalactite's rattle before a drop). Hits never stop the attacks: the idle clock runs on through hurt poses
+## (an attack that fell due during one follows the roar at once), and an attack that is under way when a hit lands
+## is finished first - the roar (hurt pose, and the rage when one is due) comes after it.
+##
 ## Parameters: `arena` zone name, `hp` [24], `drops` [trophy,trophy,trophy,trophy].
 
 enum State { DORMANT, IDLE, SPIT, SLAM, HURT, RAGE, BROKEN }
@@ -27,6 +33,13 @@ var _state: int = State.DORMANT
 var _timer: int = 0
 var _step: int = 0
 var _hits: int = 0
+## Ticks of breathing since the last attack ended (hurt poses count): the next attack starts when it reaches
+## the idle length of the loop step.
+var _clock: int = 0
+## A hit landed during an attack: the hurt pose follows the attack.
+var _hurt_due: bool = false
+## A hit that starts a rage (the 1st and every 4th after it) landed: the rage follows its hurt pose.
+var _rage_due: bool = false
 
 
 func _default_skin() -> String:
@@ -78,6 +91,9 @@ func _on_reset() -> void:
 	_timer = 0
 	_step = 0
 	_hits = 0
+	_clock = 0
+	_hurt_due = false
+	_rage_due = false
 	set_box(EnemyTuning.COLOSSUS_BOX)
 
 
@@ -107,58 +123,80 @@ func _ai_tick() -> void:
 	if _state == State.DORMANT:
 		_begin_idle()
 	var power: int = poll_weapon_hit(get_head_rect())
+	if power > 0 and _state == State.RAGE:
+		# The red rage pose is armoured: the weapon glances off.
+		Audio.play_sfx(Sfx.CLUB_HIT_SCENERY)
+		power = 0
 	if power > 0:
 		apply_boss_hit(power)
 		if dead:
 			return
+		# Its own cooldown: the next hit counts once the roar (hurt pose) is over.
+		hit_cooldown = maxi(hit_cooldown, EnemyTuning.COLOSSUS_HURT_TICKS)
 		_hits += 1
+		_rage_due = _rage_due or (_hits - 1) % EnemyTuning.COLOSSUS_RAGE_EVERY == 0
 		Audio.play_sfx(Sfx.BOSS_ROAR)
-		_state = State.HURT
-		_timer = 0
-		_play(&"hurt", true)
+		if _state == State.IDLE:
+			_begin_hurt()
+		else:
+			_hurt_due = true
 	if hero != null and not hero.is_immune() and not hero.is_feasting() and Overlap.body(hero, self, hero):
 		touch_hero(hero)
 	_timer += 1
+	if _state == State.IDLE or _state == State.HURT:
+		_clock += 1
 	match _state:
 		State.IDLE:
 			_play(&"idle")
-			if _timer >= _idle_length():
+			if _clock >= _idle_length():
 				_begin_attack()
 		State.SPIT:
 			if _timer == EnemyTuning.COLOSSUS_SPIT_RELEASE_TICK:
 				_spit()
 			if _timer >= EnemyTuning.COLOSSUS_SPIT_TICKS:
-				_next_step()
+				_end_attack(true)
 		State.SLAM:
 			if _timer == EnemyTuning.COLOSSUS_SLAM_RELEASE_TICK:
 				_drop_stalactite()
 			if _timer >= EnemyTuning.COLOSSUS_SLAM_TICKS:
-				_next_step()
+				_end_attack(true)
 		State.HURT:
 			if _timer >= EnemyTuning.COLOSSUS_HURT_TICKS:
-				if (_hits - 1) % EnemyTuning.COLOSSUS_RAGE_EVERY == 0:
+				if _rage_due:
+					_rage_due = false
 					_state = State.RAGE
 					_timer = 0
 					_play(&"rage", true)
+				elif _clock >= _idle_length():
+					_begin_attack()
 				else:
-					_begin_idle()
+					_state = State.IDLE
+					_play(&"idle", true)
 		State.RAGE:
 			if _timer == EnemyTuning.COLOSSUS_RAGE_ROCK_TICK:
 				_spit()
 			elif _timer == EnemyTuning.COLOSSUS_RAGE_DROP_TICK_A or _timer == EnemyTuning.COLOSSUS_RAGE_DROP_TICK_B:
 				_drop_stalactite()
 			if _timer >= EnemyTuning.COLOSSUS_RAGE_TICKS:
-				_begin_idle()
+				_end_attack(false)
 
 
 # =================================================================================================================
 # Internals
 # =================================================================================================================
 
+## A fresh breath: the idle clock starts again.
 func _begin_idle() -> void:
 	_state = State.IDLE
 	_timer = 0
+	_clock = 0
 	_play(&"idle")
+
+
+func _begin_hurt() -> void:
+	_state = State.HURT
+	_timer = 0
+	_play(&"hurt", true)
 
 
 func _begin_attack() -> void:
@@ -171,9 +209,17 @@ func _begin_attack() -> void:
 		_play(&"slam", true)
 
 
-func _next_step() -> void:
-	_step = (_step + 1) % LOOP.size()
-	_begin_idle()
+## An attack is over (`advance`: a step of the loop, not a rage): the roar of a hit that landed during it, or the
+## next breath. Either way the idle clock starts again.
+func _end_attack(advance: bool) -> void:
+	if advance:
+		_step = (_step + 1) % LOOP.size()
+	if _hurt_due:
+		_hurt_due = false
+		_clock = 0
+		_begin_hurt()
+	else:
+		_begin_idle()
 
 
 ## Idle pause before the next attack: the loop's value shortened by the phase (above 16 hit points, above 8, last 8).

@@ -148,6 +148,36 @@ func _ai_tick() -> void:
 	pass
 
 
+## Dozing (SimEntity, ARCHITECTURE.md 11): a record asleep at its anchor only waits for the view to come within
+## Tuning.ENEMY_SPAWN_MARGIN_PX (the doze region reaches farther), a dead or mode-excluded one does nothing at all.
+## A corpse in flight, an awake or flashing enemy, or one that must still see the view leave first, ticks.
+func _doze_area() -> Rect2i:
+	return get_box()
+
+
+func _can_doze() -> bool:
+	if _corpse:
+		return false
+	if dead or _excluded_by_mode():
+		return true
+	if awake or flash > 0 or (_must_leave_view and on_screen):
+		return false
+	return _asleep_waits_for_view()
+
+
+## True when `_asleep_tick()` of this archetype does nothing while its `_doze_area()` is far from the view and the
+## hero (the default rule: wake when the view comes near). An archetype that wakes by another rule (by the hero's
+## distance, by a timer) returns false, or narrows `_doze_area()` to what its rule looks at.
+func _asleep_waits_for_view() -> bool:
+	return true
+
+
+func _on_doze() -> void:
+	# Its next asleep tick would have cleared the flag: the anchor is off screen (it is outside the doze region).
+	if not dead:
+		_must_leave_view = false
+
+
 ## True when the weapon pass may hit it and the hero's contact pass may touch it: awake, alive, tangible and
 ## drawn in the previous frame (PHYSICS.md 10.1).
 func is_targetable() -> bool:
@@ -230,6 +260,7 @@ func kill(cause: StringName, killer: SimEntity = null) -> void:
 	died.emit(self, cause)
 	if not thrown:
 		_on_gone()
+	_doze_note()
 
 
 ## Grenade: vanish into `count` random bonus items, no score.
@@ -252,6 +283,7 @@ func burst_into_items(count: int = Tuning.GRENADE_ITEMS_PER_ENEMY) -> void:
 func wake() -> void:
 	if awake:
 		return
+	_doze_wake_now()
 	awake = true
 	visible = true
 	_must_leave_view = false
@@ -285,6 +317,7 @@ func sleep() -> void:
 	if _hide_asleep:
 		visible = false
 	teleport(spawn_pos)
+	_doze_note()
 
 
 ## Respawn of the hero: every enemy returns to its level-file state.
@@ -663,6 +696,7 @@ func _corpse_tick() -> void:
 		xvel = 0
 		yvel = 0
 		_on_gone()
+		_doze_note()
 		return
 	_refresh_visual()
 

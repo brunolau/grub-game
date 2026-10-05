@@ -9,12 +9,20 @@ const PROP_DIR: String = "res://assets/tiles/village/props/"
 var _castle: Control = null
 var _ground: UiGround = null
 var _guard: UiActor = null
+## Castle pieces (tower, keep, wall), held for the whole screen: a texture drawn from a local would be freed
+## right after the draw call and show up white.
+var _tower: Texture2D = null
+var _keep: Texture2D = null
+var _wall: Texture2D = null
 
 
 func _build_screen() -> void:
 	add_child(UiBackdrop.new("volcano", 10.0))
 	_ground = UiGround.new("volcano/terrain_obsidian", 2)
 	add_child(_ground)
+	_tower = UiKit.tex(PROP_DIR + "watchtower.png")
+	_keep = UiKit.tex(PROP_DIR + "hut_bone.png")
+	_wall = UiKit.tex(PROP_DIR + "palisade.png")
 	_castle = Control.new()
 	_castle.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_castle.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -87,9 +95,9 @@ func _layout() -> void:
 func _draw_castle() -> void:
 	var base: float = _ground.position.y + 6.0
 	var mid: float = roundf(_castle.size.x * 0.5)
-	var tower: Texture2D = UiKit.tex(PROP_DIR + "watchtower.png")
-	var keep: Texture2D = UiKit.tex(PROP_DIR + "hut_bone.png")
-	var wall: Texture2D = UiKit.tex(PROP_DIR + "palisade.png")
+	var tower: Texture2D = _tower
+	var keep: Texture2D = _keep
+	var wall: Texture2D = _wall
 	if tower == null or keep == null or wall == null:
 		return
 	var keep_left: float = mid - roundf(keep.get_width() * 0.5)

@@ -73,6 +73,77 @@ func test_hud_boss_bar_follows_the_boss() -> void:
 	assert_false(hud.is_boss_bar_visible(), "a respawn resets the fight")
 
 
+## The boss bar spans the boss's own hit points whatever their number: full at the start, and every hit shows at
+## once (lit lost part, flash, shake) and shortens the fill while the window has a pixel per hit.
+func test_boss_bar_spans_any_number_of_hit_points() -> void:
+	var hud: Hud = await _overlay(Flow.HUD_SCENE) as Hud
+	var bar: HudBossBar = hud.get_boss_bar()
+	var full: int = int(HudBossBar.WINDOW.size.x)
+	assert_eq(HudBossBar.fill_width(1, 100000), 1, "a last hit point always shows")
+	assert_eq(HudBossBar.fill_width(0, 64), 0)
+	for case: Vector2i in [Vector2i(24, 1), Vector2i(64, 25), Vector2i(150, 25), Vector2i(250, 25), Vector2i(1000, 1)]:
+		var max_hp: int = case.x
+		var power: int = case.y
+		Events.boss_started.emit(null)
+		Events.boss_energy_changed.emit(null, max_hp, max_hp)
+		assert_true(hud.is_boss_bar_visible())
+		assert_eq(hud.boss_max_hp, max_hp)
+		assert_eq(bar.get_fill_width(), full, "%d hp: a full bar" % max_hp)
+		assert_false(bar.is_showing_hit(), "no hit effect at the start")
+		var hp: int = max_hp
+		var hits: int = 0
+		while hp > 0:
+			var before: int = bar.get_fill_width()
+			hp = maxi(hp - power, 0)
+			hits += 1
+			Events.boss_energy_changed.emit(null, hp, max_hp)
+			assert_true(bar.is_showing_hit(), "%d hp, hit %d shows" % [max_hp, hits])
+			if max_hp <= full * power:
+				assert_true(bar.get_fill_width() < before, "%d hp, hit %d shortens the fill" % [max_hp, hits])
+			else:
+				assert_true(bar.get_fill_width() <= before)
+		assert_eq(bar.get_fill_width(), 0, "%d hp: empty after the last hit" % max_hp)
+		Events.boss_defeated.emit(null)
+		assert_false(hud.is_boss_bar_visible(), "the fight is over")
+	await get_tree().create_timer(HudBossBar.FINISH_HOLD + HudBossBar.FINISH_FADE + 0.2).timeout
+	assert_false(bar.visible, "the bar has faded out")
+
+
+## The real bosses of the campaign, as their levels set them up (hit points read at run time, so a retuned boss is
+## covered): the bar starts full and every weapon hit shortens it until the last one empties it.
+func test_boss_bar_follows_the_campaign_bosses() -> void:
+	var cases: Array[Array] = [
+		[Defs.Difficulty.BEGINNER, &"w2_l2b"], [Defs.Difficulty.EXPERT, &"w2_l2b"], [Defs.Difficulty.EXPERT, &"w4_l2b"],
+	]
+	for case: Array in cases:
+		Game.new_game(int(case[0]))
+		await _start_level(case[1])
+		var hud: Hud = get_tree().get_first_node_in_group(Defs.GROUP_HUD) as Hud
+		var bosses: Array[SimEntity] = Game.level.get_kind(Defs.Kind.BOSS) if Game.level != null else []
+		assert_not_null(hud, "%s has a HUD" % case[1])
+		assert_eq(bosses.size(), 1, "%s has its boss" % case[1])
+		if hud == null or bosses.size() != 1:
+			_leave_level()
+			continue
+		var boss: BossBase = bosses[0] as BossBase
+		var bar: HudBossBar = hud.get_boss_bar()
+		var label: String = "%s %s (%d hp)" % [Defs.difficulty_name(int(case[0])), case[1], boss.max_hp]
+		boss.start_fight()
+		assert_true(hud.is_boss_bar_visible(), label)
+		assert_eq(hud.boss_max_hp, boss.max_hp, "%s: the bar spans the boss's own hit points" % label)
+		assert_eq(bar.get_fill_width(), int(HudBossBar.WINDOW.size.x), "%s: full" % label)
+		var power: int = 1 if boss.thrown_only else Tuning.WEAPON_POWER[Defs.Weapon.CLUB]
+		var hits: int = 0
+		while boss.hp > 0 and hits < 1000:
+			var before: int = bar.get_fill_width()
+			boss.apply_boss_hit(power)
+			hits += 1
+			assert_true(bar.get_fill_width() < before, "%s: hit %d shortens the bar" % [label, hits])
+			assert_true(bar.is_showing_hit(), "%s: hit %d is shown" % [label, hits])
+		assert_eq(bar.get_fill_width(), 0, "%s: empty after %d hits" % [label, hits])
+		_leave_level()
+
+
 ## The HUD row fades while the hero is under it (the auto-scrolling shaft kills at the view's top edge, where the
 ## row would hide him) and comes back when he leaves it.
 func test_hud_row_fades_while_the_hero_is_under_it() -> void:
@@ -230,6 +301,29 @@ func test_pause_menu_give_up_needs_a_hero() -> void:
 	assert_true(menu.visible, "without a running level nothing happens")
 	Events.pause_changed.emit(false)
 	assert_false(menu.visible)
+
+
+## Enter `level_id` through Flow like the game does (HUD included), with the clock under the test's control.
+func _start_level(level_id: StringName) -> void:
+	Sim.manual = true
+	await get_tree().process_frame
+	while Flow.busy:
+		await get_tree().process_frame
+	Flow.start_level(level_id, Defs.Transition.NONE)
+	for i: int in 3:
+		await get_tree().process_frame
+	while Flow.busy:
+		await get_tree().process_frame
+	assert_eq(Flow.current_screen, Flow.SCREEN_LEVEL, "%s started" % level_id)
+
+
+func _leave_level() -> void:
+	Sim.manual = false
+	Sim.stop()
+	if get_tree().current_scene != null:
+		get_tree().current_scene.free()
+		get_tree().current_scene = null
+	Flow.current_screen = Flow.SCREEN_BOOT
 
 
 func _overlay(path: String) -> Control:

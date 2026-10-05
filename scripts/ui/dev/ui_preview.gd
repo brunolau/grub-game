@@ -9,11 +9,14 @@ extends Control
 ##
 ##   --ui=<name>          scene `res://scenes/ui/<name>.tscn` (screen or overlay)
 ##   --ui-args=k=v,k=v    Flow.args of the screen (integers are converted, "a|b|c" becomes a list)
-##   --ui-state=<name>    prepared game state: progress | tally | hud | boss | paused (see _prepare_state)
+##   --ui-state=<name>    prepared game state: progress | tally | hud | boss | paused (see _prepare_state); boss
+##                        starts a fight of a boss with --ui-boss-hp=<n> hit points (default 150)
 ##   --ui-keys=a,b,...    input script, one step every --ui-step seconds after --ui-delay seconds:
 ##                        up down left right accept cancel pause   ui actions / the pause action
 ##                        wait                                     do nothing for one step
 ##                        kbd pad touch                            switch the active device family
+##                        boss:<hp>                                the boss now has <hp> hit points (a hit)
+##                        defeat                                   the boss is defeated
 ##                        key:<name>                               press a key ("key:A", "key:Escape")
 ##                        tap:<x>:<y>                              click / tap at a view position (art px)
 ##                        press:<x>:<y> release:<x>:<y>            touch down / up (finger 0) for the touch overlay
@@ -30,6 +33,7 @@ var _steps: PackedStringArray = PackedStringArray()
 var _step_time: float = 0.35
 var _wait: float = 0.8
 var _next: int = 0
+var _boss_hp: int = 150
 
 
 func _ready() -> void:
@@ -46,6 +50,7 @@ func _ready() -> void:
 	_steps = str(options.get("ui-keys", "")).split(",", false)
 	_step_time = maxf(str(options.get("ui-step", "0.35")).to_float(), 0.05)
 	_wait = maxf(str(options.get("ui-delay", "0.8")).to_float(), 0.0)
+	_boss_hp = maxi(str(options.get("ui-boss-hp", "150")).to_int(), 1)
 	_show.call_deferred(screen, str(options.get("ui-state", "")))
 
 
@@ -82,8 +87,9 @@ func _show(screen: String, state: String) -> void:
 func _after_overlay(state: String) -> void:
 	match state:
 		"boss":
+			# Without a boss object the HUD reads the energy as hit points of the maximum.
 			Events.boss_started.emit(null)
-			Events.boss_energy_changed.emit(null, 5, Tuning.BOSS_BAR_MAX_PIPS)
+			Events.boss_energy_changed.emit(null, _boss_hp, _boss_hp)
 		"paused":
 			Events.pause_changed.emit(true)
 
@@ -133,6 +139,12 @@ func _play_step(step: String) -> void:
 			_send_action(StringName("ui_" + parts[0]))
 		"pause":
 			Events.pause_changed.emit(true)
+		"boss":
+			if parts.size() > 1:
+				Events.boss_energy_changed.emit(null, parts[1].to_int(), _boss_hp)
+		"defeat":
+			Events.boss_energy_changed.emit(null, 0, _boss_hp)
+			Events.boss_defeated.emit(null)
 		"kbd":
 			_send_key(KEY_SHIFT)
 		"pad":

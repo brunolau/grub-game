@@ -332,7 +332,104 @@ msgstr "Look"
 msgid "UI_ACTION_PAUSE"
 msgstr "Pause"
 
-# --- Level texts: signs (objects/sign) and hints (zones/message) of the level files ---
+# --- Level names: the `name` of every shipped level file (levels/*.lvl) is its own msgid (UiKit.level_name) ---
+# Shown in the HUD face (capitals) by the level banner, the world map, the tally and the pause menu.
+msgid "Vine Bridges"
+msgstr "Vine Bridges"
+
+msgid "Canopy Village"
+msgstr "Canopy Village"
+
+msgid "Echo Caverns"
+msgstr "Echo Caverns"
+
+msgid "Bone Gorge"
+msgstr "Bone Gorge"
+
+msgid "Brute's Den"
+msgstr "Brute's Den"
+
+msgid "Frost Summit"
+msgstr "Frost Summit"
+
+msgid "Blizzard Pass"
+msgstr "Blizzard Pass"
+
+msgid "Crystal Grotto"
+msgstr "Crystal Grotto"
+
+msgid "Cinder Shaft"
+msgstr "Cinder Shaft"
+
+msgid "Obsidian Keep"
+msgstr "Obsidian Keep"
+
+msgid "Colossus Hall"
+msgstr "Colossus Hall"
+
+msgid "Feast Land A"
+msgstr "Feast Land A"
+
+msgid "Feast Land B"
+msgstr "Feast Land B"
+
+msgid "Feast Land C"
+msgstr "Feast Land C"
+
+msgid "Way Home"
+msgstr "Way Home"
+
+# --- Level texts: signs (objects/sign) and hints (zones/message) of the level files, in level order ---
+# Shown in the HUD face on a wooden board (signs) or on the hint panel (zones), wrapped to a few lines.
+msgid "SIGN_W1_CLUB"
+msgstr "Odd-looking ground? Give it a whack with your club - food hides everywhere!"
+
+msgid "SIGN_W1_BOUNCE"
+msgstr "Hold Jump as you land on a head to bounce up high!"
+
+msgid "SIGN_W1_SPRING"
+msgstr "Jump onto the springy flower to reach the vine bridges."
+
+msgid "SIGN_W1_HOME"
+msgstr "Home sweet tree house! Touch the totem to finish the stage."
+
+msgid "SIGN_W1_VILLAGE"
+msgstr "Canopy Village - climb up to the treetops!"
+
+msgid "SIGN_W1_AXE"
+msgstr "Axes fly far: press Attack to throw one!"
+
+msgid "SIGN_W2_HATCH"
+msgstr "Crouch on a hatch to drop through it."
+
+msgid "SIGN_W2_DARK"
+msgstr "The deep caves are dark. Watch the threads!"
+
+msgid "SIGN_W2_GLIDER"
+msgstr "Run with the glider, then jump to take off. Up climbs, Down dives."
+
+msgid "SIGN_W2_BRUTE"
+msgstr "The Brute keeps the fire-starter. Only its head is soft!"
+
+msgid "SIGN_W3_ICE"
+msgstr "Snow on ice is slippery! Let go early to stop in time."
+
+msgid "SIGN_W3_ROCK"
+msgstr "Blue rock gives a firm grip - ice floes do not."
+
+msgid "SIGN_W3_WIND"
+msgstr "Blizzard! Crouch to brace yourself when a gust blows."
+
+msgid "SIGN_W3_LULL"
+msgstr "Gusts cut your jumps short - leap in the lulls."
+
+msgid "SIGN_W3_WATER"
+msgstr "Something stirs in the icy water..."
+
+msgid "SIGN_W3_FLOES"
+msgstr "Hanging floes drop when you stand on them - keep moving!"
+
+# --- Level texts of the development levels (levels/test_*.lvl, not shipped) ---
 msgid "SIGN_INTEGRATION_SPOTS"
 msgstr "Club the ground - bonuses hide everywhere!"
 
@@ -347,51 +444,3 @@ msgstr "Every object of the jungle, one after another."
 
 msgid "ZONE_DEMO"
 msgstr "A hint shown while you stand here."
-
-msgid "SIGN_W3_ICE"
-msgstr "Snow on ice is slippery! Let go early to stop in time."
-
-msgid "SIGN_W3_ROCK"
-msgstr "Blue rock gives a firm grip - ice floes do not."
-
-msgid "SIGN_W3_WIND"
-msgstr "Blizzard! Crouch to brace yourself when a gust blows."
-
-msgid "SIGN_W3_LULL"
-msgstr "Gusts cut your jumps short - leap in the lulls."
-
-msgid "SIGN_W3_FLOES"
-msgstr "Hanging floes drop when you stand on them - keep moving!"
-
-msgid "SIGN_W3_WATER"
-msgstr "Something stirs in the icy water..."
-
-msgid "SIGN_W1_CLUB"
-msgstr "Odd-looking ground? Give it a whack with your club - food hides everywhere!"
-
-msgid "SIGN_W1_BOUNCE"
-msgstr "Hold Jump as you land on a head to bounce up high!"
-
-msgid "SIGN_W1_SPRING"
-msgstr "Jump onto the springy flower to reach the vine bridges."
-
-msgid "SIGN_W1_AXE"
-msgstr "Axes fly far: press Attack to throw one!"
-
-msgid "SIGN_W1_VILLAGE"
-msgstr "Canopy Village - climb up to the treetops!"
-
-msgid "SIGN_W1_HOME"
-msgstr "Home sweet tree house! Touch the totem to finish the stage."
-
-msgid "SIGN_W2_HATCH"
-msgstr "Crouch on a hatch to drop through it."
-
-msgid "SIGN_W2_DARK"
-msgstr "The deep caves are dark. Watch the threads!"
-
-msgid "SIGN_W2_GLIDER"
-msgstr "Run with the glider, then jump to take off. Up climbs, Down dives."
-
-msgid "SIGN_W2_BRUTE"
-msgstr "The Brute keeps the fire-starter. Only its head is soft!"

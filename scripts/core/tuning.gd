@@ -299,6 +299,14 @@ const CAM_V_FAST_LIMITS: Array[int] = [3, 7, 9, 11, 12, 13, 14, 15, 19, 26, 35, 
 const CAM_V_FAST_SPEEDS: Array[int] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
 ## Non-original smooth follow (accessibility option only): hero kept between these view px. [P 12.6]
 const CAM_SMOOTH_MARGIN: int = 128
+## Dozing (ARCHITECTURE.md 11, not original - it changes no outcome): an idle entity whose area lies farther than
+## this from the view and from the hero's box and feet point is taken out of the tick. It must exceed every reach
+## that can start something within one tick: the body-overlap reach (OVERLAP_MAX_DY = 70 px between feet points),
+## the enemy activation margin (ENEMY_SPAWN_MARGIN_PX) and the hero's largest move in one tick (18 px measured over
+## every route; teleports re-decide at once). [own]
+const DOZE_REACH_PX: int = 128
+## The doze region is rounded outwards to this grid, so it is only looked at again when it crosses a grid line.
+const DOZE_GRID_PX: int = 64
 
 # =================================================================================================================
 # Enemies, items, scoring (shared numbers) [G 3] [G 4] [G 5] [G 6]

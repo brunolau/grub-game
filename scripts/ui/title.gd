@@ -34,10 +34,13 @@ var _logo_time: float = 0.0
 var _logo_ready: bool = false
 var _attract: Tween = null
 var _faded_picture: Texture2D = null
+## The title picture, held for the whole screen (a texture drawn from a local would be freed after the draw call).
+var _picture: Texture2D = null
 
 
 func _build_screen() -> void:
 	add_child(UiBackdrop.new("jungle", 0.0))
+	_picture = UiKit.tex(TEX_FOREGROUND)
 	_foreground = Control.new()
 	_foreground.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_foreground.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -233,7 +236,7 @@ func _on_logo_landed() -> void:
 ## The title picture is 640 px wide, centred and anchored to the bottom edge (its sky is transparent). On wider
 ## views its side edges dissolve in an ordered dither into the jungle backdrop behind it.
 func _draw_foreground() -> void:
-	var picture: Texture2D = UiKit.tex(TEX_FOREGROUND)
+	var picture: Texture2D = _picture
 	if picture == null:
 		return
 	var left: float = roundf((_foreground.size.x - picture.get_size().x) * 0.5)

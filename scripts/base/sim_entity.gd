@@ -46,6 +46,13 @@ var spawn_params: Dictionary = {}
 var spawn_pos: Vector2i = Vector2i.ZERO
 
 var _sim_registered: bool = false
+## Bookkeeping of Sim (registration order, phases, suspension) and of the level's doze manager. Never touch.
+var _sim_serial: int = -1
+var _sim_phase_list: PackedInt32Array = PackedInt32Array()
+var _sim_suspended: bool = false
+var _sim_awake_slot: int = -1
+var _doze_slot: int = -1
+var _level_awake_slot: int = -1
 
 
 ## Which typed list of the level this entity belongs to. Override in base classes.
@@ -83,6 +90,63 @@ func _apply_params(_params: Dictionary) -> void:
 ## collected items and opened spots stay as they are. Override.
 func _on_level_reset() -> void:
 	pass
+
+
+# =================================================================================================================
+# Dozing (ARCHITECTURE.md 11): far from the hero and the view, an idle entity costs nothing per tick
+# =================================================================================================================
+# The level's doze manager takes an entity out of the tick (Sim.suspend) while `_can_doze()` holds and its
+# `_doze_area()` lies outside the doze region: the view and the hero's box and feet point, grown by
+# Tuning.DOZE_REACH_PX (decided at the end of every tick, and between ticks when the view or the hero moved). It is
+# put back as soon as the region reaches the area again. The contract an entity signs by overriding the two:
+#   while `_can_doze()` is true and neither the view nor the hero's feet come within Tuning.DOZE_REACH_PX of
+#   `_doze_area()`, every `_sim_tick` call would change nothing but counters that `_on_doze_wake()` restores;
+#   whatever makes that false later (a hit, a reset) calls `_doze_wake_now()` first.
+# A dozing entity is never drawn (its on_screen is false), keeps its feet point, and has no interpolation.
+
+## True while the doze manager has this entity out of the tick.
+func is_dozing() -> bool:
+	return _sim_suspended
+
+
+## Area (logical px) whose distance to the view and to the hero decides whether this entity may doze; an empty
+## rectangle (the default) = it never dozes. Override together with `_can_doze()`.
+func _doze_area() -> Rect2i:
+	return Rect2i()
+
+
+## True while this entity is idle in the sense of the doze contract above. Override.
+func _can_doze() -> bool:
+	return false
+
+
+## Called right before the entity dozes off (record counters to restore). Override.
+func _on_doze() -> void:
+	pass
+
+
+## Called right after the entity woke up (restore counters, refresh the picture). Override.
+func _on_doze_wake() -> void:
+	pass
+
+
+## The entity's state changed in a way that may let it doze: the level looks at it again at the next decision.
+func _doze_note() -> void:
+	if Game.level != null and _sim_registered:
+		Game.level.doze_note(self)
+
+
+## The entity's ticks matter again right now (it was hit, opened, reset): wake it at once, also in the middle of
+## a tick (it then runs in every later phase of this tick, as if it had never dozed).
+func _doze_wake_now() -> void:
+	if _sim_suspended and Game.level != null:
+		Game.level.doze_wake(self)
+
+
+## Box grown to contain the feet point (the overlap test of PHYSICS.md 2.2 compares feet points).
+func _doze_box() -> Rect2i:
+	return Rect2i(sim_pos, Vector2i.ONE).merge(Rect2i(sim_pos.x - box_xo, sim_pos.y - box_h, maxi(box_w, 1),
+			maxi(box_h, 1)))
 
 
 ## Move without interpolation (spawn, respawn, gate travel).

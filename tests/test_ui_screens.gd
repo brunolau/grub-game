@@ -171,6 +171,62 @@ func test_world_map_never_scrolls_past_the_map() -> void:
 	await _cleanup()
 
 
+## Every marker of both campaigns keeps its number plate clear of the other markers and plates (2-2 sat on the
+## 3-1 marker of the grey rocks), and the hero standing on a stop covers no other marker or plate.
+func test_world_map_markers_and_plates_keep_their_distance() -> void:
+	const GAP: float = 6.0
+	const HERO: Rect2 = Rect2(-24.0, -52.0, 48.0, 52.0)  ## the hero's body around his feet on the map, art px
+	for difficulty: int in [Defs.Difficulty.BEGINNER, Defs.Difficulty.EXPERT]:
+		Game.new_game(difficulty)
+		var campaign: Array[StringName] = Levels.get_campaign(difficulty)
+		Flow.args = {"level_id": campaign[0]}
+		var node: WorldMapScreen = await _open(&"world_map") as WorldMapScreen
+		var markers: Array[Vector2] = node.get_markers()
+		var ids: Array[StringName] = node.get_marker_ids()
+		assert_eq(markers.size(), campaign.size(), "one marker per stop")
+		var dots: Array[Rect2] = []
+		var plates: Array[Rect2] = []
+		for i: int in markers.size():
+			var radius: float = WorldMapScreen.MARKER_RADIUS + 2.0
+			dots.append(Rect2(markers[i] - Vector2(radius, radius), Vector2(radius, radius) * 2.0))
+			plates.append(node.number_plate(markers[i], UiKit.level_number(ids[i])))
+		var map_size: Vector2 = node.get_map_rect().size
+		for i: int in markers.size():
+			assert_true(Rect2(Vector2.ZERO, map_size).encloses(plates[i]), "%s: plate on the map" % ids[i])
+			for j: int in markers.size():
+				if i == j:
+					continue
+				var pair: String = "%s / %s" % [ids[i], ids[j]]
+				assert_false(plates[i].grow(GAP).intersects(dots[j]), "%s: plate clear of the marker" % pair)
+				assert_false(plates[i].grow(GAP).intersects(plates[j]), "%s: plates clear of each other" % pair)
+				var hero: Rect2 = Rect2(markers[i] + HERO.position, HERO.size)
+				assert_false(hero.intersects(dots[j]), "%s: the hero on the stop leaves the marker free" % pair)
+				assert_false(hero.intersects(plates[j]), "%s: the hero on the stop leaves the plate free" % pair)
+		node.queue_free()
+		await get_tree().process_frame
+
+
+## Pictures drawn by a screen's own draw code are held by the screen: a texture drawn from a local variable is
+## freed right after the draw call (UiKit.tex() keeps no cache) and shows up white (the title and the map did).
+func test_screens_hold_the_pictures_they_draw() -> void:
+	Game.new_game(Defs.Difficulty.BEGINNER)
+	Game.begin_level(&"test_example")
+	var cases: Dictionary = {
+		&"title": "res://assets/ui/title_background.png",
+		&"world_map": WorldMapScreen.MAP_TEXTURE,
+		&"expert_wall": ExpertWallScreen.PROP_DIR + "palisade.png",
+		&"the_end": TheEndScreen.PROP_DIR + "fence.png",
+	}
+	for screen: StringName in cases:
+		Flow.args = {"level_id": &"test_example"}
+		var node: UiScreen = await _open(screen)
+		await get_tree().process_frame
+		await get_tree().process_frame
+		assert_true(ResourceLoader.has_cached(cases[screen]), "%s still holds %s" % [screen, cases[screen]])
+		node.queue_free()
+		await get_tree().process_frame
+
+
 func test_tally_actors_stay_on_the_ground_when_the_view_changes() -> void:
 	Game.new_game(Defs.Difficulty.BEGINNER)
 	Game.begin_level(&"test_example")

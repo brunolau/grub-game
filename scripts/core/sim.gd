@@ -32,17 +32,33 @@ var frozen: bool = false
 var rng: SimRng = SimRng.new(1)
 
 var _accumulator: float = 0.0
+## Ticking entities of every phase, in registration (= spawn) order. Suspended entities are not in them.
 var _phase_lists: Array[Array] = []
+## Every registered entity, in registration order (suspended ones included).
 var _entities: Array[SimEntity] = []
+## Registered entities that are not suspended (any order): the snapshot of `sim_prev` runs over them.
+var _awake: Array[SimEntity] = []
 var _pending_add: Array[SimEntity] = []
 var _in_tick: bool = false
-var _dirty: bool = false
+## Registration counter: an entity's serial orders it in the phase lists.
+var _serial: int = 0
+## Phase being run (-1 between phases), the list index of the entity being called, and whether that list changed
+## during the call (an entity was suspended, resumed or unregistered): the loop then continues at `_index`.
+var _phase: int = -1
+var _index: int = 0
+var _shifted: bool = false
+## How often each phase has started (never reset): lets a suspended entity restore per-tick counters.
+var _phase_runs: PackedInt32Array = PackedInt32Array()
+## Development profiler (scripts/core/dev/sim_bench.gd): when set, every `_sim_tick` call is timed and reported to
+## `_profiler.add_call(phase, script, usec)`. Null in the game: the tick loop then has no timing in it at all.
+var _profiler: Object = null
 
 
 func _init() -> void:
 	for i: int in Defs.PHASE_COUNT:
 		var list: Array[SimEntity] = []
 		_phase_lists.append(list)
+	_phase_runs.resize(Defs.PHASE_COUNT)
 
 
 func _ready() -> void:
@@ -110,31 +126,70 @@ func register(entity: SimEntity) -> void:
 		_add_now(entity)
 
 
-## Remove `entity` from all phases. Called by SimEntity itself when it leaves the tree. Safe during a tick.
+## Remove `entity` from all phases. Called by SimEntity itself when it leaves the tree. Safe during a tick: an
+## entity removed in the middle of a phase is not called any more, and every other entity of that phase is called
+## exactly once.
 func unregister(entity: SimEntity) -> void:
 	var pending_index: int = _pending_add.find(entity)
 	if pending_index >= 0:
 		_pending_add.remove_at(pending_index)
-	var index: int = _entities.find(entity)
-	if index < 0:
+	if entity._sim_serial < 0:
 		return
-	if _in_tick:
-		# Keep indices stable while phase lists are being iterated: blank the slots, compact after the tick.
-		_entities[index] = null
-		for list: Array in _phase_lists:
-			var i: int = list.find(entity)
-			if i >= 0:
-				list[i] = null
-		_dirty = true
-	else:
+	var index: int = _entities.find(entity)
+	if index >= 0:
 		_entities.remove_at(index)
-		for list: Array in _phase_lists:
-			list.erase(entity)
+	if not entity._sim_suspended:
+		_take_out(entity)
+	entity._sim_serial = -1
+	entity._sim_suspended = false
 
 
-## Number of registered entities (diagnostics, performance budget checks).
+## Take a registered entity out of the tick (ARCHITECTURE.md 11, dozing): none of its phases runs and its
+## `sim_prev` is not updated until [method resume]. It stays registered and keeps its place in the order. Safe at
+## any time, also in the middle of a phase (the entity is then not called again in this tick).
+func suspend(entity: SimEntity) -> void:
+	if entity._sim_suspended:
+		return
+	entity._sim_suspended = true
+	if entity._sim_serial >= 0:
+		_take_out(entity)
+
+
+## Put a suspended entity back into the tick at its place in the registration order. Safe at any time; in the
+## middle of a phase the entity runs in this phase when its place comes after the entity being called, and in
+## every later phase of the tick - as if it had never been suspended.
+func resume(entity: SimEntity) -> void:
+	if not entity._sim_suspended:
+		return
+	entity._sim_suspended = false
+	if entity._sim_serial < 0:
+		return
+	entity._sim_awake_slot = _awake.size()
+	_awake.append(entity)
+	for phase: int in entity._sim_phase_list:
+		var list: Array = _phase_lists[phase]
+		var at: int = _slot_of(list, entity._sim_serial)
+		list.insert(at, entity)
+		if phase == _phase:
+			if at <= _index:
+				_index += 1
+			_shifted = true
+
+
+## Number of registered entities (diagnostics, performance budget checks). Suspended (dozing) ones included.
 func get_entity_count() -> int:
 	return _entities.size()
+
+
+## Number of registered entities that tick (not suspended).
+func get_awake_count() -> int:
+	return _awake.size()
+
+
+## How often `phase` has started since the application started (a suspended entity restores per-tick counters
+## with the difference).
+func get_phase_runs(phase: int) -> int:
+	return _phase_runs[phase]
 
 
 ## True while a tick is being executed.
@@ -143,17 +198,91 @@ func is_in_tick() -> bool:
 
 
 func _add_now(entity: SimEntity) -> void:
-	if _entities.has(entity):
+	if entity._sim_serial >= 0:
 		return
-	_entities.append(entity)
+	var phases: PackedInt32Array = PackedInt32Array()
 	for phase: int in entity._sim_phases():
-		if phase >= 0 and phase < Defs.PHASE_COUNT:
-			_phase_lists[phase].append(entity)
-		else:
+		if phase < 0 or phase >= Defs.PHASE_COUNT:
 			push_error("Sim: %s lists an invalid phase %d" % [entity.name, phase])
+		elif not phases.has(phase):
+			phases.append(phase)
+	entity._sim_phase_list = phases
+	entity._sim_serial = _serial
+	_serial += 1
+	_entities.append(entity)
+	if entity._sim_suspended:
+		return
+	entity._sim_awake_slot = _awake.size()
+	_awake.append(entity)
+	for phase: int in phases:
+		_phase_lists[phase].append(entity)
+
+
+## Remove a ticking entity from the awake list and its phase lists, keeping the loop of the current phase exact.
+func _take_out(entity: SimEntity) -> void:
+	var slot: int = entity._sim_awake_slot
+	if slot >= 0 and slot < _awake.size() and _awake[slot] == entity:
+		var last: SimEntity = _awake[_awake.size() - 1]
+		_awake[slot] = last
+		last._sim_awake_slot = slot
+		_awake.resize(_awake.size() - 1)
+	entity._sim_awake_slot = -1
+	for phase: int in entity._sim_phase_list:
+		var list: Array = _phase_lists[phase]
+		var at: int = list.find(entity)
+		if at < 0:
+			continue
+		list.remove_at(at)
+		if phase == _phase:
+			if at <= _index:
+				_index -= 1
+			_shifted = true
+
+
+## First index of `list` whose entity has a serial >= `serial` (the lists are sorted by serial).
+func _slot_of(list: Array, serial: int) -> int:
+	var low: int = 0
+	var high: int = list.size()
+	while low < high:
+		var mid: int = (low + high) >> 1
+		var other: SimEntity = list[mid]
+		if other._sim_serial < serial:
+			low = mid + 1
+		else:
+			high = mid
+	return low
 
 
 func _run_tick() -> void:
+	if _profiler != null:
+		_run_tick_profiled()
+		return
+	_begin_tick()
+	tick_started.emit(tick)
+	for phase: int in Defs.PHASE_COUNT:
+		var list: Array = _phase_lists[phase]
+		_phase_runs[phase] += 1
+		_phase = phase
+		var count: int = list.size()
+		var i: int = 0
+		while i < count:
+			var entity: SimEntity = list[i]
+			if entity.sim_active:
+				_index = i
+				entity._sim_tick(phase)
+				if _shifted:
+					# The call suspended, resumed or freed entities of this phase: continue behind the same entity.
+					_shifted = false
+					i = _index
+					count = list.size()
+			i += 1
+	_phase = -1
+	_end_tick()
+
+
+## Start of a tick: entities registered meanwhile join, the counters advance, input is sampled and the previous
+## feet points are kept for the render interpolation (PHYSICS.md 15.1 #6).
+func _begin_tick() -> void:
 	if not _pending_add.is_empty():
 		for entity: SimEntity in _pending_add:
 			if is_instance_valid(entity):
@@ -163,33 +292,47 @@ func _run_tick() -> void:
 	tick += 1
 	total_ticks += 1
 	GameInput.sample()
-	# Snapshot for render interpolation (PHYSICS.md 15.1 #6).
-	for entity: SimEntity in _entities:
-		if entity != null:
-			entity.sim_prev = entity.sim_pos
-	tick_started.emit(tick)
-	for phase: int in Defs.PHASE_COUNT:
-		var list: Array = _phase_lists[phase]
-		var count: int = list.size()
-		for i: int in count:
-			var entity: SimEntity = list[i]
-			if entity != null and entity.sim_active:
-				entity._sim_tick(phase)
+	for entity: SimEntity in _awake:
+		entity.sim_prev = entity.sim_pos
+
+
+## End of a tick: the end-of-tick handlers run.
+func _end_tick() -> void:
 	_in_tick = false
-	if _dirty:
-		_dirty = false
-		_compact(_entities)
-		for phase: int in Defs.PHASE_COUNT:
-			_compact(_phase_lists[phase])
 	tick_finished.emit(tick)
 
 
-## Remove the slots blanked by unregister() during a tick, keeping the order of the rest.
-func _compact(list: Array) -> void:
-	var write: int = 0
-	for read: int in list.size():
-		if list[read] != null:
-			if write != read:
-				list[write] = list[read]
-			write += 1
-	list.resize(write)
+## [method _run_tick] with every part and every entity call timed (development profiler only).
+func _run_tick_profiled() -> void:
+	var start: int = Time.get_ticks_usec()
+	_begin_tick()
+	var now: int = Time.get_ticks_usec()
+	_profiler.call(&"add_part", &"begin: input, snapshot", now - start)
+	start = now
+	tick_started.emit(tick)
+	now = Time.get_ticks_usec()
+	_profiler.call(&"add_part", &"tick_started handlers", now - start)
+	for phase: int in Defs.PHASE_COUNT:
+		var list: Array = _phase_lists[phase]
+		_phase_runs[phase] += 1
+		_phase = phase
+		var count: int = list.size()
+		var i: int = 0
+		while i < count:
+			var entity: SimEntity = list[i]
+			if entity.sim_active:
+				_index = i
+				# The script is read first: the call may free the entity.
+				var script: Script = entity.get_script()
+				start = Time.get_ticks_usec()
+				entity._sim_tick(phase)
+				_profiler.call(&"add_call", phase, script, Time.get_ticks_usec() - start)
+				if _shifted:
+					_shifted = false
+					i = _index
+					count = list.size()
+			i += 1
+	_phase = -1
+	start = Time.get_ticks_usec()
+	_end_tick()
+	_profiler.call(&"add_part", &"end: tick_finished handlers", Time.get_ticks_usec() - start)

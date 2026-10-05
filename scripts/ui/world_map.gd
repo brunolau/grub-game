@@ -21,11 +21,13 @@ const SKY_COLOR: Color = Color("98e6ff")
 const SEA_COLOR: Color = Color("77d9ff")
 ## Marker of each campaign stage on the islands of world_map_background.png (map px), by Vector2i(world, stage):
 ## the sand and grass of the jungle island, the beaches of the two grey rocks (caves above, ice below), the shore
-## of the volcano island.
+## of the volcano island. The two rocks overlap in the picture: 2-2 stands at the far right of the upper beach and
+## 3-1 at the far left of the lower one, so that 2-2's number plate keeps clear of the 3-1 marker and the hero
+## standing on either stop covers neither the other marker nor its plate (test_ui_screens checks the spacing).
 const MARKERS: Dictionary = {
 	Vector2i(1, 1): Vector2(180, 211), Vector2i(1, 2): Vector2(362, 198),
-	Vector2i(2, 1): Vector2(586, 185), Vector2i(2, 2): Vector2(702, 185),
-	Vector2i(3, 1): Vector2(668, 218), Vector2i(3, 2): Vector2(786, 219),
+	Vector2i(2, 1): Vector2(586, 185), Vector2i(2, 2): Vector2(712, 185),
+	Vector2i(3, 1): Vector2(656, 219), Vector2i(3, 2): Vector2(786, 219),
 	Vector2i(4, 1): Vector2(992, 241), Vector2i(4, 2): Vector2(1186, 241),
 }
 ## Fallback places for a campaign stage without an entry in MARKERS (other level lists, previews): the stages are
@@ -35,6 +37,9 @@ const SLOTS: Array[Vector2] = [
 	Vector2(680, 186), Vector2(740, 214), Vector2(985, 238), Vector2(1085, 224), Vector2(1195, 238),
 ]
 const MARKER_RADIUS: float = 8.0
+## Number plate of a marker: its top edge below the marker centre and its height (map px).
+const PLATE_GAP: float = 12.0
+const PLATE_HEIGHT: float = 12.0
 const COL_LOCKED: Color = Color("8a8f99")
 
 ## Seconds left before the level starts by itself (negative while the hero is still walking).
@@ -42,6 +47,8 @@ var countdown: float = -1.0
 
 var _level_id: StringName = &""
 var _map: Control = null
+## The map picture, held for the whole screen (a texture drawn from a local would be freed after the draw call).
+var _map_texture: Texture2D = null
 var _fill: Control = null
 var _hero: UiActor = null
 var _here: TextureRect = null
@@ -62,8 +69,8 @@ func _build_screen() -> void:
 	add_child(_fill)
 	_map = Control.new()
 	_map.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var texture: Texture2D = UiKit.tex(MAP_TEXTURE)
-	_map.size = texture.get_size() if texture != null else Vector2(1280.0, 360.0)
+	_map_texture = UiKit.tex(MAP_TEXTURE)
+	_map.size = _map_texture.get_size() if _map_texture != null else Vector2(1280.0, 360.0)
 	_map.draw.connect(_draw_map)
 	add_child(_map)
 	_place_markers()
@@ -230,6 +237,22 @@ func _arrive() -> void:
 	countdown = AUTO_START
 
 
+## The number plate under the marker at `center` (map px) for the text `number` ("2-2").
+func number_plate(center: Vector2, number: String) -> Rect2:
+	var width: float = _font.get_string_size(number, HORIZONTAL_ALIGNMENT_LEFT, -1.0, UiKit.SIZE_MONO).x
+	return Rect2(roundf(center.x - width * 0.5) - 3.0, center.y + PLATE_GAP, width + 6.0, PLATE_HEIGHT)
+
+
+## Map places of the markers on this map (parallel to get_marker_ids()).
+func get_markers() -> Array[Vector2]:
+	return _markers
+
+
+## Level ids of the markers on this map.
+func get_marker_ids() -> Array[StringName]:
+	return _marker_ids
+
+
 ## The map picture on the screen (the camera never shows anything beside it while the map is wider than the view).
 func get_map_rect() -> Rect2:
 	return Rect2(_map.position, _map.size)
@@ -287,9 +310,8 @@ func _draw_fill() -> void:
 
 
 func _draw_map() -> void:
-	var texture: Texture2D = UiKit.tex(MAP_TEXTURE)
-	if texture != null:
-		_map.draw_texture(texture, Vector2.ZERO)
+	if _map_texture != null:
+		_map.draw_texture(_map_texture, Vector2.ZERO)
 	# Dotted route between the markers.
 	for i: int in range(1, _markers.size()):
 		var a: Vector2 = _markers[i - 1]
@@ -313,8 +335,7 @@ func _draw_map() -> void:
 		var number: String = UiKit.level_number(level_id)
 		if number == "":
 			continue
-		var width: float = _font.get_string_size(number, HORIZONTAL_ALIGNMENT_LEFT, -1.0, UiKit.SIZE_MONO).x
-		var plate: Rect2 = Rect2(roundf(center.x - width * 0.5) - 3.0, center.y + 12.0, width + 6.0, 12.0)
+		var plate: Rect2 = number_plate(center, number)
 		_map.draw_rect(plate, Color(UiKit.COL_INK, 0.85))
 		_map.draw_string(_font, Vector2(plate.position.x + 3.0, plate.position.y + 10.0), number,
 				HORIZONTAL_ALIGNMENT_LEFT, -1.0, UiKit.SIZE_MONO, UiKit.COL_CREAM)

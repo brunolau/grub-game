@@ -1,55 +1,66 @@
 # Credits - Club & Grub
 
 Club & Grub is an original game. It contains no graphics, audio, level data or code from Prehistorik 2 or any other commercial game.
-All third-party art, fonts and audio are listed below with their licence. Licence texts and the evidence recorded at download time are in `assets/licenses/`.
+All third-party art, fonts and audio are listed below with author, source, licence and the changes made for this game. The full licence texts and the licence evidence recorded at download time ship with every build in `assets/licenses/`; `docs/THIRD_PARTY.md` (source repository) lists every third-party component, including the engine, with its obligations.
 
 ## Art, fonts and audio
 
-| Pack | Author | Source | Licence | Used for |
-|---|---|---|---|---|
-| Fire Crackling | AntumDeluge | https://opengameart.org/content/fire-crackling | CC0 1.0 | campfire loop |
-| NES Sounds | Basto | https://opengameart.org/content/nes-sounds | CC0 1.0 | splash, exit chime |
-| Ice breaking/shattering | IgnasD | https://opengameart.org/content/ice-breakingshattering | CC0 1.0 | ice block smash |
-| 12 Music Loops | Juhani Junkala (SubspaceAudio) | https://opengameart.org/content/12-music-loops | CC0 1.0 | world map, level select, final boss, credits, spare level music |
-| 4 Chiptunes (Adventure) / Chiptune Adventures | Juhani Junkala (SubspaceAudio) | https://opengameart.org/content/4-chiptunes-adventure | CC0 1.0 | jungle, volcano, boss and bonus music |
-| 5 Chiptunes (Action) / Retro Game Music Pack | Juhani Junkala (SubspaceAudio) | https://opengameart.org/content/5-chiptunes-action | CC0 1.0 | title, cave, ice, spare level and ending music |
-| The Essential Retro Video Game Sound Effects Collection [512 sounds] | Juhani Junkala (SubspaceAudio) | https://opengameart.org/content/512-sound-effects-8-bit-style | CC0 1.0 | most sound effects |
-| 8bit Action Jingle & Mini Loop | MintoDog | https://opengameart.org/content/8bit-action-jingle-mini-loop | CC0 1.0 | level complete, death, game over and feast-mode jingles |
-| Icy Heights (wind ambience) | Ecrivain | https://opengameart.org/content/icy-heights | CC0 1.0 | blizzard wind loop (only ecrivain_icy-heights_wind.ogg is used from this staging folder) |
-| 8-bit Platformer SFX | MoxieCat | https://opengameart.org/content/8-bit-platformer-sfx-0 | CC0 1.0 | head bounce / spring |
-| 40 CC0 water / splash / slime SFX | rubberduck | https://opengameart.org/content/40-cc0-water-splash-slime-sfx | CC0 1.0 | lava bubbling loop |
-| 80 CC0 creature SFX | rubberduck | https://opengameart.org/content/80-cc0-creature-sfx | CC0 1.0 | feast-mode chomp |
-| Superpowers Asset Packs - prehistoric-platformer sound effects | Pixel-boy (Sparklin Labs) | https://github.com/sparklinlabs/superpowers-asset-packs | CC0 1.0 | dinosaur voices, wood knock, boss chest-beat |
-| Bonus Round - 8bit / 8-Bit Victory Loop | Wolfgang_ (Ted Kerr) | https://opengameart.org/content/bonus-round-8bit | CC0 1.0 | bonus stage alternate, tally loop |
-| Superpowers Asset Packs - Prehistoric Platformer | Pixel-boy (Sparklin Labs) | https://github.com/sparklinlabs/superpowers-asset-packs/tree/master/prehistoric-platformer | CC0 1.0 | hero, enemies, bosses, NPCs, all terrain and props, parallax layers, native items, FX, HUD, bitmap fonts |
-| Explosion Animations Pack | ansimuz (Luis Zuno) | https://ansimuz.itch.io/explosion-animations-pack | CC0 1.0 | explosion.png, explosion_big.png |
-| Sunny Land | ansimuz (Luis Zuno) | https://ansimuz.itch.io/sunny-land-pixel-game-art | CC0 1.0 | hit_stars.png |
-| Free Pixel foods | ghostpixxells | https://ghostpixxells.itch.io/pixelfood | CC0 1.0 | seven giant bonus foods |
-| Pixelify Sans | Stefie Justprince / The Pixelify Sans Project Authors | https://fonts.google.com/specimen/Pixelify+Sans | SIL Open Font License 1.1 | pixelify_sans.ttf |
-| Press Start 2P | CodeMan38 / The Press Start 2P Project Authors | https://fonts.google.com/specimen/Press+Start+2P | SIL Open Font License 1.1 | press_start_2p.ttf |
-| 16x16 Food | ARoachIFoundOnMyPillow | https://opengameart.org/content/16x16-food | CC0 1.0 | 40 food sprites, chili, coconut |
-| 16x16 RPG Items (DB32) | ARoachIFoundOnMyPillow | https://opengameart.org/content/16x16-rpg-items-db32 | CC0 1.0 | gems, rings, goblet, torch, bucket |
-| Treasure Hunters | Pixel Frog | https://pixelfrog-assets.itch.io/treasure-hunters | CC0 1.0 | carved-stone touch buttons |
+| Pack | Author | Source | Licence | Used for | Changes made for Club & Grub |
+|---|---|---|---|---|---|
+| Superpowers Asset Packs - Prehistoric Platformer | Pixel-boy (Sparklin Labs) | https://github.com/sparklinlabs/superpowers-asset-packs/tree/master/prehistoric-platformer (commit e8674a03) | CC0 1.0 | hero, enemies, bosses, NPCs, all terrain and props, parallax backgrounds, native items, most effects, HUD, bitmap fonts, title logo, splash, app icons | re-cut and re-packed on uniform sheets; mirrored; palette-swapped and gradient-mapped (ice, volcano, cave, feast and obsidian variants); composited (hero with four weapons and a slash arc, new hero poses from existing frames, exit totem, glider, checkpoint, title logo, world map, splash, app icons); bosses and icons scaled by integer factors |
+| Explosion Animations Pack | ansimuz (Luis Zuno) | https://ansimuz.itch.io/explosion-animations-pack | CC0 1.0 | explosion.png, explosion_big.png | none (sheets used as published) |
+| SunnyLand | ansimuz (Luis Zuno) | https://ansimuz.itch.io/sunny-land-pixel-game-art | CC0 1.0 | hit_stars.png (enemy-death burst) | none (sheet used as published) |
+| Free Pixel foods | ghostpixxells | https://ghostpixxells.itch.io/pixelfood | CC0 1.0 | seven giant bonus foods | scaled 2x, 2 px dark outline added, re-packed |
+| 16x16 Food | ARoachIFoundOnMyPillow | https://opengameart.org/content/16x16-food | CC0 1.0 | 40 food sprites, chili, coconut | scaled 2x, re-packed |
+| 16x16 RPG Items (DB32) | ARoachIFoundOnMyPillow | https://opengameart.org/content/16x16-rpg-items-db32 | CC0 1.0 | gems, rings, necklace, goblet, orb, torch, bucket, trophy | scaled 2x, re-packed |
+| Treasure Hunters | Pixel Frog | https://pixelfrog-assets.itch.io/treasure-hunters | CC0 1.0 | carved-stone touch buttons | scaled 2x, recoloured to sandstone, pressed state generated |
+| Press Start 2P | CodeMan38 (Cody Boisclair) / The Press Start 2P Project Authors | https://fonts.google.com/specimen/Press+Start+2P | SIL Open Font License 1.1 | press_start_2p.ttf | none (file renamed only) |
+| Pixelify Sans | Stefie Justprince / The Pixelify Sans Project Authors | https://fonts.google.com/specimen/Pixelify+Sans | SIL Open Font License 1.1 | pixelify_sans.ttf | none (file renamed only) |
+| 12 Music Loops | Juhani Junkala (SubspaceAudio) | https://opengameart.org/content/12-music-loops | CC0 1.0 | world map, level select, final boss, credits and spare level music | none (renamed) |
+| 4 Chiptunes (Adventure) / Chiptune Adventures | Juhani Junkala (SubspaceAudio) | https://opengameart.org/content/4-chiptunes-adventure | CC0 1.0 | jungle, volcano, boss and bonus music | none (renamed) |
+| 5 Chiptunes (Action) / Retro Game Music Pack | Juhani Junkala (SubspaceAudio) | https://opengameart.org/content/5-chiptunes-action | CC0 1.0 | title, cave, ice, spare level and ending music | WAV transcoded to OGG Vorbis (renamed) |
+| 8bit Action Jingle & Mini Loop | MintoDog | https://opengameart.org/content/8bit-action-jingle-mini-loop | CC0 1.0 | level complete, death, game over and feast-mode jingles | none (renamed) |
+| Bonus Round - 8bit / 8-Bit Victory Loop | Wolfgang_ (Ted Kerr) | https://opengameart.org/content/bonus-round-8bit and https://opengameart.org/content/8-bit-victory-loop | CC0 1.0 | bonus stage alternate, tally loop | Bonus Round WAV transcoded to OGG Vorbis (renamed) |
+| The Essential Retro Video Game Sound Effects Collection [512 sounds] | Juhani Junkala (SubspaceAudio) | https://opengameart.org/content/512-sound-effects-8-bit-style | CC0 1.0 | 44 sound effects | none (renamed) |
+| Superpowers Asset Packs - prehistoric-platformer sound effects | Pixel-boy (Sparklin Labs) | https://github.com/sparklinlabs/superpowers-asset-packs (copy from https://opengameart.org/content/superpowers-assets-sound-effects) | CC0 1.0 | dinosaur voices, wood knock, boss chest-beat | none (renamed) |
+| 8-bit Platformer SFX | MoxieCat | https://opengameart.org/content/8-bit-platformer-sfx-0 | CC0 1.0 | head bounce / spring | none (renamed) |
+| NES Sounds | Baŝto | https://opengameart.org/content/nes-sounds | CC0 1.0 | splash, exit chime | none (renamed) |
+| Fire Crackling | AntumDeluge | https://opengameart.org/content/fire-crackling | CC0 1.0 | campfire loop | none (renamed) |
+| Ice breaking/shattering | IgnasD | https://opengameart.org/content/ice-breakingshattering | CC0 1.0 | ice block smash | none (renamed) |
+| Icy Heights (wind.ogg) | Écrivain | https://opengameart.org/content/icy-heights | CC0 1.0 | blizzard wind loop | none (renamed) |
+| 40 CC0 water / splash / slime SFX | rubberduck | https://opengameart.org/content/40-cc0-water-splash-slime-sfx | CC0 1.0 | lava bubbling loop | none (renamed) |
+| 80 CC0 creature SFX | rubberduck | https://opengameart.org/content/80-cc0-creature-sfx | CC0 1.0 | feast-mode chomp | none (renamed) |
 
-## Required attribution (tier B)
+## Required attribution (fonts, SIL Open Font License 1.1)
 
-The two TrueType fonts are licensed under the SIL Open Font License 1.1. The licence text ships with the game in `assets/licenses/googlefonts_pressstart2p.txt` and `assets/licenses/googlefonts_pixelifysans.txt`. Show these lines in the in-game credits:
+The two TrueType fonts are licensed under the SIL Open Font License 1.1. They ship unmodified (only the file names changed: `press_start_2p.ttf`, `pixelify_sans.ttf`), bundled with the game and never sold by themselves. Their copyright notices and the full licence text ship with the game in `assets/licenses/googlefonts_pressstart2p.txt` and `assets/licenses/googlefonts_pixelifysans.txt`, and the in-game credits show these lines:
 
-- "Press Start 2P" - Copyright 2012 The Press Start 2P Project Authors (cody@zone38.net), with Reserved Font Name "Press Start 2P". Licensed under the SIL Open Font License, Version 1.1.
-- "Pixelify Sans" - Copyright 2021 The Pixelify Sans Project Authors (https://github.com/eifetx/Pixelify-Sans). Licensed under the SIL Open Font License, Version 1.1.
-
-The fonts are shipped unmodified under new file names (`press_start_2p.ttf`, `pixelify_sans.ttf`); they are not sold by themselves.
+- "Press Start 2P" by CodeMan38 - Copyright 2012 The Press Start 2P Project Authors (cody@zone38.net), with Reserved Font Name "Press Start 2P". Licensed under the SIL Open Font License, Version 1.1 (full text included with the game).
+- "Pixelify Sans" by Stefie Justprince - Copyright 2021 The Pixelify Sans Project Authors (https://github.com/eifetx/Pixelify-Sans). Licensed under the SIL Open Font License, Version 1.1 (full text included with the game).
 
 ## Courtesy credits (CC0 - attribution not required, given with thanks)
 
-Pixel art, sound and music by: AntumDeluge; Basto; IgnasD; Juhani Junkala (SubspaceAudio); MintoDog; Ecrivain; MoxieCat; rubberduck; Pixel-boy (Sparklin Labs); Wolfgang_ (Ted Kerr); ansimuz (Luis Zuno); ghostpixxells; ARoachIFoundOnMyPillow; Pixel Frog.
+Every other pack above is dedicated to the public domain under CC0 1.0 (legal code: `assets/licenses/cc0_1.0_legal_code.txt`). CC0 asks for nothing; the authors are credited with thanks.
 
-Suggested in-game wording: "Art: Pixel-boy / Sparklin Labs (Superpowers Asset Packs), ARoachIFoundOnMyPillow, ghostpixxells, Pixel Frog, ansimuz. Music: Juhani Junkala, MintoDog, Wolfgang_. Sound: Juhani Junkala, Sparklin Labs, MoxieCat, Basto, rubberduck, AntumDeluge, IgnasD, Ecrivain."
+Suggested in-game wording: "Art: Pixel-boy / Sparklin Labs (Superpowers Asset Packs), ARoachIFoundOnMyPillow, ghostpixxells, Pixel Frog, ansimuz (Luis Zuno). Music: Juhani Junkala (SubspaceAudio), MintoDog, Wolfgang_ (Ted Kerr). Sound: Juhani Junkala (SubspaceAudio), Pixel-boy / Sparklin Labs, MoxieCat, Baŝto, rubberduck, AntumDeluge, IgnasD, Écrivain."
 
 ## Modifications
 
-CC0 art was re-packed, recoloured, mirrored, composited and scaled by integer factors for this game; the complete edit log is section 14 of `docs/ASSET_MANIFEST.md`. Audio is used as published, except that six music tracks released only as WAV (Juhani Junkala's "5 Chiptunes (Action)" and Wolfgang_'s "Bonus Round") were transcoded to OGG Vorbis.
+Club & Grub changes third-party material only as listed in the table above. The art pipeline (`docs/art/pipeline/`, source repository) uses integer nearest-neighbour scaling, palette-preserving recolours, mirroring, cropping and compositing; its complete per-file edit log is section 14 of `docs/ASSET_MANIFEST.md`. All 79 audio files are byte-identical to the published files, except six music tracks released only as WAV (Juhani Junkala's "5 Chiptunes (Action)" and Wolfgang_'s "Bonus Round") that were transcoded to OGG Vorbis. The two fonts are byte-identical to the published files.
 
 ## Engine
 
-Made with Godot Engine (MIT licence, https://godotengine.org/license). Godot's third-party notices must be included in exported builds (see the Godot documentation, "Complying with licenses").
+Made with Godot Engine 4.7.2 (https://godotengine.org), MIT licence, Copyright (c) 2014-present Godot Engine contributors, Copyright (c) 2007-2014 Juan Linietsky and Ariel Manzur; portions of this software are copyright (c) 1996-2025 The FreeType Project (www.freetype.org), all rights reserved; the full licence texts of the engine, its third-party components and the fonts are included with the game.
+
+The MIT notice of Godot Engine and the licence texts of the third-party code compiled into the engine (FreeType, HarfBuzz, ICU, libogg / libvorbis, libpng, zlib, Zstandard, mbed TLS, SDL and others) are reproduced from the engine itself in `assets/licenses/godot_engine.txt` and `assets/licenses/godot_third_party.txt`.
+
+## Licence texts shipped with the game
+
+Every export includes `CREDITS.md` and `assets/licenses/*` (include filter of every preset in `export_presets.cfg`):
+
+- `godot_engine.txt` - Godot Engine MIT licence and the FreeType notice
+- `godot_third_party.txt` - every third-party component of the engine with its copyright lines and licence text
+- `googlefonts_pressstart2p.txt`, `googlefonts_pixelifysans.txt` - SIL Open Font License 1.1 with the font copyright notices (and the Press Start 2P FONTLOG)
+- `cc0_1.0_legal_code.txt` - the CC0 1.0 legal code the CC0 packs refer to
+- one `<pack>.txt` per CC0 pack with the licence wording captured from its source page on the download date (2026-10-04)
+- `README.md` - index of the files above

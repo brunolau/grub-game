@@ -2,8 +2,9 @@ class_name Hud
 extends Control
 ## In-game HUD overlay (GAMEPLAY.md 2, ASSET_MANIFEST.md 12): lives and score top-left (with the time left under
 ## the score on levels that have a time limit), hearts (and the bone fraction) top-centre, the bonus word
-## top-right, boss energy pips bottom-left while a boss fights, the level intro banner when a level starts and
-## the hint panel of `zones/message` (Events.message_requested) under the HUD row; a hint asked for while the
+## top-right, the boss energy bar under the hearts while a boss fights ([HudBossBar]: it spans the boss's own hit
+## points, so every hit shows), the level intro banner when a level starts and the hint panel of `zones/message`
+## (Events.message_requested) under the HUD row (below the boss bar during a fight); a hint asked for while the
 ## intro banner shows waits until the banner is gone.
 ##
 ## Owner: ui. Instantiated by Flow into the HUD CanvasLayer. It only reacts to `Game` and `Events` signals and
@@ -14,7 +15,6 @@ const HEART_SPACING: float = 34.0
 const LETTER_SPACING: float = 40.0
 ## Vertical stagger of the five letters (the original's offsets, GAMEPLAY.md 2).
 const LETTER_STAGGER: Array[int] = [4, 0, 6, 3, 1]
-const PIP_SPACING: float = 18.0
 const BONE_W: float = 9.0
 const INTRO_SECONDS: float = 2.6
 const INTRO_TOP: float = 64.0  ## the level banner sits under the HUD row, clear of the hero
@@ -37,6 +37,12 @@ const ROW_UNDER_HERO_ALPHA: float = 0.3
 const ROW_FADE_SECONDS: float = 0.15
 ## Height of the HUD row below the safe-area top (art px): the hero is "under it" when his head is above that line.
 const ROW_HEIGHT: float = 48.0
+## Boss bar: top edge below the safe-area top (under the hearts and the bone fraction), the gap kept to the intro
+## banner and the hint panel that move below it during a fight, and its alpha while the hero is behind it. It sits
+## top-centre on every device: the touch buttons fill both bottom corners.
+const BOSS_TOP: float = 44.0
+const BOSS_GAP: float = 6.0
+const BOSS_UNDER_HERO_ALPHA: float = 0.35
 
 ## Hearts drawn (mirrors Game.hearts).
 var shown_hearts: int = 0
@@ -44,9 +50,12 @@ var shown_hearts: int = 0
 var shown_bones: int = 0
 ## Letter mask drawn.
 var shown_letters: int = 0
-## Boss pips: filled / maximum; maximum 0 = no boss bar.
+## Boss energy as the last Events.boss_energy_changed told it: pips filled / maximum (maximum 0 = no boss bar).
 var boss_pips: int = 0
 var boss_max_pips: int = 0
+## Boss hit points shown by the bar: current / maximum (the boss's own; maximum 0 = no boss bar).
+var boss_hp: int = 0
+var boss_max_hp: int = 0
 ## Seconds shown by the time-limit counter; -1 = the level has no limit (the counter is hidden).
 var shown_time: int = -1
 
@@ -57,13 +66,13 @@ var _time_label: Label = null
 var _hearts: Array[TextureRect] = []
 var _bones: Control = null
 var _letters: Array[TextureRect] = []
-var _boss_bar: Control = null
+var _boss_bar: HudBossBar = null
 var _intro: Control = null
+var _intro_gap: Control = null
+var _boss_bar_was_visible: bool = false
 var _blink_left: float = 0.0
 var _heart_full: AtlasTexture = null
 var _heart_empty: AtlasTexture = null
-var _pip_full: AtlasTexture = null
-var _pip_empty: AtlasTexture = null
 ## Hints asked for through Events.message_requested, oldest first (sources and their texts, parallel).
 var _hint_sources: Array[Node] = []
 var _hint_texts: PackedStringArray = PackedStringArray()
@@ -84,8 +93,6 @@ func _init() -> void:
 	process_mode = Node.PROCESS_MODE_PAUSABLE
 	_heart_full = UiKit.cell("res://assets/ui/hud_heart.png", Vector2i(32, 32), 0)
 	_heart_empty = UiKit.cell("res://assets/ui/hud_heart.png", Vector2i(32, 32), 1)
-	_pip_full = UiKit.cell("res://assets/ui/hud_boss_pip.png", Vector2i(16, 16), 0)
-	_pip_empty = UiKit.cell("res://assets/ui/hud_boss_pip.png", Vector2i(16, 16), 1)
 
 
 func _ready() -> void:
@@ -130,6 +137,7 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	_fade_hint(delta)
 	_fade_row(delta)
+	_fade_boss_bar(delta)
 	if _blink_left <= 0.0:
 		return
 	_blink_left -= delta
@@ -150,6 +158,38 @@ func _fade_row(delta: float) -> void:
 	row_alpha = move_toward(row_alpha, ROW_UNDER_HERO_ALPHA if under else 1.0, delta / ROW_FADE_SECONDS)
 	for node: CanvasItem in _row_nodes:
 		node.modulate.a = row_alpha
+
+
+## Fade the boss bar while the hero overlaps it.
+func _fade_boss_bar(delta: float) -> void:
+	if _boss_bar.visible != _boss_bar_was_visible:
+		# The bar appeared or finished fading out: move the banner and the hint panel.
+		_boss_bar_was_visible = _boss_bar.visible
+		_place_below_boss_bar()
+	if not _boss_bar.visible:
+		_boss_bar.self_modulate.a = 1.0
+		return
+	var behind: bool = false
+	var level: LevelBase = Game.level
+	if level != null and level.player != null and level.player.is_inside_tree() and not level.player.dead:
+		var feet: Vector2 = level.player.get_global_transform_with_canvas().origin
+		var box: Vector2 = Vector2(float(level.player.box_w), float(level.player.box_h)) * float(Tuning.ART_SCALE)
+		var hero: Rect2 = Rect2(feet.x - box.x * 0.5, feet.y - box.y, box.x, box.y)
+		behind = hero.intersects(get_boss_bar_rect().grow(4.0))
+	var target: float = BOSS_UNDER_HERO_ALPHA if behind else 1.0
+	_boss_bar.self_modulate.a = move_toward(_boss_bar.self_modulate.a, target, delta / ROW_FADE_SECONDS)
+
+
+## Screen rectangle of the boss bar with its skull (viewport px).
+func get_boss_bar_rect() -> Rect2:
+	var rect: Rect2 = _boss_bar.get_global_rect()
+	return Rect2(rect.position + Vector2(HudBossBar.SKULL_POS.x, 0.0),
+			rect.size - Vector2(HudBossBar.SKULL_POS.x, 0.0))
+
+
+## The boss bar (tests, previews).
+func get_boss_bar() -> HudBossBar:
+	return _boss_bar
 
 
 ## True when a screen y (viewport px) lies within the HUD row.
@@ -177,9 +217,9 @@ func get_lives_text() -> String:
 	return _lives_label.text
 
 
-## True while the boss energy bar is shown.
+## True while the boss energy bar shows a fight (it fades out after a defeat).
 func is_boss_bar_visible() -> bool:
-	return _boss_bar.visible
+	return _boss_bar.active and _boss_bar.visible
 
 
 ## True while the time-limit counter is shown.
@@ -233,9 +273,10 @@ func show_intro(level_id: StringName) -> void:
 	holder.set_anchors_preset(Control.PRESET_FULL_RECT)
 	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var gap: Control = Control.new()
-	gap.custom_minimum_size = Vector2(0.0, INTRO_TOP)
+	gap.custom_minimum_size = Vector2(0.0, INTRO_TOP + _boss_drop())
 	gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	holder.add_child(gap)
+	_intro_gap = gap
 	var middle: CenterContainer = CenterContainer.new()
 	middle.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	middle.add_child(banner)
@@ -305,15 +346,32 @@ func _build_letters(area: Control) -> void:
 		_letters.append(letter)
 
 
+## The boss bar, centred under the hearts (the frame is centred; the skull hangs off its left end).
 func _build_boss_bar(area: Control) -> void:
-	_boss_bar = Control.new()
-	_boss_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_boss_bar.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	_boss_bar.offset_top = -16.0
-	_boss_bar.offset_bottom = 0.0
-	_boss_bar.offset_right = PIP_SPACING * float(Tuning.BOSS_BAR_MAX_PIPS)
-	_boss_bar.draw.connect(_draw_boss_bar)
+	_boss_bar = HudBossBar.new()
+	_boss_bar.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	_boss_bar.offset_left = -HudBossBar.FRAME_SIZE.x * 0.5
+	_boss_bar.offset_right = HudBossBar.FRAME_SIZE.x * 0.5
+	_boss_bar.offset_top = BOSS_TOP
+	_boss_bar.offset_bottom = BOSS_TOP + HudBossBar.FRAME_SIZE.y
 	area.add_child(_boss_bar)
+
+
+## How far the intro banner and the hint panel move down while the boss bar is shown (art px).
+func _boss_drop() -> float:
+	if _boss_bar == null or not _boss_bar.visible:
+		return 0.0
+	return maxf(0.0, BOSS_TOP + HudBossBar.FRAME_SIZE.y + BOSS_GAP - HINT_TOP)
+
+
+## Put the intro banner and the hint panel below the boss bar while it shows, back under the HUD row after.
+func _place_below_boss_bar() -> void:
+	var drop: float = _boss_drop()
+	if _hint_holder != null:
+		_hint_holder.offset_top = HINT_TOP + drop
+		_hint_holder.offset_bottom = HINT_TOP + drop
+	if _intro != null and is_instance_valid(_intro) and _intro_gap != null and is_instance_valid(_intro_gap):
+		_intro_gap.custom_minimum_size = Vector2(0.0, INTRO_TOP + drop)
 
 
 ## The hint panel: "!" icon and the hint in the HUD face on an almost opaque ink plate with a thin cream edge,
@@ -391,28 +449,11 @@ func _layout_hint() -> void:
 	if _hint_label == null:
 		return
 	_hint_label.text = _hint_shown_text
-	var font: Font = UiKit.font(UiKit.Style.HUD)
-	var font_size: int = UiKit.SIZE_HUD
-	var natural: float = ceilf(font.get_string_size(_hint_shown_text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size).x)
 	var margins: Vector4i = UiKit.safe_margins(get_viewport())
 	var view_w: float = get_viewport_rect().size.x - float(margins.x + margins.z)
 	var room: float = view_w - float(2 * HINT_PAD_X + UiKit.ICON_CELL + HINT_ICON_GAP) - 8.0
 	var limit: float = maxf(minf(HINT_MAX_TEXT_W, room), 64.0)
-	var width: float = natural
-	if natural > limit:
-		var lines: int = ceili(natural / limit)
-		var line_h: float = font.get_height(font_size)
-		width = ceilf(natural / float(lines))
-		while width < limit:
-			var block: Vector2 = font.get_multiline_string_size(_hint_shown_text, HORIZONTAL_ALIGNMENT_LEFT, width,
-					font_size)
-			if block.y <= line_h * float(lines) + 0.5:
-				break
-			width += 8.0
-		width = minf(width, limit)
-	_hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART if natural > width else TextServer.AUTOWRAP_OFF
-	_hint_label.custom_minimum_size = Vector2(width, 0.0)
-	_hint_label.reset_size()
+	UiKit.wrap_balanced(_hint_label, limit)
 
 
 func _apply_margins() -> void:
@@ -490,32 +531,55 @@ func _on_run_started(_difficulty: int) -> void:
 	refresh()
 
 
-func _on_boss_started(_boss: BossBase) -> void:
-	_set_boss(Tuning.BOSS_BAR_MAX_PIPS, Tuning.BOSS_BAR_MAX_PIPS)
+func _on_boss_started(boss: BossBase) -> void:
+	var energy: Vector2i = _boss_energy(boss, Tuning.BOSS_BAR_MAX_PIPS, Tuning.BOSS_BAR_MAX_PIPS)
+	boss_pips = Tuning.BOSS_BAR_MAX_PIPS
+	boss_max_pips = Tuning.BOSS_BAR_MAX_PIPS
+	boss_hp = energy.x
+	boss_max_hp = energy.y
+	_boss_bar.start(boss_hp, boss_max_hp)
+	_place_below_boss_bar()
 
 
-func _on_boss_energy_changed(_boss: BossBase, pips: int, max_pips: int) -> void:
-	_set_boss(pips, max_pips)
+func _on_boss_energy_changed(boss: BossBase, pips: int, max_pips: int) -> void:
+	boss_max_pips = clampi(max_pips, 0, Tuning.BOSS_BAR_MAX_PIPS)
+	boss_pips = clampi(pips, 0, boss_max_pips)
+	if boss_max_pips <= 0:
+		_set_boss(0, 0)
+		return
+	var energy: Vector2i = _boss_energy(boss, pips, max_pips)
+	boss_hp = energy.x
+	boss_max_hp = energy.y
+	_boss_bar.set_energy(boss_hp, boss_max_hp)
+	_place_below_boss_bar()
 
 
 func _on_boss_defeated(_boss: BossBase) -> void:
-	_set_boss(0, 0)
+	boss_pips = 0
+	boss_hp = 0
+	_boss_bar.finish()
 
 
 func _on_level_respawned() -> void:
 	_set_boss(0, 0)
 
 
+## The boss's own hit points (current, maximum) from the signal's boss; the pips stand in when there is no boss
+## object (previews, tests): the bar shows the same fraction.
+func _boss_energy(boss: BossBase, pips: int, max_pips: int) -> Vector2i:
+	if boss != null and is_instance_valid(boss) and boss.max_hp > 0:
+		var current: int = 0 if pips <= 0 else clampi(boss.hp, 0, boss.max_hp)
+		return Vector2i(current, boss.max_hp)
+	return Vector2i(maxi(pips, 0), maxi(max_pips, 1))
+
+
 func _set_boss(pips: int, max_pips: int) -> void:
 	boss_max_pips = clampi(max_pips, 0, Tuning.BOSS_BAR_MAX_PIPS)
 	boss_pips = clampi(pips, 0, boss_max_pips)
-	_boss_bar.visible = boss_max_pips > 0
-	_boss_bar.queue_redraw()
-
-
-func _draw_boss_bar() -> void:
-	for i: int in boss_max_pips:
-		_boss_bar.draw_texture(_pip_full if i < boss_pips else _pip_empty, Vector2(float(i) * PIP_SPACING, 0.0))
+	boss_hp = 0
+	boss_max_hp = 0
+	_boss_bar.clear()
+	_place_below_boss_bar()
 
 
 func _draw_bones() -> void:

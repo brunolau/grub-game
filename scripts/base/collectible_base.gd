@@ -45,6 +45,8 @@ var _sprite_rest_y: float = 0.0
 var _bob_phase: int = 0
 var _holds_drop_slot: bool = false
 var _removing: bool = false
+## Sim.get_phase_runs(ITEMS) when the item dozed off (its `age` catches up on waking).
+var _doze_items_run: int = 0
 
 ## Dropped bonus items alive right now (the original has 32 slots for them).
 static var _drop_slots_used: int = 0
@@ -116,6 +118,25 @@ func _sim_tick(phase: int) -> void:
 		if level != null and level.player != null and can_be_collected() \
 				and Overlap.body(self, level.player, level.player):
 			collect(level.player)
+
+
+## Dozing (SimEntity, ARCHITECTURE.md 11): a placed item far from the hero and the view only counts its age (it
+## bobs only on screen, and the overlap test rejects a hero farther than Tuning.OVERLAP_MAX_DX / _DY from its
+## feet point), so it may doze; its age catches up when it wakes. Dropped items move and expire: never.
+func _doze_area() -> Rect2i:
+	return _doze_box()
+
+
+func _can_doze() -> bool:
+	return not dropped and not collected
+
+
+func _on_doze() -> void:
+	_doze_items_run = Sim.get_phase_runs(Defs.Phase.ITEMS)
+
+
+func _on_doze_wake() -> void:
+	age += Sim.get_phase_runs(Defs.Phase.ITEMS) - _doze_items_run
 
 
 ## Movement for one tick: bobbing when placed, bouncing physics when dropped. Override.

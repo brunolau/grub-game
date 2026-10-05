@@ -229,18 +229,23 @@ const COLOSSUS_HP_PER_PIP: int = 4
 const COLOSSUS_BOX: Vector3i = Vector3i(104, 95, 104)  ## the feet point is the bottom-RIGHT corner [M 5]
 const COLOSSUS_RIM_PX: int = 32          ## the stone rim (last 64 art px of a frame) overlaps the wall face [M 5]
 const COLOSSUS_WAKE_RANGE: int = 160     ## starts the fight by itself when the hero is this close to its body [own]
-const COLOSSUS_HURT_TICKS: int = 22      ## hurt pose after every hit
-const COLOSSUS_RAGE_TICKS: int = 44
+## Fairness tuning (wf4 arms_w4): every attack shows its pose at least 10 ticks before anything can touch the hero,
+## a hit never cancels or postpones an attack beyond its hurt pose (no stun-lock), the loop opens with a long breath,
+## the red rage pose is armoured.
+const COLOSSUS_HURT_TICKS: int = 26      ## hurt pose after every hit; also its hit cooldown (was 22 = BOSS_HIT_COOLDOWN)
+const COLOSSUS_RAGE_TICKS: int = 40
 const COLOSSUS_RAGE_EVERY: int = 4       ## the 1st hit and every 4th hit after it start a rage
-const COLOSSUS_RAGE_ROCK_TICK: int = 6   ## one rock ...
+const COLOSSUS_RAGE_ROCK_TICK: int = 10  ## one rock (the red open-jaw pose shows for 10 ticks first) ...
 const COLOSSUS_RAGE_DROP_TICK_A: int = 18  ## ... and two ceiling drops in quick succession
-const COLOSSUS_RAGE_DROP_TICK_B: int = 30
-const COLOSSUS_SPIT_TICKS: int = 18      ## length of the spit step
-const COLOSSUS_SPIT_RELEASE_TICK: int = 6  ## the jaws are open on this tick of the spit animation
+const COLOSSUS_RAGE_DROP_TICK_B: int = 28
+const COLOSSUS_SPIT_TICKS: int = 20      ## length of the spit step
+const COLOSSUS_SPIT_RELEASE_TICK: int = 10  ## the rearing open-jaw pose shows 10 ticks before the rock leaves
 const COLOSSUS_SLAM_TICKS: int = 16      ## length of the slam step
-const COLOSSUS_SLAM_RELEASE_TICK: int = 4
-## Idle ticks between two attacks, by step of the attack loop (spit, slam, spit, slam, slam).
-const COLOSSUS_IDLE_TICKS: Array[int] = [48, 30, 30, 18, 18]
+const COLOSSUS_SLAM_RELEASE_TICK: int = 4  ## the fist meets the wall; the stalactite then rattles (STALACTITE_WARN_TICKS)
+## Idle ticks between two attacks, by step of the attack loop (spit, slam, spit, slam, slam). The first one is the
+## long breath that opens every loop (and the fight: the first rock leaves 94 ticks after the Colossus wakes). The
+## idle clock runs on through hurt poses: hits shorten the breathing, they never stop the attacks.
+const COLOSSUS_IDLE_TICKS: Array[int] = [84, 30, 30, 20, 20]
 ## Idle length in percent by phase: above 16 hit points, above 8, last 8. [own]
 const COLOSSUS_PHASE_PERCENT: Array[int] = [100, 75, 50]
 const COLOSSUS_PHASE_HP: Array[int] = [16, 8]
@@ -258,14 +263,16 @@ const COLOSSUS_CEILING_SCAN_ROWS: int = 4
 # =================================================================================================================
 const ROCK_LIFE: int = 132
 const ROCK_XVEL_MIN: int = 32            ## v16: spat to the left with a random speed of 32 ...
-const ROCK_XVEL_STEP: int = 8            ## ... plus 0..11 steps of 8 (up to 120)
-const ROCK_XVEL_STEPS: int = 12
+const ROCK_XVEL_STEP: int = 8            ## ... plus 0..8 steps of 8 (up to 96: 6 px per tick) [own, wf4]
+const ROCK_XVEL_STEPS: int = 9
 const ROCK_BOX: Vector3i = Vector3i(10, 10, 5)
 const ROCK_FRICTION_SHIFT: int = 3       ## every floor bounce takes an eighth of the horizontal speed [own]
+const ROCK_SETTLE_REBOUND: int = 48      ## v16: a smaller rebound ends the bouncing (two hops after the arc) [own, wf4]
+const ROCK_REST_TICKS: int = 10          ## once it stops bouncing it rolls on this long, then crumbles [own, wf4]
 const ROCK_ANIM_TICKS: int = 2           ## spin, 12 fps [M 9]
 const ROCK_FRAMES: int = 4
 const STALACTITE_LIFE: int = 66
-const STALACTITE_WARN_TICKS: int = 10    ## rattles at the ceiling before it falls [own]
+const STALACTITE_WARN_TICKS: int = 14    ## rattles at the ceiling before it falls [own, wf4: was 10]
 const STALACTITE_BOX: Vector3i = Vector3i(10, 20, 5)
 const STALACTITE_SHAKE_ART_PX: int = 2   ## cosmetic rattle amplitude, art px
 const EMBER_DROP_ABOVE_HERO: int = 150   ## falls from 150 px above the hero ...

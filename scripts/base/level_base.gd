@@ -42,12 +42,30 @@ var active_enemies: int = 0
 ## Ticks left on the level's time limit (meta key `time`); -1 = the level has no limit. Running out costs a life.
 var time_left: int = -1
 
+## Measurement switch (scripts/core/dev/sim_bench.gd --no-doze): false = no entity ever dozes. Dozing changes no
+## outcome; the bench proves it by comparing both.
+static var doze_enabled: bool = true
+
 var _by_kind: Array[Array] = []
 var _named: Dictionary = {}
 var _camera_locked: bool = false
 var _camera_lock_rect: Rect2i = Rect2i()
 ## Darkness a respawn restores: the state when the active checkpoint was touched, or at the start of play.
 var _respawn_dark: bool = false
+## Registered entities that tick (not dozing), any order: the on_screen pass runs over them.
+var _awake: Array[SimEntity] = []
+## Doze manager (ARCHITECTURE.md 11, SimEntity "Dozing"): the entities it looks after, their doze areas (4 ints per
+## slot: left, top, right, bottom, right exclusive; right <= left = never dozes), whether an area is known, the
+## entities whose state changed since the last decision, the doze region of the last full pass (rounded to
+## Tuning.DOZE_GRID_PX), and the view and hero feet point it was decided for.
+var _doze: Array[SimEntity] = []
+var _doze_rects: PackedInt32Array = PackedInt32Array()
+var _doze_known: PackedByteArray = PackedByteArray()
+var _doze_notes: Array[SimEntity] = []
+var _doze_region: Rect2i = Rect2i()
+var _doze_full: bool = true
+var _doze_view: Rect2i = Rect2i()
+var _doze_hero: Vector2i = Vector2i(-1, -1)
 
 
 func _init() -> void:
@@ -63,6 +81,8 @@ func _notification(what: int) -> void:
 			Game.level = self
 			if not Sim.tick_finished.is_connected(_on_tick_finished):
 				Sim.tick_finished.connect(_on_tick_finished)
+			if not Sim.tick_started.is_connected(_on_tick_started):
+				Sim.tick_started.connect(_on_tick_started)
 			if not Events.shake_requested.is_connected(request_shake):
 				Events.shake_requested.connect(request_shake)
 			if not Events.player_death_finished.is_connected(_on_player_death_finished):
@@ -78,6 +98,8 @@ func _notification(what: int) -> void:
 				Game.checkpoint_changed.disconnect(_on_checkpoint_changed)
 			if Sim.tick_finished.is_connected(_on_tick_finished):
 				Sim.tick_finished.disconnect(_on_tick_finished)
+			if Sim.tick_started.is_connected(_on_tick_started):
+				Sim.tick_started.disconnect(_on_tick_started)
 			if Events.shake_requested.is_connected(request_shake):
 				Events.shake_requested.disconnect(request_shake)
 			if Events.player_death_finished.is_connected(_on_player_death_finished):
@@ -100,6 +122,14 @@ func register_entity(entity: SimEntity) -> void:
 		_named[StringName(str(entity.spawn_params["name"]))] = entity
 	if kind == Defs.Kind.PLAYER and entity is PlayerBase:
 		player = entity
+	if entity._level_awake_slot < 0 and not entity._sim_suspended:
+		entity._level_awake_slot = _awake.size()
+		_awake.append(entity)
+	if doze_enabled and kind != Defs.Kind.PLAYER and kind != Defs.Kind.FX and entity._doze_slot < 0:
+		entity._doze_slot = _doze.size()
+		_doze.append(entity)
+		_doze_rects.append_array([0, 0, 0, 0])
+		_doze_known.append(0)
 
 
 ## Called by SimEntity when it leaves the tree.
@@ -110,6 +140,21 @@ func unregister_entity(entity: SimEntity) -> void:
 		_named.erase(StringName(str(entity.spawn_params["name"])))
 	if entity == player:
 		player = null
+	_awake_remove(entity)
+	var slot: int = entity._doze_slot
+	if slot >= 0 and slot < _doze.size() and _doze[slot] == entity:
+		# Swap with the last slot (the order of the doze list does not matter).
+		var last: int = _doze.size() - 1
+		var moved: SimEntity = _doze[last]
+		_doze[slot] = moved
+		moved._doze_slot = slot
+		for j: int in 4:
+			_doze_rects[slot * 4 + j] = _doze_rects[last * 4 + j]
+		_doze_known[slot] = _doze_known[last]
+		_doze.resize(last)
+		_doze_rects.resize(last * 4)
+		_doze_known.resize(last)
+	entity._doze_slot = -1
 
 
 ## Live list of the entities of one Defs.Kind, in spawn (slot) order. Do NOT modify it and do not keep it
@@ -334,6 +379,10 @@ func respawn_player() -> void:
 	if player != null:
 		player.respawn_at(get_respawn_pos())
 	snap_camera()
+	# The reset moved entities back to their anchors and the hero far away: decide every doze area afresh.
+	_doze_full = true
+	_doze_known.fill(0)
+	_doze_update()
 	Events.level_respawned.emit()
 
 
@@ -370,8 +419,9 @@ func _on_player_death_finished() -> void:
 		Flow.game_over()
 
 
-## End of every tick (after phase POST): the screen-shake step 18 of PHYSICS.md 3 and the on_screen flags
-## ("drawn in the previous frame") of every entity.
+## End of every tick (after phase POST): the screen-shake step 18 of PHYSICS.md 3, the doze decisions for the next
+## tick, and the on_screen flags ("drawn in the previous frame") of every entity. A dozing entity lies outside the
+## doze region, which contains the view: its on_screen stays false (set when it dozed off).
 func _on_tick_finished(tick: int) -> void:
 	shake_offset = 0
 	if shake > 1 and (tick & 1) == 1:
@@ -379,16 +429,154 @@ func _on_tick_finished(tick: int) -> void:
 		shake_offset = shake
 		if player != null:
 			player.apply_shake_nudge(Tuning.SHAKE_NUDGE)
-	# Overlap.rects(entity.get_box(), view) for every entity, written out: this loop runs over every registered
+	if doze_enabled:
+		_doze_update()
+	# Overlap.rects(entity.get_box(), view) for every entity, written out: this loop runs over every ticking
 	# entity every tick, and the two calls per entity were a large share of the tick on slow devices.
 	var view: Rect2i = get_view_rect()
 	var left: int = view.position.x
 	var right: int = left + view.size.x
 	var top: int = view.position.y
 	var bottom: int = top + view.size.y
-	for list: Array in _by_kind:
-		for entity: SimEntity in list:
-			var feet: Vector2i = entity.sim_pos
-			var box_left: int = feet.x - entity.box_xo
-			entity.on_screen = box_left < right and left < box_left + entity.box_w \
-					and feet.y - entity.box_h < bottom and top < feet.y
+	for entity: SimEntity in _awake:
+		var feet: Vector2i = entity.sim_pos
+		var box_left: int = feet.x - entity.box_xo
+		entity.on_screen = box_left < right and left < box_left + entity.box_w \
+				and feet.y - entity.box_h < bottom and top < feet.y
+
+
+## Start of every tick: when the view or the hero moved since the last doze decision (a respawn behind the curtain,
+## a resized window), decide again before anything reads them.
+func _on_tick_started(_tick: int) -> void:
+	if not doze_enabled or _doze.is_empty():
+		return
+	var hero: Vector2i = player.sim_pos if player != null else Vector2i(-1, -1)
+	if hero != _doze_hero or get_view_rect() != _doze_view:
+		_doze_update()
+
+
+# =================================================================================================================
+# Doze manager (ARCHITECTURE.md 11; the contract is in SimEntity, "Dozing")
+# =================================================================================================================
+
+## An entity's state changed so that it may doze now (or its area moved): look at it at the next decision.
+func doze_note(entity: SimEntity) -> void:
+	var slot: int = entity._doze_slot
+	if slot < 0 or slot >= _doze.size() or _doze[slot] != entity:
+		return
+	_doze_known[slot] = 0
+	_doze_notes.append(entity)
+
+
+## Wake a dozing entity at once (its ticks matter again; also in the middle of a tick).
+func doze_wake(entity: SimEntity) -> void:
+	if entity._sim_suspended and entity._doze_slot >= 0:
+		_doze_known[entity._doze_slot] = 0
+		_doze_wake_entity(entity)
+
+
+## Number of entities dozing now (diagnostics: the performance probe and the bench).
+func get_dozing_count() -> int:
+	var count: int = 0
+	for entity: SimEntity in _doze:
+		if entity._sim_suspended:
+			count += 1
+	return count
+
+
+## Decide which entities doze: a full pass when the doze region crossed a grid line (or after a respawn), else only
+## the entities whose state changed.
+func _doze_update() -> void:
+	var view: Rect2i = get_view_rect()
+	var region: Rect2i = view
+	_doze_view = view
+	_doze_hero = Vector2i(-1, -1)
+	if player != null:
+		_doze_hero = player.sim_pos
+		region = region.merge(player._doze_box())
+	region = region.grow(Tuning.DOZE_REACH_PX)
+	var grid_mask: int = ~(Tuning.DOZE_GRID_PX - 1)
+	var left: int = region.position.x & grid_mask
+	var top: int = region.position.y & grid_mask
+	var right: int = (region.end.x + Tuning.DOZE_GRID_PX - 1) & grid_mask
+	var bottom: int = (region.end.y + Tuning.DOZE_GRID_PX - 1) & grid_mask
+	var rounded: Rect2i = Rect2i(left, top, right - left, bottom - top)
+	if _doze_full or rounded != _doze_region:
+		_doze_full = false
+		_doze_region = rounded
+		_doze_notes.clear()
+		for i: int in _doze.size():
+			_doze_check(i, left, top, right, bottom)
+		return
+	if _doze_notes.is_empty():
+		return
+	var notes: Array[SimEntity] = _doze_notes.duplicate()
+	_doze_notes.clear()
+	for entity: SimEntity in notes:
+		if is_instance_valid(entity) and entity._doze_slot >= 0:
+			_doze_check(entity._doze_slot, left, top, right, bottom)
+
+
+## One entity against the doze region (left, top, right, bottom; right and bottom exclusive).
+func _doze_check(slot: int, left: int, top: int, right: int, bottom: int) -> void:
+	var entity: SimEntity = _doze[slot]
+	var k: int = slot * 4
+	if _doze_known[slot] == 0:
+		_doze_store_area(slot, entity._doze_area())
+	if _doze_rects[k + 2] <= _doze_rects[k]:
+		if entity._sim_suspended:
+			_doze_wake_entity(entity)
+		return
+	var far: bool = _doze_rects[k + 2] <= left or _doze_rects[k] >= right \
+			or _doze_rects[k + 3] <= top or _doze_rects[k + 1] >= bottom
+	if entity._sim_suspended:
+		if not far:
+			_doze_wake_entity(entity)
+		return
+	if not far or not entity._can_doze():
+		return
+	# The area the entity has right now (a cached one may be old), then off it goes.
+	_doze_store_area(slot, entity._doze_area())
+	if _doze_rects[k + 2] <= _doze_rects[k] or not (_doze_rects[k + 2] <= left or _doze_rects[k] >= right \
+			or _doze_rects[k + 3] <= top or _doze_rects[k + 1] >= bottom):
+		return
+	entity._on_doze()
+	entity.on_screen = false
+	entity.sim_prev = entity.sim_pos
+	Sim.suspend(entity)
+	entity.set_process_internal(false)
+	_awake_remove(entity)
+
+
+func _doze_store_area(slot: int, area: Rect2i) -> void:
+	var k: int = slot * 4
+	_doze_known[slot] = 1
+	if area.size.x <= 0 or area.size.y <= 0:
+		_doze_rects[k] = 0
+		_doze_rects[k + 1] = 0
+		_doze_rects[k + 2] = 0
+		_doze_rects[k + 3] = 0
+		return
+	_doze_rects[k] = area.position.x
+	_doze_rects[k + 1] = area.position.y
+	_doze_rects[k + 2] = area.end.x
+	_doze_rects[k + 3] = area.end.y
+
+
+func _doze_wake_entity(entity: SimEntity) -> void:
+	Sim.resume(entity)
+	entity.set_process_internal(true)
+	if entity._level_awake_slot < 0:
+		entity._level_awake_slot = _awake.size()
+		_awake.append(entity)
+	entity._on_doze_wake()
+
+
+func _awake_remove(entity: SimEntity) -> void:
+	var slot: int = entity._level_awake_slot
+	if slot >= 0 and slot < _awake.size() and _awake[slot] == entity:
+		var last: SimEntity = _awake[_awake.size() - 1]
+		_awake[slot] = last
+		last._level_awake_slot = slot
+		_awake.resize(_awake.size() - 1)
+	entity._level_awake_slot = -1

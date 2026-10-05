@@ -374,6 +374,39 @@ static func apply_safe_margins(container: MarginContainer) -> void:
 # Text helpers
 # =================================================================================================================
 
+## Width for `text` drawn with `text_font` at `size`: its natural width when that fits in `limit`, else the
+## narrowest width (8 px steps, at most `limit`) that wraps it into as few lines as `limit` allows, so that the lines
+## come out balanced (two half-long lines read better than a full line and a single word).
+static func balanced_width(text: String, text_font: Font, size: int, limit: float) -> float:
+	var natural: float = ceilf(text_font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, size).x)
+	if natural <= limit:
+		return natural
+	var lines: int = ceili(natural / limit)
+	var line_h: float = text_font.get_height(size)
+	var width: float = ceilf(natural / float(lines))
+	while width < limit:
+		var block: Vector2 = text_font.get_multiline_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, width, size)
+		if block.y <= line_h * float(lines) + 0.5:
+			break
+		width += 8.0
+	return minf(width, limit)
+
+
+## Size a label in the HUD style for its text: one line when it fits in `limit` px, else wrapped into balanced
+## lines (see [method balanced_width]). The label keeps its font; call again after the text changed.
+static func wrap_balanced(target: Label, limit: float) -> void:
+	var text_font: Font = target.get_theme_font(&"font")
+	var size: int = target.get_theme_font_size(&"font_size")
+	var natural: float = ceilf(text_font.get_string_size(target.text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, size).x)
+	var width: float = balanced_width(target.text, text_font, size, limit)
+	target.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART if natural > width else TextServer.AUTOWRAP_OFF
+	# A label with a background (a sign board) is wider than its text by the background's margins.
+	var box: StyleBox = target.get_theme_stylebox(&"normal")
+	var padding: float = 0.0 if box == null else box.get_margin(SIDE_LEFT) + box.get_margin(SIDE_RIGHT)
+	target.custom_minimum_size = Vector2(width + padding, 0.0)
+	target.reset_size()
+
+
 ## Score as shown everywhere: seven digits with leading zeros (GAMEPLAY.md 2).
 static func score_text(score: int) -> String:
 	return "%07d" % clampi(score, 0, 9999999)

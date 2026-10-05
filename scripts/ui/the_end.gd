@@ -11,11 +11,16 @@ var _ground: UiGround = null
 var _village: Control = null
 var _heading: Label = null
 var _cast: Array[UiActor] = []
+## Village pieces (huts, fence), held for the whole screen: a texture drawn from a local would be freed right
+## after the draw call and show up white.
+var _props: Array[Texture2D] = []
 var _cast_offsets: PackedFloat32Array = PackedFloat32Array([-150.0, -86.0, 0.0, 70.0, 140.0])
 
 
 func _build_screen() -> void:
 	add_child(UiBackdrop.new("jungle", 14.0))
+	for prop: String in ["hut_dome.png", "hut_bone.png", "fence.png"]:
+		_props.append(UiKit.tex(PROP_DIR + prop))
 	_village = Control.new()
 	_village.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_village.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -98,9 +103,9 @@ func _layout() -> void:
 func _draw_village() -> void:
 	var base: float = _ground.position.y + 6.0
 	var mid: float = roundf(_village.size.x * 0.5)
-	var left_hut: Texture2D = UiKit.tex(PROP_DIR + "hut_dome.png")
-	var right_hut: Texture2D = UiKit.tex(PROP_DIR + "hut_bone.png")
-	var fence: Texture2D = UiKit.tex(PROP_DIR + "fence.png")
+	var left_hut: Texture2D = _props[0]
+	var right_hut: Texture2D = _props[1]
+	var fence: Texture2D = _props[2]
 	if left_hut == null or right_hut == null or fence == null:
 		return
 	_village.draw_texture(left_hut, Vector2(mid - 300.0, base - left_hut.get_height()))
