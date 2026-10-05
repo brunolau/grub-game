@@ -1,20 +1,21 @@
-# w4_l2b "Colossus Hall" (Expert) from '@' through the boss to the trophy (ticks:KEYS, keys L R U D F K).
-# Antechamber: the checkpoint, the axe (thrown weapons are the only thing that hurts the Colossus), food.
+# w4_l2b "Colossus Hall" (Expert) from '@' through the Wall Colossus to a trophy (ticks:KEYS, keys L R U D F K).
+# Whatever weapon the hero brings, he walks over the axe at the checkpoint (only thrown weapons hurt the Colossus), so
+# this route plays the same with the club, the hammer, the axe and the swirling axe (w4_l2b.axe.inputs and
+# w4_l2b.hammer.inputs are copies; w4_l2b.boomerang.inputs keeps the swirling axe instead). Recorded against the
+# tuned Colossus (wf4): stand on the slab, throw high axes whenever the head will take the hit, and a dodge (a hop or
+# a step) before every attack that would reach the hero - no hit taken, all hearts left.
+# Antechamber: the checkpoint, the axe, food. Drop into the arena and jump onto the slab.
 80:R
-# Drop into the arena and jump onto the obsidian slab: from there a thrown axe flies at head height.
 14:R,16:
 10:R,8:U,12:
-# Throw high axes from the slab; hop whenever a rock comes (the Colossus spits them, more often when enraged).
-8:UF,4:,8:UF,4:,8:UF,1:,6:U,8:,8:UF,4:,7:UF,6:U,8:,8:UF
-4:,1:UF,6:U,8:,8:UF,2:,6:U,12:,8:UF,4:,8:UF,4:,8:UF,4:
-7:UF,6:U,8:,5:U,20:,6:UF,6:U,8:,8:UF,4:,8:UF,4:,8:UF,4:
-8:UF,4:,8:UF,4:,8:UF,4:,8:UF,4:,6:U,8:,8:UF,4:,8:UF,4:
-8:UF,1:,6:U,8:,8:UF,4:,4:UF,6:U,8:,8:UF,4:,8:UF,4:,4:UF
-6:U,8:,5:U,8:,8:UF,4:,8:UF,4:,8:UF,4:,8:UF,4:,8:UF,4:
-8:UF,4:,8:UF,4:,8:UF,4:,7:UF,6:U,15:,8:UF,1:,6:U,8:,8:UF
-4:,8:UF,4:,8:UF,4:,8:UF,4:,8:UF,4:,8:UF,4:,8:UF,4:,8:UF
-4:,8:UF,4:,8:UF,4:,8:UF,4:,8:UF,4:,8:UF,4:,6:UF
-# The Colossus breaks and bursts into bonuses and four trophies: step back while they rain down, sweep the floor,
-# then take a trophy (it starts the ending).
-14:L,40:
-40:L,30:R,60:R
+# The fight, from the obsidian slab (the Colossus wakes as the hero enters the hall; its first rock leaves 94 ticks
+# later): throw whenever its roar (the hurt pose) is over - also while it attacks, a hit never stops an attack -
+# hop the bouncing rocks, step out from under the rattling stalactites; the red rage pose is armoured.
+3:,9:UF,19:,9:UF,6:,11:UF,6:,9:UF,6:,9:UF,7:,14:U,8:,9:UF,19:,9:UF,19:,9:UF,21:,14:U,8:,9:UF,6:,14:U,8:
+9:UF,19:,9:UF,18:,9:UF,20:,13:UF,10:,12:LU,11:,4:R,8:RU,2:U,8:R,7:,3:L,8:LU,4:U,11:,5:L,3:,6:R,5:,9:UF
+18:,9:UF,21:,9:UF,19:,16:UF,14:,14:U,8:,9:UF,6:,9:UF,6:,12:LU,11:,5:R,8:RU,4:U,8:,2:L,3:,1:R,2:,13:UF
+15:,9:UF,20:,9:UF,11:,8:L,1:R,6:,8:RU,4:U,16:,5:R,3:,4:L,2:,1:R,2:,9:UF,19:,9:UF,6:,10:UF,6:,14:U,8:,9:UF
+19:,9:UF,20:,14:U,8:,9:UF,18:,9:UF,20:,9:UF,6:,14:U,8:,9:UF,20:,9:UF,20:,8:L,1:R,6:,8:RU,4:U,16:,4:R,6:
+12:UF
+# The Colossus breaks and four trophies fly out with the bonus burst: one of them starts the ending.
+9:,1:R,14:

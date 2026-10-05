@@ -1,7 +1,7 @@
 Icy Heights (wind ambience)
 ===========================
 
-Author: Ecrivain
+Author: Écrivain
 Source: https://opengameart.org/content/icy-heights
 Licence: CC0 1.0 (tier A)
 Used in Club & Grub for: blizzard wind loop (only ecrivain_icy-heights_wind.ogg is used from this staging folder)

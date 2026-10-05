@@ -298,6 +298,7 @@ func wake() -> void:
 func sleep() -> void:
 	if not awake:
 		return
+	_doze_note()
 	_release_slot()
 	_grounded = false
 	_climbing = false
@@ -317,7 +318,6 @@ func sleep() -> void:
 	if _hide_asleep:
 		visible = false
 	teleport(spawn_pos)
-	_doze_note()
 
 
 ## Respawn of the hero: every enemy returns to its level-file state.
@@ -536,8 +536,13 @@ func _refresh_visual() -> void:
 	elif _feast_sprite != null:
 		_feast_sprite.visible = false
 	_sprite.visible = not food
-	_sprite.frame = clampi(_anim.x + _anim_step(), 0, _sprite.hframes * _sprite.vframes - 1)
-	_sprite.flip_h = facing < 0
+	# Only changes are written: a sprite's frame and flip setters redraw (and signal) even when nothing changed.
+	var frame: int = clampi(_anim.x + _anim_step(), 0, _sprite.hframes * _sprite.vframes - 1)
+	if _sprite.frame != frame:
+		_sprite.frame = frame
+	var flip: bool = facing < 0
+	if _sprite.flip_h != flip:
+		_sprite.flip_h = flip
 	_sprite.modulate = FLASH_COLOR if (flash & EnemyTuning.FLASH_PERIOD_MASK) != 0 else Color.WHITE
 
 

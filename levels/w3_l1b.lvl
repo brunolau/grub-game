@@ -70,9 +70,9 @@ n = items/treasure index=14
 ................................................................................................................................kk................................%%
 ..................................................................................................................................................................%%
 ................................................................................................................c...C...XR..k.k....k........H.....h........E......%%
-..............................................................................................................c..12########-----..----%%%%%%%%%qq%%%%%w%%%%%%%%%%%%%
+..............................................................................................................c..12########-----..----%%%%%%%%%qq%w%%%%%%%%%%%%%%%%%
 %%.......................................................................................................c.....12##########...........%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%..........................................................n.........................................c...T..12############...........%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%.........................................................n..........................................c...T..12############...........%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%.........................................................=====......................................./###??######%%%%%%%%...........%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%................................................................................................c.../##########%%%%%%%%%%...........%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%.................................................................................................../#########%%%%%%%%%%%%...........%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -104,10 +104,12 @@ props/ice/bush_dark 21 29 layer=front
 props/ice/tree_trunk 35 25
 props/ice/tree_canopy_dark 35 23.75
 objects/sign 39 25 text=SIGN_W3_LULL
-# Checkpoint (reviewed): centred on the rock of pillar 4. Touching it stores the hero's own position (also in mid-air),
-# so its +-31 px touch range must lie over floor, and rock grips in a gust; on the ice shore the respawned hero was
-# blown back into the crevasse.
+# Checkpoints (reviewed): centred on the rock of pillar 4, so its +-31 px touch range lies over floor and rock grips in
+# a gust (on the ice shore the respawned hero was blown back into the crevasse). A second one stands on the eagle
+# ledge: a player who jumps from the ledge straight to the shore never touches pillar 4, and every way to the pond
+# now passes one of the two (rock grips there too).
 objects/checkpoint 62.5 25
+objects/checkpoint 60.5 19
 props/ice/sprouts 30 27 layer=front
 items/code_stone 62 19 index=2
 zones/secret 61 19 name=eagle_ledge rect=59,17,5,3
@@ -140,6 +142,8 @@ props/ice/boulders 96 25
 props/ice/grass_a 104 19
 props/ice/tree_trunk 119 16
 props/ice/tree_canopy_dark 119 14.75
+# The big spot by the hut (col 146) lies 9 cells before the exit totem (col 155): a giant bonus that bounces off the
+# hero's head flies about 7 cells to a random side, so it can no longer land past the exit.
 objects/container 137 16 skin=barrel contents=heart,food:36
 props/village/hut_dome 154 16
 props/ice/rocks_small 148 16

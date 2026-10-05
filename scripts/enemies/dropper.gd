@@ -44,6 +44,10 @@ func _triggered(hero_node: PlayerBase) -> bool:
 	return Overlap.point_in(_zone, hero_node.sim_pos.x, hero_node.sim_pos.y)
 
 
+func _trigger_area() -> Rect2i:
+	return _zone
+
+
 ## Above the top of the view, 192 px to one side of the hero (the other side next time); falls back to the other
 ## side when that column is inside rock or outside the level.
 func _pick_spawn(hero_node: PlayerBase) -> bool:

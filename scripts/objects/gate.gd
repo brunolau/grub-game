@@ -72,6 +72,16 @@ func _on_level_reset() -> void:
 	_wait_release = false
 
 
+## Dozing (SimEntity, ARCHITECTURE.md 11): a gate that is not in use and does not wait for Down to be released only
+## tests whether the hero's feet are in its cell, which they cannot be while he is far.
+func _doze_area() -> Rect2i:
+	return Rect2i(_cell * Tuning.TILE, Vector2i(Tuning.TILE, Tuning.TILE)).merge(_doze_box())
+
+
+func _can_doze() -> bool:
+	return not travelling and not _wait_release
+
+
 ## True when the hero stands in front of this gate pressing Down, on the ground, without the glider.
 func _wants_to_enter(hero: PlayerBase) -> bool:
 	if hero.dead or not hero.control_enabled:

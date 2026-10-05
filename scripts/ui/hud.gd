@@ -266,7 +266,7 @@ func show_intro(level_id: StringName) -> void:
 	title.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 	column.add_child(title)
 	var banner: PanelContainer = PanelContainer.new()
-	banner.add_theme_stylebox_override(&"panel", UiKit.plate(UiKit.COL_SHADE, 8))
+	banner.add_theme_stylebox_override(&"panel", _text_plate(UiKit.COL_SHADE))
 	banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	banner.add_child(column)
 	var holder: VBoxContainer = VBoxContainer.new()
@@ -384,11 +384,7 @@ func _build_hint(area: Control) -> void:
 	_hint_holder.offset_bottom = HINT_TOP
 	_hint_holder.visible = false
 	_hint_holder.modulate.a = 0.0
-	var plate: StyleBoxFlat = UiKit.plate(COL_HINT_BACK, HINT_PAD_Y)
-	plate.content_margin_left = float(HINT_PAD_X)
-	plate.content_margin_right = float(HINT_PAD_X)
-	plate.set_border_width_all(2)
-	plate.border_color = COL_HINT_EDGE
+	var plate: StyleBoxFlat = _text_plate(COL_HINT_BACK)
 	var panel: PanelContainer = PanelContainer.new()
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_theme_stylebox_override(&"panel", plate)
@@ -408,6 +404,16 @@ func _build_hint(area: Control) -> void:
 	panel.add_child(row)
 	_hint_holder.add_child(panel)
 	area.add_child(_hint_holder)
+
+
+## The ink plate with a thin cream edge of the HUD's text panels (the level banner and the hint panel).
+func _text_plate(color: Color) -> StyleBoxFlat:
+	var plate: StyleBoxFlat = UiKit.plate(color, HINT_PAD_Y)
+	plate.content_margin_left = float(HINT_PAD_X)
+	plate.content_margin_right = float(HINT_PAD_X)
+	plate.set_border_width_all(2)
+	plate.border_color = COL_HINT_EDGE
+	return plate
 
 
 func _on_message_requested(source: Node, text: String) -> void:

@@ -12,6 +12,9 @@
        code 0 and its log is clean. The smoke run gets its own APPDATA under build\windows\smoke, so it never reads
        or writes the user data of a real installation. It also passes a development switch (--autoplay) and
        checks that the release build ignores it.
+    6. puts the licence texts next to the exe (build\windows\licenses\: CREDITS.md and every file of
+       assets\licenses\, the same texts the game shows in Credits > Licences) and packs the release zip
+       build\ClubAndGrub-<version>-windows.zip (the exe plus that folder).
 
     Every failure stops the script with a message and exit code 1. Godot runs share the lock directory
     build\.godot_lock with .tools/gd.sh, so the script can run while other tools use the project.
@@ -56,6 +59,7 @@ $OutDir = Join-Path $BuildDir "windows"
 $LogDir = Join-Path $OutDir "logs"
 $SmokeDir = Join-Path $OutDir "smoke"
 $ExePath = Join-Path $OutDir $ExeName
+$LicenseDir = Join-Path $OutDir "licenses"
 $LockDir = Join-Path $BuildDir ".godot_lock"
 
 function Write-Step([string]$Text) {
@@ -199,6 +203,9 @@ Write-Step "Exporting '$PresetName' (release) to $ExePath"
 if (Test-Path -LiteralPath $OutDir) {
     Get-ChildItem -LiteralPath $OutDir -File | Remove-Item -Force
 }
+if (Test-Path -LiteralPath $LicenseDir) {
+    Remove-Item -LiteralPath $LicenseDir -Recurse -Force
+}
 $export = Invoke-Godot @("--headless", "--path", $Root, "--export-release", $PresetName, $ExePath) "export"
 $problems = @(Get-ProblemLines $export.Output -IncludeWarnings)
 if ($export.ExitCode -ne 0 -or $problems.Count -gt 0 -or -not (Test-Path -LiteralPath $ExePath)) {
@@ -271,8 +278,39 @@ if (($packedLevels -join ',') -ne ($expectedLevels -join ',')) {
 $campaignLine = [regex]::Match($logText, '(?m)^Smoke: campaign (.*)$')
 Write-Host "    $($packedLevels.Count) levels inside, no developer level; campaign $($campaignLine.Groups[1].Value.Trim())"
 
+# --- 6. licence texts and the release zip -----------------------------------------------------------------------------
+Write-Step "Licence texts next to the exe and the release zip"
+New-Item -ItemType Directory -Force -Path $LicenseDir | Out-Null
+Copy-Item -LiteralPath (Join-Path $Root "CREDITS.md") -Destination $LicenseDir
+$licenseSources = @(Get-ChildItem -LiteralPath (Join-Path $Root "assets\licenses") -File |
+    Where-Object { $_.Extension -in @(".txt", ".md") })
+foreach ($file in $licenseSources) {
+    Copy-Item -LiteralPath $file.FullName -Destination $LicenseDir
+}
+foreach ($required in @("CREDITS.md", "README.md", "godot_engine.txt", "godot_third_party.txt",
+        "googlefonts_pressstart2p.txt", "googlefonts_pixelifysans.txt", "cc0_1.0_legal_code.txt")) {
+    if (-not (Test-Path -LiteralPath (Join-Path $LicenseDir $required))) {
+        Stop-Build "licence text $required is missing from $LicenseDir"
+    }
+}
+$version = [regex]::Match([IO.File]::ReadAllText((Join-Path $Root "project.godot")),
+    '(?m)^config/version="([^"]+)"').Groups[1].Value
+if (-not $version) {
+    Stop-Build "no application/config/version in project.godot"
+}
+$ZipPath = Join-Path $BuildDir "ClubAndGrub-$version-windows.zip"
+if (Test-Path -LiteralPath $ZipPath) {
+    Remove-Item -LiteralPath $ZipPath -Force
+}
+Compress-Archive -Path @($ExePath, $LicenseDir) -DestinationPath $ZipPath -CompressionLevel Optimal
+Write-Host ("    {0} licence file(s) in {1}" -f (@(Get-ChildItem -LiteralPath $LicenseDir -File)).Count, $LicenseDir)
+Write-Host ("    {0} ({1:N1} MB)" -f $ZipPath, ((Get-Item -LiteralPath $ZipPath).Length / 1MB))
+
 $hash = (Get-FileHash -LiteralPath $ExePath -Algorithm SHA256).Hash
+$zipHash = (Get-FileHash -LiteralPath $ZipPath -Algorithm SHA256).Hash
 Write-Host ""
 Write-Host "BUILD OK: $ExePath" -ForegroundColor Green
 Write-Host "    SHA-256 $hash"
+Write-Host "    release zip $ZipPath"
+Write-Host "    SHA-256 $zipHash"
 exit 0

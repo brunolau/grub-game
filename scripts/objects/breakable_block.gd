@@ -65,8 +65,13 @@ func _sim_tick(phase: int) -> void:
 		var frame: int = ObjTuning.anim_frame(_break_age, BREAK_FPS)
 		if frame >= BREAK_FRAMES:
 			_sprite.visible = false
+			_doze_note()
 		else:
 			_sprite.frame = FRAME_BREAK_FIRST + frame
+
+
+func _is_idle() -> bool:
+	return super._is_idle() and (_break_age < 0 or _sprite == null or not _sprite.visible)
 
 
 func _on_hit(_power: int, _source: SimEntity) -> void:

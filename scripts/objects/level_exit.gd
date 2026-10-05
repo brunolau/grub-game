@@ -17,6 +17,8 @@ const FLAME_DY: int = 38
 var _sprite: Sprite2D = null
 var _anim: int = 0
 var _was_open: bool = false
+## Sim.get_phase_runs(WORLD) when it dozed off (the flame animation catches up on waking).
+var _doze_world_run: int = 0
 
 
 func _sim_phases() -> PackedInt32Array:
@@ -42,6 +44,21 @@ func _sim_tick(phase: int) -> void:
 		_was_open = open_now
 		if open_now and Game.level != null:
 			Game.level.spawn_fx(ID_STAR_PUFF, Vector2i(sim_pos.x, sim_pos.y - FLAME_DY))
+	_show_frame()
+
+
+## Dozing: also only while its look matches its state (an opening shows its puff first); the flame counter
+## catches up when it wakes.
+func _can_doze() -> bool:
+	return super._can_doze() and is_open() == _was_open
+
+
+func _on_doze() -> void:
+	_doze_world_run = Sim.get_phase_runs(Defs.Phase.WORLD)
+
+
+func _on_doze_wake() -> void:
+	_anim += Sim.get_phase_runs(Defs.Phase.WORLD) - _doze_world_run
 	_show_frame()
 
 

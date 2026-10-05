@@ -53,6 +53,12 @@ msgstr "Skip"
 msgid "UI_HINT_CONTINUE"
 msgstr "Continue"
 
+msgid "UI_HINT_NEXT"
+msgstr "Next"
+
+msgid "UI_HINT_LICENCES"
+msgstr "Licences"
+
 # --- Mode select ---
 msgid "UI_MODE_HEADING"
 msgstr "MODE"
@@ -164,6 +170,9 @@ msgstr "Engine"
 
 msgid "UI_CREDITS_THANKS"
 msgstr "Thank you for playing!"
+
+msgid "UI_LICENCES_THIRD_PARTY"
+msgstr "Godot Engine components"
 
 # --- Pause menu ---
 msgid "UI_PAUSE_HEADING"

@@ -97,7 +97,10 @@ var _every: int = 0
 var _every_name: String = ""
 var _ticks: int = 0
 var _frame: int = 0
-var _trace: Array[Array] = []
+## Trace rows: 8 ints per tick (frame, tick, x, y, xvel, yvel, state, dead) and the level of each row; packed, so
+## that the measured tick allocates nothing for the trace.
+var _trace: PackedInt32Array = PackedInt32Array()
+var _trace_levels: Array[StringName] = []
 var _finished: bool = false
 var _events: EventCounts = EventCounts.new()
 ## True while a `play` feeds input.
@@ -413,10 +416,15 @@ func _on_tick_finished(tick: int) -> void:
 	var level: LevelBase = Game.level
 	if level != null and level.player != null:
 		var hero: PlayerBase = level.player
-		_trace.append([
-			_frame, String(level.level_id), tick, hero.sim_pos.x, hero.sim_pos.y, hero.xvel, hero.yvel, hero.state,
-			hero.dead,
-		])
+		_trace.append(_frame)
+		_trace.append(tick)
+		_trace.append(hero.sim_pos.x)
+		_trace.append(hero.sim_pos.y)
+		_trace.append(hero.xvel)
+		_trace.append(hero.yvel)
+		_trace.append(hero.state)
+		_trace.append(1 if hero.dead else 0)
+		_trace_levels.append(level.level_id)
 	if _every > 0 and _ticks % _every == 0:
 		_capture("t%06d_%s" % [_ticks, _every_name])
 
@@ -646,8 +654,13 @@ func _finish(exit_code: int) -> void:
 	GameInput.clear_scripted()
 	var file: FileAccess = FileAccess.open(_out_dir + "/trace.json", FileAccess.WRITE)
 	if file != null:
+		var rows: Array[Array] = []
+		for i: int in _trace_levels.size():
+			var k: int = i * 8
+			rows.append([_trace[k], String(_trace_levels[i]), _trace[k + 1], _trace[k + 2], _trace[k + 3],
+				_trace[k + 4], _trace[k + 5], _trace[k + 6], _trace[k + 7] != 0])
 		file.store_string(JSON.stringify({
-			"columns": ["frame", "level", "tick", "x", "y", "xvel", "yvel", "state", "dead"], "rows": _trace,
+			"columns": ["frame", "level", "tick", "x", "y", "xvel", "yvel", "state", "dead"], "rows": rows,
 		}))
 		file.close()
 	print("Autoplay flow: %d check(s), %d failure(s), %d screenshot(s), %d tick(s), %d frame(s)" % [

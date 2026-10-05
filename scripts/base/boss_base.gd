@@ -50,6 +50,11 @@ func _apply_params(params: Dictionary) -> void:
 			boss_drops.append(StringName(token.strip_edges()))
 
 
+## A boss runs its own tick (death bursts, drops, the arena) and never dozes.
+func _can_doze() -> bool:
+	return false
+
+
 func _sim_tick(phase: int) -> void:
 	if phase != Defs.Phase.ENEMIES or _excluded_by_mode():
 		return

@@ -181,7 +181,8 @@ func _build_level_panel() -> Control:
 	_empty_note.visible = false
 	content.add_child(_empty_note)
 	var box: PanelContainer = UiKit.panel_box(content, 12)
-	box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	# Both panels take the height of the row, so their edges line up; the list shows as many levels as fit.
+	box.size_flags_vertical = Control.SIZE_FILL
 	return box
 
 
@@ -189,6 +190,7 @@ func _build_code_panel() -> Control:
 	var content: VBoxContainer = VBoxContainer.new()
 	content.add_theme_constant_override(&"separation", 6)
 	content.custom_minimum_size = Vector2(216.0, 0.0)
+	content.alignment = BoxContainer.ALIGNMENT_CENTER
 	content.add_child(UiKit.label("UI_CODE_HEADING", UiKit.Style.HUD, HORIZONTAL_ALIGNMENT_CENTER))
 	_slot_row = HBoxContainer.new()
 	_slot_row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -223,7 +225,7 @@ func _build_code_panel() -> Control:
 			slot.focus_neighbor_right = slot.get_path_to(_slots[i + 1])
 		slot.focus_neighbor_bottom = slot.get_path_to(_enter_button)
 	var box: PanelContainer = UiKit.panel_box(content, 12)
-	box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	box.size_flags_vertical = Control.SIZE_FILL
 	return box
 
 

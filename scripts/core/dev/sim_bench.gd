@@ -14,6 +14,7 @@ extends SceneTree
 ##   --profile               time every _sim_tick call (Sim._profiler) and print the cost per phase and class
 ##   --tight                 step the ticks in a tight loop like the headless tests (default: one rendered frame
 ##                           between two ticks, as the windowed game runs them)
+##   --no-doze               every entity ticks all the time (LevelBase.doze_enabled = false)
 ##   --repeat=<n>            play every route n times (timing only; digests are written by the first pass)
 ## Route arguments: file names of the route table ("w1_l1.inputs") or prefixes ("w2_"); default: every route that
 ## is not only played chained behind another one. Prints one line per played stage and a summary; exit code 0.

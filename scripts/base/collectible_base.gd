@@ -45,7 +45,7 @@ var _sprite_rest_y: float = 0.0
 var _bob_phase: int = 0
 var _holds_drop_slot: bool = false
 var _removing: bool = false
-## Sim.get_phase_runs(ITEMS) when the item dozed off (its `age` catches up on waking).
+## Sim.get_phase_runs(CONTACT_ITEMS) when the item dozed off (its `age` catches up on waking).
 var _doze_items_run: int = 0
 
 ## Dropped bonus items alive right now (the original has 32 slots for them).
@@ -75,8 +75,13 @@ func _notification(what: int) -> void:
 		_release_drop_slot()
 
 
+## A dropped item moves in phase ITEMS and tests the hero in CONTACT_ITEMS. A placed one only counts its age and bobs:
+## it does that at the start of its CONTACT_ITEMS step - one call per tick instead of two; nothing reads its age in
+## between, and at the end of every tick it is the same.
 func _sim_phases() -> PackedInt32Array:
-	return PackedInt32Array([Defs.Phase.ITEMS, Defs.Phase.CONTACT_ITEMS])
+	if dropped:
+		return PackedInt32Array([Defs.Phase.ITEMS, Defs.Phase.CONTACT_ITEMS])
+	return PackedInt32Array([Defs.Phase.CONTACT_ITEMS])
 
 
 func _apply_params(params: Dictionary) -> void:
@@ -114,6 +119,9 @@ func _sim_tick(phase: int) -> void:
 			elif life <= Tuning.DROPPED_ITEM_BLINK:
 				visible = (life & 1) == 0
 	elif phase == Defs.Phase.CONTACT_ITEMS:
+		if not dropped:
+			age += 1
+			_move_tick()
 		var level: LevelBase = Game.level
 		if level != null and level.player != null and can_be_collected() \
 				and Overlap.body(self, level.player, level.player):
@@ -132,11 +140,11 @@ func _can_doze() -> bool:
 
 
 func _on_doze() -> void:
-	_doze_items_run = Sim.get_phase_runs(Defs.Phase.ITEMS)
+	_doze_items_run = Sim.get_phase_runs(Defs.Phase.CONTACT_ITEMS)
 
 
 func _on_doze_wake() -> void:
-	age += Sim.get_phase_runs(Defs.Phase.ITEMS) - _doze_items_run
+	age += Sim.get_phase_runs(Defs.Phase.CONTACT_ITEMS) - _doze_items_run
 
 
 ## Movement for one tick: bobbing when placed, bouncing physics when dropped. Override.

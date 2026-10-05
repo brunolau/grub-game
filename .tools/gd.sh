@@ -17,9 +17,17 @@
 # code_and_options), pass --user-dir=res://build/autoplay_user yourself.
 #
 # GD_TIMEOUT=<seconds> (default 300) limits each Godot run; on timeout only that run's processes are killed.
+# GODOT=<path> uses another Godot 4.7.2 binary (default: .tools/godot/Godot_v4.7.2-stable_win64_console.exe on
+# Windows, .tools/godot/Godot_v4.7.2-stable_linux.x86_64 on Linux, .tools/godot/Godot.app on macOS).
 set -u
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && (pwd -W 2>/dev/null || pwd))"
-GODOT="$ROOT/.tools/godot/Godot_v4.7.2-stable_win64_console.exe"
+GODOT_VERSION="4.7.2"
+case "$(uname -s 2>/dev/null)" in
+	Linux*) DEFAULT_GODOT="$ROOT/.tools/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64" ;;
+	Darwin*) DEFAULT_GODOT="$ROOT/.tools/godot/Godot.app/Contents/MacOS/Godot" ;;
+	*) DEFAULT_GODOT="$ROOT/.tools/godot/Godot_v${GODOT_VERSION}-stable_win64_console.exe" ;;
+esac
+GODOT="${GODOT:-$DEFAULT_GODOT}"
 BUILD="$ROOT/build"
 LOCK="$BUILD/.godot_lock"
 READERS="$BUILD/.godot_readers"
@@ -29,6 +37,26 @@ RUN_ID="$$_${RANDOM}${RANDOM}"
 MARKER="$READERS/$RUN_ID"
 RUN_USER="build/run_users/$RUN_ID"
 mkdir -p "$BUILD" "$READERS" "$BUILD/run_users"
+
+# The engine is not part of the repository (.tools/ is not versioned): say how to get it.
+require_godot() {
+	[ -f "$GODOT" ] && return 0
+	cat >&2 <<EOF
+gd.sh: Godot ${GODOT_VERSION} was not found at
+    $GODOT
+The engine is not part of this repository (.tools/ is not versioned). To install it:
+  1. Download "Godot ${GODOT_VERSION} stable", standard build (not .NET), from
+       https://godotengine.org/download/archive/${GODOT_VERSION}-stable/
+     or https://github.com/godotengine/godot/releases/tag/${GODOT_VERSION}-stable
+     (Windows: Godot_v${GODOT_VERSION}-stable_win64.exe.zip, which holds Godot_v${GODOT_VERSION}-stable_win64_console.exe;
+      Linux: Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip; macOS: Godot_v${GODOT_VERSION}-stable_macos.universal.zip).
+  2. Unpack it into .tools/godot/ so that the path above exists,
+     or point GODOT at your binary:   GODOT=/path/to/godot bash .tools/gd.sh test
+  3. Run "bash .tools/gd.sh import" once (it builds Godot's import cache).
+To export builds, also install the ${GODOT_VERSION} export templates (docs/BUILD.md section 1).
+EOF
+	exit 3
+}
 
 cleanup() {
 	rm -f "$MARKER" 2>/dev/null
@@ -79,7 +107,11 @@ run() {
 	local pid=$!
 	local winpid
 	winpid="$(cat "/proc/$pid/winpid" 2>/dev/null)"
-	( sleep "$TMO" && touch "$flag" && taskkill //F //T //PID "$winpid" ) >/dev/null 2>&1 &
+	if [ -n "$winpid" ]; then
+		( sleep "$TMO" && touch "$flag" && taskkill //F //T //PID "$winpid" ) >/dev/null 2>&1 &
+	else
+		( sleep "$TMO" && touch "$flag" && kill -9 "$pid" ) >/dev/null 2>&1 &
+	fi
 	local dog=$!
 	wait "$pid"
 	local rc=$?
@@ -132,6 +164,9 @@ has_user_dir() {
 cmd="${1:-help}"
 [ $# -gt 0 ] && shift
 case "$cmd" in
+	import | test | smoke | play | script | raw) require_godot ;;
+esac
+case "$cmd" in
 	import)
 		acquire_exclusive
 		do_import
@@ -174,7 +209,7 @@ case "$cmd" in
 		run "$@"
 		;;
 	*)
-		sed -n '2,22p' "${BASH_SOURCE[0]}"
+		sed -n '2,21p' "${BASH_SOURCE[0]}"
 		exit 2
 		;;
 esac

@@ -1,0 +1,42 @@
+# w2_l2b "Brute's Den" from '@' to the exit on Expert (ticks:KEYS, keys L R U D F K), with the AXE a run carries from
+# Canopy Village when it skips the hammer of Echo Caverns. The axe is thrown (a high strike throws it at head
+# height), so the hero fights from two body lengths away; each throw locks him for 6 ticks.
+# The bone tunnel: the inset spot (it holds a heart), drumsticks, meat, a heart that waits for later, the ribs
+# (a hidden spot), the checkpoint and two spots in the floor by the sign.
+10:R
+4:
+10:DF,6:,10:DF,6:,10:DF,6:,8:DF
+79:R
+4:
+8:F,6:,8:F,6:,8:F,6:,6:F
+19:R
+4:
+10:DF,6:,8:DF
+16:R
+# Drop into the den. The red Brute (250 hit points, fast) watches: stop well short of it, crouch to charge, and
+# throw the axe at its head with a high strike (80).
+23:R
+15:R
+12:D
+10:UF
+# Each hit throws it back a little: follow it a few steps, charge and throw again (170 -> 90 -> 10).
+5:
+5:R
+12:D
+10:UF
+5:
+5:R
+12:D
+10:UF
+# Red now, it beats its chest: keep the distance (closer than about five steps it rushes), and once it can be hit
+# again a plain throw ends it.
+5:
+8:
+10:UF
+# It bursts into bonuses. Step away from the shower, let the fire-starter roll into his hands, then jump over the
+# skull and walk into the lit exit totem.
+20:L
+90:
+20:R
+12:RU
+30:R

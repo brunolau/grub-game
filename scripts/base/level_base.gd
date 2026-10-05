@@ -56,15 +56,27 @@ var _respawn_dark: bool = false
 var _awake: Array[SimEntity] = []
 ## Doze manager (ARCHITECTURE.md 11, SimEntity "Dozing"): the entities it looks after, their doze areas (4 ints per
 ## slot: left, top, right, bottom, right exclusive; right <= left = never dozes), whether an area is known, the
-## entities whose state changed since the last decision, the doze region of the last full pass (rounded to
-## Tuning.DOZE_GRID_PX), and the view and hero feet point it was decided for.
+## entities whose state changed since the last decision, the bounds of the two doze rectangles of the last full
+## pass (view and hero: left, top, right, bottom each), and the view and hero feet point the last decision was
+## made for.
 var _doze: Array[SimEntity] = []
 var _doze_rects: PackedInt32Array = PackedInt32Array()
 var _doze_known: PackedByteArray = PackedByteArray()
 var _doze_notes: Array[SimEntity] = []
-var _doze_region: Rect2i = Rect2i()
+var _dz_view_left: int = 0
+var _dz_view_top: int = 0
+var _dz_view_right: int = 0
+var _dz_view_bottom: int = 0
+var _dz_hero_left: int = 0
+var _dz_hero_top: int = 0
+var _dz_hero_right: int = 0
+var _dz_hero_bottom: int = 0
 var _doze_full: bool = true
 var _doze_view: Rect2i = Rect2i()
+## True while the end-of-tick decision runs (right before the on_screen pass). An entity dozing off at any other
+## moment keeps its on_screen until the next pass computes it once more (as it would have without dozing).
+var _doze_at_tick_end: bool = false
+var _doze_screen_pending: Array[SimEntity] = []
 var _doze_hero: Vector2i = Vector2i(-1, -1)
 
 
@@ -430,10 +442,13 @@ func _on_tick_finished(tick: int) -> void:
 		if player != null:
 			player.apply_shake_nudge(Tuning.SHAKE_NUDGE)
 	if doze_enabled:
+		_doze_at_tick_end = true
 		_doze_update()
+		_doze_at_tick_end = false
 	# Overlap.rects(entity.get_box(), view) for every entity, written out: this loop runs over every ticking
-	# entity every tick, and the two calls per entity were a large share of the tick on slow devices.
-	var view: Rect2i = get_view_rect()
+	# entity every tick, and the two calls per entity were a large share of the tick on slow devices. The doze
+	# decision has just read the view.
+	var view: Rect2i = _doze_view if doze_enabled else get_view_rect()
 	var left: int = view.position.x
 	var right: int = left + view.size.x
 	var top: int = view.position.y
@@ -443,6 +458,14 @@ func _on_tick_finished(tick: int) -> void:
 		var box_left: int = feet.x - entity.box_xo
 		entity.on_screen = box_left < right and left < box_left + entity.box_w \
 				and feet.y - entity.box_h < bottom and top < feet.y
+	if not _doze_screen_pending.is_empty():
+		for entity: SimEntity in _doze_screen_pending:
+			if is_instance_valid(entity) and entity._sim_suspended:
+				var feet: Vector2i = entity.sim_pos
+				var box_left: int = feet.x - entity.box_xo
+				entity.on_screen = box_left < right and left < box_left + entity.box_w \
+						and feet.y - entity.box_h < bottom and top < feet.y
+		_doze_screen_pending.clear()
 
 
 ## Start of every tick: when the view or the hero moved since the last doze decision (a respawn behind the curtain,
@@ -484,29 +507,51 @@ func get_dozing_count() -> int:
 	return count
 
 
-## Decide which entities doze: a full pass when the doze region crossed a grid line (or after a respawn), else only
-## the entities whose state changed.
+## Decide which entities doze: a full pass when a doze rectangle crossed a grid line (or after a respawn), else
+## only the entities whose state changed. The two rectangles: the view grown by Tuning.DOZE_VIEW_REACH_PX and the
+## hero's box and feet point grown by Tuning.DOZE_HERO_REACH_PX, each rounded outwards to Tuning.DOZE_GRID_PX.
 func _doze_update() -> void:
 	var view: Rect2i = get_view_rect()
-	var region: Rect2i = view
 	_doze_view = view
-	_doze_hero = Vector2i(-1, -1)
+	var grid: int = Tuning.DOZE_GRID_PX
+	var mask: int = ~(grid - 1)
+	var reach: int = Tuning.DOZE_VIEW_REACH_PX
+	var view_left: int = (view.position.x - reach) & mask
+	var view_top: int = (view.position.y - reach) & mask
+	var view_right: int = (view.position.x + view.size.x + reach + grid - 1) & mask
+	var view_bottom: int = (view.position.y + view.size.y + reach + grid - 1) & mask
+	var hero_left: int = view_left
+	var hero_top: int = view_top
+	var hero_right: int = view_right
+	var hero_bottom: int = view_bottom
 	if player != null:
-		_doze_hero = player.sim_pos
-		region = region.merge(player._doze_box())
-	region = region.grow(Tuning.DOZE_REACH_PX)
-	var grid_mask: int = ~(Tuning.DOZE_GRID_PX - 1)
-	var left: int = region.position.x & grid_mask
-	var top: int = region.position.y & grid_mask
-	var right: int = (region.end.x + Tuning.DOZE_GRID_PX - 1) & grid_mask
-	var bottom: int = (region.end.y + Tuning.DOZE_GRID_PX - 1) & grid_mask
-	var rounded: Rect2i = Rect2i(left, top, right - left, bottom - top)
-	if _doze_full or rounded != _doze_region:
+		# player._doze_box() written out (box and feet point together): this runs at the end of every tick.
+		var feet: Vector2i = player.sim_pos
+		_doze_hero = feet
+		var box_left: int = feet.x - player.box_xo
+		var box_top: int = feet.y - player.box_h
+		reach = Tuning.DOZE_HERO_REACH_PX
+		hero_left = (mini(feet.x, box_left) - reach) & mask
+		hero_top = (mini(feet.y, box_top) - reach) & mask
+		hero_right = (maxi(feet.x + 1, box_left + maxi(player.box_w, 1)) + reach + grid - 1) & mask
+		hero_bottom = (maxi(feet.y + 1, box_top + maxi(player.box_h, 1)) + reach + grid - 1) & mask
+	else:
+		_doze_hero = Vector2i(-1, -1)
+	if _doze_full or view_left != _dz_view_left or view_top != _dz_view_top or view_right != _dz_view_right \
+			or view_bottom != _dz_view_bottom or hero_left != _dz_hero_left or hero_top != _dz_hero_top \
+			or hero_right != _dz_hero_right or hero_bottom != _dz_hero_bottom:
 		_doze_full = false
-		_doze_region = rounded
+		_dz_view_left = view_left
+		_dz_view_top = view_top
+		_dz_view_right = view_right
+		_dz_view_bottom = view_bottom
+		_dz_hero_left = hero_left
+		_dz_hero_top = hero_top
+		_dz_hero_right = hero_right
+		_dz_hero_bottom = hero_bottom
 		_doze_notes.clear()
 		for i: int in _doze.size():
-			_doze_check(i, left, top, right, bottom)
+			_doze_check(i)
 		return
 	if _doze_notes.is_empty():
 		return
@@ -514,11 +559,22 @@ func _doze_update() -> void:
 	_doze_notes.clear()
 	for entity: SimEntity in notes:
 		if is_instance_valid(entity) and entity._doze_slot >= 0:
-			_doze_check(entity._doze_slot, left, top, right, bottom)
+			_doze_check(entity._doze_slot)
 
 
-## One entity against the doze region (left, top, right, bottom; right and bottom exclusive).
-func _doze_check(slot: int, left: int, top: int, right: int, bottom: int) -> void:
+## True when the area in slot `slot` touches neither doze rectangle.
+func _doze_far(slot: int) -> bool:
+	var k: int = slot * 4
+	var left: int = _doze_rects[k]
+	var top: int = _doze_rects[k + 1]
+	var right: int = _doze_rects[k + 2]
+	var bottom: int = _doze_rects[k + 3]
+	return (right <= _dz_view_left or left >= _dz_view_right or bottom <= _dz_view_top or top >= _dz_view_bottom) \
+			and (right <= _dz_hero_left or left >= _dz_hero_right or bottom <= _dz_hero_top or top >= _dz_hero_bottom)
+
+
+## One entity against the doze rectangles.
+func _doze_check(slot: int) -> void:
 	var entity: SimEntity = _doze[slot]
 	var k: int = slot * 4
 	if _doze_known[slot] == 0:
@@ -527,21 +583,22 @@ func _doze_check(slot: int, left: int, top: int, right: int, bottom: int) -> voi
 		if entity._sim_suspended:
 			_doze_wake_entity(entity)
 		return
-	var far: bool = _doze_rects[k + 2] <= left or _doze_rects[k] >= right \
-			or _doze_rects[k + 3] <= top or _doze_rects[k + 1] >= bottom
 	if entity._sim_suspended:
-		if not far:
+		if not _doze_far(slot):
 			_doze_wake_entity(entity)
 		return
-	if not far or not entity._can_doze():
+	if not _doze_far(slot) or not entity._can_doze():
 		return
 	# The area the entity has right now (a cached one may be old), then off it goes.
 	_doze_store_area(slot, entity._doze_area())
-	if _doze_rects[k + 2] <= _doze_rects[k] or not (_doze_rects[k + 2] <= left or _doze_rects[k] >= right \
-			or _doze_rects[k + 3] <= top or _doze_rects[k + 1] >= bottom):
+	if _doze_rects[k + 2] <= _doze_rects[k] or not _doze_far(slot):
 		return
 	entity._on_doze()
-	entity.on_screen = false
+	if _doze_at_tick_end:
+		# What the pass that follows would compute: the area is off the view.
+		entity.on_screen = false
+	elif entity.on_screen:
+		_doze_screen_pending.append(entity)
 	entity.sim_prev = entity.sim_pos
 	Sim.suspend(entity)
 	entity.set_process_internal(false)

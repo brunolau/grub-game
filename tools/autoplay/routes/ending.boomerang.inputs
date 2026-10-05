@@ -1,0 +1,21 @@
+# ending "Way Home" (Expert) with the SWIRLING AXE (a run that kept the swirling axe through Colossus Hall, or a level
+# code): the route of ending.inputs padded after every swing by the longer recovery of the swirling axe (12 ticks
+# instead of 2; made with test_campaign_routes.gd CAMPAIGN_ADAPT). No time limit and nothing to fear on the way home.
+# The path home: club the inset tile in the path, then over the berry hill.
+20:R,8:,20:DF,4:,20:DF,4:,20:DF,6:
+# Through the fields: light the first campfire, club the bush three times.
+83:R,6:,18:F,6:,18:F,6:,18:F,8:
+# Apples and the bush's fruit, then the plain tiles under the sandstone boulder (two low strikes).
+19:R,6:,20:DF,6:,20:DF,8:
+# Past the watchtower through the village gate (second campfire): club the barrel and the clay pot.
+34:R,2:RU,22:R,6:,18:F,12:,22:R,6:,18:F,12:
+# Into the village square: the carved tiles in the plaza (two low strikes).
+35:R,6:,20:DF,6:,20:DF,8:
+# The welcome feast: roast meat on the benches, the third campfire, and a jump for the giant roast above it.
+32:R,6:,20:U,10:
+# The flower pot by the round hut (three strikes), then the barrel by the crates.
+20:R,6:,18:F,6:,18:F,6:,18:F,10:,28:R,6:,18:F,12:
+# Up the home hill past the grapes and the last campfire; the framed block hides a giant cake.
+63:R,6:,20:DF,6:,20:DF,6:,20:DF,2:,3:L,24:
+# Home: two cakes on the doorstep and the exit totem in front of the hut.
+45:R

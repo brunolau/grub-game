@@ -1,7 +1,7 @@
 class_name HudBossBar
 extends Control
-## Boss energy bar of the HUD: a bone-framed bar (`ui/bar_frame_bone.png`, `bar_back.png`, `bar_fill.png`, ASSET_MANIFEST
-## 12) with the skull icon, that spans the boss's own hit points whatever their number. The fill is
+## Boss energy bar of the HUD: a bone-framed bar (`ui/bar_frame_bone.png`, `bar_back.png`, `bar_fill.png`,
+## ASSET_MANIFEST 12) with the skull icon, that spans the boss's own hit points whatever their number. The fill is
 ## ceil(window * hp / max_hp) px wide, so any hit point left shows. A hit lights the lost part in cream (it drains
 ## after a short hold), flashes the fill and shakes the bar, so every hit reads at once, also a 1-point hit of a
 ## boss with hundreds of hit points; quarter notches tell how much is left at a glance and the fill pulses in its

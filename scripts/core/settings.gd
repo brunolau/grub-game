@@ -78,7 +78,38 @@ var _bindings: Dictionary = {}  # action (String) -> Array of InputEvent
 
 
 func _ready() -> void:
+	# The fullscreen shortcut works everywhere, the pause menu included.
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	load_settings()
+
+
+## Desktop shortcut (ARCHITECTURE.md 2): Alt+Enter and F11 toggle fullscreen on every screen, like Options >
+## Fullscreen, and the choice is saved at once. The key press goes no further (Alt+Enter is no menu "accept").
+func _input(event: InputEvent) -> void:
+	if is_fullscreen_shortcut(event) and has_fullscreen_switch():
+		get_viewport().set_input_as_handled()
+		toggle_fullscreen()
+
+
+## True for a fresh press of F11 or Alt+Enter (either Enter key).
+static func is_fullscreen_shortcut(event: InputEvent) -> bool:
+	var key: InputEventKey = event as InputEventKey
+	if key == null or not key.pressed or key.echo:
+		return false
+	if key.keycode == KEY_F11:
+		return true
+	return key.alt_pressed and (key.keycode == KEY_ENTER or key.keycode == KEY_KP_ENTER)
+
+
+## True where the game window can switch to fullscreen (desktop platforms; phones are always fullscreen).
+func has_fullscreen_switch() -> bool:
+	return OS.has_feature("pc") and not OS.has_feature("mobile") and not OS.has_feature("web")
+
+
+## Flip the fullscreen setting, apply it and write the settings file (the Options row follows the change).
+func toggle_fullscreen() -> void:
+	set_value("video/fullscreen", not get_bool("video/fullscreen"))
+	save()
 
 
 ## Use another directory (created if missing) and reload from it.

@@ -1,7 +1,7 @@
 NES Sounds
 ==========
 
-Author: Basto
+Author: Baŝto
 Source: https://opengameart.org/content/nes-sounds
 Licence: CC0 1.0 (tier A)
 Used in Club & Grub for: splash, exit chime

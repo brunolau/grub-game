@@ -42,6 +42,11 @@ func _should_sleep() -> bool:
 	return false
 
 
+## It wakes by the hero's distance (up to two screens), not by the view: it never dozes while it waits.
+func _asleep_waits_for_view() -> bool:
+	return false
+
+
 func _on_wake() -> void:
 	_offscreen_ticks = 0
 	var hero: PlayerBase = _target_hero()

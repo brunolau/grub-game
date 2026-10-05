@@ -1,0 +1,294 @@
+# w2_l1 "Echo Caverns" from '@' to the exit on Beginner (ticks:KEYS, keys L R U D F K), with the AXE a run carries
+# from Canopy Village. A forward strike throws it low over the ground, a low strike skims it over the floor in front
+# of the hero (it opens the spots there), and each throw locks him for 6 ticks. From the HAMMER on (the alcove of the
+# Hatch Well) he swings the hammer, as every run does.
+# Echo Gallery: the inset spot in the floor (three low throws), then the food arc over the hill.
+10:R,10:,10:DF,4:,10:DF,4:,10:DF,6:
+12:R,6:RU,14:R,12:RU,14:R
+# The turtle on the plateau: walk up to it and throw.
+25:R
+7:F
+# A few steps back (the axe flies on and hits the big rock once), then on past the rock.
+12:
+16:L
+30:R
+1:
+# The big rock is a hidden spot: two more throws facing left.
+1:L,4:
+8:F,6:,8:F,6:
+# Pick up what the rock threw out, jump up onto the first ledge and take the berries.
+6:L,14:LU,2:L
+6:
+3:L,7:
+# Up to the second ledge and on into the Upper Vein.
+20:R
+16:RU
+4:R
+1:
+16:U
+# The Upper Vein: grapes, the G, and two hidden spots in the floor (low throws).
+13:R
+1:
+10:DF,6:,8:DF
+5:
+24:R
+# The code stone at the edge of the drop hole, then down into the Hall of Echoes.
+28:R
+9:
+# The framed block in the floor is a big spot: three low throws, then the giant bonus drops from above.
+13:L
+1:
+1:R,3:
+10:DF,6:,10:DF,6:,10:DF
+5:
+4:L
+12:
+10:R
+10:
+# Up on the rock shelf and through the hole in the wall: the crystal cache.
+12:L
+16:LU
+1:L
+8:
+4:R
+8:
+1:D
+10:
+# Crystal cache: the code stone, the U, and the cyan crystal (a hidden spot) at the far wall: three throws.
+40:R
+6:
+8:F,6:,8:F,6:,8:F
+5:
+8:R
+10:
+# Up on the crystal shelf for the treasure and the cakes, then back through the hole.
+22:L
+16:U
+4:L
+7:L
+12:LU
+14:L
+4:
+7:R
+4:
+1:D
+6:
+# The hatch: walk onto it over the doughnuts and crouch to drop into the first chamber.
+41:R
+4:
+9:D
+12:
+# Two hidden spots in the right wall (forward throws), then left over the hump.
+19:R
+6:
+8:F,6:,6:F
+6:
+# Collect what the spots threw, then wait at the hump for the lurker: it drops onto him (a bounce) and is finished
+# off as it turns back.
+10:
+38:L
+36:
+8:F,6:,8:F,6:,8:F,6:,8:F
+# The grapes on the next hatch, then crouch: down into the big chamber.
+30:L
+6:
+10:D
+15:
+# The cracked blocks in the left wall: two throws open the niche with the rib slab and a diamond.
+17:L
+6:
+8:F,6:,6:F
+5:
+27:L
+4:
+# Back to the right: the turtle.
+75:R
+7:F
+4:
+# Berries and eggs; the lurker over the step does not stir while he is down here: up onto the step, wait until it
+# has come down its thread, and throw.
+31:R
+8:
+21:U
+34:
+8:F
+5:
+# Into the alcove: the last lurker drops in front of the hammer - one throw.
+9:R
+15:RU
+3:,8:F,10:
+# The HAMMER and the R.
+16:R
+4:
+# Back down to the third hatch, under the step, and crouch.
+41:L
+1:
+6:
+11:D
+9:
+# Third chamber: the skull at the far end is a hidden spot (the hammer opens it quickly).
+25:R
+6:
+14:F,2:,14:F,2:,10:F
+20:
+11:R
+4:
+# The pendulum bat swings just above the ground: crawl under it, straight onto the fourth hatch.
+45:L
+4:
+56:DL
+16:
+# Fourth chamber: the checkpoint torch, the bone-strewn floor (three hidden spots); the turtle is out on its round:
+# wait until it comes back and flatten it with the hammer.
+27:R
+6:
+12:DF,2:,12:DF,2:,8:DF
+6:
+7:R
+6:F
+46:,7:F,5:,39:R
+# Into the Dark Deep: the lights go out. Down the cascade; wait for each lurker to come down and club it.
+40:R
+32:
+6:F
+29:R
+6:
+66:
+6:F
+# The black lake: jump the first pool (doughnuts on the way), club the violet crystal on the island (the
+# strikes also knock out the pendulum bat as it swings by), then crawl on under the rock lip.
+36:R
+22:RU
+4:
+14:F,2:,14:F,2:,14:F,2:,2:F
+6:
+10:R
+49:DR
+3:R
+22:RU
+# Checkpoint on the middle island; the framed block hides a giant bonus (four low strikes).
+4:R
+6:
+12:DF,2:,12:DF,2:,12:DF,2:,8:DF
+10:L
+20:
+13:R
+6:
+# Jump the third pool and crawl under the second pendulum bat, then over the last pool to the shore.
+1:R
+22:RU
+5:R
+50:DR
+2:R
+22:RU
+# The skull on the shore is a hidden spot too.
+4:
+14:F,2:,14:F,2:,10:F
+6:
+# The Bone Hollow: wait for the bat on its thread to rise, then on to the stone arch - the bone vault.
+10:
+1:R
+4:
+26:R
+8:
+4:R
+8:
+1:D
+6:
+# The bone vault: rib slabs in the air, the code stone, the B, and the big skull (a hidden spot).
+11:R
+22:RU
+8:R
+6:
+14:F,2:,14:F,2:,10:F
+10:R
+12:
+39:L
+8:
+1:D
+6:
+# Smash the cracked floor beside the arch: a necklace in the pit below. Jump out and drop into the Echo Shaft.
+1:R,4:
+12:DF,2:,8:DF
+18:R
+7:L
+4:
+23:RU
+18:R
+1:
+# The Echo Shaft: up the ledges to the rock shelf with the checkpoint.
+26:R
+16:U
+9:R
+4:
+18:L
+16:LU
+5:L
+16:LU
+2:L
+4:
+# The framed block in the shelf: four low strikes, then the giant bonus drops onto the shelf.
+1:R,4:
+12:DF,2:,12:DF,2:,8:DF
+24:
+1:L
+9:R
+6:
+# Step onto the stone lift: it climbs diagonally to the right; club the bat on the way.
+9:R
+28:
+7:UF
+# At the top of its run, jump across to the right shelf (bouncing off the dangling bat on the way).
+47:
+20:RU
+1:R
+# Zigzag up the ledges: left, left (the S), right, right.
+10:L
+16:LU
+6:L
+16:LU
+10:L
+4:
+# All five letters: the G-R-U-B-S jackpot drops from above - wait for it.
+30:
+1:L
+15:R
+16:RU
+13:R
+16:RU
+# Cracked blocks in the right wall: a nook with a code stone - and the spiral staff to Feast Land (not taken here).
+6:R
+4:
+14:F,2:,2:F
+37:R
+4:
+38:L
+# On up: left, left, right, right to the top.
+16:LU
+16:L
+16:LU
+# Two hidden spots in the shaft wall beside this ledge.
+10:L
+4:
+14:F,2:,2:F
+8:
+12:R
+16:RU
+16:R
+16:RU
+# The exit gallery: the big rock (a spot), roasts, the turtle and the little rex, the bone-strewn floor.
+13:R
+4:
+14:F,2:,14:F,2:,10:F
+29:R
+6:F
+10:R
+4:
+12:DF,2:,12:DF,2:,8:DF
+10:
+17:R
+4:
+12:DF,2:,12:DF,2:,8:DF
+40:
+15:L
+32:R

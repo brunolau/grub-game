@@ -1,0 +1,57 @@
+# bonus_b from '@' to the spiral staff on the crown (ticks:KEYS, keys L R U D F K), with the AXE a run brings from
+# Canopy Village into Echo Caverns. The club route's inputs serve: the thrown axe opens the same spots, and a strike
+# pressed during its longer recovery (6 ticks) simply starts when the recovery ends.
+# Ground floor: club the inset tile three times, collect what it throws and the cookie.
+9:R,10:
+10:DF,4:,10:DF,4:,10:DF,6:
+22:R,6:
+# The middle spring: up through the ice-cream fountain onto the biscuit floor.
+2:R,20:RU,30:
+# Along the biscuit floor to the inset tile in the left wall: three forward strikes.
+58:L,6:
+8:F,6:,8:F,6:,8:F,10:
+# Collect its treats, then the icing stair: three jumps up to the hole in the chocolate room's floor.
+24:R,6:
+20:U,8:
+3:L,20:RU,8:
+12:R,2:
+20:RU,8:
+20:U,10:
+# Chocolate room: club the barrel open, then along the strawberries to the plain tiles in the floor.
+8:R,4:
+8:F,10:
+14:R,6:
+48:L,4:
+10:DF,6:,10:DF,8:
+# Hop onto the elevator: it rises through the waffle waterfall to the next storey.
+26:L,4:,6:RU,4:
+96:
+# Off the elevator onto the next storey: the framed block in the floor (three low strikes, step back, catch).
+23:R,4:
+10:DF,6:,10:DF,6:,10:DF,2:
+8:L,22:
+# Fetch the chocolate cake, club the flower pot three times and chase its treats along the floor.
+22:R,6:
+8:F,6:,8:F,6:,8:F,8:
+40:R,4:
+# The spring by the wall: a straight jump onto it, up past two ice creams onto the icing ledge.
+9:L,4:,20:U,24:
+# Two icing ledges up to the left (cupcakes, cake slices), then up through the biscuit floor of the spiral room.
+6:L,20:LU,6:
+4:L,20:LU,6:
+20:U,10:
+# Spiral room: onto the spring in the middle, bounce up through the candy spiral and its giant cake, steer off.
+20:RU,30:L,10:
+# Over to the spring by the left wall: up onto the ledge, then the spring on the ledge to the crown hall.
+3:L,4:,8:LU,12:U,40:
+4:RU,16:U,36:
+# Crown hall: three icing ledges up the left side, then onto the crown's first tier.
+20:U,8:
+3:L,20:U,8:
+20:U,8:
+8:R,20:RU,10:
+# The plain tile under the giant doughnut hides a giant ice cream: four low strikes, step aside, catch it.
+10:DF,6:,10:DF,6:,10:DF,6:,10:DF,2:
+5:L,24:
+# Up onto the top tier and the spiral staff.
+4:R,20:RU,6:,10:R,20:

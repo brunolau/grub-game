@@ -15,7 +15,7 @@ import os
 import numpy as np
 from PIL import Image
 
-ROOT = r"C:\Users\klatt\Desktop\pre2"
+ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".."))
 CAND = os.path.join(ROOT, ".tools", "asset_candidates")
 SP = os.path.join(CAND, "environment", "superpowers-prehistoric-platformer")
 ITEMS = os.path.join(CAND, "items_ui_fx")

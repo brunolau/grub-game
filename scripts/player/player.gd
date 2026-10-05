@@ -255,9 +255,11 @@ func _weapon_pass() -> void:
 	var level: LevelBase = Game.level
 	if level == null:
 		return
+	var projectiles: Array[SimEntity] = level.get_kind(Defs.Kind.HERO_PROJECTILE)
+	if projectiles.is_empty() and not club_box_active:
+		return  # nothing in the air and no club box: the usual tick
 	var enemies: Array[SimEntity] = level.get_kind(Defs.Kind.ENEMY)
 	var hittables: Array[SimEntity] = level.get_kind(Defs.Kind.HITTABLE)
-	var projectiles: Array[SimEntity] = level.get_kind(Defs.Kind.HERO_PROJECTILE)
 	for i: int in projectiles.size():
 		var projectile: ProjectileBase = projectiles[i] as ProjectileBase
 		if projectile != null and not projectile.spent and _projectile_hits(projectile, enemies, hittables):
@@ -271,7 +273,7 @@ func _weapon_pass() -> void:
 func _club_hits(enemies: Array[SimEntity], hittables: Array[SimEntity]) -> bool:
 	for i: int in enemies.size():
 		var enemy: EnemyBase = enemies[i] as EnemyBase
-		if enemy == null or not enemy.is_targetable():
+		if enemy == null or not enemy.awake or not enemy.is_targetable():
 			continue
 		if Overlap.weapon(club_box, club_box_xo, enemy) and enemy.take_hit(club_power, self):
 			_on_weapon_connected(enemy, club_power)
@@ -288,7 +290,7 @@ func _projectile_hits(
 ) -> bool:
 	for i: int in enemies.size():
 		var enemy: EnemyBase = enemies[i] as EnemyBase
-		if enemy == null or not enemy.is_targetable():
+		if enemy == null or not enemy.awake or not enemy.is_targetable():
 			continue
 		if Overlap.weapon_entity(projectile, enemy) and enemy.take_hit(projectile.power, projectile):
 			_on_weapon_connected(enemy, projectile.power)
@@ -954,7 +956,7 @@ func _contact_pass() -> void:
 	var enemies: Array[SimEntity] = level.get_kind(Defs.Kind.ENEMY)
 	for i: int in enemies.size():
 		var enemy: EnemyBase = enemies[i] as EnemyBase
-		if enemy == null or not enemy.contact_hurts or not enemy.is_targetable():
+		if enemy == null or not enemy.awake or not enemy.contact_hurts or not enemy.is_targetable():
 			continue
 		if not Overlap.body(self, enemy, self):
 			continue
@@ -1059,13 +1061,23 @@ func _on_exit_reached(_exit_kind: StringName) -> void:
 
 ## Show the picture of this tick: sheet frame, mirroring, hurt blink, glider overlay.
 func _refresh_visual() -> void:
+	# Only changes are written: a sprite's frame and flip setters redraw (and signal) even when nothing changed,
+	# and this runs on every tick.
 	if _sprite != null:
-		_sprite.frame = anim_frame
-		_sprite.flip_h = facing < 0
+		if _sprite.frame != anim_frame:
+			_sprite.frame = anim_frame
+		var flip: bool = facing < 0
+		if _sprite.flip_h != flip:
+			_sprite.flip_h = flip
 		_sprite.visible = not dead or death_ticks < Tuning.DEATH_ANIM_TICKS
 		var ghost: bool = hit_timer > 0 and not dead and Sim.tick % Tuning.BLINK_PERIOD != 0
-		_sprite.modulate.a = BLINK_ALPHA if ghost else 1.0
+		var alpha: float = BLINK_ALPHA if ghost else 1.0
+		if _sprite.modulate.a != alpha:
+			_sprite.modulate.a = alpha
 	if _glider_sprite != null:
 		_glider_sprite.visible = Game.has_glider and not dead
-		_glider_sprite.flip_h = facing < 0
-		_glider_sprite.position.y = float(GLIDER_HANDS_Y if is_gliding() else GLIDER_CARRY_Y)
+		if _glider_sprite.visible:
+			var flip: bool = facing < 0
+			if _glider_sprite.flip_h != flip:
+				_glider_sprite.flip_h = flip
+			_glider_sprite.position.y = float(GLIDER_HANDS_Y if is_gliding() else GLIDER_CARRY_Y)

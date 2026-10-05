@@ -73,6 +73,8 @@ func _apply_params(params: Dictionary) -> void:
 	_label.z_index = BOARD_Z
 	_label.visible = false
 	_label.modulate.a = 0.0
+	if _tail != null:
+		return
 	_tail = Control.new()
 	_tail.name = "Tail"
 	_tail.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -90,6 +92,16 @@ func _sim_tick(_phase: int) -> void:
 	_near = near
 	if near:
 		_label.visible = true
+
+
+## Dozing (SimEntity, ARCHITECTURE.md 11): while the hero is not at the board its tick only repeats the overlap
+## test, which fails while he is far away (the fade runs in _process, not in the tick).
+func _doze_area() -> Rect2i:
+	return _doze_box()
+
+
+func _can_doze() -> bool:
+	return not _near
 
 
 ## Presentation only: fade the board and keep it inside the view.

@@ -3,6 +3,8 @@ extends Button
 ## A menu entry: outlined capitals, a bobbing arrow while focused, cursor and confirm sounds.
 ##
 ## Owner: ui. Works with keyboard and gamepad (focus + ui_accept), mouse (moving over it takes the focus) and touch (tap).
+## The entry is at least as wide as its text plus room for the arrow on both sides, so a menu panel always has room
+## for the arrow of its longest entry (it used to stick out of the pause panel at "Back to checkpoint").
 
 const ARROW_GAP: int = 6
 const BOB_SPEED: float = 7.0
@@ -26,6 +28,22 @@ func _init(key: String = "") -> void:
 	focus_entered.connect(_on_focus_entered)
 	focus_exited.connect(_on_focus_exited)
 	pressed.connect(_on_pressed)
+
+
+func _notification(what: int) -> void:
+	match what:
+		NOTIFICATION_READY, NOTIFICATION_THEME_CHANGED, NOTIFICATION_TRANSLATION_CHANGED:
+			_reserve_arrow_room()
+
+
+## Minimum width: the text and the arrow with its gap on both sides (the text stays centred).
+func _reserve_arrow_room() -> void:
+	var font: Font = get_theme_font(&"font")
+	if font == null or _arrow == null:
+		return
+	var text_width: float = font.get_string_size(atr(text), HORIZONTAL_ALIGNMENT_LEFT, -1.0,
+			get_theme_font_size(&"font_size")).x
+	custom_minimum_size.x = ceilf(text_width + 2.0 * (_arrow.get_size().x + float(ARROW_GAP) + BOB_PX))
 
 
 func _process(delta: float) -> void:

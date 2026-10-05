@@ -12,11 +12,13 @@ extends Node
 ##   wall       time between two frames in ms (vsync included: a hitch shows up here)
 ##   draws      canvas draw calls of the frame; objects / primitives drawn
 ##   tick       cost of one simulation tick in microseconds (Sim.tick_started .. Sim.tick_finished)
-##   entities   registered SimEntity; awake enemies; dropped (moving) items; items in view; thrown hero weapons;
-##              platforms in view; enemy projectiles; fx nodes
+##   entities   registered SimEntity and how many of them tick (the rest doze); awake enemies; dropped (moving)
+##              items; items in view; thrown hero weapons; platforms in view; enemy projectiles; fx nodes
 ##   memory     texture memory, video memory, static memory (MB); objects, nodes, resources, orphan nodes
 ## Level loads: from the covered screen (Flow.transition_covered) to Events.level_started, and from the moment the
 ## level node enters the tree to Events.level_started (the level's own build).
+## `--perf=profile` also times every _sim_tick call of the windowed game (Sim._profiler) and prints the cost per phase
+## and class at the end ("Perf profile: ...") - the windowed share of each part, which a headless run cannot show.
 ## Leak check: SNAPSHOT_FRAMES frames after each arrival on the title or the world map the object, node, resource and
 ## orphan counts and static memory are recorded; compare the first and the last.
 ## Frames of the first WARMUP_FRAMES after a scene change are filed under "<segment>#warmup" (loading hitches).
@@ -30,10 +32,12 @@ const MB: float = 1048576.0
 ## Budget of docs/ARCHITECTURE.md 11 (values the desktop run can check directly).
 const BUDGET_DRAWS: int = 60
 const BUDGET_AWAKE: int = 12
-const BUDGET_ITEMS: int = 20
+## Dropped bonus items (ObjTuning.MAX_DROPPED_ITEMS, the original's 32 slots) plus key items (at most 4).
+const BUDGET_ITEMS: int = 36
 const BUDGET_THROWN: int = 4
 const BUDGET_PLATFORMS: int = 7
-const BUDGET_ENTITIES: int = 150
+const BUDGET_ENTITIES: int = 200
+const BUDGET_TICKING: int = 48
 const BUDGET_TEXTURE_MB: float = 96.0
 const BUDGET_CPU_MS: float = 8.0
 const BUDGET_GPU_MS: float = 8.0
@@ -54,6 +58,7 @@ class Segment:
 	var max_objects_drawn: int = 0
 	var max_primitives: int = 0
 	var max_entities: int = 0
+	var max_ticking: int = 0
 	var max_awake: int = 0
 	var max_level_awake: int = 0
 	var max_dropped: int = 0
@@ -104,6 +109,9 @@ var _order: PackedStringArray = PackedStringArray()
 var _last_usec: int = 0
 var _tick_start: int = 0
 var _pending_ticks: PackedInt32Array = PackedInt32Array()
+## Most entities that ticked at the end of a tick since the last frame (sampled per tick: before a level's first
+## tick nothing dozes yet).
+var _pending_ticking: int = 0
 var _since_change: int = 0
 var _snapshot_in: int = -1
 var _snapshot_where: String = ""
@@ -117,6 +125,9 @@ var _layers_mode: bool = false
 var _layers_done: Dictionary = {}
 var _layers_busy: bool = false
 var _last_draws: int = 0
+## --perf=profile: "phase|script" -> PackedInt64Array [calls, usec], and the ticks profiled.
+var _profile_calls: Dictionary = {}
+var _profile_ticks: int = 0
 
 
 func _init() -> void:
@@ -131,6 +142,8 @@ func _init() -> void:
 func begin(out_dir: String, mode: String = "") -> void:
 	_out_dir = out_dir
 	_layers_mode = mode == "layers"
+	if mode == "profile":
+		Sim._profiler = self
 	_frame_start = FrameStart.new()
 	_frame_start.name = "PerfFrameStart"
 	add_child(_frame_start)
@@ -205,6 +218,8 @@ func _sample_level(seg: Segment) -> void:
 	if seg.grid.is_empty() and level.grid != null:
 		seg.grid = "%dx%d" % [level.grid.cols, level.grid.rows]
 	seg.max_entities = maxi(seg.max_entities, Sim.get_entity_count())
+	seg.max_ticking = maxi(seg.max_ticking, _pending_ticking)
+	_pending_ticking = 0
 	seg.max_level_awake = maxi(seg.max_level_awake, level.active_enemies)
 	var awake: int = 0
 	for entity: SimEntity in level.get_kind(Defs.Kind.ENEMY):
@@ -315,14 +330,16 @@ func _on_tick_started(_tick: int) -> void:
 
 
 func _on_tick_finished(tick: int) -> void:
+	var cost: int = Time.get_ticks_usec() - _tick_start
 	# Stay the LAST handler of tick_finished (a new level connects its own end-of-tick step after this probe), so
-	# that the measured tick includes every handler (the harness's trace row too, a few microseconds).
+	# that the measured tick includes every handler (the harness's trace row too, a few microseconds). Reconnected
+	# after the time is taken: the reconnection is the probe's own cost.
 	Sim.tick_finished.disconnect(_on_tick_finished)
 	Sim.tick_finished.connect(_on_tick_finished)
 	if _tick_start <= 0:
 		return
-	var cost: int = Time.get_ticks_usec() - _tick_start
 	_pending_ticks.append(cost)
+	_pending_ticking = maxi(_pending_ticking, Sim.get_awake_count())
 	_tick_start = 0
 	# What a tick loaded for the first time (the usual cause of a slow tick): new scenes and sounds.
 	var loaded: PackedStringArray = PackedStringArray()
@@ -334,6 +351,37 @@ func _on_tick_finished(tick: int) -> void:
 			loaded.append("sound " + str(path).get_file())
 	if not loaded.is_empty():
 		_first_loads.append([cost, _segment_key(), tick, ", ".join(loaded)])
+
+
+## Sim._profiler callbacks (--perf=profile).
+func add_call(phase: int, script: Script, usec: int) -> void:
+	_profile_add("%s|%s" % [Defs.Phase.keys()[phase], script.resource_path.get_file() if script != null else "?"], usec)
+
+
+func add_part(part: StringName, usec: int) -> void:
+	if part == &"begin: input, snapshot":
+		_profile_ticks += 1
+	_profile_add("TICK|" + String(part), usec)
+
+
+func _profile_add(key: String, usec: int) -> void:
+	var entry: PackedInt64Array = _profile_calls.get(key, PackedInt64Array([0, 0]))
+	entry[0] += 1
+	entry[1] += usec
+	_profile_calls[key] = entry
+
+
+func _print_profile() -> void:
+	var rows: Array[Array] = []
+	for key: String in _profile_calls:
+		var entry: PackedInt64Array = _profile_calls[key]
+		rows.append([key, entry[0], entry[1]])
+	rows.sort_custom(func(a: Array, b: Array) -> bool: return int(a[2]) > int(b[2]))
+	var ticks: float = maxf(float(_profile_ticks), 1.0)
+	print("Perf profile: %d ticks, usec per tick by phase|script (calls per tick, usec per call)" % _profile_ticks)
+	for row: Array in rows.slice(0, 40):
+		print("Perf profile: %-44s %7.2f us/tick  %6.2f calls/tick  %6.2f us/call" % [row[0], float(row[2]) / ticks,
+				float(row[1]) / ticks, float(row[2]) / maxf(float(row[1]), 1.0)])
 
 
 func _on_covered() -> void:
@@ -398,6 +446,9 @@ func _on_finished(_exit_code: int) -> void:
 	if _written:
 		return
 	_written = true
+	if Sim._profiler == self:
+		Sim._profiler = null
+		_print_profile()
 	_take_snapshot()
 	var report: Dictionary = {"segments": {}, "loads": _loads, "snapshots": _snapshots}
 	var worst: Dictionary = {}
@@ -405,12 +456,12 @@ func _on_finished(_exit_code: int) -> void:
 		var seg: Segment = _segments[key]
 		var row: Dictionary = _summarise(seg)
 		report["segments"][key] = row
-		print("Perf: %-16s %5d fr  cpu avg %.2f p99 %.2f max %.2f ms (process avg %.2f p99 %.2f, render avg %.2f p99 %.2f) | gpu avg %.2f max %.2f | wall avg %.1f max %.1f | draws avg %.0f max %d at tick %d hero %d,%d | tick avg %d p99 %d max %d us | ent %d awake %d/%d drop %d view-items %d thrown %d plat %d eproj %d fx %d | tex %.1f vid %.1f static %.1f MB | grid %s" % [
+		print("Perf: %-16s %5d fr  cpu avg %.2f p99 %.2f max %.2f ms (process avg %.2f p99 %.2f, render avg %.2f p99 %.2f) | gpu avg %.2f max %.2f | wall avg %.1f max %.1f | draws avg %.0f max %d at tick %d hero %d,%d | tick avg %d p99 %d max %d us | ent %d ticking %d awake %d/%d drop %d view-items %d thrown %d plat %d eproj %d fx %d | tex %.1f vid %.1f static %.1f MB | grid %s" % [
 			key, seg.frames, row["cpu_avg"], row["cpu_p99"], row["cpu_max"], row["process_avg"], row["process_p99"],
 			row["render_avg"], row["render_p99"], row["gpu_avg"], row["gpu_max"], row["wall_avg"],
 			row["wall_max"], row["draws_avg"], row["draws_max"], seg.draws_at[1], seg.draws_at[2], seg.draws_at[3],
 			row["tick_avg_us"], row["tick_p99_us"], row["tick_max_us"],
-			seg.max_entities, seg.max_awake, seg.max_level_awake, seg.max_dropped, seg.max_items_in_view,
+			seg.max_entities, seg.max_ticking, seg.max_awake, seg.max_level_awake, seg.max_dropped, seg.max_items_in_view,
 			seg.max_thrown, seg.max_platforms_in_view, seg.max_enemy_projectiles, seg.max_fx, seg.max_texture_mb,
 			seg.max_video_mb, seg.max_static_mb, seg.grid])
 		if key.ends_with("#warmup"):
@@ -426,6 +477,7 @@ func _on_finished(_exit_code: int) -> void:
 		_worst(worst, "thrown_max", seg.max_thrown, key)
 		_worst(worst, "platforms_in_view_max", seg.max_platforms_in_view, key)
 		_worst(worst, "entities_max", seg.max_entities, key)
+		_worst(worst, "ticking_max", seg.max_ticking, key)
 		_worst(worst, "texture_mb_max", seg.max_texture_mb, key)
 		_worst(worst, "static_mb_max", seg.max_static_mb, key)
 	var load_max: float = 0.0
@@ -461,6 +513,7 @@ func _on_finished(_exit_code: int) -> void:
 	_budget("thrown weapons", worst, "thrown_max", BUDGET_THROWN)
 	_budget("platforms in view", worst, "platforms_in_view_max", BUDGET_PLATFORMS)
 	_budget("registered SimEntity", worst, "entities_max", BUDGET_ENTITIES)
+	_budget("ticking SimEntity", worst, "ticking_max", BUDGET_TICKING)
 	_budget("texture MB", worst, "texture_mb_max", BUDGET_TEXTURE_MB)
 	_budget("level load ms (desktop)", worst, "load_max_ms", BUDGET_LOAD_MS)
 	if _snapshots.size() >= 2:
@@ -535,7 +588,7 @@ func _summarise(seg: Segment) -> Dictionary:
 		"draws_avg": float(draws_sum) / maxf(float(seg.draws.size()), 1.0), "draws_max": draws_max,
 		"ticks": ticks.size(),
 		"tick_avg_us": int(_avg_i(ticks)), "tick_p99_us": _pct_i(ticks, 0.99), "tick_max_us": _pct_i(ticks, 1.0),
-		"entities_max": seg.max_entities, "awake_max": seg.max_awake, "level_awake_max": seg.max_level_awake,
+		"entities_max": seg.max_entities, "ticking_max": seg.max_ticking, "awake_max": seg.max_awake, "level_awake_max": seg.max_level_awake,
 		"dropped_max": seg.max_dropped, "items_in_view_max": seg.max_items_in_view,
 		"items_registered_max": seg.max_items_total, "thrown_max": seg.max_thrown,
 		"platforms_in_view_max": seg.max_platforms_in_view, "enemy_projectiles_max": seg.max_enemy_projectiles,

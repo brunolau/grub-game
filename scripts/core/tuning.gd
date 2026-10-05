@@ -300,12 +300,15 @@ const CAM_V_FAST_SPEEDS: Array[int] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13
 ## Non-original smooth follow (accessibility option only): hero kept between these view px. [P 12.6]
 const CAM_SMOOTH_MARGIN: int = 128
 ## Dozing (ARCHITECTURE.md 11, not original - it changes no outcome): an idle entity whose area lies farther than
-## this from the view and from the hero's box and feet point is taken out of the tick. It must exceed every reach
-## that can start something within one tick: the body-overlap reach (OVERLAP_MAX_DY = 70 px between feet points),
-## the enemy activation margin (ENEMY_SPAWN_MARGIN_PX) and the hero's largest move in one tick (18 px measured over
-## every route; teleports re-decide at once). [own]
-const DOZE_REACH_PX: int = 128
-## The doze region is rounded outwards to this grid, so it is only looked at again when it crosses a grid line.
+## DOZE_HERO_REACH_PX from the hero's box and feet point and farther than DOZE_VIEW_REACH_PX from the view is taken
+## out of the tick. The hero reach covers the body-overlap reach (OVERLAP_MAX_DY = 70 px between feet points) plus
+## the most the hero can move between a decision and a contact test: 18 px per tick measured over every route, and a
+## spring's or a head's bounce lift (up to a hero box height) earlier in the same phase; teleports decide again at
+## once. The view reach is the enemy activation margin: the view is read only by the wake rule of asleep enemies
+## (ENEMY_SPAWN_MARGIN_PX), in phase ENEMIES, with the view of the last decision. [own]
+const DOZE_HERO_REACH_PX: int = 128
+const DOZE_VIEW_REACH_PX: int = ENEMY_SPAWN_MARGIN_PX
+## Both doze rectangles are rounded outwards to this grid, so they are only looked at again when they cross a line.
 const DOZE_GRID_PX: int = 64
 
 # =================================================================================================================

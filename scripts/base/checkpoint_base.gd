@@ -37,6 +37,16 @@ func _sim_tick(phase: int) -> void:
 ## other checkpoint, plays the cue. A hero who touches it in the air (jumping or falling past it) stores the
 ## checkpoint's own feet point instead, which the level designer put on the floor: the hero's point could lie
 ## above a gap beside the checkpoint, and every respawn would drop him into it again.
+## Dozing (SimEntity, ARCHITECTURE.md 11): an inactive checkpoint only tests the overlap with the hero, which fails
+## while he is far; the active one animates and ticks.
+func _doze_area() -> Rect2i:
+	return _doze_box()
+
+
+func _can_doze() -> bool:
+	return not active
+
+
 func activate(hero: PlayerBase) -> void:
 	var level: LevelBase = Game.level
 	if level != null:
@@ -69,6 +79,7 @@ func deactivate() -> void:
 		return
 	active = false
 	_on_active_changed()
+	_doze_note()
 
 
 ## Update the look (off / on animation, fire loop). Override.

@@ -2,7 +2,7 @@ Bonus Round - 8bit / 8-Bit Victory Loop
 =======================================
 
 Author: Wolfgang_ (Ted Kerr)
-Source: https://opengameart.org/content/bonus-round-8bit
+Source: https://opengameart.org/content/bonus-round-8bit and https://opengameart.org/content/8-bit-victory-loop
 Licence: CC0 1.0 (tier A)
 Used in Club & Grub for: bonus stage alternate, tally loop
 Staging folder: .tools/asset_candidates/audio/wolfgang_8bit-loops

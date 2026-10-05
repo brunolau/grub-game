@@ -1,25 +1,22 @@
 extends TestCase
-## Weapon proofs of World 3 and Feast Land C (owner: arms_w3): Frost Summit (w3_l1), Blizzard Pass (w3_l1b), Crystal
-## Grotto (w3_l2, the swirling axe = boomerang is picked up inside) and Feast Land C (bonus_c).
+## Route-building tools (no tests of their own; inert unless one of the variables below is set). The route proofs
+## themselves live in tests/test_campaign_routes.gd (ROUTES, the weapon matrix, both campaigns).
 ##
 ## A run keeps its weapon from level to level (GAMEPLAY.md 8.1), and a swing locks the hero for the weapon's recovery
 ## (club 2 ticks, hammer and axe 6, swirling axe 12), so a route recorded with one weapon proves nothing for another.
-## MATRIX names one route per (level, difficulty, weapon) a player can hold when entering the level: club, axe and
-## hammer in World 3 (the axe of 1-2, the hammer of 2-1), and the swirling axe of 3-2 too in Feast Land C. Each cell is
-## played from a fresh start with that weapon and must end the level the documented way (exit / warp back) without
-## losing a life and without an engine warning or error. A Frost Summit cell goes on into Blizzard Pass with the
-## same weapon's Blizzard Pass route (the linked pair as a campaign plays it); a Crystal Grotto cell ends with the
-## swirling axe.
-##
-## Route-building aids (the matrix tests are skipped while one runs), several jobs in one Godot run:
-##   WEAPONS_JOBS=<file>   one job per line, "probe|adapt <route> [club|hammer|axe|boomerang] [beginner|expert]
-##       [level=<id>] [every=n] [ticks=from-to] [trace=<file>] [absorb] [out=<file>]"; <route> is a file of the route
-##       folder or a res:// / absolute path. A probe replays the route from a fresh run with that weapon and prints
-##       the hero's cell, state and the events after every input line (every n ticks, every tick inside `ticks`;
-##       `trace` writes "tick x y xvel yvel state dead" per tick). An adapt replays a club route with another weapon
-##       and delays the input a longer swing recovery would swallow (see _adapt), writing the result to `out`.
+## These jobs re-time a route for another weapon (they made most of the per-weapon routes of World 3 and Feast Land C),
+## or replay one and print what happens. Several jobs run in one Godot run:
+##   WEAPONS_JOBS=<file>   one job per line, "probe|adapt|sync <route> [club|hammer|axe|boomerang] [beginner|expert]
+##       [level=<id>] [every=n] [ticks=from-to] [trace=<file>] [absorb] [line=<n>] [base=<weapon>] [out=<file>]";
+##       <route> is a file of the route folder or a res:// / absolute path. A probe replays the route from a fresh run
+##       with that weapon and prints the hero's cell, state, the events and the lying giant bonuses after every input
+##       line (every n ticks, every tick inside `ticks`; `trace` writes "tick x y xvel yvel state dead" per tick). An
+##       adapt replays a club route with another weapon and delays the input a longer swing recovery would swallow
+##       (see _adapt). A sync re-times a route for another weapon until the hero meets the base weapon's hero at
+##       every resting point (see _sync). Both write the result to `out`.
 ##   WEAPONS_PROBE=<route> / WEAPONS_ADAPT=<route> [WEAPONS_WEAPON=..] [WEAPONS_DIFF=expert] [WEAPONS_LEVEL=..]
-##       [WEAPONS_EVERY=n] [WEAPONS_TICKS=a-b] [WEAPONS_TRACE=..] [WEAPONS_ABSORB=1] [WEAPONS_OUT=..]   one such job.
+##       [WEAPONS_EVERY=n] [WEAPONS_TICKS=a-b] [WEAPONS_TRACE=..] [WEAPONS_ABSORB=1] [WEAPONS_OUT=..]   one such job,
+##       e.g. WEAPONS_PROBE=w3_l2.axe.inputs WEAPONS_WEAPON=axe bash .tools/gd.sh test route_tools
 
 const ROUTE_DIR: String = "res://tools/autoplay/routes/"
 ## Logical view of the 1280 x 720 game window (integer scale 2): enemies wake by the view.
@@ -27,42 +24,13 @@ const VIEW: Vector2i = Vector2i(Tuning.VIEW_W, Tuning.VIEW_H)
 const BEGINNER: String = "beginner"
 const EXPERT: String = "expert"
 const WEAPON_NAMES: Array[String] = ["club", "hammer", "axe", "boomerang"]
+const CLUB: int = Defs.Weapon.CLUB
+const HAMMER: int = Defs.Weapon.HAMMER
+const AXE: int = Defs.Weapon.AXE
+const BOOMERANG: int = Defs.Weapon.BOOMERANG
 
-## Every cell: level -> mode -> weapon (Defs.Weapon) -> route file. The club routes are the campaign routes.
-const MATRIX: Dictionary = {
-	"w3_l1": {
-		BEGINNER: {Defs.Weapon.CLUB: "w3_l1.inputs"},
-		EXPERT: {Defs.Weapon.CLUB: "w3_l1.expert.inputs"},
-	},
-	"w3_l1b": {
-		BEGINNER: {Defs.Weapon.CLUB: "w3_l1b.inputs"},
-		EXPERT: {Defs.Weapon.CLUB: "w3_l1b.expert.inputs"},
-	},
-	"w3_l2": {
-		BEGINNER: {Defs.Weapon.CLUB: "w3_l2.inputs"},
-		EXPERT: {Defs.Weapon.CLUB: "w3_l2.expert.inputs"},
-	},
-	"bonus_c": {
-		BEGINNER: {Defs.Weapon.CLUB: "bonus_c.inputs"},
-		EXPERT: {Defs.Weapon.CLUB: "bonus_c.inputs"},
-	},
-}
-
-## The weapons a player can hold when entering each level (pick-ups: 1-2 axe, 2-1 hammer, 3-2 swirling axe).
-const ENTRY_WEAPONS: Dictionary = {
-	"w3_l1": [Defs.Weapon.CLUB, Defs.Weapon.AXE, Defs.Weapon.HAMMER],
-	"w3_l1b": [Defs.Weapon.CLUB, Defs.Weapon.AXE, Defs.Weapon.HAMMER],
-	"w3_l2": [Defs.Weapon.CLUB, Defs.Weapon.AXE, Defs.Weapon.HAMMER],
-	"bonus_c": [Defs.Weapon.CLUB, Defs.Weapon.AXE, Defs.Weapon.HAMMER, Defs.Weapon.BOOMERANG],
-}
-
-## How each level ends: [exit kind, what follows ("tally" or "level:<id>"), source level of a bonus stage].
-const ENDS: Dictionary = {
-	"w3_l1": [&"exit", "level:w3_l1b", ""],
-	"w3_l1b": [&"exit", "tally", ""],
-	"w3_l2": [&"exit", "tally", ""],
-	"bonus_c": [&"warp", "tally", "w3_l2"],
-}
+## Bonus stages are entered through the warp of their source level.
+const BONUS_SOURCE: Dictionary = {"bonus_a": "w1_l2", "bonus_b": "w2_l1", "bonus_c": "w3_l2"}
 
 
 ## Counts the warnings and errors the engine logs while a route plays.
@@ -87,11 +55,11 @@ class ProblemCounter:
 var _counts: Dictionary = {}
 var _letters: Dictionary = {}
 var _words: int = 0
+var _jackpots: int = 0
 var _exits: Array[StringName] = []
 var _connections: Array[Array] = []
 var _problems: ProblemCounter = null
-## One line per cell played: the report of the matrix.
-var _report: PackedStringArray = PackedStringArray()
+var _counting: bool = false
 
 
 func after_each() -> void:
@@ -113,37 +81,8 @@ func after_each() -> void:
 
 
 # =================================================================================================================
-# The matrix
+# The jobs
 # =================================================================================================================
-
-## Every weapon a player can bring into each level, on every difficulty the level exists in, has a route.
-func test_the_matrix_is_complete() -> void:
-	for level_id: String in ENTRY_WEAPONS:
-		for mode: String in [BEGINNER, EXPERT]:
-			if not Levels.is_available(StringName(level_id), _difficulty(mode)):
-				continue
-			var cells: Dictionary = (MATRIX.get(level_id, {}) as Dictionary).get(mode, {})
-			for weapon: int in ENTRY_WEAPONS[level_id]:
-				assert_true(cells.has(weapon), "%s (%s) has a route for the %s" % [level_id, mode, WEAPON_NAMES[weapon]])
-				if cells.has(weapon):
-					assert_true(FileAccess.file_exists(ROUTE_DIR + str(cells[weapon])), "%s exists" % cells[weapon])
-
-
-func test_frost_summit_with_every_weapon() -> void:
-	await _play_level("w3_l1")
-
-
-func test_blizzard_pass_with_every_weapon() -> void:
-	await _play_level("w3_l1b")
-
-
-func test_crystal_grotto_with_every_weapon() -> void:
-	await _play_level("w3_l2")
-
-
-func test_feast_land_c_with_every_weapon() -> void:
-	await _play_level("bonus_c")
-
 
 ## Route-building aids: the jobs of WEAPONS_JOBS (or the single WEAPONS_PROBE / WEAPONS_ADAPT job), each from a
 ## fresh run, in one Godot run (see the header).
@@ -160,18 +99,19 @@ func test_route_aids() -> void:
 		after_each()
 
 
-## Sync job: re-time a route (recorded with `base=<weapon>`, default the club) for the job's weapon. The base replay
-## gives the hero's resting point at the end of every input line where he stands still; line by line the new
-## replay must meet him there (same cell position, facing, no death, no more hits). Where it does not, the movement
-## runs of the lines since the last meeting point are made a few ticks longer or shorter (the line's idle ticks pay
-## the difference, so the world keeps its timing) until one variant meets him. Writes the result to `out` (default
-## res://build/arms_w3/<route>.<weapon>.inputs) and prints every repair.
+## Sync job: re-time a route (recorded with `base=<weapon>`, default the club) for the job's weapon, from file line
+## `line=<n>` on. The base replay gives the hero's resting point at the end of every input line where he stands
+## still; line by line the new replay must meet him there (same position, facing, no death, no more hits). Where it
+## does not, the movement runs of the lines since the last meeting point are made a few ticks longer or shorter (the
+## line's last idle run pays the difference, so the world keeps its timing) until one variant meets him; when none
+## does, the closest variant within 16 px is kept and the next meeting point tried. Writes the result to `out`
+## (default res://build/arms_w3/<route>.<weapon>.inputs) and prints every repair.
 func _sync(job: Dictionary) -> void:
 	var file: String = str(job["file"])
 	var source_text: String = FileAccess.get_file_as_string(_route_path(file))
 	var lines: Array[Dictionary] = _parse_lines(source_text)
 	var base_weapon: int = WEAPON_NAMES.find(str(job.get("base", "club")))
-	var first_line: int = int(str(job.get("from", "0")).to_int()) if job.has("from") and int(job["from"]) > 0 else 0
+	var first_line: int = str(job.get("line", "0")).to_int()
 	var base_job: Dictionary = job.duplicate()
 	base_job["weapon"] = base_weapon
 	var ends: PackedInt32Array = _line_ends(lines)
@@ -180,7 +120,7 @@ func _sync(job: Dictionary) -> void:
 	var last_sync: int = -1
 	for l: int in lines.size():
 		var target: Dictionary = base[l]
-		if not bool(target["rest"]) or int(target["deaths"]) > 0 or l < first_line:
+		if not bool(target["rest"]) or int(target["deaths"]) > 0 or int(lines[l]["no"]) < first_line:
 			continue
 		ends = _line_ends(lines)
 		var now: Dictionary = (await _replay_marks(job, _flatten(lines), PackedInt32Array([ends[l]])))[0]
@@ -425,8 +365,8 @@ func _jobs() -> Array[Dictionary]:
 func _start_job(job: Dictionary) -> void:
 	var level_id: String = str(job["level"])
 	Game.new_game(_difficulty(str(job["mode"])))
-	if str(ENDS.get(level_id, ["", "", ""])[2]) != "":
-		Game.warp_return_level = StringName(str(ENDS[level_id][2]))
+	if BONUS_SOURCE.has(level_id):
+		Game.warp_return_level = StringName(str(BONUS_SOURCE[level_id]))
 	Game.set_weapon(int(job["weapon"]))
 	await _enter(StringName(level_id))
 
@@ -605,7 +545,7 @@ func _probe(job: Dictionary) -> void:
 				trace.append("%d %d %d %d %d %d %d" % [played, hero.sim_pos.x, hero.sim_pos.y, hero.xvel, hero.yvel,
 					hero.state, int(hero.dead)])
 		if flags.size() > 0:
-			print("L%3d t%5d %s | %s %s" % [line_no, played, _hero_text(), " ".join(log_lines), comment])
+			print("L%3d t%5d %s | %s %s%s" % [line_no, played, _hero_text(), " ".join(log_lines), comment, _drops_text()])
 			log_lines.clear()
 			comment = ""
 		if not Sim.running or Game.level != level:
@@ -620,83 +560,6 @@ func _probe(job: Dictionary) -> void:
 		Game.score, Game.lives, Game.hearts, Game.weapon, str(_letters.keys()), _words, _count(&"secret_found"),
 		_count(&"checkpoint_activated"), Game.spots_opened, Game.spots_total, Game.items_collected, Game.items_total,
 		Game.completion_percent()])
-
-
-# =================================================================================================================
-# Playing the cells
-# =================================================================================================================
-
-## Every cell of `level_id` on both difficulties, each from a fresh run.
-func _play_level(level_id: String) -> void:
-	if _dev_mode():
-		assert_true(true, "the matrix is skipped while a route-building aid runs")
-		return
-	_report.clear()
-	for mode: String in [BEGINNER, EXPERT]:
-		var cells: Dictionary = (MATRIX[level_id] as Dictionary).get(mode, {})
-		for weapon: int in cells:
-			await _play_cell(level_id, mode, weapon, str(cells[weapon]))
-			after_each()
-	print("  weapon matrix %s:\n%s" % [level_id, "\n".join(_report)])
-
-
-func _play_cell(level_id: String, mode: String, weapon: int, file: String) -> void:
-	var label: String = "%s %s %s (%s)" % [level_id, mode, WEAPON_NAMES[weapon], file]
-	Game.new_game(_difficulty(mode))
-	var source: String = str(ENDS[level_id][2])
-	if source != "":
-		Game.warp_return_level = StringName(source)
-	Game.set_weapon(weapon)
-	await _enter(StringName(level_id))
-	var lives: int = Game.lives
-	var result: Dictionary = await _play_stage(level_id, file, label)
-	var line: String = "    %-9s %-6s %s" % [mode, WEAPON_NAMES[weapon], result["text"]]
-	# The linked second half: Blizzard Pass with the same weapon's route, as a campaign run plays the pair.
-	var follows: String = str(ENDS[level_id][1])
-	if follows.begins_with("level:") and result["left"] and Flow.current_screen == Flow.SCREEN_LEVEL:
-		var next_id: String = follows.get_slice(":", 1)
-		var next_file: String = str(((MATRIX[next_id] as Dictionary)[mode] as Dictionary).get(Game.weapon, ""))
-		assert_ne(next_file, "", "%s: a %s route for the weapon carried on (%d)" % [label, next_id, Game.weapon])
-		if next_file != "":
-			var next: Dictionary = await _play_stage(next_id, next_file, "%s then %s" % [label, next_file])
-			line += "\n    %-16s then %s" % ["", next["text"]]
-	assert_true(Game.lives >= lives, "%s: no life lost (%d -> %d)" % [label, lives, Game.lives])
-	_report.append(line)
-
-
-## Play `file` in the running stage `level_id` and check how it ends. Returns {"left": bool, "text": summary}.
-func _play_stage(level_id: String, file: String, label: String) -> Dictionary:
-	assert_eq(Game.level_id, StringName(level_id), "%s plays in %s" % [label, level_id])
-	_reset_watch()
-	_start_counting()
-	var lives: int = Game.lives
-	var flags: PackedInt32Array = Autoplay.parse_inputs(FileAccess.get_file_as_string(ROUTE_DIR + file))
-	assert_true(flags.size() > 100, "%s is a real input script" % label)
-	var played: int = _run(flags)
-	_stop_counting()
-	var text: String = "%s: %d ticks, exits %s, hurt %d, deaths %d, lives %d, score %d, weapon %s, secrets %d, checkpoints %d, letters %d words %d, completion %d %%" % [
-		file, played, str(_exits), _count(&"player_hurt"), _count(&"player_died"), Game.lives, Game.score,
-		WEAPON_NAMES[Game.weapon], _count(&"secret_found"), _count(&"checkpoint_activated"), _letters.size(), _words,
-		Game.completion_percent()]
-	print("    %s -> %s" % [label, text])
-	assert_eq(_count(&"player_died"), 0, "%s: no death" % label)
-	assert_true(Game.lives >= lives, "%s: no life lost" % label)
-	assert_eq(_problems.count, 0, "%s: no engine warning or error (first: %s)" % [label, _problems.first])
-	var kind: StringName = ENDS[level_id][0]
-	assert_eq(_exits, [kind] as Array[StringName], "%s leaves through its %s" % [label, kind])
-	if level_id == "w3_l2":
-		assert_eq(Game.weapon, Defs.Weapon.BOOMERANG, "%s: the swirling axe is taken" % label)
-	var left: bool = _exits.size() == 1 and _exits[0] == kind
-	if left:
-		await _settle()
-		var follows: String = str(ENDS[level_id][1])
-		if follows == "tally":
-			assert_eq(Flow.current_screen, Flow.SCREEN_TALLY, "%s: the tally follows" % label)
-		else:
-			assert_eq(Flow.current_screen, Flow.SCREEN_LEVEL, "%s: a stage follows without a tally" % label)
-			assert_eq(Game.level_id, StringName(follows.get_slice(":", 1)), "%s leads on" % label)
-			_set_view()
-	return {"left": left, "text": text}
 
 
 # =================================================================================================================
@@ -770,6 +633,7 @@ func _reset_watch() -> void:
 	_counts.clear()
 	_letters.clear()
 	_words = 0
+	_jackpots = 0
 	_exits.clear()
 
 
@@ -777,14 +641,17 @@ func _start_counting() -> void:
 	_stop_counting()
 	_problems = ProblemCounter.new()
 	OS.add_logger(_problems)
+	_counting = true
 
 
+## Stop counting; the count stays readable in _problems.
 func _stop_counting() -> void:
-	if _problems != null:
+	if _counting:
 		OS.remove_logger(_problems)
+		_counting = false
 
 
-## True while one of the route-building aids runs (the matrix is skipped then).
+## True while one of the route-building aids runs.
 func _dev_mode() -> bool:
 	return not OS.get_environment("WEAPONS_PROBE").is_empty() or not OS.get_environment("WEAPONS_ADAPT").is_empty() \
 			or not OS.get_environment("WEAPONS_JOBS").is_empty()
@@ -805,6 +672,8 @@ func _on_event(signal_name: StringName) -> void:
 func _on_item(item_id: StringName, index: int, _points: int, _pos: Vector2i) -> void:
 	if item_id == &"items/letter":
 		_letters[index] = true
+	elif item_id == &"items/jackpot":
+		_jackpots += 1
 
 
 func _on_exit(exit_kind: StringName) -> void:
@@ -822,6 +691,18 @@ func _keys(flags: int) -> String:
 		if flags & int(pair[0]):
 			keys += str(pair[1])
 	return keys if keys != "" else "-"
+
+
+## Giant bonuses and jackpots lying (or falling) in the level, as " giant(x,y)" / " jackpot(x,y)".
+func _drops_text() -> String:
+	var text: String = ""
+	if Game.level == null:
+		return text
+	for entity: SimEntity in Game.level.get_kind(Defs.Kind.COLLECTIBLE):
+		var item: GiantBonus = entity as GiantBonus
+		if item != null and item.dropped and not item.collected:
+			text += " %s(%d,%d)" % ["jackpot" if item is Jackpot else "giant", item.sim_pos.x, item.sim_pos.y]
+	return text
 
 
 func _hero_text() -> String:

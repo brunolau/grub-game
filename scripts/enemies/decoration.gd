@@ -57,5 +57,11 @@ func _asleep_tick() -> void:
 	pass
 
 
+## Dozing (SimEntity, ARCHITECTURE.md 11): its asleep tick does nothing at all, so it dozes whenever it is off the
+## view and away from the hero.
+func _asleep_waits_for_view() -> bool:
+	return true
+
+
 func _on_level_reset() -> void:
 	visible = true

@@ -13,6 +13,9 @@ extends Node
 ##   --shots=<n>               save a screenshot every n ticks (default 24), plus the first and the last tick
 ##   --out=<name>              folder under build/screenshots/ (default: the level id or scene name)
 ##   --difficulty=<name>       beginner (default) or expert
+##   --weapon=<name>           club (default, as a new run), hammer, axe or boomerang (the swirling axe): the weapon
+##                             the hero holds when the level starts, for the per-weapon routes
+##                             (tools/autoplay/routes/<id>[.expert].<weapon>.inputs)
 ##   --seed=<n>                simulation RNG seed (default 1)
 ##   --fast                    run one tick per rendered frame instead of real time
 ##   --hold=<ticks>            idle ticks appended after the script (default 12)
@@ -47,6 +50,8 @@ extends Node
 signal finished(exit_code: int)
 
 const DEFAULT_SHOT_PERIOD: int = 24
+## Columns of trace.json: tick, x, y, xvel, yvel, state.
+const TRACE_COLUMNS: int = 6
 const DEFAULT_HOLD_TICKS: int = 12
 const SETTLE_FRAMES: int = 4
 ## The switches a release build honours; every other one needs a debug build.
@@ -100,7 +105,9 @@ var _out_dir: String = ""
 var _fast: bool = false
 var _seed: int = 1
 var _difficulty: int = Defs.Difficulty.BEGINNER
-var _trace: Array[Array] = []
+var _weapon: int = Defs.Weapon.CLUB
+## Trace rows, TRACE_COLUMNS ints per tick (packed: no allocation inside the measured tick).
+var _trace: PackedInt32Array = PackedInt32Array()
 var _shots_saved: int = 0
 var _done: bool = false
 var _can_capture: bool = true
@@ -241,6 +248,12 @@ func _configure(options: Dictionary) -> void:
 	_fast = options.has("fast")
 	if str(options.get("difficulty", "beginner")) == "expert":
 		_difficulty = Defs.Difficulty.EXPERT
+	if options.has("weapon"):
+		var weapon: int = ["club", "hammer", "axe", "boomerang"].find(str(options["weapon"]).to_lower())
+		if weapon < 0:
+			push_error("Autoplay: unknown weapon '%s' (club, hammer, axe, boomerang)" % options["weapon"])
+		else:
+			_weapon = weapon
 	var out_name: String = str(options.get("out", ""))
 	if out_name.is_empty() and options.has("flow"):
 		out_name = str(options["flow"]).get_file().get_basename()
@@ -313,6 +326,10 @@ func _run() -> void:
 			_finish(2)
 			return
 		Game.new_game(_difficulty)
+		Game.set_weapon(_weapon)
+		# The clock waits for the script's first tick: ticks run in real time while the level settles would put
+		# the level's own clock (wind script, enemies) ahead of the script, unlike the route tests and flow scripts.
+		Sim.manual = true
 		Flow.start_level(_level_id, Defs.Transition.NONE)
 		await Flow.transition_finished
 	for i: int in SETTLE_FRAMES:
@@ -353,16 +370,21 @@ func _on_tick_finished(tick: int) -> void:
 		# Another stage took over (its clock starts again at tick 0): stop before it plays this script again.
 		_done = true
 		Sim.manual = true
-		print("Autoplay: %s took over after %d ticks of %s; stopping" % [Game.level.level_id, _trace.size(),
+		print("Autoplay: %s took over after %d ticks of %s; stopping" % [Game.level.level_id, _trace_rows(),
 				_level_id])
 		_write_trace()
-		print("Autoplay: %d ticks played, %d screenshots saved" % [_trace.size(), _shots_saved])
+		print("Autoplay: %d ticks played, %d screenshots saved" % [_trace_rows(), _shots_saved])
 		_finish(0)
 		return
 	var level: LevelBase = Game.level
 	if level != null and level.player != null:
 		var hero: PlayerBase = level.player
-		_trace.append([tick, hero.sim_pos.x, hero.sim_pos.y, hero.xvel, hero.yvel, hero.state])
+		_trace.append(tick)
+		_trace.append(hero.sim_pos.x)
+		_trace.append(hero.sim_pos.y)
+		_trace.append(hero.xvel)
+		_trace.append(hero.yvel)
+		_trace.append(hero.state)
 	var last: bool = tick >= _flags.size()
 	if last:
 		_done = true
@@ -401,17 +423,24 @@ func _capture(tick: int) -> void:
 	_shots_saved += 1
 
 
+func _trace_rows() -> int:
+	return _trace.size() / TRACE_COLUMNS
+
+
 func _write_trace() -> void:
 	var file: FileAccess = FileAccess.open(_out_dir + "/trace.json", FileAccess.WRITE)
 	if file == null:
 		return
+	var rows: Array[Array] = []
+	for i: int in _trace_rows():
+		rows.append(Array(_trace.slice(i * TRACE_COLUMNS, (i + 1) * TRACE_COLUMNS)))
 	file.store_string(JSON.stringify({
 		"level": String(_level_id),
 		"scene": _scene_path,
 		"seed": _seed,
 		"ticks": _flags.size(),
 		"columns": ["tick", "x", "y", "xvel", "yvel", "state"],
-		"rows": _trace,
+		"rows": rows,
 	}))
 	file.close()
 

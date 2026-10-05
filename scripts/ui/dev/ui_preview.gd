@@ -9,7 +9,7 @@ extends Control
 ##
 ##   --ui=<name>          scene `res://scenes/ui/<name>.tscn` (screen or overlay)
 ##   --ui-args=k=v,k=v    Flow.args of the screen (integers are converted, "a|b|c" becomes a list)
-##   --ui-state=<name>    prepared game state: progress | tally | hud | boss | paused (see _prepare_state); boss
+##   --ui-state=<name>    prepared game state: progress | tally | hud | boss | paused | intro (_prepare_state); boss
 ##                        starts a fight of a boss with --ui-boss-hp=<n> hit points (default 150)
 ##   --ui-keys=a,b,...    input script, one step every --ui-step seconds after --ui-delay seconds:
 ##                        up down left right accept cancel pause   ui actions / the pause action
@@ -17,6 +17,7 @@ extends Control
 ##                        kbd pad touch                            switch the active device family
 ##                        boss:<hp>                                the boss now has <hp> hit points (a hit)
 ##                        defeat                                   the boss is defeated
+##                        intro                                    the HUD shows the level banner
 ##                        key:<name>                               press a key ("key:A", "key:Escape")
 ##                        tap:<x>:<y>                              click / tap at a view position (art px)
 ##                        press:<x>:<y> release:<x>:<y>            touch down / up (finger 0) for the touch overlay
@@ -92,6 +93,10 @@ func _after_overlay(state: String) -> void:
 			Events.boss_energy_changed.emit(null, _boss_hp, _boss_hp)
 		"paused":
 			Events.pause_changed.emit(true)
+		"intro":
+			var hud: Hud = get_tree().get_first_node_in_group(Defs.GROUP_HUD) as Hud
+			if hud != null:
+				hud.show_intro(Game.level_id)
 
 
 func _prepare_state(state: String) -> void:
@@ -120,7 +125,7 @@ func _prepare_state(state: String) -> void:
 			Game.add_tally_item(&"items/treasure", 8, 5000)
 			Game.add_tally_item(&"items/giant_bonus", 2, 30000)
 			Game.add_tally_item(&"items/letter", 1, 0)
-		"hud", "boss", "paused":
+		"hud", "boss", "paused", "intro":
 			Game.add_score(12340)
 			Game.lose_heart()
 			Game.add_bones(3)
@@ -145,6 +150,10 @@ func _play_step(step: String) -> void:
 		"defeat":
 			Events.boss_energy_changed.emit(null, 0, _boss_hp)
 			Events.boss_defeated.emit(null)
+		"intro":
+			var hud: Hud = get_tree().get_first_node_in_group(Defs.GROUP_HUD) as Hud
+			if hud != null:
+				hud.show_intro(Game.level_id)
 		"kbd":
 			_send_key(KEY_SHIFT)
 		"pad":

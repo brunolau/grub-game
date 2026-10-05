@@ -78,6 +78,13 @@ static func load_scene(id: StringName) -> PackedScene:
 	return scene
 
 
+## Put a scene loaded elsewhere (Flow's background loading) into the cache of `id`, unless one is cached already.
+static func adopt(id: StringName, scene: PackedScene) -> void:
+	if scene != null and not _cache.has(id):
+		_cache[id] = scene
+		_missing.erase(id)
+
+
 ## Instantiate an entity scene (not yet in the tree, not yet set up). Returns null when the scene is missing.
 static func instantiate(id: StringName) -> Node:
 	var scene: PackedScene = load_scene(id)

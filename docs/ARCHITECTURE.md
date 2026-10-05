@@ -84,6 +84,11 @@ Default bindings:
 | look | C, L, keypad 5 | Y (north), RB |
 | pause | Escape, P | Start |
 | ui_accept / ui_cancel | Enter, keypad Enter, Space / Escape | A, Start / B (Start pauses in play and confirms the focused pause-menu entry) |
+| fullscreen (desktop only, not rebindable) | Alt+Enter, Alt+keypad Enter, F11 | - |
+
+The fullscreen shortcut works on every screen, the pause menu included (`Settings._input`, process mode always):
+it flips `video/fullscreen` exactly like Options > Fullscreen (the Options row follows) and saves the settings at
+once. The key press goes no further, so Alt+Enter never also "accepts" a menu entry.
 
 **The visible area is not constant.** With integer scaling the root viewport is `window / s` art px where
 `s = max(1, floor(min(window_w / 640, window_h / 360)))`: exactly 640 x 360 at 1280x720, 1920x1080, 2560x1440,
@@ -122,6 +127,12 @@ Use: `spawn_setup(pos, params)` (called by the level before the node enters the 
 Registration with `Sim` and with the level, and the per-frame interpolation of `position`, happen in
 `_notification`, which Godot delivers to every script level: **subclasses may override `_ready`, `_enter_tree`,
 `_exit_tree`, `_process` freely and need not call `super`** for those. Never write `position`.
+
+Dozing (section 11): `is_dozing()`; override `_doze_area() -> Rect2i` and `_can_doze() -> bool` (optional hooks
+`_on_doze()`, `_on_doze_wake()`), call `_doze_note()` when the entity may have become idle and `_doze_wake_now()`
+before anything makes its ticks matter again (a hit, an opening). The contract is in the comment block of
+`sim_entity.gd`; collectibles, enemies, hittables, checkpoints, exits, zones, signs, springs, gates and rising
+columns implement it.
 
 ### 3.2 `TileGrid` (`scripts/core/tile_grid.gd`) - collision grid
 
@@ -366,6 +377,12 @@ bits; action names; groups; z indices; CanvasLayer numbers; physics layer bits; 
   catching up afterwards. Tests and the autoplay harness use `Sim.step(n)`, which ignores both.
 - `Sim.tick` = ticks since `start()`; `Sim.total_ticks` never resets (use it for once-per-tick guards);
   `Sim.alpha` = interpolation factor for rendering.
+- `Sim.suspend(entity)` / `Sim.resume(entity)` take a registered entity out of the tick and put it back at its
+  place in the registration order (the level's doze manager uses them, section 11). Both, and `unregister`, are
+  exact in the middle of a phase: an entity taken out is not called again, one put back runs in this phase when
+  its place comes after the entity being called, every other entity is called exactly once.
+  `Sim.get_phase_runs(phase)` counts started phases (a dozing entity restores per-tick counters with it);
+  `get_entity_count()` = registered, `get_awake_count()` = ticking.
 
 ### 4.2 Order of operations (PHYSICS.md 3)
 
@@ -379,7 +396,7 @@ entity freed during a tick is skipped at once.
 | `WEAPONS` | 2 | player | weapon pass: every hero projectile, then the club box created on the previous tick, against `Kind.ENEMY` in slot order (`is_targetable()`, `take_hit`), then - if no enemy was hit - against `Kind.HITTABLE` (`is_hit_by`, `take_hit`). One target per box. A club hit while `yvel != 0` sets `yvel = -80` |
 | `ENEMIES` | 3 | enemies | `EnemyBase._sim_tick` (wake / sleep / `_ai_tick`); bosses poll the hero's weapons here |
 | `PROJECTILES` | 4 | `ProjectileBase` | hero and enemy projectiles move |
-| `ITEMS` | 5, 6 | objects | dropped items and bones move, placed items bob, hazards move, score pop-ups rise |
+| `ITEMS` | 5, 6 | objects | dropped items and bones move, hazards move, score pop-ups rise (placed items count their age and bob at the start of their `CONTACT_ITEMS` step: one call per tick) |
 | `PLATFORMS` | 7 | objects | platforms move, then the ride test (`PlayerBase.ride_platform`) |
 | `PLAYER` | 8a-8i | player | delete the club box, read `GameInput.flags`, state, handler, integrate x then y, tile collision, glider, timers (`charge`, `swing_lock`, `drop_timer`, `feast`, and `Game.level.tick_shake_timer()`) |
 | `CONTACT_ENEMIES` | 9a | player | hero versus every `Kind.ENEMY` that `is_targetable()` (and `contact_hurts`), only while `hit_timer == 0` |
@@ -387,7 +404,7 @@ entity freed during a tick is skipped at once.
 | `WORLD` | 10-12 | objects, world | hittable cool-downs, gates, rising columns, wind script, darkness fades |
 | `CAMERA` | 13 | world | camera follow (PHYSICS.md 12) |
 | `POST` | 14-17 | player, world | `hit_timer` decrement (hero: once per tick here), death sequence, level state |
-| after the last phase | 18 | `LevelBase` (built in) | screen-shake step (nudge on odd ticks), then the `on_screen` flag of every entity |
+| after the last phase | 18 | `LevelBase` (built in) | screen-shake step (nudge on odd ticks), the doze decisions for the next tick, then the `on_screen` flag of every ticking entity (a dozing one is off the view: false) |
 
 Hero-versus-enemy resolution (phase `CONTACT_ENEMIES`, PHYSICS.md 9 / 10.1), for the first enemy that overlaps
 with `Overlap.body(hero, enemy, hero)`:
@@ -1102,7 +1119,8 @@ bash .tools/gd.sh play --flow=tools/autoplay/campaign_beginner.flow --fast --fre
 ```
 
 A plain `--autoplay=<id>` run plays its script in that one stage and ends when another stage takes over (its
-screenshots are never overwritten by the next stage).
+screenshots are never overwritten by the next stage). Its clock stands still until the script's first tick, so the
+level's tick 1 is the script's tick 1, as in the route tests and flow scripts.
 
 Tool scripts run with `-s` (`tests/run_tests.gd`, `tools/*.gd`) are compiled before the autoloads exist: a class
 that uses an autoload (`SimEntity` and every entity script) cannot be named in such a script's own source (it
@@ -1159,18 +1177,118 @@ screenshot their work from day one. It is a development tool, not the loader; it
 | Item | Budget |
 |---|---|
 | Frame time | 60 fps; CPU <= 8 ms and GPU <= 8 ms per frame at 800 x 360 internal resolution |
-| Simulation | one tick <= 2 ms on the target device (24 ticks/s = under 5 % CPU); catch-up never more than 4 ticks |
-| Active entities | <= 12 awake enemies, <= 20 active items, <= 4 thrown weapons, <= 7 platforms on screen, <= 150 registered `SimEntity` per level |
+| Simulation | one tick <= 2 ms on the target device (24 ticks/s = under 5 % CPU); catch-up never more than 4 ticks. Desktop proxy (debug binary, `--perf` campaign flow): average <= 150 us and p99 <= 500 us per tick in every level |
+| Active entities | <= 12 awake enemies; <= 32 dropped bonus items (`ObjTuning.MAX_DROPPED_ITEMS`, the original's 32 item slots) plus at most 4 key items (fire-starter, trophy, weapons: they never expire); <= 4 thrown weapons; <= 7 platforms on screen; <= 200 registered `SimEntity` per level, of which <= 48 tick at once (the others doze, 11.1) |
 | Per-tick allocations | none in `_sim_tick` hot paths: no new `Array` / `Dictionary` / `String` formatting, no `get_nodes_in_group`, no `get_children`, no node creation except real spawns; reuse `Rect2i` / ints |
 | Draw calls | <= 60 per frame; one TileMapLayer per layer; sprites share sheets; no per-entity shader materials (use `modulate` for flashes) |
 | Overdraw | <= 4 parallax layers + 3 tile layers; particles <= 64 on screen, CPUParticles2D or hand-rolled sprites, no GPU particle collisions |
 | Textures | nearest, lossless, no mipmaps; every texture <= 2048 px per side (the Brute sheets were re-packed to 2016 px, ASSET_MANIFEST); <= 96 MB of textures loaded per level; the terrain atlases and the liquid strip of a level share one texture built at load (`WorldTileSet.shared_atlas`), so the tile layers stay one batch per quadrant |
 | Audio | <= 10 SFX voices + 2 music streams; OGG music streamed; no decoding in `_sim_tick` |
-| Loading | a level loads in <= 2 s on the target device; entity scenes are cached by `Spawner`; the level loader calls `Spawner.retain_only(ids)` (scenes of the previous level are released with their textures), `Spawner.preload_ids(ids)` and `Spawner.preload_runtime()` (every fx / items / projectiles scene: nothing is loaded inside a tick) |
-| Measuring | `--perf` (debug builds, with `--autoplay` or `--flow`, `scripts/core/dev/perf_probe.gd`): frame CPU / GPU time, draw calls, tick cost, entity counts, memory and load times per level against this table, slow ticks with what they loaded, a leak snapshot at every title / map arrival; `--perf=layers` also attributes the draw calls to the layers of each level |
+| Loading | a level loads in <= 2 s on the target device; entity scenes are cached by `Spawner`; the level loader calls `Spawner.retain_only(ids)` (scenes of the previous level are released with their textures), `Spawner.preload_ids(ids)` and `Spawner.preload_runtime()` (every fx / items / projectiles scene: nothing is loaded inside a tick). Menus and the world map load ahead what the next level start needs (`Flow.warm_up`, 11.2), so the first level of a session starts as fast as any other |
+| Measuring | `--perf` (debug builds, with `--autoplay` or `--flow`, `scripts/core/dev/perf_probe.gd`): frame CPU / GPU time, draw calls, tick cost, entity counts (registered and ticking), memory and load times per level against this table, slow ticks with what they loaded, a leak snapshot at every title / map arrival; `--perf=layers` also attributes the draw calls to the layers of each level. Headless: `scripts/core/dev/sim_bench.gd` (11.3) |
 | Memory | <= 300 MB resident on Android |
 | Resolution independence | no assumption about the view size; UI anchored; touch targets >= 56 art px |
 | Battery | no busy loops; `Engine.max_fps` stays 0 (vsync); the simulation stops when the app is paused |
+
+### 11.1 Dozing: far, idle entities cost nothing per tick
+
+A level registers every entity of its file at load (enemies sleep at their anchors, items bob in place), so most of
+them are far from the action at any time. `LevelBase` runs a doze manager: an entity whose `_doze_area()` touches
+neither the hero's box and feet point grown by `Tuning.DOZE_HERO_REACH_PX` (128) nor the view grown by
+`Tuning.DOZE_VIEW_REACH_PX` (32, the enemy activation margin), and whose `_can_doze()` holds, is taken out of the
+tick (`Sim.suspend`): no phase calls, no `sim_prev` snapshot, no `on_screen` test, no interpolation. Both
+rectangles are rounded outwards to `Tuning.DOZE_GRID_PX` (64), so the manager only looks at every entity again when
+one of them crosses a grid line; otherwise only the entities that reported a change (`_doze_note()`) are looked at.
+Decisions are taken at the end of every tick (before the `on_screen` pass), at the start of a tick when the view or
+the hero moved in between (a gate, a resized window), and after a respawn.
+
+Dozing changes no outcome, by construction:
+
+- `_can_doze()` holds only while every tick of the entity would change nothing as long as the hero and the view
+  stay out of reach: a placed item only counts its age (restored on waking from `Sim.get_phase_runs`) and tests
+  the overlap, which rejects feet points farther apart than `Tuning.OVERLAP_MAX_DX` / `_DY` (64 / 70); an asleep
+  enemy waits for its box to meet the view grown by `ENEMY_SPAWN_MARGIN_PX`, read in phase `ENEMIES` with the view
+  of the last decision (the camera moves only in phase `CAMERA` and in snaps, both followed by a decision); zones,
+  spawner records, checkpoints, signs, springs, gates and rising columns test a point or an overlap in the same
+  way; hittables tick only for their cool-down, and a hit or an opening wakes them first (`_doze_wake_now`, exact
+  also in the middle of a phase).
+- The hero reach of 128 px covers the overlap reach (70 px) plus his largest move between a decision and a contact
+  test: 18 px per tick measured over every route, and a bounce lift of at most a hero box height earlier in the
+  same phase. Teleports (gates, respawns, rising columns) are followed by a decision before the next phase that
+  could see them.
+- `tests/test_core_doze.gd` checks the Sim rules and the manager on bare levels, replays a real route with and
+  without dozing tick for tick, and checks on every tick of it that no dozing entity is on screen or within the
+  hero's reach and that the hero never moves farther in one tick than the reach allows. Every enemy archetype that
+  replaces a wake hook must declare its doze rule (checked there too). `sim_bench.gd --digest [--no-doze]` compares
+  the whole state of every route run, tick for tick.
+
+`LevelBase.doze_enabled = false` switches it off (measurements only).
+
+### 11.2 Background loading
+
+While a menu screen or the world map shows, `Flow.warm_up(level_id)` loads what the next level start needs: the
+level, HUD, touch and pause scenes, the hero, every effect / item / projectile scene and, for the level the map
+shows, its entity scenes, terrain, liquid, backdrop, prop and `skin=` pictures and its music. Pictures, sounds and
+fonts load on worker threads (`ResourceLoader.load_threaded_request`, at most 2 ms of main-thread work per frame
+for looking up dependencies and collecting results). Scripts and scenes are put together on the main thread only
+while a transition covers the screen (at most 400 ms per transition), never on a visible frame: this engine
+version reported an object as leaked at exit for some scripts compiled on a worker thread, and a script compile
+(up to 100 ms in a debug build) is too long for a visible frame. For the same reason a resource that is loaded
+already (by a screen) is only kept, never requested on a thread again. What is left when the level starts, the level
+loads itself as before - never inside a tick. Headless runs (tests, smoke checks) do not warm up; the exit waits
+for running loads. Measured on the desktop debug build: the first level start (covered to started) went from about
+700 ms to under 60 ms; the covered menu transitions before it take up to 465 ms (boot to title), 258 ms and 166 ms.
+
+### 11.3 Headless bench
+
+```
+bash .tools/gd.sh script res://scripts/core/dev/sim_bench.gd -- --make-snapshot=res://build/perf_baseline
+bash .tools/gd.sh script res://scripts/core/dev/sim_bench.gd -- --snapshot=res://build/perf_baseline --digest --tight
+bash .tools/gd.sh script res://scripts/core/dev/sim_bench.gd -- --profile w2_l1.inputs      cost per phase and class
+bash .tools/gd.sh script res://scripts/core/dev/sim_bench.gd -- --load-profile=w1_l1        first level start, step by step
+```
+
+It replays the route files of `tests/test_campaign_routes.gd` exactly as that test does (from a frozen snapshot of
+the level and route files if asked), times every tick, writes a state digest per tick (`--digest`; compare two
+runs with `diff`), profiles every `_sim_tick` call (`--profile`, through `Sim._profiler`) and compares with dozing
+switched off (`--no-doze`). By default it renders one frame between two ticks with the engine's idle sleep, which
+leaves the caches as cold as the windowed game does; `--tight` steps like the headless tests (fast, for digests).
+
+### 11.4 Measured (desktop debug, Ryzen 9 7900X)
+
+Tick cost per level measured by `--perf` in the windowed game before and after the final production pass (average
+/ p99 / max in microseconds, all end-of-tick handlers of the harness included):
+
+| Level | before avg / p99 / max | after avg / p99 / max |
+|---|---|---|
+| w1_l1 | 432 / 869 / 1705 | 245 / 645 / 1275 |
+| w1_l2 | 473 / 916 / 1480 | 240 / 596 / 1101 |
+| bonus_a | 315 / 803 / 1256 | 227 / 643 / 938 |
+| w2_l1 | 404 / 991 / 1975 | 248 / 652 / 1044 |
+| w2_l2 | 408 / 1464 / 2591 | 248 / 737 / 1005 |
+| w2_l2b | 249 / 911 / 4340 | 272 / 870 / 5998 |
+| bonus_b | - | 217 / 569 / 917 |
+| w3_l1 | 317 / 843 / 1470 | 237 / 682 / 1328 |
+| w3_l1b | 260 / 754 / 1676 | 225 / 612 / 1384 |
+| w3_l2 | 338 / 826 / 1458 | 241 / 638 / 1254 |
+| bonus_c | - | 232 / 649 / 950 |
+| w4_l1 | 343 / 889 / 1430 | 230 / 586 / 1195 |
+| w4_l2 | 300 / 980 / 2104 | 198 / 641 / 923 |
+| w4_l2b | 216 / 557 / 4398 | 132 / 353 / 3139 |
+| ending | 261 / 827 / 1080 | 173 / 680 / 999 |
+
+"Before" is the release check's campaign flow on the original code (`build/release_check/perf_campaign.log`;
+bonus_b and bonus_c were not on its route), "after" a flow that starts every level on its own and plays its
+route (`start_level` + `play_file` of a flow script; a linked stage plays its own route). The headless bench with
+one rendered frame and the engine's idle sleep between two ticks gives similar numbers; with a short sleep
+(`--sleep=300`, warm caches) the averages are 103-143 us. On this machine the windowed game leaves the caches
+cold between two ticks, which roughly doubles the cost of the same code; a Cortex-A53 is estimated 10-15 times
+slower than this desktop. The budget of 150 / 500 us is not met yet: what is left is spread over the hero (about
+75 us over its four phases), the fixed per-tick work (input, snapshot, doze decision, on_screen pass, camera:
+about 50 us) and the 10-45 entities that tick near the action. The single spikes over 1 ms are boss bursts
+(64 items spawned in one tick) and first-time scene instancing. Registered entities peak at 155 (w2_l1); at most 45 tick
+at once (w2_l2b during the Brute's item burst; 44 in bonus_b); dropped items peak at 36 (w4_l2b: 32 bonus items
+and 4 key items).
 
 ---
 
@@ -1206,3 +1324,14 @@ screenshot their work from day one. It is a development tool, not the loader; it
   inside the rock, a softlock for a boss's fire-starter); a boss bar always spans the boss's own hit points; menu
   entries take the focus only from a moving pointer.
 - Windows ships as one .exe without ANGLE (OpenGL 3.3 is required; `docs/BUILD.md`).
+- Final production pass (performance): far, idle entities doze (11.1) - no recorded route, golden trace or fidelity
+  test moved; placed items count their age and bob in their `CONTACT_ITEMS` step instead of a separate `ITEMS`
+  step; sprite frames and flips are written only when they change; tile repaints after `set_cell` are batched per
+  frame; menus and the map load the next level start in the background (11.2); the activity budgets follow the
+  measurements (registered 200 / ticking 48 entities, the original's 32 dropped-item slots plus key items).
+- Alt+Enter and F11 toggle fullscreen on desktop (section 2).
+- A scene change requested inside a tick (an exit, a game over) starts at the end of that tick, also with instant
+  transitions (tests, autoplay): the tick runs to its end, as it always did with the timed transitions of the
+  game. Before, an instant transition took the level out of the tree in the middle of the exit tick, so a headless
+  replay could differ from the game in that one tick: route `w3_l2.inputs` (Beginner) now ends with 194 600 points
+  instead of 193 000 in headless replays - the score the game with its timed transitions always gave.

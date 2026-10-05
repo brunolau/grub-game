@@ -310,6 +310,31 @@ func test_credits_back_returns_to_title() -> void:
 	await _cleanup()
 
 
+## The licence texts that ship with the game can be read in the credits (on a phone there is no other place):
+## the look button opens them, Left / Right change the text, "back" returns to the roll and then to the title.
+func test_credits_show_the_licence_texts() -> void:
+	var node: CreditsScreen = await _open(&"credits") as CreditsScreen
+	assert_false(node.is_licence_open())
+	_press(Defs.ACT_LOOK)
+	assert_true(node.is_licence_open(), "the look button opens the licences")
+	assert_true(node.get_licence_text().contains("Permission is hereby granted"), "the engine's MIT notice")
+	assert_true(node.get_licence_text().contains("FreeType"), "the FreeType credit")
+	_press(&"ui_right")
+	assert_true(node.get_licence_text().contains("SIL OPEN FONT LICENSE"), "the font licence")
+	_press(&"ui_left")
+	_press(&"ui_left")
+	assert_eq(node.licence_page, CreditsScreen.LICENCES.size() - 1, "Left wraps to the last text")
+	assert_true(node.get_licence_text().contains("Component: The FreeType Project"), "the engine's third-party components")
+	_press(&"ui_cancel")
+	assert_false(node.is_licence_open(), "back closes the licences")
+	assert_eq(Flow.current_screen, Flow.SCREEN_BOOT, "...and stays in the credits")
+	for entry: Array in CreditsScreen.LICENCES:
+		assert_true(FileAccess.file_exists(str(entry[1])), "%s ships" % entry[1])
+	_press(&"ui_cancel")
+	assert_eq(Flow.current_screen, Flow.SCREEN_TITLE)
+	await _cleanup()
+
+
 func test_credits_are_generated_from_credits_md() -> void:
 	var sections: Array[Array] = CreditsScreen.parse_credits(FileAccess.get_file_as_string(CreditsScreen.CREDITS_PATH))
 	var by_heading: Dictionary = {}

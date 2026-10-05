@@ -1,4 +1,5 @@
-"""Generate docs/ASSET_MANIFEST.md, CREDITS.md and assets/licenses/README.md from the registry."""
+"""Generate docs/ASSET_MANIFEST.md from the registry, and check that CREDITS.md and assets/licenses/README.md
+(maintained by hand) credit every source pack."""
 import json
 import os
 import sys
@@ -413,67 +414,23 @@ W("")
 open(os.path.join(ROOT, "docs", "ASSET_MANIFEST.md"), "w", encoding="utf-8").write("\n".join(out))
 print("manifest lines:", len(out))
 
-# ============================================================================= CREDITS.md
-c = []
-C = c.append
-C("# Credits - Club & Grub")
-C("")
-C("Club & Grub is an original game. It contains no graphics, audio, level data or code from Prehistorik 2 or any other commercial game.")
-C("All third-party art, fonts and audio are listed below with their licence. Licence texts and the evidence recorded at download time are in `assets/licenses/`.")
-C("")
-C("## Art, fonts and audio")
-C("")
-C("| Pack | Author | Source | Licence | Used for |")
-C("|---|---|---|---|---|")
+# ============================================================================= CREDITS.md, assets/licenses/README.md
+# Both are maintained by hand since the release legal audit (author / URL corrections, the changes column, the engine
+# and FreeType notices, the licence-text index; see docs/THIRD_PARTY.md), so they are only checked here: every pack the
+# assets come from must be credited in both, by its source URL and its licence file.
+credits_md = open(os.path.join(ROOT, "CREDITS.md"), encoding="utf-8").read()
+licences_md = open(os.path.join(ASSETS, "licenses", "README.md"), encoding="utf-8").read()
+missing = []
 for r in CREDITS:
-    C("| %s | %s | %s | %s | %s |" % (r["title"], r["author"], r["url"], r["license"], r["use"]))
-C("")
-C("## Required attribution (tier B)")
-C("")
-C("The two TrueType fonts are licensed under the SIL Open Font License 1.1. The licence text ships with the game in `assets/licenses/googlefonts_pressstart2p.txt` and `assets/licenses/googlefonts_pixelifysans.txt`. Show these lines in the in-game credits:")
-C("")
-C("- \"Press Start 2P\" - Copyright 2012 The Press Start 2P Project Authors (cody@zone38.net), with Reserved Font Name \"Press Start 2P\". Licensed under the SIL Open Font License, Version 1.1.")
-C("- \"Pixelify Sans\" - Copyright 2021 The Pixelify Sans Project Authors (https://github.com/eifetx/Pixelify-Sans). Licensed under the SIL Open Font License, Version 1.1.")
-C("")
-C("The fonts are shipped unmodified under new file names (`press_start_2p.ttf`, `pixelify_sans.ttf`); they are not sold by themselves.")
-C("")
-C("## Courtesy credits (CC0 - attribution not required, given with thanks)")
-C("")
-names = []
-for r in CREDITS:
-    if r["tier"] == "A" and r["author"] not in names:
-        names.append(r["author"])
-C("Pixel art, sound and music by: " + "; ".join(names) + ".")
-C("")
-C("Suggested in-game wording: \"Art: Pixel-boy / Sparklin Labs (Superpowers Asset Packs), ARoachIFoundOnMyPillow, ghostpixxells, Pixel Frog, ansimuz. "
-  "Music: Juhani Junkala, MintoDog, Wolfgang_. Sound: Juhani Junkala, Sparklin Labs, MoxieCat, Basto, rubberduck, AntumDeluge, IgnasD, Ecrivain.\"")
-C("")
-C("## Modifications")
-C("")
-C("CC0 art was re-packed, recoloured, mirrored, composited and scaled by integer factors for this game; the complete edit log is section 14 of `docs/ASSET_MANIFEST.md`. Audio is used as published, except that six music tracks released only as WAV (Juhani Junkala's \"5 Chiptunes (Action)\" and Wolfgang_'s \"Bonus Round\") were transcoded to OGG Vorbis.")
-C("")
-C("## Engine")
-C("")
-C("Made with Godot Engine (MIT licence, https://godotengine.org/license). Godot's third-party notices must be included in exported builds (see the Godot documentation, \"Complying with licenses\").")
-C("")
-open(os.path.join(ROOT, "CREDITS.md"), "w", encoding="utf-8").write("\n".join(c))
-
-# ============================================================================= assets/licenses/README.md
-l = []
-L_ = l.append
-L_("# Licences of the third-party assets in this folder tree")
-L_("")
-L_("One text file per source pack. Each file names the author, the source URL, the licence, what the game uses from the pack, the exact licence wording captured from the source page on the download date, and the author's own licence file where one was shipped.")
-L_("`cc0_1.0_legal_code.txt` is the full Creative Commons Zero 1.0 legal code that the CC0 packs refer to.")
-L_("")
-L_("| File | Pack | Author | Licence | Tier |")
-L_("|---|---|---|---|---|")
-for r in CREDITS:
-    L_("| `%s` | %s | %s | %s | %s |" % (os.path.basename(r["file"]), r["title"], r["author"], r["license"], r["tier"]))
-L_("")
-L_("Tier A = CC0 / public domain (no obligation). Tier B = attribution or licence text must ship with the game (here: the two SIL OFL fonts). No tier C (custom / unclear licence) asset is used.")
-L_("")
-L_("Keep this folder in exported builds. Human-readable credits: `CREDITS.md` in the project root.")
-L_("")
-open(os.path.join(ASSETS, "licenses", "README.md"), "w", encoding="utf-8").write("\n".join(l))
-print("credits + licence readme written")
+    url = r["url"].split(" and ")[0]
+    if url not in credits_md:
+        missing.append("CREDITS.md lacks %s (%s)" % (r["title"], url))
+    if os.path.basename(r["file"]) not in licences_md:
+        missing.append("assets/licenses/README.md lacks %s" % os.path.basename(r["file"]))
+for name in ["godot_engine.txt", "godot_third_party.txt"]:
+    if not os.path.exists(os.path.join(ASSETS, "licenses", name)):
+        missing.append("assets/licenses/%s is missing (regenerate it from the engine, see assets/licenses/README.md)" % name)
+if missing:
+    print("\n".join("CREDITS CHECK: " + m for m in missing))
+    sys.exit(1)
+print("credits + licence readme checked: %d packs credited" % len(CREDITS))

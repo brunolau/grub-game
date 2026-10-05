@@ -1,0 +1,17 @@
+# w4_l2b "Colossus Hall" (Expert) with the SWIRLING AXE the campaign hero brings from Crystal Grotto: he jumps over
+# the axe at the checkpoint and beats the Wall Colossus with the swirling axe (thrown low from the slab, it curves up
+# into the head). Recorded against the tuned Colossus (wf4) like w4_l2b.inputs: no hit taken, all hearts left.
+# Antechamber: jump over the axe (the swirling axe stays in hand), the food, into the arena and onto the slab.
+18:R
+16:RU,46:R
+14:R,16:
+10:R,8:U,12:
+# The fight, from the obsidian slab (the Colossus wakes as the hero enters the hall; its first rock leaves 94 ticks
+# later): throw whenever its roar (the hurt pose) is over - also while it attacks, a hit never stops an attack -
+# hop the bouncing rocks, step out from under the rattling stalactites; the red rage pose is armoured.
+3:,4:R,6:,7:F,23:,12:F,19:,8:L,1:R,6:,8:RU,4:U,16:,5:R,4:,4:L,3:,1:R,2:,7:F,19:,7:F,24:,8:U,16:,7:F,12:
+7:F,19:,7:F,12:,8:L,1:R,6:,8:RU,4:U,16:,5:R,3:,4:L,2:,1:R,2:,7:F,21:,7:F,21:,7:F,21:,7:F,23:,14:U,8:,7:F
+12:,14:U,8:,7:F,21:,7:F,19:,7:F,24:,10:F,13:,12:LU,11:,3:R,8:RU,4:U,11:,7:F,21:,7:F,20:,11:F,20:,7:F,24:
+7:F,12:,14:U,8:,7:F,24:,7:F,21:,7:F,23:,14:U,8:,7:F,20:,7:F,24:,14:U,8:,7:F,24:,7:F,6:
+# The Colossus breaks and four trophies fly out with the bonus burst: one of them starts the ending.
+4:,1:R,21:,14:U,6:

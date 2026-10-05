@@ -55,6 +55,17 @@ func _sim_tick(phase: int) -> void:
 	elif not now and inside:
 		inside = false
 		_on_hero_exited(level, hero)
+		_doze_note()
+
+
+## Dozing (SimEntity, ARCHITECTURE.md 11): a zone the hero is not in only tests his feet point, which cannot enter
+## the rectangle while he is far; one he is in ticks (it must notice him leaving).
+func _doze_area() -> Rect2i:
+	return rect
+
+
+func _can_doze() -> bool:
+	return not inside
 
 
 func _on_level_reset() -> void:

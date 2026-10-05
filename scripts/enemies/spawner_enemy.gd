@@ -41,6 +41,18 @@ func is_copy() -> bool:
 	return _is_copy
 
 
+## Dozing (SimEntity, ARCHITECTURE.md 11): an untriggered record does nothing, and it cannot be triggered while the
+## hero and the view are far from what its trigger looks at.
+func _doze_area() -> Rect2i:
+	return super._doze_area() if _is_copy else _trigger_area()
+
+
+## What `_triggered()` looks at: the record's box against the view (the default, `is_in_view`), or a rectangle the
+## hero's feet must enter. Override together with `_triggered()`.
+func _trigger_area() -> Rect2i:
+	return get_box()
+
+
 ## Copies alive (record only; diagnostics and tests).
 func alive_copies() -> int:
 	return _alive

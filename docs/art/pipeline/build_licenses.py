@@ -1,5 +1,9 @@
 """Copy one licence text per source pack that is actually used into assets/licenses/ and collect
-the credit data (author, URL, licence) used by CREDITS.md and assets/licenses/README.md."""
+the credit data (author, URL, licence) that build_manifest.py checks CREDITS.md and assets/licenses/README.md against.
+
+CREDITS.md, assets/licenses/README.md, godot_engine.txt and godot_third_party.txt are maintained by hand (the legal
+audit of the release, docs/THIRD_PARTY.md) and are never written here. An author's FONTLOG is kept with the OFL text
+(the FONTLOG asks to be distributed with the font)."""
 import json
 import os
 import re
@@ -9,7 +13,9 @@ sys.path.insert(0, os.path.dirname(__file__))
 from common import *  # noqa
 
 OWN_FILES = ["REPO_LICENSE_CC0.txt", "OFL.txt", "INFO.txt", "License.txt", "LICENSE.txt", "_LICENSE.txt", "LICENSE & CREDITS.txt",
-             "license cc0 - public domain.txt", "README.txt"]
+             "license cc0 - public domain.txt", "README.txt", "FONTLOG.txt"]
+# How an author's file is introduced (default: "shipped by the author").
+OWN_NOTES = {"FONTLOG.txt": "shipped by the author; the FONTLOG asks to be distributed with the font"}
 
 # hand-checked overrides / additions (title, author, url, licence, tier, used for)
 META = {
@@ -43,11 +49,11 @@ META = {
         "CC0 1.0", "A", "world map, level select, final boss, credits, spare level music"),
     "mintodog_8bit-action-jingles": ("8bit Action Jingle & Mini Loop", "MintoDog", "https://opengameart.org/content/8bit-action-jingle-mini-loop",
         "CC0 1.0", "A", "level complete, death, game over and feast-mode jingles"),
-    "wolfgang_8bit-loops": ("Bonus Round - 8bit / 8-Bit Victory Loop", "Wolfgang_ (Ted Kerr)", "https://opengameart.org/content/bonus-round-8bit",
+    "wolfgang_8bit-loops": ("Bonus Round - 8bit / 8-Bit Victory Loop", "Wolfgang_ (Ted Kerr)", "https://opengameart.org/content/bonus-round-8bit and https://opengameart.org/content/8-bit-victory-loop",
         "CC0 1.0", "A", "bonus stage alternate, tally loop"),
     "moxiecat_8bit-platformer-sfx": ("8-bit Platformer SFX", "MoxieCat", "https://opengameart.org/content/8-bit-platformer-sfx-0", "CC0 1.0", "A",
         "head bounce / spring"),
-    "basto_nes-sounds": ("NES Sounds", "Basto", "https://opengameart.org/content/nes-sounds", "CC0 1.0", "A", "splash, exit chime"),
+    "basto_nes-sounds": ("NES Sounds", "Baŝto", "https://opengameart.org/content/nes-sounds", "CC0 1.0", "A", "splash, exit chime"),
     "rubberduck_40-cc0-water-splash-slime-sfx": ("40 CC0 water / splash / slime SFX", "rubberduck",
         "https://opengameart.org/content/40-cc0-water-splash-slime-sfx", "CC0 1.0", "A", "lava bubbling loop"),
     "rubberduck_80-cc0-creature-sfx": ("80 CC0 creature SFX", "rubberduck", "https://opengameart.org/content/80-cc0-creature-sfx", "CC0 1.0", "A",
@@ -55,7 +61,7 @@ META = {
     "antumdeluge_fire-crackling": ("Fire Crackling", "AntumDeluge", "https://opengameart.org/content/fire-crackling", "CC0 1.0", "A", "campfire loop"),
     "ignasd_ice-shatters": ("Ice breaking/shattering", "IgnasD", "https://opengameart.org/content/ice-breakingshattering", "CC0 1.0", "A",
         "ice block smash"),
-    "misc-cc0-level-themes": ("Icy Heights (wind ambience)", "Ecrivain", "https://opengameart.org/content/icy-heights", "CC0 1.0", "A",
+    "misc-cc0-level-themes": ("Icy Heights (wind ambience)", "Écrivain", "https://opengameart.org/content/icy-heights", "CC0 1.0", "A",
         "blizzard wind loop (only ecrivain_icy-heights_wind.ogg is used from this staging folder)"),
 }
 
@@ -103,14 +109,15 @@ def build_licenses():
             depth = os.path.relpath(d, folder).count(os.sep)
             if depth > 2:
                 continue
-            for f in files:
+            # The licence first, the FONTLOG after it.
+            for f in sorted(files, key=lambda name: (name == "FONTLOG.txt", name)):
                 if f in OWN_FILES and not (f == "REPO_LICENSE_CC0.txt"):
                     try:
                         txt = open(os.path.join(d, f), encoding="utf-8", errors="replace").read()
                     except OSError:
                         continue
                     if len(txt) < 20000:
-                        parts.append("---- %s (shipped by the author) ----\n\n%s\n" % (f, txt.strip()))
+                        parts.append("---- %s (%s) ----\n\n%s\n" % (f, OWN_NOTES.get(f, "shipped by the author"), txt.strip()))
         name = p.replace("-", "_") + ".txt"
         open(os.path.join(dst, name), "w", encoding="utf-8").write("\n".join(parts))
         rows.append({"pack": p, "file": "assets/licenses/" + name, "title": title, "author": author, "url": url, "license": lic, "tier": tier, "use": use})

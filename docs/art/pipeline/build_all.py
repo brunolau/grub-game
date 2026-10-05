@@ -3,7 +3,9 @@
 Order matters: tiles first (the Colossus rim uses the obsidian atlas), sprites before items (icon / splash use the hero).
 Run with the project venv:  .tools/venv/Scripts/python.exe docs/art/pipeline/build_all.py
 Inputs : .tools/asset_candidates/**            (staging area, not in git)
-Outputs: assets/**, docs/art/mock_*.png, docs/ASSET_MANIFEST.md, CREDITS.md, assets/licenses/**
+Outputs: assets/**, docs/art/mock_*.png, docs/ASSET_MANIFEST.md, the per-pack files of assets/licenses/
+CREDITS.md, assets/licenses/README.md and the engine notices (assets/licenses/godot_*.txt) are maintained by hand: they
+are never deleted or rewritten, and build_manifest.py fails when a pack is missing from them.
 """
 import os
 import shutil
@@ -17,7 +19,16 @@ STEPS = ["build_tiles.py", "build_sprites.py", "build_env.py", "build_items.py",
 
 if __name__ == "__main__":
     if "--clean" in sys.argv:
-        shutil.rmtree(os.path.join(ROOT, "assets"), ignore_errors=True)
+        # Everything under assets/ except the licence folder (hand-maintained notices live there).
+        assets = os.path.join(ROOT, "assets")
+        for name in os.listdir(assets) if os.path.isdir(assets) else []:
+            if name == "licenses":
+                continue
+            path = os.path.join(assets, name)
+            if os.path.isdir(path):
+                shutil.rmtree(path, ignore_errors=True)
+            else:
+                os.remove(path)
         reg = os.path.join(HERE, "registry.json")
         if os.path.exists(reg):
             os.remove(reg)

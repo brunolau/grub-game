@@ -5,6 +5,8 @@ extends SceneTree
 ##   godot --headless --path . -s res://tests/run_tests.gd
 ##   godot --headless --path . -s res://tests/run_tests.gd -- --filter=player     (file names containing "player")
 ##   godot --headless --path . -s res://tests/run_tests.gd -- --verbose           (list every passing test)
+##   godot --headless --path . -s res://tests/run_tests.gd -- --filter=campaign --only=world_2   (only the test
+##       methods whose name contains "world_2"; with gd.sh: bash .tools/gd.sh test campaign --only=world_2)
 ##   godot --headless --path . -s res://tests/run_tests.gd -- --user-dir=res://build/test_user_2   (parallel runs)
 ##
 ## Discovers `res://tests/test_*.gd`, runs every `test_*` method of each file (see TestCase) and exits with
@@ -57,6 +59,7 @@ func _run() -> void:
 	var options: Dictionary = _parse_args(OS.get_cmdline_user_args())
 	var filter: String = str(options.get("filter", ""))
 	var verbose: bool = options.has("verbose")
+	var only: String = str(options.get("only", ""))
 	_redirect_user_data(str(options.get("user-dir", TEST_USER_DIR)))
 	OS.add_logger(_counter)
 	var files: PackedStringArray = _discover(filter)
@@ -86,6 +89,8 @@ func _run() -> void:
 		for method: Dictionary in script.get_script_method_list():
 			var method_name: String = method["name"]
 			if not method_name.begins_with(TEST_PREFIX):
+				continue
+			if not only.is_empty() and not method_name.contains(only):
 				continue
 			_counter.reset()
 			test.call("_begin_test")

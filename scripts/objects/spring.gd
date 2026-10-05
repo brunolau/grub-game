@@ -30,6 +30,16 @@ func _apply_params(params: Dictionary) -> void:
 	_sprite = get_node_or_null(^"Sprite") as Sprite2D
 
 
+## Dozing (SimEntity, ARCHITECTURE.md 11): at rest it only tests the overlap with the hero, which fails while he is
+## far away.
+func _doze_area() -> Rect2i:
+	return _doze_box()
+
+
+func _can_doze() -> bool:
+	return _anim < 0
+
+
 func _sim_tick(_phase: int) -> void:
 	if _anim >= 0:
 		_anim += 1
@@ -37,6 +47,7 @@ func _sim_tick(_phase: int) -> void:
 		if frame >= BOUNCE_FRAMES.size():
 			_anim = -1
 			frame = BOUNCE_FRAMES.size() - 1
+			_doze_note()
 		if _sprite != null:
 			_sprite.frame = BOUNCE_FRAMES[frame]
 	var level: LevelBase = Game.level

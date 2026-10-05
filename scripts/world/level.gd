@@ -34,6 +34,8 @@ var _dark_ticks: int = 0
 var _dark_ticks_prev: int = 0
 var _respawn_pending: bool = false
 var _reported: Dictionary = {}
+## Cells whose tile layers must be painted again (set_cell), as Vector2i -> true.
+var _repaint: Dictionary = {}
 
 @onready var _parallax: WorldParallax = $Parallax
 @onready var _back_tiles: TileMapLayer = $BackTiles
@@ -72,6 +74,7 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	_flush_repaint()
 	var alpha: float = Sim.alpha
 	var view_art: Vector2 = Vector2(_camera_logic.view * Tuning.ART_SCALE)
 	var x: float = lerpf(float(_camera_logic.prev.x), float(_camera_logic.pos.x), alpha) * Tuning.ART_SCALE
@@ -137,6 +140,9 @@ func get_container(category: String) -> Node:
 	return _objects
 
 
+## Collision and the tile codes change at once; the three tile layers of the cell and its neighbours (auto-tiling)
+## are painted again before the next frame is drawn ([method _flush_repaint]): a rising column changes many cells
+## in one tick, and painting each neighbourhood at once painted most cells several times, inside the tick.
 func set_cell(col: int, row: int, ch: String) -> void:
 	super.set_cell(col, row, ch)
 	if not grid.in_bounds(col, row):
@@ -144,7 +150,7 @@ func set_cell(col: int, row: int, ch: String) -> void:
 	_looks.set_code(col, row, grid.get_char(col, row))
 	for r: int in range(row - 1, row + 2):
 		for c: int in range(col - 1, col + 2):
-			_paint_cell(c, r)
+			_repaint[Vector2i(c, r)] = true
 
 
 func set_cell_look(col: int, row: int, atlas_index: int) -> void:
@@ -152,6 +158,15 @@ func set_cell_look(col: int, row: int, atlas_index: int) -> void:
 		return
 	_looks.set_look(col, row, atlas_index)
 	_paint_cell(col, row)
+
+
+## Paint the cells changed by [method set_cell] since the last frame (each cell once).
+func _flush_repaint() -> void:
+	if _repaint.is_empty():
+		return
+	for cell: Vector2i in _repaint:
+		_paint_cell(cell.x, cell.y)
+	_repaint.clear()
 
 
 ## Switch darkness on or off; the palette fades over Tuning.DARKNESS_FADE_TICKS ticks (phase WORLD). Lights going
@@ -232,6 +247,7 @@ func set_view_size(size_art: Vector2i) -> void:
 
 ## The look painted at a cell of a layer ("back", "main" or "front"): LevelTiles look value, -1 = nothing.
 func get_painted_look(col: int, row: int, layer: String = "main") -> int:
+	_flush_repaint()
 	var map: TileMapLayer = _tiles
 	if layer == "back":
 		map = _back_tiles

@@ -16,7 +16,8 @@
 # The lull: on to pillar 3, then up the floe to the eagle ledge (secret).
 6:R,20:RU,6:
 6:R,20:RU,6:,10:R,6:
-# Drop onto pillar 4 (checkpoint, on grippy rock) and hop to the shore before the third gust.
+# The ledge's checkpoint is touched on the way (rock grips); jump from the ledge straight past pillar 4 to the shore
+# before the third gust.
 3:R,16:,20:RU,10:
 # B4 The third gust (strong): crouch on the ice shore and break the ice blocks in the floor with low strikes.
 10:DF,6:D,10:DF,6:D,10:DF,6:D,10:DF,6:D
@@ -42,5 +43,5 @@
 10:R,8:,8:F,6:,8:F,6:
 # Two rock spots and the big spot in front of the hut, then into the exit.
 26:R,8:,10:DF,6:,10:DF,6:,10:DF,6:
-30:R,8:,10:DF,6:,10:DF,6:,10:DF,6:,10:DF,2:,8:L,26:
-60:R
+10:R,8:,10:DF,6:,10:DF,6:,10:DF,6:,10:DF,2:,8:L,30:
+70:R

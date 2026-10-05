@@ -52,9 +52,10 @@
 # The cracked wall at this ledge hides the warp room (secret): throw it open, take the code stone and the ring, leave the warp staff.
 4:R,6:,8:F,8:,8:F,8:,8:F,14:
 22:R,8:,30:L,8:
-# On up: letter B on the left ledge, the dart dives from the shaft top (throw up at it).
+# On up: letter B on the left ledge completes the word: the jackpot chest bounces off the hero's head and lands
+# beside him - a step right takes it. The dart dives from the shaft top (throw up at it).
 2:L,18:LU,8:
-54:
+1:R,53:
 1:R,8:UF,6:,8:UF,6:,8:UF,6:,8:UF,6:
 # Up onto the last ledge: throw up at the dart diving from the shaft top, open the three spots in the gallery floor, walk into the exit.
 4:R,18:RU,4:,8:UF,6:,8:UF,6:,8:UF,6:,8:R,8:,10:DF,6:,10:DF,6:,10:DF,6:,60:R

@@ -3,16 +3,26 @@ extends TestCase
 ##
 ## Data-driven: ROUTES describes every input script in tools/autoplay/routes (test_every_route_file_is_described
 ## fails for a file without an entry). Each route is replayed through Flow and the real level scene from a fresh
-## run with the default seed, tick for tick as the windowed game plays it (`gd.sh play --flow=...` with
-## `play_file`, or `--autoplay=<id> --inputs-file=...`), on every difficulty it was recorded for, and must reach
-## the documented outcome: how the level ends (exit totem, warp, trophy - or nowhere for a side path), what
-## follows (tally, linked stage, bonus stage, The End), and the checks of its `expect` block.
+## run with the default seed, holding the weapon it was recorded for, tick for tick as the windowed game plays it
+## (`gd.sh play --flow=...` with `start_level`, `weapon` and `play_file`, or `--autoplay=<id> --weapon=<name>
+## --inputs-file=...`), on every difficulty it was recorded for, and must reach the documented outcome: how the level
+## ends (exit totem, warp, trophy - or nowhere for a side path), what follows (tally, linked stage, bonus stage, The
+## End), the checks of its `expect` block, and no engine warning or error.
+##
+## The weapon matrix: a run keeps its weapon from stage to stage (GAMEPLAY.md 8.1) and a stage started from its code
+## begins with the club, so every stage must be finishable with every weapon a player can hold when entering it, on
+## every difficulty it exists in. A swing locks the hero for the weapon's recovery (club 2 ticks, hammer and axe 6,
+## swirling axe 12) and only the axe and the swirling axe are thrown, so each (stage, difficulty, weapon) cell has a
+## route of its own, `<id>[.expert].<weapon>.inputs` (the club route keeps the plain name).
+## test_every_weapon_a_run_can_bring_has_a_route derives the weapons on entry from where the weapons lie (PICKUPS,
+## checked against the level files) and demands exactly one route per cell.
 ##
 ## The two campaign tests then play the WHOLE game in one run per difficulty, with everything a real run carries
 ## from level to level (score, lives, weapon, letters): every map stop in order, a bonus stage through its warp,
 ## both bosses, the tally after every level, the unlocks and records of the save file, the expert wall at the end
-## of a Beginner run and the ending stage, The End and the completion flag of an Expert run. They are the headless
-## twins of tools/autoplay/campaign.flow and campaign_beginner.flow.
+## of a Beginner run and the ending stage, The End and the completion flag of an Expert run. Every stage is played
+## with the route of the weapon the run really carries at that point (no weapon is ever handed over). They are the
+## headless twins of tools/autoplay/campaign.flow and campaign_beginner.flow.
 ##
 ## Route-building aids (no tests of their own; the route and campaign tests are skipped while one runs):
 ##   CAMPAIGN_PROBE=<route file> [CAMPAIGN_DIFF=expert] [CAMPAIGN_EVERY=n] [CAMPAIGN_WEAPON=<Defs.Weapon>]
@@ -21,32 +31,51 @@ extends TestCase
 ##   CAMPAIGN_ADAPT=<route file> CAMPAIGN_WEAPON=<n> [CAMPAIGN_ABSORB=1]   pad a route by another weapon's longer swing
 ##       recovery (made w4_l2.boomerang.inputs) -> build/adapt/<route file>
 ##   CAMPAIGN_REPAIR=<route file> CAMPAIGN_WEAPON=<n>   re-time a route for another weapon drift by drift against
-##       the recorded weapon's replay -> build/adapt/<route file> (it gets Bone Gorge with the hammer through the cave
-##       and the stepping stones, then needs a hand at the bone field)
+##       the recorded weapon's replay -> build/adapt/<route file>
+## More route tools: tests/test_route_tools.gd (WEAPONS_* sync / adapt / probe jobs) and tests/test_enemies_colossus.gd
+## (ARMS_* repair and Colossus bot aids).
 
 const ROUTE_DIR: String = "res://tools/autoplay/routes/"
 ## Logical view of the 1280 x 720 game window (integer scale 2): enemies wake by the view.
 const VIEW: Vector2i = Vector2i(Tuning.VIEW_W, Tuning.VIEW_H)
 const BEGINNER: String = "beginner"
 const EXPERT: String = "expert"
+const CLUB: int = Defs.Weapon.CLUB
+const HAMMER: int = Defs.Weapon.HAMMER
+const AXE: int = Defs.Weapon.AXE
+const BOOMERANG: int = Defs.Weapon.BOOMERANG
+const WEAPON_NAMES: Array[String] = ["club", "hammer", "axe", "boomerang"]
 ## Letter indices of the bonus word G-R-U-B-S.
 const ALL_LETTERS: Array[int] = [0, 1, 2, 3, 4]
+## A Colossus fight (from its waking to its last hit) takes 45 to 90 seconds.
+const COLOSSUS_FIGHT: Array[int] = [1092, 2185]
+
+## Every stage a run can be in, in the order a run meets them (map stops, their linked stages, the bonus stages
+## behind their source level, the ending).
+const STAGE_ORDER: Array[String] = ["w1_l1", "w1_l2", "bonus_a", "w2_l1", "bonus_b", "w2_l2", "w2_l2b", "w3_l1",
+	"w3_l1b", "w3_l2", "bonus_c", "w4_l1", "w4_l2", "w4_l2b", "ending"]
+## Where the weapons lie (test_every_weapon_a_run_can_bring_has_a_route checks it against the level files). A stage
+## can be entered with the club (a new run, a level code) and every weapon that lies in a stage before it.
+const PICKUPS: Dictionary = {"w1_l2": AXE, "w2_l1": HAMMER, "w3_l2": BOOMERANG, "w4_l2b": AXE}
 
 ## Every route file. Keys of an entry:
 ##   level      the level the route starts in
 ##   modes      difficulties it is played on
+##   weapon     weapon (Defs.Weapon) the hero holds when the route starts; default: the club of a new run
+##   side       true: a side path (no cell of the weapon matrix; the campaign may name it)
 ##   prefix     [route file, marker]: a side path; that route (or "@route", the level's route on the mode played)
 ##              is played first up to its first line that starts with the marker
-##   chained    true: played only after the route that leads into its level (an entry's `then`), never alone
-##   weapon     weapon (Defs.Weapon) the hero carries when the route starts; default: the club of a new run
+##   chained    true: played after the route that leads into its level (an entry's `then`)
+##   alone      with `chained`: also played from a fresh start (the stage's level code starts it)
 ##   source     bonus stages: the main level whose warp leads in (the stage is entered as that warp enters it)
 ##   leaves     how the level must end: "exit", "warp", "trophy"; "" = a side path that stops anywhere
 ##   after      what must follow: "tally" or "level:<id>"
-##   then       route file played in the stage that follows (a linked sub-stage, or the stage after a trophy)
+##   then       route file played in the stage that follows (a linked sub-stage, or the stage after a trophy); its
+##              weapon is the one this route ends with
 ##   tally_to   after the tally (bonus stages, ending): "map:<id>", "expert_wall" or "the_end", per mode name
-##   expect     checks, see _check_expectations()
+##   expect     checks, see _check_expectations(); every route is also checked for engine warnings and errors
 const ROUTES: Dictionary = {
-	# --- World 1 ------------------------------------------------------------------------------------------------
+	# --- World 1: the club on entry, the axe lies in Canopy Village ---------------------------------------------
 	"w1_l1.inputs": {"level": "w1_l1", "modes": [BEGINNER], "leaves": "exit", "after": "tally",
 		"expect": {"hurts": 0, "min_checkpoints": 1, "min_spots": 20, "letters": [1, 3, 4]}},
 	"w1_l1.expert.inputs": {"level": "w1_l1", "modes": [EXPERT], "leaves": "exit", "after": "tally",
@@ -57,41 +86,118 @@ const ROUTES: Dictionary = {
 		"expect": {"hurts": 0, "min_secrets": 1, "letters": [2], "min_checkpoints": 1, "lives_gained": 1}},
 	"w1_l2.inputs": {"level": "w1_l2", "modes": [BEGINNER], "leaves": "exit", "after": "tally",
 		"expect": {"hurts": 0, "min_checkpoints": 1, "min_spots": 10, "letters": ALL_LETTERS, "words": 1,
-			"weapon_end": Defs.Weapon.AXE}},
+			"weapon_end": AXE}},
 	"w1_l2.expert.inputs": {"level": "w1_l2", "modes": [EXPERT], "leaves": "exit", "after": "tally",
 		"expect": {"hurts": 0, "min_checkpoints": 1, "min_spots": 10, "letters": ALL_LETTERS, "words": 1,
-			"weapon_end": Defs.Weapon.AXE}},
-	"w1_l2.warp.inputs": {"level": "w1_l2", "modes": [BEGINNER, EXPERT], "leaves": "warp", "after": "level:bonus_a",
-		"expect": {"hurts": 0, "min_secrets": 2}},
-	# --- World 2 ------------------------------------------------------------------------------------------------
+			"weapon_end": AXE}},
+	# The campaign's way: up to the crow's nest and through the warp into Feast Land A, with the axe.
+	"w1_l2.warp.inputs": {"level": "w1_l2", "modes": [BEGINNER, EXPERT], "side": true, "leaves": "warp",
+		"after": "level:bonus_a", "expect": {"hurts": 0, "min_secrets": 2, "weapon_end": AXE}},
+	# --- Feast Land A: club or axe ------------------------------------------------------------------------------
+	"bonus_a.inputs": {"level": "bonus_a", "modes": [BEGINNER, EXPERT], "source": "w1_l2", "leaves": "warp",
+		"after": "tally", "tally_to": {BEGINNER: "map:w2_l1", EXPERT: "map:w2_l1"},
+		"expect": {"no_enemies": true, "ticks": [1092, 2185], "min_score": 150000, "min_spots": 8}},
+	"bonus_a.axe.inputs": {"level": "bonus_a", "modes": [BEGINNER, EXPERT], "source": "w1_l2", "weapon": AXE,
+		"leaves": "warp", "after": "tally", "tally_to": {BEGINNER: "map:w2_l1", EXPERT: "map:w2_l1"},
+		"expect": {"no_enemies": true, "ticks": [1092, 2185], "min_score": 150000, "min_spots": 8}},
+	# --- Echo Caverns: club or axe, the hammer lies inside ------------------------------------------------------
 	"w2_l1.inputs": {"level": "w2_l1", "modes": [BEGINNER], "leaves": "exit", "after": "tally",
-		"expect": {"weapon_end": Defs.Weapon.HAMMER, "secrets": 4, "gates": 4, "letters": ALL_LETTERS, "words": 1,
+		"expect": {"weapon_end": HAMMER, "secrets": 4, "gates": 4, "letters": ALL_LETTERS, "words": 1,
 			"min_checkpoints": 4, "min_spots": 25, "ticks": [2200, 4400], "min_completion": 80}},
+	"w2_l1.axe.inputs": {"level": "w2_l1", "modes": [BEGINNER], "weapon": AXE, "leaves": "exit", "after": "tally",
+		"expect": {"weapon_end": HAMMER, "secrets": 4, "gates": 4, "letters": ALL_LETTERS, "words": 1,
+			"min_checkpoints": 4, "min_spots": 25, "ticks": [2200, 4400], "min_completion": 80, "hurts": 0}},
 	"w2_l1.expert.inputs": {"level": "w2_l1", "modes": [EXPERT], "leaves": "exit", "after": "tally",
-		"expect": {"weapon_end": Defs.Weapon.HAMMER, "secrets": 4, "gates": 4, "letters": ALL_LETTERS, "words": 1,
+		"expect": {"weapon_end": HAMMER, "secrets": 4, "gates": 4, "letters": ALL_LETTERS, "words": 1,
 			"min_checkpoints": 4, "min_spots": 25, "ticks": [2200, 4400], "min_completion": 80}},
+	"w2_l1.expert.axe.inputs": {"level": "w2_l1", "modes": [EXPERT], "weapon": AXE, "leaves": "exit",
+		"after": "tally",
+		"expect": {"weapon_end": HAMMER, "secrets": 4, "gates": 4, "letters": ALL_LETTERS, "words": 1,
+			"min_checkpoints": 4, "min_spots": 25, "ticks": [2200, 4400], "min_completion": 80, "hurts": 0}},
+	# --- Feast Land B: club, axe or hammer ----------------------------------------------------------------------
+	"bonus_b.inputs": {"level": "bonus_b", "modes": [BEGINNER, EXPERT], "source": "w2_l1", "leaves": "warp",
+		"after": "tally", "tally_to": {BEGINNER: "map:w2_l2", EXPERT: "map:w2_l2"},
+		"expect": {"no_enemies": true, "ticks": [1092, 2185], "min_score": 100000, "min_spots": 8}},
+	"bonus_b.axe.inputs": {"level": "bonus_b", "modes": [BEGINNER, EXPERT], "source": "w2_l1", "weapon": AXE,
+		"leaves": "warp", "after": "tally", "tally_to": {BEGINNER: "map:w2_l2", EXPERT: "map:w2_l2"},
+		"expect": {"no_enemies": true, "ticks": [1092, 2185], "min_score": 100000, "min_spots": 8}},
+	"bonus_b.hammer.inputs": {"level": "bonus_b", "modes": [BEGINNER, EXPERT], "source": "w2_l1", "weapon": HAMMER,
+		"leaves": "warp", "after": "tally", "tally_to": {BEGINNER: "map:w2_l2", EXPERT: "map:w2_l2"},
+		"expect": {"no_enemies": true, "ticks": [1092, 2185], "min_score": 100000, "min_spots": 8}},
+	# --- Bone Gorge and the Brute's Den: club, axe or hammer --------------------------------------------------------
 	"w2_l2.inputs": {"level": "w2_l2", "modes": [BEGINNER], "leaves": "exit", "after": "level:w2_l2b",
 		"then": "w2_l2b.inputs",
+		"expect": {"glider": true, "letters": [0, 1, 2, 4], "min_secrets": 1, "gates": 2}},
+	"w2_l2.axe.inputs": {"level": "w2_l2", "modes": [BEGINNER], "weapon": AXE, "leaves": "exit",
+		"after": "level:w2_l2b", "then": "w2_l2b.axe.inputs",
+		"expect": {"glider": true, "letters": [0, 1, 2, 4], "min_secrets": 1, "gates": 2}},
+	"w2_l2.hammer.inputs": {"level": "w2_l2", "modes": [BEGINNER], "weapon": HAMMER, "leaves": "exit",
+		"after": "level:w2_l2b", "then": "w2_l2b.hammer.inputs",
 		"expect": {"glider": true, "letters": [0, 1, 2, 4], "min_secrets": 1, "gates": 2}},
 	"w2_l2.expert.inputs": {"level": "w2_l2", "modes": [EXPERT], "leaves": "exit", "after": "level:w2_l2b",
 		"then": "w2_l2b.expert.inputs",
 		"expect": {"glider": true, "letters": [0, 1, 2, 4], "min_secrets": 1, "gates": 2}},
-	"w2_l2b.inputs": {"level": "w2_l2b", "modes": [BEGINNER], "chained": true, "leaves": "exit", "after": "tally",
-		"expect": {"boss_hits": 2, "unlocked": true, "pair_ticks": [2200, 4400]}},
-	# The campaign hero brings the hammer of Echo Caverns into the den; the Expert fight is recorded with it.
-	"w2_l2b.expert.inputs": {"level": "w2_l2b", "modes": [EXPERT], "chained": true, "weapon": Defs.Weapon.HAMMER,
-		"leaves": "exit", "after": "tally", "expect": {"boss_hits": 3, "unlocked": true, "pair_ticks": [2200, 4400]}},
-	# --- World 3 ------------------------------------------------------------------------------------------------
+	"w2_l2.expert.axe.inputs": {"level": "w2_l2", "modes": [EXPERT], "weapon": AXE, "leaves": "exit",
+		"after": "level:w2_l2b", "then": "w2_l2b.expert.axe.inputs",
+		"expect": {"glider": true, "letters": [0, 1, 2, 4], "min_secrets": 1, "gates": 2}},
+	"w2_l2.expert.hammer.inputs": {"level": "w2_l2", "modes": [EXPERT], "weapon": HAMMER, "leaves": "exit",
+		"after": "level:w2_l2b", "then": "w2_l2b.expert.hammer.inputs",
+		"expect": {"glider": true, "letters": [0, 1, 2, 4], "min_secrets": 1, "gates": 2}},
+	# The Brute takes two hits with any weapon on Beginner (150 hp); on Expert (250 hp) three charged club strikes, two
+	# charged hammer strikes and a plain one, or three charged axe throws and a plain one.
+	"w2_l2b.inputs": {"level": "w2_l2b", "modes": [BEGINNER], "chained": true, "alone": true, "leaves": "exit",
+		"after": "tally", "expect": {"boss_hits": 2, "unlocked": true, "pair_ticks": [2200, 4400]}},
+	"w2_l2b.axe.inputs": {"level": "w2_l2b", "modes": [BEGINNER], "chained": true, "alone": true, "weapon": AXE,
+		"leaves": "exit", "after": "tally",
+		"expect": {"boss_hits": 2, "unlocked": true, "pair_ticks": [2200, 4400], "hurts": 0}},
+	"w2_l2b.hammer.inputs": {"level": "w2_l2b", "modes": [BEGINNER], "chained": true, "alone": true,
+		"weapon": HAMMER, "leaves": "exit", "after": "tally",
+		"expect": {"boss_hits": 2, "unlocked": true, "pair_ticks": [2200, 4400], "hurts": 0}},
+	"w2_l2b.expert.inputs": {"level": "w2_l2b", "modes": [EXPERT], "chained": true, "alone": true, "leaves": "exit",
+		"after": "tally", "expect": {"boss_hits": 3, "unlocked": true, "pair_ticks": [2200, 4400], "hurts": 0}},
+	"w2_l2b.expert.axe.inputs": {"level": "w2_l2b", "modes": [EXPERT], "chained": true, "alone": true,
+		"weapon": AXE, "leaves": "exit", "after": "tally",
+		"expect": {"boss_hits": 4, "unlocked": true, "pair_ticks": [2200, 4400], "hurts": 0}},
+	"w2_l2b.expert.hammer.inputs": {"level": "w2_l2b", "modes": [EXPERT], "chained": true, "alone": true,
+		"weapon": HAMMER, "leaves": "exit", "after": "tally",
+		"expect": {"boss_hits": 3, "unlocked": true, "pair_ticks": [2200, 4400], "hurts": 0}},
+	# --- Frost Summit and Blizzard Pass: club, axe or hammer --------------------------------------------------------
 	"w3_l1.inputs": {"level": "w3_l1", "modes": [BEGINNER], "leaves": "exit", "after": "level:w3_l1b",
-		"then": "w3_l1b.inputs", "expect": {"min_secrets": 3, "min_checkpoints": 4, "min_spots": 15}},
+		"then": "w3_l1b.inputs", "expect": {"min_secrets": 3, "min_checkpoints": 4, "min_spots": 15,
+			"letters": ALL_LETTERS, "jackpots": 1, "hurts": 0}},
+	"w3_l1.axe.inputs": {"level": "w3_l1", "modes": [BEGINNER], "weapon": AXE, "leaves": "exit",
+		"after": "level:w3_l1b", "then": "w3_l1b.axe.inputs", "expect": {"min_secrets": 3, "min_checkpoints": 4,
+			"min_spots": 15, "letters": ALL_LETTERS, "jackpots": 1, "hurts": 0}},
+	"w3_l1.hammer.inputs": {"level": "w3_l1", "modes": [BEGINNER], "weapon": HAMMER, "leaves": "exit",
+		"after": "level:w3_l1b", "then": "w3_l1b.hammer.inputs", "expect": {"min_secrets": 3, "min_checkpoints": 4,
+			"min_spots": 15, "letters": ALL_LETTERS, "jackpots": 1, "hurts": 0}},
 	"w3_l1.expert.inputs": {"level": "w3_l1", "modes": [EXPERT], "leaves": "exit", "after": "level:w3_l1b",
-		"then": "w3_l1b.expert.inputs", "expect": {"min_secrets": 3, "min_checkpoints": 4, "min_spots": 15}},
-	"w3_l1b.inputs": {"level": "w3_l1b", "modes": [BEGINNER], "chained": true, "leaves": "exit", "after": "tally",
-		"expect": {"min_wind": 40, "min_secrets": 2, "lives_gained": 1, "min_completion": 70,
-			"pair_ticks": [2200, 99999]}},
-	"w3_l1b.expert.inputs": {"level": "w3_l1b", "modes": [EXPERT], "chained": true, "leaves": "exit",
-		"after": "tally", "expect": {"min_wind": 40, "min_secrets": 1, "lives_gained": 1, "min_completion": 70,
-			"pair_ticks": [2200, 99999]}},
+		"then": "w3_l1b.expert.inputs", "expect": {"min_secrets": 3, "min_checkpoints": 4, "min_spots": 15,
+			"letters": ALL_LETTERS, "jackpots": 1, "max_hurts": 2}},
+	"w3_l1.expert.axe.inputs": {"level": "w3_l1", "modes": [EXPERT], "weapon": AXE, "leaves": "exit",
+		"after": "level:w3_l1b", "then": "w3_l1b.expert.axe.inputs", "expect": {"min_secrets": 3,
+			"min_checkpoints": 4, "min_spots": 15, "letters": ALL_LETTERS, "jackpots": 1, "max_hurts": 2}},
+	"w3_l1.expert.hammer.inputs": {"level": "w3_l1", "modes": [EXPERT], "weapon": HAMMER, "leaves": "exit",
+		"after": "level:w3_l1b", "then": "w3_l1b.expert.hammer.inputs", "expect": {"min_secrets": 3,
+			"min_checkpoints": 4, "min_spots": 15, "letters": ALL_LETTERS, "jackpots": 1, "max_hurts": 2}},
+	"w3_l1b.inputs": {"level": "w3_l1b", "modes": [BEGINNER], "chained": true, "alone": true, "leaves": "exit",
+		"after": "tally", "expect": {"min_wind": 40, "min_secrets": 2, "min_checkpoints": 2, "lives_gained": 1,
+			"min_completion": 70, "pair_ticks": [2200, 99999], "hurts": 0}},
+	"w3_l1b.axe.inputs": {"level": "w3_l1b", "modes": [BEGINNER], "chained": true, "alone": true, "weapon": AXE,
+		"leaves": "exit", "after": "tally", "expect": {"min_wind": 40, "min_secrets": 2, "min_checkpoints": 2,
+			"lives_gained": 1, "min_completion": 70, "pair_ticks": [2200, 99999], "hurts": 0}},
+	"w3_l1b.hammer.inputs": {"level": "w3_l1b", "modes": [BEGINNER], "chained": true, "alone": true,
+		"weapon": HAMMER, "leaves": "exit", "after": "tally", "expect": {"min_wind": 40, "min_secrets": 2,
+			"min_checkpoints": 2, "lives_gained": 1, "min_completion": 70, "pair_ticks": [2200, 99999], "hurts": 0}},
+	"w3_l1b.expert.inputs": {"level": "w3_l1b", "modes": [EXPERT], "chained": true, "alone": true, "leaves": "exit",
+		"after": "tally", "expect": {"min_wind": 40, "min_secrets": 1, "min_checkpoints": 2, "lives_gained": 1,
+			"min_completion": 70, "pair_ticks": [2200, 99999], "hurts": 0}},
+	"w3_l1b.expert.axe.inputs": {"level": "w3_l1b", "modes": [EXPERT], "chained": true, "alone": true,
+		"weapon": AXE, "leaves": "exit", "after": "tally", "expect": {"min_wind": 40, "min_secrets": 1,
+			"min_checkpoints": 2, "lives_gained": 1, "min_completion": 70, "pair_ticks": [2200, 99999], "hurts": 0}},
+	"w3_l1b.expert.hammer.inputs": {"level": "w3_l1b", "modes": [EXPERT], "chained": true, "alone": true,
+		"weapon": HAMMER, "leaves": "exit", "after": "tally", "expect": {"min_wind": 40, "min_secrets": 1,
+			"min_checkpoints": 2, "lives_gained": 1, "min_completion": 70, "pair_ticks": [2200, 99999], "hurts": 0}},
 	# The routes take the sky path over the icicle overhang; the valley under it must be passable too.
 	"w3_l1.valley.inputs": {"level": "w3_l1", "modes": [BEGINNER, EXPERT], "prefix": ["@route", "# S4"],
 		"leaves": "", "expect": {"hero_min_x": 169 * 16}},
@@ -100,85 +206,129 @@ const ROUTES: Dictionary = {
 		"leaves": "", "expect": {"hero_min_x": 88 * 16, "hero_y": 26 * 16}},
 	"w3_l1b.pond.expert.inputs": {"level": "w3_l1b", "modes": [EXPERT],
 		"prefix": ["w3_l1b.expert.inputs", "# B4"], "leaves": "", "expect": {"hero_min_x": 88 * 16, "hero_y": 26 * 16}},
+	# --- Crystal Grotto: club, axe or hammer, the swirling axe lies inside ------------------------------------------
 	"w3_l2.inputs": {"level": "w3_l2", "modes": [BEGINNER], "leaves": "exit", "after": "tally",
-		"expect": {"weapon_end": Defs.Weapon.BOOMERANG, "min_secrets": 3, "min_checkpoints": 2,
-			"ticks": [2200, 4400], "min_completion": 80, "letters": ALL_LETTERS, "words": 1}},
+		"expect": {"weapon_end": BOOMERANG, "min_secrets": 3, "min_checkpoints": 2, "ticks": [2200, 4400],
+			"min_completion": 80, "letters": ALL_LETTERS, "words": 1, "jackpots": 1, "hurts": 0}},
+	"w3_l2.axe.inputs": {"level": "w3_l2", "modes": [BEGINNER], "weapon": AXE, "leaves": "exit", "after": "tally",
+		"expect": {"weapon_end": BOOMERANG, "min_secrets": 3, "min_checkpoints": 2, "ticks": [2200, 4400],
+			"min_completion": 80, "letters": ALL_LETTERS, "words": 1, "jackpots": 1, "hurts": 0}},
+	"w3_l2.hammer.inputs": {"level": "w3_l2", "modes": [BEGINNER], "weapon": HAMMER, "leaves": "exit",
+		"after": "tally",
+		"expect": {"weapon_end": BOOMERANG, "min_secrets": 3, "min_checkpoints": 2, "ticks": [2200, 4400],
+			"min_completion": 80, "letters": ALL_LETTERS, "words": 1, "jackpots": 1, "hurts": 0}},
 	"w3_l2.expert.inputs": {"level": "w3_l2", "modes": [EXPERT], "leaves": "exit", "after": "tally",
-		"expect": {"weapon_end": Defs.Weapon.BOOMERANG, "min_secrets": 3, "min_checkpoints": 2,
-			"ticks": [2200, 4400], "min_completion": 80, "max_hurts": 1}},
-	# --- World 4 (Expert only) ----------------------------------------------------------------------------------
+		"expect": {"weapon_end": BOOMERANG, "min_secrets": 3, "min_checkpoints": 2, "ticks": [2200, 4400],
+			"min_completion": 80, "max_hurts": 1, "letters": ALL_LETTERS, "words": 1, "jackpots": 1,
+			"min_score": 150000}},
+	"w3_l2.expert.axe.inputs": {"level": "w3_l2", "modes": [EXPERT], "weapon": AXE, "leaves": "exit",
+		"after": "tally",
+		"expect": {"weapon_end": BOOMERANG, "min_secrets": 3, "min_checkpoints": 2, "ticks": [2200, 4400],
+			"min_completion": 80, "max_hurts": 1, "letters": ALL_LETTERS, "words": 1, "jackpots": 1,
+			"min_score": 150000}},
+	"w3_l2.expert.hammer.inputs": {"level": "w3_l2", "modes": [EXPERT], "weapon": HAMMER, "leaves": "exit",
+		"after": "tally",
+		"expect": {"weapon_end": BOOMERANG, "min_secrets": 3, "min_checkpoints": 2, "ticks": [2200, 4400],
+			"min_completion": 80, "max_hurts": 1, "letters": ALL_LETTERS, "words": 1, "jackpots": 1,
+			"min_score": 150000}},
+	# --- Feast Land C: club, axe, hammer or the swirling axe --------------------------------------------------------
+	"bonus_c.inputs": {"level": "bonus_c", "modes": [BEGINNER, EXPERT], "source": "w3_l2", "leaves": "warp",
+		"after": "tally", "tally_to": {BEGINNER: "expert_wall", EXPERT: "map:w4_l1"},
+		"expect": {"no_enemies": true, "ticks": [1092, 2185], "min_score": 200000, "min_spots": 8}},
+	"bonus_c.axe.inputs": {"level": "bonus_c", "modes": [BEGINNER, EXPERT], "source": "w3_l2", "weapon": AXE,
+		"leaves": "warp", "after": "tally", "tally_to": {BEGINNER: "expert_wall", EXPERT: "map:w4_l1"},
+		"expect": {"no_enemies": true, "ticks": [1092, 2185], "min_score": 200000, "min_spots": 8}},
+	"bonus_c.hammer.inputs": {"level": "bonus_c", "modes": [BEGINNER, EXPERT], "source": "w3_l2", "weapon": HAMMER,
+		"leaves": "warp", "after": "tally", "tally_to": {BEGINNER: "expert_wall", EXPERT: "map:w4_l1"},
+		"expect": {"no_enemies": true, "ticks": [1092, 2185], "min_score": 200000, "min_spots": 8}},
+	"bonus_c.boomerang.inputs": {"level": "bonus_c", "modes": [BEGINNER, EXPERT], "source": "w3_l2",
+		"weapon": BOOMERANG, "leaves": "warp", "after": "tally",
+		"tally_to": {BEGINNER: "expert_wall", EXPERT: "map:w4_l1"},
+		"expect": {"no_enemies": true, "ticks": [1092, 2185], "min_score": 200000, "min_spots": 8}},
+	"bonus_a.secret.inputs": {"level": "bonus_a", "modes": [BEGINNER], "leaves": "", "expect": {"secrets": 1}},
+	"bonus_b.secret.inputs": {"level": "bonus_b", "modes": [BEGINNER], "leaves": "", "expect": {"secrets": 1}},
+	"bonus_c.secret.inputs": {"level": "bonus_c", "modes": [BEGINNER], "leaves": "",
+		"expect": {"secrets": 1, "gates": 1}},
+	# --- World 4 (Expert only): any weapon on entry, the axe lies in Colossus Hall -----------------------------------
 	"w4_l1.inputs": {"level": "w4_l1", "modes": [EXPERT], "leaves": "exit", "after": "tally",
 		"expect": {"respawns": 0, "view_sank": 2000, "min_checkpoints": 3, "min_secrets": 3, "min_spots": 15,
-			"words": 1, "ticks": [2600, 4400], "min_completion": 70, "embers": [20, 1], "no_warnings": true}},
+			"words": 1, "ticks": [2600, 4400], "min_completion": 70, "embers": [20, 1], "hurts": 0}},
+	"w4_l1.hammer.inputs": {"level": "w4_l1", "modes": [EXPERT], "weapon": HAMMER, "leaves": "exit",
+		"after": "tally",
+		"expect": {"respawns": 0, "view_sank": 2000, "min_checkpoints": 3, "min_secrets": 3, "min_spots": 15,
+			"words": 1, "ticks": [2600, 4400], "min_completion": 70, "embers": [20, 0], "hurts": 0}},
+	"w4_l1.axe.inputs": {"level": "w4_l1", "modes": [EXPERT], "weapon": AXE, "leaves": "exit", "after": "tally",
+		"expect": {"respawns": 0, "view_sank": 2000, "min_checkpoints": 3, "min_secrets": 3, "min_spots": 15,
+			"words": 1, "ticks": [2600, 4400], "min_completion": 70, "embers": [20, 1], "hurts": 0}},
+	"w4_l1.boomerang.inputs": {"level": "w4_l1", "modes": [EXPERT], "weapon": BOOMERANG, "leaves": "exit",
+		"after": "tally",
+		"expect": {"respawns": 0, "view_sank": 2000, "min_checkpoints": 3, "min_secrets": 3, "min_spots": 10,
+			"words": 1, "ticks": [2600, 4400], "min_completion": 70, "embers": [20, 1], "hurts": 0}},
 	"w4_l2.inputs": {"level": "w4_l2", "modes": [EXPERT], "leaves": "exit", "after": "level:w4_l2b",
 		"then": "w4_l2b.inputs",
 		"expect": {"min_checkpoints": 3, "min_secrets": 3, "min_spots": 15, "min_kills": 4, "words": 1,
-			"ticks": [2200, 4400], "min_completion": 80, "no_warnings": true}},
+			"ticks": [2200, 4400], "min_completion": 80, "hurts": 0}},
+	"w4_l2.hammer.inputs": {"level": "w4_l2", "modes": [EXPERT], "weapon": HAMMER, "leaves": "exit",
+		"after": "level:w4_l2b", "then": "w4_l2b.hammer.inputs",
+		"expect": {"min_checkpoints": 3, "min_secrets": 3, "min_spots": 15, "min_kills": 4, "words": 1,
+			"ticks": [2200, 4400], "min_completion": 80, "hurts": 0}},
+	"w4_l2.axe.inputs": {"level": "w4_l2", "modes": [EXPERT], "weapon": AXE, "leaves": "exit",
+		"after": "level:w4_l2b", "then": "w4_l2b.axe.inputs",
+		"expect": {"min_checkpoints": 3, "min_secrets": 3, "min_spots": 15, "min_kills": 4, "words": 1,
+			"ticks": [2200, 4400], "min_completion": 80, "hurts": 0}},
 	# The same keep with the swirling axe a campaign run brings from Crystal Grotto (the route padded by its recovery).
-	"w4_l2.boomerang.inputs": {"level": "w4_l2", "modes": [EXPERT], "weapon": Defs.Weapon.BOOMERANG, "leaves": "exit",
-		"after": "level:w4_l2b", "then": "w4_l2b.inputs",
+	"w4_l2.boomerang.inputs": {"level": "w4_l2", "modes": [EXPERT], "weapon": BOOMERANG, "leaves": "exit",
+		"after": "level:w4_l2b", "then": "w4_l2b.boomerang.inputs",
 		"expect": {"min_checkpoints": 3, "min_secrets": 3, "min_spots": 12, "words": 1, "ticks": [2200, 4400],
-			"min_completion": 70, "no_warnings": true}},
-	"w4_l2b.inputs": {"level": "w4_l2b", "modes": [EXPERT], "chained": true, "leaves": "trophy",
-		"after": "level:ending", "expect": {"weapon_end": Defs.Weapon.AXE, "boss_hits": 24, "no_warnings": true}},
-	# --- Feast Land bonus stages and the ending -----------------------------------------------------------------
-	"bonus_a.inputs": {"level": "bonus_a", "modes": [BEGINNER, EXPERT], "source": "w1_l2", "leaves": "warp",
-		"after": "tally", "tally_to": {BEGINNER: "map:w2_l1", EXPERT: "map:w2_l1"},
-		"expect": {"no_enemies": true, "ticks": [1092, 2185], "min_score": 150000, "min_spots": 8,
-			"no_warnings": true}},
-	"bonus_b.inputs": {"level": "bonus_b", "modes": [BEGINNER, EXPERT], "source": "w2_l1", "leaves": "warp",
-		"after": "tally", "tally_to": {BEGINNER: "map:w2_l2", EXPERT: "map:w2_l2"},
-		"expect": {"no_enemies": true, "ticks": [1092, 2185], "min_score": 100000, "min_spots": 8,
-			"no_warnings": true}},
-	"bonus_c.inputs": {"level": "bonus_c", "modes": [BEGINNER, EXPERT], "source": "w3_l2", "leaves": "warp",
-		"after": "tally", "tally_to": {BEGINNER: "expert_wall", EXPERT: "map:w4_l1"},
-		"expect": {"no_enemies": true, "ticks": [1092, 2185], "min_score": 200000, "min_spots": 8,
-			"no_warnings": true}},
-	"bonus_a.secret.inputs": {"level": "bonus_a", "modes": [BEGINNER], "leaves": "",
-		"expect": {"secrets": 1, "no_warnings": true}},
-	"bonus_b.secret.inputs": {"level": "bonus_b", "modes": [BEGINNER], "leaves": "",
-		"expect": {"secrets": 1, "no_warnings": true}},
-	"bonus_c.secret.inputs": {"level": "bonus_c", "modes": [BEGINNER], "leaves": "",
-		"expect": {"secrets": 1, "gates": 1, "no_warnings": true}},
+			"min_completion": 70, "hurts": 0}},
+	# Club, hammer and axe walk over the axe at the checkpoint (only thrown weapons hurt the Colossus) and fight with
+	# it; the swirling-axe route jumps over it and keeps the swirling axe. Every fight ends with 2+ hearts left.
+	"w4_l2b.inputs": {"level": "w4_l2b", "modes": [EXPERT], "chained": true, "alone": true, "leaves": "trophy",
+		"after": "level:ending", "expect": {"weapon_end": AXE, "boss_hits": 24, "min_hearts": 2,
+			"fight_ticks": COLOSSUS_FIGHT}},
+	"w4_l2b.hammer.inputs": {"level": "w4_l2b", "modes": [EXPERT], "chained": true, "alone": true,
+		"weapon": HAMMER, "leaves": "trophy", "after": "level:ending",
+		"expect": {"weapon_end": AXE, "boss_hits": 24, "min_hearts": 2, "fight_ticks": COLOSSUS_FIGHT}},
+	"w4_l2b.axe.inputs": {"level": "w4_l2b", "modes": [EXPERT], "chained": true, "alone": true, "weapon": AXE,
+		"leaves": "trophy", "after": "level:ending",
+		"expect": {"weapon_end": AXE, "boss_hits": 24, "min_hearts": 2, "fight_ticks": COLOSSUS_FIGHT}},
+	"w4_l2b.boomerang.inputs": {"level": "w4_l2b", "modes": [EXPERT], "chained": true, "alone": true,
+		"weapon": BOOMERANG, "leaves": "trophy", "after": "level:ending",
+		"expect": {"weapon_end": BOOMERANG, "boss_hits": 24, "min_hearts": 2, "fight_ticks": COLOSSUS_FIGHT}},
+	# --- The ending (Expert only): any weapon ---------------------------------------------------------------------
 	"ending.inputs": {"level": "ending", "modes": [EXPERT], "leaves": "exit", "after": "tally",
 		"tally_to": {EXPERT: "the_end"},
-		"expect": {"checkpoints": 4, "hurts": 0, "min_score": 100000, "no_warnings": true}},
+		"expect": {"checkpoints": 4, "hurts": 0, "min_score": 100000}},
+	"ending.hammer.inputs": {"level": "ending", "modes": [EXPERT], "weapon": HAMMER, "leaves": "exit",
+		"after": "tally", "tally_to": {EXPERT: "the_end"},
+		"expect": {"checkpoints": 4, "hurts": 0, "min_score": 100000}},
+	"ending.axe.inputs": {"level": "ending", "modes": [EXPERT], "weapon": AXE, "leaves": "exit", "after": "tally",
+		"tally_to": {EXPERT: "the_end"},
+		"expect": {"checkpoints": 4, "hurts": 0, "min_score": 100000}},
+	"ending.boomerang.inputs": {"level": "ending", "modes": [EXPERT], "weapon": BOOMERANG, "leaves": "exit",
+		"after": "tally", "tally_to": {EXPERT: "the_end"},
+		"expect": {"checkpoints": 4, "hurts": 0, "min_score": 100000}},
 }
 
-## The whole game, one map stop after the other: [level the step starts in, route file per mode name]. Linked
-## stages follow inside a step (the route of the stage that follows comes from its ROUTES entry's `then`).
-## Both take the warp of Canopy Village into bonus stage A (its tally ends Canopy Village). Beginner ends at the
-## expert wall after Crystal Grotto; Expert goes on through world 4 and ends with the ending stage after the Wall
-## Colossus.
+## The whole game, one stage after the other: [level the step starts in, route file per mode name or "" for the
+## route of the weapon the run carries at that point]. Linked stages follow inside a step (the route of the stage
+## that follows comes from its ROUTES entry's `then`). Both take the warp of Canopy Village into bonus stage A (its
+## tally ends Canopy Village) and pick up every weapon on the way: the axe in Canopy Village, the hammer in Echo
+## Caverns, the swirling axe in Crystal Grotto (Expert keeps it through world 4: its Colossus route jumps over the
+## axe). Beginner ends at the expert wall after Crystal Grotto; Expert goes on through world 4 and ends with the
+## ending stage after the Wall Colossus.
 const CAMPAIGN: Dictionary = {
 	BEGINNER: [
-		["w1_l1", "w1_l1.inputs"], ["w1_l2", "w1_l2.warp.inputs"], ["bonus_a", "bonus_a.inputs"],
-		["w2_l1", "w2_l1.inputs"], ["w2_l2", "w2_l2.inputs"], ["w3_l1", "w3_l1.inputs"], ["w3_l2", "w3_l2.inputs"],
+		["w1_l1", ""], ["w1_l2", "w1_l2.warp.inputs"], ["bonus_a", ""], ["w2_l1", ""], ["w2_l2", ""],
+		["w3_l1", ""], ["w3_l2", ""],
 	],
 	EXPERT: [
-		["w1_l1", "w1_l1.expert.inputs"], ["w1_l2", "w1_l2.warp.inputs"], ["bonus_a", "bonus_a.inputs"],
-		["w2_l1", "w2_l1.expert.inputs"],
-		["w2_l2", "w2_l2.expert.inputs"], ["w3_l1", "w3_l1.expert.inputs"], ["w3_l2", "w3_l2.expert.inputs"],
-		["w4_l1", "w4_l1.inputs"], ["w4_l2", "w4_l2.inputs"], ["ending", "ending.inputs"],
+		["w1_l1", ""], ["w1_l2", "w1_l2.warp.inputs"], ["bonus_a", ""], ["w2_l1", ""], ["w2_l2", ""],
+		["w3_l1", ""], ["w3_l2", ""], ["w4_l1", ""], ["w4_l2", ""], ["ending", ""],
 	],
 }
-
-## A run carries its weapon from level to level (GAMEPLAY.md 8.1): the axe of Canopy Village into Echo Caverns, its
-## hammer through worlds 2 and 3, the swirling axe of Crystal Grotto into world 4. A swing locks the hero for the
-## weapon's recovery (club 2 ticks, hammer and axe 6, swirling axe 12), so a route recorded with another weapon
-## drifts and fails. These routes are not yet proven with the weapon a run brings: the campaign tests (and
-## tools/autoplay/campaign*.flow) hand the hero the weapon the route was recorded with before playing them, and the
-## run goes on with whatever that route ends with (so one hand-over can make the next level match again). The list
-## is checked, so a route re-recorded for the carried weapon must leave it. (CAMPAIGN_ADAPT helps re-recording;
-## w4_l2.boomerang.inputs is such a re-recording, used once w4_l1 hands on the swirling axe.)
-## Without a hand-over the replays fail: Echo Caverns with the axe (Beginner stuck before the exit, Expert dies at tick
-## 2235), Bone Gorge with the hammer (dies at the spike pit, tick 452), Frost Summit Expert with the hammer (dies at
-## tick 683), Cinder Shaft with the swirling axe (dies at tick 674).
-const WEAPON_GAPS: Dictionary = {
-	BEGINNER: ["w2_l1.inputs", "w2_l2.inputs"],
-	EXPERT: ["w2_l1.expert.inputs", "w2_l2.expert.inputs", "w2_l2b.expert.inputs", "w3_l1.expert.inputs",
-		"w4_l1.inputs"],
-}
+## The weapon each campaign run carries at the end.
+const CAMPAIGN_WEAPON_END: Dictionary = {BEGINNER: BOOMERANG, EXPERT: BOOMERANG}
 
 ## The map stops of each mode, in order.
 const MAP: Dictionary = {
@@ -221,12 +371,16 @@ var _embers_close: Dictionary = {}
 var _connections: Array[Array] = []
 var _problems: ProblemCounter = null
 var _counting: bool = false
-## Routes of the campaign run that were played with the weapon they were recorded with (WEAPON_GAPS).
-var _weapon_overrides: Array[String] = []
+## Jackpot chests (100 000) collected.
+var _jackpots: int = 0
+## Ticks of the stage at which a boss woke and was beaten (-1 = not yet).
+var _boss_up: int = -1
+var _boss_down: int = -1
 ## Per-tick observations are only made when a route asks for them (they cost time).
 var _watch_wind: bool = false
 var _watch_view: bool = false
 var _watch_embers: bool = false
+var _watch_fight: bool = false
 
 
 func after_each() -> void:
@@ -400,7 +554,60 @@ func test_every_route_file_is_described() -> void:
 		if spec.has("then"):
 			assert_true(ROUTES.has(spec["then"]) and bool(ROUTES[spec["then"]].get("chained", false)),
 					"%s: the route that follows (%s) is a chained entry" % [file, spec["then"]])
+			if ROUTES.has(spec["then"]):
+				var carried: int = int(spec.get("expect", {}).get("weapon_end", spec.get("weapon", CLUB)))
+				assert_eq(int(ROUTES[spec["then"]].get("weapon", CLUB)), carried,
+						"%s: the route that follows (%s) is the one of the weapon carried on" % [file, spec["then"]])
+				assert_eq(ROUTES[spec["then"]]["modes"], spec["modes"], "%s: %s is played on the same modes" % [
+					file, spec["then"]])
+		if bool(spec.get("alone", false)):
+			assert_true(bool(spec.get("chained", false)), "%s: `alone` is for chained entries" % file)
 	assert_eq(count, ROUTES.size(), "every route file is described once")
+	# Every chained entry has exactly one route leading into it.
+	for file: String in ROUTES:
+		if not bool(ROUTES[file].get("chained", false)):
+			continue
+		var leading: int = 0
+		for other: String in ROUTES:
+			if str(ROUTES[other].get("then", "")) == file:
+				leading += 1
+		assert_eq(leading, 1, "%s: one route leads into it" % file)
+
+
+## The weapon matrix: every weapon a player can hold when entering a stage (the club of a new run or a level code,
+## and every weapon that lies in a stage before it) has exactly one route per difficulty the stage exists in, and
+## every route starts with such a weapon. Where the weapons lie is read from the level files.
+func test_every_weapon_a_run_can_bring_has_a_route() -> void:
+	var names: Dictionary = {"club": CLUB, "hammer": HAMMER, "axe": AXE, "boomerang": BOOMERANG}
+	var regex: RegEx = RegEx.create_from_string("items/weapon\\b[^\\n]*kind=(\\w+)")
+	for level_id: String in STAGE_ORDER:
+		assert_true(Levels.has_level(StringName(level_id)), "%s exists" % level_id)
+		var found: Array[int] = []
+		for match_found: RegExMatch in regex.search_all(FileAccess.get_file_as_string(
+				Levels.get_level_path(StringName(level_id)))):
+			found.append(int(names.get(match_found.get_string(1), -1)))
+		var expected: Array[int] = []
+		if PICKUPS.has(level_id):
+			expected.append(int(PICKUPS[level_id]))
+		assert_eq(found, expected, "%s: the weapons lying in it" % level_id)
+	for level_id: StringName in Levels.all_ids():
+		if str(Levels.get_value(level_id, "kind", Levels.KIND_MAIN)) != Levels.KIND_TEST:
+			assert_true(STAGE_ORDER.has(String(level_id)), "%s is in STAGE_ORDER" % level_id)
+	var cells: int = 0
+	for level_id: String in STAGE_ORDER:
+		for mode: String in [BEGINNER, EXPERT]:
+			if not Levels.is_available(StringName(level_id), _difficulty(mode)):
+				continue
+			for weapon: int in _entry_weapons(level_id):
+				var routes: Array[String] = _main_routes(level_id, mode, weapon)
+				assert_eq(routes.size(), 1, "%s (%s) with the %s: one route (%s)" % [level_id, mode,
+					WEAPON_NAMES[weapon], ", ".join(routes)])
+				cells += 1
+	for file: String in ROUTES:
+		var spec: Dictionary = ROUTES[file]
+		assert_true(_entry_weapons(str(spec["level"])).has(int(spec.get("weapon", CLUB))),
+				"%s starts with a weapon a run can bring into %s" % [file, spec["level"]])
+	print("    weapon matrix: %d (stage, difficulty, weapon) cells" % cells)
 
 
 ## More enemies on Expert than on Beginner in every stage that has both spawn sets and is not a boss stage.
@@ -919,9 +1126,10 @@ func _keys(flags: int) -> String:
 func _play_routes(prefix: String) -> void:
 	var probing: bool = _dev_mode()
 	for file: String in ROUTES:
-		if not file.begins_with(prefix) or bool(ROUTES[file].get("chained", false)):
+		var spec: Dictionary = ROUTES[file]
+		if not file.begins_with(prefix) or (bool(spec.get("chained", false)) and not bool(spec.get("alone", false))):
 			continue
-		for mode: String in ROUTES[file]["modes"]:
+		for mode: String in spec["modes"]:
 			if probing:
 				assert_true(true, "route checks are skipped while probing")
 				continue
@@ -929,14 +1137,15 @@ func _play_routes(prefix: String) -> void:
 			after_each()
 
 
-## One route from a fresh run (and the routes chained to it), with every check of its entry.
+## One route from a fresh run holding its weapon (and the routes chained to it), with every check of its entry.
 func _play_route(file: String, mode: String) -> void:
 	var spec: Dictionary = ROUTES[file]
 	var difficulty: int = _difficulty(mode)
-	var label: String = "%s (%s)" % [file, mode]
+	var label: String = "%s (%s%s)" % [file, mode, ", alone" if bool(spec.get("chained", false)) else ""]
 	Game.new_game(difficulty)
 	if spec.has("source"):
 		Game.warp_return_level = StringName(str(spec["source"]))
+	Game.set_weapon(int(spec.get("weapon", CLUB)))
 	var level_id: StringName = StringName(str(spec["level"]))
 	await _enter(level_id)
 	var played: int = await _play_stage(file, mode, label)
@@ -944,6 +1153,7 @@ func _play_route(file: String, mode: String) -> void:
 	if chained != "" and Flow.current_screen == Flow.SCREEN_LEVEL and Game.level != null:
 		var played_next: int = await _play_stage(chained, mode, "%s (%s)" % [chained, mode], played)
 		played += played_next
+		await _check_tally(ROUTES[chained], mode, label)
 	await _check_tally(spec, mode, label)
 
 
@@ -952,28 +1162,28 @@ func _play_route(file: String, mode: String) -> void:
 func _play_stage(file: String, mode: String, label: String, before: int = 0) -> int:
 	var spec: Dictionary = ROUTES[file]
 	assert_eq(Game.level_id, StringName(str(spec["level"])), "%s starts in %s" % [label, spec["level"]])
-	if spec.has("weapon"):
-		Game.set_weapon(int(spec["weapon"]))
+	assert_eq(Game.weapon, int(spec.get("weapon", CLUB)), "%s: the hero holds the %s" % [label,
+		WEAPON_NAMES[int(spec.get("weapon", CLUB))]])
 	var expect: Dictionary = spec.get("expect", {})
 	_reset_watch()
 	_watch_wind = expect.has("min_wind")
 	_watch_view = expect.has("view_sank")
 	_watch_embers = expect.has("embers")
+	_watch_fight = expect.has("fight_ticks")
 	var lives: int = Game.lives
 	var items_total: int = Game.items_total
 	var spots_total: int = Game.spots_total
 	var start_view_y: int = Game.level.get_view_rect().position.y
-	_problems = null
-	if bool(expect.get("no_warnings", false)):
-		_start_counting_problems()
+	_start_counting_problems()
 	var flags: PackedInt32Array = Autoplay.parse_inputs(_route_text(spec, file, mode))
 	assert_true(flags.size() > 100, "%s is a real input script" % label)
 	var played: int = _run(flags)
 	_stop_counting_problems()
-	print("    %s: %d ticks, score %d, completion %d %%, spots %d/%d, items %d/%d, secrets %d, kills %d, hurt %d, deaths %d, lives %d, weapon %d, letters %s" % [
+	print("    %s: %d ticks, score %d, completion %d %%, spots %d/%d, items %d/%d, secrets %d, kills %d, hurt %d, deaths %d, lives %d, hearts %d, weapon %s, letters %s, boss hits %d" % [
 		label, played, Game.score, Game.completion_percent(), Game.spots_opened, Game.spots_total,
 		Game.items_collected, Game.items_total, _count(&"secret_found"), _count(&"enemy_killed"),
-		_count(&"player_hurt"), _count(&"player_died"), Game.lives, Game.weapon, str(_letters.keys())])
+		_count(&"player_hurt"), _count(&"player_died"), Game.lives, Game.hearts, WEAPON_NAMES[Game.weapon],
+		str(_letters.keys()), _boss_hits])
 	_check_expectations(label, expect, played, lives, start_view_y, before)
 	var leaves: String = str(spec.get("leaves", ""))
 	if leaves == "":
@@ -1065,10 +1275,18 @@ func _check_expectations(label: String, expect: Dictionary, played: int, lives: 
 	if expect.has("ticks"):
 		assert_true(played >= int(expect["ticks"][0]) and played <= int(expect["ticks"][1]), "%s: %d ticks" % [
 			label, played])
-	if expect.has("pair_ticks"):
+	if expect.has("pair_ticks") and before > 0:
 		var both: int = before + played
 		assert_true(both >= int(expect["pair_ticks"][0]) and both <= int(expect["pair_ticks"][1]),
 				"%s: both halves take %d ticks" % [label, both])
+	if expect.has("jackpots"):
+		assert_true(_jackpots >= int(expect["jackpots"]), "%s: jackpot chests collected %d" % [label, _jackpots])
+	if expect.has("min_hearts"):
+		assert_true(Game.hearts >= int(expect["min_hearts"]), "%s: %d hearts left" % [label, Game.hearts])
+	if expect.has("fight_ticks"):
+		var fight: int = _boss_down - _boss_up if _boss_up >= 0 and _boss_down >= 0 else -1
+		assert_true(fight >= int(expect["fight_ticks"][0]) and fight <= int(expect["fight_ticks"][1]),
+				"%s: the boss fight takes %d ticks (%.1f s)" % [label, fight, fight / Tuning.TICK_HZ])
 	if expect.has("min_completion"):
 		assert_true(Game.completion_percent() >= int(expect["min_completion"]), "%s: completion %d %%" % [
 			label, Game.completion_percent()])
@@ -1102,7 +1320,7 @@ func _check_expectations(label: String, expect: Dictionary, played: int, lives: 
 				label, hero.sim_pos.x])
 			if expect.has("hero_y"):
 				assert_eq(hero.sim_pos.y, int(expect["hero_y"]), "%s: the hero stands on the far side" % label)
-	if bool(expect.get("no_warnings", false)) and _problems != null:
+	if _problems != null:
 		assert_eq(_problems.count, 0, "%s: no engine warning or error (first: %s)" % [label, _problems.first])
 
 
@@ -1111,15 +1329,15 @@ func _check_expectations(label: String, expect: Dictionary, played: int, lives: 
 # =================================================================================================================
 
 ## One run through the whole campaign of `mode`, the way a player goes: each map stop's level is started as the
-## world map starts it, its route played with the state the run carries, the tally finished as the tally screen
-## finishes it. Checks the unlocks and records of the save file and how the run ends.
+## world map starts it, its route played with the state the run carries (the route of the weapon he holds by then),
+## the tally finished as the tally screen finishes it. Checks the unlocks and records of the save file and how the
+## run ends.
 func _play_campaign(mode: String) -> void:
 	if _dev_mode():
 		assert_true(true, "campaign runs are skipped while probing")
 		return
 	var difficulty: int = _difficulty(mode)
 	Save.reset()
-	_weapon_overrides.clear()
 	Game.new_game(difficulty)
 	var steps: Array = CAMPAIGN[mode]
 	var stops: Array = MAP[mode]
@@ -1127,24 +1345,36 @@ func _play_campaign(mode: String) -> void:
 	await _idle()
 	assert_eq(Levels.first_level(), stops[0])
 	var total_ticks: int = 0
+	var played_files: PackedStringArray = PackedStringArray()
 	for i: int in steps.size():
 		var level_id: StringName = StringName(str(steps[i][0]))
-		var file: String = str(steps[i][1])
-		var label: String = "campaign %s: %s" % [mode, file]
 		if i == 0 or Flow.current_screen == Flow.SCREEN_WORLD_MAP:
 			# The map shows the stop the run has reached; it starts that level.
 			var shown: StringName = StringName(str(Flow.args.get("level_id", level_id))) if i > 0 else level_id
-			assert_eq(shown, level_id, "%s: the map leads to %s" % [label, level_id])
-			assert_true(i == 0 or Save.is_level_unlocked(level_id, difficulty), "%s: %s is unlocked" % [label, level_id])
+			assert_eq(shown, level_id, "campaign %s: the map leads to %s" % [mode, level_id])
+			assert_true(i == 0 or Save.is_level_unlocked(level_id, difficulty), "campaign %s: %s is unlocked" % [
+				mode, level_id])
 			await _enter(level_id)
-		assert_eq(Game.level_id, level_id, "%s: the run is in %s" % [label, level_id])
+		assert_eq(Game.level_id, level_id, "campaign %s: the run is in %s" % [mode, level_id])
 		if Game.level_id != level_id:
 			return
+		# The step's route: a named side path, or the route of the weapon the run carries.
+		var file: String = str(steps[i][1])
+		if file == "":
+			var routes: Array[String] = _main_routes(String(level_id), mode, Game.weapon)
+			assert_eq(routes.size(), 1, "campaign %s: %s has a route for the carried %s" % [mode, level_id,
+				WEAPON_NAMES[Game.weapon]])
+			if routes.size() != 1:
+				return
+			file = routes[0]
+		var label: String = "campaign %s: %s" % [mode, file]
 		var lives: int = Game.lives
+		played_files.append(file)
 		var played: int = await _play_campaign_stage(file, mode, label)
 		total_ticks += played
 		var chained: String = str(ROUTES[file].get("then", ""))
 		while chained != "" and Flow.current_screen == Flow.SCREEN_LEVEL:
+			played_files.append(chained)
 			total_ticks += await _play_campaign_stage(chained, mode, "campaign %s: %s" % [mode, chained])
 			chained = str(ROUTES[chained].get("then", ""))
 		assert_true(Game.lives >= lives, "%s: no life lost (%d -> %d)" % [label, lives, Game.lives])
@@ -1167,13 +1397,12 @@ func _play_campaign(mode: String) -> void:
 		if expected_stop < stops.size() and Flow.current_screen == Flow.SCREEN_WORLD_MAP:
 			assert_true(Save.is_level_unlocked(stops[expected_stop], difficulty), "%s: %s is unlocked" % [
 				label, stops[expected_stop]])
-	print("    campaign %s: %d ticks (%.1f min), score %d, lives %d, weapon %d, screen %s" % [
-		mode, total_ticks, total_ticks / Tuning.TICK_HZ / 60.0, Game.score, Game.lives, Game.weapon,
-		Flow.current_screen])
+	print("    campaign %s: %d ticks (%.1f min), score %d, lives %d, weapon %s, screen %s\n      routes: %s" % [
+		mode, total_ticks, total_ticks / Tuning.TICK_HZ / 60.0, Game.score, Game.lives, WEAPON_NAMES[Game.weapon],
+		Flow.current_screen, ", ".join(played_files)])
 	assert_eq(expected_stop, stops.size(), "%s: every map stop was cleared" % mode)
-	var gaps: Array[String] = []
-	gaps.assign(WEAPON_GAPS[mode])
-	assert_eq(_weapon_overrides, gaps, "%s: the routes played with their recorded weapon instead of the carried one" % mode)
+	assert_eq(Game.weapon, int(CAMPAIGN_WEAPON_END[mode]), "%s: the run ends with the %s" % [mode,
+		WEAPON_NAMES[int(CAMPAIGN_WEAPON_END[mode])]])
 	for stop: StringName in stops:
 		assert_eq(int(Save.get_level_result(stop, difficulty)["clears"]), 1, "%s: %s cleared once" % [mode, stop])
 	assert_true(Save.get_high_score() >= Game.score and Game.score > 0, "%s: the run's score is the high score" % mode)
@@ -1186,29 +1415,55 @@ func _play_campaign(mode: String) -> void:
 
 
 ## Play one stage of the campaign run with the state the run carries; the checks that do not depend on a fresh
-## start: the stage ends the documented way, without a death.
+## start: the hero holds the route's weapon (nothing is handed over), the stage ends the documented way, without a
+## death or an engine warning.
 func _play_campaign_stage(file: String, mode: String, label: String) -> int:
 	var spec: Dictionary = ROUTES[file]
 	assert_eq(Game.level_id, StringName(str(spec["level"])), "%s plays in %s" % [label, spec["level"]])
-	var recorded: int = int(spec.get("weapon", Defs.Weapon.CLUB))
-	if Game.weapon != recorded and (WEAPON_GAPS[mode] as Array).has(file):
-		_weapon_overrides.append(file)
-		print("    %s: weapon %d handed over for the route (the run carries %d)" % [label, recorded, Game.weapon])
-		Game.set_weapon(recorded)
+	assert_eq(Game.weapon, int(spec.get("weapon", CLUB)), "%s: the run carries the route's %s" % [label,
+		WEAPON_NAMES[int(spec.get("weapon", CLUB))]])
 	_reset_watch()
+	_start_counting_problems()
 	var flags: PackedInt32Array = Autoplay.parse_inputs(_route_text(spec, file, mode))
 	var played: int = _run(flags)
-	print("    %s: %d ticks, score %d, lives %d, hurt %d, weapon %d, letters %d, completion %d %%" % [
-		label, played, Game.score, Game.lives, _count(&"player_hurt"), Game.weapon, Game.letters,
+	_stop_counting_problems()
+	print("    %s: %d ticks, score %d, lives %d, hurt %d, weapon %s, letters %d, completion %d %%" % [
+		label, played, Game.score, Game.lives, _count(&"player_hurt"), WEAPON_NAMES[Game.weapon], Game.letters,
 		Game.completion_percent()])
 	assert_eq(_count(&"player_died"), 0, "%s: no death" % label)
+	assert_eq(_problems.count, 0, "%s: no engine warning or error (first: %s)" % [label, _problems.first])
 	var leaves: String = str(spec.get("leaves", ""))
 	assert_eq(_exit_kinds, [StringName(leaves)] as Array[StringName], "%s leaves through its %s after %d ticks" % [
 		label, leaves, played])
+	if spec.get("expect", {}).has("weapon_end"):
+		assert_eq(Game.weapon, int(spec["expect"]["weapon_end"]), "%s: weapon at the end" % label)
 	await _settle()
 	if Flow.current_screen == Flow.SCREEN_LEVEL:
 		_set_view()
 	return played
+
+
+## The weapons a player can hold when entering `level_id`: the club, and every weapon lying in a stage before it.
+func _entry_weapons(level_id: String) -> Array[int]:
+	var weapons: Array[int] = [CLUB]
+	for i: int in maxi(STAGE_ORDER.find(level_id), 0):
+		var weapon: int = int(PICKUPS.get(STAGE_ORDER[i], -1))
+		if weapon >= 0 and not weapons.has(weapon):
+			weapons.append(weapon)
+	weapons.sort()
+	return weapons
+
+
+## The routes of the weapon matrix for one cell (side paths excluded).
+func _main_routes(level_id: String, mode: String, weapon: int) -> Array[String]:
+	var found: Array[String] = []
+	for file: String in ROUTES:
+		var spec: Dictionary = ROUTES[file]
+		if str(spec["level"]) == level_id and (spec["modes"] as Array).has(mode) \
+				and int(spec.get("weapon", CLUB)) == weapon and str(spec.get("leaves", "")) != "" \
+				and not bool(spec.get("side", false)):
+			found.append(file)
+	return found
 
 
 # =================================================================================================================
@@ -1278,6 +1533,11 @@ func _run(flags: PackedInt32Array) -> int:
 				_deepest_view_y = maxi(_deepest_view_y, Game.level.get_view_rect().position.y)
 			if _watch_embers:
 				_note_embers(Game.level)
+		if _watch_fight:
+			if _boss_up < 0 and _count(&"boss_started") > 0:
+				_boss_up = played
+			if _boss_down < 0 and _count(&"boss_defeated") > 0:
+				_boss_down = played
 	GameInput.clear_scripted()
 	return played
 
@@ -1329,9 +1589,13 @@ func _reset_watch() -> void:
 	_deepest_view_y = 0
 	_embers_seen.clear()
 	_embers_close.clear()
+	_jackpots = 0
+	_boss_up = -1
+	_boss_down = -1
 	_watch_wind = false
 	_watch_view = false
 	_watch_embers = false
+	_watch_fight = false
 
 
 func _start_counting_problems() -> void:
@@ -1382,6 +1646,8 @@ func _on_event(signal_name: StringName) -> void:
 func _on_item(item_id: StringName, index: int, _points: int, _pos: Vector2i) -> void:
 	if item_id == &"items/letter":
 		_letters[index] = true
+	elif item_id == &"items/jackpot":
+		_jackpots += 1
 
 
 func _on_enemy_hit(enemy: EnemyBase, _power: int) -> void:

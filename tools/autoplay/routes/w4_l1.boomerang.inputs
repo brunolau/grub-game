@@ -1,0 +1,130 @@
+# Weapon cell: Cinder Shaft entered with the SWIRLING AXE (the Expert campaign hero brings it from Crystal Grotto).
+# The club route re-timed for the swirling axe's 12-tick recovery: swing groups thrown as fewer throws in the same
+# time (two throws break the odd blocks in the cavern; the stinger throw waits 5 ticks longer), every swing in the
+# two vaults padded by 10 ticks (the camera is locked in a vault, so the descent waits), a hop over an ember in the
+# chute, a step and a hop clear of the magma leapers at the bottom (tests/test_enemies_colossus.gd ARMS_REPAIR).
+# w4_l1 "Cinder Shaft" (Expert) from '@' to the exit (ticks:KEYS, keys L R U D F K). The view sinks 1 px per tick:
+# never let the hero reach the top edge, and never drop while the floor below is not yet on screen.
+# Crater throat: club the boulder beside the start (facing left), then down the long ledges: left, right, left...
+1:L,8:F,13:,8:F,13:
+36:L
+36:R
+36:L
+36:R
+36:L
+4:L,4:,8:F,13:,8:F,13:
+40:R
+# Along the step to its left end, down to the step with the amber, then into the first digger gallery.
+30:L
+10:L,4:,14:R
+# Gallery: meat and the inset floor stone (low strikes); the skull spot is left for a calmer run.
+9:R,4:
+8:DF,6:,8:DF,6:,8:DF,6:
+# The G in the slot, down onto the step, then left along the first lava stratum.
+24:R,16:
+20:L
+4:L,6:LU,10:L
+# The plain stone next to the hole: low strikes. Then down the hole onto the next step.
+27:
+8:DF,6:,8:DF,6:,8:DF,6:
+14:L,10:
+# Second stratum: the stones in the wall beside the step, then the obsidian raft across the wide pool.
+4:L,2:
+8:F,20:
+10:R,16:
+5:R,10:RU,4:R,26:
+20:R,10:
+# Third stratum: the magma leaper jumps out of its pool; no time for the inset stone - over the pool, into the hole.
+16:L,4:
+17:L,10:LU,6:L,10:
+# Checkpoint stratum: wait on the step for the view, light the restart fire, run to the hole into the ember chute.
+30:
+36:R
+50:
+# Ember chute: obsidian ledges left and right under the ember rain. Each drop is six rows: wait by the wall (an
+# ember shoves the hero away from it), drop while the hero stands in the upper half of the view.
+6:R,40:
+50:
+24:L,30:
+18:L,17:
+4:R,4:U,26:R,14:
+# The R waits at the far end of the right ledge, under the stinger: one step toward it, club it as it dives,
+# then fetch the letter by the wall.
+4:,4:R,4:,8:F,11:
+18:R,2:
+26:L,24:
+# The hatch band: the hole in the floor on the right is a gate to the Cinder Cache.
+22:R,4:,8:D,20:
+# Cinder Cache: the inset pair in the floor, the two slabs with the treasures, the B, the big block in the floor.
+4:R,4:
+8:DF,16:,8:DF,16:,8:DF,16:,8:DF,16:
+38:R,4:
+8:DF,16:,8:DF,16:,8:DF,42:
+8:R,4:
+33:L,4:
+12:U,10:
+4:R,12:RU,4:R,8:
+# Back through the gate: it leads down into the second digger gallery.
+34:L,4:,8:D,20:
+# Gallery two: the stone under the arrival point, the checkpoint, on to the hole.
+8:DF,6:,8:DF,6:,8:DF,6:
+16:R
+26:R,8:
+# Spike strata: wait on each step for the view, hop the single spikes; never jump under the ceiling spikes.
+12:L,12:
+6:L,8:LU,10:L,12:
+4:,10:R,10:
+11:R,8:RU,8:R,10:
+# Under the ceiling spikes: the breakable wall below the step hides the U (forward strikes), then left, no jumping.
+4:R,16:
+8:L,14:
+9:R,2:
+8:F,13:,8:F,27:
+13:R,8:
+44:L,10:
+# Last spike stratum: hop the spike, into the hole to the obsidian cavern.
+8:R,10:
+11:R,8:RU,10:R,12:
+# Obsidian cavern: rock ledges left and right under the ember rain, six rows apart. Wait close to the wall, drop
+# while the hero stands in the upper half of the view.
+34:
+24:L,10:
+20:L,44:
+30:R,10:
+# The skull on the ledge: one step past it, three strikes back (its snacks fly along the ledge), then down.
+16:R,2:,1:L,8:F,13:,8:F,13:
+30:L,10:
+18:L,26:
+34:R,10:
+# Checkpoint ledge: light the fire, club the stone in the floor, drop to the last ledges.
+14:R,4:
+16:L,2:
+8:DF,6:,8:DF,6:,8:DF,6:
+20:L,24:
+26:R,4:
+# The odd blocks in the right wall: break them, behind them a hole leads to the Ember Hoard.
+8:R,2:
+8:F,13:,8:F,11:
+6:R,4:,8:D,20:
+# Ember Hoard: the stones in the floor, the two obsidian blocks and the slab with the treasures, the big block.
+5:R,2:
+8:DF,16:,8:DF,16:,8:DF,16:,8:DF,16:
+6:L,4:
+10:RU,4:R,8:
+10:RU,6:R,10:
+12:R,14:
+14:R,4:
+4:L,4:
+8:DF,16:,8:DF,16:,8:DF,36:
+# The code stones and the extra life on the floor, then back through the hole: it leads to the lava gallery.
+44:L,4:,8:D,20:
+# Lava gallery: the heart, over the two magma pools (leapers jump out of them), into the hole on the right.
+22:R,1:RU,4:R,5:RU,2:R,10:
+10:RU,8:R,16:
+# Magma chamber (the view stops sinking): down to the ledge, over the trenches, grab the S on the pillar, the exit.
+12:L,40:
+2:R,4:
+12:LU,6:L,10:
+10:U,14:
+12:LU,3:L,8:U,5:
+20:L

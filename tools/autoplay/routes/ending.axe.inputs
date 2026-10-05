@@ -1,0 +1,34 @@
+# Weapon cell: the ending entered with the AXE (the axe of Colossus Hall: the Expert campaign hero comes home with it). The
+# inputs of ending.inputs: the 6-tick recovery delays a few swings by a tick, nothing on the way home minds.
+# ending from '@' to the exit totem in front of the hero's hut (ticks:KEYS, keys L R U D F K).
+# The path home: club the inset tile in the path, then over the berry hill.
+20:R,8:
+10:DF,4:,10:DF,4:,10:DF,6:
+# Through the fields: light the first campfire, club the bush three times.
+83:R,6:
+8:F,6:,8:F,6:,8:F,8:
+# Apples and the bush's fruit, then the plain tiles under the sandstone boulder (two low strikes).
+19:R,6:
+10:DF,6:,10:DF,8:
+# Past the watchtower through the village gate (second campfire): club the barrel and the clay pot.
+34:R,2:RU,22:R,6:
+8:F,12:
+22:R,6:
+8:F,12:
+# Into the village square: the carved tiles in the plaza (two low strikes).
+35:R,6:
+10:DF,6:,10:DF,8:
+# The welcome feast: roast meat on the benches, the third campfire, and a jump for the giant roast above it.
+32:R,6:
+20:U,10:
+# The flower pot by the round hut (three strikes), then the barrel by the crates.
+20:R,6:
+8:F,6:,8:F,6:,8:F,10:
+28:R,6:
+8:F,12:
+# Up the home hill past the grapes and the last campfire; the framed block hides a giant cake.
+63:R,6:
+10:DF,6:,10:DF,6:,10:DF,2:
+3:L,24:
+# Home: two cakes on the doorstep and the exit totem in front of the hut.
+50:R

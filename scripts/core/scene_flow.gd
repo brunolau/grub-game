@@ -71,6 +71,9 @@ var transition_speed: float = 1.0
 ## When true (default) gameplay pauses and all sound is suspended while the application has no focus or is in
 ## the background. The autoplay harness switches it off: its windows rarely have the focus.
 var pause_on_focus_loss: bool = true
+## When true (default, except headless runs) the menu screens and the world map load what the next level start
+## needs on worker threads (ARCHITECTURE.md 11 "Loading"); see [method warm_up].
+var background_loading: bool = true
 
 var _layer: CanvasLayer = null
 var _cover: TransitionCover = null
@@ -84,6 +87,157 @@ var _transition_serial: int = 0
 var _app_focused: bool = true
 var _app_resumed: bool = true
 var _app_active: bool = true
+var _warmup: Warmup = null
+
+
+## Background loading of what a level start needs (ARCHITECTURE.md 11 "Loading"). The pictures, sounds and fonts
+## of the requested scenes (ResourceLoader.get_dependencies) load on worker threads (load_threaded_request) while a
+## menu or the map shows; looking them up takes at most FRAME_BUDGET_USEC per frame. Scripts and the scenes
+## themselves are put together on the main thread, and only while a transition covers the screen
+## ([method Flow._change_scene], at most COVERED_BUDGET_USEC per transition): this engine version leaks an object
+## for some scripts compiled on a worker thread, and a script compile is too long for a visible frame. Whatever is
+## left then is loaded by the level start itself, as before - never inside a simulation tick. Entity scenes go into
+## the Spawner cache; the level and overlay scenes and what they use are kept for the session; the rest until the
+## next level start (the level holds what it uses then).
+class Warmup:
+	extends Node
+
+	## Extensions of the resources that load on worker threads.
+	const THREADED: PackedStringArray = ["png", "jpg", "jpeg", "webp", "svg", "ogg", "wav", "mp3", "ttf", "otf",
+			"woff", "woff2", "fnt"]
+	## Main-thread time per visible frame (dependency lookups, collecting finished loads).
+	const FRAME_BUDGET_USEC: int = 2000
+	## Main-thread time per covered transition (scripts and scenes).
+	const COVERED_BUDGET_USEC: int = 400000
+
+	## Path -> true for every threaded load still running.
+	var pending: Dictionary = {}
+	## Requests whose dependencies are not looked up yet, and scripts and scenes waiting for a covered moment:
+	## [path, entity id, keep for the session].
+	var plan: Array[Array] = []
+	var queue: Array[Array] = []
+	## Resources kept for the whole session (level scene, overlays) and until the next level start.
+	var session: Dictionary = {}
+	var next_level: Dictionary = {}
+	var _known: Dictionary = {}
+	var _keep_for_session: Dictionary = {}
+	## Worker threads only with a real renderer: the headless one cannot create textures on another thread
+	## (tests that switch background loading on get the same caches, loaded on the main thread).
+	var _threads: bool = DisplayServer.get_name() != "headless"
+
+	func _init() -> void:
+		name = "Warmup"
+		process_mode = Node.PROCESS_MODE_ALWAYS
+		set_process(false)
+
+	## Load `path` in the background unless it is loaded or on its way already (`entity_id` puts a scene into the
+	## Spawner cache). Returns at once.
+	func request(path: String, entity_id: StringName = &"", for_session: bool = false) -> void:
+		if path.is_empty() or _known.has(path) or session.has(path) or next_level.has(path):
+			return
+		if entity_id != &"" and Spawner._cache.has(entity_id):
+			return
+		_known[path] = true
+		if for_session:
+			_keep_for_session[path] = true
+		plan.append([path, entity_id, for_session])
+		set_process(true)
+
+	## True while anything requested is not loaded yet.
+	func is_busy() -> bool:
+		return not plan.is_empty() or not pending.is_empty() or not queue.is_empty()
+
+	func _process(_delta: float) -> void:
+		var deadline: int = Time.get_ticks_usec() + FRAME_BUDGET_USEC
+		while not plan.is_empty() and Time.get_ticks_usec() < deadline:
+			_expand(plan.pop_front())
+		for path: String in pending.keys():
+			if ResourceLoader.load_threaded_get_status(path) != ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+				_collect(path)
+		if plan.is_empty() and pending.is_empty():
+			set_process(false)
+
+	## Put scripts and scenes together for at most `budget_usec` (the screen is covered). Threaded loads they need
+	## and that are still running are waited for.
+	func load_queue(budget_usec: int) -> void:
+		var deadline: int = Time.get_ticks_usec() + budget_usec
+		while not plan.is_empty() and Time.get_ticks_usec() < deadline:
+			_expand(plan.pop_front())
+		while not queue.is_empty() and Time.get_ticks_usec() < deadline:
+			_load_queued(queue.pop_front())
+
+	## Finish every request now (tests, application exit).
+	func finish_all() -> void:
+		while not plan.is_empty():
+			_expand(plan.pop_front())
+		for path: String in pending.keys():
+			_collect(path)
+		while not queue.is_empty():
+			_load_queued(queue.pop_front())
+		set_process(false)
+
+	## Forget the scripts and scenes still waiting: a level start loads what it needs itself.
+	func drop_queue() -> void:
+		for entry: Array in queue:
+			_known.erase(entry[0])
+		queue.clear()
+
+	## Start a threaded load, or look up the dependencies of a script or scene and queue it.
+	func _expand(entry: Array) -> void:
+		var path: String = entry[0]
+		var for_session: bool = entry[2]
+		if not ResourceLoader.exists(path):
+			_known.erase(path)
+			return
+		if ResourceLoader.has_cached(path):
+			# Loaded already (by a screen, a level): keep it. A threaded request for a resource the main thread had
+			# (or was still loading) left objects behind at exit.
+			_known.erase(path)
+			var cached: Resource = ResourceLoader.get_cached_ref(path)
+			if entry[1] != &"":
+				Spawner.adopt(entry[1], cached as PackedScene)
+			elif cached != null:
+				_hold(path, cached)
+			return
+		if THREADED.has(path.get_extension().to_lower()) and _threads:
+			if ResourceLoader.load_threaded_request(path, "", false) == OK:
+				pending[path] = true
+			else:
+				_known.erase(path)
+			return
+		for dependency: String in ResourceLoader.get_dependencies(path):
+			var dependency_path: String = dependency.get_slice("::", 2) if dependency.contains("::") else dependency
+			if dependency_path.begins_with("res://"):
+				request(dependency_path, &"", for_session)
+		queue.append(entry)
+
+	func _collect(path: String) -> void:
+		pending.erase(path)
+		_known.erase(path)
+		# Always fetched, also after a failure: that releases the request.
+		var resource: Resource = ResourceLoader.load_threaded_get(path)
+		if resource != null:
+			_hold(path, resource)
+
+	func _load_queued(entry: Array) -> void:
+		var path: String = entry[0]
+		var entity_id: StringName = entry[1]
+		_known.erase(path)
+		if entity_id != &"" and Spawner._cache.has(entity_id):
+			return
+		var resource: Resource = load(path)
+		if resource == null:
+			return
+		if entity_id != &"":
+			Spawner.adopt(entity_id, resource as PackedScene)
+		else:
+			_hold(path, resource)
+
+	func _hold(path: String, resource: Resource) -> void:
+		if _keep_for_session.has(path):
+			session[path] = resource
+		else:
+			next_level[path] = resource
 
 
 func _ready() -> void:
@@ -98,8 +252,12 @@ func _ready() -> void:
 	_overlay_hud = _make_overlay(Defs.LAYER_HUD)
 	_overlay_touch = _make_overlay(Defs.LAYER_TOUCH)
 	_overlay_menu = _make_overlay(Defs.LAYER_MENU)
+	_warmup = Warmup.new()
+	add_child(_warmup)
 	if DisplayServer.get_name() == "headless":
 		instant_transitions = true
+		# Tests and smoke checks load what they use themselves; nothing runs behind their back.
+		background_loading = false
 
 
 func _notification(what: int) -> void:
@@ -373,6 +531,66 @@ func play_covered(action: Callable, transition: int = Defs.Transition.CURTAIN) -
 	_pause_if_inactive()
 
 
+## Background loading (ARCHITECTURE.md 11 "Loading"; automatic on menu screens and the world map while
+## [member background_loading] is on): start loading on worker threads what a level start needs - the level scene,
+## the HUD, touch and pause overlays, the hero, every effect / item / projectile scene - and, for `level_id`, the
+## scenes of its entities, its terrain, liquid, backdrop and prop pictures, enemy sheets named by `skin=` and its music.
+## Returns at once; a level start that comes first waits for the loads it needs in its own load() calls.
+func warm_up(level_id: StringName = &"") -> void:
+	_warmup.request(LEVEL_SCENE, &"", true)
+	for path: String in [HUD_SCENE, TOUCH_SCENE, PAUSE_SCENE]:
+		_warmup.request(path, &"", true)
+	_warmup.request(Spawner.scene_path(&"player/player"), &"player/player")
+	for category_name: String in Spawner.RUNTIME_CATEGORIES:
+		for file: String in ResourceLoader.list_directory(Spawner.SCENE_ROOT + category_name):
+			if file.get_extension() == "tscn":
+				var id: StringName = StringName(category_name + "/" + file.get_basename())
+				_warmup.request(Spawner.scene_path(id), id)
+	if level_id == &"" or not Levels.has_level(level_id):
+		return
+	var data: LevelData = LevelData.load_file(Levels.get_level_path(level_id))
+	if data == null:
+		return
+	var difficulty: int = Game.difficulty
+	for record: Dictionary in data.entity_records():
+		var id: StringName = record["id"]
+		var params: Dictionary = record["params"]
+		if not LevelText.applies_to(params, difficulty):
+			continue
+		if Spawner.is_prop(id):
+			_warmup.request(Spawner.prop_texture_path(id))
+		elif Spawner.exists(id):
+			_warmup.request(Spawner.scene_path(id), id)
+		if params.has("skin"):
+			var skin: EnemySkin = EnemySkin.find(str(params["skin"]))
+			if skin != null:
+				_warmup.request(skin.texture_path)
+	var meta: Dictionary = data.resolved_meta(difficulty)
+	var terrain_a: String = str(meta.get("terrain_a", ""))
+	for atlas: String in [terrain_a, str(meta.get("terrain_b", terrain_a))]:
+		if WorldTileSet.has_terrain(atlas):
+			_warmup.request(LevelData.terrain_path(atlas))
+	var liquid: String = str(meta.get("liquid", "water"))
+	if WorldTileSet.has_liquid(liquid):
+		_warmup.request(LevelData.liquid_path(liquid))
+	for layer: Dictionary in ParallaxSets.layers(str(meta.get("background", "none"))):
+		_warmup.request(ParallaxSets.texture_path(layer))
+	for context: StringName in [StringName(str(meta.get("music", ""))), Sfx.MUSIC_FEAST]:
+		var entry: Dictionary = AudioTable.MUSIC.get(context, {})
+		if not entry.is_empty():
+			_warmup.request(AudioTable.MUSIC_DIR + str(entry["file"]))
+
+
+## True while background loads requested by [method warm_up] are still running (tests, diagnostics).
+func is_warming_up() -> bool:
+	return _warmup.is_busy()
+
+
+## Wait for every background load requested by [method warm_up] (tests; the application exit does it itself).
+func finish_warm_up() -> void:
+	_warmup.finish_all()
+
+
 ## The node that draws the transitions (read-only for everybody but Flow; tests and debug overlays look at it).
 func get_transition_cover() -> TransitionCover:
 	return _cover
@@ -395,6 +613,8 @@ func shutdown_and_quit(exit_code: int = 0) -> void:
 	_quitting = true
 	busy = true
 	Settings.save()
+	# Background loads must not be cut off by the exit (worker threads holding half-loaded resources).
+	_warmup.finish_all()
 	Sim.stop()
 	Audio.shutdown()
 	await get_tree().create_timer(0.25, true, false, true).timeout
@@ -445,6 +665,10 @@ func _change_scene(path: String, screen: StringName, transition: int, p_args: Di
 	busy = true
 	_transition_serial += 1
 	GameInput.enabled = false
+	if Sim.is_in_tick():
+		# Requested by the simulation (an exit, a death): the tick finishes first. With instant transitions the
+		# scene change would otherwise load the next scene inside the tick.
+		await Sim.tick_finished
 	# The old scene stays alive while the cover closes (the exit animation plays under the iris).
 	await _animate_cover(1.0, transition)
 	transition_covered.emit()
@@ -464,8 +688,16 @@ func _change_scene(path: String, screen: StringName, transition: int, p_args: Di
 	await get_tree().process_frame
 	if screen == SCREEN_LEVEL:
 		_fill_overlays()
+		# The level loaded what it needs and holds its pictures and music itself now.
+		_warmup.drop_queue()
+		_warmup.next_level.clear()
 	GameInput.enabled = true
 	screen_changed.emit(screen)
+	if background_loading and screen != SCREEN_LEVEL:
+		# Menus and the map have time to spare: load what the next level start needs (the map knows the level).
+		# The screen is still covered: scripts and scenes are put together now, where a long frame is never seen.
+		warm_up(StringName(str(args.get("level_id", ""))) if screen == SCREEN_WORLD_MAP else &"")
+		_warmup.load_queue(Warmup.COVERED_BUDGET_USEC)
 	await _animate_cover(0.0, transition)
 	Sim.frozen = false
 	busy = false

@@ -24,6 +24,12 @@ func _sim_tick(phase: int) -> void:
 		if _wobble_node != null:
 			var step: int = WOBBLE_ART.size() - 1 - _wobble
 			_wobble_node.position.x = _wobble_rest_x + (0.0 if _wobble == 0 else float(WOBBLE_ART[step]))
+		if _wobble == 0:
+			_doze_note()
+
+
+func _is_idle() -> bool:
+	return _wobble == 0
 
 
 ## Debris kind of the running level ("rock" outside a level).

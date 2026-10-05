@@ -73,6 +73,16 @@ func _sim_tick(_phase: int) -> void:
 		_rise_one(level)
 
 
+## Dozing (SimEntity, ARCHITECTURE.md 11): waiting, it only tests whether the hero's feet are in its trigger, which
+## they cannot be while he is far; risen to the top, it does nothing. Rising, it ticks.
+func _doze_area() -> Rect2i:
+	return trigger.merge(_doze_box()) if trigger.has_area() else _doze_box()
+
+
+func _can_doze() -> bool:
+	return not triggered or risen >= rise
+
+
 func _on_level_reset() -> void:
 	var level: LevelBase = Game.level
 	if triggered and level != null:

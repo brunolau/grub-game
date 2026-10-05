@@ -42,6 +42,10 @@ func _triggered(hero_node: PlayerBase) -> bool:
 	return Overlap.point_in(_zone, hero_node.sim_pos.x, hero_node.sim_pos.y)
 
 
+func _trigger_area() -> Rect2i:
+	return _zone
+
+
 func _on_reset() -> void:
 	_offset_index = 0
 

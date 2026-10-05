@@ -73,4 +73,15 @@ func _on_open_changed() -> void:
 
 
 func _on_exit_unlocked() -> void:
+	# A dozing exit must notice the opening in the tick it happens in (SimEntity "Dozing").
+	_doze_wake_now()
 	_on_open_changed()
+
+
+## Dozing (SimEntity, ARCHITECTURE.md 11): an unused exit far from the hero only tests the overlap, which fails.
+func _doze_area() -> Rect2i:
+	return _doze_box()
+
+
+func _can_doze() -> bool:
+	return not used

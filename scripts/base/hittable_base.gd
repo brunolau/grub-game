@@ -58,6 +58,24 @@ func _apply_params(params: Dictionary) -> void:
 func _sim_tick(phase: int) -> void:
 	if phase == Defs.Phase.WORLD and cooldown > 0:
 		cooldown -= 1
+		if cooldown == 0:
+			_doze_note()
+
+
+## Dozing (SimEntity, ARCHITECTURE.md 11): without a cool-down (and with nothing of the subclass moving, `_is_idle`)
+## the tick does nothing. The weapon pass reaches only hittables near the hero or a flying weapon in view, and a hit
+## or an opening by the flood fill wakes it first.
+func _doze_area() -> Rect2i:
+	return Rect2i(cell * Tuning.TILE, Vector2i(Tuning.TILE, Tuning.TILE)).merge(_doze_box())
+
+
+func _can_doze() -> bool:
+	return cooldown == 0 and _is_idle()
+
+
+## True while the subclass has nothing running in its ticks (no animation, no wobble). Override.
+func _is_idle() -> bool:
+	return true
 
 
 ## The hidden-tile test of PHYSICS.md 8.3 #2 for a weapon box whose origin (bottom anchor) is `origin`:
@@ -74,6 +92,7 @@ func is_hit_by(origin: Vector2i) -> bool:
 func take_hit(power: int, source: SimEntity) -> bool:
 	if opened:
 		return false
+	_doze_wake_now()
 	if cooldown > 0:
 		return true
 	cooldown = Tuning.HIDDEN_SPOT_HIT_COOLDOWN
@@ -100,6 +119,8 @@ func take_hit(power: int, source: SimEntity) -> bool:
 func open() -> void:
 	if opened:
 		return
+	# The flood fill opens touching cells anywhere in the level; their opening may start an animation.
+	_doze_wake_now()
 	opened = true
 	if counts_for_completion:
 		Game.count_spot_opened()

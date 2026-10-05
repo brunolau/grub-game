@@ -25,10 +25,17 @@ var _tight: bool = false
 var _repeat: int = 1
 var _pass: int = 0
 var _digest_file: FileAccess = null
+## --dump=<level>:<tick>: print the digest state of that tick entry by entry.
+var _dump: String = ""
 ## Profile: "phase|script" -> PackedInt64Array [calls, usec].
 var _calls: Dictionary = {}
 var _profiled_ticks: int = 0
 var _profiled_usec: int = 0
+## Profile: the heavy calls of the tick being played ([key, usec] over SLOW_CALL_USEC) and the slowest ticks.
+const SLOW_CALL_USEC: int = 15
+const SLOW_TICKS_KEPT: int = 15
+var _tick_calls: Array[Array] = []
+var _slow_ticks: Array[Array] = []
 var _stages: Array[Dictionary] = []
 
 
@@ -47,11 +54,25 @@ func run(arguments: PackedStringArray) -> int:
 			selection.append(argument)
 	if options.has("make-snapshot"):
 		return _make_snapshot(str(options["make-snapshot"]))
+	if options.has("load-profile"):
+		_redirect_user_data()
+		return await _load_profile(StringName(str(options["load-profile"])))
+	if options.has("warm-up"):
+		# Flow's background loading in a headless run (where it is off by default), until it is done.
+		Flow.background_loading = true
+		var start: int = Time.get_ticks_msec()
+		Flow.warm_up(StringName(str(options["warm-up"])))
+		while Flow.is_warming_up():
+			await get_tree().process_frame
+		print("SimBench: warm-up of %s done in %d ms" % [options["warm-up"], Time.get_ticks_msec() - start])
+		return 0
 	_out = str(options.get("out", DEFAULT_OUT))
 	_digest = options.has("digest")
+	_dump = str(options.get("dump", ""))
 	_profile = options.has("profile")
 	_tight = options.has("tight")
 	_repeat = maxi(int(options.get("repeat", "1")), 1)
+	LevelBase.doze_enabled = not options.has("no-doze")
 	if options.has("sleep"):
 		# A headless run sleeps between frames (no window can draw); the default keeps the caches as cold as the
 		# windowed game leaves them between two ticks.
@@ -82,6 +103,64 @@ func run(arguments: PackedStringArray) -> int:
 	Sim._profiler = null
 	_report()
 	return 0
+
+
+# =================================================================================================================
+# Load profile (--load-profile=<level id>, in a fresh process: what the first level start costs, step by step)
+# =================================================================================================================
+
+func _load_profile(level_id: StringName) -> int:
+	var parts: Array[Array] = []
+	var t: int = Time.get_ticks_usec()
+	load(Flow.LEVEL_SCENE)
+	t = _lap(parts, "level scene", t)
+	Spawner.load_scene(&"player/player")
+	t = _lap(parts, "player scene", t)
+	Spawner.preload_runtime()
+	t = _lap(parts, "runtime scenes (fx, items, projectiles)", t)
+	var data: LevelData = LevelData.load_file(Levels.get_level_path(level_id))
+	t = _lap(parts, "level file parse", t)
+	var ids: Array[StringName] = []
+	for record: Dictionary in data.entity_records():
+		var id: StringName = record["id"]
+		if not Spawner.is_prop(id) and not ids.has(id):
+			ids.append(id)
+	Spawner.preload_ids(ids)
+	t = _lap(parts, "level entity scenes (%d)" % ids.size(), t)
+	var meta: Dictionary = data.resolved_meta(Defs.Difficulty.BEGINNER)
+	var terrain_a: String = str(meta.get("terrain_a", ""))
+	WorldTileSet.build(terrain_a, str(meta.get("terrain_b", terrain_a)), str(meta.get("liquid", "water")))
+	t = _lap(parts, "tile set build", t)
+	for layer: Dictionary in ParallaxSets.layers(str(meta.get("background", "none"))):
+		load(ParallaxSets.texture_path(layer))
+	t = _lap(parts, "parallax textures", t)
+	Audio.preload_music(StringName(str(meta.get("music", ""))))
+	Audio.preload_music(Sfx.MUSIC_FEAST)
+	t = _lap(parts, "music streams", t)
+	for path: String in [Flow.HUD_SCENE, Flow.TOUCH_SCENE, Flow.PAUSE_SCENE]:
+		load(path)
+	t = _lap(parts, "hud, touch, pause scenes", t)
+	Game.new_game(Defs.Difficulty.BEGINNER)
+	Sim.manual = true
+	var started: Array[int] = [0]
+	Events.level_started.connect(func(_id: StringName) -> void: started[0] = Time.get_ticks_usec(), CONNECT_ONE_SHOT)
+	t = Time.get_ticks_usec()
+	Flow.start_level(level_id, Defs.Transition.NONE)
+	while started[0] == 0:
+		await get_tree().process_frame
+	_lap(parts, "level start with everything loaded", t, started[0])
+	var total: int = 0
+	for part: Array in parts:
+		total += int(part[1])
+		print("  %-44s %8.1f ms" % [part[0], float(part[1]) / 1000.0])
+	print("SimBench: load profile of %s: %.1f ms in total" % [level_id, float(total) / 1000.0])
+	return 0
+
+
+func _lap(parts: Array[Array], label: String, since: int, now: int = -1) -> int:
+	var at: int = Time.get_ticks_usec() if now < 0 else now
+	parts.append([label, at - since])
+	return Time.get_ticks_usec()
 
 
 # =================================================================================================================
@@ -175,6 +254,8 @@ func _play_stage(file: String, mode: String) -> void:
 	var costs: PackedInt32Array = PackedInt32Array()
 	var entities_max: int = 0
 	var entities_sum: int = 0
+	var awake_sum: int = 0
+	var awake_max: int = 0
 	var exit_cost: int = -1
 	var played: int = 0
 	while played < flags.size() and Sim.running and Game.level == level:
@@ -184,8 +265,12 @@ func _play_stage(file: String, mode: String) -> void:
 		played += 1
 		if Sim.running and Game.level == level:
 			costs.append(cost)
+			if _profile:
+				_note_tick("%s %s" % [level_id, mode], cost)
 			var count: int = Sim.get_entity_count()
 			entities_sum += count
+			awake_sum += Sim.get_awake_count()
+			awake_max = maxi(awake_max, Sim.get_awake_count())
 			entities_max = maxi(entities_max, count)
 			if _digest_file != null:
 				_digest_file.store_line(_digest_line(level))
@@ -208,12 +293,13 @@ func _play_stage(file: String, mode: String) -> void:
 		"avg_us": float(total) / maxf(float(costs.size()), 1.0), "p50_us": _pct(sorted, 0.5),
 		"p99_us": _pct(sorted, 0.99), "max_us": _pct(sorted, 1.0), "exit_tick_us": exit_cost,
 		"entities_avg": float(entities_sum) / maxf(float(costs.size()), 1.0), "entities_max": entities_max,
+		"awake_avg": float(awake_sum) / maxf(float(costs.size()), 1.0), "awake_max": awake_max,
 		"score": Game.score,
 	}
 	_stages.append(row)
-	print("  %-28s %-8s %-7s %5d ticks  avg %4d  p50 %4d  p99 %5d  max %5d us  (exit tick %d us)  ent avg %3d max %3d  score %d" % [
+	print("  %-28s %-8s %-7s %5d ticks  avg %4d  p50 %4d  p99 %5d  max %5d us  (exit tick %d us)  ent avg %3d max %3d awake %3d max %3d  score %d" % [
 		file, mode, level_id, played, int(row["avg_us"]), row["p50_us"], row["p99_us"], row["max_us"], exit_cost,
-		int(row["entities_avg"]), entities_max, Game.score])
+		int(row["entities_avg"]), entities_max, int(row["awake_avg"]), awake_max, Game.score])
 	await _settle()
 	if Flow.current_screen == Flow.SCREEN_LEVEL and Game.level != null and Game.level != level:
 		_set_view()
@@ -317,11 +403,14 @@ func _digest_line(level: LevelBase) -> String:
 		if kind == Defs.Kind.FX or kind == Defs.Kind.PLAYER:
 			continue
 		for entity: SimEntity in level.get_kind(kind):
-			if not is_instance_valid(entity):
+			# A node queued for deletion is gone in the game at the end of the frame; a tight loop keeps it longer.
+			if not is_instance_valid(entity) or entity.is_queued_for_deletion():
 				continue
 			var item: CollectibleBase = entity as CollectibleBase
 			if item != null and item.collected and not item.reappears_on_respawn:
 				continue
+			if not _dump.is_empty():
+				state.append(entity.name)  # auto-generated names shift with every node created anywhere
 			state.append_array([kind, entity.sim_pos, entity.xvel, entity.yvel, entity.facing, entity.box_w,
 				entity.box_h, entity.box_xo, entity.on_screen])
 			var enemy: EnemyBase = entity as EnemyBase
@@ -329,6 +418,13 @@ func _digest_line(level: LevelBase) -> String:
 				state.append_array([enemy.awake, enemy.dead, enemy.hp, enemy.tangible, enemy.flash])
 			elif item != null:
 				state.append(item.collected)
+	if _dump.begins_with(String(level.level_id) + ":") and absi(int(_dump.get_slice(":", 1)) - Sim.tick) <= 2:
+		var dozing: PackedStringArray = PackedStringArray()
+		for entity: SimEntity in level._doze:
+			if entity.is_dozing():
+				dozing.append(String(entity.name))
+		print("SimBench dump %s tick %d: view %s hero %s bounds %s dozing %s" % [_dump, Sim.tick, level.get_view_rect(),
+				hero_pos, level._doze_bounds, ",".join(dozing)])
 	return "%d %d %d %d,%d %x" % [Sim.tick, Sim.rng.get_state(), Game.score, hero_pos.x, hero_pos.y, hash(state)]
 
 
@@ -352,6 +448,18 @@ func add_call(phase: int, script: Script, usec: int) -> void:
 	entry[0] += 1
 	entry[1] += usec
 	_calls[key] = entry
+	if usec >= SLOW_CALL_USEC:
+		_tick_calls.append([key, usec])
+
+
+## Keep the tick just played among the slowest ones (profile mode), with its heavy calls.
+func _note_tick(label: String, cost: int) -> void:
+	if _slow_ticks.size() < SLOW_TICKS_KEPT or cost > int(_slow_ticks[_slow_ticks.size() - 1][0]):
+		_slow_ticks.append([cost, label, Sim.tick, _tick_calls.duplicate()])
+		_slow_ticks.sort_custom(func(a: Array, b: Array) -> bool: return int(a[0]) > int(b[0]))
+		if _slow_ticks.size() > SLOW_TICKS_KEPT:
+			_slow_ticks.resize(SLOW_TICKS_KEPT)
+	_tick_calls.clear()
 
 
 func _report() -> void:
@@ -390,6 +498,12 @@ func _report() -> void:
 		for row: Array in rows:
 			print("  %-44s %7.2f us/tick  %6.2f calls/tick  %5.2f us/call" % [row[0], float(row[2]) / float(ticks),
 					float(row[1]) / float(ticks), float(row[2]) / maxf(float(row[1]), 1.0)])
+		print("SimBench: slowest ticks and their calls of %d us or more" % SLOW_CALL_USEC)
+		for slow: Array in _slow_ticks:
+			var parts: PackedStringArray = PackedStringArray()
+			for call: Array in slow[3]:
+				parts.append("%s %d" % [call[0], call[1]])
+			print("  %6d us  %-16s tick %5d: %s" % [slow[0], slow[1], slow[2], ", ".join(parts)])
 	var out: FileAccess = FileAccess.open(_out + "/bench.json", FileAccess.WRITE)
 	if out != null:
 		out.store_string(JSON.stringify({"stages": _stages}, "\t", false))
