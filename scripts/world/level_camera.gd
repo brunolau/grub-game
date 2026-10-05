@@ -32,6 +32,9 @@ var rows: int = Tuning.VIEW_ROWS
 var bounds: Rect2i = Rect2i(0, 0, Tuning.VIEW_W, Tuning.VIEW_H)
 ## Defs.SCROLL_* bits of the level.
 var scroll_flags: int = 0
+## Auto-scrolling levels: true while the descent waits for the player's first input (Level, after the level start
+## and after a respawn). The view stays where it is meanwhile.
+var autoscroll_held: bool = false
 ## Camera home row of PHYSICS.md 12.2 #6 (-1 = none).
 var home_row: int = -1
 ## True = the second (fast) vertical speed curve: a backdrop shows through the tile layer.
@@ -327,7 +330,8 @@ func _follow_x_smooth(hero: PlayerBase) -> void:
 ## PHYSICS.md 12.2. `fixed_step` > 0 replaces the speed curve (spawn placement, 12.5) and ignores auto-scroll.
 func _follow_y(hero: PlayerBase, fixed_step: int) -> void:
 	if fixed_step == 0 and (scroll_flags & Defs.SCROLL_AUTO_DOWN) != 0:
-		pos.y = mini(pos.y + Tuning.CAM_AUTOSCROLL_PX, _max.y)
+		if not autoscroll_held:
+			pos.y = mini(pos.y + Tuning.CAM_AUTOSCROLL_PX, _max.y)
 		return
 	if hero.yvel == 0:
 		v_active = 0

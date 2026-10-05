@@ -11,6 +11,8 @@ func after_each() -> void:
 
 
 func test_options_apply_and_persist() -> void:
+	# The touch section shows where touch buttons can be used (here: switched on).
+	Settings.set_value("controls/touch_always", true)
 	var panel: OptionsPanel = await _panel()
 	var music: UiOptionRow = panel.get_row("audio/music")
 	assert_not_null(music, "music volume row")
@@ -31,6 +33,16 @@ func test_options_apply_and_persist() -> void:
 	assert_almost_eq(Settings.get_float("audio/music"), before - 0.1, 0.001, "the volume survived a reload")
 	assert_false(Settings.get_bool("video/screen_shake"), "the switch survived a reload")
 	assert_eq(str(Settings.get_value(OptionsPanel.KEY_TOUCH_LAYOUT, "")), "swapped")
+
+
+## On a desktop without a touch screen (and touch buttons not switched on) the touch section is left out.
+func test_touch_options_only_where_touch_can_be_used() -> void:
+	Settings.set_value("controls/touch_always", false)
+	var panel: OptionsPanel = await _panel()
+	var wanted: bool = OptionsPanel.touch_options_wanted()
+	assert_eq(panel.get_row(OptionsPanel.KEY_TOUCH_LAYOUT) != null, wanted, "touch rows exactly when wanted")
+	if not DisplayServer.is_touchscreen_available() and not OS.has_feature("mobile"):
+		assert_null(panel.get_row("controls/touch_opacity"), "no touch rows on a desktop without a touch screen")
 
 
 func test_rows_work_by_tap() -> void:

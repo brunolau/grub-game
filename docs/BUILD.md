@@ -1,12 +1,16 @@
 # BUILD.md - building Club & Grub for every platform
 
 Exact steps to produce the release builds. All commands run from the project root. `godot` stands for the Godot
-4.7.2 console binary (`.tools/godot/Godot_v4.7.2-stable_win64_console.exe` in this repository); inside this
-repository prefer `bash .tools/gd.sh raw <arguments>`, which waits until no other Godot uses the project.
+4.7.2 console binary. The engine is not part of the repository: download it (section 1) and unpack it to
+`.tools/godot/` (`Godot_v4.7.2-stable_win64_console.exe` on Windows), or point the `GODOT` environment variable at
+it. Inside this repository prefer `bash .tools/gd.sh raw <arguments>`, which waits until no other Godot uses the
+project; `gd.sh` says how to install the engine when it cannot find it.
 
 ## 1. Prerequisites (every platform)
 
-1. **Godot 4.7.2 stable, standard build** (not .NET). `godot --version` must print `4.7.2.stable...`.
+1. **Godot 4.7.2 stable, standard build** (not .NET), from https://godotengine.org/download/archive/4.7.2-stable/
+   or https://github.com/godotengine/godot/releases/tag/4.7.2-stable. `godot --version` must print
+   `4.7.2.stable...`.
 2. **Export templates 4.7.2.stable**, unpacked to
    - Windows: `%APPDATA%\Godot\export_templates\4.7.2.stable\`
    - macOS: `~/Library/Application Support/Godot/export_templates/4.7.2.stable/`
@@ -21,7 +25,8 @@ repository prefer `bash .tools/gd.sh raw <arguments>`, which waits until no othe
    ```
 
    Godot exits with code 0 even when an export logs errors, so always read the log: a release log has no
-   `ERROR:` and no `WARNING:` line (the Windows script below checks this for you).
+   `ERROR:` and no `WARNING:` line (the Windows script below checks this for you), apart from the two "at exit"
+   shutdown lines of the first export of a fresh checkout (3.1, step 4).
 
 ## 2. The presets (`export_presets.cfg`)
 
@@ -42,7 +47,8 @@ godot --headless --path . --export-pack "Android" build/export_check/Android.zip
 ```
 
 Shared identity: application id `com.clubandgrub.game` (macOS, iOS, Android), name "Club & Grub", version from
-`application/config/version` in `project.godot` (0.1.0; Windows shows it as 0.1.0.0). The icon is
+`application/config/version` in `project.godot` (1.0.0; the Windows exe reports 1.0.0.0 - the presets leave their
+own version fields empty so that this one value is the version everywhere). The icon is
 `res://assets/icon.png` (256 x 256); Godot derives the `.ico`, `.icns` and the legacy Android launcher icon from it.
 The iOS store icon (`assets/icon_1024.png`) and the Android adaptive layers (`assets/icon_android_*.png`) are
 built from the hero sheet by `tools/make_app_icons.py` (run it again after the hero art changes).
@@ -79,9 +85,18 @@ The script
 2. imports the project and stops on any import error or warning;
 3. runs the whole test suite and stops unless it reports `RESULT: PASS`;
 4. exports the `Windows Desktop` preset in release mode to `build\windows\ClubAndGrub.exe`, stops on any `ERROR:` /
-   `WARNING:` in the export log and checks that the exe is the only file written (no `.pck`, no DLL);
+   `WARNING:` in the export log and checks that the exe is the only file written (no `.pck`, no DLL). One pair of
+   lines is let through: the first export of a fresh checkout converts every scene to binary (`.godot/exported/`)
+   and the editor then reports `WARNING: <n> ObjectDB instances were leaked at exit` and
+   `ERROR: <n> resources still in use at exit` while it shuts down, after the pack is written; later exports reuse the
+   converted scenes and print neither. The script lists them as "ignored editor shutdown report";
 5. starts the exe for a smoke check (below) and stops unless it exits with code 0 and its log is clean;
-6. prints the SHA-256 of the exe and exits with 0. Any failure prints `BUILD FAILED: ...` and exits with 1.
+6. copies the licence texts next to the exe (`build\windows\licenses\`: `CREDITS.md` and every file of
+   `assets\licenses\` - the Godot MIT notice and third-party notices, both OFL font licences with the FONTLOG, the
+   CC0 legal code and the per-pack evidence; the game shows the same texts under Credits > Licences) and packs the
+   release zip `build\ClubAndGrub-<version>-windows.zip` (the exe plus that folder);
+7. prints the SHA-256 of the exe and of the zip and exits with 0. Any failure prints `BUILD FAILED: ...` and exits
+   with 1.
 
 Options: `-Godot <path>` (else `$env:GODOT`, else `.tools\godot\...`, else `godot` on the PATH), `-SmokeSeconds <n>`
 (default 4), `-HeadlessSmoke` (build machines without a GPU), `-SkipTests` (packaging experiments only - never
@@ -101,7 +116,7 @@ nothing logged an error or a warning. In an exported build it also logs an error
 finds inside the package. The log ends with lines such as
 
 ```
-Smoke: Club & Grub 0.1.0 (release build), 15 level(s), screen 'title'
+Smoke: Club & Grub 1.0.0 (release build), 15 level(s), screen 'title'
 Smoke: levels bonus_a,bonus_b,bonus_c,ending,w1_l1,w1_l2,w2_l1,w2_l2,w2_l2b,w3_l1,w3_l1b,w3_l2,w4_l1,w4_l2,w4_l2b
 Smoke: campaign beginner w1_l1,w1_l2,w2_l1,w2_l2,w3_l1,w3_l2; expert w1_l1,w1_l2,w2_l1,w2_l2,w3_l1,w3_l2,w4_l1,w4_l2
 Smoke: ran 3.0 s, 0 error(s), 0 warning(s) logged
@@ -235,5 +250,9 @@ no file sharing, and `ITSAppUsesNonExemptEncryption = false` (no export-complian
 2. Import clean, `tests/run_tests.gd` green, level validator green.
 3. Windows: `tools\build_windows.ps1` ends with `BUILD OK`.
 4. Other platforms: export, install on the devices of `docs/PORTING.md` section 5, run the device checklist.
-5. `CREDITS.md` and `assets/licenses/` are inside the package (they are, through the include filter).
+5. `CREDITS.md` and `assets/licenses/` are inside the package (they are, through the include filter) and readable
+   in the game (Credits > Licences); the Windows release zip also carries them as files in `licenses/` next to the
+   exe (`tools/build_windows.ps1` step 6). Distribute the zip, never the bare exe. After an asset rebuild
+   (`docs/art/pipeline/build_all.py`) the hand-maintained `CREDITS.md`, `assets/licenses/README.md` and
+   `godot_*.txt` are kept, and the pipeline fails if a pack is missing from them (docs/THIRD_PARTY.md).
 6. Archive the exact build: the exe / apk / aab / ipa, its SHA-256, and the commit it was built from.

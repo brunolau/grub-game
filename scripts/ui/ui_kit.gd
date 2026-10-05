@@ -169,6 +169,10 @@ static func font_size(style: int) -> int:
 ## A texture by path; null when the file does not exist. Only the answer "missing" is remembered here: a texture in
 ## use is shared through Godot's resource cache, and one that no screen uses any more is released (a static cache
 ## kept the backdrops of every biome the tally and the menus had shown, about 9 MB each, for the whole session).
+## CALLERS MUST KEEP THE REFERENCE while the texture is drawn: a texture loaded inside a draw callback and kept only
+## in a local variable is freed right after draw_texture(), and the canvas then draws a dead texture (white). Load it
+## once into a member (see title.gd, world_map.gd, the_end.gd, expert_wall.gd); tests/test_ui_screens.gd
+## test_screens_hold_the_pictures_they_draw guards the screens.
 static func tex(path: String) -> Texture2D:
 	if _textures.has(path):
 		return null

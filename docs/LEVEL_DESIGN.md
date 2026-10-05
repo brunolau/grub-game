@@ -424,9 +424,14 @@ inwards instead of showing outside the level); a larger one lets the camera foll
   two cells on each side, and not on ice next to a gap.
 - **The weapon a player brings**: a run keeps its weapon from level to level (the axe of 1-2 into 2-1, the hammer
   of 2-1 into worlds 2 and 3, the swirling axe of 3-2 into world 4), while a level started from its code or the
-  level select begins with the club. A level must be fair with both. Route proofs are recorded with one weapon;
-  `tests/test_campaign_routes.gd` lists the routes not yet proven with the carried one (WEAPON_GAPS) and its
-  `CAMPAIGN_ADAPT` aid pads a route for another weapon's swing recovery.
+  level select begins with the club. A level must be fair with every weapon a player can hold on entry: nothing on a
+  main path may need a melee hit (thrown weapons open spots and blocks too), and a boss must be beatable with each.
+  Every (stage, difficulty, weapon) cell has its own route proof, `<id>[.expert].<weapon>.inputs`;
+  `tests/test_campaign_routes.gd` demands one per cell and plays both campaigns with the carried weapon. To make a
+  weapon route from the club route: `CAMPAIGN_ADAPT` / `CAMPAIGN_REPAIR` there, the `sync` job of
+  `tests/test_route_tools.gd` (re-times a route so the new weapon's hero meets the club hero at every resting point),
+  and `ARMS_REPAIR` of `tests/test_enemies_colossus.gd` for the auto-scrolling shaft. After any level change, re-run
+  `bash .tools/gd.sh test campaign_routes`: it replays every weapon's routes of that level.
 - **Hidden spots**: `?` / `*` look like ground. With `look=inset` (atlas tile 15) or `look=block` (tile 7) they
   show a hint until opened. In the air: `prop=<biome>/<name>` (a bush, a rock) is the thing to hit. Thrown-out
   bonuses fly up and land on the first floor they meet: a one-way ledge right above a spot catches them (make
@@ -436,8 +441,16 @@ inwards instead of showing outside the level); a larger one lets the camera foll
   arena limits; a walled one-screen pit the hero drops into works well (`levels/test_integration_boss.lvl`: without
   walls the hero can be knocked out of the locked view). The Brute's head is the only weak point: a high strike,
   or an axe thrown with a high strike, reaches it. The Wall Colossus level must place `items/weapon kind=axe` next
-  to its checkpoint, and `bosses/colossus` goes in the floor-level air cell just left of the arena's right wall
-  (its stone rim then covers the wall face).
+  to its checkpoint (with a sign saying that only a thrown axe hurts it: a club or hammer on its head glances off
+  with a clank and a spark), and `bosses/colossus` goes in the floor-level air cell just left of the arena's right
+  wall (its stone rim then covers the wall face). Keep the arena's rock ceiling low enough that falling stalactites
+  hang below the HUD row and the boss bar (Colossus Hall: rows 2-4 of rock over the hall). The tuning is in
+  `docs/spec/GAMEPLAY.md` 6.3 and pinned by `tests/test_enemies_colossus.gd`.
+- **Teaching signs**: every new mechanic gets an `objects/sign` (or a `zones/message` hint) where the player meets it,
+  before it can kill him: the boards stay up for a read time and make the stage banner give way, so a sign right
+  at the start is fine (Cinder Shaft does that: its descent waits for the player's first input). A pit of lava
+  should show its lava: fill it to one row under the floor and put a `[backwall]` behind the open row, so the
+  parallax backdrop does not show through.
 - **Completion** = opened hidden spots + collected placed items with points, over their totals.
 
 ---

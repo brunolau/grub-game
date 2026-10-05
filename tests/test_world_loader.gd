@@ -226,6 +226,9 @@ func test_meta_variants_scroll_modes_and_darkness() -> void:
 	assert_eq(int(level.meta["time"]), 30, "time.expert overrides time in Expert")
 	assert_eq(level.get_time_left_seconds(), 30)
 	var modulate: CanvasModulate = level.get_node("Darkness")
+	# process_frame is emitted before the nodes' _process of that frame: wait two, so the level has drawn once
+	# whatever the frame phase this test started in.
+	await get_tree().process_frame
 	await get_tree().process_frame
 	assert_true(modulate.color.is_equal_approx(Level.DARK_COLOR), "no fade at the start: already dark")
 

@@ -42,6 +42,8 @@ C = objects/checkpoint
 [entities]
 # Antechamber: the axe is always here (it comes back after a death), food
 items/weapon 8 6 kind=axe
+# Teaching sign by the axe: only thrown weapons hurt the Colossus (melee hits glance off its head).
+objects/sign 11 6 text=SIGN_W4_COLOSSUS
 items/food 14 6 index=40
 items/food 16 6 index=35
 items/food 18 6 index=33

@@ -107,6 +107,8 @@ func test_code_entry_accepts_a_level_code() -> void:
 	assert_eq(Flow.current_screen, Flow.SCREEN_WORLD_MAP)
 	assert_eq(Flow.args.get("level_id"), &"test_example")
 	assert_eq(Game.difficulty, Defs.Difficulty.BEGINNER)
+	assert_true(Save.is_level_unlocked(&"test_example", Defs.Difficulty.BEGINNER),
+			"a level started by its code is listed as reached in the level select")
 	await _cleanup()
 
 
@@ -307,6 +309,21 @@ func test_credits_back_returns_to_title() -> void:
 	await _open(&"credits")
 	_press(&"ui_cancel")
 	assert_eq(Flow.current_screen, Flow.SCREEN_TITLE)
+	await _cleanup()
+
+
+## The roll opens with the logo on screen, and a confirm pressed right away (still meant for The End) does not
+## skip it; after the grace time confirm leaves as before.
+func test_credits_ignore_an_early_confirm() -> void:
+	var node: CreditsScreen = await _open(&"credits") as CreditsScreen
+	await get_tree().process_frame
+	var logo: Control = node.get("_roll").get_child(0) as Control
+	assert_true(logo.get_global_rect().position.y < node.get_viewport_rect().size.y * 0.5, "the logo shows at once")
+	_press(&"ui_accept")
+	assert_eq(Flow.current_screen, Flow.SCREEN_BOOT, "an early confirm is ignored (the roll stays)")
+	node.set("_age", CreditsScreen.ACCEPT_GRACE)
+	_press(&"ui_accept")
+	assert_eq(Flow.current_screen, Flow.SCREEN_TITLE, "later, confirm leaves")
 	await _cleanup()
 
 

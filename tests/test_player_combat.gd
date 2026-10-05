@@ -137,6 +137,28 @@ func test_charge_table() -> void:
 	assert_eq(ticks[0], int(ref["ticks_until_zero_after_standing_up"]))
 
 
+## The charge is shown (a remake addition, the reference has no cue): the hero glows warmer while his next blow is
+## charged, flickers once the charge is full (a chime plays once), and is plain again when it has run out.
+func test_charge_glows_and_chimes_when_full() -> void:
+	world_flat()
+	spawn_hero()
+	var sprite: Sprite2D = hero.get_node(^"Sprite") as Sprite2D
+	assert_eq(sprite.self_modulate, Color.WHITE, "no glow without a charge")
+	play(hold("D", 10))
+	assert_true(sprite.self_modulate.r > 1.0, "a crouch charges: the hero glows (%s)" % sprite.self_modulate)
+	play(hold("D", 60))
+	assert_true(hero.charge >= Tuning.CHARGE_STEP_MAX_AT, "full charge (%d)" % hero.charge)
+	var tints: Dictionary = {}
+	for i: int in 4:
+		play(hold("D", 1))
+		tints[sprite.self_modulate] = true
+	assert_eq(tints.size(), 2, "a full charge flickers between two glows")
+	while hero.charge != 0:
+		play(hold("", 1))
+	play(hold("", 1))
+	assert_eq(sprite.self_modulate, Color.WHITE, "the glow ends with the charge")
+
+
 func test_club_box_mirrors_when_facing_left() -> void:
 	world_flat()
 	spawn_hero()

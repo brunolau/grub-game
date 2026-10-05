@@ -121,8 +121,9 @@ Route logic (verified against the original in `[P:pre2/native/level_state.py:nat
 
 ### 1.6 Easter eggs (optional for us)
 
-- If the system clock is 1996 or later the game opens with: "YEAAA... MY GAME IS STILL WORKING IN <year>. PROGRAMMED IN
-  1992 ON AT 286 12MHZ. ENJOY OLDIES" `[B:game.c:do_programmed_in_1992_screen]`, `[TVT]`.
+- If the system clock is 1996 or later the game opens with a short message from the programmer, cheering that the
+  game still runs in the current year and that it was programmed in 1992 on a 286 PC (paraphrased here; not used by
+  Club & Grub) `[B:game.c:do_programmed_in_1992_screen]`, `[TVT]`.
 - Hidden credits screen and photo screen on key combinations (Ctrl+Alt+W / Ctrl+Alt+E) `[B:game.c:input_check_ctrl_alt_w/e]`, `[WP]`.
 
 ---
@@ -146,6 +147,8 @@ Not on the panel but on screen:
 - **"1UP" pop-up** when a life is gained `[B:level_update_panel]`.
 - **Boss energy bar**: up to 8 small pips in the lower-left corner of the playfield (5 px apart, about 6 px above the
   panel), only while a boss is active `[B:bosses.c:level_update_objects_boss_energy]`. Exact screen anchoring `[INFERRED]`.
+  *Club & Grub*: a continuous bone-framed bar under the hearts, top-centre on every device (the touch buttons fill
+  both bottom corners), its fill spanning the boss's own hit points (`scripts/ui/hud_boss_bar.gd`).
 - Bones are **not** shown on the HUD; the 6-bone fraction of a heart is invisible state `[B:level_update_player_collision]`.
 - No timer, no weapon icon, no level name on the HUD (none drawn by `[B:level_draw_panel]` / `[P:hud.py]`).
 
@@ -439,6 +442,22 @@ exit light green `[B:bosses.c]`.
   `[B:level.c:level_update_player_collision]`; the id comparison in `blues` does not match the spawned ids, so the exact
   path is `[INFERRED]`).
 - **Defeat**: statue switches to the broken pose; 4 trophies fly out; touching one starts the ending.
+- **Club & Grub (the remake's Wall Colossus, `scripts/bosses/colossus.gd`, EnemyTuning COLOSSUS_* / ROCK_* /
+  STALACTITE_*)**, tuned for fairness with telegraphs the original lacks:
+  - idle loop of 84, 30, 30, 20, 20 ticks between attacks (the first rock leaves on the 94th tick of the fight);
+    hits never stop the attacks: the idle clock runs on through hurt poses, and a hit landed during an attack is
+    roared after it (no stun-lock);
+  - **spit**: the open jaws show 10 ticks before the rock leaves; rock speeds 32..96 v16 (2-6 px per tick); a rock
+    bounces twice, rolls 10 ticks and crumbles (none lies waiting on the slab);
+  - **stalactites** (the chandeliers) rattle 14 ticks under the hall's rock ceiling before they fall, below the HUD
+    row and the boss bar;
+  - **hurt pose** and the boss's own hit cooldown: 26 ticks; the 1st hit and every 4th hit after it start the red
+    **rage** pose (40 ticks, armoured: thrown weapons glance off it; its rock leaves 10 ticks in, stalactites drop at
+    18 and 28);
+  - a club or hammer on the head **glances off** with a clank and a spark (no damage), and a sign by the axe at the
+    checkpoint says that only a thrown axe cracks the statue;
+  - fairness is pinned by `tests/test_enemies_colossus.gd` (every attack shown 10+ ticks ahead, every rock speed
+    jumpable from the slab, stalactites escapable, no stun-lock, both thrown weapons reach the head).
 
 ---
 
@@ -537,6 +556,9 @@ Two invisible-effect items fade the whole level palette to a dark "night" palett
 
 Level 6 scrolls down by itself 1 px per tick with horizontal scrolling off; touching the top edge or falling below the
 screen kills `[TD]` (scroll mode bits), `[B:level.c:level_adjust_y_scroll, level_update_player_decor]`, `[TVT]`.
+*Club & Grub*: the descent starts with the player's first input (at the level start and after a respawn), so a
+newcomer reading the start sign is not carried off the top edge; the deadly top edge is drawn as a band of smoke
+(`scripts/world/level.gd`). A route that moves on its first tick sinks exactly as in the original.
 
 ### 7.12 Camera
 

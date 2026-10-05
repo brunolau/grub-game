@@ -58,7 +58,7 @@ Contract files are `scripts/core/**`, `scripts/base/**`, `tests/test_case.gd`, `
 
 | Setting | Value | Why |
 |---|---|---|
-| Name / version / main scene | `Club & Grub`, `0.1.0`, `res://scenes/main.tscn` | boot scene hands over to `scenes/ui/title.tscn` when it exists |
+| Name / version / main scene | `Club & Grub`, `1.0.0`, `res://scenes/main.tscn` | boot scene hands over to `scenes/ui/title.tscn` when it exists |
 | User data dir | `user://` = `%APPDATA%/ClubAndGrub` (custom user dir) | stable across renames; save.json, settings.cfg |
 | Renderer | `gl_compatibility` on desktop and mobile | maximum device coverage |
 | Base viewport | **640 x 360 art px** = 320 x 180 logical px x `Tuning.ART_SCALE` (2) | ASSET_MANIFEST 1 |
@@ -935,8 +935,13 @@ it ends, what follows, what it must achieve) and replays each one through Flow a
 campaign tests play the whole game in one run per mode with everything a run carries, and are the headless twins
 of `tools/autoplay/campaign.flow` (Expert, title to credits) and `campaign_beginner.flow` (code to the expert
 wall). A run keeps its weapon from level to level, and a swing locks the hero for the weapon's recovery, so a route
-recorded with the club drifts with another weapon: the routes not yet proven with the weapon a run carries are
-listed in `WEAPON_GAPS` there (the campaign test and flow hand the hero the route's weapon before them).
+recorded with the club drifts with another weapon: every (stage, difficulty, weapon a run can bring) cell has a route
+of its own (`<id>[.expert].<weapon>.inputs`), `test_every_weapon_a_run_can_bring_has_a_route` derives the cells from
+where the weapons lie and demands exactly one route each, and both campaigns (headless and the flows) play every
+stage with the route of the weapon the run really carries - no weapon is ever handed over. Every route replay also
+fails on any engine warning or error. Route-building aids: `CAMPAIGN_PROBE` / `CAMPAIGN_ADAPT` / `CAMPAIGN_REPAIR`
+there, the sync / adapt jobs of `tests/test_route_tools.gd`, the repair and Colossus-bot aids of
+`tests/test_enemies_colossus.gd`.
 
 ### 8.2 player
 
@@ -1010,8 +1015,9 @@ May consume: `Spawner`, `LevelText`, `TileGrid`, `Levels`, `Game`, `Sim`, `Audio
 
 ### 8.6 ui
 
-Responsibilities: every screen of section 3.10 and the three overlays; HUD (lives, score, hearts, letters, boss
-pips, score pop-ups are FX not HUD) laid out from ASSET_MANIFEST 12 with safe-area margins; title + attract,
+Responsibilities: every screen of section 3.10 and the three overlays; HUD (lives, score, hearts, letters, the boss
+bar under the hearts (HudBossBar: its fill spans the boss's own hit points; the signal API still carries pips),
+score pop-ups are FX not HUD) laid out from ASSET_MANIFEST 12 with safe-area margins; title + attract,
 mode select, code entry / continue, options (volumes, fullscreen, bindings, touch layout, accessibility), pause
 menu (resume, restart from checkpoint = `Game.level.player.kill(&"give_up")`, restart level, options, quit),
 level intro, world map, tally (GAMEPLAY.md 3.7), game over, Beginner wall, the end, credits (CREDITS.md wording),
@@ -1120,7 +1126,9 @@ bash .tools/gd.sh play --flow=tools/autoplay/campaign_beginner.flow --fast --fre
 
 A plain `--autoplay=<id>` run plays its script in that one stage and ends when another stage takes over (its
 screenshots are never overwritten by the next stage). Its clock stands still until the script's first tick, so the
-level's tick 1 is the script's tick 1, as in the route tests and flow scripts.
+level's tick 1 is the script's tick 1, as in the route tests and flow scripts. `--weapon=club|hammer|axe|boomerang`
+starts the hero with that weapon (the per-weapon routes `<id>[.expert].<weapon>.inputs`), like the flow command
+`weapon`; `--difficulty=expert` picks the Expert spawn set.
 
 Tool scripts run with `-s` (`tests/run_tests.gd`, `tools/*.gd`) are compiled before the autoloads exist: a class
 that uses an autoload (`SimEntity` and every entity script) cannot be named in such a script's own source (it
@@ -1335,3 +1343,12 @@ and 4 key items).
   game. Before, an instant transition took the level out of the tree in the middle of the exit tick, so a headless
   replay could differ from the game in that one tick: route `w3_l2.inputs` (Beginner) now ends with 194 600 points
   instead of 193 000 in headless replays - the score the game with its timed transitions always gave.
+- Release pass (fresh-eyes playtest), deviations from the original for readability, none of which moves a recorded
+  route: the 4-1 auto-scroll waits for the player's first input after the start and after a respawn, and draws
+  its deadly top edge as smoke; sign boards stay up for a read time (presentation only) and make the stage banner
+  give way, which a waking boss does too; the crouch charge shows as a glow on the hero with a chime when full;
+  a club or hammer on the Colossus' head glances off with a clank and a spark; a hero who dies in water or lava
+  splashes, the death jingle plays before the respawn curtain and lava plays its ambience loop; world letters
+  shimmer. The extra-life rule stays the original's (one per 250 000 points, at most 99 lives).
+- Every route proof is played with the weapon it was recorded for, every (stage, difficulty, weapon a run can
+  bring) cell has one, and both campaigns play the route of the weapon the run carries (8.1).

@@ -35,6 +35,8 @@ Q = objects/hidden_spot kind=small count=3 look=inset tile=% contents=food:40,fo
 q = objects/hidden_spot kind=small count=3 look=inset tile=# contents=food:33,food:43,treasure:6
 k = objects/hidden_spot kind=small count=3 look=inset tile=# contents=food:45,food:46,treasure:5
 K = objects/hidden_spot kind=small count=3 look=inset tile=% contents=food:43,food:33,food:46
+# The big spot in the orange road before the lava pits (the default '*' is a '#' cell: an obsidian block in it).
+Z = objects/hidden_spot kind=big hits=3 tile=%
 
 [tiles]
 %%......................................................................................##############################################............................................................##
@@ -75,14 +77,16 @@ K = objects/hidden_spot kind=small count=3 look=inset tile=% contents=food:43,fo
 %%.........a.a....................======............e.e........c.c....------------------........................................####################################################################
 %%......../%Q%%\......b.b.b..b.b................d...........c...................................................................####################################################################
 %K@....../%%%%%%\.........................C..........................................C..........................................####################################################################
-%%%%%%%%%%%%%%%%%%%%*%%%...%%...%%%%%%%%%%%%#######......######^^^##############q###########^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^####################################################################
-%%%%%%%%%%%%%%%%%%%%%%%%...%%...%%%%%%%%%%%%#######......###########################################################################################################################################
+%%%%%%%%%%%%%%%%%%%%Z%%%...%%...%%%%%%%%%%%%#######......######^^^##############q###########^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^####################################################################
+%%%%%%%%%%%%%%%%%%%%%%%%~~~%%~~~%%%%%%%%%%%%#######......###########################################################################################################################################
 %%%%%%%%%%%%%%%%%%%%%%%%~~~%%~~~%%%%%%%%%%%%#######^^^^^^###########################################################################################################################################
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%########################################################################################################################################################
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%########################################################################################################################################################
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%########################################################################################################################################################
 
 [entities]
+# Teaching sign before the first lava pits (cols 24-26 and 29-31).
+objects/sign 18.5 37 text=SIGN_W4_LAVA
 # Ash road
 objects/hidden_spot 5 37 kind=small count=3 contents=food:43,food:46,treasure:4 prop=volcano/rock_big
 objects/hidden_spot 39 37 kind=small count=3 contents=food:33,food:45,food:35 prop=volcano/skull_big
@@ -121,6 +125,15 @@ items/letter 165 20 index=4
 items/code_stone 167 20 index=3
 items/treasure 166 20 index=15
 objects/hidden_spot 163 26 kind=small count=3 contents=food:40,heart,food:35 prop=volcano/boulder_orange
+# More guards for the keep (review fresh_eyes: the finale had the fewest enemies of the game): stingers hover in the
+# great hall over the column staircase and over the ramparts and dive at a hero who climbs into their reach; a turtle
+# patrols the far rampart. Placed so that every weapon's route keeps its timing (tests/test_campaign_routes.gd).
+enemies/stinger 96 24 skin=insect_b range=5 hp=25
+enemies/stinger 110 15 skin=insect_b range=6 hp=25
+enemies/stinger 122 12 skin=insect_b range=7 hp=25
+enemies/stinger 150 14 skin=insect_b range=5 hp=25
+enemies/stinger 175 16 skin=insect_b range=5 hp=25
+enemies/walker 181 26 skin=turtle_b left=-2 right=2 hp=25
 # Scenery
 props/volcano/drips 90 7
 props/volcano/drips 102 7
@@ -164,8 +177,50 @@ props/volcano/grass_a 44 37
 props/volcano/grass_a 68 37
 props/volcano/grave_cross 73 37 flip
 props/volcano/tusk_b 91 37 flip
+# The keep dressed (review fresh_eyes: the interior looked unfinished): bones, skulls and tusks on its floors,
+# stalactites and drips under its ceilings, so the dark halls have landmarks.
+props/volcano/bone_pile 46 37
+props/volcano/skull_buried 57 37 flip
+props/volcano/tusk_a 62 37
+props/volcano/rocks_small 75 37
+props/volcano/bone_big 82 37 flip
+props/volcano/twigs 87 37
+props/volcano/stalactite 88 33
+props/volcano/skull_ribs 117 19
+props/volcano/tusk_b 122 19 flip
+props/volcano/mound_small 116 26
+props/volcano/bone_pile 121 26
+props/volcano/drips 92 7
+props/volcano/drip_cap 96 7
+props/volcano/stalactite 100 7
+props/volcano/drips 104 7
+props/volcano/stalactite 108 7
+props/volcano/drips 112 7
+props/volcano/drip_cap 121 7
+props/volcano/stalactite 125 7
+props/volcano/drips 117 21
+props/volcano/stalactite 121 21
+props/volcano/drips 116 25
+props/volcano/drip_cap 120 25
+props/volcano/stalactite 113 29
+props/volcano/drips 117 29
+props/volcano/stalactite 121 29
+props/volcano/drips 125 29
+props/volcano/skull_buried 27 37 flip
+props/volcano/tusk_a 32 37
+props/volcano/rocks_small 37 37
+props/volcano/bone_big 130 26 flip
+props/volcano/twigs 143 26
+props/volcano/skull_ribs 152 26
+props/volcano/tusk_b 160 26 flip
+props/volcano/mound_small 179 26
+props/volcano/bone_pile 184 26
+props/volcano/drip_cap 130 22
 
 [backwall]
+# The first lava pits: rock behind them, so the pit reads as a hole in the ground (not the burnt forest behind).
+24 38 3 1 set=b deco=0
+29 38 3 1 set=b deco=0
 47 28 43 10 set=a deco=25
 51 38 6 3 set=a deco=10
 63 38 3 1 set=a deco=0

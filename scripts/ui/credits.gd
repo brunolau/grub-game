@@ -15,6 +15,11 @@ const SPEED: float = 30.0          ## art px per second
 const FAST_FACTOR: float = 6.0
 const TEXT_WIDTH: float = 520.0
 const END_HOLD: float = 3.0
+## Confirm and a tap are ignored this long after the roll opened (a player who pressed Enter on The End just as it
+## moved on would otherwise skip the whole roll); Back leaves at once.
+const ACCEPT_GRACE: float = 1.5
+## Where the roll starts: its top (the logo) this far down the view, so the screen never opens empty.
+const START_TOP: float = 0.3
 ## Licence texts: [title (a translation key or a name), file]. Shipped with every export (include filter).
 const LICENCES: Array[Array] = [
 	["Godot Engine", "res://assets/licenses/godot_engine.txt"],
@@ -31,6 +36,8 @@ var _roll: VBoxContainer = null
 var _clip: Control = null
 var _offset: float = 0.0
 var _end_time: float = 0.0
+## Seconds since the roll opened.
+var _age: float = 0.0
 var _corner: UiPrompts = null
 var _viewer: Control = null
 var _viewer_title: Label = null
@@ -130,10 +137,11 @@ func _build_screen() -> void:
 
 func _screen_ready() -> void:
 	Audio.play_music(Sfx.MUSIC_CREDITS)
-	_offset = _clip.size.y
+	_offset = roundf(_clip.size.y * START_TOP)
 
 
 func _process(delta: float) -> void:
+	_age += delta
 	if is_licence_open():
 		var step: float = Input.get_axis(&"ui_up", &"ui_down") * LICENCE_SCROLL_SPEED * delta
 		if step != 0.0:
@@ -174,6 +182,8 @@ func _on_accept() -> void:
 	if is_licence_open():
 		show_licence(licence_page + 1)
 		return
+	if _age < ACCEPT_GRACE:
+		return
 	leave()
 
 
@@ -185,7 +195,7 @@ func _on_cancel() -> void:
 
 
 func _on_tap() -> void:
-	if not is_licence_open():
+	if not is_licence_open() and _age >= ACCEPT_GRACE:
 		leave()
 
 

@@ -8,6 +8,12 @@ extends SimEntity
 ## text is set like the in-level hint panel of the HUD (HUD face in cream, the same line spacing and balanced
 ## wrapping, the same fade). The board lives in the world, so it has no safe-area margins; it is kept inside the
 ## view and below the HUD row, so a sign near an edge of the view stays readable.
+##
+## Read time (presentation only, the tick rule is unchanged): once shown, a board stays at least READ_SECONDS, and
+## LINGER_SECONDS after the hero left the sign, while the sign is in or near the view (the board waits at the view's
+## edge when the camera pages on) - a hero walking past at full speed overlaps it for half a second. The level's
+## intro banner gives way to a board that appears under it (Hud.dismiss_intro()), so the first sign of a stage is
+## never hidden by the stage name.
 
 ## Widest text line (art px) and the room around the text inside the board.
 const TEXT_MAX_W: float = 360.0
@@ -22,6 +28,14 @@ const VIEW_EDGE: float = 8.0
 const VIEW_TOP: float = 56.0
 ## Fade in / out, like the HUD's hint panel.
 const FADE_SECONDS: float = 0.18
+## Least time a board stays up once shown, and how long it stays after the hero left the sign (seconds).
+const READ_SECONDS: float = 2.5
+const LINGER_SECONDS: float = 1.0
+## How far beyond the view's edge (view px) the sign of a held board may be (the board waits at the edge).
+const HOLD_MARGIN: float = 200.0
+## Top edge of the board while a boss bar shows under the hearts (view px): the board stays below the bar, and a
+## held board gives way to the fight.
+const VIEW_TOP_BOSS: float = 96.0
 ## Colours of ui/panel.png's edge: outline, rim and face. The tail is drawn with them.
 const COL_EDGE: Color = Color8(46, 39, 31)
 const COL_RIM: Color = Color8(108, 61, 40)
@@ -39,6 +53,11 @@ var _label: Label = null
 var _tail: Control = null
 var _near: bool = false
 var _alpha: float = 0.0
+## Seconds since the board appeared, and since the hero left the sign.
+var _shown_for: float = 0.0
+var _away_for: float = 0.0
+## True while the HUD shows a boss bar.
+var _boss_bar: bool = false
 
 
 func _init() -> void:
@@ -104,16 +123,39 @@ func _can_doze() -> bool:
 	return not _near
 
 
-## Presentation only: fade the board and keep it inside the view.
+## Presentation only: fade the board, hold it for the read time, keep it inside the view.
 func _process(delta: float) -> void:
 	if _label == null or not _label.visible:
+		_shown_for = 0.0
 		return
-	_alpha = move_toward(_alpha, 1.0 if _near else 0.0, delta / FADE_SECONDS)
+	var hud: Node = get_tree().get_first_node_in_group(Defs.GROUP_HUD)
+	if _shown_for == 0.0 and hud != null and hud.has_method(&"dismiss_intro"):
+		hud.call(&"dismiss_intro")
+	_boss_bar = hud != null and hud.has_method(&"is_boss_bar_visible") and bool(hud.call(&"is_boss_bar_visible"))
+	_shown_for += delta
+	_away_for = 0.0 if _near else _away_for + delta
+	var held: bool = (_shown_for < READ_SECONDS or _away_for < LINGER_SECONDS) and _sign_in_view() and not _boss_bar
+	var wanted: bool = _near or held
+	_alpha = move_toward(_alpha, 1.0 if wanted else 0.0, delta / FADE_SECONDS)
 	_label.modulate.a = _alpha
-	if _alpha <= 0.0 and not _near:
+	if _alpha <= 0.0 and not wanted:
 		_label.visible = false
+		_shown_for = 0.0
 		return
 	_place_board()
+
+
+## True while the sign is inside the view or less than HOLD_MARGIN beyond its edge: the camera pages ahead of a
+## running hero, so a held board waits at the view's edge for the rest of its read time, but never follows a sign
+## that is far away.
+func _sign_in_view() -> bool:
+	var x: float = get_global_transform_with_canvas().origin.x
+	return x >= -HOLD_MARGIN and x <= get_viewport_rect().size.x + HOLD_MARGIN
+
+
+## True while the board is on screen (also while it fades or is held for the read time).
+func is_board_shown() -> bool:
+	return _label != null and _label.visible and _alpha > 0.0
 
 
 ## The wooden board: ui/panel.png as a nine-patch around the text.
@@ -138,7 +180,7 @@ func _place_board() -> void:
 	var board: Vector2 = _label.size * Vector2(scale_x, scale_y)
 	var left: float = origin.x - board.x * 0.5
 	left = clampf(left, VIEW_EDGE, maxf(VIEW_EDGE, view.x - VIEW_EDGE - board.x))
-	var top: float = maxf(origin.y + BOARD_BOTTOM_ART * scale_y - board.y, VIEW_TOP)
+	var top: float = maxf(origin.y + BOARD_BOTTOM_ART * scale_y - board.y, VIEW_TOP_BOSS if _boss_bar else VIEW_TOP)
 	var target: Vector2 = Vector2(roundf((left - origin.x) / scale_x), roundf((top - origin.y) / scale_y))
 	if target != _label.position:
 		_label.position = target

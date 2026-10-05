@@ -5,7 +5,8 @@ extends Control
 ## top-right, the boss energy bar under the hearts while a boss fights ([HudBossBar]: it spans the boss's own hit
 ## points, so every hit shows), the level intro banner when a level starts and the hint panel of `zones/message`
 ## (Events.message_requested) under the HUD row (below the boss bar during a fight); a hint asked for while the
-## intro banner shows waits until the banner is gone.
+## intro banner shows waits until the banner is gone. The banner gives way early to a sign board the hero reads and
+## to a boss that wakes up (dismiss_intro()).
 ##
 ## Owner: ui. Instantiated by Flow into the HUD CanvasLayer. It only reacts to `Game` and `Events` signals and
 ## never reaches into the level. Layout follows the mock-ups at 640 x 360 and stays anchored to the safe area on
@@ -18,6 +19,8 @@ const LETTER_STAGGER: Array[int] = [4, 0, 6, 3, 1]
 const BONE_W: float = 9.0
 const INTRO_SECONDS: float = 2.6
 const INTRO_TOP: float = 64.0  ## the level banner sits under the HUD row, clear of the hero
+## The banner gives way this fast to a sign board the hero reads or to a boss that wakes up (dismiss_intro()).
+const INTRO_DISMISS_SECONDS: float = 0.2
 const COL_LETTER_MISSING: Color = Color(0.38, 0.5, 0.62, 0.55)
 ## The time-limit counter turns red for the last seconds.
 const TIME_WARN_SECONDS: int = 10
@@ -69,6 +72,7 @@ var _letters: Array[TextureRect] = []
 var _boss_bar: HudBossBar = null
 var _intro: Control = null
 var _intro_gap: Control = null
+var _intro_tween: Tween = null
 var _boss_bar_was_visible: bool = false
 var _blink_left: float = 0.0
 var _heart_full: AtlasTexture = null
@@ -289,6 +293,27 @@ func show_intro(level_id: StringName) -> void:
 	tween.tween_interval(INTRO_SECONDS)
 	tween.tween_property(holder, "modulate:a", 0.0, 0.4)
 	tween.tween_callback(holder.queue_free)
+	_intro_tween = tween
+
+
+## True while the level intro banner is on screen (also while it fades in or out).
+func is_intro_visible() -> bool:
+	return _intro != null and is_instance_valid(_intro) and not _intro.is_queued_for_deletion()
+
+
+## Fade the level intro banner out now: something else needs the top of the view (a sign board the hero reads, a
+## boss waking up). Nothing happens when no banner shows.
+func dismiss_intro() -> void:
+	if not is_intro_visible() or _intro.has_meta(&"dismissed"):
+		return
+	_intro.set_meta(&"dismissed", true)
+	if _intro_tween != null and _intro_tween.is_valid():
+		_intro_tween.kill()
+	var holder: Control = _intro
+	var tween: Tween = holder.create_tween()
+	tween.tween_property(holder, "modulate:a", 0.0, INTRO_DISMISS_SECONDS)
+	tween.tween_callback(holder.queue_free)
+	_intro_tween = tween
 
 
 func _build_left(area: Control) -> void:
@@ -439,8 +464,7 @@ func _current_hint() -> int:
 
 func _fade_hint(delta: float) -> void:
 	var text: String = get_hint_text()
-	var intro_showing: bool = _intro != null and is_instance_valid(_intro)
-	var wanted: bool = not text.is_empty() and not intro_showing
+	var wanted: bool = not text.is_empty() and not is_intro_visible()
 	if wanted and text != _hint_shown_text:
 		_hint_shown_text = text
 		_layout_hint()
@@ -545,6 +569,8 @@ func _on_boss_started(boss: BossBase) -> void:
 	boss_max_hp = energy.y
 	_boss_bar.start(boss_hp, boss_max_hp)
 	_place_below_boss_bar()
+	# A short boss stage: the fight starts a few seconds in, the arena needs the whole view.
+	dismiss_intro()
 
 
 func _on_boss_energy_changed(boss: BossBase, pips: int, max_pips: int) -> void:

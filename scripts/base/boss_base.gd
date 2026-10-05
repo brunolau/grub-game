@@ -12,6 +12,8 @@ extends EnemyBase
 
 const ITEM_PREFIX: String = "items/"
 const FX_DEFEAT: StringName = &"fx/explosion_big"
+## Least ticks between two glance-off clanks of a melee weapon on a `thrown_only` boss.
+const GLANCE_TICKS: int = 12
 ## Short content tokens that name another item id (ARCHITECTURE.md 6.2).
 const TOKEN_ALIASES: Dictionary[String, String] = {"giant": "giant_bonus", "random": "random_bonus"}
 
@@ -27,6 +29,8 @@ var hp_per_pip: int = 8
 var music: StringName = Sfx.MUSIC_BOSS
 ## When true only thrown weapons count and every hit removes exactly 1 hit point (the Wall Colossus).
 var thrown_only: bool = false
+## Ticks until the next glance-off clank may play (thrown_only bosses).
+var _glance_ticks: int = 0
 ## What the boss drops when defeated (level parameter `drops`): content tokens such as `fire_starter`, `trophy`,
 ## `food:3`, `weapon:axe` (ARCHITECTURE.md 6.2) or full entity ids such as `items/heart`.
 var boss_drops: Array[StringName] = []
@@ -100,10 +104,13 @@ func start_fight() -> void:
 
 ## Test the hero's weapons against `weak_point` (logical px) for this tick: first every thrown weapon in flight,
 ## then the club box created on the previous tick. Returns the power of the first hit (0 = none) and consumes a
-## thrown weapon that hit. Honours `thrown_only` and the hit cooldown; a club hit makes the hero pogo.
+## thrown weapon that hit. Honours `thrown_only` and the hit cooldown; a club hit makes the hero pogo. On a
+## `thrown_only` boss a club or hammer on the weak point glances off: a clank and a spark, no damage, no pogo.
 func poll_weapon_hit(weak_point: Rect2i) -> int:
 	if hit_cooldown > 0:
 		hit_cooldown -= 1
+	if _glance_ticks > 0:
+		_glance_ticks -= 1
 	var level: LevelBase = Game.level
 	if level == null or dead or not fighting:
 		return 0
@@ -116,12 +123,26 @@ func poll_weapon_hit(weak_point: Rect2i) -> int:
 				return 0
 			return 1 if thrown_only else projectile.power
 	var hero: PlayerBase = level.player
-	if thrown_only or hero == null or not hero.club_box_active or hit_cooldown > 0:
+	if thrown_only:
+		_glance(level, hero, weak_point)
+		return 0
+	if hero == null or not hero.club_box_active or hit_cooldown > 0:
 		return 0
 	if Overlap.rects(hero.club_box, weak_point):
 		hero.notify_weapon_hit()
 		return hero.club_power
 	return 0
+
+
+## A melee weapon on the weak point of a boss that only thrown weapons hurt: show that it glances off (a clank and
+## a spark at most every GLANCE_TICKS), so a player learns to throw instead.
+func _glance(level: LevelBase, hero: PlayerBase, weak_point: Rect2i) -> void:
+	if _glance_ticks > 0 or hero == null or not hero.club_box_active or not Overlap.rects(hero.club_box, weak_point):
+		return
+	_glance_ticks = GLANCE_TICKS
+	Audio.play_sfx(Sfx.CLUB_HIT_SCENERY)
+	var contact: Rect2i = hero.club_box.intersection(weak_point)
+	level.spawn_fx(&"fx/hit_stars", contact.get_center())
 
 
 ## Apply a weapon hit found by poll_weapon_hit(): lose `power` hit points, update the bar, die at zero.

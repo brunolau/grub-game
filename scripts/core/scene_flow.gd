@@ -341,8 +341,12 @@ func start_new_game(difficulty: int) -> void:
 	show_world_map(first)
 
 
-## Start a new run at a later level (level select / code entry). Score and lives start fresh.
+## Start a new run at a later level (level select / code entry). Score and lives start fresh. A level reached by
+## its code counts as reached from then on, so the level select lists it (with its record once cleared).
 func continue_game(level_id: StringName, difficulty: int) -> void:
+	if not Save.is_level_unlocked(level_id, difficulty):
+		Save.unlock_level(level_id, difficulty)
+		Save.save_game()
 	Game.new_game(difficulty)
 	show_world_map(level_id)
 

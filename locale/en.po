@@ -409,7 +409,7 @@ msgid "SIGN_W1_AXE"
 msgstr "Axes fly far: press Attack to throw one!"
 
 msgid "SIGN_W2_HATCH"
-msgstr "Crouch on a hatch to drop through it."
+msgstr "Crouch on a hatch to drop through it. Crouching also powers up your next blow - you glow while it lasts!"
 
 msgid "SIGN_W2_DARK"
 msgstr "The deep caves are dark. Watch the threads!"
@@ -418,7 +418,7 @@ msgid "SIGN_W2_GLIDER"
 msgstr "Run with the glider, then jump to take off. Up climbs, Down dives."
 
 msgid "SIGN_W2_BRUTE"
-msgstr "The Brute keeps the fire-starter. Only its head is soft!"
+msgstr "The Brute keeps the fire-starter. Only its head is soft - crouch until you glow, then strike for four times the damage!"
 
 msgid "SIGN_W3_ICE"
 msgstr "Snow on ice is slippery! Let go early to stop in time."
@@ -437,6 +437,18 @@ msgstr "Something stirs in the icy water..."
 
 msgid "SIGN_W3_FLOES"
 msgstr "Hanging floes drop when you stand on them - keep moving!"
+
+msgid "SIGN_W4_SHAFT"
+msgstr "The shaft sinks as soon as you move. Keep heading down - the smoke above is deadly!"
+
+msgid "SIGN_W4_EMBERS"
+msgstr "Embers rain from the vents here - keep moving and watch the sky!"
+
+msgid "SIGN_W4_LAVA"
+msgstr "Lava glows in the pits ahead - jump over them!"
+
+msgid "SIGN_W4_COLOSSUS"
+msgstr "Clubs and hammers glance off the Colossus! Take the axe and throw it at its head from the black slab."
 
 # --- Level texts of the development levels (levels/test_*.lvl, not shipped) ---
 msgid "SIGN_INTEGRATION_SPOTS"

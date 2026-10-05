@@ -81,10 +81,10 @@ the asset staging area `.tools/asset_candidates` are ignored too and never pushe
 
 | # | Requirement | Status |
 |---|---|---|
-| 1 | Godot MIT copyright + permission notice with every copy | text ships in `assets/licenses/godot_engine.txt`; copyright lines shown in the credits roll. The full permission text is not yet readable by the player (it sits inside the PCK): add an in-game licence view (requested in `build/engine_requests/wf4_legal.txt`) and put the licence files next to the executable in the desktop download (section 5) |
-| 2 | Third-party notices of the engine (BSD / Apache / FTL / ...) | `assets/licenses/godot_third_party.txt` ships; same readability caveat as #1 |
+| 1 | Godot MIT copyright + permission notice with every copy | text ships in `assets/licenses/godot_engine.txt`; copyright lines shown in the credits roll; the full text is readable in the game (Credits > Licences, `scripts/ui/credits.gd`) and, in the Windows release zip, as `licenses/godot_engine.txt` next to the exe (`tools/build_windows.ps1` step 6) |
+| 2 | Third-party notices of the engine (BSD / Apache / FTL / ...) | `assets/licenses/godot_third_party.txt` ships; readable in the game's licence view and as a file in the Windows release zip, like #1 |
 | 3 | FreeType credit ("Portions of this software are copyright (c) <year> The FreeType Project (www.freetype.org). All rights reserved.") | in `godot_engine.txt` and in the in-game "Engine" credits line |
-| 4 | OFL fonts: copyright notice + licence with every copy | notices in the in-game "Fonts" credits; licence texts ship in `assets/licenses/googlefonts_*.txt` |
+| 4 | OFL fonts: copyright notice + licence with every copy | notices in the in-game "Fonts" credits; licence texts ship in `assets/licenses/googlefonts_*.txt`, readable in the licence view and as files in the Windows release zip |
 | 5 | CC0 art and audio | nothing required; every author is credited in the roll ("Art / Music / Sound" and "Asset packs") |
 | 6 | Trademarks | the game, its icon and its store name must not use "Prehistorik" or "Titus" (the shipped game does not; `CREDITS.md` only states that none of their material is used). Keep store copy to a neutral description; "Made with Godot" text is allowed, the logo needs the CC-BY credit |
 
@@ -133,21 +133,25 @@ the asset staging area `.tools/asset_candidates` are ignored too and never pushe
   (`_jump_body`, `glider_tilt`, `idle_timer`, `score_index`, `anim_num`, ...): they name the same game concepts; the
   bodies are independent GDScript written from `docs/spec/PHYSICS.md`.
 - **Docs.** `docs/spec/GAMEPLAY.md` and `PHYSICS.md` cite reference functions as `[B:file:function]` / `[P:path]`
-  without reproducing their code. One 17-word quotation of the original game's on-screen easter-egg text is in
+  without reproducing their code. The original game's on-screen easter-egg text is paraphrased, not quoted, in
   `docs/spec/GAMEPLAY.md` 1.6 (repository only, not shipped). The in-game Beginner-wall line "To enter you must be an
   expert eater!" (`locale/en.po`) echoes the original's "YOU MUST BE AN EXPERT EATER" picture; a short phrase, low risk.
 
 ## 5. Maintenance rules
 
-- **Pipeline overwrite.** `docs/art/pipeline/build_manifest.py` rewrites `CREDITS.md` and `assets/licenses/README.md`,
-  and `build_licenses.py` rewrites the pack files in `assets/licenses/`; `build_all.py --clean` deletes `assets/`
-  (including `godot_engine.txt` / `godot_third_party.txt`). Update those scripts to the 2026-10-05 text before re-running them.
+- **Pipeline.** `CREDITS.md`, `assets/licenses/README.md` and `godot_engine.txt` / `godot_third_party.txt` are
+  maintained by hand. `docs/art/pipeline/build_manifest.py` no longer writes the first two: it fails when a pack the
+  assets come from is missing from them (by source URL and licence file) or an engine file is missing.
+  `build_licenses.py` writes only the per-pack files and keeps an author's FONTLOG after the OFL text (it reproduces
+  the shipped files, checked 2026-10-05); `build_all.py --clean` deletes everything under `assets/` except
+  `assets/licenses/`.
 - **Engine upgrade.** Regenerate `godot_engine.txt` and `godot_third_party.txt` from the new engine
   (a headless script printing `Engine.get_license_text()`, `Engine.get_copyright_info()`, `Engine.get_license_info()`),
   and update the version in the `CREDITS.md` engine line.
-- **Desktop downloads.** Ship the licence texts next to the executable as well (for example a `licenses/` folder with
-  `assets/licenses/*` and `CREDITS.md` in the release zip): Godot's "Complying with licenses" accepts an accompanying
-  file; the copies inside the embedded PCK are not readable by players.
+- **Desktop downloads.** Distribute the release zip, not the bare exe: `tools/build_windows.ps1` puts `CREDITS.md`
+  and every file of `assets/licenses/` into `licenses/` next to `ClubAndGrub.exe` and packs
+  `build/ClubAndGrub-<version>-windows.zip` (Godot's "Complying with licenses" accepts an accompanying file; the
+  in-game licence view covers platforms without one).
 - **New assets.** Only CC0 or OFL-style licences with saved evidence (`LICENSE_INFO.md` + saved page); add the row to
   `CREDITS.md` (author, source, licence, changes), the licence file to `assets/licenses/`, and the registry entry.
   A CC-BY asset additionally needs its attribution line in the credits roll and the licence link.

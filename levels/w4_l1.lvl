@@ -217,14 +217,24 @@ Q = objects/hidden_spot kind=small count=3 look=inset tile=# contents=food:40,fo
 [entities]
 # Crater throat: a boulder by the start hides a snack
 objects/hidden_spot 13 6 kind=small count=3 contents=food:43,food:45,food:33 prop=volcano/rock_big
+# Teaching sign under the start: the view only starts to sink once the player moves (Level, autoscroll).
+objects/sign 16.5 6 text=SIGN_W4_SHAFT
 # Digger gallery 1
 enemies/digger 8 31 skin=lizard_b zone=1,27,15,5
+# More of the shaft's dwellers (review fresh_eyes: the finale had the fewest enemies of the game): a turtle on the
+# gallery floor, stingers hovering in the chimneys. Placed so that every weapon's route keeps its timing.
+enemies/walker 12 31 skin=turtle_b left=-3 right=3 hp=25
+enemies/stinger 8 14 skin=insect_b range=3 hp=20
+enemies/stinger 9 102 skin=insect_b range=3 hp=20
+enemies/stinger 14 125 skin=insect_b range=4 hp=20
 objects/hidden_spot 13 31 kind=small count=3 contents=food:35,food:43,treasure:2 prop=volcano/skull_big
 # Lava strata: an obsidian raft crosses the wide pool when the hero steps on it
 objects/platform 8.5 46 dir=2 speed=3 travel=21 mode=ride skin=stone
 enemies/leaper 5.5 55 skin=dragon pause=88
 # Ember chute
 zones/ember_rain 9 74 rect=1,64,18,22 period=28
+# A hint as the hero enters the first ember rain (review fresh_eyes: the rain started unannounced).
+zones/message 9 65 rect=1,62,18,5 text=SIGN_W4_EMBERS
 enemies/stinger 17 77 skin=insect_b range=4 hp=20
 objects/hidden_spot 5 74 kind=small count=3 contents=food:46,food:41,food:45 prop=volcano/bone_big
 # Hatch band: the gate to the Cinder Cache

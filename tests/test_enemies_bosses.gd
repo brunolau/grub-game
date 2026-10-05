@@ -285,9 +285,13 @@ func test_colossus_takes_only_thrown_weapons_one_point_each() -> void:
 	var colossus: Colossus = _colossus()
 	_hero.teleport(Vector2i(100, 160))
 	Sim.step(2)
+	var stars_before: int = _count_fx(&"fx/hit_stars")
 	_club(colossus.get_head_rect(), 100)
 	Sim.step(1)
 	assert_eq(colossus.hp, 24, "the club cannot hurt it")
+	assert_eq(_count_fx(&"fx/hit_stars"), stars_before + 1, "... it glances off with a spark (and a clank)")
+	Sim.step(1)
+	assert_eq(_count_fx(&"fx/hit_stars"), stars_before + 1, "one spark per glance, not one per tick")
 	_hero.club_box_active = false
 	_throw_at(colossus.get_head_rect(), 120)
 	Sim.step(1)
@@ -424,6 +428,15 @@ func _colossus() -> Colossus:
 	rows.append("#".repeat(30))
 	_rows_level(rows)
 	return _enemy(&"bosses/colossus", Vector2i(19 * Tuning.TILE + 8, 160)) as Colossus
+
+
+## Effects of `id` alive in the level.
+func _count_fx(id: StringName) -> int:
+	var count: int = 0
+	for entity: SimEntity in _level.get_kind(Defs.Kind.FX):
+		if entity.scene_file_path.get_file().get_basename() == String(id).get_file():
+			count += 1
+	return count
 
 
 ## Make the hero's club box (of the "previous tick") cover `box`.

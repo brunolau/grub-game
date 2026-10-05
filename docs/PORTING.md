@@ -22,6 +22,8 @@ are in [BUILD.md](BUILD.md).
 | Architectures | Android arm64-v8a + armeabi-v7a; iOS arm64; macOS universal (Apple Silicon + Intel) | `export_presets.cfg` |
 | Development files | tests, tools, docs, test levels, debug level and `dev` folders are excluded from every preset; release builds ignore development switches | ARCHITECTURE.md 2, 9.2 |
 | Battery | `Engine.max_fps` 0 with vsync; the clock stops while paused or in the background | ARCHITECTURE.md 11 |
+| Licences | the full Godot MIT / third-party notices and both OFL font licences are readable in the game (Credits > Licences, look button or tap): the only compliant place on a phone, where no file ships next to the app | `scripts/ui/credits.gd`, `assets/licenses/` |
+| Options | the touch section (buttons always shown, opacity, size, layout) appears where touch can be used: a touch screen, a mobile build, or touch buttons switched on | `OptionsPanel.touch_options_wanted()` |
 
 ## 2. Android - what remains
 
@@ -44,7 +46,11 @@ are in [BUILD.md](BUILD.md).
 3. Verify 16 KB memory-page compatibility (required for new Play uploads targeting Android 15+): the Play Console
    pre-launch report flags it; locally `zipalign -c -P 16 -v 4 <apk>`.
 4. Raise `version/code` for every upload; keep `version/name` empty (it follows the project version).
-5. Decide whether to support Android TV / Chromebooks with a gamepad (`package/show_in_android_tv`, leanback banner);
+5. Measure the simulation on the low-end phone before the release: the budget is one tick <= 2 ms on 4 x Cortex-A53
+   (ARCHITECTURE.md 11), and only desktop numbers exist so far (ARCHITECTURE.md 11.4: 132-272 us average per tick
+   windowed on a Ryzen 9 7900X; a Cortex-A53 runs GDScript roughly 10-15x slower). If it is over, the remaining
+   cost is the hero's tick and the item bursts of the boss defeats (ARCHITECTURE.md 11.4).
+6. Decide whether to support Android TV / Chromebooks with a gamepad (`package/show_in_android_tv`, leanback banner);
    not planned now.
 
 **Store metadata (Play Console)**: app name, short and full description, 512 x 512 icon, 1024 x 500 feature

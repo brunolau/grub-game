@@ -3,7 +3,8 @@ extends VBoxContainer
 ## The settings menu, shared by the options screen and the pause menu (docs/ARCHITECTURE.md 8.6).
 ##
 ## Owner: ui. Every change is applied at once through `Settings.set_value` / `Settings.set_binding` and written to
-## disk when the panel closes. Pages: the main list (audio, video, gameplay, touch, language, reset), the
+## disk when the panel closes. Pages: the main list (audio, video, gameplay, touch where a touch screen can be used,
+## language, reset), the
 ## button bindings (keyboard and gamepad) and a yes / no confirmation. The host forwards "back" to
 ## [method go_back] and listens to [signal closed].
 
@@ -231,28 +232,30 @@ func _build_main(list: VBoxContainer) -> void:
 	list.add_child(_bindings_entry)
 	_toggle(list, "controls/up_jumps", "UI_OPT_UP_JUMPS")
 	_toggle(list, "controls/vibration", "UI_OPT_VIBRATION")
-	_heading(list, "UI_OPT_TOUCH")
-	var show_row: UiOptionRow = UiOptionRow.choice("UI_OPT_TOUCH_SHOW",
-			PackedStringArray(["UI_OPT_TOUCH_AUTO", "UI_OPT_TOUCH_ALWAYS"]),
-			1 if Settings.get_bool("controls/touch_always") else 0)
-	show_row.changed.connect(func(index: int) -> void: Settings.set_value("controls/touch_always", index == 1))
-	_add_row(list, "controls/touch_always", show_row)
-	var opacity: UiOptionRow = UiOptionRow.slider("UI_OPT_TOUCH_OPACITY", VOLUME_STEPS,
-			roundi(Settings.get_float("controls/touch_opacity") * float(VOLUME_STEPS)))
-	opacity.min_index = 2
-	opacity.changed.connect(func(index: int) -> void:
-		Settings.set_value("controls/touch_opacity", float(index) / float(VOLUME_STEPS)))
-	_add_row(list, "controls/touch_opacity", opacity)
-	var scale_row: UiOptionRow = UiOptionRow.choice("UI_OPT_TOUCH_SIZE",
-			PackedStringArray(["100%", "125%", "150%"]), _scale_index(Settings.get_float("controls/touch_scale")))
-	scale_row.changed.connect(func(index: int) -> void:
-		Settings.set_value("controls/touch_scale", TOUCH_SCALES[index]))
-	_add_row(list, "controls/touch_scale", scale_row)
-	var layout_row: UiOptionRow = UiOptionRow.choice("UI_OPT_TOUCH_LAYOUT",
-			PackedStringArray(["UI_OPT_TOUCH_STANDARD", "UI_OPT_TOUCH_SWAPPED"]),
-			maxi(0, TOUCH_LAYOUTS.find(str(Settings.get_value(KEY_TOUCH_LAYOUT, TOUCH_LAYOUTS[0])))))
-	layout_row.changed.connect(func(index: int) -> void: Settings.set_value(KEY_TOUCH_LAYOUT, TOUCH_LAYOUTS[index]))
-	_add_row(list, KEY_TOUCH_LAYOUT, layout_row)
+	# The touch section only where touch buttons can show: a touch screen, a phone, or buttons switched on.
+	if touch_options_wanted():
+		_heading(list, "UI_OPT_TOUCH")
+		var show_row: UiOptionRow = UiOptionRow.choice("UI_OPT_TOUCH_SHOW",
+				PackedStringArray(["UI_OPT_TOUCH_AUTO", "UI_OPT_TOUCH_ALWAYS"]),
+				1 if Settings.get_bool("controls/touch_always") else 0)
+		show_row.changed.connect(func(index: int) -> void: Settings.set_value("controls/touch_always", index == 1))
+		_add_row(list, "controls/touch_always", show_row)
+		var opacity: UiOptionRow = UiOptionRow.slider("UI_OPT_TOUCH_OPACITY", VOLUME_STEPS,
+				roundi(Settings.get_float("controls/touch_opacity") * float(VOLUME_STEPS)))
+		opacity.min_index = 2
+		opacity.changed.connect(func(index: int) -> void:
+			Settings.set_value("controls/touch_opacity", float(index) / float(VOLUME_STEPS)))
+		_add_row(list, "controls/touch_opacity", opacity)
+		var scale_row: UiOptionRow = UiOptionRow.choice("UI_OPT_TOUCH_SIZE",
+				PackedStringArray(["100%", "125%", "150%"]), _scale_index(Settings.get_float("controls/touch_scale")))
+		scale_row.changed.connect(func(index: int) -> void:
+			Settings.set_value("controls/touch_scale", TOUCH_SCALES[index]))
+		_add_row(list, "controls/touch_scale", scale_row)
+		var layout_row: UiOptionRow = UiOptionRow.choice("UI_OPT_TOUCH_LAYOUT",
+				PackedStringArray(["UI_OPT_TOUCH_STANDARD", "UI_OPT_TOUCH_SWAPPED"]),
+				maxi(0, TOUCH_LAYOUTS.find(str(Settings.get_value(KEY_TOUCH_LAYOUT, TOUCH_LAYOUTS[0])))))
+		layout_row.changed.connect(func(index: int) -> void: Settings.set_value(KEY_TOUCH_LAYOUT, TOUCH_LAYOUTS[index]))
+		_add_row(list, KEY_TOUCH_LAYOUT, layout_row)
 	_heading(list, "UI_OPT_GAME")
 	_locales = PackedStringArray([""])
 	_locales.append_array(UiKit.available_locales())
@@ -306,6 +309,15 @@ func _build_confirm() -> VBoxContainer:
 	no.pressed.connect(_close_confirm)
 	page.add_child(no)
 	return page
+
+
+## True when the touch section belongs in the list: a touch screen exists, it is a mobile build, the touch buttons
+## are switched on, or the last input was a touch. On a desktop without a touch screen it would be four rows of
+## settings for buttons that never show.
+static func touch_options_wanted() -> bool:
+	if DisplayServer.is_touchscreen_available() or OS.has_feature("mobile"):
+		return true
+	return Settings.get_bool("controls/touch_always") or GameInput.device == Defs.Device.TOUCH
 
 
 func _heading(list: VBoxContainer, key: String) -> void:

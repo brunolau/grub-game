@@ -12,8 +12,11 @@ shot mode_select
 press ui_accept
 wait_until flow.current_screen == world_map 300
 wait_until flow.busy == false 600
-wait 30
+wait_until scene.countdown >= 0 600
 shot world_map
+# The map would start the level by itself after a few seconds; with --fast the frames run faster than real time,
+# so confirm as a player would.
+press ui_accept
 wait_until flow.current_screen == level 600
 wait_until flow.busy == false 600
 expect level.level_id == w1_l1

@@ -1,7 +1,7 @@
 extends ObjectsTestCase
 ## ui module: the look of `objects/sign` boards (the rule of when they show is tested by test_objects_flow): a wooden
-## board (ui/panel.png) with the text in the HUD face, wrapped into balanced lines, faded in near the sign and out
-## after, and kept inside the view.
+## board (ui/panel.png) with the text in the HUD face, wrapped into balanced lines, faded in near the sign, held
+## for a read time after the hero left, kept inside the view, and never under the stage banner.
 
 
 func before_each() -> void:
@@ -41,7 +41,24 @@ func test_sign_board_is_a_wooden_board_in_the_hud_face() -> void:
 	hero.teleport(Vector2i(100, 160))
 	Sim.step(1)
 	await get_tree().create_timer(SignBoard.FADE_SECONDS + 0.15).timeout
-	assert_false(label.visible, "faded out after the hero left")
+	assert_true(label.visible and label.modulate.a > 0.99, "held for the read time after the hero left")
+	await get_tree().create_timer(SignBoard.READ_SECONDS + SignBoard.FADE_SECONDS).timeout
+	assert_false(label.visible, "faded out once the read time is over")
+
+
+## A board that appears while the stage banner shows makes the banner give way (it never sits under the banner).
+func test_a_board_makes_the_stage_banner_give_way() -> void:
+	var hud: Hud = Hud.new()
+	get_tree().root.add_child(hud)
+	hud.show_intro(&"w1_l1")
+	assert_true(hud.is_intro_visible(), "the banner shows")
+	var sign: SignBoard = spawn(&"objects/sign", Vector2i(200, 160), {"text": "SIGN_W1_CLUB"}) as SignBoard
+	hero.teleport(Vector2i(196, 160))
+	Sim.step(1)
+	await get_tree().create_timer(Hud.INTRO_DISMISS_SECONDS + 0.2).timeout
+	assert_true(sign.is_board_shown(), "the board shows")
+	assert_false(hud.is_intro_visible(), "the banner is gone")
+	hud.queue_free()
 
 
 ## A sign at the right edge of the view keeps its board inside the view; the board is no longer centred on it.

@@ -158,7 +158,9 @@ func _start_after_delay(level_id: StringName, difficulty: int) -> void:
 func _build_level_panel() -> Control:
 	var content: VBoxContainer = VBoxContainer.new()
 	content.add_theme_constant_override(&"separation", 4)
-	content.custom_minimum_size = Vector2(330.0, 0.0)
+	# As wide as the 640 px view allows next to the code panel: the longest names ("1-2 CANOPY VILLAGE") fit next
+	# to a completion percentage.
+	content.custom_minimum_size = Vector2(350.0, 0.0)
 	_mode_row = UiOptionRow.choice("UI_MODE", PackedStringArray(["UI_MODE_BEGINNER", "UI_MODE_EXPERT"]), 0)
 	_mode_row.changed.connect(_on_mode_changed)
 	content.add_child(_mode_row)
@@ -189,7 +191,7 @@ func _build_level_panel() -> Control:
 func _build_code_panel() -> Control:
 	var content: VBoxContainer = VBoxContainer.new()
 	content.add_theme_constant_override(&"separation", 6)
-	content.custom_minimum_size = Vector2(216.0, 0.0)
+	content.custom_minimum_size = Vector2(UiCodeSlot.SLOT_SIZE.x * 4.0 + 24.0, 0.0)
 	content.alignment = BoxContainer.ALIGNMENT_CENTER
 	content.add_child(UiKit.label("UI_CODE_HEADING", UiKit.Style.HUD, HORIZONTAL_ALIGNMENT_CENTER))
 	_slot_row = HBoxContainer.new()
@@ -240,15 +242,16 @@ func _fill_levels() -> void:
 	for level_id: StringName in campaign:
 		var row: UiOptionRow = UiOptionRow.action("")
 		var number: String = UiKit.level_number(level_id)
-		row.caption = "%s  %s" % [number, UiKit.level_name(level_id)] if number != "" else UiKit.level_name(level_id)
+		row.caption = "%s %s" % [number, UiKit.level_name(level_id)] if number != "" else UiKit.level_name(level_id)
 		row.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 		if _is_reached(level_id, _difficulty):
 			var result: Dictionary = Save.get_level_result(level_id, _difficulty)
 			row.value_text = "%d%%" % int(result["percent"]) if int(result["clears"]) > 0 else ""
 		else:
+			# Locked: dimmed, no value (a "---" column cut the longer names short).
 			row.set_meta(&"locked", true)
 			row.modulate = UiKit.COL_DIM
-			row.value_text = "---"
+			row.value_text = ""
 		row.activated.connect(start_level.bind(level_id))
 		_list.add_child(row)
 		previous.focus_neighbor_bottom = previous.get_path_to(row)

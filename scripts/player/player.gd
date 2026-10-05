@@ -71,6 +71,11 @@ var _death_vy: int = 0
 var _animator: HeroAnim = HeroAnim.new()
 var _sprite: Sprite2D = null
 var _glider_sprite: Sprite2D = null
+## Presentation of the crouch charge (PHYSICS.md 8.5): the original shows nothing, the remake lets the hero glow
+## while his next blow is charged (x4) and chimes once when the charge is full, so the mechanic can be found.
+const CHARGE_TINT: Color = Color(1.5, 1.4, 1.1)
+const CHARGE_FULL_TINT: Color = Color(1.9, 1.8, 1.4)
+var _charge_chimed: bool = false
 
 
 func _ready() -> void:
@@ -195,6 +200,13 @@ func kill(cause: StringName) -> void:
 		if sim_pos.x >= view.position.x + view.size.x / 2:
 			_death_dx = -Tuning.DEATH_DX
 	Audio.play_sfx(Sfx.PLAYER_DEATH)
+	if cause == &"liquid" and level != null:
+		# Into the water or the lava: the splash an enemy makes there too.
+		var surface: int = Tuning.to_cell(sim_pos.y - 1) * Tuning.TILE
+		if Spawner.exists(&"fx/splash"):
+			level.spawn_fx(&"fx/splash", Vector2i(sim_pos.x, surface + 2),
+					{"kind": "lava" if str(level.meta.get("liquid", "water")) == "lava" else "water"})
+		Audio.play_sfx(Sfx.SPLASH)
 	Events.player_died.emit(cause)
 
 
@@ -415,6 +427,9 @@ func _gravity() -> void:
 func _add_charge() -> void:
 	if charge <= Tuning.CHARGE_STEP_MAX_AT:
 		charge += Tuning.CHARGE_STEP
+		if charge > Tuning.CHARGE_STEP_MAX_AT and not _charge_chimed:
+			_charge_chimed = true
+			Audio.play_sfx(Sfx.PICKUP_LETTER)
 
 
 # --- State handlers (PHYSICS.md 5.2, 6.1, 8) --------------------------------------------------------------------------
@@ -911,6 +926,8 @@ func _airborne_step() -> void:
 func _tick_timers(level: LevelBase) -> void:
 	if charge > 0:
 		charge -= 1
+	if charge == 0:
+		_charge_chimed = false
 	if swing_lock > 0:
 		swing_lock -= 1
 	if drop_timer > 0:
@@ -1074,6 +1091,14 @@ func _refresh_visual() -> void:
 		var alpha: float = BLINK_ALPHA if ghost else 1.0
 		if _sprite.modulate.a != alpha:
 			_sprite.modulate.a = alpha
+		var tint: Color = Color.WHITE
+		if charge > 0 and not dead:
+			if _charge_chimed:
+				tint = CHARGE_FULL_TINT if (Sim.tick >> 1) & 1 == 0 else CHARGE_TINT
+			else:
+				tint = Color.WHITE.lerp(CHARGE_TINT, minf(float(charge) / float(Tuning.CHARGE_STEP_MAX_AT), 1.0))
+		if _sprite.self_modulate != tint:
+			_sprite.self_modulate = tint
 	if _glider_sprite != null:
 		_glider_sprite.visible = Game.has_glider and not dead
 		if _glider_sprite.visible:

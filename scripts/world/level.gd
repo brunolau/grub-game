@@ -17,6 +17,46 @@ const DARK_COLOR: Color = Color(0.30, 0.28, 0.45)
 ## Extra tile columns / rows painted around the map when the view is larger than the level (section 7.4: the
 ## ground continues beyond the edges), beyond the strictly visible overflow.
 const APRON_EXTRA: int = 2
+## Auto-scrolling levels: the deadly top edge of the view is drawn as a band of smoke with glowing embers, so the
+## threat that kills a hero who falls behind the descent is visible (presentation only).
+const SMOKE_HEIGHT_ART: float = 22.0
+const SMOKE_Z: int = Defs.Z_FRONT_TILES + 5
+## Lava ambience loop: plays while lava lies within this many tiles of the view (checked a few times a second).
+const LAVA_REACH_TILES: int = 3
+const LAVA_CHECK_SECONDS: float = 0.25
+
+
+## The smoke band along the top edge of the view on an auto-scrolling level.
+class TopSmoke:
+	extends Node2D
+
+	var width: float = 640.0
+	var alpha: float = 1.0
+	var _time: float = 0.0
+
+	func advance(delta: float) -> void:
+		_time += delta
+		queue_redraw()
+
+	func _draw() -> void:
+		if alpha <= 0.0:
+			return
+		var rows: int = int(SMOKE_HEIGHT_ART / 2.0)
+		for i: int in rows:
+			var a: float = alpha * 0.92 * (1.0 - float(i) / float(rows))
+			draw_rect(Rect2(0.0, float(i * 2), width, 2.0), Color(0.16, 0.09, 0.07, a))
+		# A ragged lower edge (pixel teeth) with glowing embers that drift sideways.
+		var step: float = 8.0
+		var shift: float = fmod(_time * 6.0, step * 4.0)
+		var x: float = -step * 4.0 + shift
+		var k: int = 0
+		while x < width:
+			var tooth: float = float((k * 7) % 5 + 1) * 2.0
+			draw_rect(Rect2(x, SMOKE_HEIGHT_ART, step, tooth), Color(0.16, 0.09, 0.07, alpha * 0.55))
+			if (k + int(_time * 3.0)) % 3 == 0:
+				draw_rect(Rect2(x + 2.0, SMOKE_HEIGHT_ART + tooth - 2.0, 2.0, 2.0), Color(1.0, 0.45, 0.12, alpha * 0.9))
+			x += step
+			k += 1
 
 var _data: LevelData = null
 var _source_text: String = ""
@@ -53,6 +93,11 @@ var _repaint: Dictionary = {}
 @onready var _flies: FlySwarm = $Flies
 @onready var _camera: Camera2D = $Camera
 @onready var _darkness: CanvasModulate = $Darkness
+var _top_smoke: TopSmoke = null
+## Lava cells of the level (the lava ambience loop plays while one is near the view), and the seconds until the
+## next look.
+var _lava_cells: PackedVector2Array = PackedVector2Array()
+var _lava_check: float = 0.0
 
 
 ## Load from this text instead of the level file of Flow.pending_level_id (tests, tools). Call before the node
@@ -71,6 +116,7 @@ func _ready() -> void:
 	add_child(_driver)
 	_load()
 	start_play()
+	Events.player_died.connect(_on_player_died)
 
 
 func _process(delta: float) -> void:
@@ -88,12 +134,59 @@ func _process(delta: float) -> void:
 	var rise: float = maxf(top_left.y - float(_camera_logic.get_min().y * Tuning.ART_SCALE), 0.0)
 	_parallax.set_view(top_left, view_art, sink, rise)
 	_weather.advance(top_left, view_art, delta)
+	_lava_check -= delta
+	if _lava_check <= 0.0:
+		_lava_check = LAVA_CHECK_SECONDS
+		_update_lava_loop(Rect2(top_left / float(Tuning.ART_SCALE), view_art / float(Tuning.ART_SCALE)))
+	if _top_smoke != null:
+		_top_smoke.position = top_left
+		_top_smoke.width = view_art.x
+		var smoke_on: bool = (scroll_flags & Defs.SCROLL_AUTO_DOWN) != 0
+		_top_smoke.alpha = move_toward(_top_smoke.alpha, 1.0 if smoke_on else 0.0, delta * 2.0)
+		_top_smoke.visible = _top_smoke.alpha > 0.0
+		_top_smoke.advance(delta)
 	var fade: float = lerpf(float(_dark_ticks_prev), float(_dark_ticks), alpha) / float(Tuning.DARKNESS_FADE_TICKS)
 	_darkness.color = Color.WHITE.lerp(DARK_COLOR, clampf(fade, 0.0, 1.0))
 
 
 func _exit_tree() -> void:
 	Audio.stop_loop(Sfx.LOOP_WIND)
+	Audio.stop_loop(Sfx.LOOP_LAVA)
+
+
+## The death jingle (GAMEPLAY.md 10.1 slot 7) plays over the death toss before the respawn curtain; the level music
+## starts again after it. On the last life the game-over screen brings its own music instead.
+func _on_player_died(_cause: StringName) -> void:
+	if Game.lives > 0 and _music != &"":
+		Audio.play_jingle(Sfx.MUSIC_DEATH, _music)
+
+
+## Lava ambience: the bubbling loop plays while a lava cell lies in the view or within LAVA_REACH_TILES of it.
+func _update_lava_loop(view: Rect2) -> void:
+	if _lava_cells.is_empty():
+		return
+	var reach: float = float(LAVA_REACH_TILES * Tuning.TILE)
+	var area: Rect2 = view.grow(reach)
+	var near: bool = false
+	for cell: Vector2 in _lava_cells:
+		if area.has_point(cell * float(Tuning.TILE)):
+			near = true
+			break
+	if near:
+		Audio.start_loop(Sfx.LOOP_LAVA)
+	else:
+		Audio.stop_loop(Sfx.LOOP_LAVA)
+
+
+## The surface cells of the lava (liquid cells with no liquid above them), for the ambience loop.
+func _find_lava_cells() -> void:
+	_lava_cells.clear()
+	if str(meta.get("liquid", "water")) != "lava":
+		return
+	for row: int in grid.rows:
+		for col: int in grid.cols:
+			if grid.get_char(col, row) == TileGrid.CH_LIQUID and (row == 0 or grid.get_char(col, row - 1) != TileGrid.CH_LIQUID):
+				_lava_cells.append(Vector2(col, row))
 
 
 # =================================================================================================================
@@ -278,11 +371,13 @@ func _load() -> void:
 	grid = _data.build_grid(difficulty)
 	_base_scroll_flags = _scroll_flags_from_meta()
 	scroll_flags = _base_scroll_flags
+	_hold_autoscroll()
 	_build_visuals()
 	_place_start()
 	_spawn_entities()
 	_preload_music()
 	_setup_world_state()
+	_find_lava_cells()
 	_setup_camera()
 
 
@@ -533,8 +628,27 @@ func _world_step() -> void:
 
 ## Phase CAMERA: PHYSICS.md 12.
 func _camera_step() -> void:
+	if _camera_logic.autoscroll_held and GameInput.flags != 0:
+		_camera_logic.autoscroll_held = false
 	_camera_logic.scroll_flags = scroll_flags
 	_camera_logic.tick(player)
+
+
+## An auto-scrolling level does not sink before the player's first input (at the start and after a respawn), so
+## nobody is carried off the top edge while reading the start sign or the stage banner. A route that moves on its
+## first tick sinks exactly as without the wait.
+func _hold_autoscroll() -> void:
+	_camera_logic.autoscroll_held = (_base_scroll_flags & Defs.SCROLL_AUTO_DOWN) != 0
+	if _camera_logic.autoscroll_held and _top_smoke == null:
+		_top_smoke = TopSmoke.new()
+		_top_smoke.name = "TopSmoke"
+		_top_smoke.z_index = SMOKE_Z
+		add_child(_top_smoke)
+
+
+## True while an auto-scrolling level waits for the player's first input.
+func is_autoscroll_held() -> bool:
+	return _camera_logic.autoscroll_held
 
 
 ## Phase POST: time limit.
@@ -553,6 +667,7 @@ func _respawn_now() -> void:
 	_respawn_pending = false
 	scroll_flags = _base_scroll_flags
 	_camera_logic.scroll_flags = scroll_flags
+	_hold_autoscroll()
 	set_time_limit(int(meta.get("time", 0)))
 	super.respawn_player()
 	# The darkness of the checkpoint is back at once (the curtain hid the change): no fade.

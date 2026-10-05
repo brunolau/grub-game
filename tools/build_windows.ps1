@@ -207,7 +207,14 @@ if (Test-Path -LiteralPath $LicenseDir) {
     Remove-Item -LiteralPath $LicenseDir -Recurse -Force
 }
 $export = Invoke-Godot @("--headless", "--path", $Root, "--export-release", $PresetName, $ExePath) "export"
-$problems = @(Get-ProblemLines $export.Output -IncludeWarnings)
+# The first export of a checkout converts every scene to binary (.godot\exported\), and the editor process then
+# reports the scripts it loaded for that as "leaked at exit" / "still in use at exit" while it shuts down, after the
+# pack is written. Later exports reuse the converted scenes and print nothing. These two shutdown lines say nothing
+# about the exported game (step 5 checks that), so they alone do not fail the build; every other line still does.
+$exitLeakPattern = 'ObjectDB instances were leaked at exit|resources still in use at exit'
+$exitLeaks = @(Get-ProblemLines $export.Output -IncludeWarnings | Where-Object { $_ -match $exitLeakPattern })
+$exitLeaks | ForEach-Object { Write-Host "    ignored editor shutdown report: $($_.Trim())" -ForegroundColor DarkGray }
+$problems = @(Get-ProblemLines $export.Output -IncludeWarnings | Where-Object { $_ -notmatch $exitLeakPattern })
 if ($export.ExitCode -ne 0 -or $problems.Count -gt 0 -or -not (Test-Path -LiteralPath $ExePath)) {
     $problems | ForEach-Object { Write-Host "    $_" -ForegroundColor Red }
     Stop-Build "the export failed (exit code $($export.ExitCode)); see $LogDir\export.*.txt"
@@ -302,7 +309,33 @@ $ZipPath = Join-Path $BuildDir "ClubAndGrub-$version-windows.zip"
 if (Test-Path -LiteralPath $ZipPath) {
     Remove-Item -LiteralPath $ZipPath -Force
 }
-Compress-Archive -Path @($ExePath, $LicenseDir) -DestinationPath $ZipPath -CompressionLevel Optimal
+# Packed with System.IO.Compression rather than Compress-Archive: Windows PowerShell 5.1's Compress-Archive writes
+# "licenses\x.txt" entry names, which the zip format forbids (other unzip tools then create files with a backslash
+# in their name). Every entry name here uses "/".
+Add-Type -AssemblyName System.IO.Compression
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$licenseFiles = @(Get-ChildItem -LiteralPath $LicenseDir -File | Sort-Object Name)
+$zip = [System.IO.Compression.ZipFile]::Open($ZipPath, [System.IO.Compression.ZipArchiveMode]::Create)
+try {
+    $level = [System.IO.Compression.CompressionLevel]::Optimal
+    $null = [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $ExePath, $ExeName, $level)
+    foreach ($file in $licenseFiles) {
+        $null = [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $file.FullName,
+            "licenses/$($file.Name)", $level)
+    }
+} finally {
+    $zip.Dispose()
+}
+$zip = [System.IO.Compression.ZipFile]::OpenRead($ZipPath)
+try {
+    $entryNames = @($zip.Entries | ForEach-Object { $_.FullName })
+} finally {
+    $zip.Dispose()
+}
+if ($entryNames.Count -ne $licenseFiles.Count + 1 -or $entryNames -notcontains $ExeName -or
+        @($entryNames | Where-Object { $_.Contains("\") }).Count -gt 0) {
+    Stop-Build "the release zip does not hold exactly $ExeName and licenses/ ($($entryNames.Count) entries)"
+}
 Write-Host ("    {0} licence file(s) in {1}" -f (@(Get-ChildItem -LiteralPath $LicenseDir -File)).Count, $LicenseDir)
 Write-Host ("    {0} ({1:N1} MB)" -f $ZipPath, ((Get-Item -LiteralPath $ZipPath).Length / 1MB))
 

@@ -448,7 +448,7 @@ horizontally (`texture_repeat`). Width = loop length. `scroll` = suggested horiz
 |---|---|---|---|---|
 | `ui/bar_back.png` | 128x18 | 128x18 | 1x1 | bar background |
 | `ui/bar_fill.png` | 10x18 | 10x18 | 1x1 | nine-patch: left 3 px cap, 4 px stretchable middle, right 3 px cap |
-| `ui/bar_frame_bone.png` | 152x37 | 152x37 | 1x1 | bone bar frame (boss bar alternative); inner window 128x18 at (12, 9) |
+| `ui/bar_frame_bone.png` | 152x37 | 152x37 | 1x1 | bone bar frame of the HUD boss bar; inner window 128x18 at (12, 10) (measured by the ui module) |
 | `ui/bar_frame_wood.png` | 148x32 | 148x32 | 1x1 | wooden bar frame; inner window 128x18 at (10, 7) |
 | `ui/hud_boss_pip.png` | 32x16 | 16x16 | 2x1 | boss energy: up to 8 pips, 10 art px apart. Cells: 0 full, 1 empty. |
 | `ui/hud_heart.png` | 64x32 | 32x32 | 2x1 | energy: 3 heart slots (GAMEPLAY 2). Cells: 0 full, 1 empty. |

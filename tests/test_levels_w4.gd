@@ -56,6 +56,34 @@ func test_cinder_shaft_gives_a_rusher_time() -> void:
 			hero.sim_pos.y / Tuning.TILE))
 
 
+## The shaft waits for the player (review fresh_eyes): the view does not sink before his first input, so nobody is
+## carried off the top edge while reading the start sign; the start sign is up from the first tick; the deadly top
+## edge is drawn as a smoke band; and once he moves, the view sinks 1 px per tick.
+func test_cinder_shaft_waits_for_the_first_input() -> void:
+	Game.new_game(Defs.Difficulty.EXPERT)
+	await _start(W4_L1)
+	var level: Level = Game.level as Level
+	var top: int = level.get_view_rect().position.y
+	assert_true(level.is_autoscroll_held(), "the descent waits")
+	var idle: PackedInt32Array = PackedInt32Array()
+	idle.resize(150)
+	assert_eq(_replay(idle), 150)
+	assert_eq(_deaths, 0, "idle for 6 s on the start ledge: alive")
+	assert_eq(level.get_view_rect().position.y, top, "the view did not sink")
+	var signs: Array[SignBoard] = []
+	for entity: SimEntity in level.get_kind(Defs.Kind.OTHER):
+		if entity is SignBoard:
+			signs.append(entity as SignBoard)
+	assert_eq(signs.size(), 1, "one sign in the shaft")
+	if not signs.is_empty():
+		assert_eq(signs[0].text_key, "SIGN_W4_SHAFT")
+		assert_true((signs[0].get_node("Text") as Label).visible, "it shows from the start")
+	assert_not_null(level.get_node_or_null(^"TopSmoke"), "the top edge is drawn as smoke")
+	_replay(Autoplay.parse_inputs("1:L,9:"))
+	assert_false(level.is_autoscroll_held(), "the first input starts the descent")
+	assert_eq(level.get_view_rect().position.y, top + 10, "1 px per tick from the first input on")
+
+
 ## The four rising columns over the spike carpet: a player who walks up to the edge, waits for the next column to
 ## stop rising and jumps with Up held and Right for most of the rise lands on every column - not only with one
 ## exact input. Played from the hall's entrance as the route reaches it.
