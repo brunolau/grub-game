@@ -22,11 +22,18 @@ extends Node
 ##   --transitions             keep the timed transitions (default: instant)
 ##   --smoke=<seconds>         boot check: run the game normally for that long (0.1 .. 120), then quit cleanly.
 ##                             Exit code 0 only when no error and no warning was logged (works with --headless)
+##   --perf                    with --autoplay or --flow: sample frame time, draw calls, tick cost, entity counts,
+##                             memory and level load times per screen / level against the budget of
+##                             ARCHITECTURE.md 11; prints "Perf:" lines and writes <out>/perf.json
+##                             (scripts/core/dev/perf_probe.gd; run windowed, best without screenshots)
 ##
 ## Example (run the windowed console binary, NOT --headless, or no image can be captured):
 ##   godot --path . -- --autoplay=test_example --inputs=40:R,12:RU,30:R,8:F --shots=10
 ##
-## Output: build/screenshots/<out>/tick_00010.png ... and trace.json (hero position per tick).
+## Output: build/screenshots/<out>/tick_00010.png ... and trace.json (hero position per tick). The run ends when the
+## script (plus --hold) is played, or as soon as another stage takes over (a linked sub-stage after a `tally = false`
+## exit, a bonus stage behind a warp, the stage after a trophy): the script belongs to the level it was written for,
+## and that level's screenshots are never overwritten. A whole chain of stages is played with a flow script.
 ## Exit code: 0 = finished, 1 = smoke run logged errors or warnings, 2 = bad arguments / unknown level,
 ## 3 = scene could not be loaded, 4 = a check of a flow script failed.
 ##
@@ -49,10 +56,12 @@ const SMOKE_MAX_SECONDS: float = 120.0
 ## Development files and folders that must never be inside an exported build (export_presets.cfg excludes them).
 const DEVELOPMENT_PATHS: PackedStringArray = [
 	"res://tests", "res://tools", "res://docs", "res://scenes/core/debug_level.tscn",
-	"res://scripts/core/debug_level.gd", "res://levels/test_example.lvl", FLOW_RUNNER,
+	"res://scripts/core/debug_level.gd", "res://levels/test_example.lvl", FLOW_RUNNER, PERF_PROBE,
 ]
 ## The flow-script runner (development only, excluded from exports with every `dev` folder).
 const FLOW_RUNNER: String = "res://scripts/core/dev/autoplay_flow.gd"
+## The performance probe of `--perf` (development only, like the flow runner).
+const PERF_PROBE: String = "res://scripts/core/dev/perf_probe.gd"
 ## Saves and settings of harness runs (never the player's real ones).
 const DEFAULT_USER_DIR: String = "res://build/autoplay_user"
 const USER_FILES: PackedStringArray = ["save.json", "save.json.bak", "save.json.tmp", "settings.cfg"]
@@ -95,6 +104,9 @@ var _trace: Array[Array] = []
 var _shots_saved: int = 0
 var _done: bool = false
 var _can_capture: bool = true
+## Instance id of the stage the script plays in (the run ends when another one takes over; an id, because a freed
+## level compares equal to null).
+var _stage: int = 0
 
 
 func _ready() -> void:
@@ -116,6 +128,8 @@ func _ready() -> void:
 	Flow.pause_on_focus_loss = false
 	_configure(options)
 	_redirect_user_data(str(options.get("user-dir", DEFAULT_USER_DIR)), options.has("fresh-user"))
+	if options.has("perf"):
+		_start_perf()
 	if flow_mode:
 		_start_flow(str(options["flow"]))
 		return
@@ -201,6 +215,13 @@ func _smoke(seconds: float) -> void:
 		ProjectSettings.get_setting("application/config/version"),
 		"debug" if OS.is_debug_build() else "release", Levels.all_ids().size(), Flow.current_screen,
 	])
+	var ids: PackedStringArray = PackedStringArray()
+	for id: StringName in Levels.all_ids():
+		ids.append(String(id))
+	print("Smoke: levels %s" % ",".join(ids))
+	print("Smoke: campaign beginner %s; expert %s" % [
+		",".join(PackedStringArray(Levels.get_campaign(Defs.Difficulty.BEGINNER))),
+		",".join(PackedStringArray(Levels.get_campaign(Defs.Difficulty.EXPERT)))])
 	print("Smoke: ran %.1f s, %d error(s), %d warning(s) logged" % [seconds, counter.errors, counter.warnings])
 	Flow.shutdown_and_quit(0 if counter.errors + counter.warnings == 0 else 1)
 
@@ -244,6 +265,20 @@ func _redirect_user_data(dir_path: String, fresh: bool) -> void:
 	print("Autoplay: user data in %s" % absolute)
 
 
+## Attach the performance probe (debug builds only; it is not exported). It must connect to the simulation
+## signals before the flow runner does, so that its tick timing sees the tick and nothing else.
+func _start_perf() -> void:
+	DirAccess.make_dir_recursive_absolute(_out_dir)
+	var probe_script: GDScript = load(PERF_PROBE) as GDScript if ResourceLoader.exists(PERF_PROBE) else null
+	if probe_script == null:
+		push_error("Autoplay: the performance probe %s is missing" % PERF_PROBE)
+		return
+	var probe: Node = probe_script.new() as Node
+	probe.name = "PerfProbe"
+	add_child(probe)
+	probe.call("begin", _out_dir)
+
+
 ## Hand the run to the flow-script runner (debug builds only; the runner is not exported).
 func _start_flow(path: String) -> void:
 	DirAccess.make_dir_recursive_absolute(_out_dir)
@@ -282,6 +317,7 @@ func _run() -> void:
 		await Flow.transition_finished
 	for i: int in SETTLE_FRAMES:
 		await get_tree().process_frame
+	_stage = Game.level.get_instance_id() if Game.level != null else 0
 	GameInput.set_scripted(_flags_for_tick)
 	Sim.tick_finished.connect(_on_tick_finished)
 	if not Sim.running:
@@ -302,6 +338,8 @@ func _process(_delta: float) -> void:
 
 
 func _flags_for_tick(tick: int) -> int:
+	if _left_stage():
+		return 0
 	var index: int = tick - 1
 	if index < 0 or index >= _flags.size():
 		return 0
@@ -310,6 +348,16 @@ func _flags_for_tick(tick: int) -> int:
 
 func _on_tick_finished(tick: int) -> void:
 	if _done:
+		return
+	if _left_stage():
+		# Another stage took over (its clock starts again at tick 0): stop before it plays this script again.
+		_done = true
+		Sim.manual = true
+		print("Autoplay: %s took over after %d ticks of %s; stopping" % [Game.level.level_id, _trace.size(),
+				_level_id])
+		_write_trace()
+		print("Autoplay: %d ticks played, %d screenshots saved" % [_trace.size(), _shots_saved])
+		_finish(0)
 		return
 	var level: LevelBase = Game.level
 	if level != null and level.player != null:
@@ -321,6 +369,11 @@ func _on_tick_finished(tick: int) -> void:
 		Sim.manual = true
 	if last or tick % _shot_period == 0:
 		_capture_then(tick, last)
+
+
+## True when a stage other than the scripted one is running (a scene-only run never leaves).
+func _left_stage() -> bool:
+	return _stage != 0 and is_instance_valid(Game.level) and Game.level.get_instance_id() != _stage
 
 
 func _capture_then(tick: int, last: bool) -> void:

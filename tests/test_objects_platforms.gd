@@ -62,6 +62,29 @@ func test_ride_mode_waits_for_the_hero_and_carries_him() -> void:
 	assert_true(absi(resting_x - 160) <= 2, "back home")
 
 
+## A hero falling at 8 px/tick or faster can step across the platform's 8 px contact band in one tick; the ride test
+## still catches him (and puts him on the surface). A slow hero deep inside the platform is not caught.
+func test_a_fast_falling_hero_lands_on_a_platform() -> void:
+	var platform: MovingPlatform = spawn(&"objects/platform", Vector2i(160, 96), {
+		"dir": 2, "speed": 2, "travel": 3, "mode": "ride",
+	}) as MovingPlatform
+	Sim.step(2)
+	var top: int = platform.sim_pos.y - platform.box_h
+	# Terminal speed, feet 10 px below the surface (they were 2 px above it on the previous tick).
+	hero.teleport(Vector2i(160, top + 10))
+	hero.yvel = Tuning.TERMINAL
+	Sim.step(1)
+	assert_true(platform.ridden, "the fast landing is caught")
+	assert_eq(hero.sim_pos.y, top + 1, "and the hero stands on the surface")
+	# The same depth while falling slowly: he was below the surface already, no catch.
+	hero.teleport(Vector2i(40, 160))
+	Sim.step(2)
+	hero.teleport(Vector2i(160, top + 10))
+	hero.yvel = 32
+	Sim.step(1)
+	assert_false(platform.ridden, "a slow hero 10 px inside the platform is not lifted onto it")
+
+
 func test_platform_skins_by_biome_and_parameter() -> void:
 	var small: MovingPlatform = spawn(&"objects/platform", Vector2i(160, 96), {"skin": "small"}) as MovingPlatform
 	assert_eq(small.box_w, 32)

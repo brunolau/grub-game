@@ -34,7 +34,9 @@ func _sim_tick(phase: int) -> void:
 
 
 ## Make this the active restart point: stores the HERO's feet point (not the checkpoint's), deactivates every
-## other checkpoint, plays the cue.
+## other checkpoint, plays the cue. A hero who touches it in the air (jumping or falling past it) stores the
+## checkpoint's own feet point instead, which the level designer put on the floor: the hero's point could lie
+## above a gap beside the checkpoint, and every respawn would drop him into it again.
 func activate(hero: PlayerBase) -> void:
 	var level: LevelBase = Game.level
 	if level != null:
@@ -43,10 +45,22 @@ func activate(hero: PlayerBase) -> void:
 			if checkpoint != null and checkpoint != self and checkpoint.active:
 				checkpoint.deactivate()
 	active = true
-	Game.set_checkpoint(hero.sim_pos)
+	Game.set_checkpoint(hero.sim_pos if _stands_on_floor(hero) else sim_pos)
 	Audio.play_sfx(Sfx.CHECKPOINT)
 	Events.checkpoint_activated.emit(self)
 	_on_active_changed()
+
+
+## True when the hero's feet rest on a floor of the grid (the surface of the cell under them).
+func _stands_on_floor(hero: PlayerBase) -> bool:
+	var level: LevelBase = Game.level
+	if level == null or level.grid == null:
+		return true
+	var col: int = hero.sim_pos.x >> 4
+	var row: int = hero.sim_pos.y >> 4
+	if not TileGrid.is_ground(level.grid.floor_at(col, row)):
+		return false
+	return hero.sim_pos.y == row * Tuning.TILE + level.grid.surface_offset(col, row, hero.sim_pos.x)
 
 
 ## Another checkpoint took over.

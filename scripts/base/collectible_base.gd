@@ -239,6 +239,11 @@ func _drop_tick() -> void:
 		elif sim_pos.y > grid.height_px() + Tuning.PIT_DEPTH_PX:
 			_lose()
 	elif grid.ceiling_at(col, (sim_pos.y - box_h) >> 4) == TileGrid.CEILING_SOLID:
+		# Stopped UNDER the ceiling, never inside it: the top of the box goes back to the bottom edge of the solid
+		# cell it rose into. (Left inside, an item whose feet had entered the rock landed on that cell's top and
+		# rested in the rock out of reach - a boss's fire-starter too, a softlock in a closed arena.)
+		var ceiling_row: int = (sim_pos.y - box_h) >> 4
+		sim_pos.y = maxi(sim_pos.y, (ceiling_row + 1) * Tuning.TILE + box_h)
 		yvel = 0
 
 

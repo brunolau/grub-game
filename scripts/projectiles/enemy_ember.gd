@@ -10,7 +10,8 @@ extends ProjectileBase
 
 const SKIN_EMBER: String = "ember"
 const SKIN_LEAF: String = "leaf"
-const LEAF_TEXTURE: String = "res://assets/sprites/fx/falling_leaf.png"
+## Loaded with the script: an ember spawns inside a tick, where a first load would stall it.
+const LEAF_TEXTURE: Texture2D = preload("res://assets/sprites/fx/falling_leaf.png")
 
 ## Picture: "ember" or "leaf" (level parameter `skin`).
 var skin: String = SKIN_EMBER
@@ -42,7 +43,7 @@ func _apply_params(params: Dictionary) -> void:
 func _ready() -> void:
 	_sprite = get_node_or_null(^"Sprite") as Sprite2D
 	if _sprite != null and skin == SKIN_LEAF:
-		_sprite.texture = load(LEAF_TEXTURE) as Texture2D
+		_sprite.texture = LEAF_TEXTURE
 	if _count_falling() > EnemyTuning.EMBER_MAX_ALIVE:
 		consume()
 

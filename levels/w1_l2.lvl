@@ -3,7 +3,7 @@
 # a diagonal lift, danglers over gaps, stingers, arc leapers), pick up the axe and learn to throw it, cross the
 # trunk top (a bat there bounces the curious up to the crow's nest with the warp to bonus stage A) and come down
 # the far side deck by deck to the exit at the trunk's foot.
-# Route proof: tools/autoplay/routes/w1_l2.inputs (+ .expert.inputs), replayed by tests/test_levels_w1.gd.
+# Route proof: tools/autoplay/routes/w1_l2.inputs (+ .expert.inputs), replayed by tests/test_campaign_routes.gd.
 
 [meta]
 format = 1

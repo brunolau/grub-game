@@ -253,6 +253,23 @@ if ($logText -notmatch '\(release build\)') {
 if ($logText -notmatch 'development switches are ignored by release builds') {
     Stop-Build "the release build did not reject the development switch --autoplay; see $smokeLog"
 }
+# The package holds exactly the shipped levels: every levels\*.lvl except the developer levels test_*.lvl.
+$expectedLevels = @(Get-ChildItem -LiteralPath (Join-Path $Root "levels") -Filter "*.lvl" |
+    Where-Object { -not $_.BaseName.StartsWith("test_") } | ForEach-Object { $_.BaseName } | Sort-Object)
+$levelLine = [regex]::Match($logText, '(?m)^Smoke: levels (.*)$')
+if (-not $levelLine.Success) {
+    Stop-Build "the smoke check did not list the levels inside the build; see $smokeLog"
+}
+$packedLevels = @($levelLine.Groups[1].Value.Trim() -split ',' | Where-Object { $_ } | Sort-Object)
+$testLevels = @($packedLevels | Where-Object { $_.StartsWith("test_") })
+if ($testLevels.Count -gt 0) {
+    Stop-Build "developer levels are inside the build: $($testLevels -join ', ')"
+}
+if (($packedLevels -join ',') -ne ($expectedLevels -join ',')) {
+    Stop-Build "the build holds the levels '$($packedLevels -join ',')', expected '$($expectedLevels -join ',')'"
+}
+$campaignLine = [regex]::Match($logText, '(?m)^Smoke: campaign (.*)$')
+Write-Host "    $($packedLevels.Count) levels inside, no developer level; campaign $($campaignLine.Groups[1].Value.Trim())"
 
 $hash = (Get-FileHash -LiteralPath $ExePath -Algorithm SHA256).Hash
 Write-Host ""

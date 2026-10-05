@@ -28,6 +28,7 @@ const FEAST_OFFSET: Vector2 = Vector2(-16.0, -32.0)
 const FLASH_COLOR: Color = Color(3.0, 3.0, 3.0, 1.0)
 const FX_HIT: StringName = &"fx/hit_stars"
 const FX_POOF: StringName = &"fx/poof"
+const FX_SPLASH: StringName = &"fx/splash"
 const ITEM_BONE: StringName = &"items/bone"
 const ITEM_RANDOM: StringName = &"items/random_bonus"
 ## "No floor here" result of the floor search (far outside any level).
@@ -446,6 +447,8 @@ func _ground_step(climber: bool = false, bouncy: bool = true) -> bool:
 		return false
 	sim_pos.x += Tuning.floor16(xvel)
 	sim_pos.y += Tuning.floor16(yvel)
+	if yvel >= 0 and _sank_in_liquid(grid):
+		return false
 	if dir != 0 and _blocked_ahead(grid, dir):
 		if climber and yvel >= 0 and not _edge_ahead(grid, dir) and not _ceiling_above(grid):
 			# Stay in front of the wall and start to climb it.
@@ -575,6 +578,21 @@ func _release_slot() -> void:
 	awake = false
 	if Game.level != null:
 		Game.level.active_enemies = maxi(Game.level.active_enemies - 1, 0)
+
+
+## A ground enemy whose feet entered a liquid cell (water, ice water, lava) is gone with a splash, without points,
+## like one that fell off the map: it leaves the view and returns from its anchor later (sleep). Liquids are pits
+## for everybody - only the hero used to die in them, while walkers, hoppers and chargers walked on the pit bed.
+func _sank_in_liquid(grid: TileGrid) -> bool:
+	var col: int = Tuning.to_cell(sim_pos.x)
+	var row: int = Tuning.to_cell(sim_pos.y)
+	if grid.get_char(col, row) != TileGrid.CH_LIQUID:
+		return false
+	var lava: bool = Game.level != null and str(Game.level.meta.get("liquid", "")) == "lava"
+	_spawn_optional(FX_SPLASH, Vector2i(sim_pos.x, row * Tuning.TILE), {"kind": "lava" if lava else "water"})
+	Audio.play_sfx(Sfx.SPLASH)
+	sleep()
+	return true
 
 
 ## Feet y on the floor of cell (col, row), or NO_FLOOR when that cell is no floor for enemies.

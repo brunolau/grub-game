@@ -56,13 +56,21 @@ func _ride_test() -> bool:
 	var hero: PlayerBase = level.player
 	if hero.dead or hero.yvel <= Tuning.PLATFORM_RIDE_MIN_YVEL_EXCL or _carried_on_tick == Sim.total_ticks:
 		return false
-	if sim_pos.y <= hero.sim_pos.y:
+	# The hero's feet must be inside the platform's contact band below its surface. The band is the platform's own
+	# height (8 px), but a hero falling at PLATFORM_CATCH_YVEL or faster can step across 8 px in one tick: for him
+	# it reaches PLATFORM_CATCH_DEPTH below the surface, so a landing at any fall speed up to the terminal one is
+	# caught (ride_platform puts him back on the surface).
+	var depth: int = box_h
+	if hero.yvel >= Tuning.PLATFORM_CATCH_YVEL:
+		depth = maxi(box_h, Tuning.PLATFORM_CATCH_DEPTH)
+	var band_bottom: int = sim_pos.y - box_h + depth
+	if band_bottom <= hero.sim_pos.y:
 		return false
 	var ride: Vector3i = Tuning.HERO_BOX_RIDE
 	var hero_bottom: int = hero.sim_pos.y + (dy if dy > 0 else 0)
 	if not Overlap.test(
 		hero.sim_pos.x, hero_bottom, ride.x, ride.y, ride.z,
-		sim_pos.x, sim_pos.y, box_w, box_h, box_xo,
+		sim_pos.x, band_bottom, box_w, depth, box_xo,
 		false, hero.yvel, 1
 	):
 		return false

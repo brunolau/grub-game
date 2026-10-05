@@ -2,7 +2,7 @@ class_name UiButton
 extends Button
 ## A menu entry: outlined capitals, a bobbing arrow while focused, cursor and confirm sounds.
 ##
-## Owner: ui. Works with keyboard and gamepad (focus + ui_accept), mouse (hover takes the focus) and touch (tap).
+## Owner: ui. Works with keyboard and gamepad (focus + ui_accept), mouse (moving over it takes the focus) and touch (tap).
 
 const ARROW_GAP: int = 6
 const BOB_SPEED: float = 7.0
@@ -22,7 +22,7 @@ func _init(key: String = "") -> void:
 	custom_minimum_size = Vector2(0.0, float(UiKit.row_height()))
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	set_process(false)
-	mouse_entered.connect(_on_mouse_entered)
+	gui_input.connect(_on_gui_input)
 	focus_entered.connect(_on_focus_entered)
 	focus_exited.connect(_on_focus_exited)
 	pressed.connect(_on_pressed)
@@ -52,8 +52,10 @@ func _draw() -> void:
 	draw_texture(_arrow, pos)
 
 
-func _on_mouse_entered() -> void:
-	if not disabled and not has_focus():
+## The pointer takes the focus when it MOVES over the button. (Not on mouse_entered: that also fires when a screen
+## appears under a resting pointer, and the keyboard focus would jump to whatever entry lies there - Quit included.)
+func _on_gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion and not disabled and not has_focus():
 		grab_focus()
 
 

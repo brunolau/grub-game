@@ -7,7 +7,10 @@ extends UiScreen
 ## level list (previews, tests); by default the campaign of the current mode. Ends with
 ## `Flow.start_level(Flow.args["level_id"])` (ARCHITECTURE.md 8.6).
 ## Every campaign level of the current mode has a marker on an island: gold = completed, cream = reached,
-## grey = not reached yet. Levels outside the campaign (bonus, test) show the hero in the middle of the map.
+## grey = not reached yet. Each world has its island (MARKERS: jungle on the left, the caves and the ice on the two
+## grey rocks, the volcano on the right, which only Expert runs visit). A stage without a marker of its own stands at
+## the marker of the map stop it belongs to: a linked sub-stage at its main level, a bonus stage at its source level,
+## the ending at the last stop. Levels outside the campaign (test levels) show the hero in the middle of the map.
 
 ## Seconds the map waits on the marker before the level starts by itself.
 const AUTO_START: float = 4.0
@@ -16,7 +19,17 @@ const SCROLL_IN_PX: float = 260.0
 const MAP_TEXTURE: String = "res://assets/ui/world_map_background.png"
 const SKY_COLOR: Color = Color("98e6ff")
 const SEA_COLOR: Color = Color("77d9ff")
-## Marker places on the islands of world_map_background.png (map px); campaign levels are spread over them.
+## Marker of each campaign stage on the islands of world_map_background.png (map px), by Vector2i(world, stage):
+## the sand and grass of the jungle island, the beaches of the two grey rocks (caves above, ice below), the shore
+## of the volcano island.
+const MARKERS: Dictionary = {
+	Vector2i(1, 1): Vector2(180, 211), Vector2i(1, 2): Vector2(362, 198),
+	Vector2i(2, 1): Vector2(586, 185), Vector2i(2, 2): Vector2(702, 185),
+	Vector2i(3, 1): Vector2(668, 218), Vector2i(3, 2): Vector2(786, 219),
+	Vector2i(4, 1): Vector2(992, 241), Vector2i(4, 2): Vector2(1186, 241),
+}
+## Fallback places for a campaign stage without an entry in MARKERS (other level lists, previews): the stages are
+## spread over these.
 const SLOTS: Array[Vector2] = [
 	Vector2(180, 206), Vector2(265, 198), Vector2(335, 186), Vector2(402, 208), Vector2(598, 184),
 	Vector2(680, 186), Vector2(740, 214), Vector2(985, 238), Vector2(1085, 224), Vector2(1195, 238),
@@ -97,7 +110,7 @@ func _build_screen() -> void:
 func _screen_ready() -> void:
 	Audio.play_music(Sfx.MUSIC_MAP)
 	resized.connect(_on_resized)
-	var index: int = _marker_ids.find(_level_id)
+	var index: int = _marker_ids.find(map_stop(_level_id))
 	_target = _markers[index] if index >= 0 else SLOTS[SLOTS.size() / 2]
 	var start: Vector2 = _target
 	if index > 0:
@@ -163,15 +176,44 @@ func _place_markers() -> void:
 			campaign.append(StringName(str(id)))
 	var count: int = campaign.size()
 	for i: int in count:
-		var t: float = 0.0 if count <= 1 else float(i) * float(SLOTS.size() - 1) / float(count - 1)
-		if count <= SLOTS.size():
-			_markers.append(SLOTS[roundi(t)])
-		else:
-			# More levels than places: interpolate between neighbouring places.
-			var low: int = floori(t)
-			var high: int = mini(low + 1, SLOTS.size() - 1)
-			_markers.append(SLOTS[low].lerp(SLOTS[high], t - float(low)).round())
+		var place: Vector2 = marker_place(campaign[i])
+		if place == Vector2.INF:
+			var t: float = 0.0 if count <= 1 else float(i) * float(SLOTS.size() - 1) / float(count - 1)
+			if count <= SLOTS.size():
+				place = SLOTS[roundi(t)]
+			else:
+				# More levels than places: interpolate between neighbouring places.
+				var low: int = floori(t)
+				var high: int = mini(low + 1, SLOTS.size() - 1)
+				place = SLOTS[low].lerp(SLOTS[high], t - float(low)).round()
+		_markers.append(place)
 		_marker_ids.append(campaign[i])
+
+
+## The island place of a campaign stage (MARKERS by its world and stage), or Vector2.INF when it has none.
+static func marker_place(level_id: StringName) -> Vector2:
+	var key: Vector2i = Vector2i(int(Levels.get_value(level_id, "world", 0)), int(Levels.get_value(level_id, "stage", 0)))
+	return MARKERS.get(key, Vector2.INF)
+
+
+## The map stop a level is shown at: itself for a campaign level, the main level of a linked sub-stage, the source
+## level of a bonus stage, the last stop of the mode for the ending; "" for anything else.
+static func map_stop(level_id: StringName) -> StringName:
+	var difficulty: int = Game.difficulty
+	var campaign: Array[StringName] = Levels.get_campaign(difficulty)
+	if campaign.has(level_id):
+		return level_id
+	var kind: String = str(Levels.get_value(level_id, "kind", Levels.KIND_MAIN))
+	match kind:
+		Levels.KIND_SUB:
+			return Levels.parent_level(level_id, difficulty)
+		Levels.KIND_BONUS:
+			for id: StringName in campaign:
+				if str(Levels.get_value(id, "bonus", "", difficulty)) == String(level_id):
+					return id
+		Levels.KIND_ENDING:
+			return campaign[-1] if not campaign.is_empty() else &""
+	return &""
 
 
 func _walk_hero(t: float, from: Vector2) -> void:
@@ -263,7 +305,7 @@ func _draw_map() -> void:
 		var fill_color: Color = COL_LOCKED
 		if int(Save.get_level_result(level_id, Game.difficulty)["clears"]) > 0:
 			fill_color = UiKit.COL_FOCUS
-		elif i == 0 or Save.is_level_unlocked(level_id, Game.difficulty) or level_id == _level_id:
+		elif i == 0 or Save.is_level_unlocked(level_id, Game.difficulty) or level_id == map_stop(_level_id):
 			fill_color = UiKit.COL_CREAM
 		_map.draw_circle(center, MARKER_RADIUS + 2.0, UiKit.COL_INK)
 		_map.draw_circle(center, MARKER_RADIUS, fill_color)

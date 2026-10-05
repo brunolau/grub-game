@@ -263,6 +263,7 @@ func _load() -> void:
 	_build_visuals()
 	_place_start()
 	_spawn_entities()
+	_preload_music()
 	_setup_world_state()
 	_setup_camera()
 
@@ -379,6 +380,8 @@ func _spawn_entities() -> void:
 		if not Spawner.is_prop(id) and not ids.has(id) and LevelText.applies_to(record["params"], Game.difficulty):
 			ids.append(id)
 	Spawner.preload_ids(ids)
+	# Effects, revealed or dropped items and shots are spawned by code in the middle of a tick: load them now.
+	Spawner.preload_runtime()
 	var spots: int = 0
 	var items: int = 0
 	for record: Dictionary in records:
@@ -410,6 +413,15 @@ func _spawn_entities() -> void:
 		if hero is PlayerBase:
 			var hero_base: PlayerBase = hero
 			hero_base.respawn_at(start_pos)
+
+
+## Music that starts in the middle of a tick (feast mode, a boss fight) is loaded with the level, not on its tick.
+func _preload_music() -> void:
+	Audio.preload_music(Sfx.MUSIC_FEAST)
+	for entity: SimEntity in get_kind(Defs.Kind.BOSS):
+		var boss: BossBase = entity as BossBase
+		if boss != null:
+			Audio.preload_music(boss.music)
 
 
 func _add_prop(id: StringName, col: float, row: float, params: Dictionary, line: int) -> void:

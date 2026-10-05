@@ -109,6 +109,9 @@ func submit_code() -> bool:
 		return false
 	var code: String = get_code()
 	var found: Dictionary = Levels.find_by_password(code) if code.length() == _slots.size() else {}
+	# A code only opens a level its mode can play (an Expert-only stage never starts in Beginner).
+	if not found.is_empty() and not Levels.is_available(found["level_id"], int(found["difficulty"])):
+		found = {}
 	if found.is_empty():
 		Audio.play_sfx(Sfx.CODE_REJECT)
 		_show_message("UI_CODE_WRONG", UiKit.COL_BAD)

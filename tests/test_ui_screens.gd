@@ -53,6 +53,48 @@ func test_mode_select_back_returns_to_title() -> void:
 	await _cleanup()
 
 
+## A screen that appears under a resting mouse pointer keeps its keyboard focus: only a pointer that MOVES over an
+## entry takes the focus (the title menu used to open with "Credits" or "Quit" focused wherever the pointer rested).
+func test_menu_entries_take_the_focus_only_from_a_moving_pointer() -> void:
+	var holder: VBoxContainer = VBoxContainer.new()
+	add_node(holder)
+	var first: UiButton = UiButton.new("UI_TITLE_START")
+	var second: UiButton = UiButton.new("UI_TITLE_QUIT")
+	var row: UiOptionRow = UiOptionRow.action("UI_TITLE_OPTIONS")
+	for control: Control in [first, second, row]:
+		holder.add_child(control)
+	first.grab_focus()
+	second.mouse_entered.emit()
+	row.mouse_entered.emit()
+	assert_true(first.has_focus(), "a pointer resting where an entry appears does not take the focus")
+	second.gui_input.emit(InputEventMouseMotion.new())
+	assert_true(second.has_focus(), "a pointer moving over an entry does")
+	row._gui_input(InputEventMouseMotion.new())
+	assert_true(row.has_focus(), "the same for option rows")
+
+
+## Every level code of the campaign is accepted by the code screen and starts its level in its mode; a code of an
+## Expert-only stage has no Beginner twin, and the look-alike letters O and I are read as 0 and 1.
+func test_code_entry_accepts_every_campaign_code() -> void:
+	var codes: Array[Array] = []
+	for level_id: StringName in Levels.all_ids():
+		if str(Levels.get_value(level_id, "kind", Levels.KIND_MAIN)) == Levels.KIND_TEST:
+			continue
+		for difficulty: int in [Defs.Difficulty.BEGINNER, Defs.Difficulty.EXPERT]:
+			var code: String = Levels.get_password(level_id, difficulty)
+			if code != "":
+				codes.append([code, level_id, difficulty])
+	assert_true(codes.size() >= 20, "the campaign has its codes: %d" % codes.size())
+	for entry: Array in codes:
+		var node: CodeEntryScreen = await _open(&"code_entry") as CodeEntryScreen
+		node.set_code(str(entry[0]).replace("0", "O"))
+		assert_true(node.submit_code(), "code %s is accepted (typed with O for 0)" % entry[0])
+		await get_tree().create_timer(CodeEntryScreen.START_DELAY + 0.05).timeout
+		assert_eq(Flow.args.get("level_id"), entry[1], "code %s leads to %s" % [entry[0], entry[1]])
+		assert_eq(Game.difficulty, entry[2], "code %s plays in its mode" % entry[0])
+		await _cleanup()
+
+
 func test_code_entry_accepts_a_level_code() -> void:
 	var node: CodeEntryScreen = await _open(&"code_entry") as CodeEntryScreen
 	node.set_code("XXXX")

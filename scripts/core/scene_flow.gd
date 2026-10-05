@@ -258,6 +258,12 @@ func complete_level(exit_kind: StringName) -> void:
 	if exit_kind == &"trophy":
 		var epilogue: StringName = Levels.next_level(level_id, difficulty)
 		if epilogue != &"":
+			# The final boss ends its map stop here (the epilogue that follows has a tally of its own): record the
+			# stop's result now, as its tally would have.
+			var stop: StringName = Levels.parent_level(level_id, difficulty)
+			if stop != &"":
+				Save.record_level_result(stop, difficulty, Game.score, Game.completion_percent())
+				Save.save_game()
 			start_level(epilogue, Defs.Transition.CURTAIN, false)
 			return
 	if has_screen(SCREEN_TALLY):
@@ -276,6 +282,14 @@ func finish_tally() -> void:
 	if Game.warp_return_level != &"":
 		finished = Game.warp_return_level
 		Game.warp_return_level = &""
+	elif str(Levels.get_value(finished, "kind", Levels.KIND_MAIN)) == Levels.KIND_BONUS:
+		# A bonus stage entered without its source level's warp (debug level select): nothing to record or unlock,
+		# and it never ends the game. The run goes back to the title.
+		Game.clear_tally()
+		Save.submit_score(Game.score)
+		Save.save_game()
+		goto_title()
+		return
 	# A linked sub-stage ends the main level it belongs to: the result goes to that level's map stop (the
 	# campaign then continues after it, Levels.next_level).
 	var parent: StringName = Levels.parent_level(finished, difficulty)

@@ -699,17 +699,26 @@ func _check_visual_sections(data: LevelData) -> void:
 func _check_passwords() -> void:
 	var seen: Dictionary = {}
 	for data: LevelData in _levels:
+		var kind: String = str(data.value("kind"))
 		for key: String in data.meta:
 			if not key.begins_with("password_"):
 				continue
 			var code: String = str(data.meta[key]).to_upper()
 			if code == "":
 				continue
-			if seen.has(code):
+			# O / 0 and I / 1 are the same character for the code screen (Levels.normalize_code).
+			var same: String = code.replace("O", "0").replace("I", "1")
+			if seen.has(same):
 				_add(data.path, _meta_line(data, key), ERROR,
-						"password '%s' is already used by %s" % [code, seen[code]])
+						"password '%s' is already used by %s (O = 0, I = 1)" % [code, seen[same]])
 			else:
-				seen[code] = "%s (%s)" % [data.path.get_file(), key]
+				seen[same] = "%s (%s)" % [data.path.get_file(), key]
+			if kind == "bonus":
+				_add(data.path, _meta_line(data, key), WARNING,
+						"%s: a bonus stage started by its code has no source level to return to; only its warp should lead in" % key)
+			if key == "password_beginner" and str(data.value("min_difficulty")) == "expert":
+				_add(data.path, _meta_line(data, key), WARNING,
+						"password_beginner on an Expert-only level (min_difficulty = expert) can never be used")
 
 
 # =================================================================================================================

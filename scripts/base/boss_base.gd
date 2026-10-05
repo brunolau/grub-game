@@ -60,16 +60,25 @@ func _sim_tick(phase: int) -> void:
 	_anim_age += 1
 
 
-## Pips to draw on the energy bar: ceil(hp / hp_per_pip), at most Tuning.BOSS_BAR_MAX_PIPS.
+## Pips to draw on the energy bar: ceil(hp / pip size), at most Tuning.BOSS_BAR_MAX_PIPS.
 func get_pips() -> int:
 	if hp <= 0:
 		return 0
-	return clampi((hp + hp_per_pip - 1) / hp_per_pip, 0, Tuning.BOSS_BAR_MAX_PIPS)
+	var size: int = get_hp_per_pip()
+	return clampi((hp + size - 1) / size, 0, Tuning.BOSS_BAR_MAX_PIPS)
 
 
 ## Pips of the full bar.
 func get_max_pips() -> int:
-	return clampi((max_hp + hp_per_pip - 1) / hp_per_pip, 1, Tuning.BOSS_BAR_MAX_PIPS)
+	var size: int = get_hp_per_pip()
+	return clampi((max_hp + size - 1) / size, 1, Tuning.BOSS_BAR_MAX_PIPS)
+
+
+## Hit points one pip stands for: `hp_per_pip`, or more for a boss whose `hp` would need more pips than the bar
+## has (a tougher boss set by its level), so that the full bar always spans its own hit points and every hit of
+## such a boss visibly removes pips.
+func get_hp_per_pip() -> int:
+	return maxi(maxi(hp_per_pip, 1), ceili(float(max_hp) / float(Tuning.BOSS_BAR_MAX_PIPS)))
 
 
 ## Start the fight: show the energy bar and switch to the boss music. Idempotent.

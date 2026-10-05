@@ -1,5 +1,5 @@
 # w3_l1b "Blizzard Pass" (Expert) side path: the frozen pond crossed on its ice floes instead of through the
-# secret grotto. tests/test_levels_w3.gd plays tools/autoplay/routes/w3_l1b.expert.inputs up to its "# B4" comment,
+# secret grotto. tests/test_campaign_routes.gd plays tools/autoplay/routes/w3_l1b.expert.inputs up to its "# B4" comment,
 # then this file: the hero lands on the ice shore just before the fifth gust (peak 72).
 # Brace through the gust, then use the whole lull: land running and re-jump at each edge (the lull wind of 16 cuts
 # every jump to about 50 px, so a stop on a floe costs the run-up).

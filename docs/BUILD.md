@@ -101,13 +101,17 @@ nothing logged an error or a warning. In an exported build it also logs an error
 finds inside the package. The log ends with lines such as
 
 ```
-Smoke: Club & Grub 0.1.0 (release build), 9 level(s), screen 'title'
+Smoke: Club & Grub 0.1.0 (release build), 15 level(s), screen 'title'
+Smoke: levels bonus_a,bonus_b,bonus_c,ending,w1_l1,w1_l2,w2_l1,w2_l2,w2_l2b,w3_l1,w3_l1b,w3_l2,w4_l1,w4_l2,w4_l2b
+Smoke: campaign beginner w1_l1,w1_l2,w2_l1,w2_l2,w3_l1,w3_l2; expert w1_l1,w1_l2,w2_l1,w2_l2,w3_l1,w3_l2,w4_l1,w4_l2
 Smoke: ran 3.0 s, 0 error(s), 0 warning(s) logged
 ```
 
 The script runs the exe with `APPDATA` pointed at `build\windows\smoke\appdata`, so the check never reads or writes
 the settings and saves of a real installation, and it adds `--autoplay=w1_l1`, which the log must report as
-ignored. The exe is a GUI program: it opens no console, so read the log file, not the terminal.
+ignored. It also compares the `Smoke: levels` line with the folder: the build must hold every `levels\*.lvl` except
+the developer levels `test_*.lvl`, and none of those. The exe is a GUI program: it opens no console, so read the log
+file, not the terminal.
 
 ### 3.3 Manual export and optional code signing
 

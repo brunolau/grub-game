@@ -381,6 +381,9 @@ msgstr "Axes fly far: press Attack to throw one!"
 msgid "SIGN_W1_VILLAGE"
 msgstr "Canopy Village - climb up to the treetops!"
 
+msgid "SIGN_W1_HOME"
+msgstr "Home sweet tree house! Touch the totem to finish the stage."
+
 msgid "SIGN_W2_HATCH"
 msgstr "Crouch on a hatch to drop through it."
 

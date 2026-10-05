@@ -56,6 +56,7 @@ func _ready() -> void:
 		_sfx_players.append(player)
 	_music_a = _make_music_player()
 	_music_b = _make_music_player()
+	preload_sfx()
 
 
 func _exit_tree() -> void:
@@ -94,6 +95,23 @@ func shutdown() -> void:
 			player.stop()
 			player.stream = null
 	_streams.clear()
+
+
+## Load every sound effect of AudioTable.SFX now (about 1 MB; called once at boot). Effects are started from inside
+## simulation ticks, and loading a file there on first use stalls the tick (a visible hitch on phones).
+func preload_sfx() -> void:
+	for event: StringName in AudioTable.SFX:
+		var entry: Dictionary = AudioTable.SFX[event]
+		for file: Variant in entry["files"]:
+			_get_stream(AudioTable.SFX_DIR + str(file), bool(entry.get("loop", false)))
+
+
+## Load the track of a music context ahead of time without playing it: for music that starts inside a tick (feast
+## mode, a boss fight), which the level loads with itself. Unknown contexts are ignored.
+func preload_music(context: StringName) -> void:
+	var entry: Dictionary = AudioTable.MUSIC.get(context, {})
+	if not entry.is_empty():
+		_get_stream(AudioTable.MUSIC_DIR + str(entry["file"]), bool(entry["loop"]))
 
 
 ## Play a sound effect by event name (Sfx.*). `variant` picks one of several files (-1 = cycle through them).

@@ -273,6 +273,39 @@ func test_ground_physics_gravity_landing_bounce_and_walls() -> void:
 	assert_true(walker.sim_pos.x < 200, "turned round at the wall")
 
 
+## A ground enemy that walks into a liquid pit is gone with a splash (no points) instead of walking on the pit bed,
+## and it comes back from its anchor later like any enemy that left.
+func test_a_walker_sinks_in_a_liquid_pit() -> void:
+	_rows_level(PackedStringArray([
+		"....................",
+		"....................",
+		"....................",
+		"....................",
+		"....................",
+		"....................",
+		"....................",
+		"....................",
+		"....................",
+		"....................",
+		"##########~~~~######",
+		"##########~~~~######",
+		"####################",
+	]))
+	var walker: Walker = _enemy(&"enemies/walker", Vector2i(120, 160), {"left": 0, "right": 14, "speed": 32}) as Walker
+	var score: int = Game.score
+	var sank: bool = false
+	for tick: int in 120:
+		Sim.step(1)
+		if not walker.awake:
+			sank = true
+			break
+		assert_true(walker.sim_pos.y <= 160, "never below the liquid's surface (y %d)" % walker.sim_pos.y)
+	assert_true(sank, "the walker went into the pool and is gone")
+	assert_false(walker.dead, "not killed: it returns from its anchor later")
+	assert_eq(walker.sim_pos, walker.spawn_pos, "back at its anchor")
+	assert_eq(Game.score, score, "no points")
+
+
 func test_expert_uses_the_second_palette_by_default() -> void:
 	Game.new_game(Defs.Difficulty.EXPERT)
 	var walker: EnemyBase = _enemy(&"enemies/walker", Vector2i(200, 160))

@@ -55,7 +55,6 @@ func _init(p_kind: int = Kind.ACTION, p_caption: String = "") -> void:
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	focus_entered.connect(_on_focus_entered)
 	focus_exited.connect(queue_redraw)
-	mouse_entered.connect(_on_mouse_entered)
 
 
 ## A plain entry.
@@ -92,6 +91,11 @@ func _notification(what: int) -> void:
 
 
 func _gui_input(event: InputEvent) -> void:
+	# The pointer takes the focus when it moves over the row (not when the row appears under a resting pointer).
+	if event is InputEventMouseMotion:
+		if not has_focus():
+			grab_focus()
+		return
 	# ACTION rows leave Left / Right to the focus navigation.
 	if kind != Kind.ACTION and event.is_action_pressed(&"ui_left", true):
 		accept_event()
@@ -262,6 +266,3 @@ func _on_focus_entered() -> void:
 	queue_redraw()
 
 
-func _on_mouse_entered() -> void:
-	if not has_focus():
-		grab_focus()

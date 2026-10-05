@@ -19,6 +19,13 @@ static var depth: int = 0
 ## `hero` is the entity whose yvel and identity drive the stomp flag: pass the hero when one of the two is the
 ## hero, or null for tests that do not involve him (the flag is then set by the top-half rule only).
 static func body(a: SimEntity, b: SimEntity, hero: SimEntity = null) -> bool:
+	# Step 1 of test() (coarse reject) without the cost of the full call: most tested pairs are far apart.
+	var apos: Vector2i = a.sim_pos
+	var bpos: Vector2i = b.sim_pos
+	if absi(apos.x - bpos.x) >= Tuning.OVERLAP_MAX_DX or absi(apos.y - bpos.y) >= Tuning.OVERLAP_MAX_DY:
+		stomp = false
+		depth = 0
+		return false
 	return test(
 		a.sim_pos.x, a.sim_pos.y, a.box_w, a.box_h, a.box_xo,
 		b.sim_pos.x, b.sim_pos.y, b.box_w, b.box_h, b.box_xo,
@@ -41,6 +48,13 @@ static func weapon(box: Rect2i, x_offset: int, target: SimEntity) -> bool:
 
 ## Weapon test for an entity that is itself the weapon (a thrown axe) against a target.
 static func weapon_entity(projectile: SimEntity, target: SimEntity) -> bool:
+	# Step 1 of test() (coarse reject) without the cost of the full call.
+	var apos: Vector2i = projectile.sim_pos
+	var bpos: Vector2i = target.sim_pos
+	if absi(apos.x - bpos.x) >= Tuning.OVERLAP_MAX_DX or absi(apos.y - bpos.y) >= Tuning.OVERLAP_MAX_DY:
+		stomp = false
+		depth = 0
+		return false
 	return test(
 		projectile.sim_pos.x, projectile.sim_pos.y, projectile.box_w, projectile.box_h, projectile.box_xo,
 		target.sim_pos.x, target.sim_pos.y, target.box_w, target.box_h, target.box_xo,

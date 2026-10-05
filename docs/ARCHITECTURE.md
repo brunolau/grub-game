@@ -220,7 +220,8 @@ Scans `res://levels/*.lvl`; no hand-maintained list. `has_level`, `all_ids`, `ge
 `get_value(id, key, default, difficulty)` (applies `.beginner` / `.expert` variants), `get_campaign(difficulty)`,
 `first_level`, `is_available`, `next_level`, `has_locked_successor`, `parent_level(id, difficulty)` (the map stop a
 linked `sub` level belongs to: its result is recorded there and the campaign continues after it),
-`find_by_password(code)`, `get_password`, `rescan()`. Syntax lives in `LevelText` (`scripts/core/level_text.gd`): `split_sections`, `parse_value`,
+`find_by_password(code)` (case-insensitive; the look-alike letters O and I are read as 0 and 1, see
+`normalize_code`), `get_password`, `rescan()`. Syntax lives in `LevelText` (`scripts/core/level_text.gd`): `split_sections`, `parse_value`,
 `parse_key_values`, `parse_meta`, `parse_params`, `parse_legend_line`, `parse_legend`, `legend_tiles`,
 `parse_entity_line`, `cell_to_feet`, `applies_to`, `to_list`, `to_int_list`, `to_rect_px`, `problems`, `quiet`.
 
@@ -274,6 +275,9 @@ level scene contains no UI. The `pause` action is handled by Flow (toggle + `Eve
 A screen that does not exist is skipped or replaced by the boot placeholder; a missing level scene is replaced by
 the debug level (section 9.3). The route logic of GAMEPLAY.md 1.1 (tally, linked sub-stage without tally, warp to
 and from bonus stages, trophy, Beginner wall, ending) is implemented in `complete_level` and `finish_tally`.
+A trophy that leads to an epilogue records the result of its map stop at once (the stop has no tally of its own);
+a bonus stage entered without its source level's warp (debug level select) returns to the title after its tally,
+never to The End.
 
 ### 3.11 `LevelBase` (`scripts/base/level_base.gd`) - what everybody may ask the running level
 
@@ -903,6 +907,18 @@ enters the pair with `start_level` after the title, mode select and world map. E
 `levels/test_*.lvl`. Their input scripts (`tools/autoplay/integration_level.inputs`, `integration_boss.inputs`) are
 replayed tick for tick by `tests/test_integration_levels.gd` and by the flow scripts of section 9.2.
 
+The campaign (integration): eight map stops in `order` 10..80 - `w1_l1`, `w1_l2`, `w2_l1`, `w2_l2` (+ sub-stage
+`w2_l2b`, the Brute), `w3_l1` (+ `w3_l1b`), `w3_l2`, and for Expert only `w4_l1`, `w4_l2` (+ `w4_l2b`, the Wall
+Colossus, whose trophy leads to the `ending` stage). The warps of `w1_l2`, `w2_l1` and `w3_l2` lead to `bonus_a`,
+`bonus_b` and `bonus_c`; a Beginner run ends at the expert wall after `w3_l2`. `tests/test_campaign_routes.gd` is
+the data-driven route suite: its `ROUTES` table describes every file of `tools/autoplay/routes/` (level, modes, how
+it ends, what follows, what it must achieve) and replays each one through Flow and the real level scene; its two
+campaign tests play the whole game in one run per mode with everything a run carries, and are the headless twins
+of `tools/autoplay/campaign.flow` (Expert, title to credits) and `campaign_beginner.flow` (code to the expert
+wall). A run keeps its weapon from level to level, and a swing locks the hero for the weapon's recovery, so a route
+recorded with the club drifts with another weapon: the routes not yet proven with the weapon a run carries are
+listed in `WEAPON_GAPS` there (the campaign test and flow hand the hero the route's weapon before them).
+
 ### 8.2 player
 
 Responsibilities: `Player extends PlayerBase` reproducing PHYSICS.md sections 4-11 and 13 tick for tick; the
@@ -1072,6 +1088,17 @@ bash .tools/gd.sh play --flow=tools/autoplay/robustness.flow --fast --fresh-user
 
 Flow scripts can also resize the window (`window 1600 720` gives the 800 x 360 view of a wide phone) and take the
 focus away from the game (`focus out` / `focus in`), so view sizes and the background rules are checked in a window.
+With `--fast` a stage that has just started waits for its first `play`, so a route file plays tick for tick as in
+the headless tests; a `play` ends when another stage takes over (sub-stage, bonus stage, epilogue), and
+`weapon <name>` hands the hero a weapon. The campaign flows:
+
+```
+GD_TIMEOUT=1800 bash .tools/gd.sh play --flow=tools/autoplay/campaign.flow --fast --fresh-user     Expert, all levels
+bash .tools/gd.sh play --flow=tools/autoplay/campaign_beginner.flow --fast --fresh-user            code -> expert wall
+```
+
+A plain `--autoplay=<id>` run plays its script in that one stage and ends when another stage takes over (its
+screenshots are never overwritten by the next stage).
 
 Tool scripts run with `-s` (`tests/run_tests.gd`, `tools/*.gd`) are compiled before the autoloads exist: a class
 that uses an autoload (`SimEntity` and every entity script) cannot be named in such a script's own source (it
@@ -1167,4 +1194,10 @@ screenshot their work from day one. It is a development tool, not the loader; it
   feast kit, weapon and counters as they were, lives only downwards, and a death toss in progress still costs its
   life. Otherwise every item of the level could be collected again and again (points and extra lives for free).
 - The autoplay harness redirects saves and settings to `build/autoplay_user`.
+- Campaign integration fixes (not in the original): a code is read with O = 0 and I = 1; a hero who touches a
+  checkpoint in the air stores the checkpoint's own feet point (his own could lie over a gap); sprite platforms
+  catch a hero falling at 8 px/tick or more 16 px deep (Tuning.PLATFORM_CATCH_*); ground enemies that enter a liquid
+  are gone with a splash; a dropped item that rises into a solid ceiling is stopped under it (it used to rest
+  inside the rock, a softlock for a boss's fire-starter); a boss bar always spans the boss's own hit points; menu
+  entries take the focus only from a moving pointer.
 - Windows ships as one .exe without ANGLE (OpenGL 3.3 is required; `docs/BUILD.md`).

@@ -12,7 +12,6 @@ extends SpawnerEnemy
 
 enum State { POISE, FLIGHT, REST }
 
-const FX_SPLASH: StringName = &"fx/splash"
 
 ## Horizontal leap speed, v16 (level parameter `speed`).
 var speed: int = EnemyTuning.LEAPER_SPEED

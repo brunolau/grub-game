@@ -48,7 +48,7 @@ func _init(picture: Texture2D = null, caption_key: String = "", description_key:
 	column.add_child(description)
 	focus_entered.connect(_on_focus_changed.bind(true))
 	focus_exited.connect(_on_focus_changed.bind(false))
-	mouse_entered.connect(_on_mouse_entered)
+	gui_input.connect(_on_gui_input)
 	pressed.connect(_on_pressed)
 
 
@@ -64,8 +64,9 @@ func _on_focus_changed(focused: bool) -> void:
 	_lift.tween_property(_body, "modulate", Color.WHITE if focused else DIM, 0.18)
 
 
-func _on_mouse_entered() -> void:
-	if not has_focus():
+## The pointer takes the focus when it moves over the card (not when the card appears under a resting pointer).
+func _on_gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion and not has_focus():
 		grab_focus()
 
 

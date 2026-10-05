@@ -12,10 +12,19 @@ extends Node
 ##   press <action> [frames]          press an input action (ui_accept, ui_down, pause, ...) and release it after
 ##                                    `frames` frames (default 2), as a keyboard or pad would
 ##   key <name> [<name> ...]          press and release keys by name (`key B R U T`, `key Enter`), for typing
+##   pad <button> [frames]            press and release a gamepad control as a real pad reports it (device 0, no
+##                                    action event): a button index or name (a, b, x, y, back, start, up, down, left,
+##                                    right, lb, rb) or a stick direction (lx-, lx+, ly-, ly+); `frames` held
+##                                    (default 2). For gamepad-only menu paths through the input map
 ##   play <ticks:KEYS,...>            gameplay input for the next ticks, keys L R U D F K as in `--inputs`; waits
-##                                    until it is played or gameplay ends (level completed, game over). Outside
-##                                    `play` the hero gets no input.
+##                                    until it is played or gameplay ends (level completed, game over, or another
+##                                    stage starts: a linked sub-stage, a bonus stage behind a warp, the stage after a
+##                                    trophy). Outside `play` the hero gets no input.
 ##   play_file <path>                 the same, read from a file (commas or new lines; `#` lines are comments)
+##   input device|script              `device`: the hero reads the real devices (keys and pads sent with `key` / `pad`,
+##                                    which then also run the clock with --fast); `script` (the default): only `play`
+##   weapon <club|hammer|axe|boomerang>   hand the hero this weapon (Game.set_weapon), e.g. the one a route was
+##                                    recorded with
 ##   shot <name>                      save a screenshot now: <out>/<NN>_<name>.png
 ##   every <ticks> [name]             also save a screenshot every <ticks> simulation ticks (0 = off):
 ##                                    <out>/t<tick count>_<name>.png
@@ -39,7 +48,10 @@ extends Node
 ## Values: integers, decimals, true, false, null or text.
 ##
 ## The simulation runs one tick per rendered frame with `--fast` (never while paused or covered), otherwise in real
-## time. trace.json gets one row per tick: [frame, level, tick, x, y, xvel, yvel, state, dead].
+## time. With `--fast` a stage that has just started waits for its first `play`: its clock starts with the first
+## scripted tick, so a route file plays exactly as in the headless route tests (tests/test_campaign_routes.gd), no
+## matter how many frames the commands before it took. trace.json gets one row per tick: [frame, level, tick, x, y,
+## xvel, yvel, state, dead].
 ## Exit code: 0 = the script ran to the end and every check passed, 4 = a check failed or a wait timed out,
 ## 2 = the script could not be read.
 
@@ -88,6 +100,12 @@ var _frame: int = 0
 var _trace: Array[Array] = []
 var _finished: bool = false
 var _events: EventCounts = EventCounts.new()
+## True while a `play` feeds input.
+var _playing: bool = false
+## The stage whose clock the runner steps; a new stage waits for its first `play` (see the header).
+var _stepping_level: int = 0
+## True after `input device`: the hero reads the real devices and the clock runs without a `play`.
+var _device_input: bool = false
 
 
 func _init() -> void:
@@ -122,8 +140,21 @@ func begin(script_text: String, out_dir: String, fast: bool, can_capture: bool) 
 
 func _process(_delta: float) -> void:
 	_frame += 1
-	if _fast and not _finished and Sim.running and not Sim.frozen and not get_tree().paused:
+	if _fast and not _finished and Sim.running and not Sim.frozen and not get_tree().paused and _may_step():
 		Sim.step(1)
+
+
+## False while a stage that just started waits for its first `play`.
+func _may_step() -> bool:
+	if not is_instance_valid(Game.level):
+		return true
+	var level: int = Game.level.get_instance_id()
+	if level == _stepping_level:
+		return true
+	if not _playing and not _device_input:
+		return false
+	_stepping_level = level
+	return true
 
 
 func _run() -> void:
@@ -152,10 +183,35 @@ func _execute(command: PackedStringArray) -> bool:
 		"key":
 			for i: int in range(1, command.size()):
 				await _key(command[i])
+		"pad":
+			if not await _pad(_arg(command, 1), maxi(_int_arg(command, 2, DEFAULT_PRESS_FRAMES), 1)):
+				return false
+		"input":
+			match _arg(command, 1):
+				"device":
+					GameInput.clear_scripted()
+					_device_input = true
+				"script":
+					GameInput.set_scripted(_next_flags)
+					_device_input = false
+				_:
+					push_error("Autoplay flow: 'input' needs 'device' or 'script'")
+					return false
 		"play":
 			return await _play(rest)
 		"play_file":
 			return await _play(FileAccess.get_file_as_string(_project_path(rest)))
+		"weapon":
+			var weapon: int = -1
+			for w: int in [Defs.Weapon.CLUB, Defs.Weapon.HAMMER, Defs.Weapon.AXE, Defs.Weapon.BOOMERANG]:
+				if Defs.weapon_name(w) == _arg(command, 1):
+					weapon = w
+			if weapon < 0:
+				push_error("Autoplay flow: 'weapon' needs club, hammer, axe or boomerang")
+				return false
+			print("Autoplay flow: weapon %s handed over (the hero carried %s)" % [_arg(command, 1),
+					Defs.weapon_name(Game.weapon)])
+			Game.set_weapon(weapon)
 		"shot":
 			await _capture("%02d_%s" % [_shots, rest.validate_filename()])
 		"every":
@@ -259,16 +315,63 @@ func _key(key_name: String) -> void:
 		await get_tree().process_frame
 
 
+## Press and release one gamepad control (see the header); false for an unknown name.
+func _pad(control: String, frames: int) -> bool:
+	const BUTTONS: Dictionary = {
+		"a": JOY_BUTTON_A, "b": JOY_BUTTON_B, "x": JOY_BUTTON_X, "y": JOY_BUTTON_Y, "back": JOY_BUTTON_BACK,
+		"start": JOY_BUTTON_START, "up": JOY_BUTTON_DPAD_UP, "down": JOY_BUTTON_DPAD_DOWN,
+		"left": JOY_BUTTON_DPAD_LEFT, "right": JOY_BUTTON_DPAD_RIGHT, "lb": JOY_BUTTON_LEFT_SHOULDER,
+		"rb": JOY_BUTTON_RIGHT_SHOULDER,
+	}
+	const AXES: Dictionary = {
+		"lx-": [JOY_AXIS_LEFT_X, -1.0], "lx+": [JOY_AXIS_LEFT_X, 1.0],
+		"ly-": [JOY_AXIS_LEFT_Y, -1.0], "ly+": [JOY_AXIS_LEFT_Y, 1.0],
+	}
+	var control_name: String = control.to_lower()
+	if AXES.has(control_name):
+		var axis: Array = AXES[control_name]
+		for value: float in [float(axis[1]), 0.0]:
+			var motion: InputEventJoypadMotion = InputEventJoypadMotion.new()
+			motion.device = 0
+			motion.axis = int(axis[0]) as JoyAxis
+			motion.axis_value = value
+			Input.parse_input_event(motion)
+			for i: int in (frames if value != 0.0 else 1):
+				await get_tree().process_frame
+		return true
+	var index: int = -1
+	if BUTTONS.has(control_name):
+		index = int(BUTTONS[control_name])
+	elif control_name.is_valid_int():
+		index = control_name.to_int()
+	if index < 0:
+		push_error("Autoplay flow: unknown pad control '%s'" % control)
+		return false
+	for pressed: bool in [true, false]:
+		var event: InputEventJoypadButton = InputEventJoypadButton.new()
+		event.device = 0
+		event.button_index = index as JoyButton
+		event.pressed = pressed
+		event.pressure = 1.0 if pressed else 0.0
+		Input.parse_input_event(event)
+		for i: int in (frames if pressed else 1):
+			await get_tree().process_frame
+	return true
+
+
 ## Gameplay input for the next ticks; returns when it was played or gameplay ended (true), or false when no tick
 ## ran for STALL_FRAMES frames (paused, or nothing to simulate).
 func _play(script_text: String) -> bool:
 	# Entries may also be separated by spaces on a `play` line; comment lines keep their leading '#'.
 	_flags = Autoplay.parse_inputs(script_text.replace(" ", ","))
 	_flag_index = 0
+	_playing = true
 	var idle_frames: int = 0
 	var stalled: int = 0
 	var last_index: int = 0
 	var played: bool = true
+	# The stage is told apart by its instance id: a freed level compares equal to null.
+	var stage: int = Game.level.get_instance_id() if Game.level != null else 0
 	while _flag_index < _flags.size():
 		await get_tree().process_frame
 		if Flow.current_screen != Flow.SCREEN_LEVEL and not Flow.busy:
@@ -276,6 +379,13 @@ func _play(script_text: String) -> bool:
 			if idle_frames > 2:
 				print("Autoplay flow: gameplay ended after %d of %d ticks" % [_flag_index, _flags.size()])
 				break
+		var current: int = Game.level.get_instance_id() if is_instance_valid(Game.level) else 0
+		if stage == 0:
+			stage = current
+		elif current != 0 and current != stage:
+			# A linked sub-stage, a bonus stage or the stage after a trophy took over: its own input comes next.
+			print("Autoplay flow: %s started after %d of %d ticks" % [Game.level.level_id, _flag_index, _flags.size()])
+			break
 		stalled = 0 if _flag_index != last_index else stalled + 1
 		last_index = _flag_index
 		if stalled >= STALL_FRAMES:
@@ -284,6 +394,7 @@ func _play(script_text: String) -> bool:
 			break
 	_flags = PackedInt32Array()
 	_flag_index = 0
+	_playing = false
 	return played
 
 

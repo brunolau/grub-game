@@ -209,7 +209,11 @@ Collision facts worth knowing:
   walk through. Do not build 1-row tunnels unless that squeeze is the point - he is drawn overlapping the ceiling.
 - A ceiling 2 rows above the floor makes jumping impossible there (instant head bump); 3 rows allows a 16 px hop.
 - Liquids and spikes kill at once. Falling more than one cell below the last row is a pit death; a `zones/kill`
-  makes a pit anywhere.
+  makes a pit anywhere. Liquids are pits for ground enemies too: a walker, hopper, charger or lurker whose feet
+  enter a `~` cell is gone with a splash (no points) and comes back from its anchor later.
+- Ceiling spikes (`!`) kill as soon as the hero's head probe (feet row - 2) reaches them: with the floor at row r,
+  spikes in row r-4 kill after a rise of only 17 px, and every enemy hit knocks the hero up 36 px. Keep enemies
+  away from the floor under ceiling spikes that are 4-5 rows up, or put the spikes 6+ rows above the floor.
 - The hero's x stays within 8 px of the left edge and 8 px of the right edge. Close both ends with ground or `|`
   unless a pit is wanted.
 
@@ -354,6 +358,9 @@ joined by commas: `food:3,treasure:8,heart,weapon:axe`. `giant` = `giant_bonus`,
 | `objects/container` | `skin=barrel\|crate\|pot` [crate], `contents` [random], `hits` [1] |
 | `objects/platform` | `dir` 0..7 [2] (0 up, clockwise: 2 right, 4 down, 6 left), `speed` px/tick [2], `travel` ticks [44], `mode=always\|ride` [always], `skin=wood\|ice\|stone\|small` [by biome] |
 | `objects/drop_platform` | `delay` ticks [0], `skin` |
+
+Sprite platforms catch the hero from any fall speed: the ride test's 8 px contact band reaches 16 px below the
+surface for a hero falling at 8 px/tick or faster (our fix; in the original a fast landing could pass through).
 | `objects/column` | `size=w,h` tiles (the bottom-left cell is the anchor), `rise` tiles, `trigger=c,r,w,h`, `shake` [7] |
 | `objects/gate` | `name`, `dest=<gate or marker name>`, `lock=c,r` (camera cell of a one-screen room), `skin=arch\|hole\|none` [arch]; Down while standing on it; not with the glider |
 | `objects/marker` | `name` (invisible gate destination) |
@@ -395,7 +402,7 @@ jumps.
 | `zones/autoscroll_stop` | - | on `scroll = autoscroll` levels, entering stops the descent |
 | `zones/message` | `text=<translation key>` | shows the text on the HUD's hint panel (under the HUD row) while the hero is inside |
 | `zones/flies` | `count` [5] | dirty ground: every visit adds flies around the hero (cosmetic, at most 20); `items/water_bucket` washes them off |
-| `zones/ember_rain` | `period` ticks [22], `skin=ember\|leaf` [ember] | while the hero is inside, an ember (or a leaf) falls toward him every `period` ticks; at most five fall at once and a touch costs a bone (the volcano shaft) |
+| `zones/ember_rain` | `period` ticks [22], `skin=ember\|leaf` [ember] | while the hero is inside, an ember (or a leaf) falls toward him every `period` ticks; at most five fall at once and a touch costs a bone (the volcano shaft). Embers appear 150 px above the hero and die on the first floor they meet, one-way slabs included: keep about 11 rows of open air above the places where the hero stands, or the rain never reaches him. A touch also shoves him about 36 px up and sideways with ice-like sliding, so waiting spots under the rain should be wide or against a wall (near the top edge of an auto-scrolling view the shove alone can kill) |
 
 Camera rectangles (`zones/camera_lock`, `zones/arena`, gates with `lock=`): one screen is 20 x 11 cells. Make the
 rectangle 11 rows high with the floor the hero stands on as its bottom row - the view shows the top of the
@@ -411,7 +418,15 @@ inwards instead of showing outside the level); a larger one lets the camera foll
   no exit, the boss drops the trophy. A `locked=true` exit needs an `items/fire_starter` somewhere (placed, in
   `contents`, or the Brute's default drop). The validator checks all of this.
 - **Checkpoints** stand on the floor. The first one is optional; without any, the hero restarts at `@`. After a
-  death, enemies, platforms and columns reset; collected items and opened spots stay.
+  death, enemies, platforms and columns reset; collected items and opened spots stay. A hero who touches a
+  checkpoint while standing stores his own feet point as the respawn point; one who touches it in the air (jumping
+  past it, falling onto it) stores the checkpoint's own point. Keep the floor around a checkpoint solid for about
+  two cells on each side, and not on ice next to a gap.
+- **The weapon a player brings**: a run keeps its weapon from level to level (the axe of 1-2 into 2-1, the hammer
+  of 2-1 into worlds 2 and 3, the swirling axe of 3-2 into world 4), while a level started from its code or the
+  level select begins with the club. A level must be fair with both. Route proofs are recorded with one weapon;
+  `tests/test_campaign_routes.gd` lists the routes not yet proven with the carried one (WEAPON_GAPS) and its
+  `CAMPAIGN_ADAPT` aid pads a route for another weapon's swing recovery.
 - **Hidden spots**: `?` / `*` look like ground. With `look=inset` (atlas tile 15) or `look=block` (tile 7) they
   show a hint until opened. In the air: `prop=<biome>/<name>` (a bush, a rock) is the thing to hit. Thrown-out
   bonuses fly up and land on the first floor they meet: a one-way ledge right above a spot catches them (make
@@ -518,3 +533,5 @@ height with high strikes. Thrown weapons (axe, boomerang) fly 13 px/tick and als
 - [ ] Hidden spots, secrets and the completion items are where the strike table can find them.
 - [ ] Expert and Beginner spawn sets make sense (`--difficulty=expert` preview).
 - [ ] An autoplay run or a camera tour was looked at, on the base view and on `--size=2400x1080`.
+- [ ] Its route files are in `tools/autoplay/routes/` and described in `ROUTES` of `tests/test_campaign_routes.gd`
+      (level, modes, how it ends, what it must achieve); a new map stop also goes into `CAMPAIGN` and `MAP` there.

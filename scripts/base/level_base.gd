@@ -379,7 +379,16 @@ func _on_tick_finished(tick: int) -> void:
 		shake_offset = shake
 		if player != null:
 			player.apply_shake_nudge(Tuning.SHAKE_NUDGE)
+	# Overlap.rects(entity.get_box(), view) for every entity, written out: this loop runs over every registered
+	# entity every tick, and the two calls per entity were a large share of the tick on slow devices.
 	var view: Rect2i = get_view_rect()
+	var left: int = view.position.x
+	var right: int = left + view.size.x
+	var top: int = view.position.y
+	var bottom: int = top + view.size.y
 	for list: Array in _by_kind:
 		for entity: SimEntity in list:
-			entity.on_screen = Overlap.rects(entity.get_box(), view)
+			var feet: Vector2i = entity.sim_pos
+			var box_left: int = feet.x - entity.box_xo
+			entity.on_screen = box_left < right and left < box_left + entity.box_w \
+					and feet.y - entity.box_h < bottom and top < feet.y

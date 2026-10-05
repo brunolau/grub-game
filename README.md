@@ -13,6 +13,30 @@ original or of any other commercial game. See [CREDITS.md](CREDITS.md).
 - Input: keyboard, gamepad and touch; every game action can be rebound.
 - Any screen shape: the 640 x 360 base picture is scaled by whole numbers; wider or taller screens show more level.
 
+## The game
+
+Four worlds, eight stages, two bosses, three bonus stages and an epilogue. Beginner plays worlds 1-3 and ends at
+the expert wall; Expert adds the volcano, the Wall Colossus and the way home.
+
+| Stage | Name | What happens there |
+|---|---|---|
+| 1-1 | Vine Bridges | jungle tutorial: the club, hidden spots, head bounces, vine bridges over a lake, a canopy road home |
+| 1-2 | Canopy Village | a tall tree village: the axe, danglers, lifts, a trunk room; a bat bounce up to the warp to Feast Land A |
+| 2-1 | Echo Caverns | hatches between cave chambers, darkness, swinging bats, gates to secret rooms, the hammer, the warp to Feast Land B |
+| 2-2 | Bone Gorge, Brute's Den | rising stepping stones, a lift pillar, the hang-glider over the gorge, then boss 1: the Brute |
+| 3-1 | Frost Summit, Blizzard Pass | slippery snow on ice, a frozen lake, a cliff climb, chargers; then gusts of a blizzard (crouch to brace) |
+| 3-2 | Crystal Grotto | drop floes over icy water, leapers, the swirling axe, the warp to Feast Land C - the last Beginner stage |
+| 4-1 | Cinder Shaft | Expert: an auto-scrolling descent through lava strata and ember rain |
+| 4-2 | Obsidian Keep, Colossus Hall | Expert: a fortress of rising columns and spikes, then boss 2: the Wall Colossus |
+| - | Feast Land A, B, C | bonus stages full of food behind the warps of 1-2, 2-1 and 3-2 |
+| - | Way Home | the epilogue after the Colossus: the walk home to the village, then The End |
+
+Features: hidden spots to club open everywhere (inset ground, scenery, big spots with giant bonuses, breakable
+walls), the bonus word G-R-U-B-S (100 000 points), four weapons that a run keeps from level to level (club, hammer,
+axe, swirling axe), checkpoints, secret rooms, level codes for every stage (Continue on the title screen; a stage
+started from a code begins with the club), saved progress and high score per mode, and a level select of the
+stages reached.
+
 ## Controls
 
 | Action | Keyboard | Gamepad | Touch |
@@ -55,11 +79,19 @@ several tools share the folder (one Godot at a time); with a plain Godot the equ
 | Boot check | `bash .tools/gd.sh smoke 3` (`godot --headless --path . -- --smoke=3`; exit code 0 = clean log) |
 | Scripted play + screenshots | `bash .tools/gd.sh play --autoplay=test_example --inputs=40:R,12:RU --shots=10 --fast` |
 | Whole game loop, played and checked | `bash .tools/gd.sh play --flow=tools/autoplay/full_loop.flow --fast --fresh-user` |
+| The whole Expert campaign, played and checked | `GD_TIMEOUT=1800 bash .tools/gd.sh play --flow=tools/autoplay/campaign.flow --fast --fresh-user` |
+| Beginner: level code to the expert wall | `bash .tools/gd.sh play --flow=tools/autoplay/campaign_beginner.flow --fast --fresh-user` |
+| Every route proof and both campaign runs, headless | `bash .tools/gd.sh test campaign_routes --verbose` |
+| Check level files | `bash .tools/gd.sh script res://tools/validate_levels.gd -- --strict` (or `-- w1_l1 w2_l2`) |
+| Render a whole level | `bash .tools/gd.sh script res://tools/world_render_level.gd -- w1_l1 --collision` |
 | Robustness (timed transitions, mashing, focus, window sizes) | `bash .tools/gd.sh play --flow=tools/autoplay/robustness.flow --fast --fresh-user --transitions` |
 
 Screenshots land in `build/screenshots/<name>/`; harness runs keep their saves and settings in
-`build/autoplay_user/`. The two integration levels (`levels/test_integration*.lvl`, `kind = test`, linked by
-`next`) use every system of the game; `tools/autoplay/full_loop.flow` plays them from the title to the ending. The architecture, ownership rules and every API are in
+`build/autoplay_user/`. Every stage has route proofs in `tools/autoplay/routes/` (input scripts that play it to its
+exit, its warp or a secret); `tests/test_campaign_routes.gd` describes and replays all of them and plays both
+campaigns in one run. The two integration levels (`levels/test_integration*.lvl`, `kind = test`, linked by `next`)
+use every system of the game; `tools/autoplay/full_loop.flow` plays them from the title to the ending. How to build
+a level is in [docs/LEVEL_DESIGN.md](docs/LEVEL_DESIGN.md); the architecture, ownership rules and every API are in
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); the specifications are in `docs/spec/`.
 
 ## Building a release
@@ -79,7 +111,7 @@ the export templates are described in [docs/BUILD.md](docs/BUILD.md).
 | Path | Content |
 |---|---|
 | `scripts/`, `scenes/` | game code and scenes, one folder per module (core, player, enemies, objects, world, ui) |
-| `levels/` | level files (plain text, format in ARCHITECTURE.md section 7); `test_*.lvl` are developer levels |
+| `levels/` | level files (plain text, format in ARCHITECTURE.md section 7): `w<world>_l<stage>[b].lvl` the campaign, `bonus_*.lvl`, `ending.lvl`; `test_*.lvl` are developer levels (not exported) |
 | `assets/` | art, fonts and audio (all third-party, licences in `assets/licenses/`) |
 | `tests/` | headless test suite |
 | `tools/` | build scripts and level tools (not exported) |

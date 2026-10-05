@@ -18,7 +18,6 @@ background = volcano_shaft
 music = level_shaft
 scroll = autoscroll
 min_difficulty = expert
-password_beginner = "4CND"
 password_expert = "4SHF"
 
 [legend]

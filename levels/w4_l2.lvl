@@ -14,7 +14,6 @@ terrain_b = volcano/terrain
 liquid = lava
 background = volcano
 music = level_volcano
-password_beginner = "4KEP"
 password_expert = "4OBS"
 min_difficulty = expert
 next = w4_l2b

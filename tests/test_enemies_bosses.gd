@@ -162,6 +162,21 @@ func test_brute_body_costs_a_bone_and_the_head_is_a_springboard() -> void:
 	assert_eq(brute.hp, 64, "to either side")
 
 
+## A tougher Brute set by its level (w2_l2b: hp 150 / 250) still fills exactly the 8-pip bar, and every club hit
+## takes pips off it; the default 64-hp Brute keeps 8 hit points per pip as in the original.
+func test_a_tougher_brute_spans_the_whole_bar() -> void:
+	var standard: Brute = _brute()
+	assert_eq(standard.get_hp_per_pip(), EnemyTuning.BRUTE_HP_PER_PIP)
+	assert_eq(standard.get_max_pips(), 8)
+	var tough: Brute = _brute({"hp": 150})
+	assert_eq(tough.get_max_pips(), Tuning.BOSS_BAR_MAX_PIPS, "a full bar")
+	assert_eq(tough.get_pips(), Tuning.BOSS_BAR_MAX_PIPS)
+	tough.hp -= Tuning.WEAPON_POWER[Defs.Weapon.CLUB]
+	assert_eq(tough.get_pips(), 7, "one club hit (25 of 150 hp) removes a pip")
+	tough.hp = 1
+	assert_eq(tough.get_pips(), 1, "the last pip stays until the end")
+
+
 func test_brute_ground_pound_under_40() -> void:
 	var brute: Brute = _brute()
 	brute.hp = 30

@@ -786,6 +786,9 @@ knock-back, death arc, bone burst after stealing a heart, head-bounce multiplier
 | One sound at a time, no jump/landing cue | small mixer; add jump, land, checkpoint, exit, menu cues | production quality |
 | 320x200, 24 px panel | 320x180 base scaled by integer factors; HUD as an overlay with safe-area margins | 16:9 screens, phones |
 | Easter eggs tied to the PC clock | dropped | not relevant |
+| A checkpoint touched in the air stores the hero's mid-air point | a touch in the air stores the checkpoint's own (floor) point | a point over a gap made every respawn fall into it again |
+| A fast landing (8+ px/tick) can step across a sprite platform's 8 px contact band | the band reaches 16 px for a fast-falling hero | fairness: floes "not catching" the hero looked like a bug |
+| Codes are compared character by character | O and I are read as 0 and 1 | the pixel font draws them alike |
 
 ---
 

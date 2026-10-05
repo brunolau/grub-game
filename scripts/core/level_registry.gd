@@ -191,18 +191,25 @@ func _linking_level(level_id: StringName, difficulty: int) -> StringName:
 
 
 ## Level and difficulty a 4-character code belongs to: {"level_id": StringName, "difficulty": int}, or {} when
-## the code is unknown. Codes are compared case-insensitively.
+## the code is unknown. Codes are compared case-insensitively, and the look-alike pairs O / 0 and I / 1 count as
+## the same character (normalize_code), so "BONE" finds the code B0NE. The validator keeps codes unique that way.
 func find_by_password(code: String) -> Dictionary:
-	var wanted: String = code.strip_edges().to_upper()
+	var wanted: String = normalize_code(code)
 	if wanted.is_empty():
 		return {}
 	for id: StringName in _meta:
 		var meta: Dictionary = _meta[id]
-		if str(meta.get("password_beginner", "")).to_upper() == wanted:
+		if normalize_code(str(meta.get("password_beginner", ""))) == wanted:
 			return {"level_id": id, "difficulty": Defs.Difficulty.BEGINNER}
-		if str(meta.get("password_expert", "")).to_upper() == wanted:
+		if normalize_code(str(meta.get("password_expert", ""))) == wanted:
 			return {"level_id": id, "difficulty": Defs.Difficulty.EXPERT}
 	return {}
+
+
+## A level code as it is compared: trimmed, upper case, the letter O read as the digit 0 and the letter I as 1
+## (the pixel font draws them alike; a player who types the other one still gets in).
+static func normalize_code(code: String) -> String:
+	return code.strip_edges().to_upper().replace("O", "0").replace("I", "1")
 
 
 ## Code of a level for a difficulty ("" when it has none).

@@ -1,0 +1,402 @@
+# Whole-game flow, Expert, from a fresh save (docs/ARCHITECTURE.md 9.2, scripts/core/dev/autoplay_flow.gd):
+# title -> mode select (Expert) -> every map stop in campaign order, each played by its route from
+# tools/autoplay/routes (the input the headless campaign test tests/test_campaign_routes.gd plays), with the warp
+# of Canopy Village into bonus stage A, both bosses (the Brute in Brute's Den, the Wall Colossus in Colossus Hall),
+# the ending stage, The End, the credits and back to the title. Checks: no life lost, the HUD at every stage start,
+# every tally, the save file's records and unlocks after each map stop, the completion flag at the end. Named
+# screenshots of every map stop, stage start and tally, plus one every 480 ticks of play.
+#   GD_TIMEOUT=1800 bash .tools/gd.sh play --flow=tools/autoplay/campaign.flow --fast --fresh-user --out=campaign
+
+# --- Boot, title, mode select --------------------------------------------------------------------------------------
+wait_until flow.current_screen == title 600
+wait_until flow.busy == false 600
+wait 40
+shot title
+expect save.has_progress() == false
+expect save.get_high_score() == 0
+press ui_accept
+wait_until flow.current_screen == mode_select 300
+wait_until flow.busy == false 600
+press ui_right
+wait 10
+shot mode_select_expert
+press ui_accept
+wait_until flow.current_screen == world_map 300
+wait_until flow.busy == false 600
+expect game.difficulty == 1
+expect game.lives == 2
+expect game.score == 0
+expect game.weapon == 0
+
+# --- 1-1 Vine Bridges ------------------------------------------------------------------------------------------------
+# On the world map.
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w1_l1
+wait_until scene.countdown >= 0 600
+shot map_w1_l1
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w1_l1 600
+expect hero.dead == false
+expect hud.shown_hearts == 3
+wait 2
+shot w1_l1_start
+every 480 w1_l1
+play_file tools/autoplay/routes/w1_l1.expert.inputs
+every 0
+expect events.player_died == 0
+expect events.exit_reached == 1
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_w1_l1
+press ui_accept
+wait 20
+press ui_accept
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect save.get_level_result(w1_l1,1).clears == 1
+expect save.is_level_unlocked(w1_l2,1) == true
+
+# --- 1-2 Canopy Village: up the trunk to the crow's nest and the warp ------------------------------------------------
+# On the world map.
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w1_l2
+expect save.is_level_unlocked(w1_l2,1) == true
+wait_until scene.countdown >= 0 600
+shot map_w1_l2
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w1_l2 600
+expect hero.dead == false
+expect hud.shown_hearts == 3
+wait 2
+shot w1_l2_start
+every 480 w1_l2
+play_file tools/autoplay/routes/w1_l2.warp.inputs
+every 0
+expect events.player_died == 0
+expect game.weapon == 2
+
+# The warp staff leads straight into Feast Land A (no tally); the bonus stage's tally ends Canopy Village.
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == bonus_a 600
+expect hero.dead == false
+expect hud.shown_hearts == 3
+wait 2
+shot bonus_a_start
+expect game.warp_return_level == w1_l2
+every 480 bonus_a
+play_file tools/autoplay/routes/bonus_a.inputs
+every 0
+expect events.player_died == 0
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_bonus_a
+press ui_accept
+wait 20
+press ui_accept
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect save.get_level_result(w1_l2,1).clears == 1
+expect save.is_level_unlocked(w2_l1,1) == true
+expect save.get_level_result(bonus_a,1).clears == 0
+
+# --- 2-1 Echo Caverns ------------------------------------------------------------------------------------------------
+# On the world map.
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w2_l1
+expect save.is_level_unlocked(w2_l1,1) == true
+wait_until scene.countdown >= 0 600
+shot map_w2_l1
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w2_l1 600
+expect hero.dead == false
+expect hud.shown_hearts == 3
+wait 2
+shot w2_l1_start
+# Not yet proven with the weapon the run carries (tests/test_campaign_routes.gd WEAPON_GAPS): the
+# route's own weapon is handed over.
+weapon club
+every 480 w2_l1
+play_file tools/autoplay/routes/w2_l1.expert.inputs
+every 0
+expect events.player_died == 0
+expect game.weapon == 1
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_w2_l1
+press ui_accept
+wait 20
+press ui_accept
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect save.get_level_result(w2_l1,1).clears == 1
+expect save.is_level_unlocked(w2_l2,1) == true
+
+# --- 2-2 Bone Gorge, then Brute's Den (boss 1) -----------------------------------------------------------------------
+# On the world map.
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w2_l2
+expect save.is_level_unlocked(w2_l2,1) == true
+wait_until scene.countdown >= 0 600
+shot map_w2_l2
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w2_l2 600
+expect hero.dead == false
+expect hud.shown_hearts == 3
+wait 2
+shot w2_l2_start
+# Not yet proven with the weapon the run carries (tests/test_campaign_routes.gd WEAPON_GAPS): the
+# route's own weapon is handed over.
+weapon club
+every 480 w2_l2
+play_file tools/autoplay/routes/w2_l2.expert.inputs
+every 0
+expect events.player_died == 0
+
+# No tally: the far rim of the gorge leads straight into the Brute's den.
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w2_l2b 600
+expect hero.dead == false
+expect hud.shown_hearts == 3
+wait 2
+shot w2_l2b_start
+expect game.has_glider == false
+# Not yet proven with the weapon the run carries (tests/test_campaign_routes.gd WEAPON_GAPS): the
+# route's own weapon is handed over.
+weapon hammer
+every 120 w2_l2b
+play_file tools/autoplay/routes/w2_l2b.expert.inputs
+every 0
+expect events.player_died == 0
+expect events.boss_defeated == 1
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_w2_l2
+press ui_accept
+wait 20
+press ui_accept
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect save.get_level_result(w2_l2,1).clears == 1
+expect save.is_level_unlocked(w3_l1,1) == true
+expect save.get_level_result(w2_l2b,1).clears == 0
+
+# --- 3-1 Frost Summit, then Blizzard Pass ----------------------------------------------------------------------------
+# On the world map.
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w3_l1
+expect save.is_level_unlocked(w3_l1,1) == true
+wait_until scene.countdown >= 0 600
+shot map_w3_l1
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w3_l1 600
+expect hero.dead == false
+expect hud.shown_hearts == 3
+wait 2
+shot w3_l1_start
+# Not yet proven with the weapon the run carries (tests/test_campaign_routes.gd WEAPON_GAPS): the
+# route's own weapon is handed over.
+weapon club
+every 480 w3_l1
+play_file tools/autoplay/routes/w3_l1.expert.inputs
+every 0
+expect events.player_died == 0
+
+# No tally: the summit cave leads into the blizzard.
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w3_l1b 600
+expect hero.dead == false
+expect hud.shown_hearts == 3
+wait 2
+shot w3_l1b_start
+every 480 w3_l1b
+play_file tools/autoplay/routes/w3_l1b.expert.inputs
+every 0
+expect events.player_died == 0
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_w3_l1
+press ui_accept
+wait 20
+press ui_accept
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect save.get_level_result(w3_l1,1).clears == 1
+expect save.is_level_unlocked(w3_l2,1) == true
+
+# --- 3-2 Crystal Grotto ----------------------------------------------------------------------------------------------
+# On the world map.
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w3_l2
+expect save.is_level_unlocked(w3_l2,1) == true
+wait_until scene.countdown >= 0 600
+shot map_w3_l2
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w3_l2 600
+expect hero.dead == false
+expect hud.shown_hearts == 3
+wait 2
+shot w3_l2_start
+every 480 w3_l2
+play_file tools/autoplay/routes/w3_l2.expert.inputs
+every 0
+expect events.player_died == 0
+expect game.weapon == 3
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_w3_l2
+press ui_accept
+wait 20
+press ui_accept
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect save.get_level_result(w3_l2,1).clears == 1
+expect save.is_level_unlocked(w4_l1,1) == true
+
+# --- 4-1 Cinder Shaft (auto-scroll) ----------------------------------------------------------------------------------
+# On the world map.
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w4_l1
+expect save.is_level_unlocked(w4_l1,1) == true
+wait_until scene.countdown >= 0 600
+shot map_w4_l1
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w4_l1 600
+expect hero.dead == false
+expect hud.shown_hearts == 3
+wait 2
+shot w4_l1_start
+# Not yet proven with the weapon the run carries (tests/test_campaign_routes.gd WEAPON_GAPS): the
+# route's own weapon is handed over.
+weapon club
+every 480 w4_l1
+play_file tools/autoplay/routes/w4_l1.inputs
+every 0
+expect events.player_died == 0
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_w4_l1
+press ui_accept
+wait 20
+press ui_accept
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect save.get_level_result(w4_l1,1).clears == 1
+expect save.is_level_unlocked(w4_l2,1) == true
+
+# --- 4-2 Obsidian Keep, then Colossus Hall (boss 2) ------------------------------------------------------------------
+# On the world map.
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w4_l2
+expect save.is_level_unlocked(w4_l2,1) == true
+wait_until scene.countdown >= 0 600
+shot map_w4_l2
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w4_l2 600
+expect hero.dead == false
+expect hud.shown_hearts == 3
+wait 2
+shot w4_l2_start
+every 480 w4_l2
+play_file tools/autoplay/routes/w4_l2.inputs
+every 0
+expect events.player_died == 0
+
+# No tally: the keep's door leads into the Colossus' hall.
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w4_l2b 600
+expect hero.dead == false
+expect hud.shown_hearts == 3
+wait 2
+shot w4_l2b_start
+every 120 w4_l2b
+play_file tools/autoplay/routes/w4_l2b.inputs
+every 0
+expect events.player_died == 0
+expect events.boss_defeated == 2
+expect game.weapon == 2
+
+# The trophy ends Obsidian Keep (its result is recorded at once) and starts the ending stage without a tally.
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == ending 600
+expect hero.dead == false
+expect hud.shown_hearts == 3
+wait 2
+shot ending_start
+expect save.get_level_result(w4_l2,1).clears == 1
+every 240 ending
+play_file tools/autoplay/routes/ending.inputs
+every 0
+expect events.player_died == 0
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_ending
+press ui_accept
+wait 20
+press ui_accept
+
+# --- The End, credits, title --------------------------------------------------------------------------------------
+wait_until flow.current_screen == the_end 900
+wait_until flow.busy == false 600
+expect save.is_game_completed(1) == true
+expect save.is_game_completed(0) == false
+expect save.get_high_score() >= 1000000
+expect game.lives >= 2
+expect save.get_level_result(w1_l1,1).clears == 1
+expect save.get_level_result(w1_l2,1).clears == 1
+expect save.get_level_result(w2_l1,1).clears == 1
+expect save.get_level_result(w2_l2,1).clears == 1
+expect save.get_level_result(w3_l1,1).clears == 1
+expect save.get_level_result(w3_l2,1).clears == 1
+expect save.get_level_result(w4_l1,1).clears == 1
+expect save.get_level_result(w4_l2,1).clears == 1
+wait 90
+shot the_end
+press ui_accept
+wait_until flow.current_screen == credits 900
+wait_until flow.busy == false 600
+wait 240
+shot credits
+press ui_cancel
+wait_until flow.current_screen == title 900
+wait_until flow.busy == false 600
+wait 30
+shot title_again
+expect save.has_progress() == true
+expect events.player_died == 0

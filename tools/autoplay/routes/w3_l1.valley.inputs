@@ -1,5 +1,5 @@
 # w3_l1 "Frost Summit" side path (Beginner and Expert): the valley under the icicle overhang instead of the sky
-# route over it. tests/test_levels_w3.gd plays the main route (w3_l1.inputs / w3_l1.expert.inputs) up to its "# S4"
+# route over it. tests/test_campaign_routes.gd plays the main route (w3_l1.inputs / w3_l1.expert.inputs) up to its "# S4"
 # comment, then this file: the hero stands at checkpoint 3 on the cliff-top plateau.
 # Down the slope, club the walker in front of the overhang (this also opens the rock spot), walk under the ceiling
 # spikes without jumping, jump the pond just past the overhang, and up the slope beyond.

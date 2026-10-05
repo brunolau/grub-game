@@ -73,6 +73,16 @@ func test_hud_boss_bar_follows_the_boss() -> void:
 	assert_false(hud.is_boss_bar_visible(), "a respawn resets the fight")
 
 
+## The HUD row fades while the hero is under it (the auto-scrolling shaft kills at the view's top edge, where the
+## row would hide him) and comes back when he leaves it.
+func test_hud_row_fades_while_the_hero_is_under_it() -> void:
+	var hud: Hud = await _overlay(Flow.HUD_SCENE) as Hud
+	await get_tree().process_frame
+	assert_true(hud.is_under_row(10.0), "the top band is under the row")
+	assert_false(hud.is_under_row(200.0), "the middle of the screen is not")
+	assert_eq(hud.row_alpha, 1.0, "no hero: the row is fully visible")
+
+
 func test_hud_shows_level_hints_on_a_panel() -> void:
 	var hud: Hud = await _overlay(Flow.HUD_SCENE) as Hud
 	assert_false(hud.is_hint_visible(), "no hint panel without a hint")

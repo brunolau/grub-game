@@ -15,8 +15,13 @@ const CATEGORIES: Array[String] = [
 	"player", "enemies", "bosses", "projectiles", "objects", "items", "zones", "fx", "props",
 ]
 
+## Categories whose scenes are spawned by code during play (effects, revealed and dropped items, thrown weapons,
+## enemy and boss shots): preload_runtime() loads all of them, so that no simulation tick ever loads a scene.
+const RUNTIME_CATEGORIES: Array[String] = ["fx", "items", "projectiles"]
+
 static var _cache: Dictionary = {}
 static var _missing: Dictionary = {}
+static var _runtime_loaded: bool = false
 
 
 ## Scene path of an entity id: "enemies/walker" -> "res://scenes/enemies/walker.tscn".
@@ -88,7 +93,21 @@ static func preload_ids(ids: Array[StringName]) -> void:
 			load_scene(id)
 
 
+## Load every scene of RUNTIME_CATEGORIES once (the level loader calls it next to preload_ids): an effect, item or
+## projectile spawned by code in the middle of play is then never loaded inside a tick (a visible hitch on phones).
+## Cheap after the first call.
+static func preload_runtime() -> void:
+	if _runtime_loaded:
+		return
+	_runtime_loaded = true
+	for category_name: String in RUNTIME_CATEGORIES:
+		for file: String in ResourceLoader.list_directory(SCENE_ROOT + category_name):
+			if file.get_extension() == "tscn":
+				load_scene(StringName(category_name + "/" + file.get_basename()))
+
+
 ## Drop the cache (level change, tests).
 static func clear_cache() -> void:
 	_cache.clear()
 	_missing.clear()
+	_runtime_loaded = false

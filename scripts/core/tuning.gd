@@ -249,6 +249,11 @@ const FEAST_WARN_SHAKE: int = 9                ## strength of that warning shake
 # Platforms [P 11.4]
 # =================================================================================================================
 const PLATFORM_RIDE_MIN_YVEL_EXCL: int = -16   ## ride test only while hero.yvel > -16
+## Fast landings on sprite platforms (our fix, not in the original): from this fall speed (8 px/tick) the ride test's
+## contact band reaches PLATFORM_CATCH_DEPTH px below the surface instead of the platform's 8 px, so a hero who
+## steps across the 8 px band in one tick (up to the 12 px/tick terminal speed) still lands.
+const PLATFORM_CATCH_YVEL: int = 128
+const PLATFORM_CATCH_DEPTH: int = 16
 const PLATFORM_ACCEL: int = 1        ## px/tick per tick toward the target speed (movers)
 const DROPPER_ACCEL: int = 8         ## v16 per tick
 const DROPPER_MAX: int = 192         ## v16

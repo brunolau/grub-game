@@ -31,6 +31,12 @@ const HINT_ICON: int = 5  ## "!" of ui/icons.png
 const HINT_ICON_GAP: int = 8
 const COL_HINT_BACK: Color = Color(0.153, 0.125, 0.094, 0.9)
 const COL_HINT_EDGE: Color = Color(1.0, 0.945, 0.812, 0.45)
+## The HUD row (lives, score, hearts, letters) fades to this alpha while the hero is under it, so he stays visible
+## where the view's top edge matters (the auto-scrolling shaft kills at that edge).
+const ROW_UNDER_HERO_ALPHA: float = 0.3
+const ROW_FADE_SECONDS: float = 0.15
+## Height of the HUD row below the safe-area top (art px): the hero is "under it" when his head is above that line.
+const ROW_HEIGHT: float = 48.0
 
 ## Hearts drawn (mirrors Game.hearts).
 var shown_hearts: int = 0
@@ -64,6 +70,10 @@ var _hint_texts: PackedStringArray = PackedStringArray()
 var _hint_holder: CenterContainer = null
 var _hint_label: Label = null
 var _hint_shown_text: String = ""
+## The top-row elements that fade while the hero is under them, and their current alpha.
+var _row_nodes: Array[CanvasItem] = []
+var row_alpha: float = 1.0
+var _row_area: Control = null
 
 
 func _init() -> void:
@@ -87,9 +97,12 @@ func _ready() -> void:
 	var area: Control = Control.new()
 	area.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_safe.add_child(area)
+	_row_area = area
 	_build_left(area)
 	_build_hearts(area)
 	_build_letters(area)
+	for child: Node in area.get_children():
+		_row_nodes.append(child as CanvasItem)
 	_build_boss_bar(area)
 	_build_hint(area)
 	_apply_margins()
@@ -116,6 +129,7 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_fade_hint(delta)
+	_fade_row(delta)
 	if _blink_left <= 0.0:
 		return
 	_blink_left -= delta
@@ -124,6 +138,24 @@ func _process(delta: float) -> void:
 		letter.modulate = Color.WHITE if lit else COL_LETTER_MISSING
 	if _blink_left <= 0.0:
 		_show_letters(Game.letters)
+
+
+## Fade the top row while the hero's head is under it (see ROW_UNDER_HERO_ALPHA).
+func _fade_row(delta: float) -> void:
+	var level: LevelBase = Game.level
+	var under: bool = false
+	if level != null and level.player != null and level.player.is_inside_tree() and not level.player.dead:
+		var feet: Vector2 = level.player.get_global_transform_with_canvas().origin
+		under = is_under_row(feet.y - float(level.player.box_h * Tuning.ART_SCALE))
+	row_alpha = move_toward(row_alpha, ROW_UNDER_HERO_ALPHA if under else 1.0, delta / ROW_FADE_SECONDS)
+	for node: CanvasItem in _row_nodes:
+		node.modulate.a = row_alpha
+
+
+## True when a screen y (viewport px) lies within the HUD row.
+func is_under_row(screen_y: float) -> bool:
+	var top: float = _row_area.get_global_rect().position.y if _row_area != null else 0.0
+	return screen_y < top + ROW_HEIGHT
 
 
 ## Show everything as it is in `Game` now.
