@@ -119,3 +119,23 @@ func test_mix_levels_stay_below_full_scale() -> void:
 	for context: StringName in AudioTable.MUSIC:
 		var db: float = float(AudioTable.MUSIC[context]["db"])
 		assert_true(db >= -24.0 and db <= 6.0, "%s: a measured volume (%s)" % [context, db])
+
+
+func test_effects_are_preloaded_and_a_level_keeps_only_its_tracks() -> void:
+	# Effects start inside ticks: all of them are loaded ahead (a first load stalled the tick, release_check).
+	Audio.preload_sfx()
+	for event: StringName in AudioTable.SFX:
+		for file: Variant in AudioTable.SFX[event]["files"]:
+			assert_true(Audio._streams.has(AudioTable.SFX_DIR + str(file)), "%s is loaded" % file)
+	var boss_path: String = AudioTable.MUSIC_DIR + str(AudioTable.MUSIC[Sfx.MUSIC_BOSS]["file"])
+	var feast_path: String = AudioTable.MUSIC_DIR + str(AudioTable.MUSIC[Sfx.MUSIC_FEAST]["file"])
+	var credits_path: String = AudioTable.MUSIC_DIR + str(AudioTable.MUSIC[Sfx.MUSIC_CREDITS]["file"])
+	Audio.preload_music(Sfx.MUSIC_BOSS)
+	Audio.preload_music(Sfx.MUSIC_FEAST)
+	Audio.preload_music(Sfx.MUSIC_CREDITS)
+	assert_true(Audio._streams.has(boss_path) and Audio._streams.has(credits_path), "preloaded tracks")
+	Audio.retain_music([Sfx.MUSIC_FEAST, Sfx.MUSIC_BOSS])
+	assert_true(Audio._streams.has(boss_path) and Audio._streams.has(feast_path), "the level's tracks stay")
+	assert_false(Audio._streams.has(credits_path), "other tracks are released")
+	assert_true(Audio._streams.has(AudioTable.SFX_DIR + "jump_a.wav"), "effects are never released")
+	Audio.retain_music([])

@@ -183,7 +183,20 @@ func test_tile_set_has_every_atlas_tile_and_the_liquid_animation() -> void:
 	assert_almost_eq(liquid.get_tile_animation_frame_duration(Vector2i.ZERO, 0),
 			Tuning.ticks_to_seconds(Tuning.TILE_ANIM_TICKS), 0.0001, "4 ticks per frame")
 	assert_true(liquid.has_tile(Vector2i(LevelTiles.LIQUID_BODY_BUBBLES, 0)))
-	assert_true(liquid.texture.resource_path.ends_with("lava.png"))
+	# One shared texture (one batch per rendering quadrant): A on top, B below it, the liquid strip at the bottom.
+	var lava: Texture2D = load(LevelData.liquid_path("lava")) as Texture2D
+	var stone: Texture2D = load(LevelData.terrain_path("cave/terrain_stone")) as Texture2D
+	var shared: Texture2D = (tile_set.get_source(A) as TileSetAtlasSource).texture
+	assert_true(shared == (tile_set.get_source(B) as TileSetAtlasSource).texture and shared == liquid.texture,
+			"the three sources share one texture")
+	assert_eq((tile_set.get_source(A) as TileSetAtlasSource).margins, Vector2i.ZERO)
+	assert_eq((tile_set.get_source(B) as TileSetAtlasSource).margins, Vector2i(0, stone.get_height()))
+	assert_eq(liquid.margins, Vector2i(0, stone.get_height() * 2))
+	assert_eq(shared.get_size(), Vector2(stone.get_width(), stone.get_height() * 2 + lava.get_height()))
+	var atlas: Image = shared.get_image()
+	var strip: Image = lava.get_image()
+	for x: int in [0, 37, strip.get_width() - 1]:
+		assert_eq(atlas.get_pixel(x, liquid.margins.y + 5), strip.get_pixel(x, 5), "liquid pixel %d" % x)
 	var fallback: TileSet = WorldTileSet.build("nowhere/none", "nowhere/none", "tar")
 	assert_not_null((fallback.get_source(A) as TileSetAtlasSource).texture, "unknown atlases fall back to jungle")
 	assert_false(WorldTileSet.has_terrain("nowhere/none"))

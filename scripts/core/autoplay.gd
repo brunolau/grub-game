@@ -22,7 +22,7 @@ extends Node
 ##   --transitions             keep the timed transitions (default: instant)
 ##   --smoke=<seconds>         boot check: run the game normally for that long (0.1 .. 120), then quit cleanly.
 ##                             Exit code 0 only when no error and no warning was logged (works with --headless)
-##   --perf                    with --autoplay or --flow: sample frame time, draw calls, tick cost, entity counts,
+##   --perf[=layers]           with --autoplay or --flow: sample frame time, draw calls, tick cost, entity counts,
 ##                             memory and level load times per screen / level against the budget of
 ##                             ARCHITECTURE.md 11; prints "Perf:" lines and writes <out>/perf.json
 ##                             (scripts/core/dev/perf_probe.gd; run windowed, best without screenshots)
@@ -129,7 +129,7 @@ func _ready() -> void:
 	_configure(options)
 	_redirect_user_data(str(options.get("user-dir", DEFAULT_USER_DIR)), options.has("fresh-user"))
 	if options.has("perf"):
-		_start_perf()
+		_start_perf(str(options["perf"]))
 	if flow_mode:
 		_start_flow(str(options["flow"]))
 		return
@@ -267,7 +267,7 @@ func _redirect_user_data(dir_path: String, fresh: bool) -> void:
 
 ## Attach the performance probe (debug builds only; it is not exported). It must connect to the simulation
 ## signals before the flow runner does, so that its tick timing sees the tick and nothing else.
-func _start_perf() -> void:
+func _start_perf(mode: String) -> void:
 	DirAccess.make_dir_recursive_absolute(_out_dir)
 	var probe_script: GDScript = load(PERF_PROBE) as GDScript if ResourceLoader.exists(PERF_PROBE) else null
 	if probe_script == null:
@@ -276,7 +276,7 @@ func _start_perf() -> void:
 	var probe: Node = probe_script.new() as Node
 	probe.name = "PerfProbe"
 	add_child(probe)
-	probe.call("begin", _out_dir)
+	probe.call("begin", _out_dir, mode)
 
 
 ## Hand the run to the flow-script runner (debug builds only; the runner is not exported).

@@ -175,6 +175,8 @@ func start_play(seed_value: int = 1) -> void:
 	set_time_limit(int(meta.get("time", 0)))
 	super.start_play(seed_value)
 	_start_music()
+	# The tracks of the screens and levels before this one are released (they are loaded again when needed).
+	Audio.retain_music(_level_music_contexts())
 
 
 ## Respawn after a death with the curtain of GAMEPLAY.md 11.1 step 9 (ARCHITECTURE.md 3.10): Flow closes the
@@ -379,6 +381,8 @@ func _spawn_entities() -> void:
 		var id: StringName = record["id"]
 		if not Spawner.is_prop(id) and not ids.has(id) and LevelText.applies_to(record["params"], Game.difficulty):
 			ids.append(id)
+	# Scenes of the previous level that this one does not use are released with their textures.
+	Spawner.retain_only(ids)
 	Spawner.preload_ids(ids)
 	# Effects, revealed or dropped items and shots are spawned by code in the middle of a tick: load them now.
 	Spawner.preload_runtime()
@@ -417,11 +421,20 @@ func _spawn_entities() -> void:
 
 ## Music that starts in the middle of a tick (feast mode, a boss fight) is loaded with the level, not on its tick.
 func _preload_music() -> void:
-	Audio.preload_music(Sfx.MUSIC_FEAST)
+	for context: StringName in _level_music_contexts():
+		Audio.preload_music(context)
+
+
+## The music contexts this level may play: its own, feast mode, its bosses'.
+func _level_music_contexts() -> Array[StringName]:
+	var contexts: Array[StringName] = [Sfx.MUSIC_FEAST]
+	if _music != &"":
+		contexts.append(_music)
 	for entity: SimEntity in get_kind(Defs.Kind.BOSS):
 		var boss: BossBase = entity as BossBase
 		if boss != null:
-			Audio.preload_music(boss.music)
+			contexts.append(boss.music)
+	return contexts
 
 
 func _add_prop(id: StringName, col: float, row: float, params: Dictionary, line: int) -> void:

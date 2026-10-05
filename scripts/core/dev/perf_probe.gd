@@ -113,6 +113,10 @@ var _covered_usec: int = 0
 var _added_usec: int = 0
 var _viewport_rid: RID = RID()
 var _written: bool = false
+var _layers_mode: bool = false
+var _layers_done: Dictionary = {}
+var _layers_busy: bool = false
+var _last_draws: int = 0
 
 
 func _init() -> void:
@@ -121,9 +125,12 @@ func _init() -> void:
 	process_priority = 100000
 
 
-## Start sampling; `out_dir` is the absolute output folder of the run.
-func begin(out_dir: String) -> void:
+## Start sampling; `out_dir` is the absolute output folder of the run. `mode` "layers" (`--perf=layers`) also
+## attributes the draw calls of every level once: each layer of the level and each overlay is hidden for a few
+## frames and the drop in draw calls is printed ("Perf layers: ...").
+func begin(out_dir: String, mode: String = "") -> void:
 	_out_dir = out_dir
+	_layers_mode = mode == "layers"
 	_frame_start = FrameStart.new()
 	_frame_start.name = "PerfFrameStart"
 	add_child(_frame_start)
@@ -160,6 +167,11 @@ func _process(_delta: float) -> void:
 	var draws: int = RenderingServer.viewport_get_render_info(_viewport_rid,
 			RenderingServer.VIEWPORT_RENDER_INFO_TYPE_CANVAS, RenderingServer.VIEWPORT_RENDER_INFO_DRAW_CALLS_IN_FRAME)
 	draws = maxi(draws, int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)))
+	_last_draws = draws
+	if _layers_mode and not _layers_busy and key.begins_with("level:") and not key.ends_with("#warmup") \
+			and not _layers_done.has(key):
+		_layers_done[key] = true
+		_attribute_layers(key)
 	seg.draws.append(draws)
 	var hero: Vector2i = _hero_pos()
 	if draws > int(seg.draws_at[0]):
@@ -222,6 +234,43 @@ func _sample_level(seg: Segment) -> void:
 		if level.is_in_view(entity):
 			platforms += 1
 	seg.max_platforms_in_view = maxi(seg.max_platforms_in_view, platforms)
+
+
+## Hide every layer of the running level and every overlay in turn and print how many draw calls each one costs.
+func _attribute_layers(key: String) -> void:
+	_layers_busy = true
+	var targets: Array[CanvasItem] = []
+	var names: PackedStringArray = PackedStringArray()
+	var level: Node = Game.level
+	for child: Node in level.get_children():
+		if child is CanvasItem and (child as CanvasItem).visible:
+			targets.append(child as CanvasItem)
+			names.append(String(child.name))
+	for layer: int in [Defs.LAYER_HUD, Defs.LAYER_TOUCH, Defs.LAYER_MENU]:
+		for child: Node in Flow.get_overlay(layer).get_children():
+			if child is CanvasItem and (child as CanvasItem).visible:
+				targets.append(child as CanvasItem)
+				names.append("overlay:" + String(child.name))
+	for i: int in 3:
+		await get_tree().process_frame
+	var base: int = _last_draws
+	var parts: PackedStringArray = PackedStringArray()
+	for i: int in targets.size():
+		var item: CanvasItem = targets[i]
+		if not is_instance_valid(item):
+			continue
+		item.visible = false
+		for f: int in 3:
+			await get_tree().process_frame
+		var without: int = _last_draws
+		if is_instance_valid(item):
+			item.visible = true
+		for f: int in 2:
+			await get_tree().process_frame
+		var children: int = item.get_child_count()
+		parts.append("%s %d (%d children)" % [names[i], base - without, children])
+	print("Perf layers %s: %d draw calls; cost per layer: %s" % [key, base, ", ".join(parts)])
+	_layers_busy = false
 
 
 func _hero_pos() -> Vector2i:
@@ -421,6 +470,7 @@ func _on_finished(_exit_code: int) -> void:
 			first["where"], last["where"], int(last["objects"]) - int(first["objects"]),
 			int(last["nodes"]) - int(first["nodes"]), int(last["resources"]) - int(first["resources"]),
 			int(last["orphans"]) - int(first["orphans"]), float(last["static_mb"]) - float(first["static_mb"])])
+	report["textures_still_loaded"] = _loaded_textures()
 	if OS.is_debug_build():
 		print("Perf: orphan nodes now:")
 		Node.print_orphan_nodes()
@@ -429,6 +479,36 @@ func _on_finished(_exit_code: int) -> void:
 		file.store_string(JSON.stringify(report, "\t"))
 		file.close()
 		print("Perf: report %s/perf.json" % _out_dir)
+
+
+## Textures under res://assets that are still in the resource cache now (someone holds them), by folder, with their
+## size as RGBA8 in MB (what they take as uncompressed textures).
+func _loaded_textures() -> Dictionary:
+	var by_folder: Dictionary = {}
+	var total: float = 0.0
+	var pending: PackedStringArray = PackedStringArray(["res://assets"])
+	while not pending.is_empty():
+		var dir: String = pending[pending.size() - 1]
+		pending.remove_at(pending.size() - 1)
+		for entry: String in ResourceLoader.list_directory(dir):
+			var path: String = dir + "/" + entry
+			if entry.ends_with("/"):
+				pending.append(path.trim_suffix("/"))
+				continue
+			if entry.get_extension() != "png" or not ResourceLoader.has_cached(path):
+				continue
+			var texture: Texture2D = ResourceLoader.get_cached_ref(path) as Texture2D
+			var mb: float = float(texture.get_width() * texture.get_height() * 4) / MB if texture != null else 0.0
+			var folder: String = dir.trim_prefix("res://assets/")
+			if not by_folder.has(folder):
+				by_folder[folder] = [0.0, PackedStringArray()]
+			by_folder[folder][0] = float(by_folder[folder][0]) + mb
+			(by_folder[folder][1] as PackedStringArray).append(entry)
+			total += mb
+	print("Perf: textures still loaded at the end: %.1f MB (RGBA8)" % total)
+	for folder: String in by_folder:
+		print("Perf:   %-28s %6.1f MB  %s" % [folder, by_folder[folder][0], ", ".join(by_folder[folder][1])])
+	return by_folder
 
 
 func _summarise(seg: Segment) -> Dictionary:

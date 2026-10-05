@@ -67,6 +67,7 @@ const PANEL_MARGIN: int = 16
 const LOCALE_DIR: String = "res://locale"
 
 static var _fonts: Dictionary = {}
+## Texture paths that do not exist (tex() answers null without asking the file system again).
 static var _textures: Dictionary = {}
 static var _theme: Theme = null
 static var _locale_ready: bool = false
@@ -165,15 +166,16 @@ static func font_size(style: int) -> int:
 			return SIZE_HUD
 
 
-## A texture by path, cached; null when the file does not exist.
+## A texture by path; null when the file does not exist. Only the answer "missing" is remembered here: a texture in
+## use is shared through Godot's resource cache, and one that no screen uses any more is released (a static cache
+## kept the backdrops of every biome the tally and the menus had shown, about 9 MB each, for the whole session).
 static func tex(path: String) -> Texture2D:
 	if _textures.has(path):
-		return _textures[path]
-	var texture: Texture2D = null
-	if ResourceLoader.exists(path):
-		texture = load(path) as Texture2D
-	_textures[path] = texture
-	return texture
+		return null
+	if not ResourceLoader.exists(path):
+		_textures[path] = true
+		return null
+	return load(path) as Texture2D
 
 
 ## One cell of a uniform sprite sheet as a texture (`index` is row-major, manifest 1).

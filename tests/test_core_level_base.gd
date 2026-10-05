@@ -198,3 +198,24 @@ func test_spawner_naming_convention() -> void:
 	assert_false(Spawner.exists(&"wrongcategory/thing"))
 	expect_errors(0)
 	Spawner.clear_cache()
+
+
+func test_spawner_keeps_runtime_scenes_and_releases_the_previous_level() -> void:
+	Spawner.clear_cache()
+	Spawner.preload_runtime()
+	for category_name: String in Spawner.RUNTIME_CATEGORIES:
+		for file: String in ResourceLoader.list_directory(Spawner.SCENE_ROOT + category_name):
+			if file.get_extension() == "tscn":
+				var id: StringName = StringName(category_name + "/" + file.get_basename())
+				assert_true(Spawner._cache.has(id), "%s is preloaded (spawned by code inside ticks)" % id)
+	assert_true(Spawner._cache.has(&"fx/dust") and Spawner._cache.has(&"projectiles/hero_axe"))
+	Spawner.load_scene(&"bosses/brute")
+	Spawner.load_scene(&"enemies/walker")
+	Spawner.load_scene(&"player/player")
+	Spawner.retain_only([&"enemies/walker"])
+	assert_false(Spawner._cache.has(&"bosses/brute"), "a scene the next level does not use is released")
+	assert_true(Spawner._cache.has(&"enemies/walker"), "a scene the next level uses stays")
+	assert_true(Spawner._cache.has(&"player/player"), "the hero stays")
+	assert_true(Spawner._cache.has(&"items/bone"), "runtime scenes stay")
+	expect_errors(0)
+	Spawner.clear_cache()

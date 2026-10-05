@@ -93,6 +93,17 @@ static func preload_ids(ids: Array[StringName]) -> void:
 			load_scene(id)
 
 
+## Drop the cached scenes of every id that is not in `ids`, except the hero ("player") and RUNTIME_CATEGORIES, which
+## every level uses. The level loader calls it before preload_ids: a cached scene holds its textures, so without this
+## the sheets of every enemy and boss met in a session (megabytes each) stayed loaded until the game was closed.
+static func retain_only(ids: Array[StringName]) -> void:
+	for id: StringName in _cache.keys():
+		var category_name: String = category(id)
+		if ids.has(id) or category_name == "player" or RUNTIME_CATEGORIES.has(category_name):
+			continue
+		_cache.erase(id)
+
+
 ## Load every scene of RUNTIME_CATEGORIES once (the level loader calls it next to preload_ids): an effect, item or
 ## projectile spawned by code in the middle of play is then never loaded inside a tick (a visible hitch on phones).
 ## Cheap after the first call.

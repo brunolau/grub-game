@@ -114,6 +114,23 @@ func preload_music(context: StringName) -> void:
 		_get_stream(AudioTable.MUSIC_DIR + str(entry["file"]), bool(entry["loop"]))
 
 
+## Release the tracks of every music context except `contexts`, the one playing and the interrupted ones
+## (push_music). The level loader calls it once its music runs, so that a session does not keep every track it has
+## ever played in memory (1 to 4 MB each). Sound effects are never released.
+func retain_music(contexts: Array[StringName]) -> void:
+	var keep: Dictionary = {}
+	var wanted: Array[StringName] = contexts.duplicate()
+	wanted.append_array(_music_stack)
+	wanted.append(_music_context)
+	for context: StringName in wanted:
+		var entry: Dictionary = AudioTable.MUSIC.get(context, {})
+		if not entry.is_empty():
+			keep[AudioTable.MUSIC_DIR + str(entry["file"])] = true
+	for path: Variant in _streams.keys():
+		if str(path).begins_with(AudioTable.MUSIC_DIR) and not keep.has(path):
+			_streams.erase(path)
+
+
 ## Play a sound effect by event name (Sfx.*). `variant` picks one of several files (-1 = cycle through them).
 ## `volume_offset_db` is added to the table value. The same event is started at most once per rendered frame.
 func play_sfx(event: StringName, variant: int = -1, volume_offset_db: float = 0.0) -> void:

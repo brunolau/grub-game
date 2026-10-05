@@ -232,7 +232,9 @@ stop_all_loops`, `play_music(Sfx.MUSIC_JUNGLE)`, `play_jingle(context, then_cont
 `pop_music()` (feast, boss: the interrupted track **continues where it was**), `stop_music`, `get_music_context`,
 `get_music_position`, `stop_all_sfx`, `get_bus_volume`, `set_suspended(on)` / `is_suspended()` (Flow calls it
 while the app is in the background: music and loops halt in place, effects are dropped), `shutdown`, signal
-`music_changed`. Event and context names are the constants of `Sfx` (`scripts/core/sfx.gd`); files and
+`music_changed`; `preload_sfx()` (every effect is loaded at boot: a first load inside a tick stalled it),
+`preload_music(context)` and `retain_music(contexts)` (the level loads the tracks that may start inside a tick -
+feast, boss - and releases every other track once its own music runs). Event and context names are the constants of `Sfx` (`scripts/core/sfx.gd`); files and
 volumes are in `AudioTable`. **No other module loads or plays an audio file.** Calls are allowed inside a tick;
 nothing is read back. In headless runs (tests, CI) streams are loaded and all state is tracked, but nothing is
 actually started and jingles end at once.
@@ -1087,7 +1089,9 @@ bash .tools/gd.sh play --flow=tools/autoplay/robustness.flow --fast --fresh-user
 ```
 
 Flow scripts can also resize the window (`window 1600 720` gives the 800 x 360 view of a wide phone) and take the
-focus away from the game (`focus out` / `focus in`), so view sizes and the background rules are checked in a window.
+focus away from the game (`focus out` / `focus in`), so view sizes and the background rules are checked in a window. `pad <button>` sends gamepad events (buttons, d-pad,
+left stick, as a pad reports them) and `input device` lets the hero read the devices instead of the script, for
+keyboard-free paths through menus and play.
 With `--fast` a stage that has just started waits for its first `play`, so a route file plays tick for tick as in
 the headless tests; a `play` ends when another stage takes over (sub-stage, bonus stage, epilogue), and
 `weapon <name>` hands the hero a weapon. The campaign flows:
@@ -1160,9 +1164,10 @@ screenshot their work from day one. It is a development tool, not the loader; it
 | Per-tick allocations | none in `_sim_tick` hot paths: no new `Array` / `Dictionary` / `String` formatting, no `get_nodes_in_group`, no `get_children`, no node creation except real spawns; reuse `Rect2i` / ints |
 | Draw calls | <= 60 per frame; one TileMapLayer per layer; sprites share sheets; no per-entity shader materials (use `modulate` for flashes) |
 | Overdraw | <= 4 parallax layers + 3 tile layers; particles <= 64 on screen, CPUParticles2D or hand-rolled sprites, no GPU particle collisions |
-| Textures | nearest, lossless, no mipmaps; every texture <= 2048 px per side (see open risks: the Brute sheets are 2304 px wide); <= 96 MB of textures loaded per level |
+| Textures | nearest, lossless, no mipmaps; every texture <= 2048 px per side (the Brute sheets were re-packed to 2016 px, ASSET_MANIFEST); <= 96 MB of textures loaded per level; the terrain atlases and the liquid strip of a level share one texture built at load (`WorldTileSet.shared_atlas`), so the tile layers stay one batch per quadrant |
 | Audio | <= 10 SFX voices + 2 music streams; OGG music streamed; no decoding in `_sim_tick` |
-| Loading | a level loads in <= 2 s on the target device; entity scenes are cached by `Spawner`; preload a level's ids with `Spawner.preload_ids` |
+| Loading | a level loads in <= 2 s on the target device; entity scenes are cached by `Spawner`; the level loader calls `Spawner.retain_only(ids)` (scenes of the previous level are released with their textures), `Spawner.preload_ids(ids)` and `Spawner.preload_runtime()` (every fx / items / projectiles scene: nothing is loaded inside a tick) |
+| Measuring | `--perf` (debug builds, with `--autoplay` or `--flow`, `scripts/core/dev/perf_probe.gd`): frame CPU / GPU time, draw calls, tick cost, entity counts, memory and load times per level against this table, slow ticks with what they loaded, a leak snapshot at every title / map arrival; `--perf=layers` also attributes the draw calls to the layers of each level |
 | Memory | <= 300 MB resident on Android |
 | Resolution independence | no assumption about the view size; UI anchored; touch targets >= 56 art px |
 | Battery | no busy loops; `Engine.max_fps` stays 0 (vsync); the simulation stops when the app is paused |
