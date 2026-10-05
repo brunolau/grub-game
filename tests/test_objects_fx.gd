@@ -11,7 +11,7 @@ const ITEM_IDS: Array[StringName] = [
 const OBJECT_IDS: Array[StringName] = [
 	&"objects/checkpoint", &"objects/exit", &"objects/hidden_spot", &"objects/breakable_block", &"objects/container",
 	&"objects/platform", &"objects/drop_platform", &"objects/column", &"objects/gate", &"objects/marker",
-	&"objects/spring", &"objects/sign",
+	&"objects/spring", &"objects/sign", &"objects/npc",
 ]
 const FX_IDS: Array[StringName] = [
 	&"fx/dust", &"fx/star_puff", &"fx/hit_stars", &"fx/poof", &"fx/explosion", &"fx/explosion_big", &"fx/ring",
@@ -84,6 +84,25 @@ func test_popups_are_limited() -> void:
 	assert_eq(alive, ObjTuning.MAX_POPUPS)
 
 
+func test_popups_at_one_spot_on_consecutive_ticks_stack() -> void:
+	var popups: Array[FxPopup] = []
+	for i: int in 3:
+		popups.append(spawn(&"fx/popup", Vector2i(100, 100), {"value": 100 * (i + 1)}) as FxPopup)
+		Sim.step(1)
+	for i: int in popups.size():
+		for j: int in range(i + 1, popups.size()):
+			var gap: int = absi(popups[i].sim_pos.y - popups[j].sim_pos.y)
+			assert_true(gap >= FxPopup.STAGGER_LINE, "pop-ups %d and %d are a line apart (%d px)" % [i, j, gap])
+	assert_true(popups[1].sim_pos.y < popups[0].sim_pos.y, "the later one starts higher")
+	var beside: FxPopup = spawn(&"fx/popup", Vector2i(118, 100), {"value": 300}) as FxPopup
+	assert_true(beside.sim_pos.y <= popups[2].sim_pos.y - FxPopup.STAGGER_LINE, "text that would touch moves up too")
+	var elsewhere: FxPopup = spawn(&"fx/popup", Vector2i(160, 100), {"value": 5}) as FxPopup
+	assert_eq(elsewhere.sim_pos, Vector2i(160, 100), "a pop-up clear of the others keeps its place")
+	var first_y: int = popups[0].sim_pos.y
+	Sim.step(1)
+	assert_eq(popups[0].sim_pos.y, first_y - 1, "stacked pop-ups still rise 1 px per tick")
+
+
 func test_level_turns_popup_requests_into_popups() -> void:
 	Events.popup_requested.emit(&"heart", 1, Vector2i(80, 80))
 	assert_eq(count_alive(Defs.Kind.FX), 1)
@@ -128,6 +147,47 @@ func test_debris_sprays_bits_that_fall() -> void:
 	assert_true(debris.is_queued_for_deletion())
 	var many: FxDebris = spawn(&"fx/debris", Vector2i(100, 100), {"count": 99}) as FxDebris
 	assert_eq(many.get_child_count(), ObjTuning.DEBRIS_MAX_COUNT)
+
+
+func test_debris_lands_on_floors_instead_of_falling_through() -> void:
+	# Sprayed from the middle of a ground tile (a hidden spot in the floor): up, back down, bounce, lie still.
+	var ground_y: int = 10 * Tuning.TILE
+	var debris: FxDebris = spawn(&"fx/debris", Vector2i(100, ground_y + 8), {"count": 8}) as FxDebris
+	var lowest: int = -9999
+	var bounced: bool = false
+	var touched: Dictionary = {}
+	var prev_y: PackedInt32Array = PackedInt32Array()
+	prev_y.resize(8)
+	prev_y.fill(ground_y + 8)
+	for t: int in ObjTuning.DEBRIS_LIFE - 1:
+		Sim.step(1)
+		for i: int in 8:
+			var pos: Vector2i = debris.bit_pos(i)
+			if prev_y[i] <= ground_y:
+				lowest = maxi(lowest, pos.y)
+				if pos.y == ground_y:
+					touched[i] = true
+				if pos.y < prev_y[i] and prev_y[i] == ground_y:
+					bounced = true
+			prev_y[i] = pos.y
+	assert_true(lowest <= ground_y, "once above the floor no bit sinks into it (lowest %d)" % lowest)
+	assert_true(touched.size() >= 3, "bits come down onto the floor (%d)" % touched.size())
+	assert_true(bounced, "a bit bounces off the floor")
+	for i: int in 8:
+		if debris.is_resting(i):
+			assert_eq(debris.bit_pos(i).y, ground_y, "a resting bit lies on the surface")
+	# A solid ceiling stops a rising bit.
+	var lines: PackedStringArray = PackedStringArray()
+	for row: int in 16:
+		lines.append(TileGrid.CH_SOLID_A.repeat(40) if row == 8 or row >= 10 else TileGrid.CH_AIR.repeat(40))
+	make_recording_level(lines)
+	var capped: FxDebris = spawn(&"fx/debris", Vector2i(100, ground_y + 8), {"count": 8}) as FxDebris
+	var highest: int = 9999
+	for t: int in 12:
+		Sim.step(1)
+		for i: int in 8:
+			highest = mini(highest, capped.bit_pos(i).y)
+	assert_eq(highest, 9 * Tuning.TILE, "rising bits stop under the ceiling (highest %d)" % highest)
 
 
 func test_effects_do_not_touch_the_gameplay_random_sequence() -> void:

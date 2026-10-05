@@ -112,11 +112,19 @@ func test_charge_table() -> void:
 		var charged_front: int = 0
 		for i: int in rows.size():
 			var has_box: bool = int(rows[i]["club_frame"]) != Tuning.ClubFrame.NONE
-			powers.append(int(rows[i]["club_power"]) if has_box else null)
+			if has_box:
+				powers.append(int(rows[i]["club_power"]))
+			else:
+				powers.append(null)
 			if i >= 4 and has_box and int(rows[i]["club_power"]) == 100:
 				charged_front += 1
-		assert_eq(powers, expected["box_power_per_strike_tick"].map(func(v: Variant) -> Variant:
-			return null if v == null else int(v)), "box power per strike tick after %d crouched ticks" % k)
+		var wanted: Array = []
+		for v: Variant in expected["box_power_per_strike_tick"]:
+			if v == null:
+				wanted.append(null)
+			else:
+				wanted.append(int(v))
+		assert_eq(powers, wanted, "box power per strike tick after %d crouched ticks" % k)
 		assert_eq(charged_front, int(expected["charged_front_frames"]))
 	world_flat()
 	spawn_hero()
@@ -414,6 +422,37 @@ func test_trap_and_boss_hits() -> void:
 	assert_false(hero.hurt(boss_side, Defs.HurtKind.BOSS_BODY), "immune for 44 ticks")
 	assert_true(hero.hurt(null, Defs.HurtKind.BOSS_PROJECTILE), "boss projectiles ignore the immunity")
 	boss_side.free()
+
+
+func test_no_damage_or_death_once_the_level_is_completed() -> void:
+	# The exit iris closes while the simulation still runs: an enemy, a trap, spikes or a pit must not reach him.
+	world_flat()
+	spawn_hero()
+	var enemy: EnemyBase = _place_enemy(START, 25)
+	level.completed = true
+	var hurts: Array[int] = []
+	var deaths: Array[StringName] = []
+	var on_hurt: Callable = func(kind: int, _source: SimEntity) -> void: hurts.append(kind)
+	var on_died: Callable = func(cause: StringName) -> void: deaths.append(cause)
+	Events.player_hurt.connect(on_hurt)
+	Events.player_died.connect(on_died)
+	play(hold("", 60))
+	for kind: int in [Defs.HurtKind.ENEMY, Defs.HurtKind.TRAP, Defs.HurtKind.BOSS_BODY,
+			Defs.HurtKind.BOSS_PROJECTILE]:
+		assert_false(hero.hurt(enemy, kind), "hurt kind %d is ignored after the exit" % kind)
+	for cause: StringName in [&"spikes", &"pit", &"liquid", &"time", &"off_screen"]:
+		hero.kill(cause)
+	Events.player_hurt.disconnect(on_hurt)
+	Events.player_died.disconnect(on_died)
+	assert_true(hurts.is_empty(), "no player_hurt after the exit")
+	assert_true(deaths.is_empty(), "no player_died after the exit")
+	assert_false(hero.dead)
+	assert_eq(hero.hit_timer, 0)
+	assert_eq(Game.hearts, Tuning.ENERGY_START)
+	assert_eq(Game.bones, 0, "no energy scattered")
+	# The same contact hurts as soon as the level is running again.
+	level.completed = false
+	assert_true(hero.hurt(enemy), "a running level still hurts")
 
 
 # --- Helpers ----------------------------------------------------------------------------------------------------------

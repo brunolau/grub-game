@@ -34,3 +34,7 @@ desktop.ini
 *~
 .vscode/
 .idea/
+
+# Claude Code local session files
+.claude/scheduled_tasks.lock
+.claude/settings.local.json

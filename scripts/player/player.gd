@@ -131,7 +131,7 @@ func get_anim() -> int:
 # =================================================================================================================
 
 func hurt(source: SimEntity, kind: int = Defs.HurtKind.ENEMY) -> bool:
-	if dead:
+	if dead or _level_completed():
 		return false
 	var pierces_immunity: bool = kind == Defs.HurtKind.TRAP or kind == Defs.HurtKind.BOSS_PROJECTILE
 	if hit_timer > 0 and not pierces_immunity:
@@ -172,7 +172,7 @@ func hurt(source: SimEntity, kind: int = Defs.HurtKind.ENEMY) -> bool:
 
 
 func kill(cause: StringName) -> void:
-	if dead:
+	if dead or _level_completed():
 		return
 	dead = true
 	control_enabled = false
@@ -1021,6 +1021,13 @@ func _death_step() -> void:
 # =================================================================================================================
 # Helpers
 # =================================================================================================================
+
+## True once the hero reached an exit: the level only plays its exit animation (the closing iris) from here on,
+## and nothing may hurt or kill him any more.
+func _level_completed() -> bool:
+	var level: LevelBase = Game.level
+	return level != null and level.completed
+
 
 func _scatter_bones(count: int) -> void:
 	var level: LevelBase = Game.level

@@ -117,8 +117,11 @@ func is_feasting() -> bool:
 ## ENEMY: -1 heart or lose the glider, yvel -128, xvel = -(xvel * 4), hit_timer 44.
 ## BOSS_BODY: one bone, yvel -128, xvel +/-128 away from the source with ice = 3, hit_timer 44.
 ## BOSS_PROJECTILE: -1 heart and 6 bones scattered. TRAP: all energy scattered as bones, hurt pose, no death.
+## Once the level is completed (LevelBase.completed: the exit animation plays) every hit is ignored.
 func hurt(source: SimEntity, kind: int = Defs.HurtKind.ENEMY) -> bool:
-	if dead or (hit_timer > 0 and kind != Defs.HurtKind.TRAP and kind != Defs.HurtKind.BOSS_PROJECTILE):
+	if dead or (Game.level != null and Game.level.completed):
+		return false
+	if hit_timer > 0 and kind != Defs.HurtKind.TRAP and kind != Defs.HurtKind.BOSS_PROJECTILE:
 		return false
 	var killed: bool = false
 	match kind:
@@ -152,9 +155,9 @@ func hurt(source: SimEntity, kind: int = Defs.HurtKind.ENEMY) -> bool:
 
 ## Instant death (PHYSICS.md 10.3): costs a life regardless of energy and of hit_timer.
 ## `cause`: &"enemy", &"spikes", &"liquid", &"pit", &"crush", &"off_screen", &"give_up", &"time" (the
-## level's time limit ran out).
+## level's time limit ran out). Ignored once the level is completed (the exit animation plays).
 func kill(cause: StringName) -> void:
-	if dead:
+	if dead or (Game.level != null and Game.level.completed):
 		return
 	dead = true
 	control_enabled = false

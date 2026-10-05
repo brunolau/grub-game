@@ -16,6 +16,7 @@ const TOUCH_LAYOUTS: PackedStringArray = ["standard", "swapped"]
 const TOUCH_SCALES: Array[float] = [1.0, 1.25, 1.5]
 const LISTEN_SECONDS: float = 5.0
 const VOLUME_STEPS: int = 10
+## Smallest room the lists get (art px); they always show a whole number of rows (see [method list_height]).
 const LIST_HEIGHT: float = 210.0
 ## Space a host needs around the lists (title row, panel padding, prompts, margins): fit_height(view - this).
 const CHROME_HEIGHT: float = 150.0
@@ -134,11 +135,19 @@ func close() -> void:
 	closed.emit()
 
 
-## Let the lists use `height` art px (taller views show more rows); never less than LIST_HEIGHT.
+## Let the lists use up to `height` art px (taller views show more rows); never less than LIST_HEIGHT.
 func fit_height(height: float) -> void:
-	var list_height: float = maxf(LIST_HEIGHT, floorf(height))
+	var fitted: float = list_height(height)
 	for page: Control in [_main_page, _bind_page, _confirm_page]:
-		page.custom_minimum_size.y = list_height
+		page.custom_minimum_size.y = fitted
+
+
+## Height of a list in `room` art px: a whole number of rows (every heading and row is one row tall and the
+## lists scroll row by row), so no row is ever cut in half at the top or bottom edge.
+static func list_height(room: float) -> float:
+	var row: int = UiKit.row_height()
+	var rows: int = maxi(floori(LIST_HEIGHT / float(row)), floori(room / float(row)))
+	return float(rows * row)
 
 
 ## The settings row of a key (null when the key has no row, e.g. fullscreen on phones).
@@ -183,14 +192,24 @@ func _make_page() -> ScrollContainer:
 	var scroll: ScrollContainer = ScrollContainer.new()
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.follow_focus = true
-	scroll.custom_minimum_size = Vector2(0.0, LIST_HEIGHT)
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.custom_minimum_size = Vector2(0.0, list_height(LIST_HEIGHT))
+	scroll.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	var list: VBoxContainer = VBoxContainer.new()
 	list.add_theme_constant_override(&"separation", 0)
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(list)
 	add_child(scroll)
+	var bar: VScrollBar = scroll.get_v_scroll_bar()
+	bar.value_changed.connect(_snap_scroll.bind(bar))
 	return scroll
+
+
+## Keep a list scrolled by whole rows (wheel, drag, focus changes, scroll bar alike).
+func _snap_scroll(value: float, bar: VScrollBar) -> void:
+	var row: float = float(UiKit.row_height())
+	var on_row: float = clampf(roundf(value / row) * row, 0.0, maxf(bar.max_value - bar.page, 0.0))
+	if not is_equal_approx(on_row, value):
+		bar.value = on_row  # emits value_changed once more, with a value that needs no snapping
 
 
 func _build_main(list: VBoxContainer) -> void:
@@ -273,7 +292,7 @@ func _build_bindings(list: VBoxContainer) -> void:
 
 func _build_confirm() -> VBoxContainer:
 	var page: VBoxContainer = VBoxContainer.new()
-	page.custom_minimum_size = Vector2(0.0, LIST_HEIGHT)
+	page.custom_minimum_size = Vector2(0.0, list_height(LIST_HEIGHT))
 	page.alignment = BoxContainer.ALIGNMENT_CENTER
 	page.add_theme_constant_override(&"separation", 8)
 	_confirm_text = UiKit.label("", UiKit.Style.BODY, HORIZONTAL_ALIGNMENT_CENTER)
@@ -292,7 +311,9 @@ func _build_confirm() -> VBoxContainer:
 func _heading(list: VBoxContainer, key: String) -> void:
 	var label: Label = UiKit.label(key, UiKit.Style.BODY)
 	label.add_theme_color_override(&"font_color", UiKit.COL_FOCUS)
-	label.custom_minimum_size = Vector2(0.0, 26.0)
+	# Exactly one row tall, so the list scrolls (and is cut) on row boundaries only.
+	label.custom_minimum_size = Vector2(0.0, float(UiKit.row_height()))
+	label.clip_text = true
 	label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 	list.add_child(label)
 

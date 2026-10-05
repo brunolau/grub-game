@@ -1,0 +1,40 @@
+# w2_l2b "Brute's Den" from '@' to the exit on Expert (ticks:KEYS, keys L R U D F K), with the HAMMER that the
+# campaign hero carries from Echo Caverns (the test gives it to him; the hammer's longer swing changes the timing).
+# The bone tunnel: the inset spot (it holds a heart), drumsticks, meat, a heart that waits for later, the ribs
+# (a hidden spot), the checkpoint and two spots in the floor by the sign.
+10:R
+4:
+10:DF,6:,10:DF,6:,10:DF,6:,8:DF
+79:R
+4:
+8:F,6:,8:F,6:,8:F,6:,6:F
+19:R
+4:
+10:DF,6:,8:DF
+16:R
+# Drop into the den. The red Brute (250 hit points, fast) watches at first: walk up close, crouch to charge the
+# hammer, then a charged high strike at its head (120).
+23:R
+15:R
+13:R
+12:D
+10:UF
+# It reels back and watches again: charge, step in and strike once more (130 -> 10).
+10:
+12:D
+5:R
+10:UF
+# Now it attacks. Back off so it does not rush, charge while it beats its chest, walk in under its very high jump
+# and strike its head the moment it lands.
+10:L
+55:D
+14:R
+4:
+10:UF
+# It bursts into bonuses. Step away from the shower, let the fire-starter roll into his hands, then jump over the
+# skull and walk into the lit exit totem.
+20:L
+90:
+7:R
+12:RU
+30:R

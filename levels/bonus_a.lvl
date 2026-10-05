@@ -1,0 +1,139 @@
+# Club & Grub level file - format 1 (docs/ARCHITECTURE.md 7).
+# Feast Land A "Sky Picnic": the bonus stage of 1-2 (Canopy Village). An open sky playground over a sponge-cake
+# meadow: springs throw the hero up to icing clouds, a cloud stair climbs to a cake island, a ride crosses to the
+# icing island, a waterfall of sweets falls back to the meadow and a big spring launches him onto the cake tower
+# with the spiral staff (items/warp) that ends the stage and its source level. No enemies, no pits: the meadow
+# catches every fall. Optional: the cloud pantry in the top-left (secret) and the spring garden under the ride.
+
+[meta]
+format = 1
+id = bonus_a
+name = "Feast Land A"
+kind = bonus
+order = 0
+world = 0
+stage = 0
+biome = feast
+terrain_a = feast/terrain
+terrain_b = feast/terrain_icing
+background = feast
+music = bonus
+bonus_tier = 0
+home_row = 15
+author = feast
+notes = "Bonus stage A, entered from w1_l2 (meta bonus = bonus_a). 45-90 s. No level codes: only the warp leads here."
+
+[legend]
+? = objects/hidden_spot kind=small count=3 contents=food:15,food:16,food:17 look=inset tile=#
+* = objects/hidden_spot kind=big hits=3 contents=giant:2 look=block tile=#
+Q = objects/hidden_spot kind=small count=2 contents=food:20,food:21 tile=#
+R = objects/hidden_spot kind=small count=3 contents=food:19,food:31,food:38 tile=#
+B = objects/hidden_spot kind=big hits=4 contents=giant:6 tile=#
+U = objects/hidden_spot kind=small count=3 contents=food:31,food:38,treasure:12 prop=village/flower_pot
+I = objects/hidden_spot kind=small count=2 contents=food:29,food:30 look=inset tile=%
+T = objects/hidden_spot kind=small count=3 contents=food:38,treasure:9,food:38 look=inset tile=#
+S = objects/hidden_spot kind=small count=4 contents=food:20,food:21,food:19,treasure:3 prop=jungle/bush_light
+$ = objects/breakable_block hits=2 contents=food:16 tile=;
+J = objects/spring
+K = objects/spring power=-288
+P = objects/platform dir=2 speed=2 travel=96 mode=ride
+W = items/warp
+a = items/food index=15
+b = items/food index=16
+c = items/food index=17
+d = items/food index=20
+e = items/food index=21
+g = items/food index=19
+h = items/food index=31
+k = items/food index=38
+r = items/food index=2
+s = items/food index=3
+w = items/food index=30
+x = items/treasure index=14
+t = items/treasure index=8
+m = items/giant_bonus index=2
+n = items/giant_bonus index=3
+
+[tiles]
+........%%%%%%%%%%%%%...........................................................................................................
+........%...........%...........................................................................................................
+........%...........%...........................d.d.............................................................................
+........%.x.t.n.t...$....r.....................d.d.d............................................................................
+........%===================...................h...h............................................................................
+................................................h.h.............................................................................
+..............................r..................h..............................................................................
+.............................===..................m.............................................................................
+............................................S../####\.........w.w.w.w.....U......ee..x..........................................
+....................................dd...##############B##.P............%%%%%III%%%%%%%%........................................
+..................................=====....##############................%%%%%%%%%%%%%%..g......................................
+.............................................##########....................%%%%%%%%%%...........................................
+................................ee........................................................c.....................................
+..............................=====.............................................................................................
+...........................................................................................g....................................
+............................aa...........................................................................................n...W..
+.......................k..=====.............................................................c.........................%%%%%%%%%%
+.......................k..............................................................................................%%%%%%%%%%
+.............................................................................................g........................##########
+............b.......=======...........................................................................................##########
+...........c.c.........g.....................................................................c........................##########
+..........b...b........g......................................c...b...................................................%%%%%%%%%%
+.........c.....c.......g........sr...........................b.b.c.c..........................g.......................##########
+...........%%%................/####\..........%%..................................................%%..................T#########
+...@.......%%%.........J...12########34.......%%..%%%......................../##\.................%%r.s.r.s.r.....K...##########
+#######?##########*#####################QQ################.............###############################QQ#####*##################
+##########################################################.............#########################################################
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%..J...J...J..%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+##############################################################R###R#############################################################
+################################################################################################################################
+
+[entities]
+zones/secret 14 2 name=cloud_pantry rect=9,1,11,3
+props/jungle/bush_light 5 24
+props/jungle/grass_a 16 24
+props/jungle/sprouts 21 24
+props/jungle/flower 40.5 24
+props/jungle/fern 44 24 layer=front
+props/jungle/grass_b 53 24
+props/jungle/sprouts 56.5 24
+props/jungle/grass_a 62 27
+props/jungle/sprouts 66 27
+props/jungle/bush_big 73 24
+props/jungle/flower 84 24
+props/jungle/grass_a 88 24
+props/jungle/bush_light 96 24
+props/jungle/sprouts 105 24
+props/jungle/grass_b 111 24
+props/jungle/grass_strip_light 48.5 7
+props/jungle/sprouts 55 8
+props/jungle/grass_b 76 8
+props/jungle/flower 79 8
+props/jungle/grass_a 119 15
+props/jungle/flower 123 15
+props/jungle/sprouts 126.5 15
+props/jungle/sprouts 37.5 9
+props/jungle/sprouts 33.5 12
+
+[overrides]
+46 12 a 30
+47 12 a 31
+48 12 a 31
+49 12 a 31
+50 12 a 31
+51 12 a 31
+52 12 a 31
+53 12 a 32
+76 12 b 30
+77 12 b 31
+78 12 b 31
+79 12 b 31
+80 12 b 31
+81 12 b 31
+82 12 b 31
+83 12 b 32
+119 19 a 15
+121 23 a 23
+123 19 a 23
+125 23 a 15
+126 19 a 15
+120 24 a 23
+124 20 a 23

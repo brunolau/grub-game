@@ -58,8 +58,8 @@ several tools share the folder (one Godot at a time); with a plain Godot the equ
 | Robustness (timed transitions, mashing, focus, window sizes) | `bash .tools/gd.sh play --flow=tools/autoplay/robustness.flow --fast --fresh-user --transitions` |
 
 Screenshots land in `build/screenshots/<name>/`; harness runs keep their saves and settings in
-`build/autoplay_user/`. Until the campaign levels exist, debug builds play a development campaign of two levels
-(`levels/test_integration*.lvl`); the flow scripts in `tools/autoplay/` drive it from the title to the ending. The architecture, ownership rules and every API are in
+`build/autoplay_user/`. The two integration levels (`levels/test_integration*.lvl`, `kind = test`, linked by
+`next`) use every system of the game; `tools/autoplay/full_loop.flow` plays them from the title to the ending. The architecture, ownership rules and every API are in
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); the specifications are in `docs/spec/`.
 
 ## Building a release

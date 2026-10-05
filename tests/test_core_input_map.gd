@@ -32,6 +32,27 @@ func test_ui_actions_are_bound_to_keyboard_and_gamepad() -> void:
 		)
 
 
+func test_gamepad_start_pauses_and_confirms_but_never_cancels() -> void:
+	var start: InputEventJoypadButton = InputEventJoypadButton.new()
+	start.button_index = JOY_BUTTON_START
+	start.pressed = true
+	assert_true(InputMap.event_is_action(start, Defs.ACT_PAUSE, true), "Start pauses the game")
+	assert_true(InputMap.event_is_action(start, &"ui_accept", true), "Start confirms menu entries")
+	assert_false(InputMap.event_is_action(start, &"ui_cancel", true), "Start is no 'back'")
+	var a_button: InputEventJoypadButton = InputEventJoypadButton.new()
+	a_button.button_index = JOY_BUTTON_A
+	var accept_pad: Array[int] = []
+	for event: InputEvent in InputMap.action_get_events(&"ui_accept"):
+		if event is InputEventJoypadButton:
+			accept_pad.append((event as InputEventJoypadButton).button_index)
+	assert_eq(accept_pad[0], JOY_BUTTON_A, "A stays the first pad button of ui_accept (the prompts show it)")
+	var escape: InputEventKey = InputEventKey.new()
+	escape.physical_keycode = KEY_ESCAPE
+	escape.pressed = true
+	assert_true(InputMap.event_is_action(escape, &"ui_cancel", true), "Escape keeps 'back'")
+	assert_false(InputMap.event_is_action(escape, &"ui_accept", true))
+
+
 func test_display_settings() -> void:
 	assert_eq(int(ProjectSettings.get_setting("display/window/size/viewport_width")), Tuning.VIEW_W * Tuning.ART_SCALE)
 	assert_eq(int(ProjectSettings.get_setting("display/window/size/viewport_height")), Tuning.VIEW_H * Tuning.ART_SCALE)

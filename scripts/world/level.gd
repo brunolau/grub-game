@@ -61,6 +61,9 @@ func setup_from_text(p_level_id: StringName, text: String) -> void:
 
 
 func _ready() -> void:
+	# Sign texts are translated while the entities spawn: register the catalogues even when no menu screen ran
+	# before this level (autoplay, debug starts).
+	UiKit.ensure_locale()
 	_driver = LevelDriver.new()
 	_driver.setup(_world_step, _camera_step, _post_step)
 	add_child(_driver)
@@ -511,6 +514,9 @@ func _respawn_now() -> void:
 	_camera_logic.scroll_flags = scroll_flags
 	set_time_limit(int(meta.get("time", 0)))
 	super.respawn_player()
+	# The darkness of the checkpoint is back at once (the curtain hid the change): no fade.
+	_dark_ticks = Tuning.DARKNESS_FADE_TICKS if dark else 0
+	_dark_ticks_prev = _dark_ticks
 	_start_music()
 
 

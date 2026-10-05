@@ -137,6 +137,9 @@ func _process(_delta: float) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if current_screen == SCREEN_LEVEL and not busy and event.is_action_pressed(Defs.ACT_PAUSE):
+		# A button that both pauses and confirms (gamepad Start) confirms the focused entry of the pause menu.
+		if get_tree().paused and event.is_action(&"ui_accept", true) and get_viewport().gui_get_focus_owner() != null:
+			return
 		toggle_pause()
 		get_viewport().set_input_as_handled()
 
@@ -273,7 +276,11 @@ func finish_tally() -> void:
 	if Game.warp_return_level != &"":
 		finished = Game.warp_return_level
 		Game.warp_return_level = &""
-	Save.record_level_result(finished, difficulty, Game.score, Game.completion_percent())
+	# A linked sub-stage ends the main level it belongs to: the result goes to that level's map stop (the
+	# campaign then continues after it, Levels.next_level).
+	var parent: StringName = Levels.parent_level(finished, difficulty)
+	Save.record_level_result(parent if parent != &"" else finished, difficulty, Game.score,
+			Game.completion_percent())
 	Game.clear_tally()
 	var kind: String = str(Levels.get_value(finished, "kind", Levels.KIND_MAIN))
 	var next: StringName = Levels.next_level(finished, difficulty)

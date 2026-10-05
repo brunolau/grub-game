@@ -74,6 +74,9 @@ signal wind_changed(wind: int)
 ## The level's time limit (meta key `time`) shows another whole second; -1 = the level has no limit. Emitted when
 ## the limit is armed (level start, respawn) and whenever the displayed second changes. For the HUD.
 signal time_left_changed(seconds: int)
+## A level hint (zones/message) asks to be shown: `text` is a translation key (or plain text) and `source` the
+## node that asks. An empty `text` withdraws the hint of that source. The HUD shows the newest hint still asked for.
+signal message_requested(source: Node, text: String)
 
 # --- Level flow -------------------------------------------------------------------------------------------------------
 ## A level finished loading; gameplay is about to start.

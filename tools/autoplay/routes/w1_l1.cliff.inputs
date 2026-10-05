@@ -1,0 +1,11 @@
+# w1_l1 "Vine Bridges" - side-path proof, Beginner, default seed (ticks:KEYS, keys L R U D F K): the branch steps
+# above the start lead up to the secret cliff top with the letter G and a leafy-mound spot (the routes skip it).
+# Under the lowest branch, then straight up onto it (each step is 3 tiles).
+19:R,8:
+22:U,14:
+# Up and to the left, branch by branch.
+8:LU,14:U,10:
+8:LU,14:U,10:
+8:LU,14:U,10:
+# Along the cliff top to the letter G.
+30:L,10:

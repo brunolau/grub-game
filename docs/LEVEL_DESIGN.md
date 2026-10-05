@@ -144,7 +144,7 @@ Rules of the text:
 | `music` | music context | by biome | `level_jungle`, `level_cave`, `level_ice`, `level_volcano`, `level_shaft`, `level_grotto`, `bonus`, `secret`, `ending`, ... |
 | `time` | seconds | 0 | time limit; 0 = none (the original has none); running out costs a life |
 | `password_beginner`, `password_expert` | 4 characters 0-9 A-Z | "" | level codes; unique across all levels |
-| `next` | level id | "" | explicit successor; empty = next `main` level by `order` |
+| `next` | level id | "" | explicit successor; empty = next `main` level by `order` (for a `sub` level: the `main` level after the one whose `next` leads to it; its tally result counts for that main level) |
 | `tally` | bool | true | false = first half of a linked pair (exit leads to `next` without a tally) |
 | `bonus` | level id | "" | bonus stage the `items/warp` of this level leads to |
 | `min_difficulty` | `beginner` `expert` | `beginner` | `expert` hides the level from Beginner runs |
@@ -359,6 +359,7 @@ joined by commas: `food:3,treasure:8,heart,weapon:axe`. `giant` = `giant_bonus`,
 | `objects/marker` | `name` (invisible gate destination) |
 | `objects/spring` | `power` v16 [-224] |
 | `objects/sign` | `text=<translation key>` |
+| `objects/npc` | `kind=elder\|kid\|warrior` [elder], `turn` [true], `facing`: a friendly villager (ending stage) that plays its idle loop and turns to face the hero while he is near (`turn=false` keeps `facing`); harmless, not hittable, counted nowhere |
 
 Hidden spots that touch each other (8 neighbours) open together and each counts for the completion percentage.
 Walls of secret passages are columns of `$`.
@@ -392,7 +393,7 @@ jumps.
 | `zones/dark` | `on` [true] | entering switches the night palette on (`on=false`: off); it fades over one designer second |
 | `zones/kill` | - | entering is a pit death |
 | `zones/autoscroll_stop` | - | on `scroll = autoscroll` levels, entering stops the descent |
-| `zones/message` | `text=<translation key>` | shows the text above the rectangle while the hero is inside |
+| `zones/message` | `text=<translation key>` | shows the text on the HUD's hint panel (under the HUD row) while the hero is inside |
 | `zones/flies` | `count` [5] | dirty ground: every visit adds flies around the hero (cosmetic, at most 20); `items/water_bucket` washes them off |
 | `zones/ember_rain` | `period` ticks [22], `skin=ember\|leaf` [ember] | while the hero is inside, an ember (or a leaf) falls toward him every `period` ticks; at most five fall at once and a touch costs a bone (the volcano shaft) |
 

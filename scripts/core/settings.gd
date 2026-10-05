@@ -227,7 +227,7 @@ func has_custom_bindings() -> bool:
 
 ## True when a captured input event can become a binding: a key press (no echo), a gamepad button press, or a
 ## stick / trigger pushed at least AXIS_CAPTURE_THRESHOLD. Releases, mouse and touch events cannot.
-static func is_bindable(event: InputEvent) -> bool:
+func is_bindable(event: InputEvent) -> bool:
 	if normalize_event(event) == null:
 		return false
 	if event is InputEventKey:
@@ -241,7 +241,7 @@ static func is_bindable(event: InputEvent) -> bool:
 
 ## Device family of a binding: Defs.Device.KEYBOARD for a key, Defs.Device.GAMEPAD for a pad button or axis,
 ## -1 for everything else.
-static func event_device(event: InputEvent) -> int:
+func event_device(event: InputEvent) -> int:
 	if event is InputEventKey:
 		return Defs.Device.KEYBOARD
 	if event is InputEventJoypadButton or event is InputEventJoypadMotion:
@@ -251,7 +251,7 @@ static func event_device(event: InputEvent) -> int:
 
 ## The form in which a binding is kept: valid for every device, keys by physical position without modifiers,
 ## axes as a direction (-1 or +1). Returns null when the event cannot be a binding.
-static func normalize_event(event: InputEvent) -> InputEvent:
+func normalize_event(event: InputEvent) -> InputEvent:
 	if event is InputEventKey:
 		var source_key: InputEventKey = event
 		var code: Key = source_key.physical_keycode if source_key.physical_keycode != KEY_NONE \
@@ -284,7 +284,7 @@ static func normalize_event(event: InputEvent) -> InputEvent:
 
 ## Text token of a binding as stored in the settings file: "key:<physical keycode>", "joy_button:<index>",
 ## "joy_axis:<axis>:<-1|1>". "" when the event cannot be a binding.
-static func encode_event(event: InputEvent) -> String:
+func encode_event(event: InputEvent) -> String:
 	var normal: InputEvent = normalize_event(event)
 	if normal is InputEventKey:
 		var key: InputEventKey = normal
@@ -299,7 +299,7 @@ static func encode_event(event: InputEvent) -> String:
 
 
 ## The binding a token stands for; null when the token is not valid.
-static func decode_event(token: String) -> InputEvent:
+func decode_event(token: String) -> InputEvent:
 	var parts: PackedStringArray = token.split(":")
 	for i: int in range(1, parts.size()):
 		if not parts[i].is_valid_int():
@@ -333,7 +333,7 @@ static func decode_event(token: String) -> InputEvent:
 ## Short English name of a binding for menus ("Z", "Space", "Pad A", "Left Stick Up"); "" when the event is not
 ## a binding. On desktops keys are named after the player's keyboard layout, elsewhere after the US layout. The
 ## ui module may translate it or show a glyph instead.
-static func event_label(event: InputEvent) -> String:
+func event_label(event: InputEvent) -> String:
 	var normal: InputEvent = normalize_event(event)
 	if normal is InputEventKey:
 		var key: InputEventKey = normal
@@ -469,7 +469,7 @@ func _take_from_others(action: StringName, device: int, token: String, replaceme
 
 
 ## Index of the event with this token in `events`, or -1.
-static func _find_token(events: Array[InputEvent], token: String) -> int:
+func _find_token(events: Array[InputEvent], token: String) -> int:
 	for i: int in events.size():
 		if encode_event(events[i]) == token:
 			return i

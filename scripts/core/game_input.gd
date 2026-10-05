@@ -138,7 +138,7 @@ func is_scripted() -> bool:
 
 ## Convert a key string of the reference traces ("L", "R", "U", "D", "F", plus "K" for look) to flags.
 ## Example: keys_to_flags("RU") == Defs.IN_RIGHT | Defs.IN_UP.
-static func keys_to_flags(keys: String) -> int:
+func keys_to_flags(keys: String) -> int:
 	var result: int = 0
 	for i: int in keys.length():
 		match keys[i]:
@@ -159,7 +159,7 @@ static func keys_to_flags(keys: String) -> int:
 
 ## Expand a run-length input script ([[ticks, "KEYS"], ...], the format of PHYSICS_REFERENCE.json traces) into
 ## one flags value per tick.
-static func expand_runs(runs: Array) -> PackedInt32Array:
+func expand_runs(runs: Array) -> PackedInt32Array:
 	var result: PackedInt32Array = PackedInt32Array()
 	for run: Variant in runs:
 		var count: int = int(run[0])

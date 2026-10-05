@@ -1,0 +1,349 @@
+# Club & Grub level file - format 1 (docs/ARCHITECTURE.md 7). World 2, stage 2 (first half): "Bone Gorge".
+# Out of the caves onto the rim of a giant gorge full of old bones: diggers burst out of the bone dirt, stepping
+# stones rise out of a spike pit as the hero goes, a pillar lifts him up a cliff and a stone slab rises to bridge
+# a gap. At the end of the upper terrace lies the HANG-GLIDER: a long runway, then the glide over the Bone Gorge
+# itself, where bats and pterodactyls patrol below the glide line (dive on them: 1 000 / 5 000 / 10 000). The
+# exit on the far rim leads straight into the sub-stage w2_l2b (the Brute) without a tally.
+# Authored with a generator; positions are (column, row) of 16 px cells.
+
+[meta]
+format = 1
+id = w2_l2
+name = "Bone Gorge"
+kind = main
+order = 40
+world = 2
+stage = 2
+biome = cave
+terrain_a = cave/terrain_stone
+terrain_b = cave/terrain
+liquid = water
+background = cave
+music = level_cave
+password_beginner = "B0NE"
+password_expert = "GL1D"
+next = w2_l2b
+tally = false
+bonus_tier = 1
+author = w2
+notes = "World 2-2a: diggers, rising columns (stepping stones, lift, bridge), the hang-glider over the Bone Gorge; continues in w2_l2b."
+
+[legend]
+? = objects/hidden_spot kind=small count=3 contents=food:13,food:22,food:9 look=inset tile=#
+* = objects/hidden_spot kind=big hits=3 contents=giant:4 look=block tile=#
+$ = objects/breakable_block hits=2 tile=;
+k = objects/hidden_spot kind=small count=2 contents=food:24,food:12 tile=#
+K = objects/hidden_spot kind=small count=3 contents=food:27,treasure:4,food:31 tile=#
+n = objects/hidden_spot kind=small count=4 contents=food:22,food:30,food:23,treasure:7 tile=#
+J = objects/hidden_spot kind=big hits=4 contents=giant:2 tile=#
+a = items/food index=0
+b = items/food index=8
+c = items/food index=13
+d = items/food index=20
+e = items/food index=44
+f = items/food index=36
+g = items/food index=41
+h = items/food index=45
+t = items/treasure index=1
+
+[tiles]
+################################################################################################################################################################################################################################################################
+################################################################################################################################################################################################################################################################
+####..................................................................................................................................................####...........######............#######.................................................................#
+####...................................................................................................................................................##............######............#######.................................................................#
+####..................................................................................................................................................................####..............#####..................................................................#
+####...................................................................................................................................................................##...............#####..................................................................#
+####.....................................................................................................................................................................................###...................................................................#
+####.................................................................................................................................................d...................................###...................................................................#
+####......................................................................................c.c............................................................d................................#....................................................................#
+####............................................................................h.h.h............g.g.g.......................................................d.................................................................................................#
+####.............................................................................................................................................................d.............................................................................................#
+####......................................................................#####?################......##nn######\....................................................d...d.....................................................................................#
+####...............................................e.t.e..................######################......###########\...........................................................d.................................................................................#
+####..............................................#######.................######################......############\............................................................................................................................................#
+#.................................................#######...........---...#..............#######......#############\...................................................................e.......................................................................#
+#.........................................................g...............#..............#######......##############\...........b.b.b.b.b...................................................e..................................................................#
+#................b.b.b........c...........................................#..............############################*#######################....................................................e.............................................................#
+#.........a.a.a.............c.............................g.........---...#..f.f.........#######......#######################################.........................................................e........................................................#
+#.........................c...............................................#..............#######......#######################################..............................................................e...................................................#
+#.@...........12######34............d.......d..........12#####34......b...#..............#######......#######################################...................................................................e..............................................#
+########?#########################............####################kk##############J#############......#######################################..................................................................................................................#
+##################################............##################################################^^^^^^#######################################..................................................................................................................#
+##################################............###############################################################################################.............................................................................h.h.h.h..............................#
+##################################............###############################################################################################........................................................................./#kk#######################KK##*##########
+##################################............###############################################################################################......................................................................../##########################################
+##################################^^^^^^^^^^^^###############################################################################################......................................................................./###########################################
+#############################################################################################################################################....................................f.f.............................../############################################
+#############################################################################################################################################...................................####............................../#############################################
+#############################################################################################################################################...................................####............................./##############################################
+#############################################################################################################################################...................................####............................/###############################################
+#############################################################################################################################################...................................####.........................../################################################
+#############################################################################################################################################...................................####........................../#################################################
+#############################################################################################################################################...................................####........................./##################################################
+#############################################################################################################################################...................................####......###.............../###################################################
+#############################################################################################################################################...................................####......###............../####################################################
+#############################################################################################################################################........###........................####......###............./#####################################################
+#############################################################################################################################################........###........................####......###............/######################################################
+#############################################################################################################################################........###...............##.......####......###.........../#######################################################
+#############################################################################################################################################........###...............##.......####......###........../########################################################
+#############################################################################################################################################........###.....##........##.......####......###........./#########################################################
+#############################################################################################################################################........###.....##........##.......####......###......../##########################################################
+#############################################################################################################################################........###.....##........##.......####......###......./###########################################################
+#############################################################################################################################################........###.....##........##.......####......###....../############################################################
+#############################################################################################################################################........###.....##........##.......####......###...../#############################################################
+#############################################################################################################################################........###.....##........##.......####......###..../##############################################################
+#############################################################################################################################################........###.....##........##.......####......###.../###############################################################
+#############################################################################################################################################^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^################################################################
+################################################################################################################################################################################################################################################################
+################################################################################################################################################################################################################################################################
+################################################################################################################################################################################################################################################################
+
+[entities]
+enemies/digger 24 19 zone=12,12,20,8 skin=lizard
+objects/hidden_spot 20 18 kind=small count=3 contents=food:41,food:43,treasure:0 prop=cave/bone_pile
+objects/column 35 30 size=2,5 rise=5 trigger=30,15,4,5
+objects/column 39 30 size=2,5 rise=5 trigger=35,15,2,6
+objects/column 43 30 size=2,5 rise=5 trigger=39,15,2,6
+items/letter 40 18 index=0
+objects/checkpoint 50 19
+enemies/walker 59 18 skin=turtle left=-3 right=3
+objects/hidden_spot 64 19 kind=small count=3 contents=food:35,treasure:5,food:28 prop=cave/skull_ribs
+# The R waits on the lower of two stone ledges under the lift pillar; the ledges also let a hero who steps off the
+# raised pillar climb back up (a risen column stays up until a respawn).
+items/letter 69 16 index=1
+zones/secret 53 12 rect=50,10,7,3 name=bone_perch
+items/code_stone 56 12 index=0
+objects/hidden_spot 50 12 kind=small count=3 contents=treasure:8,food:40,food:37 prop=cave/rocks_small
+objects/column 72 28 size=2,9 rise=9 trigger=72,18,2,2
+objects/gate 85 10 name=cave_in dest=cave_out skin=hole
+objects/gate 77 19 name=cave_out dest=cave_in lock=72,10 skin=hole
+zones/secret 81 19 rect=75,14,14,6 name=bone_cave
+items/letter 86 19 index=2
+items/code_stone 79 19 index=1
+items/treasure 83 19 index=11
+objects/hidden_spot 88 19 kind=small count=4 contents=food:38,treasure:9,food:39,food:40 prop=cave/skull_big
+objects/checkpoint 76 10
+enemies/digger 88 10 zone=78,4,16,8 skin=lizard_b
+enemies/hopper 92 10 skin=lizard range=5
+objects/column 96 16 size=6,1 rise=5 trigger=92,6,4,5
+enemies/walker 107 10 skin=turtle left=-3 right=3
+objects/hidden_spot 110 10 kind=small count=3 contents=food:33,food:27,treasure:3 prop=cave/rock_big
+objects/checkpoint 119 15
+items/heart 120 15
+items/glider 123 15
+objects/sign 126 15 text=SIGN_W2_GLIDER
+items/treasure 158 4 index=14
+items/letter 172 6 index=3
+items/treasure 178.5 26 index=13
+enemies/flyer 155 16 skin=bat left=-4 right=4
+enemies/flyer 170 19 skin=pterodactyl_b left=-5 right=5
+enemies/flyer 188 22 skin=bat_b left=-4 right=4
+enemies/flyer 202 26 skin=pterodactyl left=-3 right=3
+enemies/harrier 185 24 skin=pterodactyl range=6 expert
+enemies/flyer 162 25 skin=bat left=-5 right=5 expert
+items/letter 228 22 index=4
+enemies/walker 236 22 skin=turtle left=-3 right=3
+objects/hidden_spot 248 22 kind=small count=3 contents=food:37,treasure:12,food:34 prop=cave/skull_ribs
+objects/exit 252 22
+enemies/hopper 62 18 skin=lizard_b range=5 expert
+enemies/digger 60 18 zone=50,12,20,8 skin=lizard expert
+enemies/hopper 101 10 skin=lizard_b range=5 expert
+props/cave/stalactite 5 2
+props/cave/drips 6.5 2
+props/cave/stalactite 13 2
+props/cave/drips 17.5 2
+props/cave/drip_cap 22 2
+props/cave/drip_cap 33 2
+props/cave/stalactite 34 2
+props/cave/stalactite 35 2
+props/cave/stalactite 38 2
+props/cave/drip_cap 44 2
+props/cave/stalactite 49 2
+props/cave/drips 52.5 2
+props/cave/stalactite 58 2
+props/cave/drip_cap 64 2
+props/cave/drip_cap 66 2
+props/cave/stalactite 67 2
+props/cave/stalactite 71 2
+props/cave/drips 72.5 2
+props/cave/stalactite 79 2
+props/cave/stalactite 81 2
+props/cave/drip_cap 87 2
+props/cave/stalactite 90 2
+props/cave/drips 95.5 2
+props/cave/stalactite 100 2
+props/cave/drip_cap 108 2
+props/cave/stalactite 113 2
+props/cave/stalactite 124 2
+props/cave/stalactite 125 2
+props/cave/stalactite 126 2
+props/cave/drips 129.5 2
+props/cave/stalactite 134 2
+props/cave/drip_cap 218 2
+props/cave/stalactite 225 2
+props/cave/drips 226.5 2
+props/cave/stalactite 234 2
+props/cave/stalactite 235 2
+props/cave/stalactite 236 2
+props/cave/drips 239.5 2
+props/cave/stalactite 243 2
+props/cave/crystal_violet_c 78 10
+props/cave/pebble 80 10
+props/cave/crystal_cyan_a 94 10 flip
+props/cave/drips 77.5 14
+props/cave/stalactite 79 14
+props/cave/stalactite 80 14
+props/cave/drips 87.5 14
+props/cave/drips 51.5 15
+props/cave/drip_cap 53 15
+props/cave/drip_cap 54 15
+props/cave/crystal_violet_c 98 15 flip
+props/cave/twigs 99 15
+props/cave/crystal_cyan_c 101 15
+props/cave/mushrooms 140 15 flip
+props/cave/stalactite 98 17
+props/cave/stalactite 99 17
+props/cave/crystal_cyan_c 4 19
+props/cave/twigs 5 19 flip
+props/cave/mound_brown 6.5 19
+props/cave/skull_buried 10.5 19
+props/cave/bone_pile 29 19
+props/cave/pebble 46 19
+props/cave/crystal_cyan_b 52 19
+props/cave/mushrooms 75 19
+props/cave/rocks_small 231 22 flip
+props/cave/crystal_violet_b 232 22
+props/cave/bone_pile 238 22
+props/cave/tusk_d 246 22 flip
+props/cave/stalactite 143 2
+props/cave/drips 146.5 2
+props/cave/drips 148.5 2
+props/cave/drips 159.5 2
+props/cave/stalactite 161 2
+props/cave/stalactite 162 2
+props/cave/stalactite 174 2
+props/cave/stalactite 176 2
+props/cave/drip_cap 177 2
+props/cave/drips 181.5 2
+props/cave/drips 190.5 2
+props/cave/drips 201.5 2
+props/cave/stalactite 208 2
+props/cave/drip_cap 210 2
+props/cave/drips 213.5 2
+props/cave/stalactite 215 2
+props/cave/stalactite 150 3
+props/cave/stalactite 168 6
+props/cave/stalactite 188 6
+props/cave/stalactite 185 8
+props/cave/skull_ribs 177.5 26
+props/cave/bone_big 150 34
+props/cave/tusk_b 158 38
+props/cave/skull_big 187 32
+props/cave/bone_pile 168 36
+props/cave/skull_buried 219 22
+props/cave/bone_big 224 22 flip
+props/cave/tusk_a 233 22
+props/cave/tusk_c 122 21 layer=front
+props/cave/bone_pile 110 22 layer=front flip
+props/cave/skull_ribs 20 23 layer=front
+props/cave/twigs 59 23 layer=front flip
+props/cave/skull_big 72 23 layer=front
+props/cave/bone_big 90 23 layer=front
+props/cave/skull_big 129 23 layer=front flip
+props/cave/skull_big 11 24 layer=front
+props/cave/skull_big 27 25 layer=front flip
+props/cave/bone_big 78 25 layer=front
+props/cave/tusk_c 111 26 layer=front
+props/cave/twigs 123 26 layer=front
+props/cave/tusk_c 227 26 layer=front
+props/cave/skull_ribs 234 26 layer=front flip
+props/cave/skull_ribs 251 26 layer=front
+props/cave/skull_big 57 27 layer=front flip
+props/cave/skull_ribs 64 27 layer=front
+props/cave/skull_ribs 130 27 layer=front
+props/cave/twigs 95 28 layer=front
+props/cave/twigs 103 28 layer=front
+props/cave/bone_pile 243 28 layer=front
+props/cave/bone_big 9 29 layer=front flip
+props/cave/skull_big 21 29 layer=front flip
+props/cave/tusk_c 40 29 layer=front
+props/cave/skull_ribs 80 29 layer=front
+props/cave/skull_buried 89 29 layer=front flip
+props/cave/skull_ribs 216 29 layer=front
+props/cave/skull_ribs 124 30 layer=front flip
+props/cave/bone_big 49 31 layer=front flip
+props/cave/skull_big 111 31 layer=front flip
+props/cave/skull_big 133 31 layer=front flip
+props/cave/skull_big 224 31 layer=front
+props/cave/tusk_c 249 31 layer=front flip
+props/cave/skull_ribs 100 32 layer=front flip
+props/cave/bone_big 243 32 layer=front
+props/cave/bone_pile 6 33 layer=front
+props/cave/skull_ribs 13 33 layer=front flip
+props/cave/bone_pile 24 33 layer=front
+props/cave/skull_buried 37 33 layer=front flip
+props/cave/skull_ribs 55 33 layer=front flip
+props/cave/bone_big 65 33 layer=front flip
+props/cave/skull_buried 79 33 layer=front flip
+props/cave/bone_pile 86 33 layer=front
+props/cave/skull_big 237 33 layer=front flip
+props/cave/bone_pile 94 34 layer=front flip
+props/cave/bone_pile 125 34 layer=front
+props/cave/skull_big 73 35 layer=front flip
+props/cave/skull_big 108 35 layer=front
+props/cave/skull_ribs 213 35 layer=front flip
+props/cave/skull_ribs 226 35 layer=front
+props/cave/skull_big 47 36 layer=front
+props/cave/skull_ribs 101 36 layer=front
+props/cave/bone_big 18 37 layer=front
+props/cave/bone_big 27 37 layer=front flip
+props/cave/bone_pile 55 37 layer=front flip
+props/cave/tusk_c 118 37 layer=front
+props/cave/skull_buried 132 37 layer=front
+props/cave/skull_big 67 39 layer=front flip
+props/cave/skull_ribs 94 39 layer=front
+props/cave/twigs 125 39 layer=front flip
+props/cave/skull_ribs 213 39 layer=front flip
+props/cave/twigs 230 39 layer=front
+props/cave/skull_buried 236 39 layer=front
+props/cave/skull_ribs 4 40 layer=front flip
+props/cave/twigs 12 40 layer=front flip
+props/cave/tusk_c 41 40 layer=front
+props/cave/bone_pile 77 40 layer=front
+props/cave/tusk_c 88 40 layer=front flip
+props/cave/twigs 101 40 layer=front
+props/cave/skull_buried 221 40 layer=front
+props/cave/skull_big 243 40 layer=front
+props/cave/twigs 20 41 layer=front
+props/cave/twigs 35 41 layer=front flip
+props/cave/skull_buried 114 41 layer=front
+props/cave/skull_buried 206 41 layer=front
+props/cave/skull_big 54 42 layer=front flip
+props/cave/tusk_c 133 42 layer=front
+props/cave/bone_big 47 43 layer=front flip
+props/cave/twigs 61 43 layer=front flip
+props/cave/skull_buried 230 43 layer=front
+props/cave/skull_big 237 43 layer=front flip
+props/cave/bone_pile 71 44 layer=front
+props/cave/skull_buried 77 44 layer=front
+props/cave/bone_big 104 44 layer=front flip
+props/cave/twigs 120 44 layer=front flip
+props/cave/skull_buried 216 44 layer=front flip
+props/cave/tusk_c 200 45 layer=front
+props/cave/bone_pile 207 45 layer=front flip
+props/cave/skull_big 223 45 layer=front flip
+props/cave/bone_pile 22 46 layer=front flip
+props/cave/twigs 41 46 layer=front
+props/cave/bone_pile 87 46 layer=front
+props/cave/tusk_c 93 46 layer=front
+props/cave/bone_big 133 46 layer=front
+props/cave/skull_ribs 244 46 layer=front flip
+props/cave/bone_pile 32 47 layer=front
+props/cave/skull_buried 8 48 layer=front flip
+props/cave/twigs 16 48 layer=front flip
+props/cave/skull_buried 73 48 layer=front
+props/cave/skull_big 81 48 layer=front
+props/cave/tusk_c 235 48 layer=front
+
+[backwall]
+75 14 14 6 set=b deco=30

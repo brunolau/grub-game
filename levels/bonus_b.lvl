@@ -1,0 +1,202 @@
+# Club & Grub level file - format 1 (docs/ARCHITECTURE.md 7).
+# Feast Land B "Tower of Treats": the bonus stage of 2-1 (Echo Caverns). A tall cake tower climbed from the
+# ground floor to the crown: springs throw the hero up through biscuit floors past fountains of ice cream, an icing
+# stair climbs to a ceiling spot, an elevator rises through a waterfall of waffles, springs and ledges reach the
+# candy spiral, and the spiral staff (items/warp) waits on the crown. No enemies; every floor catches a fall.
+# Optional: the pantry hidden in the thick right wall (secret), spots in every storey, the candy spiral.
+
+[meta]
+format = 1
+id = bonus_b
+name = "Feast Land B"
+kind = bonus
+order = 0
+world = 0
+stage = 0
+biome = feast
+terrain_a = feast/terrain_icing
+terrain_b = feast/terrain_biscuit
+background = feast
+music = bonus
+bonus_tier = 1
+author = feast
+notes = "Bonus stage B, entered from w2_l1 (meta bonus = bonus_b). 45-90 s. No level codes: only the warp leads here."
+
+[legend]
+? = objects/hidden_spot kind=small count=3 contents=food:15,food:16,food:17 look=inset tile=%
+* = objects/hidden_spot kind=big hits=3 contents=giant:6 look=block tile=%
+Q = objects/hidden_spot kind=small count=2 contents=food:20,food:21 tile=%
+Y = objects/hidden_spot kind=small count=2 contents=food:20,treasure:6 look=inset tile=#
+R = objects/hidden_spot kind=small count=3 contents=food:31,food:38,food:31 tile=%
+V = objects/hidden_spot kind=small count=3 contents=food:31,treasure:10,food:38 look=inset tile=#
+B = objects/hidden_spot kind=big hits=4 contents=giant:4 tile=%
+U = objects/hidden_spot kind=small count=3 contents=food:29,food:30,treasure:4 prop=village/flower_pot
+K = objects/container skin=barrel contents=food:38,food:37,food:31
+$ = objects/breakable_block hits=2 contents=food:16 tile=;
+J = objects/spring
+P = objects/platform dir=0 speed=2 travel=80 mode=ride
+W = items/warp
+a = items/food index=15
+b = items/food index=16
+c = items/food index=17
+d = items/food index=20
+e = items/food index=21
+g = items/food index=19
+h = items/food index=31
+k = items/food index=38
+r = items/food index=2
+s = items/food index=3
+w = items/food index=30
+x = items/treasure index=14
+t = items/treasure index=8
+m = items/giant_bonus index=2
+n = items/giant_bonus index=3
+
+[tiles]
+................................
+................................
+................................
+................................
+................................
+................................
+................................
+................................
+................................
+................................
+.#.............................#
+##............................##
+##............................##
+##............................##
+##..............W.............##
+##............####............##
+##............####............##
+##.........n..####.kk.........##
+##........%%B%%%%%R%%%........##
+##........%%%%%%%%%%%%........##
+##....c.c..............b.b....##
+##..------............------..##
+##............................##
+##.b.b...................b.b..##
+##------................------##
+##............................##
+##...b.b................c.c...##
+##.-------............-------.##
+##............................##
+##............................##
+##============================##
+##............................##
+##............................##
+##............................##
+##............h..d.h..........##
+#Y......J.......h.............##
+##--------.......mh.d.........##
+##............d.d.d...........##
+##...............h..h.........##
+##.............h...d..........##
+##............................##
+##...J...........J............##
+##============================##
+##............................##
+##.........hh...............####
+##.......-------............####
+##..........................####
+##...............dd.........#.##
+##.............-------......#t##
+##..........................$.##
+##..........................$x##
+##...................-------####
+##.......................g..####
+##..........................####
+##.......................g....##
+##............................##
+##................U......J....##
+##....%QQ%%%%*%%%%%%%%%%%%%%%%##
+##....%%%%%%%%%%%%%%%%%%%%%%%%##
+##..w.........................##
+##............................##
+##..w.........................##
+##............................##
+##..w.........................##
+##............................##
+##..w.........................##
+##............................##
+##..P.....s.r.s.r.s.r....K....##
+##%%%%%%%%QQ%%================##
+##%%%%%%%%%%%%................##
+##....................e.e.....##
+##..................--------..##
+##............................##
+##............e.e.............##
+##..........-------...........##
+##............................##
+##.....e.e....................##
+##...-------..................##
+##..........b......k.....b....##
+#V............................Y#
+##============================##
+##..........c......g.....c....##
+##............................##
+##..........c......g.....c....##
+##............................##
+##..@.......J...a..J..a..J..m.##
+%%%%%%%%?%%%%%%%%%%%%%QQ%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+[entities]
+zones/secret 29 49 name=wall_pantry rect=29,47,1,4
+props/jungle/grass_a 6 85
+props/jungle/sprouts 22.5 85
+props/jungle/bush_light 28 85
+props/village/barrel 3 67
+props/village/crate 21 67
+props/village/clay_pot 27 67
+props/jungle/grass_b 11 56
+props/jungle/flower 22 56
+props/village/bench 6 41
+props/village/flower_pot 26 41
+props/village/stone_tablet 11 41
+props/jungle/sprouts 3 29
+props/jungle/grass_a 27 29
+props/jungle/grass_strip_light 16 17
+props/jungle/flower 18 17
+
+[backwall]
+6 59 24 2 set=a deco=30
+6 61 4 3 set=a deco=30
+14 61 6 3 set=a deco=30
+24 61 6 3 set=a deco=30
+6 64 24 4 set=a deco=30
+29 47 1 4 set=a deco=0
+2 31 28 2 set=a deco=30
+2 33 9 3 set=a deco=30
+21 33 3 3 set=a deco=30
+28 33 2 3 set=a deco=30
+2 36 28 6 set=a deco=30
+
+[overrides]
+0 16 a 15
+31 19 a 15
+0 22 a 15
+31 25 a 15
+0 28 a 15
+31 31 a 15
+0 34 a 15
+31 37 a 15
+0 40 a 15
+31 43 a 15
+0 46 a 15
+31 49 a 15
+0 52 a 15
+31 55 a 15
+0 58 a 15
+31 61 a 15
+0 64 a 15
+31 67 a 15
+0 70 a 15
+31 73 a 15
+0 76 a 15
+31 79 a 15
+0 82 a 15
+31 85 a 15

@@ -311,6 +311,30 @@ func test_dropped_items_are_limited_and_cleared_on_respawn() -> void:
 	assert_eq(count_items(&"items/fire_starter"), 1)
 
 
+func test_dropped_item_slots_free_without_rendering_frames() -> void:
+	# A replay that steps ticks without frames (no queue_free ever completes) must count like the game.
+	var first: Array[CollectibleBase] = []
+	for i: int in ObjTuning.MAX_DROPPED_ITEMS:
+		first.append(spawn(&"items/food", Vector2i(200, 100), {"dropped": true, "fan": i}) as CollectibleBase)
+	assert_eq(count_items(), ObjTuning.MAX_DROPPED_ITEMS, "every slot is taken")
+	Sim.step(Tuning.DROPPED_ITEM_LIFE)
+	for item: CollectibleBase in first:
+		assert_true(item.collected and not item.sim_active, "an expired item has left the simulation")
+	assert_eq(count_items(), 0)
+	var later: CollectibleBase = spawn(&"items/food", Vector2i(220, 100), {"dropped": true}) as CollectibleBase
+	assert_false(later.collected, "the slots of expired items are free again before the next frame")
+	# Collected and respawn-cleared items give their slot back too.
+	var picked: CollectibleBase = spawn(&"items/food", HERO_FEET, {"dropped": true}) as CollectibleBase
+	Sim.step(Tuning.DROPPED_ITEM_NO_PICKUP + 2)
+	assert_true(picked.collected)
+	assert_false(picked.sim_active)
+	level.reset_entities()
+	assert_false(later.sim_active, "a respawn clears dropped items at once")
+	for i: int in ObjTuning.MAX_DROPPED_ITEMS:
+		var item: CollectibleBase = spawn(&"items/food", Vector2i(200, 100), {"dropped": true, "fan": i}) as CollectibleBase
+		assert_false(item.collected, "slot %d is free" % i)
+
+
 func test_dropped_key_item_comes_back_from_a_pit() -> void:
 	var key: CollectibleBase = spawn(&"items/fire_starter", Vector2i(300, 30), {"dropped": true}) as CollectibleBase
 	level.grid.set_char(18, 10, TileGrid.CH_AIR)

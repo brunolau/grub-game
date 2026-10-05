@@ -46,6 +46,8 @@ var _by_kind: Array[Array] = []
 var _named: Dictionary = {}
 var _camera_locked: bool = false
 var _camera_lock_rect: Rect2i = Rect2i()
+## Darkness a respawn restores: the state when the active checkpoint was touched, or at the start of play.
+var _respawn_dark: bool = false
 
 
 func _init() -> void:
@@ -67,9 +69,13 @@ func _notification(what: int) -> void:
 				Events.player_death_finished.connect(_on_player_death_finished)
 			if not Events.popup_requested.is_connected(_on_popup_requested):
 				Events.popup_requested.connect(_on_popup_requested)
+			if not Game.checkpoint_changed.is_connected(_on_checkpoint_changed):
+				Game.checkpoint_changed.connect(_on_checkpoint_changed)
 		NOTIFICATION_EXIT_TREE:
 			if Events.popup_requested.is_connected(_on_popup_requested):
 				Events.popup_requested.disconnect(_on_popup_requested)
+			if Game.checkpoint_changed.is_connected(_on_checkpoint_changed):
+				Game.checkpoint_changed.disconnect(_on_checkpoint_changed)
 			if Sim.tick_finished.is_connected(_on_tick_finished):
 				Sim.tick_finished.disconnect(_on_tick_finished)
 			if Events.shake_requested.is_connected(request_shake):
@@ -291,6 +297,7 @@ func get_time_left_seconds() -> int:
 ## Begin gameplay: start the simulation clock and announce the level.
 func start_play(seed_value: int = 1) -> void:
 	completed = false
+	_respawn_dark = dark
 	Sim.start(seed_value)
 	Events.level_started.emit(level_id)
 	play_started.emit()
@@ -311,12 +318,18 @@ func get_respawn_pos() -> Vector2i:
 
 
 ## Respawn after a death (PHYSICS.md 10.4 step 3): reset enemies / platforms / columns, put the hero at the
-## respawn point with full energy. Collected items and opened spots stay as they are.
+## respawn point with full energy. Collected items and opened spots stay as they are. The darkness goes back to
+## what it was when the active checkpoint was touched (at the level start without one), so a checkpoint before a
+## `zones/dark` trigger is lit again.
 func respawn_player() -> void:
 	Game.on_respawn()
 	shake = 0
 	shake_offset = 0
 	unlock_camera()
+	if dark != _respawn_dark:
+		# Directly, not through set_darkness(): a respawn behind the curtain plays no "lights out" cue.
+		dark = _respawn_dark
+		Events.darkness_changed.emit(dark)
 	reset_entities()
 	if player != null:
 		player.respawn_at(get_respawn_pos())
@@ -337,6 +350,16 @@ func reset_entities() -> void:
 func _on_popup_requested(kind: StringName, value: int, pos: Vector2i) -> void:
 	if Spawner.exists(&"fx/popup"):
 		spawn_fx(&"fx/popup", pos, {"kind": String(kind), "value": value})
+
+
+## A checkpoint was touched: a respawn there brings back the darkness of this moment.
+func _on_checkpoint_changed(_pos: Vector2i) -> void:
+	_respawn_dark = dark
+
+
+## Darkness a respawn would restore now (tests, tools).
+func get_respawn_darkness() -> bool:
+	return _respawn_dark
 
 
 func _on_player_death_finished() -> void:

@@ -5,6 +5,7 @@ extends SceneTree
 ##   bash .tools/gd.sh script res://tools/validate_levels.gd                       every level in res://levels
 ##   bash .tools/gd.sh script res://tools/validate_levels.gd -- levels/w1_l1.lvl   only these files (the others
 ##                                                                                  are still read for references)
+##   bash .tools/gd.sh script res://tools/validate_levels.gd -- w1_l1 w1_l2        the same by level id
 ##   ... -- --strict        warnings count as failures too
 ##   ... -- --quiet         print errors only
 ##
@@ -60,6 +61,9 @@ func _to_resource_path(argument: String) -> String:
 	var text: String = argument.replace("\\", "/")
 	if text.begins_with("res://"):
 		return text
+	if not text.contains("/") and text.get_extension() != "lvl":
+		# A bare level id ("w1_l1"): the file of that level.
+		return LEVEL_DIR + "/" + text + ".lvl"
 	var absolute: String = ProjectSettings.globalize_path("res://")
 	if text.begins_with(absolute):
 		return "res://" + text.substr(absolute.length())

@@ -55,14 +55,18 @@ func rescan() -> void:
 			continue
 		_meta[id] = meta
 		_paths[id] = path
-	# Campaign order: main levels sorted by their `order` key.
+	_index_campaign()
+	rescanned.emit(_meta.size())
+
+
+## Campaign order: main levels sorted by their `order` key. (Tests that add level metas call it again.)
+func _index_campaign() -> void:
 	var ordered: Array[StringName] = []
 	for id: StringName in _meta:
 		if str(_meta[id].get("kind", KIND_MAIN)) == KIND_MAIN and _meta[id].has("order"):
 			ordered.append(id)
 	ordered.sort_custom(_by_order)
 	_campaign = ordered
-	rescanned.emit(_meta.size())
 
 
 ## True when a level file with this id exists.
@@ -122,7 +126,8 @@ func is_available(level_id: StringName, difficulty: int) -> bool:
 	return minimum != "expert" or difficulty == Defs.Difficulty.EXPERT
 
 
-## Level that follows `level_id`: its `next` key when present, otherwise the next campaign level.
+## Level that follows `level_id`: its `next` key when present, otherwise the next campaign level. A linked
+## sub-stage (`kind = sub`) without `next` continues after the campaign level it belongs to ([method parent_level]).
 ## Returns "" at the end of the game (the flow then shows the ending), and "" for unknown ids.
 func next_level(level_id: StringName, difficulty: int) -> StringName:
 	if not _meta.has(level_id):
@@ -130,7 +135,7 @@ func next_level(level_id: StringName, difficulty: int) -> StringName:
 	var explicit: String = str(get_value(level_id, "next", "", difficulty))
 	if explicit != "":
 		return StringName(explicit)
-	var index: int = _campaign.find(level_id)
+	var index: int = _campaign_index(level_id, difficulty)
 	if index < 0:
 		return &""
 	for i: int in range(index + 1, _campaign.size()):
@@ -140,15 +145,49 @@ func next_level(level_id: StringName, difficulty: int) -> StringName:
 
 
 ## True when the campaign continues after `level_id` but only for a higher difficulty: the flow shows the
-## "you must be an expert" wall instead of the ending (GAMEPLAY.md 1.3).
+## "you must be an expert" wall instead of the ending (GAMEPLAY.md 1.3). A sub-stage asks for its main level.
 func has_locked_successor(level_id: StringName, difficulty: int) -> bool:
-	var index: int = _campaign.find(level_id)
+	var index: int = _campaign_index(level_id, difficulty)
 	if index < 0:
 		return false
 	for i: int in range(index + 1, _campaign.size()):
 		if not is_available(_campaign[i], difficulty):
 			return true
 	return false
+
+
+## The campaign (world-map) level that `level_id` is part of: the level itself when it is on the campaign; for a
+## linked sub-stage (`kind = sub`) the main level whose `next` (in this difficulty) leads to it, directly or
+## through further sub-stages. "" when there is none (bonus, ending and test levels, unknown ids). Its result
+## is recorded under that level and the campaign continues after it.
+func parent_level(level_id: StringName, difficulty: int) -> StringName:
+	var current: StringName = level_id
+	var seen: Dictionary = {}
+	while _meta.has(current) and not seen.has(current):
+		if _campaign.has(current):
+			return current
+		seen[current] = true
+		if str(_meta[current].get("kind", KIND_MAIN)) != KIND_SUB:
+			return &""
+		current = _linking_level(current, difficulty)
+	return &""
+
+
+## Index in the campaign of the level itself or, for a sub-stage, of its main level (-1 = none).
+func _campaign_index(level_id: StringName, difficulty: int) -> int:
+	var index: int = _campaign.find(level_id)
+	if index >= 0:
+		return index
+	var parent: StringName = parent_level(level_id, difficulty)
+	return _campaign.find(parent) if parent != &"" else -1
+
+
+## The level whose `next` (in this difficulty) is `level_id` ("" when none; the first by file name).
+func _linking_level(level_id: StringName, difficulty: int) -> StringName:
+	for id: StringName in _meta:
+		if id != level_id and str(get_value(id, "next", "", difficulty)) == String(level_id):
+			return id
+	return &""
 
 
 ## Level and difficulty a 4-character code belongs to: {"level_id": StringName, "difficulty": int}, or {} when

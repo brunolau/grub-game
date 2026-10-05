@@ -1,0 +1,83 @@
+# w3_l1 "Frost Summit" (Expert, default seed): from '@' to the exit in the summit cave without losing a life.
+# Format of tools/autoplay/integration_level.inputs: ticks:KEYS (L R U D F K), one run per line.
+# Expert: a walker patrols the meadow - wait for it and club it, then the inset spot.
+6:R,80:,8:F,6:,8:F,6:
+9:R,20:
+10:DF,4:,10:DF,4:,10:DF,10:
+# Collect what it threw and the strawberries, walk up the ramp toward the walker.
+30:R
+14:R,8:F,4:,8:F,4:,8:F,4:
+10:R,8:F,4:,8:F,4:
+10:DF,4:,10:DF,4:,10:DF,6:
+15:R,12:,8:F,6:,8:F,6:,8:F,6:,8:F,6:
+# Down the slope: club the hopper at its foot, jump the pond along the arc of ice creams (letter G).
+8:R,8:F,6:,8:F,6:,8:F,6:,8:F,6:,8:F,6:,8:F,6:
+26:R,14:RU,4:R,14:
+# The big spot in front of the checkpoint: three low strikes, the giant ice cream falls from above.
+10:DF,6:,10:DF,6:,10:DF,6:,24:,4:R,10:
+# S2 The frozen lake: checkpoint, the rock floe, the two ice floes (jump again before sliding off).
+20:R,12:RU,6:R
+6:R,18:RU,8:R,16:RU,4:R
+6:R,16:RU,4:R
+# The island: club the hopper, open the rock spot with low strikes.
+2:,8:F,6:,8:F,6:,8:F,6:
+5:R,6:,10:DF,6:,10:DF,6:,10:DF,6:
+# The high detour: up onto the rock ledge, over to the floe with the diamond, drop onto the last ice floe.
+6:R,14:RU,4:
+4:R,14:RU,6:,3:R,24:
+7:R,16:RU,10:
+# The hatch in the far shore: crouch on it and drop into the ice cave (secret).
+6:R,12:D,6:
+# West through the cave: code stone, letter U, the big spot in the floor, then the three rock spots.
+40:L,4:,6:L,14:
+10:DLF,6:,10:DF,6:,10:DF,6:,10:DF,6:,14:,6:R,6:
+16:L,14:,10:DF,6:,10:DF,6:,10:DF,6:
+# Further west for the treasure and the ice creams, then back east to the shaft.
+40:L,10:,64:R
+# Up the shaft: the step, two rock floes, then jump up through the hatch.
+26:R,4:,6:RU,6:R,6:
+2:R,6:,22:U,8:,22:U,8:,22:U,8:
+# S3 The cliff face: checkpoint, then up the floating rock ledges.
+32:R,10:,22:U,10:
+7:R,16:RU,2:
+2:,8:F,6:,8:F,6:
+2:L,16:LU,8:
+4:L,16:LU,8:
+7:R,16:RU,8:
+8:R,16:RU,8:
+# Club the ice wall at the end of the sixth ledge: the cliff room (letter B, code stone, giant spot).
+12:R,6:,8:F,8:,8:F,8:
+18:R,6:,10:DF,6:,10:DF,6:,10:DF,6:,10:DF,6:,16:,12:R,6:
+# Back out onto the ledge and on up.
+40:L,4:,2:L,16:LU,8:
+8:UF,6:,8:UF,6:,8:UF,6:,8:UF,6:
+6:R,16:RU,8:
+4:R,16:RU,8:
+# S4 The ridge: checkpoint, then the sky route over the icicle overhang to the treasure ledge (letter R).
+27:R,16:RU,8:
+8:R,16:RU,8:
+6:R,16:RU,8:
+# Onto the overhang: two rock spots in its top (low strikes).
+14:R,10:,10:DF,6:,10:DF,6:,10:DF,6:
+# Up the two high floes to the treasure ledge.
+28:R,16:RU,8:
+10:R,16:RU,8:
+# Down onto the ridge: the walker on the slope and the charger rushing down from its ledge.
+80:,6:R,16:
+8:F,6:,8:F,6:
+# Up the ramp: club the crate, then the hopper.
+20:R,6:,8:F,6:,8:F,6:,8:F,6:
+# Over the hill (a spot in its top), then the dangler under the charger's ledge: high strikes.
+27:R,8:,10:DF,6:,10:DF,6:,10:DF,6:,8:UF,6:,8:UF,6:
+27:R,6:,8:UF,6:,8:UF,6:
+# Letter S: up the rock floe beside the charger's ledge and onto the ledge itself.
+8:L,6:,22:U,10:
+4:R,16:RU,8:
+12:R,24:,5:L,4:,12:R,16:
+# S5 The summit: up the steep step, club the hopper on the landing.
+12:R,8:F,6:,8:F,6:,8:F,6:,8:F,6:
+# Up the ramp to the summit; club the hopper there.
+46:R,8:F,6:,8:F,6:,8:F,6:
+# The big spot in front of the summit cave, then into the exit.
+16:R,10:,10:DF,6:,10:DF,6:,10:DF,6:,24:
+6:R,6:,30:R

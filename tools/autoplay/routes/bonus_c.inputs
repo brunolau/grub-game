@@ -1,0 +1,37 @@
+# bonus_c from '@' to the spiral staff on the podium (ticks:KEYS, keys L R U D F K).
+# Start: club the inset tile in the road three times.
+14:R,10:
+10:DF,4:,10:DF,4:,10:DF,6:
+# Run along the candy line and jump the first gap through the ice-cream arc.
+47:R,16:RU,6:R,4:
+# The framed block in the road: three low strikes, step back, catch the giant cake.
+2:R,4:
+10:DF,6:,10:DF,6:,10:DF,2:
+3:L,24:
+# Catch it, over the cake hill and the second gap through the cupcake arc.
+57:R,16:RU,6:R,4:
+# The flower pot: three forward strikes, then after its treats along the cherries.
+8:F,6:,8:F,6:,8:F,8:
+20:R,6:
+14:R,4:
+12:L,4:
+# The big spring: a jump onto it, then hold right through the long arc of cake slices over the wide gap.
+20:RU,40:R,6:
+# Icing hills (slippery): up the waffle slope to the clay pot on the peak, three forward strikes.
+16:R,14:
+8:F,6:,8:F,6:,8:F,8:
+# Over the peak after the pot's treats, then the inset tiles in the icing (two low strikes open both).
+24:R,16:
+10:DF,6:,10:DF,8:
+# Over the treasure hill, jump the last gap and run across the crumbling biscuit bridge without stopping.
+56:R,16:RU,110:R,14:R,4:
+# The candy fountain in the road: six low strikes, six sweets.
+10:DF,6:,10:DF,6:,10:DF,6:,10:DF,6:,10:DF,6:,10:DF,8:
+# The final sprint: the fountain's sweets, the strawberry line and three giant treats on the road.
+160:R,6:
+# The last framed block: three low strikes, a step back, the giant cake.
+10:DF,6:,10:DF,6:,10:DF,2:
+3:L,24:
+# Jump the cellar's exit gap, then up onto the podium: two cakes and the spiral staff.
+64:R,16:RU,6:R,4:
+4:R,20:RU,20:R

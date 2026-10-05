@@ -1,0 +1,74 @@
+# Colossus Hall (world 4, stage 2, second half): the antechamber with the axe, then the Wall Colossus,
+# boss 2. Only thrown weapons hurt it. Its trophy leads to the ending stage. Expert only.
+[meta]
+format = 1
+id = w4_l2b
+name = "Colossus Hall"
+kind = sub
+world = 4
+stage = 2
+biome = volcano
+terrain_a = volcano/terrain_obsidian
+terrain_b = volcano/terrain
+liquid = lava
+background = volcano_shaft
+music = level_volcano
+password_beginner = "4COL"
+password_expert = "4WAL"
+min_difficulty = expert
+next = ending
+bonus_tier = 2
+author = w4
+notes = "World 4-2b: the Wall Colossus (boss 2, thrown weapons only). Axe at the checkpoint, a reserve heart in the arena corner; the trophy leads to the ending."
+
+[legend]
+C = objects/checkpoint
+
+[tiles]
+##############################################
+##############################################
+#...................######..................##
+#.....................##....................##
+#...........................................##
+#...........................................##
+#@...C......................................##
+##########################..................##
+##########################..................##
+##########################..................##
+##########################..................##
+##########################.......===........##
+##############################################
+##############################################
+
+[entities]
+# Antechamber: the axe is always here (it comes back after a death), food
+items/weapon 8 6 kind=axe
+items/food 14 6 index=40
+items/food 16 6 index=35
+items/food 18 6 index=33
+# The arena: a single locked screen; the Colossus is part of the right wall
+zones/arena 33 12 name=colossus_hall rect=24,2,20,11
+bosses/colossus 43 11 arena=colossus_hall
+# A reserve heart in the far corner of the arena, away from the Colossus: it waits while the hero is unhurt
+items/heart 26 11
+# Scenery
+props/volcano/stalactite 1 2
+props/volcano/stalactite 2 2
+props/volcano/stalactite 5 2
+props/volcano/stalactite 6 2
+props/volcano/drip_cap 11 2
+props/volcano/stalactite 13 2
+props/volcano/stalactite 14 2
+props/volcano/stalactite 33 2
+props/volcano/stalactite 34 2
+props/volcano/drip_cap 22 4
+props/volcano/bone_big 22 6
+props/volcano/rocks_small 27 11
+props/volcano/skull_big 20 6
+props/volcano/gravestone 3 6
+props/volcano/bone_pile 25 11
+props/volcano/skull_ribs 31 11 flip
+
+[backwall]
+1 2 23 5 set=a deco=30
+24 2 20 10 set=a deco=15

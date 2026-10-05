@@ -347,3 +347,48 @@ msgstr "Every object of the jungle, one after another."
 
 msgid "ZONE_DEMO"
 msgstr "A hint shown while you stand here."
+
+msgid "SIGN_W3_ICE"
+msgstr "Snow on ice is slippery! Let go early to stop in time."
+
+msgid "SIGN_W3_ROCK"
+msgstr "Blue rock gives a firm grip - ice floes do not."
+
+msgid "SIGN_W3_WIND"
+msgstr "Blizzard! Crouch to brace yourself when a gust blows."
+
+msgid "SIGN_W3_LULL"
+msgstr "Gusts cut your jumps short - leap in the lulls."
+
+msgid "SIGN_W3_FLOES"
+msgstr "Hanging floes drop when you stand on them - keep moving!"
+
+msgid "SIGN_W3_WATER"
+msgstr "Something stirs in the icy water..."
+
+msgid "SIGN_W1_CLUB"
+msgstr "Odd-looking ground? Give it a whack with your club - food hides everywhere!"
+
+msgid "SIGN_W1_BOUNCE"
+msgstr "Hold Jump as you land on a head to bounce up high!"
+
+msgid "SIGN_W1_SPRING"
+msgstr "Jump onto the springy flower to reach the vine bridges."
+
+msgid "SIGN_W1_AXE"
+msgstr "Axes fly far: press Attack to throw one!"
+
+msgid "SIGN_W1_VILLAGE"
+msgstr "Canopy Village - climb up to the treetops!"
+
+msgid "SIGN_W2_HATCH"
+msgstr "Crouch on a hatch to drop through it."
+
+msgid "SIGN_W2_DARK"
+msgstr "The deep caves are dark. Watch the threads!"
+
+msgid "SIGN_W2_GLIDER"
+msgstr "Run with the glider, then jump to take off. Up climbs, Down dives."
+
+msgid "SIGN_W2_BRUTE"
+msgstr "The Brute keeps the fire-starter. Only its head is soft!"

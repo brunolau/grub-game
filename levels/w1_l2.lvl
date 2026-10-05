@@ -1,0 +1,623 @@
+# Club & Grub - World 1, stage 2: "Canopy Village" (designer w1).
+# A tall map around one great tree: climb from the forest floor through the tree houses of the village (lifts,
+# a diagonal lift, danglers over gaps, stingers, arc leapers), pick up the axe and learn to throw it, cross the
+# trunk top (a bat there bounces the curious up to the crow's nest with the warp to bonus stage A) and come down
+# the far side deck by deck to the exit at the trunk's foot.
+# Route proof: tools/autoplay/routes/w1_l2.inputs (+ .expert.inputs), replayed by tests/test_levels_w1.gd.
+
+[meta]
+format = 1
+id = w1_l2
+name = "Canopy Village"
+kind = main
+order = 20
+world = 1
+stage = 2
+biome = jungle
+terrain_a = jungle/terrain
+terrain_b = jungle/terrain_grass
+background = jungle
+music = level_jungle
+liquid = water
+password_beginner = "HUTS"
+password_expert = "AX3S"
+bonus = bonus_a
+bonus_tier = 0
+author = w1
+
+[legend]
+a = objects/hidden_spot kind=small count=3 contents=food:6,food:11,code_stone:0 look=inset tile=#
+b = objects/hidden_spot kind=small count=3 contents=food:15,food:16,food:21 prop=village/clay_pot
+c = objects/hidden_spot kind=small count=2 contents=food:24,treasure:3 prop=village/clay_pot
+d = objects/hidden_spot kind=small count=2 contents=food:25,food:28 tile=%
+e = objects/hidden_spot kind=big hits=3 contents=giant:5 tile=%
+q = objects/hidden_spot kind=small count=3 contents=food:30,food:33,treasure:6 prop=village/barrel
+r = objects/hidden_spot kind=small count=2 contents=food:34,food:36 prop=jungle/foliage_clump
+n = objects/hidden_spot kind=small count=2 contents=food:37,treasure:7 prop=village/crate
+Q = objects/hidden_spot kind=small count=3 contents=food:39,food:40,food:43 prop=jungle/tree_trunk_small
+x = objects/hidden_spot kind=small count=2 contents=food:44,food:45 look=inset tile=#
+y = objects/hidden_spot kind=big hits=3 contents=giant:0 tile=%
+z = objects/hidden_spot kind=small count=2 contents=food:22,food:23 tile=%
+v = objects/hidden_spot kind=small count=2 contents=code_stone:1,treasure:11 tile=#
+w = objects/breakable_block hits=2 contents=food:35 tile=;
+K = objects/container skin=crate contents=food:5,food:12,food:17
+p = objects/container skin=pot contents=food:26,heart
+P = objects/container skin=pot contents=code_stone:2,food:31
+t = objects/container skin=barrel contents=code_stone:3,food:38,food:41
+X = items/weapon kind=axe
+C = objects/checkpoint
+N = objects/exit
+W = items/warp
+H = items/heart
+f = items/food index=4
+g = items/food index=8
+h = items/food index=9
+i = items/food index=47
+j = items/food index=27
+k = items/food index=29
+m = items/treasure index=5
+M = items/treasure index=14
+O = items/treasure index=12
+G = items/letter index=0
+R = items/letter index=1
+u = items/letter index=2
+B = items/letter index=3
+s = items/letter index=4
+T = enemies/walker skin=turtle left=-2 right=2 hp=10
+V = enemies/walker skin=turtle_b left=-3 right=3 hp=10
+Z = enemies/snapper skin=plant range=30 hp=10 beginner
+D = enemies/dangler skin=bat depth=56 hp=10
+E = enemies/dangler skin=bat depth=64 hp=10
+J = enemies/dangler skin=bat_b depth=64 hp=10
+I = enemies/dangler skin=bat depth=120 hp=10
+S = enemies/stinger skin=insect range=4 hp=10
+L = enemies/leaper skin=dragon hp=10
+Y = enemies/hopper skin=mini_rex range=5 hp=10
+A = enemies/harrier skin=pterodactyl range=6 hp=10
+
+[tiles]
+................................................................................................
+................................................................................................
+................................................................................................
+................................................................................................
+................................................................................................
+................................................................................................
+................................................................................................
+................................................................................................
+................................................................................................
+................................................................................................
+................................................................................................
+................................................................................................
+................................................................................................
+................................................................................................
+................................................................................................
+................................................................................................
+................................................................................................
+................................................................................................
+................................................................................................
+................................................................................................
+................................................................................................
+..............................................W..MM.............................................
+............................................--------............................................
+................................................j...............................................
+................................................................................................
+...............................................j................................................
+................................................................................................
+..............................................j.................................................
+...........................................................#########............................
+............................................##..C.B........#########............................
+............................................########...........J................................
+......................................------########............................................
+............................................########............................................
+.......................................g....########............................................
+....................................-----...########............................................
+............................................########....jj..........r.k.........................
+................................A...........#############################.......................
+..............................-----.........#############################.......................
+............................................########............................................
+......................................f.....########............................................
+....................................-----...########............................................
+............................................########......................i.....................
+.................................kk.........#......#............................................
+..............................-----.........#......#............................................
+............................................w......#............................................
+.......................................jj...w..u.H.#......................i...........S.........
+....................................%%%%%%%%##v#####............................................
+....................................%%%%%%%%########.............T..kkk...................P..s..
+............................................########..........%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+............................................########..........%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+............###############.................########............................................
+............###############.................########............................................
+................E.....E.....................########............................................
+............................................########.........g..................................
+............................................########............................................
+............................................########............................................
+.....O......................................########............................................
+..q....G...........C....hhh.Y...............########.........g..................................
+%%%%%%%%%%.......%%%%%%%%%%%%%%%%...........########............................................
+%%%%%%%%%%.......%%%%%%%%%%%%%%%%...........########..........n.......hh.Y......................
+............................................########%%%%%%%%%%%%%%%%%%%%%%%%%%%%%...............
+..........------............................########%%%%%%%%%%%%%%%%%%%%%%%%%%%%%...............
+............................................########............................................
+............................................########............................................
+.......------...............................########............................................
+............................................########............................................
+..............................R.............########............................................
+..........------............................########............................................
+............................................########............................................
+.................................mm.........########............................................
+................%%%%%%%...%%e%%%%%%%........########............................................
+................%%%%%%%.L.%%%%%%%%%%........########........O...........ff..C...................
+............................................########......%%%zz%%%...%%%%%%%%%%%................
+............................................########......%%%%%%%%.L.%%%%%%%%%%%................
+............................................########..........I.....I...........................
+............................................########............................................
+............................................########............................................
+............................................########....f.......................................
+............................................########............................................
+..................S.....S...................########............................................
+.................kk.........................########............................................
+............C......ff...p...................########....f.......................................
+..........%%%%ddd%%%%%%%%%..................########............................................
+..........%%%%%%%%%%%%%%%%..................########..............Z.........gg..t...............
+............................................########%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%.............
+...------...................................########%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%.............
+............##########......................########............................................
+............##########......................########............................................
+.------.......D.....D.......................########................................h...........
+............................................########............................................
+............................................########............................................
+...------...................................########............................................
+............................................########................................h...........
+...ii............c.......X..........hh......########............................................
+#############...---...%%%%%%%%%%%%%%%%%%....########............................................
+#############.........%%%%%%%%%%%%%%%%%%....########......................kkY.............Q.....
+............................................########................%%%%%%%%%%%%%%%%%%%%y%%%%%%%
+............................................########................%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+............................................########............................................
+............................................########............................................
+............................................########............................................
+............................................########..............k.............................
+............................................########............................................
+............................................########............................................
+...............................gg...........########............................................
+...@........ff.....b....T...K......Z........########....N...ii......................V...........
+#########a######################################################x###############################
+################################################################################################
+################################################################################################
+################################################################################################
+
+[entities]
+objects/platform 41 105 name=lift_floor dir=0 speed=2 travel=88 mode=ride
+objects/platform 27 82 name=lift_diag dir=1 speed=2 travel=96 mode=ride
+objects/platform 34 58 name=lift_trunk dir=0 speed=2 travel=96 mode=ride
+objects/platform 82 60 name=lift_down dir=4 speed=2 travel=96 mode=ride
+objects/sign 6 105 text=SIGN_W1_VILLAGE
+objects/sign 28 93 text=SIGN_W1_AXE
+zones/secret 47 44 name=trunk_room rect=45,42,6,4
+# The bat over the trunk top is the way up to the crow's nest (bounce on it holding Jump): it takes several hits,
+# so one stray axe does not take the warp away until the next death.
+enemies/flyer 48 25 skin=bat left=-3 right=3 hp=60 dy=8
+zones/secret 48 20 name=crow_nest rect=44,17,8,5
+# Expert: more and tougher enemies
+enemies/stinger 35 38 skin=insect_b range=4 hp=10 expert
+enemies/flyer 62 33 skin=bat_b left=-4 right=4 hp=10 expert
+enemies/stinger 70 57 skin=insect_b range=4 hp=25 expert
+enemies/leaper 67 73 skin=dragon_b pause=100 hp=25 expert
+enemies/snapper 66 83 skin=plant_b hp=25 expert
+enemies/snapper 35 105 skin=plant_b hp=25 expert
+enemies/hopper 71 95 skin=mini_rex_b range=4 hp=25 expert
+props/village/hut_bone 20 81
+props/village/flower_pot 15 81
+props/village/sign_wood 11 81
+props/jungle/vine_a 11 84
+props/jungle/vine_b 17 84
+props/jungle/vine_a 24 84
+props/village/hut_dome 5 57
+props/village/clay_pot 25 57
+props/village/fence 21.5 57
+props/jungle/grass_a 31 57
+props/jungle/vine_a 2 60
+props/jungle/vine_b 8 60
+props/jungle/vine_a 19 60
+props/jungle/vine_b 27 60
+props/jungle/vine_a 31 60
+props/village/hut_bone 14 105
+props/village/fence 6.5 105
+props/village/signpost 37.5 105
+props/village/flower_pot 21 105
+props/jungle/bush_big 2 105
+props/jungle/fern 16 105
+props/jungle/grass_a 27 105
+props/jungle/bush_dark 33 105 layer=front
+props/jungle/tree_trunk 39 105
+props/village/barrel 42.5 105
+props/village/hut_dome 31 93
+props/village/bench 24 93
+props/village/clay_pot 38 93
+props/jungle/vine_a 23 96
+props/jungle/vine_b 27 96
+props/jungle/vine_a 35 96
+props/jungle/vine_b 39 96
+props/jungle/moss_fringe 16.5 88
+props/jungle/vine_a 13 88
+props/jungle/vine_b 18 88
+props/jungle/vine_a 21 88
+props/jungle/bush_light 2 93
+props/jungle/grass_b 8 93
+props/jungle/vine_a 1 96
+props/jungle/vine_b 6 96
+props/jungle/vine_a 10 96
+props/jungle/vine_branch 6 90
+props/jungle/vine_branch 3 87
+props/jungle/vine_branch 6 84
+props/village/watchtower 32.5 69
+props/village/fence 22 69
+props/jungle/bush_dark 17 69
+props/jungle/vine_a 17 72
+props/jungle/vine_b 23 72
+props/jungle/vine_a 29 72
+props/jungle/vine_b 34 72
+props/jungle/vine_branch 13 66
+props/jungle/vine_branch 9 63
+props/jungle/vine_branch 13 60
+props/jungle/moss_fringe 19.5 52
+props/jungle/vine_a 13 52
+props/jungle/vine_b 25 52
+props/village/barrel 38 45
+props/jungle/fern 42 45
+props/jungle/vine_a 37 48
+props/jungle/vine_b 42 48
+props/jungle/vine_branch 32 42
+props/jungle/vine_branch 38 39
+props/jungle/vine_branch 32 36
+props/jungle/vine_branch 38 33
+props/jungle/tree_canopy_dark 45 29.5 layer=front
+props/jungle/tree_canopy_dark 51 29.5 layer=front
+props/jungle/foliage_block 43.5 23
+props/jungle/foliage_block 52.5 23
+props/jungle/treetop_stack 44 21
+props/jungle/treetop_stack 51 21
+props/jungle/leaf 47 18
+props/jungle/egg_nest 48.5 21
+props/jungle/moss_fringe 47.5 31
+props/jungle/bush_big 60 35
+props/jungle/grass_a 65 35
+props/jungle/flower 54 35
+props/jungle/moss_fringe 63 30
+props/jungle/vine_a 55 38
+props/jungle/vine_b 62 38
+props/jungle/vine_a 70 38
+props/village/hut_dome 80 47
+props/village/fence 72 47
+props/village/flower_pot 94 47
+props/jungle/fern 64 47
+props/jungle/vine_a 63 50
+props/jungle/vine_b 70 50
+props/jungle/vine_a 78 50
+props/jungle/vine_b 86 50
+props/jungle/vine_a 93 50
+props/village/hut_bone 57 59
+props/village/barrel 66 59
+props/jungle/bush_light 77 59
+props/jungle/vine_a 53 62
+props/jungle/vine_b 60 62
+props/jungle/vine_a 68 62
+props/jungle/vine_b 76 62
+props/village/watchtower 62.5 71
+props/village/bench 74 71
+props/jungle/grass_b 78 71
+props/jungle/vine_a 59 74
+props/jungle/vine_b 66 74
+props/jungle/vine_a 73 74
+props/jungle/vine_b 78 74
+props/village/hut_dome 59 83
+props/village/clay_pot 72 83
+props/jungle/fern 53 83
+props/jungle/vine_a 53 86
+props/jungle/vine_b 61 86
+props/jungle/vine_a 71 86
+props/jungle/vine_b 80 86
+props/village/hut_bone 84 95
+props/village/fence 71 95
+props/jungle/bush_dark 94 95
+props/jungle/vine_a 69 98
+props/jungle/vine_b 77 98
+props/jungle/vine_a 86 98
+props/jungle/vine_b 93 98
+props/village/stone_house 88 105
+props/village/fence 75 105
+props/jungle/bush_big 94 105
+props/village/signpost 53.5 105
+props/jungle/grass_a 68 105
+props/jungle/flower 72 105
+props/jungle/vine_b 43.5 34
+props/jungle/vine_b 43.5 54
+props/jungle/vine_b 43.5 74
+props/jungle/vine_b 43.5 94
+props/jungle/vine_b 43.5 47
+props/jungle/vine_b 43.5 58
+props/jungle/vine_b 43.5 66
+props/jungle/vine_b 43.5 79
+props/jungle/vine_b 43.5 90
+props/jungle/vine_b 43.5 99
+props/jungle/vine_a 51.5 40
+props/jungle/vine_a 51.5 52
+props/jungle/vine_a 51.5 63
+props/jungle/vine_a 51.5 75
+props/jungle/vine_a 51.5 88
+props/jungle/vine_a 51.5 97
+props/jungle/leaf 31 41
+props/jungle/leaf 39 35
+props/jungle/foliage_clump 30.5 36
+props/jungle/foliage_clump 40 39
+props/jungle/sprouts 33 42
+props/jungle/grass_b 37 33
+props/jungle/vine_a 31 44
+props/jungle/vine_b 39 41
+props/jungle/vine_a 33 38
+props/jungle/vine_b 37 35
+props/jungle/vine_a 40 32
+props/jungle/root_arch 42 105
+props/jungle/boulders 54 105
+props/jungle/mound_leafy 47 29
+
+[backwall]
+45 42 6 4 set=a deco=30
+
+[overrides]
+46 40 a 23
+49 50 a 23
+47 60 a 23
+50 70 a 23
+45 78 a 23
+48 88 a 23
+46 98 a 23
+49 34 a 23
+22 96 b 30
+23 96 b 31
+24 96 b 31
+25 96 b 31
+26 96 b 31
+27 96 b 31
+28 96 b 31
+29 96 b 31
+30 96 b 31
+31 96 b 31
+32 96 b 31
+33 96 b 31
+34 96 b 31
+35 96 b 31
+36 96 b 31
+37 96 b 31
+38 96 b 31
+39 96 b 32
+0 96 a 30
+1 96 a 31
+2 96 a 31
+3 96 a 31
+4 96 a 31
+5 96 a 31
+6 96 a 31
+7 96 a 31
+8 96 a 31
+9 96 a 31
+10 96 a 31
+11 96 a 31
+12 96 a 32
+16 72 b 30
+17 72 b 31
+18 72 b 31
+19 72 b 31
+20 72 b 31
+21 72 b 31
+22 72 b 32
+26 72 b 30
+27 72 b 31
+28 72 b 31
+29 72 b 31
+30 72 b 31
+31 72 b 31
+32 72 b 31
+33 72 b 31
+34 72 b 31
+35 72 b 32
+36 48 b 30
+37 48 b 31
+38 48 b 31
+39 48 b 31
+40 48 b 31
+41 48 b 31
+42 48 b 31
+43 48 b 32
+62 50 b 30
+63 50 b 31
+64 50 b 31
+65 50 b 31
+66 50 b 31
+67 50 b 31
+68 50 b 31
+69 50 b 31
+70 50 b 31
+71 50 b 31
+72 50 b 31
+73 50 b 31
+74 50 b 31
+75 50 b 31
+76 50 b 31
+77 50 b 31
+78 50 b 31
+79 50 b 31
+80 50 b 31
+81 50 b 31
+82 50 b 31
+83 50 b 31
+84 50 b 31
+85 50 b 31
+86 50 b 31
+87 50 b 31
+88 50 b 31
+89 50 b 31
+90 50 b 31
+91 50 b 31
+92 50 b 31
+93 50 b 31
+94 50 b 31
+95 50 b 32
+52 62 b 30
+53 62 b 31
+54 62 b 31
+55 62 b 31
+56 62 b 31
+57 62 b 31
+58 62 b 31
+59 62 b 31
+60 62 b 31
+61 62 b 31
+62 62 b 31
+63 62 b 31
+64 62 b 31
+65 62 b 31
+66 62 b 31
+67 62 b 31
+68 62 b 31
+69 62 b 31
+70 62 b 31
+71 62 b 31
+72 62 b 31
+73 62 b 31
+74 62 b 31
+75 62 b 31
+76 62 b 31
+77 62 b 31
+78 62 b 31
+79 62 b 31
+80 62 b 32
+58 74 b 30
+59 74 b 31
+60 74 b 31
+61 74 b 31
+62 74 b 31
+63 74 b 31
+64 74 b 31
+65 74 b 32
+69 74 b 30
+70 74 b 31
+71 74 b 31
+72 74 b 31
+73 74 b 31
+74 74 b 31
+75 74 b 31
+76 74 b 31
+77 74 b 31
+78 74 b 31
+79 74 b 32
+52 86 b 30
+53 86 b 31
+54 86 b 31
+55 86 b 31
+56 86 b 31
+57 86 b 31
+58 86 b 31
+59 86 b 31
+60 86 b 31
+61 86 b 31
+62 86 b 31
+63 86 b 31
+64 86 b 31
+65 86 b 31
+66 86 b 31
+67 86 b 31
+68 86 b 31
+69 86 b 31
+70 86 b 31
+71 86 b 31
+72 86 b 31
+73 86 b 31
+74 86 b 31
+75 86 b 31
+76 86 b 31
+77 86 b 31
+78 86 b 31
+79 86 b 31
+80 86 b 31
+81 86 b 31
+82 86 b 32
+68 98 b 30
+69 98 b 31
+70 98 b 31
+71 98 b 31
+72 98 b 31
+73 98 b 31
+74 98 b 31
+75 98 b 31
+76 98 b 31
+77 98 b 31
+78 98 b 31
+79 98 b 31
+80 98 b 31
+81 98 b 31
+82 98 b 31
+83 98 b 31
+84 98 b 31
+85 98 b 31
+86 98 b 31
+87 98 b 31
+88 98 b 31
+89 98 b 31
+90 98 b 31
+91 98 b 31
+92 98 b 31
+93 98 b 31
+94 98 b 31
+95 98 b 32
+10 84 b 30
+11 84 b 31
+12 84 b 31
+13 84 b 31
+14 84 b 31
+15 84 b 31
+16 84 b 31
+17 84 b 31
+18 84 b 31
+19 84 b 31
+20 84 b 31
+21 84 b 31
+22 84 b 31
+23 84 b 31
+24 84 b 31
+25 84 b 32
+0 60 b 30
+1 60 b 31
+2 60 b 31
+3 60 b 31
+4 60 b 31
+5 60 b 31
+6 60 b 31
+7 60 b 31
+8 60 b 31
+9 60 b 32
+17 60 b 30
+18 60 b 31
+19 60 b 31
+20 60 b 31
+21 60 b 31
+22 60 b 31
+23 60 b 31
+24 60 b 31
+25 60 b 31
+26 60 b 31
+27 60 b 31
+28 60 b 31
+29 60 b 31
+30 60 b 31
+31 60 b 31
+32 60 b 32
+45 52 a 23
+49 58 a 23
+46 64 a 23
+50 72 a 23
+47 92 a 23
+49 100 a 23
+45 104 a 23
+48 81 a 23

@@ -43,7 +43,9 @@ godot --headless --path . --export-pack "Android" build/export_check/Android.zip
 
 Shared identity: application id `com.clubandgrub.game` (macOS, iOS, Android), name "Club & Grub", version from
 `application/config/version` in `project.godot` (0.1.0; Windows shows it as 0.1.0.0). The icon is
-`res://assets/icon.png` (256 x 256); Godot derives the `.ico`, `.icns` and launcher icons from it.
+`res://assets/icon.png` (256 x 256); Godot derives the `.ico`, `.icns` and the legacy Android launcher icon from it.
+The iOS store icon (`assets/icon_1024.png`) and the Android adaptive layers (`assets/icon_android_*.png`) are
+built from the hero sheet by `tools/make_app_icons.py` (run it again after the hero art changes).
 
 ### Placeholders to replace before a store release
 

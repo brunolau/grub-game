@@ -90,3 +90,34 @@ func test_platform_specific_release_settings() -> void:
 		assert_eq(str(file.get_value(options, id_key)), "com.clubandgrub.game", "one application id everywhere")
 	assert_eq(int(ProjectSettings.get_setting("display/window/handheld/orientation")), 4,
 		"phones and tablets run in (sensor) landscape")
+
+
+func test_mobile_app_icons() -> void:
+	var file: ConfigFile = _presets()
+	var ios: String = _preset_section(file, "iOS") + ".options"
+	var store: Image = _icon(str(file.get_value(ios, "icons/icon_1024x1024")))
+	assert_eq(store.get_size(), Vector2i(1024, 1024), "iOS: the 1024 px store icon")
+	assert_false(store.detect_alpha() != Image.ALPHA_NONE, "iOS: the store icon is opaque")
+	var android: String = _preset_section(file, "Android") + ".options"
+	var back: Image = _icon(str(file.get_value(android, "launcher_icons/adaptive_background_432x432")))
+	var fore: Image = _icon(str(file.get_value(android, "launcher_icons/adaptive_foreground_432x432")))
+	var mono: Image = _icon(str(file.get_value(android, "launcher_icons/adaptive_monochrome_432x432")))
+	for layer: Image in [back, fore, mono]:
+		assert_eq(layer.get_size(), Vector2i(432, 432), "Android: adaptive layers are 432 px")
+	assert_true(back.detect_alpha() == Image.ALPHA_NONE, "Android: the background layer is opaque")
+	# Everything drawn on the foreground lies inside the 66 dp safe circle of the 108 dp layer.
+	var radius: float = 432.0 * 66.0 / 108.0 / 2.0
+	var outside: int = 0
+	for layer: Image in [fore, mono]:
+		for y: int in range(0, 432, 2):
+			for x: int in range(0, 432, 2):
+				if layer.get_pixel(x, y).a > 0.0 and Vector2(x, y).distance_to(Vector2(216, 216)) > radius:
+					outside += 1
+	assert_eq(outside, 0, "Android: the hero stays inside the safe zone")
+	assert_true(ResourceLoader.exists(str(file.get_value(android, "launcher_icons/main_192x192"))))
+
+
+func _icon(path: String) -> Image:
+	var image: Image = Image.load_from_file(ProjectSettings.globalize_path(path))
+	assert_not_null(image, "%s loads" % path)
+	return image if image != null else Image.create_empty(1, 1, false, Image.FORMAT_RGBA8)

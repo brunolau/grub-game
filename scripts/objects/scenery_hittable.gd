@@ -53,21 +53,21 @@ func spray(kind: String, count: int, pos: Vector2i) -> void:
 ## Where something thrown out of this cell appears, and the speed it leaves with: Vector4i(x, y, xvel, yvel).
 ## Out of the top when the cell above is open (the usual case: a spot in the floor or a free-standing thing);
 ## otherwise out of the open side the strike came from; otherwise out of the bottom (a spot in a ceiling).
-## `xvel` / `yvel` is the speed of a throw out of the top.
-func emerge(xvel: int, yvel: int) -> Vector4i:
+## `throw_xvel` / `throw_yvel` is the speed of a throw out of the top.
+func emerge(throw_xvel: int, throw_yvel: int) -> Vector4i:
 	var level: LevelBase = Game.level
 	var feet: Vector2i = Vector2i(cell.x * Tuning.TILE + Tuning.TILE / 2, cell.y * Tuning.TILE + Tuning.TILE)
 	if level == null or not _is_solid(level.grid, cell.x, cell.y):
-		return Vector4i(feet.x, feet.y, xvel, yvel)
+		return Vector4i(feet.x, feet.y, throw_xvel, throw_yvel)
 	var grid: TileGrid = level.grid
 	if not _is_solid(grid, cell.x, cell.y - 1):
-		return Vector4i(feet.x, cell.y * Tuning.TILE, xvel, yvel)
+		return Vector4i(feet.x, cell.y * Tuning.TILE, throw_xvel, throw_yvel)
 	var back: int = -strike_dir
 	if not _is_solid(grid, cell.x + back, cell.y):
-		return Vector4i(feet.x + back * Tuning.TILE, feet.y, back * absi(xvel), ObjTuning.SPOT_FACE_YVEL)
+		return Vector4i(feet.x + back * Tuning.TILE, feet.y, back * absi(throw_xvel), ObjTuning.SPOT_FACE_YVEL)
 	if not _is_solid(grid, cell.x - back, cell.y):
-		return Vector4i(feet.x - back * Tuning.TILE, feet.y, -back * absi(xvel), ObjTuning.SPOT_FACE_YVEL)
-	return Vector4i(feet.x, feet.y + Tuning.TILE, Tuning.shr(back * absi(xvel), 1), 0)
+		return Vector4i(feet.x - back * Tuning.TILE, feet.y, -back * absi(throw_xvel), ObjTuning.SPOT_FACE_YVEL)
+	return Vector4i(feet.x, feet.y + Tuning.TILE, Tuning.shr(back * absi(throw_xvel), 1), 0)
 
 
 func _is_solid(grid: TileGrid, col: int, row: int) -> bool:

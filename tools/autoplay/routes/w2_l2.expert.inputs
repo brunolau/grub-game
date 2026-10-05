@@ -1,0 +1,107 @@
+# w2_l2 "Bone Gorge" from '@' to the exit on Expert (ticks:KEYS, keys L R U D F K). The exit leads on to w2_l2b.
+# Out of the cave: the inset spot in the ground (three low strikes), apples.
+16:R
+4:
+10:DF,4:,10:DF,4:,8:DF
+# The digger meadow: a lizard bursts out of the bone dirt - club it when it comes.
+45:R
+74:
+7:F
+# The spike pit: at the edge the first stepping stone rises out of the spikes; each stone raises the next.
+39:R
+36:
+6:R
+36:
+11:RU
+12:U
+36:
+15:RU
+7:U
+36:
+13:RU
+7:U
+12:R
+# Bone field: club the turtle on the mound; on Expert a blue lizard hops in behind it - keep swinging.
+19:R
+7:F
+8:F,2:,8:F,2:,8:F,2:,8:F,2:,8:F,2:,8:F,2:,4:F
+# ... and a second digger comes up out of the bone field.
+8:F,2:,8:F,2:,6:F
+22:R
+4:
+8:F,2:,8:F,2:,6:F
+10:R
+4:
+10:DF,2:,8:DF
+13:R
+4:
+# The pillar at the foot of the cliff lifts him up to the terrace.
+9:R
+41:
+8:R
+# The upper terrace: checkpoint, meat, and a hole in the ground - down into the bone cave (secret).
+30:R
+8:
+1:D
+6:
+# The bone cave: hams, the code stone, the framed block (a giant bonus), the U and the big skull.
+14:R
+4:
+12:DF,2:,12:DF,2:,12:DF,2:,12:DF,2:,12:DF,2:
+24:
+18:R
+4:
+8:F,2:,8:F,2:,8:F,2:,8:F,2:,7:F
+3:R
+10:
+32:L
+10:
+1:D
+6:
+# Back on the terrace: the little lizard hops at him - keep swinging.
+8:R
+8:F,2:,7:F
+4:
+# A digger comes up out of the terrace: club it too.
+8:F,2:,8:F,2:,7:F
+4:
+# At the gap the stone slab rises out of the depths to form a bridge; wait until the quake is over.
+20:R
+40:
+# On Expert a blue lizard waits at the end of the bridge: let it hop over and club it.
+8:R
+10:UF,2:,10:UF,2:,10:UF,2:,8:UF
+16:R
+# The second turtle, the bone-strewn ground (two spots) and the big rock at the top of the slope.
+1:R
+7:F
+4:R
+8:
+10:DF,2:,10:DF,2:,10:DF,2:,10:DF,2:,8:DF
+20:R
+4:
+8:F,2:,8:F,2:,8:F,2:,6:F
+5:R
+6:
+# Down to the runway: checkpoint, a heart, and the HANG-GLIDER. Run, then jump to take off and hold Up to climb.
+75:R
+30:RU
+39:R
+15:DR
+231:R
+# The far rim: the turtle knocks the folded glider away (no harm done) - now the club works again.
+19:R
+30:
+1:L
+7:F
+13:R
+4:
+10:DF,2:,10:DF,2:,10:DF,2:,8:DF
+13:R
+4:
+10:DF,2:,10:DF,2:,10:DF,2:,8:DF
+24:
+9:R
+4:
+8:F,2:,8:F,2:,8:F,2:,6:F
+17:R

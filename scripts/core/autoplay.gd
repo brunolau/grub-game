@@ -125,7 +125,7 @@ func _ready() -> void:
 
 ## The options this build may act on: all of them in a debug build, only RELEASE_SWITCHES in a release build,
 ## so that no development switch can change what a player's copy of the game does.
-static func allowed_options(options: Dictionary, debug_build: bool) -> Dictionary:
+func allowed_options(options: Dictionary, debug_build: bool) -> Dictionary:
 	if debug_build:
 		return options
 	var result: Dictionary = {}
@@ -137,7 +137,7 @@ static func allowed_options(options: Dictionary, debug_build: bool) -> Dictionar
 
 ## Development files found in this build (paths of DEVELOPMENT_PATHS that exist, plus test levels). Empty for
 ## a correct export; meaningless in the editor, where all of them exist.
-static func find_development_files() -> PackedStringArray:
+func find_development_files() -> PackedStringArray:
 	var found: PackedStringArray = PackedStringArray()
 	for path: String in DEVELOPMENT_PATHS:
 		if FileAccess.file_exists(path) or DirAccess.dir_exists_absolute(path) or ResourceLoader.exists(path):
@@ -149,7 +149,7 @@ static func find_development_files() -> PackedStringArray:
 
 
 ## Parse "--key=value" / "--flag" arguments into a Dictionary (keys without the dashes; flags map to "").
-static func parse_args(arguments: PackedStringArray) -> Dictionary:
+func parse_args(arguments: PackedStringArray) -> Dictionary:
 	var options: Dictionary = {}
 	for argument: String in arguments:
 		if not argument.begins_with("--"):
@@ -166,7 +166,7 @@ static func parse_args(arguments: PackedStringArray) -> Dictionary:
 ## Convert an input script "40:R,12:RU,8:" into one flags value (Defs.IN_*) per tick.
 ## Entries are separated by commas or new lines; a missing key part means "nothing held". A line whose first
 ## non-blank character is `#` is a comment (it may contain commas).
-static func parse_inputs(script: String) -> PackedInt32Array:
+func parse_inputs(script: String) -> PackedInt32Array:
 	var result: PackedInt32Array = PackedInt32Array()
 	var entries: PackedStringArray = PackedStringArray()
 	for line: String in script.split("\n"):

@@ -1,0 +1,111 @@
+# w1_l1 "Vine Bridges" - route proof, Beginner, default seed (ticks:KEYS, keys L R U D F K).
+# The inset spot in the floor: three low strikes.
+28:R,10:
+10:DF,4:,10:DF,4:,10:DF,6:
+# The bush beside the path is a scenery spot: three forward strikes.
+8:R,10:
+8:F,4:,8:F,4:,8:F,6:
+8:F,8:
+# Into the wall of the step: its face hides two spots (forward strikes).
+16:R,4:
+8:F,6:,8:F,6:,8:F,8:
+# Up onto the step and along it.
+12:RU,12:R,6:
+# The first walker: wait for it and club it.
+10:R,8:F,6:
+# The turtle trough: walk to its edge.
+8:R,4:
+28:
+# Jump onto the first turtle holding Jump: the big bounce reaches the letter R.
+22:RU,14:U
+# Drift right over the other turtles.
+18:R,8:F,6:
+# Hop out of the trough and club the grassy rock (a scenery spot) twice.
+14:RU,4:R,6:
+8:F,6:,8:F,6:
+# A lone flower marks a big spot: three low strikes, and a giant bonus falls from the sky.
+12:R,10:
+10:DF,4:,10:DF,4:,10:DF,30:
+5:R,19:
+# The hopper: step into its range, let it come and club it.
+6:R,14:,8:F,6:
+# Over the first vine bridge to the crate: club it open.
+48:R,6:
+8:F,10:
+# Collect, then jump up onto the second bridge and drop off its far end.
+16:R,14:RU,20:R,8:
+# The tunnel under the rock is closed by a breakable wall: two strikes.
+14:R,4:
+8:F,6:,8:F,8:
+# Through, and light the first checkpoint fire.
+40:R,6:
+# The spring flower: hop onto it and it throws us up onto the first lake bridge.
+6:U,40:
+# Along the bridge to its end; the bat over the next bridge patrols at head height.
+20:R,30:
+3:R,57:
+# A high strike (Up + attack) as it comes in.
+10:UF,6:
+# Bridge to bridge across the lake.
+18:RU,4:R
+14:R,22:RU
+10:R,20:RU
+8:R,22:RU
+13:R,22:RU
+# A short hop onto the little island, then a full jump to the far bank.
+6:R,1:RU,16:R
+4:R,24:RU,6:R
+# Off the bank past the second checkpoint and up the hollow hill.
+52:R,8:
+# The snapper plant bites further than it seems: club it from just outside its reach.
+5:R,4:,8:F,8:
+# Over the hill top and down its far side (the hoppers below wait a few steps further on).
+26:R,22:
+# The cracked blocks at the foot of the hill hide a room: turn round and break them.
+4:L,6:,8:F,6:,8:F,10:
+# Inside: a heart, the letter B, and floor spots with a code stone (low strikes).
+27:L,10:
+10:DF,4:,10:DF,10:
+# Pick up what flew out, then back out of the room.
+8:L,6:,40:R,6:
+# The little tree stump is a scenery spot too (it already took a hit).
+8:F,4:,8:F,8:
+# The first hopper: step past the stump into its range, let it hop over and club it as it rests.
+3:R,20:,8:F,8:
+# The second hopper: walk on until it notices us, then club it where it lands.
+14:R,20:,8:F,8:
+# The last pond: walk under the bat that flutters over its bridge.
+50:R,6:
+# The last turtle carries the letter S above its path: bounce on it holding Jump.
+6:R,40:
+52:,6:R,6:,22:U,12:
+# Drift back left while falling, let the turtle walk off and club it when it comes back.
+6:L,60:
+1:R,26:,8:F,8:
+# The barrel by the path: one strike.
+13:R,6:,8:F,12:
+# The skull marks a row of floor spots: two low strikes open all four.
+19:R,6:
+10:DF,4:,10:DF,20:
+# The rock pillar closes the glade: climb its branches straight up; the fire at the top lights on the way.
+8:R,8:
+140:U,6:
+# The canopy road leads back to the left: a run-up along the top branch first.
+6:R,8:
+14:L,24:LU,6:
+# A hopper guards the first treetop.
+4:L,14:,8:F,8:
+# Treetop to vine bridge to treetop.
+12:L,24:LU,4:L
+9:L,26:LU,4:L,14:
+# A big spot in this treetop: face it and strike low three times; the giant bonus drops onto it.
+1:R,4:
+10:DF,4:,10:DF,4:,10:DF,2:
+# Step aside while it falls, then pick it up.
+4:,3:L,35:
+6:R,20:
+# On along the canopy road.
+8:L,24:LU,4:L
+4:L,22:LU,4:
+# Down to the tree house: the exit totem stands beside it.
+16:L,24:LU,20:L

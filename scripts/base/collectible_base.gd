@@ -44,6 +44,7 @@ var _sprite: Sprite2D = null
 var _sprite_rest_y: float = 0.0
 var _bob_phase: int = 0
 var _holds_drop_slot: bool = false
+var _removing: bool = false
 
 ## Dropped bonus items alive right now (the original has 32 slots for them).
 static var _drop_slots_used: int = 0
@@ -69,9 +70,7 @@ func _notification(what: int) -> void:
 				_holds_drop_slot = true
 				_drop_slots_used += 1
 	elif what == NOTIFICATION_EXIT_TREE:
-		if _holds_drop_slot:
-			_holds_drop_slot = false
-			_drop_slots_used -= 1
+		_release_drop_slot()
 
 
 func _sim_phases() -> PackedInt32Array:
@@ -109,7 +108,7 @@ func _sim_tick(phase: int) -> void:
 		if dropped and life > 0:
 			life -= 1
 			if life == 0:
-				queue_free()
+				_remove()
 			elif life <= Tuning.DROPPED_ITEM_BLINK:
 				visible = (life & 1) == 0
 	elif phase == Defs.Phase.CONTACT_ITEMS:
@@ -157,7 +156,7 @@ func collect(hero: PlayerBase) -> bool:
 	if reappears_on_respawn:
 		visible = false
 	else:
-		queue_free()
+		_remove()
 	return true
 
 
@@ -190,7 +189,7 @@ func get_sprite() -> Sprite2D:
 
 func _on_level_reset() -> void:
 	if dropped and expires:
-		queue_free()
+		_remove()
 	elif reappears_on_respawn and collected:
 		collected = false
 		visible = true
@@ -270,9 +269,42 @@ func _sink(level: LevelBase, surface: int) -> void:
 func _lose() -> void:
 	if expires:
 		collected = true
-		queue_free()
+		_remove()
 		return
 	xvel = 0
 	yvel = 0
 	resting = false
 	teleport(spawn_pos)
+
+
+## The item is gone (collected, expired, lost, cleared by a respawn). It is freed at the end of the frame as
+## before, but it leaves the simulation and gives its dropped-item slot back at the end of the current tick (at
+## once between ticks), exactly when a node freed at the end of the frame disappears in the game. Replays that step
+## ticks without rendering frames (headless tests) then count like the game: queue_free() alone would leave the
+## item in the level and its slot taken until the next frame.
+func _remove() -> void:
+	queue_free()
+	if _removing:
+		return
+	_removing = true
+	if Sim.is_in_tick():
+		Sim.tick_finished.connect(_on_removal_tick_finished, CONNECT_ONE_SHOT)
+	else:
+		_finish_removal()
+
+
+func _on_removal_tick_finished(_tick: int) -> void:
+	_finish_removal()
+
+
+func _finish_removal() -> void:
+	collected = true
+	visible = false
+	sim_active = false
+	_release_drop_slot()
+
+
+func _release_drop_slot() -> void:
+	if _holds_drop_slot:
+		_holds_drop_slot = false
+		_drop_slots_used -= 1

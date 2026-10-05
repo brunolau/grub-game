@@ -73,6 +73,50 @@ func test_hud_boss_bar_follows_the_boss() -> void:
 	assert_false(hud.is_boss_bar_visible(), "a respawn resets the fight")
 
 
+func test_hud_shows_level_hints_on_a_panel() -> void:
+	var hud: Hud = await _overlay(Flow.HUD_SCENE) as Hud
+	assert_false(hud.is_hint_visible(), "no hint panel without a hint")
+	var first: Node = Node.new()
+	var second: Node = Node.new()
+	add_node(first)
+	add_node(second)
+	Events.message_requested.emit(first, "ZONE_DEMO")
+	assert_eq(hud.get_hint_text(), tr("ZONE_DEMO"), "the hint is a translation key")
+	await get_tree().create_timer(Hud.HINT_FADE_SECONDS + 0.1).timeout
+	assert_true(hud.is_hint_visible())
+	assert_eq(hud.get_hint_shown_text(), tr("ZONE_DEMO"))
+	Events.message_requested.emit(second, "Plain text works too")
+	assert_eq(hud.get_hint_text(), "Plain text works too", "the newest hint wins")
+	Events.message_requested.emit(first, "")
+	assert_eq(hud.get_hint_text(), "Plain text works too", "withdrawing an older hint keeps the newer one")
+	Events.message_requested.emit(first, "ZONE_DEMO")
+	Events.message_requested.emit(first, "")
+	assert_eq(hud.get_hint_text(), "Plain text works too", "back to the hint still asked for")
+	second.free()
+	assert_eq(hud.get_hint_text(), "", "the hint of a freed source is forgotten")
+	await get_tree().create_timer(Hud.HINT_FADE_SECONDS + 0.1).timeout
+	assert_false(hud.is_hint_visible(), "faded out")
+	# The panel stays inside the view at the narrowest supported width and wraps long text.
+	Events.message_requested.emit(first, "Club the ground - bonuses hide everywhere! Every single one of them.")
+	await get_tree().create_timer(Hud.HINT_FADE_SECONDS + 0.1).timeout
+	var label_rect: Rect2 = _hint_label_rect(hud)
+	var view: Rect2 = hud.get_viewport_rect()
+	assert_true(view.encloses(label_rect), "the hint text is inside the view: %s in %s" % [label_rect, view])
+	assert_true(label_rect.size.x <= Hud.HINT_MAX_TEXT_W + 0.5, "long hints wrap")
+	assert_true(label_rect.position.y >= Hud.HINT_TOP, "the hint sits under the HUD row")
+	first.free()
+
+
+func _hint_label_rect(hud: Hud) -> Rect2:
+	var found: Array[Label] = []
+	for node: Node in hud.find_children("*", "Label", true, false):
+		var label: Label = node as Label
+		if label.text == hud.get_hint_shown_text():
+			found.append(label)
+	assert_eq(found.size(), 1, "one hint label")
+	return found[0].get_global_rect() if not found.is_empty() else Rect2()
+
+
 func test_touch_controls_feed_game_input_with_multi_touch() -> void:
 	var touch: TouchControls = await _overlay(Flow.TOUCH_SCENE) as TouchControls
 	assert_true(touch.is_in_group(Defs.GROUP_TOUCH))
@@ -148,6 +192,27 @@ func test_pause_menu_resume_unpauses_the_level() -> void:
 	Flow.current_screen = Flow.SCREEN_BOOT
 
 
+func test_pause_menu_gamepad_start_confirms_the_focused_entry() -> void:
+	var menu: PauseMenu = await _overlay(Flow.PAUSE_SCENE) as PauseMenu
+	Flow.current_screen = Flow.SCREEN_LEVEL
+	Flow.set_paused(true)
+	assert_true(menu.visible)
+	menu._options_button.grab_focus()
+	_pad(JOY_BUTTON_START)
+	assert_eq(menu.page, PauseMenu.Page.OPTIONS, "Start confirmed 'options' instead of resuming")
+	assert_true(Flow.is_paused(), "the game stays paused")
+	_press(&"ui_cancel")
+	assert_eq(menu.page, PauseMenu.Page.MAIN)
+	menu._resume.grab_focus()
+	_pad(JOY_BUTTON_START)
+	assert_false(Flow.is_paused(), "Start on 'resume' resumes")
+	assert_false(menu.visible)
+	_pad(JOY_BUTTON_START)
+	assert_true(Flow.is_paused(), "in play Start pauses")
+	Flow.set_paused(false)
+	Flow.current_screen = Flow.SCREEN_BOOT
+
+
 func test_pause_menu_give_up_needs_a_hero() -> void:
 	var menu: PauseMenu = await _overlay(Flow.PAUSE_SCENE) as PauseMenu
 	Events.pause_changed.emit(true)
@@ -168,6 +233,14 @@ func _press(action: StringName) -> void:
 	for pressed: bool in [true, false]:
 		var event: InputEventAction = InputEventAction.new()
 		event.action = action
+		event.pressed = pressed
+		get_tree().root.push_input(event)
+
+
+func _pad(button: JoyButton) -> void:
+	for pressed: bool in [true, false]:
+		var event: InputEventJoypadButton = InputEventJoypadButton.new()
+		event.button_index = button
 		event.pressed = pressed
 		get_tree().root.push_input(event)
 

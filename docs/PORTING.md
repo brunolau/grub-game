@@ -36,9 +36,11 @@ are in [BUILD.md](BUILD.md).
 
 1. Switch the preset to Gradle + AAB for Play (`gradle_build/use_gradle_build=true`, `export_format=1`); keep APK
    for sideloading.
-2. Adaptive launcher icons: art must provide `launcher_icons/adaptive_foreground_432x432`,
-   `adaptive_background_432x432` and `adaptive_monochrome_432x432` (the current icon is a 256 x 256 square that
-   Godot scales; it looks soft and gets a white plate on some launchers).
+2. Adaptive launcher icons: DONE. `launcher_icons/adaptive_foreground_432x432`, `adaptive_background_432x432` and
+   `adaptive_monochrome_432x432` are `assets/icon_android_foreground.png` (the hero inside the 66 dp safe circle),
+   `icon_android_background.png` (opaque sky and grass) and `icon_android_monochrome.png` (themed icons), built by
+   `tools/make_app_icons.py` from the hero sheet with integer nearest-neighbour scaling only;
+   `tests/test_core_release.gd` checks sizes, opacity and the safe zone. `main_192x192` stays `assets/icon.png`.
 3. Verify 16 KB memory-page compatibility (required for new Play uploads targeting Android 15+): the Play Console
    pre-launch report flags it; locally `zipalign -c -P 16 -v 4 <apk>`.
 4. Raise `version/code` for every upload; keep `version/name` empty (it follows the project version).
@@ -60,8 +62,9 @@ and profiles (automatic signing) or supply provisioning profiles through the `GO
 
 **Project work**
 
-1. App icon: art must provide a 1024 x 1024 **opaque** PNG (no alpha; the App Store rejects transparency) for
-   `icons/icon_1024x1024` and, optionally, dark and tinted variants. The current 256 x 256 icon is only a stand-in.
+1. App icon: DONE for `icons/icon_1024x1024`: `assets/icon_1024.png`, 1024 x 1024, opaque (the App Store rejects
+   transparency; the system rounds the corners), built by `tools/make_app_icons.py`. Dark and tinted variants are
+   optional and still empty.
 2. Launch screen: the storyboard uses `assets/splash.png` on the splash colour; check it on notched iPhones and
    iPads, or provide `storyboard/custom_image@2x` / `@3x`.
 3. Renderer: the Compatibility renderer runs on Apple's OpenGL ES, which Apple deprecated. Measure on the oldest

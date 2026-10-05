@@ -129,6 +129,34 @@ func test_dark_zones_switch_the_light() -> void:
 	assert_false(_level.dark, "on=false switches the light back on")
 
 
+func test_a_respawn_restores_the_darkness_of_the_checkpoint() -> void:
+	_zone(&"zones/dark", {"rect": "10,13,2,2"})
+	_level.start_play()
+	var changes: Array[bool] = []
+	var on_change: Callable = func(dark: bool) -> void: changes.append(dark)
+	Events.darkness_changed.connect(on_change)
+	# No checkpoint: back to the level start (lit).
+	_walk_to(10 * 16 + 8)
+	assert_true(_level.dark)
+	_level.respawn_player()
+	assert_false(_level.dark, "a respawn at the start is lit again")
+	# Checkpoint before the trigger: lit on respawn.
+	Game.set_checkpoint(Vector2i(5 * 16, 240))
+	_walk_to(10 * 16 + 8)
+	assert_true(_level.dark)
+	_level.respawn_player()
+	assert_false(_level.dark, "a checkpoint touched in the light respawns in the light")
+	# Checkpoint after the trigger: dark on respawn.
+	_walk_to(10 * 16 + 8)
+	Game.set_checkpoint(Vector2i(12 * 16, 240))
+	assert_true(_level.get_respawn_darkness())
+	_level.respawn_player()
+	assert_true(_level.dark, "a checkpoint touched in the dark respawns in the dark")
+	Events.darkness_changed.disconnect(on_change)
+	assert_eq(changes, [true, false, true, false, true] as Array[bool], "listeners hear every switch")
+	Sim.stop()
+
+
 func test_kill_zone() -> void:
 	_zone(&"zones/kill", {"rect": "30,0,2,15"})
 	_walk_to(29 * 16)
@@ -146,19 +174,29 @@ func test_autoscroll_stop() -> void:
 	assert_eq(_level.scroll_flags, Defs.SCROLL_NO_HORIZONTAL, "the descent stops, vertical-only stays")
 
 
-func test_message_shows_its_text_while_inside() -> void:
+func test_message_asks_for_its_hint_while_inside() -> void:
 	var zone: MessageZone = _zone(&"zones/message", {"rect": "10,12,4,3", "text": "Hit_the_ground!"}) as MessageZone
-	var label: Label = zone.get_node("Text")
-	assert_eq(label.text, "Hit_the_ground!", "the text goes through tr(); untranslated keys show as written")
+	var id: int = zone.get_instance_id()
+	var requests: Array = []
+	var on_request: Callable = func(source: Node, text: String) -> void:
+		requests.append([source.get_instance_id(), text])
+	Events.message_requested.connect(on_request)
 	assert_false(zone.is_shown())
 	_walk_to(11 * 16)
 	assert_true(zone.is_shown())
-	await get_tree().process_frame
-	assert_true(label.visible, "fading in")
+	_walk_to(12 * 16)
+	assert_eq(requests, [[id, "Hit_the_ground!"]], "asked once on entering, with the key as written")
 	_walk_to(20 * 16)
 	assert_false(zone.is_shown())
-	var label_bottom: float = zone.position.y + label.position.y + label.size.y
-	assert_true(label_bottom <= float(zone.rect.position.y * Tuning.ART_SCALE), "drawn above the rectangle")
+	assert_eq(requests.back(), [id, ""], "withdrawn on leaving")
+	_walk_to(11 * 16)
+	_level.reset_entities()
+	assert_eq(requests.back(), [id, ""], "a respawn withdraws it")
+	_walk_to(11 * 16)
+	zone.free()
+	assert_eq(requests.back(), [id, ""], "a zone that leaves the level withdraws it")
+	Events.message_requested.disconnect(on_request)
+	assert_eq(requests.size(), 6)
 
 
 func test_ember_rain_drops_embers_while_the_hero_is_inside() -> void:

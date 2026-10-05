@@ -1,0 +1,49 @@
+# w3_l1b "Blizzard Pass" (Expert, default seed): from '@' to the exit at the hut without losing a life.
+# Expert wind script: gusts swell at ticks 160, 360, 560, 760, ... (every 200 ticks, peak 48 / 64 / 72 for 40 ticks); between them the wind is 16.
+# B1 Out of the cave onto the ice, club the walker.
+28:R,14:
+10:DF,6:,10:DF,6:,10:DF,6:
+6:R,8:F,6:,8:F,6:
+28:R,10:,8:F,6:,8:F,6:
+# B2 The first gust: walk up the ice slope into it (it only slows you down here).
+46:R,8:F,6:,8:F,6:,8:F,6:
+8:R,10:,10:DF,6:,10:DF,6:,14:,4:R,8:
+# Expert: the second gust (peak 64) - crouch on the slope top.
+78:D
+10:R,10:,10:DF,6:,10:DF,6:,10:DF,2:,6:L,16:,26:R,90:D
+# The lull: the crevasse pillars (the head wind of 16 shortens every jump a little).
+18:R,22:RU,6:
+10:R,22:RU,6:
+# Club the rock spot on the second pillar, then brace through the fourth gust (the rock grips).
+10:DF,6:,10:DF,6:,10:DF,6:,70:D
+# The fifth lull: on to pillar 3, then pillar 4 (checkpoint) and over to the shore. This route skips the eagle
+# ledge (reachable on Expert too: from the floe above pillar 3, a jump with Right held lands on it in a lull).
+6:R,20:RU,6:
+11:R,22:RU,6:
+8:R,22:RU,8:
+# B4 The fifth gust: crouch on the ice shore and break the ice blocks in the floor with low strikes.
+10:DF,6:D,10:DF,6:D,10:DF,6:D,10:DF,6:D
+# Crawl (immune to the wind) into the hole: the grotto under the pond (secret).
+16:DR,24:
+36:R,10:,10:DF,6:,10:DF,6:,10:DF,6:,10:DF,6:,16:,6:R,6:
+# Back for the giant bonus, then wait at the foot of the shaft for the lull.
+6:R,10:,30:R,10:
+# Wait at the foot of the shaft for the next lull, then up the rock floes and out through the hatch.
+24:R,8:,157:D,5:UR,17:U,6:,5:UR,17:U,6:,5:UR,17:U,6:,5:UR,17:U,8:
+# Off the hatch (crouching on it would drop you back) and brace through the eighth gust.
+5:R,8:,80:D
+# B5 In the lull: onto the rock step, up the snow slope, club the walker.
+8:R,20:RU,8:,26:R,8:F,6:,8:F,6:,8:F,6:
+4:R,8:F,6:,8:F,6:,8:F,6:
+44:D
+12:R,8:,10:DF,6:,10:DF,6:,10:DF,6:
+# Up to the ridge checkpoint, brace through the tenth gust.
+30:R,10:,92:D
+# B6 The lull: along the ridge and over the gap in the ice bridge.
+60:R,22:RU,6:R
+# The far rock: two hoppers (one only on Expert), the barrel.
+8:R,8:F,6:,8:F,6:,8:F,6:,8:F,6:,8:F,6:,8:F,6:,8:F,6:
+10:R,8:,8:F,6:,8:F,6:,8:F,6:,8:F,6:,8:F,6:,8:F,6:
+14:R,4:,8:F,6:,8:F,6:,8:F,6:,8:F,6:,8:F,6:
+# The big spot in front of the hut (step back while the giant cake falls), then into the exit.
+20:R,8:,10:DF,6:,10:DF,6:,10:DF,6:,10:DF,2:,8:L,26:,60:R

@@ -1,0 +1,51 @@
+# Start: walk to the inset tile and club it three times (low strikes).
+8:R,10:
+10:DF,4:,10:DF,4:,10:DF,6:
+# Pick up what it threw and jump the candy rainbow over the pink block.
+11:R,16:RU,12:R,6:
+# The framed block: three low strikes drop a giant cake from the sky; step back while it falls.
+10:DF,6:,10:DF,6:,10:DF,2:
+8:L,24:
+# Collect the cake, then a full jump onto the spring: up through the ice creams onto the cloud.
+12:R,6:,20:RU,30:
+# Cloud stair: three jumps up and to the right, then over to the cake island.
+16:RU,8:
+18:RU,8:
+18:RU,8:
+4:R,18:RU,4:
+# Cake island: club the bush four times (it throws its treats onto the hill), up the hill for them.
+4:R,4:
+8:F,6:,8:F,6:,8:F,6:,8:F,10:
+15:R,6:
+20:U,8:
+5:R,6:,20:U,8:
+# Down the hill (the bush's treats rest at the island's edge), turn round on the big spot: four low strikes,
+# step back from the falling chocolate cake, then fetch it.
+18:R,6:,1:L,4:
+10:DF,6:,10:DF,6:,10:DF,6:,10:DF,2:
+8:L,24:
+# Fetch the cake and step onto the ride: it carries the hero through the waffles to the icing island.
+20:R,8:
+84:
+# Icing island: club the flower pot three times, then the inset tiles (one used up opens all three).
+6:R,4:
+8:F,6:,8:F,6:,8:F,6:
+12:R,4:
+10:DF,6:,10:DF,8:
+# Along the island for the donuts and the goblet, then off its edge down the waterfall of sweets.
+62:R,6:
+# Finale meadow: hop the pink block, collect the strawberry line, club the plain tiles under the flower.
+8:R,16:RU,10:R,6:
+10:DF,6:,10:DF,6:
+# Strawberries to the framed block: three low strikes, step back, catch the giant cake.
+16:R,6:
+10:DF,6:,10:DF,6:,10:DF,2:
+8:L,24:
+# On to the cake tower, fetching the giant cake: three forward strikes at the inset tile in its foot.
+40:R,6:
+8:F,6:,8:F,6:,8:F,10:
+# The tile spits its treats back along the meadow: fetch them.
+28:L,6:
+# Back onto the big spring with a straight jump: it throws the hero past the icing layer onto the tower top,
+# where the giant doughnut waits next to the spiral staff.
+20:R,6:,20:U,40:R,30:

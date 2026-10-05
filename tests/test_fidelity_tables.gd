@@ -75,9 +75,9 @@ func test_crawl() -> void:
 	var slide: Dictionary = ref["enter_at_full_speed_right"]
 	load_world(flat_rows())
 	set_running(1)
-	var rows: Array[Dictionary] = run(hold("RD", 12))
-	assert_ints_eq(column(rows, "xvel"), slide["xvel"], "crawl entered at full speed: xvel")
-	assert_ints_eq(rel_x(rows, START_X), slide["x"], "crawl entered at full speed: x")
+	var slide_rows: Array[Dictionary] = run(hold("RD", 12))
+	assert_ints_eq(column(slide_rows, "xvel"), slide["xvel"], "crawl entered at full speed: xvel")
+	assert_ints_eq(rel_x(slide_rows, START_X), slide["x"], "crawl entered at full speed: x")
 
 
 func test_ice_levels() -> void:
@@ -195,21 +195,21 @@ func test_running_jumps() -> void:
 	var repeated: Dictionary = ref["hold_up_right_repeated"]
 	load_world(flat_rows())
 	set_running(1)
-	var rows: Array[Dictionary] = run(hold("RU", 90))
+	var repeat_rows: Array[Dictionary] = run(hold("RU", 90))
 	var takeoffs: Array = []
 	var landings: Array = []
 	var x_at: Array = []
-	for i: int in rows.size():
-		var up: bool = int(rows[i]["y"]) < START.y
-		if up and (i == 0 or int(rows[i - 1]["y"]) == START.y):
+	for i: int in repeat_rows.size():
+		var up: bool = int(repeat_rows[i]["y"]) < START.y
+		if up and (i == 0 or int(repeat_rows[i - 1]["y"]) == START.y):
 			takeoffs.append(i + 1)
-		if i > 0 and int(rows[i]["grounded"]) == 1 and int(rows[i - 1]["grounded"]) == 0:
+		if i > 0 and int(repeat_rows[i]["grounded"]) == 1 and int(repeat_rows[i - 1]["grounded"]) == 0:
 			landings.append(i + 1)
-			x_at.append(int(rows[i]["x"]) - START_X)
+			x_at.append(int(repeat_rows[i]["x"]) - START_X)
 	assert_ints_eq(takeoffs, repeated["takeoff_ticks"], "repeated jumps: take-off ticks", true)
 	assert_ints_eq(landings, repeated["landing_ticks"], "repeated jumps: landing ticks", true)
 	assert_ints_eq(x_at, repeated["x_at_landings"], "repeated jumps: x at landings", true)
-	assert_ints_eq(column(rows, "xvel").slice(21, 27), repeated["xvel_on_ground_between_jumps"],
+	assert_ints_eq(column(repeat_rows, "xvel").slice(21, 27), repeated["xvel_on_ground_between_jumps"],
 			"repeated jumps: braking during the lock-out")
 
 
@@ -338,9 +338,9 @@ func test_hurt_knockback_tables() -> void:
 	hero.hurt(null, Defs.HurtKind.ENEMY)
 	assert_eq(hero.hit_timer, int(ref["hit_timer_start"]))
 	hero.hit_timer -= 1
-	var rows: Array[Dictionary] = run(hold("", 50))
+	var contact_rows: Array[Dictionary] = run(hold("", 50))
 	# The contact pass runs only while hit_timer == 0: it is skipped on every tick that starts with hit_timer > 0.
-	var cleared: int = _first_tick(column(rows, "hit_timer"), 0)
+	var cleared: int = _first_tick(column(contact_rows, "hit_timer"), 0)
 	assert_eq(cleared, int(ref["immune_contact_passes"]), "immune contact passes after the hit tick")
 	assert_eq(cleared + 1, int(ref["ticks_after_hit_tick_until_contact_tested_again"]))
 
@@ -429,8 +429,8 @@ func test_charge_table() -> void:
 	load_world(flat_rows())
 	run(hold("D", 80))
 	assert_eq(hero.charge, int(ref["saturation_value_after_long_crouch"]), "charge saturates")
-	var rows: Array[Dictionary] = run(hold("", 60))
-	assert_eq(_first_tick(column(rows, "charge"), 0), int(ref["ticks_until_zero_after_standing_up"]))
+	var standing_rows: Array[Dictionary] = run(hold("", 60))
+	assert_eq(_first_tick(column(standing_rows, "charge"), 0), int(ref["ticks_until_zero_after_standing_up"]))
 
 
 func test_thrown_weapon_flight() -> void:

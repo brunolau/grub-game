@@ -1,5 +1,5 @@
 extends ObjectsTestCase
-## Checkpoints, exits, gates and markers, springs, signs and sprite hazards.
+## Checkpoints, exits, gates and markers, springs, signs, villagers and sprite hazards.
 
 
 func before_each() -> void:
@@ -126,14 +126,48 @@ func test_spring_throws_the_hero_up() -> void:
 
 
 func test_sign_shows_its_text_near_the_hero() -> void:
-	var sign: SignBoard = spawn(&"objects/sign", Vector2i(300, 160), {"text": "SIGN_TEST"}) as SignBoard
-	var label: Label = sign.get_node("Text") as Label
+	var board: SignBoard = spawn(&"objects/sign", Vector2i(300, 160), {"text": "SIGN_TEST"}) as SignBoard
+	var label: Label = board.get_node("Text") as Label
 	assert_eq(label.text, "SIGN_TEST")
 	Sim.step(1)
 	assert_false(label.visible)
 	hero.teleport(Vector2i(296, 160))
 	Sim.step(1)
 	assert_true(label.visible)
+
+
+func test_villagers_idle_turn_to_the_hero_and_are_harmless() -> void:
+	var sizes: Dictionary = {"elder": 5, "kid": 6, "warrior": 6}
+	var villagers: Array[Npc] = []
+	var x: int = 120
+	for kind: String in sizes:
+		var npc: Npc = spawn(&"objects/npc", Vector2i(x, 160), {"kind": kind, "facing": "l"}) as Npc
+		assert_eq(npc.kind, kind)
+		assert_eq((npc.get_node("Sprite") as Sprite2D).hframes, int(sizes[kind]), "%s: idle frames" % kind)
+		assert_eq(npc.get_kind(), Defs.Kind.OTHER, "not an enemy, item, hazard or hittable")
+		villagers.append(npc)
+		x += 120
+	var still: Npc = spawn(&"objects/npc", Vector2i(60, 160), {"kind": "kid", "facing": "l", "turn": false}) as Npc
+	var sprite: Sprite2D = villagers[0].get_node("Sprite") as Sprite2D
+	var frames: Dictionary = {}
+	var hearts: int = Game.hearts
+	hero.teleport(Vector2i(150, 160))
+	for i: int in 30:
+		Sim.step(1)
+		frames[sprite.frame] = true
+	assert_true(frames.size() >= 3, "the idle loop plays")
+	assert_eq(villagers[0].facing, 1, "a villager turns to face the hero standing near")
+	assert_eq(villagers[2].facing, -1, "one far away keeps its facing")
+	assert_eq(still.facing, -1, "turn=false keeps the placed facing")
+	assert_true(sprite.flip_h == false)
+	assert_eq(Game.hearts, hearts, "standing in a villager never hurts")
+	assert_false(hero.dead)
+	var counter: LogCounter = LogCounter.new()
+	OS.add_logger(counter)
+	var odd: Npc = spawn(&"objects/npc", Vector2i(200, 160), {"kind": "dragon"}) as Npc
+	OS.remove_logger(counter)
+	assert_eq(odd.kind, Npc.DEFAULT_KIND, "an unknown kind falls back to the elder")
+	assert_eq(counter.warnings, 1, "and says so once")
 
 
 func test_sprite_hazards_hurt_or_kill() -> void:

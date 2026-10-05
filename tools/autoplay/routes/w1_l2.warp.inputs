@@ -1,0 +1,82 @@
+# w1_l2 "Canopy Village" - warp proof, Beginner: up the climb, then from the stump on the trunk top onto the bat and up to the crow's nest with the warp, default seed (ticks:KEYS, keys L R U D F K).
+# The forest floor: the inset spot by the village sign (low strikes).
+18:R,8:
+10:DF,4:,10:DF,4:,10:DF,6:
+# The clay pot is a scenery spot: three forward strikes.
+26:R,8:
+8:F,4:,8:F,4:,8:F,8:
+8:F,8:
+# The turtle by the hut: club it as it comes.
+8:R,8:F,8:
+# The crate: one strike.
+22:R,4:,8:F,8:
+# The snapper plant guards the lift: club it from just outside its bite.
+18:R,8:F,8:
+# Hop onto the lift and ride it up to the first tree-house deck.
+14:R,3:RU,9:R,94:
+# Step off at the top and walk past the hut to the axe.
+50:L,10:
+# The axe: every strike throws it. Bats yo-yo over the gap - throw axes at them.
+1:L,27:,10:UF,12:
+# Over to the middle branch, then the second bat.
+6:L,18:LU,4:,20:
+32:,10:UF,10:
+# Jump to the ledge and climb the branches.
+3:L,20:LU,14:L,8:
+60:U,6:
+# From the end of the top branch up onto the second deck.
+8:R,16:RU,4:
+# Stingers dive at us from above: axes.
+# Stingers hover above the deck: a high throw (Up + attack) hits them before they dive.
+4:R,4:,10:UF,10:
+18:R,6:,10:UF,10:
+# The diagonal lift carries us up to the watchtower deck.
+26:R,96:
+# Jump off to the left at the top.
+18:LU,4:
+# An arc leaper lives in the gap of this deck: it lands, rests a moment - an axe then.
+30:,8:F,12:,50:,1:R
+# The letter R floats by the watchtower: jump for it.
+13:L,6:,22:U,6:
+# A big spot in the deck: three low strikes, step aside while the giant bonus falls, then take it.
+10:DF,4:,10:DF,4:,10:DF,2:
+4:R,34:,12:L,6:
+# Over the leapers' pit to the far end of the deck.
+1:L,20:LU,4:L
+# Up the branches to the long deck.
+10:L,16:LU,6:
+2:L,6:,42:U,6:
+# Side trip: the hut on the left holds the letter G and a ring.
+1:L,16:LU,10:L,8:
+# Back down onto the branch, then up onto the long deck.
+21:R,10:
+# Bats yo-yo from the branch above the long deck: jump up while they are high, then throw high.
+14:R,4:RU,10:R,4:
+10:UF,8:
+# The hopper at the end of the deck: an axe from a distance, then onto the trunk lift.
+6:R,4:,8:F,12:
+38:R,98:
+# Step off beside the trunk. Food leads to cracked blocks in the bark: two axes open a hollow.
+14:R,6:
+8:F,10:,8:F,14:
+# Inside the trunk: the letter U, a heart and a floor spot with a code stone.
+36:R,6:,6:L,10:
+10:DF,4:,10:DF,10:
+# Out again, to the branches that climb the trunk.
+32:L,10:
+14:LU,6:
+# The pterodactyl circles us and swoops: high throws as it comes round.
+50:,44:UF,6:
+# Zig-zag up the branches to the top of the trunk.
+5:R,14:RU,8:
+14:LU,8:
+5:R,14:RU,8:
+20:U,6:
+# Hop onto the trunk top: the third checkpoint and the letter B.
+8:R,4:RU,8:R,4:
+# Stand on the stump and watch the bat.
+44:
+# Jump as it comes over the stump and land on it holding Jump: the bounce reaches the nest.
+30:U,10:
+# The warp staff in the nest leads to bonus stage A.
+10:R,20:

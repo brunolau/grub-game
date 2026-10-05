@@ -462,6 +462,10 @@ horizontally (`texture_repeat`). Width = loop length. `scroll` = suggested horiz
 | `ui/touch_pause.png` | 56x56 | 56x56 | 1x1 | pause / menu button for the touch overlay (the X stone) |
 | `ui/world_map_background.png` | 1280x360 | 1280x360 | 1x1 | world map backdrop (GAMEPLAY 11.1 step 6); place level markers on the islands |
 | `icon.png` | 256x256 | 256x256 | 1x1 | application icon |
+| `icon_1024.png` | 1024x1024 | 1024x1024 | 1x1 | iOS app icon (opaque); hero frame 48 of `sprites/player/hero.png` at 10x on a pixel sky, built by `tools/make_app_icons.py` (integer nearest-neighbour only) |
+| `icon_android_foreground.png` | 432x432 | 432x432 | 1x1 | Android adaptive icon foreground: the same hero at 3x on transparency, inside the 66 dp safe circle |
+| `icon_android_background.png` | 432x432 | 432x432 | 1x1 | Android adaptive icon background (opaque sky, sun and grass at 3x) |
+| `icon_android_monochrome.png` | 432x432 | 432x432 | 1x1 | Android 13 themed-icon layer: the hero as a white cut-out (outline pixels left out) |
 | `splash.png` | 640x360 | 640x360 | 1x1 | boot splash (set as application/boot_splash/image, background colour #272018) |
 
 | File | Size | Grid | Characters | Use |
@@ -479,97 +483,97 @@ bonus letters at x 430 + 40 n, y 4-10 (staggered); boss pips from (10, 334) ever
 
 All 79 files are byte-identical copies of the files recorded in the staging area (WAV 16-bit or OGG Vorbis); nothing was edited or re-encoded by the art pipeline.
 Six music tracks exist only as WAV at the source and were transcoded to OGG Vorbis (quality 0.6, sample-exact length) by the audio scout; they are marked in the table.
-Apply `volume_db` in the AudioStreamPlayer (masters differ by up to 20 dB between authors).
+Apply `volume_db` in the AudioStreamPlayer (masters differ by up to 20 dB between authors). The `volume_db` values below are measured, not guessed: see 13.4.
 Looping files: set the import flag `loop = true` (OGG) / loop mode Forward (WAV).
 
 ### 13.1 Sound effects
 
 | File | Game event | Seconds | Loop | volume_db | Author (all CC0) |
 |---|---|---|---|---|---|
-| `audio/sfx/bonus_reveal_a.wav` | a = hidden spot used up / secret opened; b = giant bonus or jackpot chest appears | 0.61 | no | +0.0 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/bonus_reveal_b.wav` | a = hidden spot used up / secret opened; b = giant bonus or jackpot chest appears | 1.03 | no | +0.0 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/boss_hit_a.wav` | boss hit by a weapon | 0.33 | no | +0.0 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/boss_roar_a.wav` | a = boss appears / Colossus roars when hit; b = Brute chest-beat | 1.50 | no | +0.1 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/boss_roar_b.wav` | a = boss appears / Colossus roars when hit; b = Brute chest-beat | 0.77 | no | -4.9 | Sparklin Labs / Pixel-boy (Superpowers asset packs) |
-| `audio/sfx/breakable_smash_a.wav` | breakable block destroyed (dirt, rock) | 0.23 | no | +0.0 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/breakable_smash_ice_a.ogg` | breakable ice block destroyed | 0.59 | no | -4.2 | IgnasD |
-| `audio/sfx/checkpoint_a.wav` | a = restart point lit; b = exit totem unlocked / level exit touched | 0.52 | no | +1.7 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/checkpoint_b.ogg` | a = restart point lit; b = exit totem unlocked / level exit touched | 1.73 | no | +4.1 | Basto |
-| `audio/sfx/club_hit_a.wav` | weapon connects with an enemy; a = club, b = hammer / charged 4x hit | 0.10 | no | +0.3 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/club_hit_b.wav` | weapon connects with an enemy; a = club, b = hammer / charged 4x hit | 0.28 | no | +0.0 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/club_hit_wood_a.wav` | weapon hits scenery / a hidden spot (with the star puff) | 0.23 | no | -6.0 | Sparklin Labs / Pixel-boy (Superpowers asset packs) |
-| `audio/sfx/club_swing_a.wav` | a = club swing (original slot 5); b = hammer swing (slot 0) | 0.11 | no | +0.0 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/club_swing_b.wav` | a = club swing (original slot 5); b = hammer swing (slot 0) | 0.10 | no | +0.0 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/dino_voice_a.wav` | enemy alert / spawn voices (dropper lands, charger rushes, plant bites, pterodactyl dives) | 1.31 | no | +7.7 | Sparklin Labs / Pixel-boy (Superpowers asset packs) |
-| `audio/sfx/dino_voice_b.wav` | enemy alert / spawn voices (dropper lands, charger rushes, plant bites, pterodactyl dives) | 0.45 | no | +3.1 | Sparklin Labs / Pixel-boy (Superpowers asset packs) |
-| `audio/sfx/dino_voice_c.wav` | enemy alert / spawn voices (dropper lands, charger rushes, plant bites, pterodactyl dives) | 0.54 | no | -4.9 | Sparklin Labs / Pixel-boy (Superpowers asset packs) |
-| `audio/sfx/dino_voice_d.wav` | enemy alert / spawn voices (dropper lands, charger rushes, plant bites, pterodactyl dives) | 0.23 | no | -0.4 | Sparklin Labs / Pixel-boy (Superpowers asset packs) |
-| `audio/sfx/enemy_death_a.wav` | enemy killed by a weapon (slot 2); alternate a / b | 0.16 | no | +0.0 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/enemy_death_b.wav` | enemy killed by a weapon (slot 2); alternate a / b | 0.28 | no | +0.0 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/enemy_hurt_a.wav` | enemy survives a hit (flash + knock-back) | 0.06 | no | +0.0 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/energy_refill_a.wav` | heart collected, sixth bone restores a heart | 0.69 | no | +0.0 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/explosion_a.wav` | grenade / kill-all item (slot 0) | 1.24 | no | -3.0 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/explosion_b.wav` | boss projectile impact, boulder smash | 0.85 | no | -3.0 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/explosion_big_a.wav` | boss defeated (bursts into bonus items) | 2.49 | no | -3.0 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/fire_loop_a.ogg` | ambience loop near a lit checkpoint fire | 3.54 | yes | +0.4 | AntumDeluge |
-| `audio/sfx/fireball_b.wav` | Colossus spits a rock | 0.29 | no | +0.0 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/food_chomp_a.ogg` | feast mode: enemy eaten on touch | 0.39 | no | -4.2 | rubberduck |
-| `audio/sfx/food_pickup_a.wav` | normal pick-up: food, bones, letters, feast kit, weapons, glider (slot 8); cycle a-d for variety | 0.17 | no | +0.0 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/food_pickup_b.wav` | normal pick-up: food, bones, letters, feast kit, weapons, glider (slot 8); cycle a-d for variety | 0.13 | no | +0.0 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/food_pickup_c.wav` | normal pick-up: food, bones, letters, feast kit, weapons, glider (slot 8); cycle a-d for variety | 0.13 | no | +0.0 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/food_pickup_d.wav` | normal pick-up: food, bones, letters, feast kit, weapons, glider (slot 8); cycle a-d for variety | 0.09 | no | +0.0 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/footstep_a.wav` | optional run steps, alternate a / b | 0.05 | no | +1.5 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/footstep_b.wav` | optional run steps, alternate a / b | 0.05 | no | +0.6 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/gem_pickup_a.wav` | a = big pick-up: treasure, giant bonus (slot 4); b = bonus letter / warp item | 0.27 | no | +0.0 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/gem_pickup_b.wav` | a = big pick-up: treasure, giant bonus (slot 4); b = bonus letter / warp item | 0.47 | no | +0.0 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/ice_slide_a.wav` | skid on slippery ground | 0.28 | no | +0.0 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/ice_wind_loop_a.ogg` | blizzard ambience loop (ice level second half) | 52.15 | yes | +0.1 | Ecrivain |
-| `audio/sfx/jump_a.wav` | hero jump (added cue, GAMEPLAY 12.4) | 0.16 | no | +0.0 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/land_a.wav` | hero lands after a fall of more than 10 ticks (dust puff) | 0.10 | no | +7.4 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/lava_bubble_loop_a.ogg` | ambience loop near lava | 7.33 | yes | +1.5 | rubberduck |
-| `audio/sfx/menu_back_a.wav` | menu cancel | 0.24 | no | +0.0 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/menu_move_a.wav` | menu cursor | 0.04 | no | +0.0 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/menu_select_a.wav` | menu confirm | 0.35 | no | +1.9 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/one_up_a.wav` | extra life (item or every 250 000 points) | 0.74 | no | +0.0 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/password_accept_a.wav` | save slot / level select accepted, code stone collected | 0.42 | no | +0.0 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/password_reject_a.wav` | locked level, invalid action | 0.30 | no | -0.9 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/pause_in_a.wav` | pause opened | 0.27 | no | +0.2 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/pause_out_a.wav` | pause closed | 0.27 | no | +0.1 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/player_death_a.wav` | hero death toss (slot 7) | 0.75 | no | +0.0 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/player_hurt_a.wav` | a = hero hurt by an enemy (slot 9); b = heavy hurt: skull item, boss hit, boss projectile, lights-off trigger (slot 1) | 0.17 | no | +0.0 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/player_hurt_b.wav` | a = hero hurt by an enemy (slot 9); b = heavy hurt: skull item, boss hit, boss projectile, lights-off trigger (slot 1) | 0.43 | no | +0.1 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/projectile_throw_b.wav` | axe / boomerang throw (slot 10) | 0.19 | no | +0.0 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/quake_a.wav` | screen shake: rising columns, Brute ground pound, feast-end warning | 2.23 | no | -3.0 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/splash_a.ogg` | something falls into water or lava | 0.74 | no | +2.9 | Basto |
-| `audio/sfx/spring_bounce_a.wav` | head bounce on an enemy or boss (slot 3); spring pad | 0.33 | no | +8.4 | MoxieCat |
-| `audio/sfx/tally_end_a.wav` | tally finished | 0.33 | no | +1.5 | Juhani Junkala (SubspaceAudio) |
-| `audio/sfx/tally_tick_a.wav` | each item counted at the end-of-level tally | 0.04 | no | +0.0 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/bonus_reveal_a.wav` | a = hidden spot used up / secret opened; b = giant bonus or jackpot chest appears | 0.61 | no | -8.7 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/bonus_reveal_b.wav` | a = hidden spot used up / secret opened; b = giant bonus or jackpot chest appears | 1.03 | no | -8.9 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/boss_hit_a.wav` | boss hit by a weapon | 0.33 | no | -3.1 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/boss_roar_a.wav` | a = boss appears / Colossus roars when hit; b = Brute chest-beat | 1.50 | no | +2.8 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/boss_roar_b.wav` | a = boss appears / Colossus roars when hit; b = Brute chest-beat | 0.77 | no | -8.1 | Sparklin Labs / Pixel-boy (Superpowers asset packs) |
+| `audio/sfx/breakable_smash_a.wav` | breakable block destroyed (dirt, rock) | 0.23 | no | -3.9 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/breakable_smash_ice_a.ogg` | breakable ice block destroyed | 0.59 | no | -0.2 | IgnasD |
+| `audio/sfx/checkpoint_a.wav` | a = restart point lit; b = exit totem unlocked / level exit touched | 0.52 | no | -2.1 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/checkpoint_b.ogg` | a = restart point lit; b = exit totem unlocked / level exit touched | 1.73 | no | +3.1 | Basto |
+| `audio/sfx/club_hit_a.wav` | weapon connects with an enemy; a = club, b = hammer / charged 4x hit | 0.10 | no | +4.5 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/club_hit_b.wav` | weapon connects with an enemy; a = club, b = hammer / charged 4x hit | 0.28 | no | -6.2 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/club_hit_wood_a.wav` | weapon hits scenery / a hidden spot (with the star puff) | 0.23 | no | -5.3 | Sparklin Labs / Pixel-boy (Superpowers asset packs) |
+| `audio/sfx/club_swing_a.wav` | a = club swing (original slot 5); b = hammer swing (slot 0) | 0.11 | no | -3.4 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/club_swing_b.wav` | a = club swing (original slot 5); b = hammer swing (slot 0) | 0.10 | no | -3.7 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/dino_voice_a.wav` | enemy alert / spawn voices (dropper lands, charger rushes, plant bites, pterodactyl dives) | 1.31 | no | +4.2 | Sparklin Labs / Pixel-boy (Superpowers asset packs) |
+| `audio/sfx/dino_voice_b.wav` | enemy alert / spawn voices (dropper lands, charger rushes, plant bites, pterodactyl dives) | 0.45 | no | +0.3 | Sparklin Labs / Pixel-boy (Superpowers asset packs) |
+| `audio/sfx/dino_voice_c.wav` | enemy alert / spawn voices (dropper lands, charger rushes, plant bites, pterodactyl dives) | 0.54 | no | -7.4 | Sparklin Labs / Pixel-boy (Superpowers asset packs) |
+| `audio/sfx/dino_voice_d.wav` | enemy alert / spawn voices (dropper lands, charger rushes, plant bites, pterodactyl dives) | 0.23 | no | -0.1 | Sparklin Labs / Pixel-boy (Superpowers asset packs) |
+| `audio/sfx/enemy_death_a.wav` | enemy killed by a weapon (slot 2); alternate a / b | 0.16 | no | -0.4 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/enemy_death_b.wav` | enemy killed by a weapon (slot 2); alternate a / b | 0.28 | no | -5.7 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/enemy_hurt_a.wav` | enemy survives a hit (flash + knock-back) | 0.06 | no | -1.0 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/energy_refill_a.wav` | heart collected, sixth bone restores a heart | 0.69 | no | -8.1 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/explosion_a.wav` | grenade / kill-all item (slot 0) | 1.24 | no | -6.8 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/explosion_b.wav` | boss projectile impact, boulder smash | 0.85 | no | -8.4 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/explosion_big_a.wav` | boss defeated (bursts into bonus items) | 2.49 | no | -5.8 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/fire_loop_a.ogg` | ambience loop near a lit checkpoint fire | 3.54 | yes | +4.3 | AntumDeluge |
+| `audio/sfx/fireball_b.wav` | Colossus spits a rock | 0.29 | no | -0.5 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/food_chomp_a.ogg` | feast mode: enemy eaten on touch | 0.39 | no | -2.3 | rubberduck |
+| `audio/sfx/food_pickup_a.wav` | normal pick-up: food, bones, letters, feast kit, weapons, glider (slot 8); cycle a-d for variety | 0.17 | no | -0.8 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/food_pickup_b.wav` | normal pick-up: food, bones, letters, feast kit, weapons, glider (slot 8); cycle a-d for variety | 0.13 | no | -1.0 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/food_pickup_c.wav` | normal pick-up: food, bones, letters, feast kit, weapons, glider (slot 8); cycle a-d for variety | 0.13 | no | -0.4 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/food_pickup_d.wav` | normal pick-up: food, bones, letters, feast kit, weapons, glider (slot 8); cycle a-d for variety | 0.09 | no | -0.7 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/footstep_a.wav` | optional run steps, alternate a / b | 0.05 | no | -4.6 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/footstep_b.wav` | optional run steps, alternate a / b | 0.05 | no | -5.0 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/gem_pickup_a.wav` | a = big pick-up: treasure, giant bonus (slot 4); b = bonus letter / warp item | 0.27 | no | -5.2 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/gem_pickup_b.wav` | a = big pick-up: treasure, giant bonus (slot 4); b = bonus letter / warp item | 0.47 | no | -7.3 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/ice_slide_a.wav` | skid on slippery ground | 0.28 | no | -7.6 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/ice_wind_loop_a.ogg` | blizzard ambience loop (ice level second half) | 52.15 | yes | +0.7 | Ecrivain |
+| `audio/sfx/jump_a.wav` | hero jump (added cue, GAMEPLAY 12.4) | 0.16 | no | -6.4 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/land_a.wav` | hero lands after a fall of more than 10 ticks (dust puff) | 0.10 | no | +10.9 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/lava_bubble_loop_a.ogg` | ambience loop near lava | 7.33 | yes | +1.9 | rubberduck |
+| `audio/sfx/menu_back_a.wav` | menu cancel | 0.24 | no | -4.1 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/menu_move_a.wav` | menu cursor | 0.04 | no | +4.9 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/menu_select_a.wav` | menu confirm | 0.35 | no | -4.0 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/one_up_a.wav` | extra life (item or every 250 000 points) | 0.74 | no | -10.2 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/password_accept_a.wav` | save slot / level select accepted, code stone collected | 0.42 | no | -9.1 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/password_reject_a.wav` | locked level, invalid action | 0.30 | no | -4.4 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/pause_in_a.wav` | pause opened | 0.27 | no | -4.6 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/pause_out_a.wav` | pause closed | 0.27 | no | -4.2 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/player_death_a.wav` | hero death toss (slot 7) | 0.75 | no | -7.3 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/player_hurt_a.wav` | a = hero hurt by an enemy (slot 9); b = heavy hurt: skull item, boss hit, boss projectile, lights-off trigger (slot 1) | 0.17 | no | -0.5 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/player_hurt_b.wav` | a = hero hurt by an enemy (slot 9); b = heavy hurt: skull item, boss hit, boss projectile, lights-off trigger (slot 1) | 0.43 | no | -2.0 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/projectile_throw_b.wav` | axe / boomerang throw (slot 10) | 0.19 | no | -1.6 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/quake_a.wav` | screen shake: rising columns, Brute ground pound, feast-end warning | 2.23 | no | -8.0 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/splash_a.ogg` | something falls into water or lava | 0.74 | no | +2.7 | Basto |
+| `audio/sfx/spring_bounce_a.wav` | head bounce on an enemy or boss (slot 3); spring pad | 0.33 | no | +5.0 | MoxieCat |
+| `audio/sfx/tally_end_a.wav` | tally finished | 0.33 | no | -6.3 | Juhani Junkala (SubspaceAudio) |
+| `audio/sfx/tally_tick_a.wav` | each item counted at the end-of-level tally | 0.04 | no | -7.2 | Juhani Junkala (SubspaceAudio) |
 
 ### 13.2 Music
 
 | File | Context | Seconds | Loop | volume_db | Author (all CC0) |
 |---|---|---|---|---|---|
-| `audio/music/bonus_room_a.ogg` | bonus stages Feast Land (KOOL), short loop | 21.3 | yes | +1.2 | Juhani Junkala (SubspaceAudio) |
-| `audio/music/bonus_room_b.ogg` | bonus stages, alternate longer loop / secret rooms [OGG transcode of the author's WAV] | 42.7 | yes | +3.4 | Wolfgang_ (Ted Kerr) |
-| `audio/music/boss_a.ogg` | boss fights, starts when the boss energy bar appears (MONSTER) | 71.7 | yes | -2.6 | Juhani Junkala (SubspaceAudio) |
-| `audio/music/boss_final_a.ogg` | final boss: the Wall Colossus | 98.0 | yes | -3.0 | Juhani Junkala (SubspaceAudio) |
-| `audio/music/credits_a.ogg` | credits roll / The End | 68.6 | yes | +1.5 | Juhani Junkala (SubspaceAudio) |
-| `audio/music/ending_a.ogg` | ending stage Way Home (FINAL) [OGG transcode of the author's WAV] | 44.7 | yes | -3.8 | Juhani Junkala (SubspaceAudio) |
-| `audio/music/game_over_a.ogg` | game over jingle (BOULA) | 4.8 | no | -5.2 | MintoDog |
-| `audio/music/game_over_loop_a.ogg` | game over screen loop after the jingle | 15.4 | yes | -3.9 | MintoDog |
-| `audio/music/invincible_loop_a.ogg` | feast mode (660 ticks): replaces the level music | 12.4 | yes | -3.4 | MintoDog |
-| `audio/music/level_cave_a.ogg` | world 2 Cave levels (PRES role) [OGG transcode of the author's WAV] | 74.3 | yes | -7.6 | Juhani Junkala (SubspaceAudio) |
-| `audio/music/level_complete_a.ogg` | level-complete jingle when the iris closes (BRAVO) | 6.5 | no | -3.2 | MintoDog |
-| `audio/music/level_extra_a.ogg` | spare level theme: Cinder Shaft auto-scroll descent [OGG transcode of the author's WAV] | 72.8 | yes | -7.6 | Juhani Junkala (SubspaceAudio) |
-| `audio/music/level_extra_b.ogg` | spare level theme: Crystal Grotto / second stage of a world | 70.6 | yes | -4.1 | Juhani Junkala (SubspaceAudio) |
-| `audio/music/level_ice_a.ogg` | world 3 Ice levels (GLACE) [OGG transcode of the author's WAV] | 81.9 | yes | -7.2 | Juhani Junkala (SubspaceAudio) |
-| `audio/music/level_jungle_a.ogg` | world 1 Jungle levels (MINES role) | 41.1 | yes | -2.6 | Juhani Junkala (SubspaceAudio) |
-| `audio/music/level_volcano_a.ogg` | world 4 Volcano levels (MYSTERY) | 56.1 | yes | -2.8 | Juhani Junkala (SubspaceAudio) |
-| `audio/music/password_screen_a.ogg` | mode select / level select screens (CODE) | 21.3 | yes | -4.4 | Juhani Junkala (SubspaceAudio) |
-| `audio/music/player_death_a.ogg` | death jingle before the respawn curtain | 2.7 | no | -4.3 | MintoDog |
-| `audio/music/tally_loop_a.ogg` | tally screen after the jingle | 53.3 | yes | +2.2 | Wolfgang_ (Ted Kerr) |
-| `audio/music/title_a.ogg` | title picture and main menu (the original's PRESENTA) [OGG transcode of the author's WAV] | 11.3 | yes | -6.8 | Juhani Junkala (SubspaceAudio) |
-| `audio/music/title_b.ogg` | world map between levels (CARTE) | 54.9 | yes | -3.8 | Juhani Junkala (SubspaceAudio) |
+| `audio/music/bonus_room_a.ogg` | bonus stages Feast Land (KOOL), short loop | 21.3 | yes | -4.7 | Juhani Junkala (SubspaceAudio) |
+| `audio/music/bonus_room_b.ogg` | bonus stages, alternate longer loop / secret rooms [OGG transcode of the author's WAV] | 42.7 | yes | +2.4 | Wolfgang_ (Ted Kerr) |
+| `audio/music/boss_a.ogg` | boss fights, starts when the boss energy bar appears (MONSTER) | 71.7 | yes | -6.6 | Juhani Junkala (SubspaceAudio) |
+| `audio/music/boss_final_a.ogg` | final boss: the Wall Colossus | 98.0 | yes | -6.9 | Juhani Junkala (SubspaceAudio) |
+| `audio/music/credits_a.ogg` | credits roll / The End | 68.6 | yes | -1.7 | Juhani Junkala (SubspaceAudio) |
+| `audio/music/ending_a.ogg` | ending stage Way Home (FINAL) [OGG transcode of the author's WAV] | 44.7 | yes | -5.5 | Juhani Junkala (SubspaceAudio) |
+| `audio/music/game_over_a.ogg` | game over jingle (BOULA) | 4.8 | no | -9.9 | MintoDog |
+| `audio/music/game_over_loop_a.ogg` | game over screen loop after the jingle | 15.4 | yes | -6.3 | MintoDog |
+| `audio/music/invincible_loop_a.ogg` | feast mode (660 ticks): replaces the level music | 12.4 | yes | -6.8 | MintoDog |
+| `audio/music/level_cave_a.ogg` | world 2 Cave levels (PRES role) [OGG transcode of the author's WAV] | 74.3 | yes | -10.9 | Juhani Junkala (SubspaceAudio) |
+| `audio/music/level_complete_a.ogg` | level-complete jingle when the iris closes (BRAVO) | 6.5 | no | -7.2 | MintoDog |
+| `audio/music/level_extra_a.ogg` | spare level theme: Cinder Shaft auto-scroll descent [OGG transcode of the author's WAV] | 72.8 | yes | -11.1 | Juhani Junkala (SubspaceAudio) |
+| `audio/music/level_extra_b.ogg` | spare level theme: Crystal Grotto / second stage of a world | 70.6 | yes | -8.2 | Juhani Junkala (SubspaceAudio) |
+| `audio/music/level_ice_a.ogg` | world 3 Ice levels (GLACE) [OGG transcode of the author's WAV] | 81.9 | yes | -10.8 | Juhani Junkala (SubspaceAudio) |
+| `audio/music/level_jungle_a.ogg` | world 1 Jungle levels (MINES role) | 41.1 | yes | -6.2 | Juhani Junkala (SubspaceAudio) |
+| `audio/music/level_volcano_a.ogg` | world 4 Volcano levels (MYSTERY) | 56.1 | yes | -6.7 | Juhani Junkala (SubspaceAudio) |
+| `audio/music/password_screen_a.ogg` | mode select / level select screens (CODE) | 21.3 | yes | -9.5 | Juhani Junkala (SubspaceAudio) |
+| `audio/music/player_death_a.ogg` | death jingle before the respawn curtain | 2.7 | no | -7.9 | MintoDog |
+| `audio/music/tally_loop_a.ogg` | tally screen after the jingle | 53.3 | yes | -2.2 | Wolfgang_ (Ted Kerr) |
+| `audio/music/title_a.ogg` | title picture and main menu (the original's PRESENTA) [OGG transcode of the author's WAV] | 11.3 | yes | -9.7 | Juhani Junkala (SubspaceAudio) |
+| `audio/music/title_b.ogg` | world map between levels (CARTE) | 54.9 | yes | -7.0 | Juhani Junkala (SubspaceAudio) |
 
 ### 13.3 Original cue slots -> files (GAMEPLAY 10.1)
 
@@ -585,6 +589,97 @@ Looping files: set the import flag `loop = true` (OGG) / loop mode Forward (WAV)
 | 8 | normal pick-up; boss hit by a weapon; tally item | `food_pickup_a..d.wav`; `boss_hit_a.wav`; `tally_tick_a.wav` |
 | 9 | hero hurt by an enemy | `player_hurt_a.wav` |
 | 10 | axe throw | `projectile_throw_b.wav` |
+
+### 13.4 Loudness, peaks and the mix
+
+Measured by `tools/audio_loudness.py` (decodes every file to float exactly as the game's decoders do, so values above 0 dBFS are visible; ITU-R BS.1770-4 K-weighting via pyloudnorm; true peak 4x oversampled). `scripts/core/audio_table.gd` holds the resulting `volume_db` per file; run `tools/audio_loudness.py --write` after adding or replacing a file.
+
+- **Music** (and jingles) play at **-18 LUFS integrated**. The masters ranged from -6.9 LUFS (`level_extra_a`) to -20.4 LUFS (`bonus_room_b`), a 13.5 LU spread; 9 of the 21 music files decode above 0 dBFS sample peak (up to +1.3 dBFS, `level_cave_a.ogg`) and 13 above 0 dBTP true peak (up to +2.4 dBTP, `password_screen_a.ogg`).
+- **Effects** play at **-14 LUFS over their loudest 200 ms** (short-window loudness: the EBU 400 ms momentary window over-rates the boost very short clicks need), i.e. a few LU above the music so that they cut through it. Per-role offsets: footsteps -10 LU, fire / lava ambience loops -12 LU and the blizzard loop -8 LU (loops measured by integrated loudness), menu cursor -3 LU, tally tick -4 LU, scenery hits -2 LU, boss roar and boss defeated +2 LU.
+- **No clipping**: every gain is capped so that the file's true peak stays at or below **-1 dBTP** (this limits `land_a`, `menu_move_a`, `club_hit_a` and `breakable_smash_ice_a`, which therefore play slightly below their target), and the `Master` bus has a hard limiter (ceiling -0.5 dB) for sounds that overlap.
+- The user's volume sliders (music 0.8 by default = -1.9 dB) apply on top of these values.
+
+| File | Seconds | Peak dBFS | True peak dBTP | Integrated LUFS | Short (200 ms) LUFS | volume_db | Played at |
+|---|---|---|---|---|---|---|---|
+| `audio/music/bonus_room_a.ogg` | 21.33 | -0.1 | -0.0 | -13.3 | -6.1 | -4.7 | -18.0 LUFS, -4.7 dBTP |
+| `audio/music/bonus_room_b.ogg` | 42.68 | -7.0 | -7.0 | -20.4 | -14.7 | +2.4 | -18.0 LUFS, -4.6 dBTP |
+| `audio/music/boss_a.ogg` | 71.72 | -0.1 | +0.4 | -11.4 | -4.4 | -6.6 | -18.0 LUFS, -6.2 dBTP |
+| `audio/music/boss_final_a.ogg` | 97.96 | +0.2 | +0.3 | -11.1 | -1.9 | -6.9 | -18.0 LUFS, -6.6 dBTP |
+| `audio/music/credits_a.ogg` | 68.57 | +0.1 | +0.1 | -16.3 | -7.0 | -1.7 | -18.0 LUFS, -1.6 dBTP |
+| `audio/music/ending_a.ogg` | 44.65 | +0.0 | +0.6 | -12.5 | -3.2 | -5.5 | -18.0 LUFS, -4.9 dBTP |
+| `audio/music/game_over_a.ogg` | 4.80 | -3.8 | -3.0 | -8.1 | -4.7 | -9.9 | -18.0 LUFS, -12.9 dBTP |
+| `audio/music/game_over_loop_a.ogg` | 15.36 | -3.7 | -3.2 | -11.7 | -5.4 | -6.3 | -18.0 LUFS, -9.5 dBTP |
+| `audio/music/invincible_loop_a.ogg` | 12.39 | -0.9 | -0.5 | -11.2 | -4.8 | -6.8 | -18.0 LUFS, -7.3 dBTP |
+| `audio/music/level_cave_a.ogg` | 74.25 | +1.3 | +1.3 | -7.1 | +0.3 | -10.9 | -18.0 LUFS, -9.6 dBTP |
+| `audio/music/level_complete_a.ogg` | 6.55 | -1.3 | -0.9 | -10.8 | -3.6 | -7.2 | -18.0 LUFS, -8.1 dBTP |
+| `audio/music/level_extra_a.ogg` | 72.80 | +1.0 | +1.0 | -6.9 | -0.2 | -11.1 | -18.0 LUFS, -10.1 dBTP |
+| `audio/music/level_extra_b.ogg` | 70.59 | +0.3 | +0.3 | -9.8 | -4.2 | -8.2 | -18.0 LUFS, -7.9 dBTP |
+| `audio/music/level_ice_a.ogg` | 81.90 | +1.0 | +1.1 | -7.2 | -0.6 | -10.8 | -18.0 LUFS, -9.7 dBTP |
+| `audio/music/level_jungle_a.ogg` | 41.14 | -0.0 | +0.6 | -11.8 | -3.3 | -6.2 | -18.0 LUFS, -5.6 dBTP |
+| `audio/music/level_volcano_a.ogg` | 56.10 | -0.7 | +0.3 | -11.3 | -3.7 | -6.7 | -18.0 LUFS, -6.4 dBTP |
+| `audio/music/password_screen_a.ogg` | 21.33 | +0.5 | +2.4 | -8.5 | -4.0 | -9.5 | -18.0 LUFS, -7.1 dBTP |
+| `audio/music/player_death_a.ogg` | 2.74 | -3.4 | -3.3 | -10.1 | -3.6 | -7.9 | -18.0 LUFS, -11.2 dBTP |
+| `audio/music/tally_loop_a.ogg` | 53.33 | -4.2 | -4.1 | -15.8 | -8.1 | -2.2 | -18.0 LUFS, -6.3 dBTP |
+| `audio/music/title_a.ogg` | 11.29 | +0.9 | +0.9 | -8.3 | -1.2 | -9.7 | -18.0 LUFS, -8.8 dBTP |
+| `audio/music/title_b.ogg` | 54.86 | +0.2 | +0.6 | -11.0 | -3.3 | -7.0 | -18.0 LUFS, -6.4 dBTP |
+| `audio/sfx/bonus_reveal_a.wav` | 0.61 | -6.0 | -6.0 | - | -5.3 | -8.7 | -14.0 LUFS short, -14.7 dBTP |
+| `audio/sfx/bonus_reveal_b.wav` | 1.03 | -6.0 | -6.0 | - | -5.1 | -8.9 | -14.0 LUFS short, -14.9 dBTP |
+| `audio/sfx/boss_hit_a.wav` | 0.33 | -6.0 | -3.7 | - | -10.9 | -3.1 | -14.0 LUFS short, -6.8 dBTP |
+| `audio/sfx/boss_roar_a.wav` | 1.50 | -6.1 | -6.1 | - | -14.8 | +2.8 | -12.0 LUFS short, -3.3 dBTP |
+| `audio/sfx/boss_roar_b.wav` | 0.77 | -1.1 | -1.1 | - | -5.9 | -8.1 | -14.0 LUFS short, -9.2 dBTP |
+| `audio/sfx/breakable_smash_a.wav` | 0.23 | -6.0 | -3.1 | - | -10.1 | -3.9 | -14.0 LUFS short, -7.0 dBTP |
+| `audio/sfx/breakable_smash_ice_a.ogg` | 0.59 | -1.8 | -0.8 | - | -18.3 | -0.2 | -18.5 LUFS short, -1.0 dBTP |
+| `audio/sfx/checkpoint_a.wav` | 0.52 | -7.7 | -7.7 | - | -11.9 | -2.1 | -14.0 LUFS short, -9.8 dBTP |
+| `audio/sfx/checkpoint_b.ogg` | 1.73 | -10.1 | -10.1 | - | -17.1 | +3.1 | -14.0 LUFS short, -7.0 dBTP |
+| `audio/sfx/club_hit_a.wav` | 0.10 | -6.3 | -6.3 | - | -18.5 | +4.5 | -14.0 LUFS short, -1.8 dBTP |
+| `audio/sfx/club_hit_b.wav` | 0.28 | -6.0 | -4.8 | - | -7.8 | -6.2 | -14.0 LUFS short, -11.0 dBTP |
+| `audio/sfx/club_hit_wood_a.wav` | 0.22 | +0.0 | +0.1 | - | -10.7 | -5.3 | -16.0 LUFS short, -5.2 dBTP |
+| `audio/sfx/club_swing_a.wav` | 0.11 | -6.0 | -3.2 | - | -10.6 | -3.4 | -14.0 LUFS short, -6.6 dBTP |
+| `audio/sfx/club_swing_b.wav` | 0.10 | -6.0 | -3.3 | - | -10.3 | -3.7 | -14.0 LUFS short, -7.0 dBTP |
+| `audio/sfx/dino_voice_a.wav` | 1.31 | -13.7 | -13.7 | - | -18.2 | +4.2 | -14.0 LUFS short, -9.5 dBTP |
+| `audio/sfx/dino_voice_b.wav` | 0.45 | -9.1 | -9.1 | - | -14.3 | +0.3 | -14.0 LUFS short, -8.8 dBTP |
+| `audio/sfx/dino_voice_c.wav` | 0.53 | -1.1 | -1.1 | - | -6.6 | -7.4 | -14.0 LUFS short, -8.5 dBTP |
+| `audio/sfx/dino_voice_d.wav` | 0.23 | -5.6 | -5.5 | - | -13.9 | -0.1 | -14.0 LUFS short, -5.6 dBTP |
+| `audio/sfx/enemy_death_a.wav` | 0.16 | -6.0 | -5.2 | - | -13.6 | -0.4 | -14.0 LUFS short, -5.6 dBTP |
+| `audio/sfx/enemy_death_b.wav` | 0.28 | -6.0 | -4.1 | - | -8.3 | -5.7 | -14.0 LUFS short, -9.8 dBTP |
+| `audio/sfx/enemy_hurt_a.wav` | 0.06 | -6.0 | -4.2 | - | -13.0 | -1.0 | -14.0 LUFS short, -5.2 dBTP |
+| `audio/sfx/energy_refill_a.wav` | 0.70 | -6.0 | -3.9 | - | -5.9 | -8.1 | -14.0 LUFS short, -12.0 dBTP |
+| `audio/sfx/explosion_a.wav` | 1.24 | -6.0 | -3.4 | - | -7.2 | -6.8 | -14.0 LUFS short, -10.2 dBTP |
+| `audio/sfx/explosion_b.wav` | 0.85 | -6.0 | -3.6 | - | -5.6 | -8.4 | -14.0 LUFS short, -12.0 dBTP |
+| `audio/sfx/explosion_big_a.wav` | 2.49 | -6.0 | -4.0 | - | -6.2 | -5.8 | -12.0 LUFS short, -9.8 dBTP |
+| `audio/sfx/fire_loop_a.ogg` | 3.55 | -6.4 | -6.3 | -30.3 | -22.3 | +4.3 | -26.0 LUFS, -2.0 dBTP |
+| `audio/sfx/fireball_b.wav` | 0.29 | -6.0 | -4.3 | - | -13.5 | -0.5 | -14.0 LUFS short, -4.8 dBTP |
+| `audio/sfx/food_chomp_a.ogg` | 0.39 | -1.8 | -1.7 | - | -11.7 | -2.3 | -14.0 LUFS short, -4.0 dBTP |
+| `audio/sfx/food_pickup_a.wav` | 0.17 | -6.0 | -5.9 | - | -13.2 | -0.8 | -14.0 LUFS short, -6.7 dBTP |
+| `audio/sfx/food_pickup_b.wav` | 0.13 | -6.0 | -5.7 | - | -13.0 | -1.0 | -14.0 LUFS short, -6.7 dBTP |
+| `audio/sfx/food_pickup_c.wav` | 0.13 | -6.0 | -5.7 | - | -13.6 | -0.4 | -14.0 LUFS short, -6.1 dBTP |
+| `audio/sfx/food_pickup_d.wav` | 0.09 | -6.0 | -5.9 | - | -13.3 | -0.7 | -14.0 LUFS short, -6.6 dBTP |
+| `audio/sfx/footstep_a.wav` | 0.05 | -7.5 | -7.4 | - | -19.4 | -4.6 | -24.0 LUFS short, -12.0 dBTP |
+| `audio/sfx/footstep_b.wav` | 0.05 | -6.6 | -6.6 | - | -19.0 | -5.0 | -24.0 LUFS short, -11.6 dBTP |
+| `audio/sfx/gem_pickup_a.wav` | 0.27 | -6.0 | -4.9 | - | -8.8 | -5.2 | -14.0 LUFS short, -10.1 dBTP |
+| `audio/sfx/gem_pickup_b.wav` | 0.47 | -6.0 | -5.9 | - | -6.7 | -7.3 | -14.0 LUFS short, -13.2 dBTP |
+| `audio/sfx/ice_slide_a.wav` | 0.28 | -6.0 | -5.3 | - | -6.4 | -7.6 | -14.0 LUFS short, -12.9 dBTP |
+| `audio/sfx/ice_wind_loop_a.ogg` | 52.15 | -6.1 | -6.1 | -22.7 | -13.0 | +0.7 | -22.0 LUFS, -5.4 dBTP |
+| `audio/sfx/jump_a.wav` | 0.16 | -6.0 | -5.4 | - | -7.6 | -6.4 | -14.0 LUFS short, -11.8 dBTP |
+| `audio/sfx/land_a.wav` | 0.10 | -13.4 | -11.9 | - | -25.8 | +10.9 | -14.9 LUFS short, -1.0 dBTP |
+| `audio/sfx/lava_bubble_loop_a.ogg` | 7.33 | -7.5 | -7.5 | -27.9 | -19.4 | +1.9 | -26.0 LUFS, -5.6 dBTP |
+| `audio/sfx/menu_back_a.wav` | 0.24 | -6.0 | -4.5 | - | -9.9 | -4.1 | -14.0 LUFS short, -8.6 dBTP |
+| `audio/sfx/menu_move_a.wav` | 0.04 | -6.0 | -5.9 | - | -23.0 | +4.9 | -18.1 LUFS short, -1.0 dBTP |
+| `audio/sfx/menu_select_a.wav` | 0.35 | -7.9 | -7.9 | - | -10.0 | -4.0 | -14.0 LUFS short, -11.9 dBTP |
+| `audio/sfx/one_up_a.wav` | 0.74 | -6.0 | -5.2 | - | -3.8 | -10.2 | -14.0 LUFS short, -15.4 dBTP |
+| `audio/sfx/password_accept_a.wav` | 0.43 | -6.0 | -5.9 | - | -4.9 | -9.1 | -14.0 LUFS short, -15.0 dBTP |
+| `audio/sfx/password_reject_a.wav` | 0.30 | -5.1 | -5.1 | - | -9.6 | -4.4 | -14.0 LUFS short, -9.5 dBTP |
+| `audio/sfx/pause_in_a.wav` | 0.27 | -6.2 | -6.1 | - | -9.4 | -4.6 | -14.0 LUFS short, -10.7 dBTP |
+| `audio/sfx/pause_out_a.wav` | 0.27 | -6.1 | -6.1 | - | -9.8 | -4.2 | -14.0 LUFS short, -10.3 dBTP |
+| `audio/sfx/player_death_a.wav` | 0.75 | -6.0 | -5.9 | - | -6.7 | -7.3 | -14.0 LUFS short, -13.2 dBTP |
+| `audio/sfx/player_hurt_a.wav` | 0.17 | -6.0 | -5.8 | - | -13.5 | -0.5 | -14.0 LUFS short, -6.3 dBTP |
+| `audio/sfx/player_hurt_b.wav` | 0.43 | -6.1 | -6.0 | - | -12.0 | -2.0 | -14.0 LUFS short, -8.0 dBTP |
+| `audio/sfx/projectile_throw_b.wav` | 0.19 | -6.0 | -4.7 | - | -12.4 | -1.6 | -14.0 LUFS short, -6.3 dBTP |
+| `audio/sfx/quake_a.wav` | 2.23 | -6.0 | -4.0 | - | -6.0 | -8.0 | -14.0 LUFS short, -12.0 dBTP |
+| `audio/sfx/splash_a.ogg` | 0.74 | -8.9 | -8.5 | - | -16.7 | +2.7 | -14.0 LUFS short, -5.8 dBTP |
+| `audio/sfx/spring_bounce_a.wav` | 0.33 | -14.4 | -14.3 | - | -19.0 | +5.0 | -14.0 LUFS short, -9.3 dBTP |
+| `audio/sfx/tally_end_a.wav` | 0.33 | -7.5 | -6.6 | - | -7.7 | -6.3 | -14.0 LUFS short, -12.9 dBTP |
+| `audio/sfx/tally_tick_a.wav` | 0.04 | -6.0 | -4.1 | - | -10.8 | -7.2 | -18.0 LUFS short, -11.3 dBTP |
 
 ## 14. Generated or modified assets (edit log)
 

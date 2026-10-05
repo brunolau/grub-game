@@ -1,10 +1,12 @@
 extends TestCase
-## The integration levels and the development campaign (owner: core, as the integrator of the modules).
+## The integration levels (owner: core, as the integrator of the modules).
 ##
-## levels/test_integration.lvl and levels/test_integration_boss.lvl use every system of the game; together they are
-## the campaign of debug builds. The two input scripts in tools/autoplay are replayed here through Flow and the
-## real level scene, tick for tick as the autoplay flow `tools/autoplay/full_loop.flow` plays them in a window, so
-## a change in any module that breaks the playthrough fails the suite.
+## levels/test_integration.lvl and levels/test_integration_boss.lvl use every system of the game. They were the
+## stand-in campaign of debug builds until the level designers' campaign arrived; now they are a linked pair of
+## `kind = test` levels (the first one's `next` leads to the second). The two input scripts in tools/autoplay are
+## replayed here through Flow and the real level scene, tick for tick as the autoplay flow
+## `tools/autoplay/full_loop.flow` plays them in a window, so a change in any module that breaks the playthrough
+## fails the suite.
 
 const LEVEL_ONE: StringName = &"test_integration"
 const LEVEL_TWO: StringName = &"test_integration_boss"
@@ -63,13 +65,14 @@ func test_both_levels_are_valid() -> void:
 	assert_eq(validator.error_count(), 0, "every level file of the folder is valid")
 
 
-func test_they_form_the_development_campaign() -> void:
-	assert_eq(Levels.first_level(), LEVEL_ONE)
-	assert_eq(Levels.next_level(LEVEL_ONE, Defs.Difficulty.BEGINNER), LEVEL_TWO)
-	assert_eq(Levels.next_level(LEVEL_TWO, Defs.Difficulty.BEGINNER), &"", "the boss level ends the game")
+func test_they_are_a_linked_development_pair_outside_the_campaign() -> void:
+	for level_id: StringName in [LEVEL_ONE, LEVEL_TWO]:
+		assert_eq(str(Levels.get_value(level_id, "kind", "")), Levels.KIND_TEST, "%s is a developer level" % level_id)
+		for difficulty: int in [Defs.Difficulty.BEGINNER, Defs.Difficulty.EXPERT]:
+			assert_false(Levels.get_campaign(difficulty).has(level_id), "%s is not on the world map" % level_id)
+	assert_eq(Levels.next_level(LEVEL_ONE, Defs.Difficulty.BEGINNER), LEVEL_TWO, "the pair stays linked")
+	assert_eq(Levels.next_level(LEVEL_TWO, Defs.Difficulty.BEGINNER), &"", "the boss level ends the pair")
 	assert_false(Levels.has_locked_successor(LEVEL_TWO, Defs.Difficulty.BEGINNER))
-	for difficulty: int in [Defs.Difficulty.BEGINNER, Defs.Difficulty.EXPERT]:
-		assert_eq(Levels.get_campaign(difficulty), [LEVEL_ONE, LEVEL_TWO] as Array[StringName])
 	assert_eq(Levels.find_by_password("brut"), {"level_id": LEVEL_TWO, "difficulty": Defs.Difficulty.BEGINNER})
 	assert_eq(Levels.find_by_password("W1LD"), {"level_id": LEVEL_ONE, "difficulty": Defs.Difficulty.EXPERT})
 

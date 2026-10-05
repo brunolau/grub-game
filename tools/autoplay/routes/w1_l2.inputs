@@ -1,0 +1,116 @@
+# w1_l2 "Canopy Village" - route proof, Beginner, default seed (ticks:KEYS, keys L R U D F K).
+# The forest floor: the inset spot by the village sign (low strikes).
+18:R,8:
+10:DF,4:,10:DF,4:,10:DF,6:
+# The clay pot is a scenery spot: three forward strikes.
+26:R,8:
+8:F,4:,8:F,4:,8:F,8:
+8:F,8:
+# The turtle by the hut: club it as it comes.
+8:R,8:F,8:
+# The crate: one strike.
+22:R,4:,8:F,8:
+# The snapper plant guards the lift: club it from just outside its bite.
+18:R,8:F,8:
+# Hop onto the lift and ride it up to the first tree-house deck.
+14:R,3:RU,9:R,94:
+# Step off at the top and walk past the hut to the axe.
+50:L,10:
+# The axe: every strike throws it. Bats yo-yo over the gap - throw axes at them.
+1:L,27:,10:UF,12:
+# Over to the middle branch, then the second bat.
+6:L,18:LU,4:,20:
+32:,10:UF,10:
+# Jump to the ledge and climb the branches.
+3:L,20:LU,14:L,8:
+60:U,6:
+# From the end of the top branch up onto the second deck.
+8:R,16:RU,4:
+# Stingers dive at us from above: axes.
+# Stingers hover above the deck: a high throw (Up + attack) hits them before they dive.
+4:R,4:,10:UF,10:
+18:R,6:,10:UF,10:
+# The diagonal lift carries us up to the watchtower deck.
+26:R,96:
+# Jump off to the left at the top.
+18:LU,4:
+# An arc leaper lives in the gap of this deck: it lands, rests a moment - an axe then.
+30:,8:F,12:,50:,1:R
+# The letter R floats by the watchtower: jump for it.
+13:L,6:,22:U,6:
+# A big spot in the deck: three low strikes, step aside while the giant bonus falls, then take it.
+10:DF,4:,10:DF,4:,10:DF,2:
+4:R,34:,12:L,6:
+# Over the leapers' pit to the far end of the deck.
+1:L,20:LU,4:L
+# Up the branches to the long deck.
+10:L,16:LU,6:
+2:L,6:,42:U,6:
+# Side trip: the hut on the left holds the letter G and a ring.
+1:L,16:LU,10:L,8:
+# Back down onto the branch, then up onto the long deck.
+21:R,10:
+# Bats yo-yo from the branch above the long deck: jump up while they are high, then throw high.
+14:R,4:RU,10:R,4:
+10:UF,8:
+# The hopper at the end of the deck: an axe from a distance, then onto the trunk lift.
+6:R,4:,8:F,12:
+38:R,98:
+# Step off beside the trunk. Food leads to cracked blocks in the bark: two axes open a hollow.
+14:R,6:
+8:F,10:,8:F,14:
+# Inside the trunk: the letter U, a heart and a floor spot with a code stone.
+36:R,6:,6:L,10:
+10:DF,4:,10:DF,10:
+# Out again, to the branches that climb the trunk.
+32:L,10:
+14:LU,6:
+# The pterodactyl circles us and swoops: high throws as it comes round.
+50:,44:UF,6:
+# Zig-zag up the branches to the top of the trunk.
+5:R,14:RU,8:
+14:LU,8:
+5:R,14:RU,8:
+20:U,6:
+# Hop onto the trunk top: the third checkpoint and the letter B.
+8:R,4:RU,8:R,4:
+# Across the trunk top under the bat (jumping into it hurts; landing on it while holding Jump
+# bounces up to the crow's nest with the warp), then down onto the big branch on the far side.
+36:R,16:
+# A bat yo-yos over the branch: throw high when it is low.
+5:R,42:,10:UF,12:
+# The leafy clump at the end of the branch hides food: two axes.
+12:R,4:,8:F,6:,8:F,10:
+# Follow the food trail down to the village deck below.
+44:R,20:
+# The stinger over the hut: a high throw from a distance.
+15:R,6:,10:UF,12:
+# A pot with a code stone, and the letter S at the end of the deck.
+24:R,4:,8:F,10:
+16:R,6:
+# Back along the deck to its far end, and down again.
+70:
+# All five letters: the jackpot chest falls behind us - pick it up on the way back along the deck.
+64:L,8:F,12:
+# The turtle on the way back takes an axe; then off the end of the deck.
+50:L,20:
+# The crate on this deck is scenery with food inside: two axes. Then the hopper.
+1:R,8:F,6:,8:F,10:
+27:R,4:,8:F,10:
+# The lift at the end of the deck goes down.
+55:R,94:
+# Jump off to the left at the bottom: the fourth checkpoint.
+16:LU,6:
+# A leaper lives in the gap of this deck: let it jump, axe it, then cross.
+14:L,54:,10:UF,12:
+# Over the gap before the next one jumps, and off the end of the deck.
+10:L,20:LU,40:L,24:
+# Under the first bat while it climbs, then an axe for the snapper.
+24:R,2:,8:F,10:
+# Both bats are up now: walk under them to the barrel (one axe), then off the end of the deck.
+36:R,4:,8:F,10:
+40:R,20:
+# The hopper on the lowest deck: an axe from a distance.
+6:L,4:,8:F,12:
+# Off the end of the lowest deck to the forest floor, and left to the exit at the trunk's foot.
+50:L,40:L

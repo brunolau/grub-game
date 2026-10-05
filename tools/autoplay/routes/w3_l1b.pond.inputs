@@ -1,0 +1,9 @@
+# w3_l1b "Blizzard Pass" (Beginner) side path: the frozen pond crossed on its ice floes instead of through the
+# secret grotto. tests/test_levels_w3.gd plays tools/autoplay/routes/w3_l1b.inputs up to its "# B4" comment, then
+# this file: the hero lands on the ice shore just before the third gust.
+# Brace through the gust, then in the lull run to each edge and jump: shore -> floe 1 -> floe 2 -> far shore
+# (2-cell gaps, 5-wide floes).
+92:D
+14:R,18:RU,14:
+15:R,18:RU,14:
+15:R,18:RU,40:

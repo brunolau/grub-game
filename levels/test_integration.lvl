@@ -10,8 +10,8 @@
 format = 1
 id = test_integration
 name = "Integration Meadow"
-kind = main
-order = 10
+kind = test
+next = test_integration_boss
 world = 1
 stage = 1
 biome = jungle
@@ -23,7 +23,7 @@ password_beginner = "MEAD"
 password_expert = "W1LD"
 bonus_tier = 0
 author = integrator
-notes = "Development campaign level 1: every system of the game in one walk (whole-loop autoplay QA)."
+notes = "Development pair, level 1 (kind test since the real campaign exists; next leads to the boss pit): every system of the game in one walk (whole-loop autoplay QA)."
 
 [legend]
 ? = objects/hidden_spot kind=small count=3 contents=food:4,food:9,treasure:2 look=inset tile=#

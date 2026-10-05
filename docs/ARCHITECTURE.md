@@ -71,7 +71,7 @@ Contract files are `scripts/core/**`, `scripts/base/**`, `tests/test_case.gd`, `
 | Autoloads (in this order) | `Settings`, `Save`, `Events`, `Game`, `Levels`, `GameInput`, `Sim`, `Audio`, `Flow`, `Autoplay` | section 3 |
 | Input actions | `move_left`, `move_right`, `move_up`, `move_down`, `jump`, `attack`, `look`, `pause`, plus `ui_accept` / `ui_cancel` redefined with a gamepad button; other `ui_*` actions keep Godot's defaults (keys, d-pad, stick) | every action has keyboard and gamepad events; touch feeds the same actions |
 | 2D physics layer names | 1 world, 2 player, 3 enemies, 4 items, 5 objects, 6 hazards, 7 platforms, 8 hero_weapons, 9 enemy_projectiles, 10 triggers | cosmetic use only, section 5.5 |
-| Audio buses | `Master` <- `Music`, `Master` <- `SFX` <- `UI` | `default_bus_layout.tres` |
+| Audio buses | `Master` <- `Music`, `Master` <- `SFX` <- `UI`; a hard limiter (ceiling -0.5 dB) on `Master` | `default_bus_layout.tres`; per-file volumes are measured (ASSET_MANIFEST 13.4) |
 | GDScript warnings | `untyped_declaration` = warn | all code is statically typed |
 
 Default bindings:
@@ -83,7 +83,7 @@ Default bindings:
 | attack | Space, X, J | X (west), B (east) |
 | look | C, L, keypad 5 | Y (north), RB |
 | pause | Escape, P | Start |
-| ui_accept / ui_cancel | Enter, keypad Enter, Space / Escape | A / B |
+| ui_accept / ui_cancel | Enter, keypad Enter, Space / Escape | A, Start / B (Start pauses in play and confirms the focused pause-menu entry) |
 
 **The visible area is not constant.** With integer scaling the root viewport is `window / s` art px where
 `s = max(1, floor(min(window_w / 640, window_h / 360)))`: exactly 640 x 360 at 1280x720, 1920x1080, 2560x1440,
@@ -151,6 +151,7 @@ Items / objects: `item_collected(item_id, index, points, pos)`, `hittable_hit`, 
 `secret_found`, `checkpoint_activated`, `exit_unlocked`, `exit_reached(exit_kind)`, `gate_used`.
 Level: `shake_requested(amount)`, `feast_changed(ticks)`, `darkness_changed`, `popup_requested(kind, value, pos)`,
 `wind_changed`, `time_left_changed(seconds)` (the level's time limit shows another second; -1 = no limit),
+`message_requested(source, text)` (a `zones/message` hint for the HUD; empty text withdraws it),
 `level_started`, `level_completed`, `pause_changed`, `level_respawned`, `game_over`.
 
 Use the bus for fan-out to HUD, audio, FX, statistics. **Nothing the simulation depends on goes through it**:
@@ -217,8 +218,9 @@ while the setting `controls/up_jumps` is on, otherwise only together with `attac
 
 Scans `res://levels/*.lvl`; no hand-maintained list. `has_level`, `all_ids`, `get_level_path`, `get_level_meta`,
 `get_value(id, key, default, difficulty)` (applies `.beginner` / `.expert` variants), `get_campaign(difficulty)`,
-`first_level`, `is_available`, `next_level`, `has_locked_successor`, `find_by_password(code)`, `get_password`,
-`rescan()`. Syntax lives in `LevelText` (`scripts/core/level_text.gd`): `split_sections`, `parse_value`,
+`first_level`, `is_available`, `next_level`, `has_locked_successor`, `parent_level(id, difficulty)` (the map stop a
+linked `sub` level belongs to: its result is recorded there and the campaign continues after it),
+`find_by_password(code)`, `get_password`, `rescan()`. Syntax lives in `LevelText` (`scripts/core/level_text.gd`): `split_sections`, `parse_value`,
 `parse_key_values`, `parse_meta`, `parse_params`, `parse_legend_line`, `parse_legend`, `legend_tiles`,
 `parse_entity_line`, `cell_to_feet`, `applies_to`, `to_list`, `to_int_list`, `to_rect_px`, `problems`, `quiet`.
 
@@ -287,7 +289,8 @@ Effects: `request_shake(amount)`, `tick_shake_timer()`, `set_darkness(on)`, `set
 Time limit (meta `time`): field `time_left` (ticks, -1 = none), signal `time_left_changed(seconds)` (also sent as
 `Events.time_left_changed` for the HUD), `set_time_limit(seconds)`, `tick_time_limit()` (phase POST; kills the hero
 with cause `&"time"` at zero), `get_time_left_seconds()` (-1 = none).
-Flow: `start_play(seed)`, `complete(exit_kind)`, `get_respawn_pos()`, `respawn_player()`, `reset_entities()`.
+Flow: `start_play(seed)`, `complete(exit_kind)`, `get_respawn_pos()`, `respawn_player()` (also restores the darkness
+the level had when the active checkpoint was touched, or at the start; `get_respawn_darkness()`), `reset_entities()`.
 Built in: step 18 of the tick (shake nudge on odd ticks), `on_screen` flags for every entity after each tick,
 respawn-or-game-over on `Events.player_death_finished`, pop-ups on `Events.popup_requested`.
 
@@ -299,7 +302,8 @@ Readable state (names of PHYSICS.md 0): `state`, `input_flags`, `ice`, `on_platf
 `club_box_active`, `club_box: Rect2i`, `club_box_xo`, `club_origin`, `club_power`.
 Queries: `is_grounded`, `is_crouching`, `is_low`, `is_gliding`, `is_striking`, `is_immune`, `is_feasting`.
 Calls: `hurt(source, kind) -> bool`, `kill(cause)` (causes `&"enemy"`, `&"spikes"`, `&"liquid"`, `&"pit"`,
-`&"crush"`, `&"off_screen"`, `&"give_up"`, `&"time"`), `bounce(yvel, depth)`, `ride_platform(platform, dx, dy)`,
+`&"crush"`, `&"off_screen"`, `&"give_up"`, `&"time"`; both are ignored once `LevelBase.completed`, while the exit
+iris closes), `bounce(yvel, depth)`, `ride_platform(platform, dx, dy)`,
 `apply_shake_nudge(px)`, `start_feast(ticks)`, `set_glider(carrying)`, `respawn_at(pos)`,
 `set_control_enabled(on)`, `notify_weapon_hit()`.
 
@@ -613,6 +617,7 @@ commas, e.g. `food:3,treasure:8,heart,weapon:axe`; `giant` = `giant_bonus`; `ran
 | `objects/marker` | `name` (invisible destination) |
 | `objects/spring` | `power` v16 [-224] (optional, not in the original) |
 | `objects/sign` | `text=<translation key>` |
+| `objects/npc` | `kind=elder\|kid\|warrior` [elder], `turn` [true] (cosmetic villager: idle loop, faces a hero standing near; never hurts, not hittable, counted nowhere) |
 
 **Zones** (world; all take `rect=c,r,w,h` in tiles): `zones/secret` (`name`), `zones/arena` (`name`, `music`
 [boss], locks the camera to the rect and wakes the boss whose `arena` equals `name`), `zones/camera_lock`,
@@ -678,7 +683,7 @@ key = value          # in [meta]
 | `music` | a `Sfx.MUSIC_*` context name | by biome | e.g. `level_jungle` |
 | `time` | int seconds | 0 | time limit; 0 = none (the original has none). When > 0 the HUD shows it and running out costs a life |
 | `password_beginner`, `password_expert` | 4 characters `0-9A-Z` | "" | level code per mode (code-entry screen, code stones) |
-| `next` | level id | "" | explicit next level; empty = next `main` level by `order` |
+| `next` | level id | "" | explicit next level; empty = next `main` level by `order` (a `sub` level: the one after its main level) |
 | `tally` | bool | true | false = first half of a linked pair: the exit leads to `next` without a tally |
 | `bonus` | level id | "" | bonus stage the warp item of this level leads to |
 | `min_difficulty` | `beginner` `expert` | `beginner` | `expert` = not playable in Beginner (Beginner wall) |
@@ -891,10 +896,11 @@ Provides: everything in section 3 except the base files owned by others. Consume
 (only scenes by naming convention).
 
 Integration (core): `levels/test_integration.lvl` (jungle, 120 x 40: every system once) and
-`levels/test_integration_boss.lvl` (the Brute arena) are `kind = main` with `order` 10 / 20, so debug builds have a
-playable campaign (title -> map -> level -> tally -> boss -> the end) until the level designers' `w1_l1` ... exist;
-exports exclude them with every `levels/test_*.lvl`. When real campaign levels arrive, set the two back to
-`kind = test`. Their input scripts (`tools/autoplay/integration_level.inputs`, `integration_boss.inputs`) are
+`levels/test_integration_boss.lvl` (the Brute arena) were `kind = main` with `order` 10 / 20 (the playable stand-in
+campaign of debug builds) until the level designers' `w1_l1` ... arrived; they are now `kind = test`, linked by
+`next = test_integration_boss`, so the world map shows only the real campaign. `tools/autoplay/full_loop.flow`
+enters the pair with `start_level` after the title, mode select and world map. Exports exclude them with every
+`levels/test_*.lvl`. Their input scripts (`tools/autoplay/integration_level.inputs`, `integration_boss.inputs`) are
 replayed tick for tick by `tests/test_integration_levels.gd` and by the flow scripts of section 9.2.
 
 ### 8.2 player
@@ -1155,7 +1161,8 @@ screenshot their work from day one. It is a development tool, not the loader; it
 - Module tuning tables (`EnemyTuning`, `ObjTuning`) hold the numbers only their module uses; `Tuning` keeps the
   physics appendix and every number shared between modules (section 4.4).
 - Respawns and gates travel behind `Flow.play_covered` (clock frozen) instead of a curtain that runs on ticks.
-- Debug builds have a development campaign made of the two integration levels (section 8.1).
+- Debug builds had a development campaign made of the two integration levels until the real campaign arrived;
+  they are now a linked pair of `kind = test` levels (section 8.1).
 - "Restart level" (pause menu) puts the run back to the level entry (`Game.restore_level_entry`): score, letters,
   feast kit, weapon and counters as they were, lives only downwards, and a death toss in progress still costs its
   life. Otherwise every item of the level could be collected again and again (points and extra lives for free).

@@ -7,8 +7,7 @@
 format = 1
 id = test_integration_boss
 name = "Integration Brute Pit"
-kind = main
-order = 20
+kind = test
 world = 1
 stage = 2
 biome = cave
@@ -20,7 +19,7 @@ password_beginner = "BRUT"
 password_expert = "K0NG"
 bonus_tier = 0
 author = integrator
-notes = "Development campaign level 2: a corridor with a checkpoint, then the Brute in a walled pit; it drops the fire-starter for the locked exit."
+notes = "Development pair, level 2: a corridor with a checkpoint, then the Brute in a walled pit; it drops the fire-starter for the locked exit."
 
 [legend]
 ? = objects/hidden_spot kind=small count=2 contents=food:8,heart look=inset tile=#

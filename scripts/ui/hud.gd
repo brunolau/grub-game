@@ -2,7 +2,9 @@ class_name Hud
 extends Control
 ## In-game HUD overlay (GAMEPLAY.md 2, ASSET_MANIFEST.md 12): lives and score top-left (with the time left under
 ## the score on levels that have a time limit), hearts (and the bone fraction) top-centre, the bonus word
-## top-right, boss energy pips bottom-left while a boss fights, and the level intro banner when a level starts.
+## top-right, boss energy pips bottom-left while a boss fights, the level intro banner when a level starts and
+## the hint panel of `zones/message` (Events.message_requested) under the HUD row; a hint asked for while the
+## intro banner shows waits until the banner is gone.
 ##
 ## Owner: ui. Instantiated by Flow into the HUD CanvasLayer. It only reacts to `Game` and `Events` signals and
 ## never reaches into the level. Layout follows the mock-ups at 640 x 360 and stays anchored to the safe area on
@@ -19,6 +21,16 @@ const INTRO_TOP: float = 64.0  ## the level banner sits under the HUD row, clear
 const COL_LETTER_MISSING: Color = Color(0.38, 0.5, 0.62, 0.55)
 ## The time-limit counter turns red for the last seconds.
 const TIME_WARN_SECONDS: int = 10
+## Hint panel: top edge inside the safe area (the intro banner's row), widest text line, fade time, padding.
+const HINT_TOP: float = INTRO_TOP - float(UiKit.MARGIN)
+const HINT_MAX_TEXT_W: float = 420.0
+const HINT_FADE_SECONDS: float = 0.18
+const HINT_PAD_X: int = 12
+const HINT_PAD_Y: int = 8
+const HINT_ICON: int = 5  ## "!" of ui/icons.png
+const HINT_ICON_GAP: int = 8
+const COL_HINT_BACK: Color = Color(0.153, 0.125, 0.094, 0.9)
+const COL_HINT_EDGE: Color = Color(1.0, 0.945, 0.812, 0.45)
 
 ## Hearts drawn (mirrors Game.hearts).
 var shown_hearts: int = 0
@@ -46,6 +58,12 @@ var _heart_full: AtlasTexture = null
 var _heart_empty: AtlasTexture = null
 var _pip_full: AtlasTexture = null
 var _pip_empty: AtlasTexture = null
+## Hints asked for through Events.message_requested, oldest first (sources and their texts, parallel).
+var _hint_sources: Array[Node] = []
+var _hint_texts: PackedStringArray = PackedStringArray()
+var _hint_holder: CenterContainer = null
+var _hint_label: Label = null
+var _hint_shown_text: String = ""
 
 
 func _init() -> void:
@@ -73,6 +91,7 @@ func _ready() -> void:
 	_build_hearts(area)
 	_build_letters(area)
 	_build_boss_bar(area)
+	_build_hint(area)
 	_apply_margins()
 	get_viewport().size_changed.connect(_apply_margins)
 	Game.score_changed.connect(_on_score_changed)
@@ -87,6 +106,7 @@ func _ready() -> void:
 	Events.boss_defeated.connect(_on_boss_defeated)
 	Events.level_respawned.connect(_on_level_respawned)
 	Events.time_left_changed.connect(_on_time_left_changed)
+	Events.message_requested.connect(_on_message_requested)
 	refresh()
 	# The level armed its time limit before this overlay existed: show the current value.
 	_on_time_left_changed(Game.level.get_time_left_seconds() if Game.level != null else -1)
@@ -95,6 +115,7 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	_fade_hint(delta)
 	if _blink_left <= 0.0:
 		return
 	_blink_left -= delta
@@ -137,6 +158,22 @@ func is_time_visible() -> bool:
 ## Text of the time-limit counter.
 func get_time_text() -> String:
 	return _time_label.text
+
+
+## Translated text of the level hint that is asked for now ("" = none).
+func get_hint_text() -> String:
+	var index: int = _current_hint()
+	return tr(_hint_texts[index]) if index >= 0 else ""
+
+
+## True while the hint panel is on screen (also while it fades in or out).
+func is_hint_visible() -> bool:
+	return _hint_holder.visible
+
+
+## The text the hint panel shows (it keeps the last hint while fading out).
+func get_hint_shown_text() -> String:
+	return _hint_shown_text
 
 
 ## The level banner: "WORLD 1 - STAGE 2" and the level name, sliding in and out (the level intro).
@@ -247,12 +284,113 @@ func _build_boss_bar(area: Control) -> void:
 	area.add_child(_boss_bar)
 
 
+## The hint panel: "!" icon and the hint in the HUD face on an almost opaque ink plate with a thin cream edge,
+## centred under the HUD row. Hidden until a zone asks for a hint.
+func _build_hint(area: Control) -> void:
+	_hint_holder = CenterContainer.new()
+	_hint_holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_hint_holder.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	_hint_holder.offset_top = HINT_TOP
+	_hint_holder.offset_bottom = HINT_TOP
+	_hint_holder.visible = false
+	_hint_holder.modulate.a = 0.0
+	var plate: StyleBoxFlat = UiKit.plate(COL_HINT_BACK, HINT_PAD_Y)
+	plate.content_margin_left = float(HINT_PAD_X)
+	plate.content_margin_right = float(HINT_PAD_X)
+	plate.set_border_width_all(2)
+	plate.border_color = COL_HINT_EDGE
+	var panel: PanelContainer = PanelContainer.new()
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_theme_stylebox_override(&"panel", plate)
+	var row: HBoxContainer = HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_constant_override(&"separation", HINT_ICON_GAP)
+	var icon: TextureRect = UiKit.picture(UiKit.icon(HINT_ICON))
+	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(icon)
+	_hint_label = UiKit.label("", UiKit.Style.HUD, HORIZONTAL_ALIGNMENT_CENTER)
+	_hint_label.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+	_hint_label.add_theme_color_override(&"font_color", UiKit.COL_CREAM)
+	_hint_label.add_theme_constant_override(&"line_spacing", 4)
+	_hint_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_hint_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(_hint_label)
+	panel.add_child(row)
+	_hint_holder.add_child(panel)
+	area.add_child(_hint_holder)
+
+
+func _on_message_requested(source: Node, text: String) -> void:
+	var index: int = _hint_sources.find(source)
+	if index >= 0:
+		_hint_sources.remove_at(index)
+		_hint_texts.remove_at(index)
+	if text.is_empty() or source == null:
+		return
+	_hint_sources.append(source)
+	_hint_texts.append(text)
+
+
+## Index of the newest hint whose source still exists (-1 = none). Forgets the hints of freed sources.
+func _current_hint() -> int:
+	for i: int in range(_hint_sources.size() - 1, -1, -1):
+		if is_instance_valid(_hint_sources[i]):
+			return i
+		_hint_sources.remove_at(i)
+		_hint_texts.remove_at(i)
+	return -1
+
+
+func _fade_hint(delta: float) -> void:
+	var text: String = get_hint_text()
+	var intro_showing: bool = _intro != null and is_instance_valid(_intro)
+	var wanted: bool = not text.is_empty() and not intro_showing
+	if wanted and text != _hint_shown_text:
+		_hint_shown_text = text
+		_layout_hint()
+	var alpha: float = move_toward(_hint_holder.modulate.a, 1.0 if wanted else 0.0, delta / HINT_FADE_SECONDS)
+	_hint_holder.modulate.a = alpha
+	_hint_holder.visible = alpha > 0.0
+
+
+## Width of the hint text: one line when it fits, else wrapped into as few lines as the view allows, with the
+## lines balanced (two half-long lines read better than a full line and a single word).
+func _layout_hint() -> void:
+	if _hint_label == null:
+		return
+	_hint_label.text = _hint_shown_text
+	var font: Font = UiKit.font(UiKit.Style.HUD)
+	var font_size: int = UiKit.SIZE_HUD
+	var natural: float = ceilf(font.get_string_size(_hint_shown_text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size).x)
+	var margins: Vector4i = UiKit.safe_margins(get_viewport())
+	var view_w: float = get_viewport_rect().size.x - float(margins.x + margins.z)
+	var room: float = view_w - float(2 * HINT_PAD_X + UiKit.ICON_CELL + HINT_ICON_GAP) - 8.0
+	var limit: float = maxf(minf(HINT_MAX_TEXT_W, room), 64.0)
+	var width: float = natural
+	if natural > limit:
+		var lines: int = ceili(natural / limit)
+		var line_h: float = font.get_height(font_size)
+		width = ceilf(natural / float(lines))
+		while width < limit:
+			var block: Vector2 = font.get_multiline_string_size(_hint_shown_text, HORIZONTAL_ALIGNMENT_LEFT, width,
+					font_size)
+			if block.y <= line_h * float(lines) + 0.5:
+				break
+			width += 8.0
+		width = minf(width, limit)
+	_hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART if natural > width else TextServer.AUTOWRAP_OFF
+	_hint_label.custom_minimum_size = Vector2(width, 0.0)
+	_hint_label.reset_size()
+
+
 func _apply_margins() -> void:
 	var margins: Vector4i = UiKit.safe_margins(get_viewport())
 	_safe.add_theme_constant_override(&"margin_left", margins.x)
 	_safe.add_theme_constant_override(&"margin_top", maxi(0, margins.y - 2))
 	_safe.add_theme_constant_override(&"margin_right", margins.z)
 	_safe.add_theme_constant_override(&"margin_bottom", margins.w)
+	if not _hint_shown_text.is_empty():
+		_layout_hint()
 
 
 func _on_score_changed(score: int) -> void:

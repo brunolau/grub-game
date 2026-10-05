@@ -45,6 +45,38 @@ func test_rows_work_by_tap() -> void:
 	assert_eq(Settings.get_bool("video/vsync"), not before, "a drag (scroll gesture) is not a tap")
 
 
+func test_lists_show_whole_rows_only() -> void:
+	var panel: OptionsPanel = await _panel()
+	var row_h: float = float(UiKit.row_height())
+	for room: float in [360.0 - OptionsPanel.CHROME_HEIGHT, 199.0, 263.0, 512.0 - OptionsPanel.CHROME_HEIGHT]:
+		var fitted: float = OptionsPanel.list_height(room)
+		assert_eq(fmod(fitted, row_h), 0.0, "room %d: a whole number of rows" % room)
+		assert_true(fitted <= maxf(room, OptionsPanel.LIST_HEIGHT), "room %d: fits" % room)
+	panel.fit_height(360.0 - OptionsPanel.CHROME_HEIGHT)
+	await get_tree().process_frame
+	var scrolls: Array[Node] = panel.find_children("*", "ScrollContainer", false, false)
+	assert_eq(scrolls.size(), 2, "the main list and the bindings list")
+	var main: ScrollContainer = scrolls[0] as ScrollContainer
+	assert_eq(fmod(main.size.y, row_h), 0.0, "the visible list is a whole number of rows: %s" % main.size.y)
+	var list: VBoxContainer = main.get_child(0) as VBoxContainer
+	for child: Node in list.get_children():
+		var control: Control = child as Control
+		if control.visible:
+			assert_eq(control.size.y, row_h, "every heading and row is one row tall: %s" % control.name)
+	# Scrolling of any kind (focus, wheel, drag) ends on a row boundary.
+	var bar: VScrollBar = main.get_v_scroll_bar()
+	assert_true(bar.max_value - bar.page > row_h, "the list scrolls at 640 x 360")
+	bar.value = row_h * 1.4
+	assert_eq(bar.value, row_h, "snapped down")
+	bar.value = row_h * 2.6
+	assert_eq(bar.value, row_h * 3.0, "snapped up")
+	panel.get_row("game/locale").grab_focus()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	assert_eq(fmod(bar.value, row_h), 0.0, "following the focus keeps whole rows")
+	assert_true(bar.value > 0.0)
+
+
 func test_rebinding_swaps_and_persists() -> void:
 	var panel: OptionsPanel = await _panel()
 	var x_key: InputEventKey = InputEventKey.new()

@@ -44,11 +44,11 @@ var _factors: PackedFloat32Array = PackedFloat32Array()
 var _scroll: float = 0.0
 
 
-func _init(set_name: String = "jungle", p_speed: float = 24.0) -> void:
+func _init(set_id: String = "jungle", p_speed: float = 24.0) -> void:
 	speed = p_speed
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	set_anchors_preset(Control.PRESET_FULL_RECT)
-	set_backdrop(set_name)
+	set_backdrop(set_id)
 
 
 func _process(delta: float) -> void:
@@ -83,17 +83,17 @@ func _draw() -> void:
 
 
 ## Switch to another background set (a key of SETS).
-func set_backdrop(set_name: String) -> void:
+func set_backdrop(set_id: String) -> void:
 	_textures.clear()
 	_factors = PackedFloat32Array()
-	var entry: Dictionary = SETS.get(set_name, {})
+	var entry: Dictionary = SETS.get(set_id, {})
 	if entry.is_empty():
-		push_error("UiBackdrop: unknown background set '%s'" % set_name)
+		push_error("UiBackdrop: unknown background set '%s'" % set_id)
 		return
 	_top = entry["top"]
 	_tile_up = bool(entry["tile_up"])
 	for layer: Array in entry["layers"]:
-		var texture: Texture2D = UiKit.tex(BACKGROUND_DIR + set_name + "/" + str(layer[0]) + ".png")
+		var texture: Texture2D = UiKit.tex(BACKGROUND_DIR + set_id + "/" + str(layer[0]) + ".png")
 		if texture != null:
 			_textures.append(texture)
 			_factors.append(float(layer[1]))

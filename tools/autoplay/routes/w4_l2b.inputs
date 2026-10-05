@@ -1,0 +1,20 @@
+# w4_l2b "Colossus Hall" (Expert) from '@' through the boss to the trophy (ticks:KEYS, keys L R U D F K).
+# Antechamber: the checkpoint, the axe (thrown weapons are the only thing that hurts the Colossus), food.
+80:R
+# Drop into the arena and jump onto the obsidian slab: from there a thrown axe flies at head height.
+14:R,16:
+10:R,8:U,12:
+# Throw high axes from the slab; hop whenever a rock comes (the Colossus spits them, more often when enraged).
+8:UF,4:,8:UF,4:,8:UF,1:,6:U,8:,8:UF,4:,7:UF,6:U,8:,8:UF
+4:,1:UF,6:U,8:,8:UF,2:,6:U,12:,8:UF,4:,8:UF,4:,8:UF,4:
+7:UF,6:U,8:,5:U,20:,6:UF,6:U,8:,8:UF,4:,8:UF,4:,8:UF,4:
+8:UF,4:,8:UF,4:,8:UF,4:,8:UF,4:,6:U,8:,8:UF,4:,8:UF,4:
+8:UF,1:,6:U,8:,8:UF,4:,4:UF,6:U,8:,8:UF,4:,8:UF,4:,4:UF
+6:U,8:,5:U,8:,8:UF,4:,8:UF,4:,8:UF,4:,8:UF,4:,8:UF,4:
+8:UF,4:,8:UF,4:,8:UF,4:,7:UF,6:U,15:,8:UF,1:,6:U,8:,8:UF
+4:,8:UF,4:,8:UF,4:,8:UF,4:,8:UF,4:,8:UF,4:,8:UF,4:,8:UF
+4:,8:UF,4:,8:UF,4:,8:UF,4:,8:UF,4:,8:UF,4:,6:UF
+# The Colossus breaks and bursts into bonuses and four trophies: step back while they rain down, sweep the floor,
+# then take a trophy (it starts the ending).
+14:L,40:
+40:L,30:R,60:R

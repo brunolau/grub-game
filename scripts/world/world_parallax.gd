@@ -22,15 +22,15 @@ func _init() -> void:
 	texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 
 
-## Use the parallax set `set_name` (meta key `background`; "none" = plain fill colour). Returns false when the
+## Use the parallax set `set_id` (meta key `background`; "none" = plain fill colour). Returns false when the
 ## set or one of its images does not exist (the backdrop is then the plain fill).
-func setup(set_name: String) -> bool:
-	_set_name = set_name
-	_fill = ParallaxSets.fill_color(set_name)
+func setup(set_id: String) -> bool:
+	_set_name = set_id
+	_fill = ParallaxSets.fill_color(set_id)
 	_layers.clear()
 	_textures.clear()
-	var complete: bool = set_name == "none" or ParallaxSets.has_set(set_name)
-	for layer: Dictionary in ParallaxSets.layers(set_name):
+	var complete: bool = set_id == "none" or ParallaxSets.has_set(set_id)
+	for layer: Dictionary in ParallaxSets.layers(set_id):
 		var path: String = ParallaxSets.texture_path(layer)
 		if not ResourceLoader.exists(path):
 			complete = false

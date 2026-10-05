@@ -1,0 +1,121 @@
+# Club & Grub level file - format 1 (docs/ARCHITECTURE.md 7). World 2, stage 2 (second half): "Brute's Den".
+# Linked sub-stage of w2_l2 (Bone Gorge): its exit leads here without a tally. A short bone tunnel with a heart
+# refill and a checkpoint, then the hero drops into a walled one-screen den where BOSS 1, the Brute, waits.
+# Only its head is soft (high strikes, strikes from above after a bounce on the head, charged strikes); beating
+# it drops the fire-starter that lights the locked exit totem in the den. The tally after it ends Bone Gorge.
+
+[meta]
+format = 1
+id = w2_l2b
+name = "Brute's Den"
+kind = sub
+world = 2
+stage = 2
+biome = cave
+terrain_a = cave/terrain_stone
+terrain_b = cave/terrain
+background = cave
+music = level_cave
+password_beginner = "R0AR"
+password_expert = "F1ST"
+bonus_tier = 1
+author = w2
+notes = "World 2-2b: the Brute (boss 1) in a walled den; it drops the fire-starter for the locked exit."
+
+[legend]
+? = objects/hidden_spot kind=small count=3 contents=food:44,heart,food:33 look=inset tile=#
+k = objects/hidden_spot kind=small count=2 contents=food:36,food:29 tile=#
+E = objects/exit locked=true
+C = objects/checkpoint
+a = items/food index=33
+b = items/food index=46
+Y = items/heart
+
+[tiles]
+########################################################################
+#########################################....................###########
+#########################################....................###########
+#########################################....................###########
+#########################################....................###########
+#............................................................###########
+#............................................................###########
+#..............b.b...........................................###########
+#........a.a.................................................###########
+#.@.........12###34...Y...a.a.a...C..........................###########
+######?#############################kk###....................###########
+#########################################....................###########
+#########################################....................###########
+#########################################....................###########
+#########################################....................###########
+#########################################....................###########
+#########################################..................E.###########
+########################################################################
+########################################################################
+########################################################################
+########################################################################
+########################################################################
+########################################################################
+########################################################################
+########################################################################
+########################################################################
+
+[entities]
+objects/hidden_spot 31 9 kind=small count=3 contents=food:38,food:40,treasure:10 prop=cave/skull_ribs
+objects/sign 37 9 text=SIGN_W2_BRUTE
+zones/arena 50 16 name=den rect=41,7,20,11 music=boss
+# The Brute: a charged strike does 4 x the weapon (club 100, hammer 120 - the hero brings the hammer from w2_l1),
+# so 150 / 250 hit points mean one free strike while it watches, then at least one more against the red Brute.
+# Its limits sit one column inside the den walls: no corner is out of its reach. The den is open up to row 1 so
+# the burst of bonuses (and the fire-starter) never lodges in the rock (build/engine_requests/review_w2.txt #1).
+bosses/brute 55 16 arena=den left=42 right=59 hp=150 beginner
+bosses/brute 55 16 arena=den left=42 right=59 hp=250 speed=3 enraged expert
+props/cave/skull_big 43 16
+props/cave/bone_pile 47 16
+props/cave/skull_ribs 51 16 flip
+props/cave/bone_big 57 16
+props/cave/tusk_b 42 16
+props/cave/cave_hole_b 3 9
+props/cave/stalactite 6 5
+props/cave/drip_cap 14 5
+props/cave/stalactite 19 5
+props/cave/drip_cap 25 5
+props/cave/drip_cap 26 5
+props/cave/stalactite 30 5
+props/cave/stalactite 31 5
+props/cave/drips 35.5 5
+props/cave/stalactite 39 5
+props/cave/drip_cap 42 1
+props/cave/drips 44.5 1
+props/cave/stalactite 49 1
+props/cave/drip_cap 51 1
+props/cave/drips 53.5 1
+props/cave/drips 55.5 1
+props/cave/stalactite 58 1
+props/cave/stalactite 59 1
+props/cave/mushrooms 16 8 flip
+props/cave/pebble 8 9
+props/cave/mound_small 42 16
+props/cave/mushrooms 44 16 flip
+props/cave/crystal_violet_a 47 16
+props/cave/mound_brown 48.5 16 flip
+props/cave/tusk_c 14 13 layer=front
+props/cave/skull_big 20 13 layer=front
+props/cave/skull_big 28 13 layer=front
+props/cave/twigs 3 14 layer=front
+props/cave/skull_ribs 68 14 layer=front flip
+props/cave/bone_big 9 17 layer=front flip
+props/cave/twigs 22 17 layer=front
+props/cave/skull_buried 65 18 layer=front
+props/cave/skull_ribs 15 20 layer=front
+props/cave/tusk_c 39 20 layer=front
+props/cave/twigs 53 20 layer=front
+props/cave/tusk_c 6 21 layer=front
+props/cave/bone_pile 24 21 layer=front
+props/cave/skull_big 32 21 layer=front
+props/cave/tusk_c 59 21 layer=front flip
+props/cave/skull_big 67 22 layer=front
+props/cave/skull_big 45 23 layer=front flip
+
+[backwall]
+1 5 40 5 set=b deco=20
+41 1 20 16 set=b deco=25

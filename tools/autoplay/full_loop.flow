@@ -1,7 +1,9 @@
 # The whole game loop, played like a player would (docs/ARCHITECTURE.md 9.2, scripts/core/dev/autoplay_flow.gd):
-# boot -> title -> mode select -> world map -> level 1 (intro, walk, jump, strikes, food, hidden spots, damage,
-# death, respawn at the checkpoint, exit) -> tally -> world map -> level 2 (pause menu, boss fight, fire-starter,
-# exit) -> tally -> the end -> credits -> title.
+# boot -> title -> mode select -> world map (the campaign's first level) -> the integration pair: level 1 (intro,
+# walk, jump, strikes, food, hidden spots, damage, death, respawn at the checkpoint, exit) -> tally -> world map ->
+# level 2 (pause menu, boss fight, fire-starter, exit) -> tally -> the end -> credits -> title.
+# The integration levels are `kind = test` since the designers' campaign exists: the flow enters level 1 with
+# `start_level` from the world map, and level 1's `next` leads on to level 2 through the tally and the map.
 #   bash .tools/gd.sh play --flow=tools/autoplay/full_loop.flow --fast --fresh-user
 
 # --- Boot, title, mode select, world map --------------------------------------------------------------------------
@@ -24,7 +26,7 @@ expect game.lives == 2
 expect game.score == 0
 wait 60
 shot world_map_1
-press ui_accept
+start_level test_integration
 
 # --- Level 1: test_integration ------------------------------------------------------------------------------------
 wait_until flow.current_screen == level 600

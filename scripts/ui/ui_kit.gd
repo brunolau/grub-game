@@ -38,6 +38,9 @@ const SIZE_DIGITS: int = 40
 const SIZE_BODY: int = 22
 const SIZE_SMALL: int = 11
 const SIZE_MONO: int = 8
+## Extra px after every space of the SMALL style: the face's own space is only 2 px wide at 11 px, so words ran
+## together ("Score0000400").
+const SMALL_WORD_SPACING: int = 2
 
 const FONT_HUD: String = "res://resources/ui/font_hud.fnt"
 const FONT_TITLE: String = "res://resources/ui/font_title.fnt"
@@ -105,6 +108,8 @@ static func available_locales() -> PackedStringArray:
 
 ## Font of a text style. The three bitmap fonts fall back to the TTF faces for characters they do not have.
 static func font(style: int) -> Font:
+	if style == Style.SMALL:
+		return _small_font()
 	var path: String = FONT_HUD
 	match style:
 		Style.TITLE:
@@ -129,6 +134,18 @@ static func font(style: int) -> Font:
 			file.fallbacks = fallbacks
 	_fonts[path] = loaded
 	return loaded
+
+
+## The body face with wider word spacing for the SMALL style (cached).
+static func _small_font() -> Font:
+	const KEY: String = "small"
+	if _fonts.has(KEY):
+		return _fonts[KEY]
+	var small: FontVariation = FontVariation.new()
+	small.base_font = font(Style.BODY)
+	small.spacing_space = SMALL_WORD_SPACING
+	_fonts[KEY] = small
+	return small
 
 
 ## Pixel size to request for a text style.
