@@ -733,10 +733,20 @@ and adds the co-op gates, traits and the P2 start.
 
   | Layout | P1 | P2 |
   |---|---|---|
-  | Two hands each (default) | move W A S D, strike F, jump G, look R, swap T | move arrows, strike `.`, jump `/`, look `,`, swap `;` |
+  | **Classic: WASD + numpad** (owner requirement 2026-10-06; the default for versus on one keyboard, offered first in co-op too) | move W A S D, jump Space, strike Left Shift, swap E, look Q | move Num 8 / Num 4 / Num 5 / Num 6 (up / left / down / right), jump Num 0, strike Num Enter, swap Num +, look Num `.` |
+  | Two hands each (keyboards without a numpad: laptops) | move W A S D, strike F, jump G, look R, swap T | move arrows, strike `.`, jump `/`, look `,`, swap `;` |
   | One hand each (the original's Up-jumps scheme) | W A S D (W jumps), strike Space, swap E, look Q | arrows (Up jumps), strike Right Ctrl, swap Right Shift, look Num 0 |
 
-  Left + Right together is Look in both layouts. In a party, slot 0 uses its own generated `p1_*` actions, so the
+  The classic layout is the old-school shared-keyboard deathmatch setup: each player keeps one hand on a cluster at
+  opposite ends of the keyboard (thumb on Space / Num 0 for jump, little finger on Left Shift / Num Enter for strike).
+  It must work **whatever the NumLock state**: bind the numpad by physical key, verify on Windows that NumLock off
+  still reports the numpad keys (if it reports navigation keys instead, bind those as aliases for P2 in this layout
+  only), and say "Num Lock" in the key test if a key does not arrive. The join panel / versus lobby offers the three
+  layouts as presets, shows the keys on a keyboard picture, and both players can navigate the menus from their own
+  cluster (P1: W / S / Space / Q, P2: Num 8 / Num 5 / Num 0 / Num `.`). The ghosting key test holds Left + Jump +
+  Strike + Swap for BOTH players at once.
+
+  Left + Right together is Look in every layout. In a party, slot 0 uses its own generated `p1_*` actions, so the
   halves never feed two heroes.
 - **Pads**: one per slot, the solo layout (A jump, X / B strike, Y / RB look, **LB swap**, Start pause); rumble only on
   that slot's pad.
@@ -1004,7 +1014,10 @@ ticks ahead. They start at 60 s in Last Caveman Standing and are available as an
 ### E.9 Controls and readability for 2-4 on one device
 
 - Every player needs only direction + Jump + Strike + Swap; Look doubles as the emote / taunt in versus.
-- **Keyboard**: two players at most, the D.11 layouts. **Pads**: up to four, a sideways half-controller works.
+- **Keyboard**: two players at most, the D.11 layouts; the **classic WASD + numpad layout is the versus default**
+  (old-school one-keyboard deathmatch: P1 on W A S D + Space / Left Shift, P2 on the numpad 8 4 5 6 + 0 / Enter).
+  Must be proven by a scripted two-player versus match driven only by those keys. **Pads**: up to four, a sideways
+  half-controller works.
   **Touch**: one touch player on a phone, two on a tablet in table mode (swipe up on strike = high strike). Any mix:
   keyboard halves for P1-P2 and pads for P3-P4, or one tablet player against three bots.
 - **Telling four cavemen apart**: P1 yellow, P2 blue, P3 pink, P4 green (white on jungle arenas); loincloth patterns;
