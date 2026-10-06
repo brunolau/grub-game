@@ -1,0 +1,1126 @@
+# DESIGN.md - Club & Grub 2.0 "The Far Shore": the binding expansion design
+
+Status: **binding design** for the 2.0 expansion. Author: lead designer (expansion workflow), 2026-10-06. Nothing is
+implemented yet. Every number marked *(tune)* is a starting value for playtests; every other number is derived from
+`docs/spec/PHYSICS.md`, `docs/LEVEL_DESIGN.md` 12 or the research documents and is binding until a playtest changes it
+through this document.
+
+Inputs: `PROPOSAL_A_FAITHFUL.md` (the spine), `PROPOSAL_B_COOP.md`, `PROPOSAL_C_BOLD.md`, `RESEARCH_COOP.md`,
+`RESEARCH_VERSUS.md`, `TECH_AUDIT.md`, the art and audio staging under `.tools/asset_candidates/`. The production plan
+is `docs/expansion/PLAN.md`.
+
+Units: **tick** = 1/24.2753 s (22 ticks = one "designer second"; 1 s = 24 ticks, 3 s = 73, 5 s = 121, 10 s = 243,
+15 s = 364, 60 s = 1 457, 90 s = 2 185); **px** = logical pixel (1 cell = 16 px); **v16** = 1/16 px per tick. Hero
+reach (LEVEL_DESIGN 12): standing jump 3 tiles, running gap 4 tiles (5 with a run-up to the right), head bounce with
+Up held 105 px (6 tiles). Gravity 16 v16/tick, terminal fall 192 v16. Club power 25.
+
+Order of authority is unchanged (ARCHITECTURE header): PHYSICS > GAMEPLAY > ASSET_MANIFEST > ARCHITECTURE. The
+per-tick rules of every new system below go into a PHYSICS.md appendix and a GAMEPLAY.md section 13 in phase 0 of
+the plan; until then this document is their source.
+
+---
+
+## 0. The expansion on one page
+
+| Question | Answer |
+|---|---|
+| What ships | **Club & Grub 2.0**, a free update of the same app. Title > Play > **Solo / Co-op / Versus**. Solo and Co-op continue to **Book I: The First Feast** (the 15 shipped levels) or **Book II: The Far Shore** (20 new levels). |
+| Book II | 20 level files counted the way 1.0 counts its 15: **11 map stops + 6 linked sub-stages + 2 Feast Lands + 1 playable ending**, in five new worlds: 5 Sunbaked Canyon, 6 Tar Fen, 7 Coral Coast, 8 Idol Ruins, 9 Sky Spire. Beginner plays worlds 5-7 (11 files); Expert plays all 20. Expert wall before world 8. |
+| Bosses | **6 new**: Tusker the Boar King, Old Mangrove (the Rooted Guardian, the original's third boss type that 1.0 never built), Inkjaw the Grotto Squid, the Twin Idols, the Storm Roc, and the final **Rival Chieftains** Gorm and Gulla, who fight with our own co-op moves. The Brute and the Wall Colossus get co-op forms. Every boss has a solo form (club-beatable) and a co-op form that one hero cannot beat. |
+| New for everyone | The **Weapon Belt** (the club is never lost; one special rides on the belt; a new Swap button), the **spear** (sticks in bark boards as a step), **vines**, **tar**, **geysers**, **rafts and currents**, the **rising tide**, **Chomper the rex** (a mount that eats enemies), three new enemy behaviours (Roller, Guard, Mimic), and **30 Cave Paintings** that unlock versus content. |
+| Co-op | **Exactly 2 players**, local (keyboard halves, pads, tablet table mode). One shared **tribe camera**, **Egg Hatch** revive, **tribe lives** (a life is lost only when both are down). A co-op version of all 35 stages, each its own `<id>_coop.lvl`. **The enemy structure changes**: every enemy record in a co-op file may carry a co-op trait (shell, bond, daze, heavy, lone, grab, leech, split) and 7 co-op-only enemies exist; every co-op stage has at least two gates on the main path that one hero cannot pass, proven by a search. Duo verbs: **Shoulder Hop, Totem Ride, Batter Up, Brace Wall**. |
+| Versus | Same device, **2-4 players**, bots fill empty slots. Flagship **Grub Stack**: food you grab stacks on your head, hits knock it off, stomps steal it, a cookpot banks it. Launch modes: Grub Stack, **Last Caveman Standing**, **Hot Rock**, **Clubball**. **10 single-screen arenas** (8 at launch, 2 unlocked by paintings). Deterministic bots (Rookie / Hunter / Chief). |
+| Single-player 1.0 | Book I solo plays exactly as 1.0.0: its 15 level files and 72 route files stay byte-identical and replay tick for tick, proven by per-tick digests and a permanent guard test. Book I solo keeps the 1.0 weapon rule (no belt). |
+| Art and audio | Everything **CC0**. The anchor artist's own CC0 packs (RPG Battle System, Ninja Adventure, Western FPS 2D) plus recolours and composites of shipped art. No CC-BY file ships. |
+| Proofs | One club route per (Book II stage, difficulty) proves every weapon (fresh-club rule + belt-invariance test): **31 solo routes** instead of 155. **57 two-stream co-op routes**. Solo-impossibility search on every co-op gate. Headless bot matches on every (arena, mode). |
+
+**Owner decisions** (this design applies the recommended default of each; a different answer changes only the named
+parts):
+
+| # | Decision | Recommended default (applied) | Alternative and its cost |
+|---|---|---|---|
+| 1 | What "20 more levels" counts | 20 level files counted the way 1.0 counts its 15 (17 stages + 2 Feast Lands + 1 ending) | 20 playable stages: +3 files (+~4 ew, +6 routes) |
+| 2 | Weapon rule in Book I solo | exactly 1.0 (no belt, Swap ignored) | belt and Swap in Book I too: routes still replay (none presses Swap); one extra invariance check |
+| 3 | Book II availability | open from the start | unlocked by finishing Book I in that mode (shuts Beginner-only players out) |
+| 4 | Co-op player count | exactly 2 | a 3-4 player "party" co-op later, without designed gates |
+| 5 | Licences | CC0 only; no CC-BY file (the Gregor Quendel crowd cheer and Wolfgang_'s CC-BY themes stay out) | accept CC-BY files with attribution in CREDITS and the credits roll |
+| 6 | Versus announcer | no adult voice: beeps and chiptune jingles | the Kenney CC0 voice lines ("round one", "sudden death") in versus only |
+| 7 | Release form | a free 2.0.0 update of the same app, 1.0 saves migrated | a separate product or paid add-on |
+
+**Why A is the spine** (scores in PLAN.md 1): it is the most faithful, the cheapest with the art that really exists,
+and the easiest to prove. From B we take the co-op-native final boss (Rival Chieftains on hero physics), the role
+vocabulary of the co-op enemies, the Tar Pulleys and Mesa Rodeo arenas, Chomper's two seats, the drift hash of co-op
+files and the duo route macros. From C we take the fresh-club belt with its invariance test, Batter Up and Brace
+Wall, the bark-board spear, Grub Stack, Clubball and the scouting egg. Rejected (section C.10): B's "one map, two
+keys" and Carry & Throw, C's three-mount stable, stage clocks, low gravity, zip-lines, bola and co-op overlays.
+
+---
+
+## A. Campaign - Book II: The Far Shore
+
+### A.1 Entry, story, map, registry
+
+- **Entry.** Title > Play > Solo / Co-op / Versus. Solo and Co-op open a **book select** with two carved slabs, then
+  Beginner / Expert, then the world map of that book. **Book II is open from the start** (Beginner players never
+  finish Book I because of the expert wall; locking Book II behind it would shut them out). Each (mode, book,
+  difficulty) has its own save slot, high-score table and level select. Book II has level codes (solo only, as Book
+  I); co-op continues from the save.
+- **Story** (two still pictures composed in-engine from shipped sprites, plus signs and the map banner, the 1.0 way):
+  at the homecoming feast after the Way Home, the two chieftains of the **Tar Tribe**, Gorm and Gulla, swoop down on
+  their **Storm Roc** and carry off the **Great Roast**. Grub (P1, the 1.0 hero) and his cousin Munch (P2, blue) lash
+  logs into a raft and follow the trail of crumbs across five lands. Every boss has eaten a share of the roast and
+  coughs up the fire-starter for the next exit totem. The Roc is brought down above the clouds; the chieftains make
+  their last stand at the pyre on the spire top; the ending is the long raft voyage home. In solo, Munch waves from
+  the map and from the tally companion's side.
+- **Map.** A second 1280 x 360 map page, `ui/world_map_far_shore.png`, east of the home islands: the 1.0 sea and sky
+  with five islands (a red mesa, a tar delta with a giant mangrove, a coral coast with sea stacks, an idol isle behind
+  a temple gate, a spire into a storm cloud), joined by a dotted raft route. A stone slab in the lower-right corner
+  holds the Cave Painting slots (C.9). As in Book I, only `main` levels are map stops.
+- **Registry.** New meta key `book` (int, default 1; Book II files say `book = 2`). `Levels.get_campaign(difficulty,
+  book)`, `next_level`, the map and the route tests filter by it. Book I files get the default and stay
+  byte-identical. Co-op files (`kind = coop`) and arenas (`kind = arena`) never appear in a solo registry query.
+- **Carried state inside Book II**: score, lives, letters (a fresh G-R-U-B-S set in worlds 5-7), and hand + belt
+  (C.1). The glider is removed at the tally, as in Book I.
+
+### A.2 The 20 levels
+
+Difficulty on one scale for both books (Book I: 1-1 = 1, 1-2 = 2, 2-1 = 3, 2-2 = 4, 3-1 = 5, 3-2 = 6, 4-1 = 7,
+4-2 = 8, 4-2b = 9). Mode: **B** = Beginner and Expert, **E** = Expert only (`min_difficulty = expert`).
+
+| # | Id | Name | World | Kind | Mode | Signature mechanic | Diff. |
+|---|---|---|---|---|---|---|---|
+| 1 | `w5_l1` | Red Mesa Trail | 5 Sunbaked Canyon | main, order 110 | B | **Belt + Swap** and the **spear** taught; bark boards on palisade walls; long sand slopes with **Rollers** | 3 |
+| 2 | `w5_l2` | Rattlesnake Gulch | 5 | main, order 115, `tally = false`, `bonus = bonus_d` | B | vertical gulch: **vines** and rolled vines; rattlers in burrows; warp to Feast Land D up two spear steps | 4 |
+| 3 | `w5_l2b` | Tusker's Wallow | 5 | sub | B | **Boss: Tusker the Boar King** in a mud wallow | 4 |
+| 4 | `w6_l1` | Bubbling Fen | 6 Tar Fen | main, order 120 | B | **tar** floors, **rafts** on slow currents, **Chomper the rex** tamed and ridden across the tar flats | 5 |
+| 5 | `w6_l2` | Spore Hollow | 6 (mushroom cave) | main, order 125, `tally = false` | B | darkness lit by glowing caps, mushroom springs, spore **geysers**, Puffcap snappers | 5 |
+| 6 | `w6_l2b` | Heart of the Mangrove | 6 (inside a hollow tree) | sub | B | **rising tide of tar** up the trunk on vines, then **Boss: Old Mangrove** | 6 |
+| 7 | `w7_l1` | Shell Beach | 7 Coral Coast | main, order 130, `bonus = bonus_e` | B | surf currents and rafts, blowhole geysers, leaping fish, Chomper over urchin beds; warp to Feast Land E on a sea stack | 5 |
+| 8 | `w7_l2` | Sea Caves | 7 (coast cave) | main, order 135, `tally = false` | B | dark caves, driftwood drop floes over deadly water, octopus lurkers, bark boards on drift-logs | 6 |
+| 9 | `w7_l2b` | Squid Grotto | 7 | sub | B | **Boss: Inkjaw**; **last Beginner stage** (expert-wall picture) | 7 |
+| 10 | `w8_l1` | Overgrown Steps | 8 Idol Ruins | main, order 140 | E | stair puzzles of **rising columns** on trigger plates, **Guards**, **Mimic** chests, vines through the roof | 7 |
+| 11 | `w8_l2` | Hall of Idols | 8 (ruins interior) | main, order 145, `tally = false` | E | a maze of gates and one-screen secret rooms, darkness, spike pits, Guards in 3-row halls | 8 |
+| 12 | `w8_l2b` | Idol Court | 8 | sub | E | **Boss: the Twin Idols** (one fixed screen) | 8 |
+| 13 | `w9_l1` | Cloudbreak Climb | 9 Sky Spire | main, order 150, `tally = false` | E | vertical climb: vines, steam geysers, drop clouds, harriers in updrafts | 8 |
+| 14 | `w9_l1b` | Thunderhead Glide | 9 | sub | E | **glider crossing** through a storm; lightning marks its column 22 ticks ahead; dive-scoring harriers | 8 |
+| 15 | `w9_l2` | The Roc's Spire | 9 | main, order 155, `tally = false` | E | the gauntlet: alternating gusts (crouch to brace), crumbling clouds, tar pockets, Guards and Rollers | 9 |
+| 16 | `w9_l2b` | Storm Nest | 9 | sub | E | **Boss: the Storm Roc** on the nest (beaten with the glider dive) | 9 |
+| 17 | `w9_l3` | Chieftains' Pyre | 9 | main, order 160 | E | a short climb past the Tar Tribe camp, then **final boss: the Rival Chieftains**; the Great Roast is the trophy | 10 |
+| 18 | `bonus_d` | Feast Land D: Honey Falls | feast | bonus (from 5-2) | B | honey floors (tar in candy skin), soda geysers, honeycomb walls full of spots | 2 |
+| 19 | `bonus_e` | Feast Land E: Pudding Lagoon | feast | bonus (from 7-1) | B | wafer rafts on a syrup current under a rain of fruit | 3 |
+| 20 | `ending_b` | The Long Raft Home | coast / village | ending | E | playable credits on a raft past every island; the home beach shows THE END (the mural if all 30 paintings are found) | 2 |
+
+Linking: `w5_l2 -> w5_l2b`, `w6_l2 -> w6_l2b`, `w7_l2 -> w7_l2b`, `w8_l2 -> w8_l2b`, `w9_l1 -> w9_l1b`,
+`w9_l2 -> w9_l2b` (`tally = false` on the first half, as 1.0). `w9_l3` drops `items/trophy` (the Great Roast), which
+leads to `ending_b`. Map stops: 11, `order` 110-160 as listed (Book I uses 10-80, so the two books never collide).
+
+Placements across the book:
+- **Letters G-R-U-B-S**: 5-2 G, 6-1 R, 6-2 U, 7-1 B, 7-2 S (all in Beginner range, as in Book I).
+- **Cutlery**: one full feast kit per world.
+- **Specials**: spear in 5-1 (at the first checkpoint, before a bark board with a painting above it), hammer in 6-1,
+  axe in 7-1, swirling axe in 8-1, spear again in 9-1. None is ever needed (C.1 rule 6).
+- **Cave Paintings**: one per level (C.9).
+- **Expert-only enemies**: the per-record `expert` flag in every level, as 1.0.
+
+### A.3 Level notes (what each designer must hit)
+
+**World 5 - Sunbaked Canyon** (the re-entry world: wide, bright, forgiving).
+- **5-1 Red Mesa Trail** (about 220 x 30 cells). Opens on the beach where the raft lands. The first sign teaches the
+  belt ("Your club never leaves you. Press SWAP.") before the first enemy. The spear lies at the first checkpoint in
+  front of a palisade with a bark board; a painting sits two boards up. The second half runs down long sand slopes
+  where Rollers curl and roll at the hero; head bounces over them reach mesa-top secrets.
+- **5-2 Rattlesnake Gulch** (about 80 x 90, vertical). Vines up the walls; snake burrows behind hatches; **rolled
+  vines** on ledges that one strike unrolls (shortcuts for the next attempt). The Feast Land D warp sits on a ledge
+  reachable only by two spear steps - the "aha" use of the new weapon, optional by design.
+- **5-2b Tusker's Wallow**: a short approach, a checkpoint, then the walled arena (B.1).
+
+**World 6 - Tar Fen** (slower, stickier, darker).
+- **6-1 Bubbling Fen** (about 230 x 40). Teaches **tar** (you sink in and only tap-jump) and **rafts** on slow
+  currents (a forward strike on a raft paddles it). At the second checkpoint **Chomper** is stuck behind a rock fall:
+  three head bounces in a row tame him (C.8); the second half crosses tar flats on his back (he wades `:` at full
+  speed and eats the slime walkers). Gnat zones bring back the flies and the water bucket. The hammer lies on a raft
+  that drifts past a secret.
+- **6-2 Spore Hollow** (about 200 x 60). A mushroom cave in near darkness (dark zones); glowing caps mark the way;
+  caps are springs; spore geysers lift drop platforms. Puffcaps (snapper skin) bite from the dark; their wind-up glow
+  is the telegraph.
+- **6-2b Heart of the Mangrove** (about 40 x 120). Up the hollow trunk while tar rises 1 px per tick behind you
+  (`scroll = rising`), with vines, roots and burrowing bugs; an `autoscroll_stop` zone at the top opens into Old
+  Mangrove's chamber (B.2).
+
+**World 7 - Coral Coast** (a breather after the swamp, then the hardest Beginner stretch).
+- **7-1 Shell Beach** (about 240 x 40). Surf currents carry rafts between sand bars, blowholes throw rafts and heroes
+  onto sea stacks, leaping fish, gulls. A Chomper pen before the urchin beds (floor spikes `^` he walks over). The
+  Feast Land E warp is on the tallest sea stack (blowhole + vine).
+- **7-2 Sea Caves** (about 200 x 60). Driftwood drop floes over dark water, octopus lurkers on the ceilings, bark
+  boards on drift-logs for spear steps.
+- **7-2b Squid Grotto**: Inkjaw (B.3). Clearing it ends the Beginner run with the expert-wall picture: *"Only an
+  expert eater may climb to the Roc!"*
+
+**World 8 - Idol Ruins** (Expert; the castle world).
+- **8-1 Overgrown Steps** (about 200 x 60). A temple stair puzzle of **rising columns** that move when you step on
+  trigger plates; Guards that turn slowly toward you; Mimic chests among real ones; vines through the ruined roof;
+  the swirling axe.
+- **8-2 Hall of Idols** (about 180 x 70). The original's gate-and-secret-room craft at full strength: a maze of gates
+  (`objects/gate` with `lock=`), each a one-screen room, plus darkness, spike pits and Guards in 3-row halls where
+  nobody can bounce over them.
+- **8-2b Idol Court**: the Twin Idols (B.4).
+
+**World 9 - Sky Spire** (Expert; the climb to the Roc).
+- **9-1 Cloudbreak Climb** (about 60 x 150, vertical). Vines, steam geysers, drop clouds; harriers and darts in the
+  updrafts; bark boards in soft cloud-rock; the spear returns.
+- **9-1b Thunderhead Glide** (about 250 x 20). Take the glider, run up, cross a storm; lightning marks its column 22
+  ticks ahead; dive-attack harriers for the 1 000 / 5 000 / 10 000 ladder.
+- **9-2 The Roc's Spire** (about 220 x 50). The exam: alternating gusts (Blizzard Pass's crouch-to-brace),
+  crumbling drop clouds, tar pockets, Guards and Rollers, a checkpoint before every section.
+- **9-2b Storm Nest**: the Storm Roc (B.5).
+- **9-3 Chieftains' Pyre** (about 60 x 40). A short climb past the Tar Tribe camp, a checkpoint, then the final fight
+  (B.6).
+- **Feast Land D** (honey floors use the tar rules in a candy skin; soda geysers; honeycomb walls full of spots) and
+  **Feast Land E** (wafer rafts on a syrup current, fruit rain): food-made and enemy-light, as Feast Land A-C.
+- **The Long Raft Home**: a raft on a gentle current past the five islands; credits on floating signs; food rains
+  from the Roc's broken hoard; no failure state; the home beach is the exit.
+
+### A.4 Difficulty curve
+
+| Book | Beginner part (play order -> difficulty) | Expert-only part |
+|---|---|---|
+| I | 1-1 **1**, 1-2 **2**, 2-1 **3**, 2-2 / 2-2b **4**, 3-1 / 3-1b **5**, 3-2 **6** | 4-1 **7**, 4-2 **8**, 4-2b **9**, Way Home |
+| II | 5-1 **3**, 5-2 / 5-2b **4**, 6-1 **5**, 6-2 **5**, 6-2b **6**, 7-1 **5**, 7-2 **6**, 7-2b **7** | 8-1 **7**, 8-2 / 8-2b **8**, 9-1 / 9-1b **8**, 9-2 / 9-2b **9**, 9-3 **10**, Raft Home |
+
+Book II re-enters at world 2's level (3): newcomers get a re-warm, veterans get new toys at once. 7-1 is a deliberate
+dip after the swamp boss. The Beginner run ends at 7, one above Book I's; Expert peaks at 10.
+
+### A.5 Enemies of Book II
+
+Mostly **new species on the 13 existing behaviours** (skins), plus **three new behaviours** in the same spirit: one
+parameterised state machine each, no projectiles (only bosses throw things), heads always safe to bounce on.
+
+| Archetype (GAMEPLAY 5.2) | Book II species (sprite source, section F.1) |
+|---|---|
+| 0 Dropper | slime blobs (RPG `slime`, 2 palettes) in the fen; sea snails on the coast (shipped `turtle_b` + anchor shell item 18) |
+| 2 Dangler | cave bats (RPG `bat`) in the gulch; octopus on a kelp thread (Ninja `Monster/Octopus` 2x) in the sea caves |
+| 3 Lurker | scarabs (shipped `insect`) in the ruins; octopus (Ninja `Monster/RedOctopus` 2x) on sea-cave ceilings |
+| 4 Swinger | swinging bats (shipped `bat_b`), rare as in the original |
+| 5 Stinger | swamp mosquitoes (shipped `insect_b`, recoloured) |
+| 6 Harrier | desert eagle (Sunny Land eagle 2x), gull (shipped `pterodactyl` recoloured white), ruin ghost (RPG `ghost`), storm pterodactyls |
+| 7 Dart | eagle dive, storm pterodactyl (shipped `pterodactyl_b`) |
+| 8 Hopper | swamp frogs (Sunny Land frog 2x), temple raptors (shipped `mini_rex_b`) |
+| 9 Walker / Flyer | tortoises (shipped `turtle`), grubs (Ninja `Monster/Larva` 2x), jelly flyers (RPG `slime` recoloured translucent blue) |
+| 10 Digger | burrow snakes (RPG `snake`, red and green), mangrove bugs (shipped `lizard`) |
+| 11 Leaper | leaping fish (Ninja `Animal/Fish` 2x, plus a red recolour), cloud drakes (shipped `dragon_b`) |
+| 12 Charger | desert tribesmen (shipped `rival`, Tar Tribe palette); heavy charger = shipped `rex_b` |
+| Snapper | rattler in a hole (RPG `snake`), cave bear (Western FPS bear: idle, claw = bite, hurt, death), Puffcap (RPG `mushroom`, spore burst = bite), shipped `plant` |
+| **13 Roller** (new, `enemies/roller`) | RPG `dino` (rolls into a ball). Walks; within `range` [6] tiles it curls (14-tick visible tuck) and rolls at the hero; follows slopes, +4 v16/tick downhill (cap 96); bounces off a wall and is **dizzy 33 ticks** (hittable); a head bounce on the ball is safe. Params `range`, `speed` [64], `dizzy` [33] |
+| **14 Guard** (new, `enemies/guard`) | RPG `reptile` (GUARD animation; armour recoloured bone and stone). Patrols, holds its shield toward the hero and **turns only every `turn` [33] ticks**. Front hits glance with the Colossus clank and spark; back hits count. Solo answer: bounce over it and strike before it turns. Teaches the pincer that co-op then demands |
+| **15 Mimic** (new, `enemies/mimic`) | RPG `mimic`: looks exactly like `objects/container skin=chest`. Within 2 tiles it opens with a 10-tick shudder and bites (snapper rules); dies to a strike from behind or a head bounce + strike; killed, it drops a treasure. The original's cruel joke (the skull) as an enemy |
+
+The three new archetypes live in `scripts/enemies/`, declare their doze rule (ARCHITECTURE 11.1), and Book I never
+spawns them.
+
+---
+
+## B. Bosses
+
+### B.0 Rules every boss follows
+
+- **Telegraphs**: every attack shows itself **10 or more ticks** ahead, pinned per boss by a
+  `tests/test_enemies_<boss>.gd` like `test_enemies_colossus.gd`.
+- **Hit cooldown** `BOSS_HIT_COOLDOWN` (22 ticks) per boss: no stun-lock, attack clocks keep running through hurt
+  poses, and two heroes cannot double the damage.
+- **Head bounces** on a boss always bounce the hero and harm nobody.
+- **Book II rule: every boss falls to the club.** Specials only make it easier. (Book I's Colossus keeps its
+  thrown-only rule and the axe at its checkpoint.)
+- **Defeat**: 64 bonus items plus the key item (fire-starter, or the trophy). Boss music while the bar shows.
+- **Co-op form**: hit points at most x1.25 and **one rule that one hero cannot satisfy** (a twin window shorter than
+  the solo minimum, a guard that always faces the nearer hero, a grab only the partner can break, a brace that needs
+  two bodies). The solo search of D.8 must fail to beat each co-op form; the boss test asserts it.
+
+Hit points are in club hits (25 each; a charged hit counts 4). Archetype 6.2 / 6.3 bosses count 1 per hit.
+
+### B.1 Tusker, the Boar King (`w5_l2b` Tusker's Wallow)
+
+- **Art**: RPG `boar` (239 x 178 cells; idle, walk, charge, spin-ball, hit, death) at native 1x - body about
+  75 x 55 px, twice the hero's height. Outline to `#272018`, tusks lengthened by pixel edit, palette 2 for rage.
+- **Arena**: one walled screen (`zones/arena`, `|` walls); mesa banks 3 rows up at cols 1-4 and 15-18; a 6-cell mud
+  wallow (`:` tar floor in mud skin) in the middle that slows everyone, Tusker included.
+- **Phase 1** (hp > 60 %), **Paw and Charge**: paws 22 ticks (dust, snort), charges at 96 v16. Into a wall: **dizzy
+  44 ticks**. Across the wallow: slowed to 2 px/tick and **stuck 22 ticks**.
+- **Phase 2** (60-30 %), **Spin Ball**: 14-tick squeal while it curls, rolls and bounces off the walls in two arcs,
+  then a high hop whose landing shakes the screen (crouch to stand firm); dizzy 33 ticks when it uncurls.
+- **Phase 3** (< 30 %), **Stampede**: every wall impact shakes 3 rocks loose (`boss_rock` physics), each marked by a
+  dust trickle 14 ticks ahead; shorter idles.
+- **Weak point**: the head while dizzy or stuck; tusks glance during a charge.
+- **Hit points**: Beginner 150 (6 hits), Expert 225 (9).
+- **Co-op form** (190 / 280): it charges whoever hit it last; while dizzy it swings to face the nearer hero, so only
+  the partner behind can strike the **leafy rump** (the co-op weak point). In phase 3 its charges no longer crash: it
+  skids and turns 2 tiles before a wall, and only a **Brace Wall** (D.4) of two crouching heroes stops it dead
+  (dazed 66 ticks, flanks open). One crouching hero is trampled.
+
+### B.2 Old Mangrove, the Rooted Guardian (`w6_l2b` Heart of the Mangrove)
+
+The original's tree-stump archetype (GAMEPLAY 6.2; 12.1 stretch goal).
+- **Art**: body = Ninja `Boss/GiantBamboo` (62 x 62 frames: idle, attack, charge, hit) at 2x, gradient-mapped to
+  mossy bark, set into the right wall like the Colossus. Fist = composite of shipped `props/jungle/root_arch` and
+  `objects/boulder` on a 3-segment root arm cut from `vine_branch`. Leaves = `enemy_ember skin=leaf`. Minions =
+  shipped `lizard` diggers.
+- **Arena**: the chamber at the top of the tar climb; floor row 10; the Guardian fills cols 15-18; one-way root
+  ledges on the left at rows 7 and 4.
+- **Stage 1 Face**: the fist punches along the floor in bursts of 3-8 (10-tick draw-back with a creak); each punch
+  shakes and shoves 2 px and drops one leaf from 150 px. **The resting fist is a springboard** that launches the hero
+  unharmed to the face at row 4.
+- **Stage 2 Upper hand**: a second root sweeps the upper ledge (14-tick ledge shake), then **rests on the ledge 44
+  ticks**: high-strike it from the lower ledge.
+- **Stage 3 Fist**: bursts of 8, bugs burrow up (every shake sends them down); the fist is hittable **20 ticks after
+  each burst** while stuck in the floor.
+- **Hits** (any weapon counts 1): Beginner 4 / 3 / 3, Expert 6 / 5 / 5.
+- **Co-op form**: stages 1 and 2 merge - the face and the hand must both be struck **within the twin window** (D.4):
+  one hero rides the fist springboard to the face, the other waits on the upper ledge. A hero standing on the resting
+  fist **pins** it (no punch until it flings him off after 66 ticks). Stage 3: the knuckle armour turns to the nearer
+  hero, so the wrist must be struck from the far side.
+
+### B.3 Inkjaw, the Grotto Squid (`w7_l2b` Squid Grotto)
+
+- **Art**: Ninja `Boss/SquidGreen` (76 x 79 frames: idle, walk, attack, attack loop, shoot, hit) at 2x, outline
+  recoloured; `SquidRed` for the rage phase. Tentacle = chain of segments cut from the RPG `octopus.png` arm,
+  recoloured to the squid palette. Ink blob = shipped `projectile_rock` recoloured black-violet. Slams = attack frames
+  + shipped `fx/ring` + `fx/splash`.
+- **Arena**: one screen; deadly water across the floor; rock islands at cols 2-5, 8-11, 14-17 (row 9); one-way
+  root ledges at row 6 over the gaps. Inkjaw surfaces in gap 6-7 or 12-13; **22 ticks of bubbles** mark which.
+- **Phase 1 Surface and Slam**: a tentacle rises over the next island for 12 ticks (its shadow marks the landing),
+  slams (deadly box 4 ticks, shake); the squid stays up 44 ticks. Weak point: the top of its head (high strike from
+  an island edge, a bounce, or a throw).
+- **Phase 2 Ink**: adds a spit (jaws open 10 ticks, then an arcing ink blob). A hit costs a bone **and dims the
+  screen to the night palette for 66 ticks**; the surfacing bubbles stay bright.
+- **Phase 3 Whirlpool** (< 30 %, red): the middle island sinks; two log **rafts** circle the pool on a current; the
+  squid surfaces beside a raft and slams it (the raft dips and shakes, nobody is thrown off). Fight from the raft;
+  paddle with a strike on the water side.
+- **Hit points**: Beginner 150 (6), Expert 225 (9).
+- **Co-op form, Tentacle Lock** (190 / 280): on surfacing it crosses **two** tentacles over its head. A strike makes
+  a tentacle flinch 16 ticks (Expert) / 24 (Beginner); the head opens for 33 ticks only while **both** flinch - one
+  hero on each flanking island, striking on a count of three. Phase 3: one hero paddles the raft into position while
+  the other strikes.
+
+### B.4 The Twin Idols (`w8_l2b` Idol Court)
+
+- **Art**: shipped `colossus.png`, the left idol **mirrored** and gradient-mapped to jade (Moon Idol), the right to
+  sandstone gold (Sun Idol); all six poses reused. Masonry = `projectile_stalactite` recoloured sandstone.
+- **Arena**: one fixed screen; the idols sit in both walls at floor level; a 2-row altar block in the centre
+  (cols 8-11); a ledge at row 6 in front of each idol's jaws.
+- **Pattern**: one shared brain. One idol is **Awake** (eyes glow; spits rocks, jaws 10 ticks ahead, each rock
+  bounces twice - the Colossus rules); the other is **Asleep** and armoured, and drops masonry over the hero
+  (14-tick rattle). Every 4th hit both **rage** for 40 ticks (armoured), then swap roles.
+- **Weak point**: the open jaws of the awake idol - high strike from its ledge, forward strike when it slams low, or
+  any thrown weapon. The club works here (Book II rule).
+- **Hits**: Expert 7 per idol (14 in all); the boss bar shows two halves.
+- **Co-op form, Twin Hit**: both idols wake together, each spits at the hero on its own side; an idol cracks only if
+  its twin is hit within the twin window. A rage swaps their targets.
+
+### B.5 The Storm Roc (`w9_l2b` Storm Nest)
+
+- **Art**: shipped `pterodactyl.png` at 2x (288 x 240 cells; body about 104 x 44 px), gradient-mapped to storm slate
+  with a gold crest (pixel edit), **re-packed 4 x 4 to stay under the 2048 px texture limit**. It already has fly,
+  perch, rise, dive, screech, hit, dead. Feathers = anchor items 43-46 as a `feather` skin of the leaf hazard.
+  Lightning = RPG fx recoloured white-yellow.
+- **Arena**: one 20 x 12 screen at the spire top: a stick nest (one-way, cols 6-13, row 8), a stone floor at row 10
+  with a 4-cell runway on each side, two drop clouds at row 5.
+- **Phase 1 Gale**: perches on the nest rim, raises its wings 14 ticks (whoosh), beats them: wind left or right for
+  66 ticks (blizzard wind code; crouch to brace); feathers fall like leaves. Its head is reachable from the nest by a
+  high strike or a bounce. After 3 gusts it takes off.
+- **Phase 2 Dive**: circles the hero (harrier loop), screeches 14 ticks, dives at his position (dart rule); a miss
+  **buries its beak** in the nest or floor for 44 ticks: head open.
+- **Phase 3 Storm** (< 1/3): lightning strikes cells a darkening cloud marks **22 ticks** ahead (struck nest sticks
+  burn 66 ticks); the Roc climbs above the view and comes down only to swoop. **The hang-glider lies on the nest**:
+  take off along the runway (24 ticks at speed, the original rule), climb on lift and **dive onto its back**; the
+  dive ladder (1 000 / 5 000 / 10 000) counts the three hits; the third dive brings it down.
+- **Hit points**: phases 1-2 take 200 (8 club hits); phase 3 takes 3 dives. Expert only.
+- **Defeat**: it tumbles into the clouds and coughs up the fire-starter for the summit totem.
+- **Co-op form**: phase 1 - a wing shield faces the nearer hero (pincer on the nest). Phase 2 **Snatch** - a dive
+  grabs the hero it targeted and climbs at 2 px/tick; the partner frees him by hitting the Roc's head within 3 s (73
+  ticks), otherwise the grabbed hero becomes an egg (no life lost); a rescue stuns the Roc 66 ticks. Phase 3 **Pilot
+  and Spotter** - the pilot dives (and cannot strike, the glider rule); after each dive the Roc tumbles low over the
+  nest for 24 ticks, and a dive counts only if the hero on the nest strikes its tail feathers within those 24 ticks.
+  Each hero has his own glider on the nest.
+
+### B.6 The Rival Chieftains, Gorm and Gulla (`w9_l3` Chieftains' Pyre, final boss)
+
+- **Art**: shipped `rival.png` (hero-sized, full move set: idle, walk, jump, fall, land, roll, crouch, attack, hurt,
+  death) in two palette swaps - tar-black with bone war paint (Gorm), ochre with red (Gulla) - with bone headdresses
+  composited from the anchor dino-skull items 57-58. Their revive egg = `egg_kid` roll frames in their palettes. Two
+  boss bars (two rows of pips).
+- **How they move**: **on hero physics, driven by the versus bot brain** (E.7). Each chieftain is a boss shell around
+  the hero simulation fed every tick by a `HeroBot` input producer with its own seeded `SimRng`. They walk, jump,
+  strike and bounce exactly as we do - readable and fair, and the bots pay twice. **Fallback** (PLAN cut list): a
+  Brute-style state machine on the same sprite with the same phases.
+- **Arena**: one screen around the pyre; the Great Roast on an altar 6 tiles up at the centre; a see-saw and two
+  plates on the floor; ledges 3 rows up.
+- **Energy**: 4 pips each (one pip = 1 hit, hit cooldown per chieftain).
+- **Phases** (every attack telegraphed with a shout pop-up "HUP!" and a 14-tick crouch):
+  - **P1 Raiders**: they flank, strike and stomp heads; they pick the hero farther from his partner (lone rule).
+  - **P2 Totem Chief** (from 2 pips each): they **stack** (the bottom walks, the top strikes high) and the bottom
+    **bats** the curled top across the arena at a hero (Batter Up); a batted chief lies dazed 30 ticks where he lands.
+  - **P3 Roast Thieves** (last pip each): one grabs the Great Roast and runs for the Roc perch at the arena edge; he
+    cannot strike while carrying; a hit makes him drop it; if he reaches the perch the roast returns to the altar and
+    he regains one pip.
+  - **Egg revive**: a chieftain knocked to 0 becomes an egg; his partner runs to hatch it with a head bounce unless
+    the heroes smash it first (3 hits).
+- **Solo**: they tag in one at a time (the other waits on the pyre and tags in at half energy); a knocked-out
+  chieftain's egg hatches after 132 ticks unless smashed; P2 bats are aimed at the hero, so the dazed chieftain is the
+  solo opening.
+- **Co-op**: both fight at once; their egg hatches in 66 ticks, so one hero must smash the egg while the other keeps
+  the surviving chieftain away - our own revive rule turned against us.
+- **Defeat**: they hand back the Great Roast (the trophy) -> `ending_b`.
+
+### B.7 Co-op forms of the two shipped bosses (in `w2_l2b_coop` and `w4_l2b_coop` only)
+
+- **The Brute** (hp 64 -> 80): targets whoever hit him last; his arm guard faces his target and blocks throws and head
+  strikes from that side, so **only the partner can reach the head** (a Totem Ride rider reaches it with a forward
+  strike). Below 50 % the **Grab**: after a 22-tick chest beat his hands open 8 ticks; a target within 30 px in front
+  is squeezed (1 bone per 44 ticks); wriggling (alternate Left / Right) shortens the hold by 4 ticks per press; a
+  partner's head hit frees him and staggers the Brute 19 ticks. The ground pound shakes both (crouch to stand firm).
+- **The Wall Colossus** (hp 24 -> 30): a stone **visor** covers the face; two stone plates at the hall's sides lift it
+  while a hero stands on the plate whose chain glows. Rocks are spat at the plate holder, stalactites rattle over the
+  thrower. Still thrown weapons only; the co-op checkpoint places **two** axes. Each rage (the 1st hit and every 4th)
+  moves the live chain to the other plate: the roles swap. The fairness tests of `test_enemies_colossus.gd` run per
+  hero.
+- Solo: both bosses are exactly the 1.0 bosses.
+
+---
+
+## C. Something new (solo too)
+
+### C.1 The Weapon Belt and the fresh-club rule
+
+**Rules.**
+1. A hero has two weapon places, the **hand** and the **belt**. One of them always holds the **club**; the other holds
+   at most one **special** (hammer, axe, swirling axe, spear).
+2. **Pick-up**: a special goes into the hand and the club onto the belt; an owned special is replaced and gone (no
+   item is spawned). A club item while holding a special swaps them.
+3. **Swap** is one new action, `swap` (input flag `IN_SWAP`, route key letter `S`). It swaps hand and belt on the tick
+   it is pressed unless a strike is running (attack gate); it works in the air; star puff + blip; lock-out 8 ticks
+   *(tune)*. It never changes movement.
+4. **Fresh club**: every Book II stage and every co-op stage (Book I co-op included) **starts with the club in hand**;
+   the special waits on the belt (meta `belt = fresh`, the default when `book = 2` or `kind = coop`). Hand and belt
+   are kept through deaths and from stage to stage. A stage started from a code or the level select begins with the
+   club and an empty belt.
+5. **HUD**: one 16 px icon next to the hearts shows what a swap brings; it shows only while a special is owned.
+6. **Design rule**: nothing on a Book II main path or co-op gate needs a special; every boss falls to the club.
+   Specials open shortcuts, secrets and paintings and make fights easier.
+7. **Book I solo keeps the 1.0 rule** (one weapon, carried, replaced on pick-up; `belt = carry`, Swap ignored). Its
+   files, rules and 72 routes are untouched. (Owner decision 2 may enable the belt there later; every Book I stage
+   already has a club route.)
+
+**Why the proof matrix collapses.** With rule 4 every Book II stage begins in the same state whatever the run
+carries; the special changes nothing in the simulation until Swap is pressed. One club route per (stage, difficulty)
+proves the stage for every belt. A permanent **belt-invariance test** replays every Book II and co-op route with each
+special on the belt and demands identical per-tick digests (the belt slot excluded from the hash). Book II: **31
+recorded solo routes** (11 Beginner cells + 20 Expert cells) instead of 155; co-op: club / club only.
+
+**Keys**: single-player keyboard **V** (next to Z / X / C) and **`;`** (next to J / K / L); pad **LB**; touch: the
+spare **Y stone** of `ui/touch_buttons.png` (cells 7 / 15). Shared-keyboard layouts in D.11.
+
+### C.2 The spear and bark boards
+
+- **Spear** (`items/weapon kind=spear`, `projectiles/hero_spear`): thrown flat at 12 px/tick for 8 ticks, then
+  drops (+16 v16/tick); power 25; 6-tick recovery; at most **2 per hero** in flight or stuck (a third pulls out the
+  oldest). Like the axe it passes ordinary walls and opens hidden spots.
+- **Bark board** (`objects/bark_board`, one cell on a wall face, designer-placed on trees, palisades, drift-logs and
+  cloud-rock): a spear that hits it **sticks** and becomes a **16 px one-way platform** at its height for 220 ticks,
+  blinking the last 22, then falls.
+- **Why it fits**: the hero climbs by bouncing on heads; the spear lets him make his own step with the same one strike
+  button. Boards exist only where the designer wants them (secrets, the Feast Land D warp, paintings); the co-op
+  validator keeps them out of reach of every co-op gate (D.8).
+
+### C.3 Vines
+
+- `objects/vine length=<cells> rolled=<bool>` hangs from a ledge or ceiling (shipped `vine_a` / `vine_b` stacked,
+  recoloured per biome; the coil is cut from `vine_branch`).
+- Grab: Up while the feet column is within 6 px of the vine. Climb Up 2 px/tick, Down 3 px/tick (climb frames 44-47,
+  already in every hero sheet). Up at the top steps onto the ledge. Jump lets go: -128 v16 plus 32 v16 toward the
+  held direction. Down + Jump drops.
+- No strikes while climbing (the glider rule); a hit knocks the hero off as an ordinary hurt.
+- **Rolled vines** lie coiled on an upper ledge; one strike on the coil unrolls it: a shortcut opener in solo and the
+  "way back" gift in co-op (D.5).
+
+### C.4 Tar and geysers
+
+- **Tar floor** `:` (new tile character, terrain set A in a tar skin): a ground cell whose surface sits 6 px lower
+  (the existing lowered-surface profile of `TileGrid`). Walking capped at 32 v16 (2 px/tick); jump thrust only 3
+  ticks (a hop of about 30 px); crouch and strikes normal; ground enemies slowed the same way; dropped items stop dead.
+  Chomper ignores the slowdown. `liquid = tar` draws `~` as deadly tar; `liquid = honey` / `syrup` are the Feast Land
+  skins of the same rule.
+- **Geysers** `objects/geyser period=<ticks> delay=<ticks> power=<v16> skin=mud|blowhole|steam|soda`: bubble 22
+  ticks (the telegraph, with sound), then spout 12 ticks; the spout launches heroes, enemies, rafts and drop
+  platforms with the spring code (default -224). Harmless: a spring with a timer.
+
+### C.5 Rafts and currents
+
+- `objects/raft width=3|4 skin=log|wafer` floats on `~`. `zones/current rect=c,r,w,h dir=l|r|u|d speed=1..3` (px per
+  tick) moves rafts and floating items. Outside a current a raft slows by 1 px/tick every 8 ticks; banks stop it.
+  Riding uses the platform rules (PHYSICS 11.4).
+- **Paddling**: a forward strike while standing on a raft pushes it backward by 16 v16, up to 3 px/tick. A raft dips
+  2 px under each rider (visual only).
+- Water stays deadly (no swimming); in co-op a fall is an egg.
+- Used in 6-1, 7-1, 7-2b (phase 3), Feast Land E, the Long Raft Home.
+
+### C.6 The rising tide
+
+`scroll = rising` (with `rise_speed` [16 v16 = 1 px/tick], `.expert` variant allowed): the view rises at that speed
+with a band of the level's liquid at its bottom edge; it waits for the first input, like the 4-1 descent;
+`zones/autoscroll_stop` ends it; a checkpoint resets the band to 6 rows under itself. Touching the band kills (in
+co-op it makes an egg while the partner lives). Used in 6-2b and the Tar Pulleys / Cinder Pit sudden deaths.
+
+### C.7 New enemy behaviours
+
+Roller, Guard and Mimic (A.5). Their co-op rules are in D.6.
+
+### C.8 Chomper, the rex you ride
+
+- `objects/mount kind=rex pen=<name>` with its pen `objects/rex_pen name=<name>` (shipped `rex.png` at 1x, orange; Expert
+  foes keep the grey `rex_b`). Wild in 6-1: **three head bounces in a row** tame him. Later stages keep him in pens.
+  **Stage-local**: a mount never travels between stages (no entry-state variation, no extra proofs).
+- **Mount**: land on the saddle from above (the stomp test means "sit" on a mount). **Dismount**: Down + Jump.
+- **Mounted**: walk up to 64 v16 (4 px/tick); Jump = rex hop -160 v16 (about 55 px); **Strike = bite**: a box 0..40 px
+  in front, knee to head; an enemy with hp < 50 is **eaten** and pays its score plus a food bonus (the game is about
+  eating). Chomper walks over floor spikes `^` and wades tar floors `:` at full speed (deep `~` still kills).
+- **The glider contract**: no strikes with your own weapon while driving; a hit **removes the mount** (he bolts to his
+  pen and returns after 132 ticks) and costs no energy; no gates or hatches while mounted; mounted corridors need 4
+  rows of air (rex + rider stand about 55 px tall).
+- **Two seats (co-op)**: the first hero to sit drives (move, hop, bite); a partner who lands on Chomper's back becomes
+  the **gunner** - he cannot move but strikes and throws both ways with his own belt (Left / Right turns him). A hit
+  throws both off.
+- Used in 6-1, 7-1 and the Mesa Rodeo arena. Mount physics is an integer table (`MountTuning`) pinned by a reference
+  test like `PHYSICS_REFERENCE.json`; mount speed is far under the 18 px/tick doze reach.
+
+### C.9 Cave Paintings (the meta-goal)
+
+- `items/painting index=0..29`: **30 fragments** - one in every Book II level (20; at the same index in its solo and
+  co-op file, possibly in a different hiding place) and one behind an **x2 secret** in ten Book I co-op files (1-1,
+  1-2, 2-1, 2-2, 3-1, 3-1b, 3-2, 4-1, 4-2, Way Home). 5 000 points each; they count for completion; saved per profile
+  across modes (`Save.add_painting`), like code stones.
+- Hiding places: behind `$` walls, up spear steps, at the top of vines, inside a big spot, behind x2 gates. Never on the
+  main path.
+- **Unlocks** (shown on the Far Shore map slab and in the Versus menu): 5 = Mesa Rodeo arena; 10 = eight loincloth
+  patterns for P1-P4; 15 = variants Big Bounce, Lights Out, Giant Rain; 20 = Cloud Top arena; 25 = variant Spear Party
+  and a golden loincloth palette; 30 = the mural that ends The Long Raft Home. Options > Versus > "Unlock everything"
+  exists for parties.
+
+### C.10 Considered and rejected
+
+| Idea (source) | Why not in 2.0 |
+|---|---|
+| Swimming (all) | water kills in the original; a second physics model; no swim art |
+| Raptor and pterodactyl mounts, auto-run stages (C) | three physics tables and new art for one fantasy; Chomper alone delivers it |
+| Day / night, tide clocks, sun and moon blocks, low gravity, zip-lines, ropes (C, B) | stage clocks add state to every proof and drift from the original's feel; vines, rafts, geysers and the rising tide give the new worlds their identity |
+| Bola, sling (C, B) | one new special (the spear) is enough; each needs a hero sheet and art that does not exist |
+| Carry & Throw of rocks, eggs, torches (B) | Down + Strike would steal the low strike; solo keys are not needed because co-op content lives in its own files |
+| "One map, two keys" (B) | it bends every solo Book II level around co-op geometry; separate co-op files on the same skeleton keep solo levels pure |
+| Co-op overlays merged at load (C) | a merge step in the loader is a new failure mode; full co-op files with a drift hash are simpler |
+| Golden Egg escort, Hatchery screen (C, B) | Cave Paintings give the same hunt with one item and no carry state |
+| Split screen | half of 640 x 360 breaks the 20-column paging design (RESEARCH_COOP 5.4) |
+| Shops, upgrades, a second strike button | not the original's language; the score is the only currency |
+
+---
+
+## D. Co-op: the tribe
+
+### D.1 Rules of the two-hero game
+
+| Topic | Rule |
+|---|---|
+| Players | **exactly 2**, designed, tested and proven for two. The engine holds 4 (versus). |
+| Heroes | same physics, boxes and strike scripts. P2 is a palette swap through a per-slot 16 x 1 LUT shader (no baked sheets). Default colours: P1 the original yellow loincloth, P2 blue (from `hero_colours/`). A "P1" / "P2" tag and a colour arrow show at stage start and whenever the heroes overlap |
+| Body contact | heroes pass through each other sideways; only heads are solid (landing on a partner uses the stomp test). No friendly fire: strikes and throws pass through partners except where a co-op move says otherwise |
+| Shared | score (tribe score), lives (tribe pool), letters G-R-U-B-S, feast kit (any hero's 3 pieces feast both), checkpoint, exit unlock, completion, paintings |
+| Per hero | hearts, bones (bones picked up at full energy fly to the partner), hand + belt, glider |
+| Exit | **team exit**: the stage ends when both heroes are at the exit totem (an egg on screen counts) |
+| Gates | Down on a gate takes both heroes; a partner more than a screen away arrives as an egg |
+| Joining / leaving | from the join panel, the world map or the pause menu; mid-stage it restarts from the checkpoint in the other layout (score kept), because co-op files hold different entities |
+
+### D.2 The tribe camera
+
+One shared paging camera (TECH_AUDIT option B): it pages when the front hero reaches column 16 (column 4 going
+left) and the rear hero is not at the margin; it stops when the front hero is back at column 5 or the rear hero
+reaches column 1. The view edges are walls for the leader. Vertically it follows the **grounded** heroes, so a
+falling hero never drags the view. Holding **Look** claims the camera. A hero off the view gets an edge arrow with a
+stone countdown and becomes an **egg** after 3 s (Expert, 73 ticks) / 5 s (Beginner, 121 ticks) - no life lost.
+Gates, boss arenas and camera-lock rooms take both heroes. Auto-scroll (4-1) and the rising tide: the deadly edge
+eggs a hero while his partner lives. No zoom, no split screen.
+
+### D.3 Lives and the Egg Hatch
+
+- **Tribe lives**: one pool, starting like solo (the counter shows 2). A life is lost only on a **team wipe** (both
+  heroes dead or in eggs at once); then both respawn at the checkpoint (spread by slot) and enemies reset as today.
+  1UPs and every 250 000 points feed the pool. A single co-op death never resets the world, a boss or a gate.
+- **Egg Hatch**: a downed hero plays the death toss, then floats inside an egg (`egg_kid` roll frames in his colour)
+  that drifts after his partner; its owner nudges it Left / Right. **The partner hatches it with any hit, a thrown
+  weapon or a head bounce.** The hatched hero gets 2 hearts (Beginner) / 1 (Expert), 44 ticks of blinking, and loses
+  his own "since last death" tally list. A checkpoint touched by either hero hatches every egg. Expert: an egg not
+  hatched within 10 s (243 ticks) flies to the checkpoint and waits there.
+- **The egg scouts**: hidden spots within 2 tiles of an egg glint, so the downed player keeps helping. An egg never
+  touches plates, items or enemies, so it can never solve a gate.
+- **Voluntary egg**: Down + Look held 1 s turns a hero into an egg on purpose, to be carried through a hard stretch.
+- **Helper mode** (Options): P2 cannot be hurt by enemies (only pits and liquids egg him). Gates are unchanged.
+
+### D.4 Duo moves
+
+| Move | Rule | Easy role / hard role |
+|---|---|---|
+| **Shoulder Hop** | landing on the partner's head with Up (jump) held bounces -224 v16, as on an enemy: rises 105 px from his head, feet reach about 140 px (8.7 tiles) over the floor. Co-op ledges for it are 7 tiles (Beginner) / 8 tiles (Expert) | stand still / one held jump |
+| **Totem Ride** | landing on the partner without Up held: stand on his head (the carrier is a moving platform, PHYSICS 11.4, resolved in the party driver after both heroes moved). The carrier's jump impulses are halved. The rider can strike (a high strike reaches about 4-5 tiles over the floor), jump off (Up), or drop (Down + Jump) | walk / strike |
+| **Batter Up** | Down + Swap (co-op and versus only) curls the hero into a ball (roll frames 24-26) for up to 66 ticks. The partner's strike in contact launches him: **forward = line drive** (xvel ±144, yvel -128: 9 tiles to the same height), **high = lob** (xvel ±32, yvel -240: about 7 tiles up, 4 across), **low = grounder** (rolls at 6 px/tick for 32 ticks: 12 tiles), a charged strike x1.5. The ball breaks `$` blocks (one hit), opens spots it touches, knocks small enemies (hp < 50, power 25). It uncurls on landing (the 6-tick landing rule) or against a wall. A curled hero is hurt by enemies as usual *(tune all)* | curl / aim and strike |
+| **Brace Wall** | two heroes crouching within 16 px of each other in a heavy's path are a wall: a `heavy` enemy (or Tusker's phase 3) stops dead and is dazed 44 ticks with its head open; a lone croucher is trampled (hurt, thrown back). Reuses crouch-bracing (wind, earthquakes) | crouch / crouch and line up |
+| **Egg Hatch** | D.3 | be carried / strike the egg |
+
+All windows (twin drums, bonds, twin hits) are **24 ticks on Beginner / 12 on Expert**, and never longer than the
+measured solo minimum minus 4 ticks (D.8). Every window has an audible count-in (Junkala `Blip5` x3); nothing needs two
+inputs on the same tick. Every launch move moves at most 18 px/tick or calls `notify_hero_teleported` (doze rule).
+
+### D.5 Co-op objects
+
+| Id | Rule | Built on |
+|---|---|---|
+| `objects/plate name= count=1\|2 mode=hold\|timed:<ticks>\|latch` | pressed while the weight on it (heroes; Chomper counts 2) >= `count`; drives columns by name | the step-on test |
+| `objects/column` + `rise_while=<plate>[,...]` / `sink_while=` | the 1.0 rising column driven by plates: rises or sinks 1 tile per 4 ticks while held, returns when released. A plate stands **8+ tiles** from its door | `objects/column` |
+| `objects/column trigger=keepers:<name>` | the **keeper door**: rises when every enemy named `<name>` is dead. Keepers carry `shell`, `bond` or `daze` and stand in a hall **3 rows high**, so nobody can bounce over them | `objects/column` |
+| `objects/drum bond=<name>` | struck drums of one bond must all be hit within the window, then they open a column or gate | `HittableBase` |
+| `objects/seesaw len=<cells>` | a hard landing (4+ tiles fall) on the high end launches whoever stands on the low end: launch = -(landing yvel + 32), +64 on a hard landing, cap -288 (about 10 tiles). Enemies on the low end are thrown off | `PlatformBase`, the hard-landing rule |
+| `objects/boulder_heavy` | moves 1 tile per 6 ticks only while **two** heroes push the same side; fills a gap, plugs a vent, presses a plate | column-style tile mover |
+| `objects/pulley a=<platform> b=<platform>` | two linked ride platforms; the heavier side sinks 2 px/tick, the other rises | `PlatformBase` |
+| Drop gifts: rolled vine (C.3), `objects/flower_pot` | every boost ledge holds a gift only the upper hero can release: a rolled vine, or a flower pot that becomes a spring where it lands when clubbed off the edge | vine, `objects/spring` |
+| `objects/x2_tablet gate=<name>` | a stone tablet carved with two cavemen marks every co-op gate and every co-op secret (diegetic, not HUD). Every co-op gate has one; the validator pairs them | `objects/sign` skin |
+| `objects/hero_start slot=2` | P2 start (ignored in solo) | marker |
+| `objects/exit`, `objects/gate` | team rules in co-op (D.1) | existing |
+
+### D.6 The enemy structure for co-op: traits
+
+The original gave every enemy record an Expert bit; co-op gets its twin. **Every enemy record in a co-op file may
+carry one co-op trait** (`coop=shell|bond|daze|heavy|lone|grab|leech|split`, plus `bond=<name>` for pairs). Traits
+exist only in `kind = coop` files (the validator refuses them elsewhere). In every co-op stage **at least a third of
+the enemy records carry a trait**, and every enemy guarding a main-path chokepoint does.
+
+**Base rules for every enemy in co-op**: target = the nearest hatched hero (ties to P1), sticky for
+`TARGET_HOLD_TICKS`; despawn only when far from both; zone spawners alternate between the heroes inside, `max` x1.5;
+active cap 12 unchanged; each hero's stolen heart bursts as bones for the team; resets only on a team wipe; hit points
+unchanged (two heroes already deal double damage).
+
+| Trait (role) | Rule | Why one hero cannot do it |
+|---|---|---|
+| `shell` (guard) | the shield faces the nearer hero **every tick**; front hits glance (clank and spark) | one hero is always "in front"; the partner hits the back |
+| `bond` (bond) | linked records (`bond=<name>`): when one dies, the others must die within the window or the dead one regrows | targets are placed out of one hero's reach in the window |
+| `daze` (daze-gate) | hops back out of reach when any hero within 48 px starts a strike and jumps low throws; a head bounce **dazes** it 12 ticks (Expert) / 14 (Beginner); only a dazed one can be hurt | one hero needs about 15 ticks from his bounce to a damaging strike |
+| `heavy` (heavy) | front hits glance; stopped only by a **Brace Wall**, which dazes it 44 ticks with its head open | needs two braced bodies |
+| `lone` (pack) | targets the hero **farther from his partner** | staying together is the defence |
+| `grab` (grabber) | seizes a hero who touches it from below or that it dives on and reels / carries him toward a pit-side perch at 1 px/tick; the partner frees him with any hit on it | a grabbed hero cannot strike |
+| `leech` (grabber) | lands on a hero's back and drains one bone per 44 ticks; only the partner can club it off (alone it falls off after 220 ticks) | a hero cannot hit his own back |
+| `split` (bond on the fly) | a hit splits it into two halves that run apart; both must die within the window or they merge back | the halves run in opposite directions |
+
+| Archetype | Co-op base behaviour | Traits used in layouts |
+|---|---|---|
+| 0 Dropper | drops land beside each hero in turn | `bond` (pairs, one by each hero), `split` (tar blobs) |
+| 1 Decoration | none | - |
+| 2 Dangler | unchanged; its thread can be struck (cuts it) | `grab` (Snatcher bat) |
+| 3 Lurker | drops when any hero is in range, chases the nearest | `leech` |
+| 4 Swinger | unchanged | `bond` (pairs swinging in opposition, rare) |
+| 5 Stinger | dives at its target | `lone`, `grab` (Snatcher gull / pterodactyl) |
+| 6 Harrier | loop relative to its target, retargets every loop | `bond` (pairs circling in opposite directions, one reachable only from a Totem Ride), `lone` |
+| 7 Dart | aims at the nearest hero at launch | none |
+| 8 Hopper | hops at its target | `daze` (Raptor) |
+| 9 Walker / Flyer | unchanged | `shell` (Shellback turtle), `bond` (flyer pairs on opposite ledges) |
+| 10 Digger | rises beside each hero in turn | `lone` |
+| 11 Leaper | leaps at its target | `bond` (twin leapers from two pits) |
+| 12 Charger | runs at its target | `heavy` (Bull Rex), `lone` |
+| Snapper | bites the nearest; the bite tests every hero | bait-and-bite (built in): its stem is open for 20 ticks after a lunge, only from the side opposite the lunge |
+| 13 Roller | rolls at the nearest | `bond` pairs on two slopes |
+| 14 Guard | solo turn delay 33 ticks | `shell` (turns every tick: the Shellback guard) |
+| 15 Mimic | bites the nearer; its back faces the far hero | none (a solo joke stays a solo joke) |
+
+### D.7 Co-op-only enemies (7)
+
+Presets of archetype + trait with their own skins; each is a scene of its own so designers can place it by id. They
+exist only in `*_coop.lvl` files.
+
+| Id | Archetype + trait | Sprite | Where |
+|---|---|---|---|
+| `enemies/shellback` | Guard + `shell` | RPG `reptile` (armour recoloured bone); Book I variant `skin=turtle_b` (walker + `shell`) | ruins, canyon; Book I jungle, ice, keep |
+| `enemies/raptor` | Hopper + `daze` | shipped `mini_rex_b` (its `dizzy` frames 16-19 show the daze) | jungle, ice, ruins, fen |
+| `enemies/snatcher` | Dangler or Stinger + `grab` | shipped `bat_b` (dangler); shipped `pterodactyl_b` recoloured as a gull (stinger) | caves, coast, sky |
+| `enemies/leech` | Lurker + `leech` | Ninja `Monster/Larva` 2x, recoloured | caves, fen, sea caves |
+| `enemies/bull_rex` | Charger + `heavy` | shipped `rex_b` | ice lake, gorge, canyon |
+| `enemies/tar_splitter` | Dropper / Walker + `split` | RPG `slime` (the two palettes are the two halves) | fen, Feast Land D (honey skin) |
+| `enemies/shaman` | new patroller | anchor `characters/npc/dragon-man` (idle loop; motion in code) | keep, ruins |
+
+The **Shaman** casts bone shields on enemies within 4 tiles (they glance until he dies) and flees along his platform
+from the nearer hero, so he has to be pinned from both sides.
+
+### D.8 Making cooperation required (and proving it)
+
+1. **Gate count**: every co-op `main` file has **at least 2 co-op gates on the main path** (the final-boss stage 9-3:
+   its boss form); every co-op `sub` file has at least 1 gate or its boss's co-op form; bonus stages and endings need
+   only the team exit (the Way Home adds its lookout gate). Every gate is marked by an
+   `objects/x2_tablet gate=<name>`.
+2. **Gate kinds**: boost ledge (7 tiles Beginner / 8 Expert, Shoulder Hop or Totem Ride), Batter Up gap (8-9 tiles of
+   deadly liquid, or a 7-tile lob ledge), plate door, twin drums, see-saw, heave boulder, pulley, keeper door, Brace
+   Wall corridor (a `heavy` in a 3-row-high hall, so nobody can bounce over it), Chomper two-seat stretch.
+3. **Solo-impossibility checks** (validator `--coop` + `tests/test_coop_gates.gd`): for every x2 gate, a bounded search
+   with the reference hero (the route tools' simulator), alone, with every weapon including every special from the
+   belt and Chomper where a pen is in the stage, must **fail** to reach the gate's far marker. Static rules first: no
+   bounceable enemy, spring, geyser, hidden spot column (club pogo), vine, glider, bark board or see-saw within reach of
+   a boost ledge (an enemy bounce rises 105 px); plates 8+ tiles from their doors; Guard and keeper halls 3 rows high.
+4. **Windows**: every twin window and daze time is `min(24 B / 12 E, measured solo minimum - 4)`. The solo minimum is
+   measured by the search (one hero striking one target and throwing a special at the other included: an axe crosses
+   12 columns in about 15 ticks).
+5. **Fairness**: each gate has an easy role and a hard role; every one-way move has a way back (a drop gift); each gate
+   takes under about 30 s once understood; a failure costs an egg, never a life, while the partner stands.
+
+### D.9 Book I in co-op (15 files `<id>_coop.lvl`)
+
+Each shipped stage gets `levels/<id>_coop.lvl` (`kind = coop`, `coop_of = <id>`, `coop_base_hash = <sha of the solo
+file>`): a copy of the solo map with its own edits. The validator warns when the solo file's hash changes, so the two
+never drift silently. Co-op files carry no passwords. Specials are placed in pairs where the solo file places weapons.
+
+| Stage | Main-path co-op gates | Trait enemies | x2 secret (painting) |
+|---|---|---|---|
+| 1-1 Vine Bridges | (1) the springy flower becomes a 7-tile Shoulder Hop ledge, and the upper hero clubs a flower pot down (teaches hop and gift); (2) a leapfrog plate door on the canopy road. Signs teach the egg and the x2 tablet at the first checkpoint | two Shellback turtles before the exit (taught by a sign) | High Cache 7 tiles up, Totem Ride high strike (#20) |
+| 1-2 Canopy Village | (1) the first tree house only by Totem Ride + jump; (2) a pulley in the trunk room. The Feast Land A warp sits behind twin drums | bonded flying-squirrel leapers; a Snatcher bat on the bat bounce | treetop cache by Batter Up lob (#21) |
+| 2-1 Echo Caverns | (1) paired plates on two hatches (one holds, one drops); (2) a keeper door guarded by two Raptors in a 3-row hall | Leeches under the dark section; `lone` stingers | a secret-room wall of `$` opened by a Batter Up line drive (#22) |
+| 2-2 Bone Gorge | (1) a see-saw on the rising stepping stones; (2) the lift pillar driven by a plate. Two gliders over the gorge with bonded harrier pairs | a Bull Rex on the gorge floor (Brace Wall) | x2 ledge over the lift pillar (#23) |
+| 2-2b Brute's Den | a keeper door into the den (two bonded diggers); **the co-op Brute** (B.7) | - | - |
+| 3-1 Frost Summit | (1) a Bull Rex on the frozen lake (bracing on ice slides both heroes - the joke of the level); (2) the cliff climb by Shoulder Hop steps with a rolled vine back | bonded chargers, Shellback turtles on the slopes | x2 ice cave (#24) |
+| 3-1b Blizzard Pass | (1) a keeper hall of Shellback turtles, 3 rows high, in the gusts; (2) lee leapfrog: a crouching hero shelters the hero behind him from the wind over the last gaps | Snatcher pterodactyls riding the gusts | x2 lee ledge (#25) |
+| 3-2 Crystal Grotto | (1) a Batter Up line drive over 9 tiles of icy water; (2) twin drums that freeze a floe bridge (a column) | Raptors, twin leapers from the water pits | the Feast Land C warp on a boost ledge; crystal cache (#26) |
+| 4-1 Cinder Shaft | (1) both inside the auto-scroll: a heave boulder pushed off a ledge plugs a lava vent before the view passes; (2) a Batter Up lob across a lava stratum | `lone` stingers in the ember rain | x2 shelf (#27) |
+| 4-2 Obsidian Keep | (1) leapfrog plate doors (A holds for B, B holds for A); (2) twin drums that stop a spike column | Shamans shielding the keep guards; Raptors | x2 keep tower (#28) |
+| 4-2b Colossus Hall | **the visor Colossus** (B.7); two axes at the checkpoint | - | - |
+| Feast Land A / B / C | team exit only; a giant roast spot pays its giant bonus only when both strike it within the window; **Relay Bounce**: alternate bounces by both heroes on one enemy extend the 1-2-3-4-6-8 ladder to x10 and x12 | - | - |
+| Way Home | the village gate is barred: one hero is lifted to the lookout (Shoulder Hop) to open it; team exit | - | x2 lookout (#29) |
+
+Paintings 0-19 are the Book II ones (one per level, in `A.2` order).
+
+### D.10 Book II in co-op (20 files `<id>_coop.lvl` on the same skeleton)
+
+Authored together with the solo file: the designer builds the solo file, proves it, copies it to `<id>_coop.lvl`
+and adds the co-op gates, traits and the P2 start.
+
+| Level | Co-op signature (main-path gates) |
+|---|---|
+| 5-1 Red Mesa Trail | teaching stage: a 7-tile Shoulder Hop ledge with a flower pot gift; a leapfrog plate door; a keeper gully of two Shellback guards |
+| 5-2 Rattlesnake Gulch | one climbs a vine while the other holds a plate that keeps a sand gate open; the upper hero unrolls the second vine (the gift); twin rattlers (bonded snappers) |
+| 5-2b Tusker's Wallow | co-op Tusker: rump pincer, Brace Wall in phase 3 (B.1) |
+| 6-1 Bubbling Fen | Chomper with two seats: the driver wades the tar flats, the gunner clears Leeches; a raft for two (one paddles, one fights); Tar Splitters |
+| 6-2 Spore Hollow | a mushroom see-saw in the dark (a hard landing launches the partner to a 10-tile cap); twin drums made of glowing caps; Raptors |
+| 6-2b Heart of the Mangrove | rising tar for two: a heave boulder must be pushed onto a vent before the tar reaches it; co-op Old Mangrove (B.2) |
+| 7-1 Shell Beach | a blowhole + Batter Up lob onto a 10-tile sea stack; bonded leaping fish; Chomper gunner over the urchin beds |
+| 7-2 Sea Caves | a plate that holds a sea gate while the partner rides a driftwood floe through; Snatcher gulls over a pit; Leeches |
+| 7-2b Squid Grotto | the Tentacle Lock (B.3) |
+| 8-1 Overgrown Steps | column stairs that rise only while both plates are held, then a heave boulder holds one plate while the heroes cross; Shellback guards in 3-row halls |
+| 8-2 Hall of Idols | a gate maze where every room door is a plate held from the other room; keeper halls with Shamans |
+| 8-2b Idol Court | the Twin Hit (B.4) |
+| 9-1 Cloudbreak Climb | see-saw + geyser combos to 10-tile clouds; a pulley between two cloud stacks; `lone` harriers |
+| 9-1b Thunderhead Glide | two gliders; bonded harrier pairs that must both be dive-hit within the window |
+| 9-2 The Roc's Spire | lee leapfrog in the gusts; a Batter Up line drive over the final gap; Bull Rex on a cloud bridge |
+| 9-2b Storm Nest | Snatch rescue and Pilot and Spotter (B.5) |
+| 9-3 Chieftains' Pyre | both chieftains at once, the 66-tick egg race (B.6) |
+| Feast Land D / E | roasts for two, Relay Bounce; team exit only |
+| The Long Raft Home | one raft for two; the home beach is the team exit |
+
+### D.11 Joining, controls, HUD, difficulty
+
+- **Join** ("the Tribe Gathering"): Title > Co-op opens a carved panel with two slots. **Press Jump on any device** to
+  take a slot; Left / Right picks a colour; hold Strike 1 s = ready. A lost pad pauses ("Reconnect, or continue
+  alone"). Menu music Tallbeard "Connected"; join sting ctske "party join".
+- **Keyboard** (bound by physical key position, rebindable per slot). The join panel runs a key test: each player
+  holds Left + Jump + Strike + Swap and all lights must stay lit (ghosting check).
+
+  | Layout | P1 | P2 |
+  |---|---|---|
+  | Two hands each (default) | move W A S D, strike F, jump G, look R, swap T | move arrows, strike `.`, jump `/`, look `,`, swap `;` |
+  | One hand each (the original's Up-jumps scheme) | W A S D (W jumps), strike Space, swap E, look Q | arrows (Up jumps), strike Right Ctrl, swap Right Shift, look Num 0 |
+
+  Left + Right together is Look in both layouts. In a party, slot 0 uses its own generated `p1_*` actions, so the
+  halves never feed two heroes.
+- **Pads**: one per slot, the solo layout (A jump, X / B strike, Y / RB look, **LB swap**, Start pause); rumble only on
+  that slot's pad.
+- **Touch**: phones get one touch player (P2 on a pad). Tablets of 9 inches or more get **table mode**: mirrored
+  clusters at each end in the player colours (pad + jump / strike / swap stones of 56 art px); marked experimental
+  until tested.
+- **Talk without voice**: a double tap of Look shows an emote bubble over the hero (Ninja Adventure emotes "!", "?",
+  heart, angry).
+- **HUD**: P1 panel top-left exactly as today; P2 hearts and belt icon mirrored top-right; tribe lives and score where
+  they are today; letters as today; edge arrows with a stone countdown for a hero off the view.
+- **Tally**: one tribe score; the companion catches each hero's items in his own pile and hands out medals - Most Food,
+  Best Bounce Chain, Hatchling (eggs hatched), Slugger (Batter Up launches), Strongman (plates held, boulders pushed),
+  Clumsiest (as a joke). Options: "Rival score" (two scores on the same stages).
+- **Difficulty**:
+
+  | Setting | Co-op Beginner | Co-op Expert |
+  |---|---|---|
+  | Twin windows | 24 ticks (or solo minimum - 4) | 12 ticks |
+  | Raptor daze | 14 ticks | 12 ticks |
+  | Leash before the egg | 5 s (121 ticks) | 3 s (73 ticks) |
+  | Hatch hearts | 2 | 1 |
+  | Unhatched egg | follows forever | returns to the checkpoint after 10 s |
+  | `lone` trait | off (acts as plain targeting) | on |
+  | Boss grabs | off | on |
+  | Boost ledges | 7 tiles | 8 tiles |
+
+  The Beginner wall is unchanged in both books.
+
+---
+
+## E. Versus: same-device deathmatch (2-4 players)
+
+### E.1 Pillars
+
+1. **Nobody sits out long**, **everyone sees the score** (it stacks on the heroes' heads), **the leader is the biggest
+   target** (structural, visible comeback - no hidden rubber-banding).
+2. **Built from this game's verbs**: clubbing scenery for food, head bounces and their 1-2-3-4-6-8 ladder, charged
+   strikes, giant bonuses falling from the sky, the feast.
+3. **Short rounds** (60-90 s), matches of 5-8 minutes, **Rematch** as the default button.
+4. **Bots** so one person, a parent and a child, or three friends can fill four slots.
+
+Versus runs only in arena files (`kind = arena`) with its own rule tables (`VersusTuning`); campaign values are
+untouched.
+
+### E.2 Combat kit
+
+- **Attacks** (existing frame data): forward strike (damaging from tick 5), high strike (anti-air), low strike, stomp,
+  the crouch-charged strike (a launch), thrown specials.
+- **Hit**: the victim loses one unit of the mode's currency, is knocked away from the attacker (xvel ±64, yvel -128);
+  a **charged hit launches** (xvel ±128 with ice-like sliding, yvel -160); hammer x1.5 horizontal; swirling axe pops
+  up (yvel -160).
+- **Clang**: two front boxes meeting in the same tick push both 16 px apart with the Colossus clank and spark; a
+  charged strike wins the clang.
+- **Deflect**: a strike bats a thrown special back, now owned by the striker, 2 px/tick faster.
+- **Stomp**: the stomper bounces as on an enemy; the victim is squashed 8 ticks (no jump, no strike) and pays by the
+  bounce ladder 1-2-3-4-6-8 for a chain. A blinking (immune) head is a free springboard.
+- **Curl** (Down + Swap): a turtle stance (roll frames) that ignores stomps and strikes from above, but **a rival can bat
+  a curled hero** like a Batter Up ball - into lava if he is unlucky. Teammates bat each other as in co-op.
+- **Hurt timing**: 12 ticks stunned + 30 immune (immunity ends when the victim strikes or throws); hit-stop 2 ticks,
+  4 on a charged or deciding hit.
+- **Thrown specials stop at solid cells** and lie there as pick-ups; spears stick in bark boards as steps for anyone.
+  In wrap arenas a special wraps once and vanishes after 40 ticks.
+- **Body bump**: overlapping heroes are nudged 1 px/tick apart; running into each other at 4+ px/tick knocks both back.
+- **Weapons**: everyone starts every round with the club; specials come from pterodactyl crates straight onto the belt
+  and are **temporary** (lost on a knock-out or after 3 axe / 2 swirling-axe / 3 spear throws).
+- **Spawns** rotate every round (the physics is left-right asymmetric); 48 ticks of spawn shield that ends on the first
+  strike or throw.
+
+### E.3 Flagship: Grub Stack
+
+*"Everything you grab stacks on your head. Biggest stack at the gong wins."*
+
+- **Setup**: 2-4 players, free-for-all or 2v2; club for everyone, an empty head; no hearts - nobody dies from hits;
+  hazards cost a respawn after 48 ticks.
+- **The stack**: every food item you pick up lands on your head as a picture in a wobbling tower: small food 1, big food
+  2, treasure 5, giant bonus 10. Above 8 pictures the tower shows 5s and 10s, so it never leaves the screen. The tower
+  **is** the score, readable at a glance; the **crown** sits on the tallest.
+- **Weight**: 10+ on your head caps walking at 64 v16 (4 px/tick); 20+ caps it at 48 v16 and jump impulses at 3/4
+  *(tune)*. The leader is slower and a bigger springboard.
+- **Losing food**: a hit knocks **1 + stack/5** pieces off the top (they fly out with the shipped dropped-item physics,
+  198 ticks, blinking); a charged hit **1 + stack/2** and a launch; a thrown special 1 + stack/8; a **stomp steals**:
+  the stomper takes the ladder count (1, 2, 3, 4, 6, 8) straight onto **his own** stack (the pieces arc head to head);
+  a hazard spills everything (half bursts out, half is lost). The victim cannot pick up during his 12 stun ticks.
+- **The Cookpot** (one per arena; two on 4-player arenas, on contested ground): crouch inside it to **bank** one piece
+  per 4 ticks. Banked food is safe; a banking hero is crouched, and a stomp on him steals double. Final score =
+  banked + stack.
+- **Food sources**: visible hidden spots that refill 15 s after they are emptied (sparkle 2 s before); one big spot (3
+  hits by anyone; its giant bonus falls from 7 rows up and **bonks the head** it lands on); pterodactyl crates every
+  20 s on marked lanes (shadow 22 ticks ahead): food, a special, one cutlery piece, sometimes a skull or a grenade.
+- **Items**: *Feast* (fork + knife + spoon, each from crates, dropped on a hit): 8 s (194 ticks) in which your touch
+  knocks 3 pieces off anyone and hits cannot touch you; the shake warns 7 ticks before the end. *Skull*: whoever picks
+  it up spills everything. *Grenade*: every rival spills 5.
+- **Feast Rush**: the last 15 s - a bell, every spot refills at once, a second giant bonus drops and the **pot lids
+  close**: no banking, everything on heads.
+- **Round**: 90 s (2 185 ticks; 60 s with 2 players); first to 3 round wins. Tie: the **Golden Drumstick** falls in the
+  middle; first to grab it wins.
+- **Teams (2v2)**: one shared pot, separate stacks; a teammate's head is a free springboard; friendly hits only bump.
+
+### E.4 The other modes
+
+| Mode | Rules | Launch |
+|---|---|---|
+| **Last Caveman Standing** | the literal deathmatch: 3 hearts; hit = 1 heart, charged = 2 + launch, stomp = 1 + squash, hazard = out. **A lost heart bursts into 6 bones** anyone can grab (6 bones heal a heart, max 3). Last alive wins the round; first to 5. At 60 s the arena's **themed sudden death** starts (E.6). Eliminated players ride **Grudge Pterodactyls** along the top and drop a rock with Strike (one per 3 s, 10-tick squawk first; a rock dazes 12 ticks, costs no heart). Option *Stock*: 3 lives with respawn | yes |
+| **Hot Rock** | a glowing ember sticks to one player and passes on any touch, hit or stomp; whoever passed it is immune to it for 44 ticks; the holder walks at most 96 v16; the fuse is 12-20 s (`Sim.rng`, round seed) and bubbles faster in the last 3 s; the holder pops (the death toss). Last one standing; first to 3 | yes |
+| **Clubball** | 1v1, 2v1 or 2v2 on Coconut Cove: a coconut (gravity 16 v16, bounces at 3/4, rolls) and a goal mouth 3 rows high at each end. The strike direction is the shot: forward = drive, high = lob, low = grounder, charged = smash (x1.5). Every strike within 44 ticks of the last adds +16 v16, up to 12 px/tick (rallies escalate); a coconut faster than 8 px/tick knocks a hero down (12 stun ticks); heads bounce it; a curled teammate can be batted as a "missile". First to 5 goals or most after 3 min; sudden death "golden coconut"; the ball resets to the middle 66 ticks after a goal | yes |
+| King of the Feast | carry the giant roast to fill 20 counts of 22 ticks; the carrier cannot strike, walks at most 64 v16; a hit drops it; your count never falls back below 5 left | second wave |
+| Letter Snatch | 8-12 visible spots, five hold G-R-U-B-S (shuffled); held letters float over your head; a hit drops your newest; hold all five for 44 ticks = round won | second wave |
+| Egg Heist (2v2) | carry a giant egg to your nest ledge; teammates boost and bat each other; the egg cracks after a fall of 6+ rows; a mother rex chases a carrier who holds it 8 s | second wave (team bots) |
+
+- **Party Mix** picks mode and arena per round. **Presets**: *Classic* (club only, no crates), *Feast* (default),
+  *Mayhem* (crates every 8 s, skull spots, a random variant per round).
+- **Variants**: Hammer Time, Axe Rain, Big Bounce, One-Bonk, Slippery, Lights Out (night palette, heroes glow), Gusty,
+  Giant Rain, Spear Party (some unlocked by paintings, C.9).
+- **Handicap card** in the lobby: hearts 1-5 (LCS) or stack guard x0.5 / x1 / x1.5 (Grub Stack), or Auto (a player
+  two rounds behind gets a leaf shield that absorbs one hit).
+
+### E.5 Arenas: 10 single screens (8 at launch, 2 unlocked)
+
+Every arena is **20 x 11 cells** (floor row 10, plus fill), camera locked; row 0 holds nothing to stand on (HUD corners
+and the round sundial); wider or taller screens show a decorated frame, never gameplay. Tiers 3 rows apart; 5+ rows only
+by spring, geyser, see-saw or a head; clear gaps of at most 5 cells; mirrored layouts with spawns rotated every round;
+4-8 visible hidden spots; one signature hazard telegraphed 10+ ticks ahead; geometry a bot graph can describe (no 1-row
+squeezes, no pixel-perfect jumps on main routes). Files `levels/arena_<name>.lvl`.
+
+| # | Arena | Biome | Edges | Signature | Sudden death | Default mode |
+|---|---|---|---|---|---|---|
+| 1 | **Totem Ring** | jungle | wrap left-right | a totem with the cookpot on top; springs to the wrap ledges; the big spot's giant lands on a bridge | **Stampede**: chargers along the floor every 3 s, dust 22 ticks ahead | Grub Stack |
+| 2 | **Echo Hollow** | cave | wrap top-bottom (a shaft) | darkness pulse every 20 s (3 s of night, heroes glow), `$` walls that grow back after 15 s, a dangler as a neutral springboard | **Cave-in**: blocks fall from the top row inward, one per 11 ticks | Hot Rock |
+| 3 | **Floe Rink** | ice | open sides into icy water | ice floor, two see-saw floes (land on your end to fling whoever stands on the other out over the water), alternating gusts | **Whiteout**: gusts grow every 5 s | Last Caveman Standing |
+| 4 | **Cinder Pit** | volcano | walls, lava pit | obsidian slabs over a lava pit, an ember lane | **Lava rise**: 1 row per 44 ticks with a rumble | Last Caveman Standing |
+| 5 | **Tar Pulleys** | swamp | walls, tar pit | two pulley lifts over tar: step on your lift to yank a rival's side up to the island - or down to the tar | **Tar rise** | Grub Stack |
+| 6 | **Coconut Cove** | coast | walls with goal mouths | the Clubball pitch: rims, a lob bridge, two low ledges; in other modes the goal mouths are ring-outs into the surf (leaving through one is a hazard) | **High tide** (the rising-tide code) | Clubball |
+| 7 | **Sky Picnic** | Feast Land | wrap top-bottom, **no deaths** (kid-safe) | springs, icing clouds, a cake island | **Syrup flood** (safe: it only slows) | Hot Rock / Grub Stack |
+| 8 | **Colossus Hall** | volcano keep | walls | the Wall Colossus as a neutral: every 10 s it spits at the **crowned leader** (jaws 10 ticks ahead) | **Stalactite storm** | Grub Stack |
+| 9 | Mesa Rodeo (5 paintings) | canyon | walls | Chomper leaves his pen every 30 s (rumble 22 ticks ahead); the rider bites (spill 3) until a stomp unseats him; regrowing cover blocks | **Rockslide** from the mesa rims | Last Caveman Standing |
+| 10 | Cloud Top (20 paintings) | sky | wrap top-bottom | drop clouds, alternating gusts (crouch to brace), steam geysers | **Lightning**: marked cells, 22 ticks ahead | Grub Stack |
+
+Sketches (`?` small spot, `*` big spot, `J` spring -224, `-` one-way, `P` cookpot, `L` / `R` pulley lifts, `G` goal
+zone, `B` coconut drop point, `%` rim rock, `~` liquid). Each must pass `tools/validate_levels.gd` (`kind = arena`) and
+the bot graph bake.
+
+**Totem Ring** (wraps left-right):
+
+```
+     col 01234567890123456789
+row  0   ....................   HUD row: nothing to stand on
+row  1   ....................
+row  2   ....................
+row  3   .........P..........   cookpot on the totem top (room for one banker)
+row  4   .........##.........   totem top, 3 rows over the bridges
+row  5   ---......#?......---   wrap ledge (6 cells across the seam); spot in the totem face
+row  6   .........##.........
+row  7   ....-----##-----....   bridges either side, 3 rows over the floor
+row  8   .........?#.........   spot at body height
+row  9   ..J......##......J..   springs: rise 105 px onto the wrap ledges
+row 10   ###?#**#########?###   floor wraps; the big spot's giant falls onto the left bridge
+row 11   ####################
+```
+
+**Tar Pulleys** (walled):
+
+```
+     col 01234567890123456789
+row  0   ....................   HUD row
+row  1   ....................   log beam with the pulley wheels (prop)
+row  2   .........P..........   cookpot on the island
+row  3   ........#**#........   mud island with the big spot
+row  4   ........####........
+row  5   ....................
+row  6   ##?..LLL....RRR..?##   side ledges with spots; lifts L and R at rest (balanced)
+row  7   ###..............###
+row  8   ....................
+row  9   ...J............J...   springs on the banks (-224, up to the side ledges)
+row 10   ####~~~~~~~~~~~~####   4-cell banks and a 12-cell tar pit
+row 11   ####~~~~~~~~~~~~####
+```
+
+L and R hang from one rope: the heavier lift sinks 2 px/tick down to row 9, one row over the tar, while the other rises
+to row 3, level with the island. Riding the high lift is the only way onto the island; a rival who jumps onto the low
+lift yanks you down.
+
+**Coconut Cove** (Clubball):
+
+```
+     col 01234567890123456789
+row  0   ....................
+row  1   ....................
+row  2   ....................
+row  3   ....................
+row  4   %%....--------....%%   rims (stand on top) and the lob bridge
+row  5   %%................%%
+row  6   %%%..............%%%
+row  7   G.....--....--.....G   goal mouths 3 rows high under the rims; two low ledges
+row  8   G..................G
+row  9   G........B.........G   the coconut drops in at column 9 (sides rotate per round)
+row 10   ####################
+row 11   ####################
+```
+
+Routes: floor -> low ledge (3 rows) -> bridge (3 rows) -> rim (4 cells across). Keepers stand on the rims and volley
+down; the bridge is where lobs are won.
+
+**Cinder Pit**:
+
+```
+     col 01234567890123456789
+row  0   ....................
+row  1   ....................
+row  2   ....................
+row  3   ....................
+row  4   ...-----....-----...   high slabs
+row  5   ....................
+row  6   ....................
+row  7   .......------.......   central slab over the pit
+row  8   ....................
+row  9   ..J..............J..   springs to the high slabs
+row 10   ~~######....######~~   two floor islands; a 4-cell lava pit in the middle, lava at both ends
+row 11   ~~######~~~~######~~
+```
+
+### E.6 Themed sudden deaths
+
+Per biome: Stampede (jungle), Cave-in (cave), Whiteout (ice), Lava rise (volcano), Tar rise (swamp), High tide (coast),
+Syrup flood (feast, slows only), Stalactite storm (keep), Rockslide (canyon), Lightning (sky). Every one telegraphs 10+
+ticks ahead. They start at 60 s in Last Caveman Standing and are available as an event toggle in the other modes.
+
+### E.7 Bots (at launch, for all four launch modes)
+
+- A bot is an **input producer** (`InputSlot.BOT`): each tick it writes the flags a human would, decided from the
+  previous tick's state, with its own `SimRng` seeded from the match seed and the slot. It never draws from `Sim.rng`
+  and never knows what a spot or crate contains. A bot match replays tick for tick and runs headless as a test.
+- **Navigation**: a graph per arena baked offline (`tools/bots/`): nodes are standable spans; links are walk, drop,
+  hatch, jumps with k held ticks (from `PHYSICS_REFERENCE.json`), spring, geyser (timed), see-saw, pulley, wrap. **Every
+  link is verified by simulating the real hero**, like the route proofs. Moving geometry (lifts, floes) is a moving
+  node.
+- **Goals**, chosen every 6 ticks by utility: food, spots, the cookpot (bank when the stack is tall), the leader,
+  the ember (flee or pass), the coconut (Clubball bots predict its landing with the deterministic ball physics and
+  stand goal-side of it), safety. Combat micro-rules from the triangle: high strike against a jumper above within
+  26 px, crouch-charge against an approaching rival, stomp a croucher, deflect specials, bat curled rivals toward
+  hazards.
+- **Levels**: Rookie (reacts in 10 ticks, never charges or deflects), **Hunter** (default; 6 ticks; stomps and
+  charges), Chief (3 ticks; stomp chains; deflects half the time; never frame-perfect). Difficulty is reaction and
+  decisions, never cheating.
+- The same `HeroBot` drives the Rival Chieftains (B.6).
+
+### E.8 Match flow and results
+
+1. **Lobby**: four slots, press Jump on any device; colour and loincloth pattern; team toggle; *Add CPU* (level);
+   handicap card; hold Strike = ready. Music: Spring Spring "Melon Field" character-select loop.
+2. **Rules**: mode, preset, rounds, round time, crates, weapons, variants (whoever pressed Start controls it; the last
+   rules are remembered).
+3. **Arena**: thumbnails, Random, Party Mix; locked arenas show their painting count.
+4. **Round**: heroes burst out of spots on "3, 2, 1, GRUB!" (kheetor countdown beeps + Junkala `fanfare2`; no adult
+   voice); play; gong (Junkala `fanfare1`).
+5. **Deciding moment**: the last 3 s (Grub Stack: the biggest steal) replayed at half speed from the input log and a
+   start snapshot; skippable.
+6. **Scoreboard** (about 5 s): round wins as drumsticks thrown onto each player's plate.
+7. **Results**: the heroes painted on a cave wall in victory poses; the tally companion hands out 1-3 awards each -
+   Leaning Tower (tallest stack), Pickpocket (most stolen by stomps), Glutton (most eaten), Butterfingers (most
+   dropped), Chain Gang (longest stomp chain), Clang Master, Slugger (most curled rivals batted), Home Run (longest
+   Clubball shot), Hot Potato, Lava Lover, Head Case (bonked by a giant bonus), Comeback Caveman, Pacifist. **Rematch**
+   is the default button. Match-win jingle celestialghost8 "Victory"; results loop Spring Spring melon win; CC0
+   applause bed (eXpl0it3r).
+
+### E.9 Controls and readability for 2-4 on one device
+
+- Every player needs only direction + Jump + Strike + Swap; Look doubles as the emote / taunt in versus.
+- **Keyboard**: two players at most, the D.11 layouts. **Pads**: up to four, a sideways half-controller works.
+  **Touch**: one touch player on a phone, two on a tablet in table mode (swipe up on strike = high strike). Any mix:
+  keyboard halves for P1-P2 and pads for P3-P4, or one tablet player against three bots.
+- **Telling four cavemen apart**: P1 yellow, P2 blue, P3 pink, P4 green (white on jungle arenas); loincloth patterns;
+  P1-P4 tags and colour arrows at round start and whenever heroes overlap; hit sparks in the attacker's colour; four
+  corner panels (the Ninja Adventure caveman portrait recoloured per player, stack or hearts, held special); the round
+  sundial top centre; the crown on the leader; bubbles for heroes above the view.
+
+---
+
+## F. Assets, audio and production
+
+### F.1 Art map (every need -> a staged pack or a stated edit; all CC0)
+
+Path prefixes: **RB** = `.tools/asset_candidates/expansion/superpowers-rpg-battle-system/`, **NA** =
+`.tools/asset_candidates/expansion/pixelboy-ninja-adventure-full/Ninja Adventure - Asset Pack/`, **WF** =
+`.tools/asset_candidates/expansion/superpowers-western-fps-2d/`, **AP** =
+`.tools/asset_candidates/environment/superpowers-prehistoric-platformer/` (the anchor), **SH** = shipped `assets/`.
+Global edits: every imported sprite's near-black outline -> `#272018`; Ninja art at integer 2x only; nearest-neighbour
+only; every sheet at most 2048 px on a side (re-pack, as the Brute was).
+
+| Need | Source | Edit |
+|---|---|---|
+| Terrain, canyon (`canyon/terrain`, `canyon/terrain_mesa`) | SH `tiles/volcano/terrain.png`; SH `tiles/cave/terrain_stone.png` | gradient maps (proven: `_style_tests/terrain_canyon.png`); same 40-tile layout and collision table |
+| Terrain, swamp + mushroom (`swamp/terrain`, `swamp/terrain_mushroom`) | SH `tiles/jungle/terrain.png`; SH `tiles/jungle/terrain_grass.png` | gradient maps (`terrain_swamp.png`, `terrain_mushroom.png`) |
+| Terrain, coast (`coast/terrain`, `coast/terrain_sand`) | SH `tiles/cave/terrain.png`; SH `tiles/feast/terrain_biscuit.png` | gradient maps (`terrain_coral.png`; biscuit toward sand) |
+| Terrain, ruins (`ruins/terrain`, `ruins/terrain_jade`) | SH `tiles/cave/terrain_stone.png`; SH `tiles/jungle/terrain.png` | gradient maps (`terrain_temple.png`; mossy jade) |
+| Terrain, sky (`sky/terrain`, `sky/terrain_rock`) | SH `tiles/ice/terrain.png`; SH `tiles/ice/terrain_rock.png` | gradient maps (`terrain_sky.png`; slate) |
+| Tar floor `:` and liquids `tar` / `honey` / `syrup` | SH `tiles/common/water.png`; a set-A ground tile | recolours (black-violet, amber, pink); tar floor = surface tiles 0-2 recoloured with a 6 px lowered top |
+| Parallax, canyon | RB `backgrounds/17.png`; WF `background-elements/rock-background.png`; `emceeflesher-rocky-desert-landscape` layers | crop the horizon band, **paint out the two towers**; mesa strip at 2x as mid layer; Emcee layers gradient-mapped warm, far layers only |
+| Parallax, swamp / mushroom cave | RB `backgrounds/12.png`; SH `backgrounds/jungle/layer1-3`; SH `backgrounds/cave/*` | band crop + night variant; jungle layers gradient-mapped murky teal; cave layers gradient-mapped purple |
+| Parallax, coast / sea caves | AP `background-elements/background-1.png` (sea cliffs); RB `backgrounds/5.png`; SH `backgrounds/cave/*` | band crop; cave layers recoloured teal |
+| Parallax, ruins | RB `backgrounds/21.png`, `22.png`; SH `backgrounds/jungle/layer3_forest.png`; SH `backgrounds/cave/layer0_wall.png` | band crop, **paint out towers**; recolours sandstone |
+| Parallax, sky | SH `backgrounds/ice/layer0_sky.png`, `layer1_far_peaks.png`; `environment/superpowers-backgrounds` sky islands 15 / 39; AP `cloud-1.png` | recolours; Superpowers islands at 4x **farthest layer only** |
+| Props | WF cactus-1..3, rock-1..6, rolling-bush, skull, bone, tree-1/-2, branch; SH `tiles/jungle/props/*`, `tiles/village/props/*`; RB `item/*` shells and feathers; NA `Backgrounds/Tilesets/TilesetNature.png` reeds (2x) | 1x as is; recolours per biome |
+| New enemy sheets | RB `monster/{dino,reptile,mimic,snake,slime,mushroom,bat,ghost}`; NA `Actor/Monster/{Octopus,RedOctopus,Larva}`, `Actor/Animal/Fish`; `characters/ansimuz-sunny-land-series` eagle, frog; WF `animals/` bear | outline swap; RPG at 1x; Ninja and Sunny Land at 2x; reptile armour recoloured bone / stone; jelly = slime recoloured translucent blue; sea snail = SH `turtle_b` + AP shell item 18 |
+| Co-op-only enemies | SH `mini_rex_b`, `bat_b`, `pterodactyl_b`, `rex_b`, `turtle_b`; NA `Monster/Larva`; RB `slime`, `reptile`; AP `characters/npc/dragon-man` | gull = `pterodactyl_b` recoloured white; Larva recoloured |
+| Tusker | RB `monster/boar/sprite-sheet-239x178.png` (+ `-2-` palette for rage) | outline swap, tusks lengthened |
+| Old Mangrove | NA `Actor/Boss/GiantBamboo` (Idle, Attack, Charge, Hit) 2x; SH `props/jungle/root_arch.png`, `objects/boulder.png`, `vine_branch.png` | gradient map to bark; fist and 3-segment root arm composited |
+| Inkjaw | NA `Actor/Boss/SquidGreen`, `SquidRed` 2x; RB `monster/octopus.png`; SH `fx/projectile_rock.png` | tentacle segments cut from the octopus arm, recoloured; ink blob recolour |
+| Twin Idols | SH `bosses/colossus.png`; SH `fx/projectile_stalactite.png` | mirrored copy; gradient maps jade and sandstone |
+| Storm Roc | SH `enemies/pterodactyl.png` at 2x; AP items 43-46 (feathers); RB `fx/*` | gradient map storm slate, gold crest; **re-pack 4 x 4** (1152 x 960); lightning recolour |
+| Rival Chieftains | SH `enemies/rival.png`; AP items 57-58 (dino skulls); SH `enemies/egg_kid.png` | two palette swaps; headdress composite; egg recolours |
+| Co-op Colossus visor and plates | SH `objects/carved_block.png`; AP `tileset-1.png` crest icons | visor cut from the carved block; plate = flattened slab + crest |
+| Hero colours P2-P4 | `.tools/asset_candidates/expansion/hero_colours/` (mapping proofs) | shipped as **16 x 1 LUTs per slot** for a palette-swap shader, not baked sheets |
+| Hero poses | SH `sprites/player/hero*.png` (52 frames) | climb = 44-47; curl = roll 24-26; ride (rider) = crouch 21; carried-by-glider = glide 50-51; cheer = victory 48-49; none needs new drawing |
+| `hero_spear` sheet + spear pick-up / projectile | AP item 12 (spear) | composited into the hero sheet the way 1.0 built `hero_axe` |
+| Egg (revive) | SH `enemies/egg_kid.png` roll frames | per-slot LUT |
+| Chomper with riders | SH `enemies/rex.png` (1x) + hero crouch frame 21 | saddle strap pixel edit; second-seat composite; riders take the slot LUT |
+| Raft | SH `objects/platform_wood.png` x2 + AP log item; wafer skin from SH `feast/terrain_biscuit` | composite + rope pixels |
+| Vine, rolled vine | SH `props/jungle/vine_a.png`, `vine_b.png`, `vine_branch.png` | stacked; coil cut; recoloured per biome |
+| Bark board | SH jungle terrain tile 15 (inset panel) | recoloured bark, one cell |
+| Geyser spout | SH `fx/splash_water.png`, `fx/particles_smoke.png` | stacked frames; recolours mud / blowhole / steam / soda |
+| Plate, drum, see-saw, heave boulder, pulley, flower pot, x2 tablet, rex pen | SH `objects/carved_block.png`, `objects/barrel.png`, `objects/platform_wood.png`, `objects/boulder.png`, `items/bone.png`, `tiles/village/props/flower_pot.png`, `stone_tablet.png`, `palisade.png`; WF `background-elements/skull.png`, `barrel.png` | plate = flattened carved block; drum = barrel with a hide top + crest; see-saw = plank + bone ends + skull pivot; pulley wheel = barrel end recoloured wood + 2 px rope; x2 tablet = stone tablet + two hero silhouettes in ochre; pen = palisade |
+| Cave Paintings + mural, map slab | SH `village/props/stone_tablet.png`; AP crest icons; shipped sprites as ochre silhouettes | composites |
+| Far Shore map page | SH `ui/world_map_background.png`; new terrain atlases; WF cacti; ruin props | gradient-mapped islands + props, 1280 x 360 |
+| Belt icon | SH `items/weapon_club.png`, `weapon_hammer.png`, `weapon_axe.png`, `weapon_boomerang.png` + the spear item | 1x |
+| Join / HUD / versus UI | NA `Actor/Character/Caveman/Faceset.png` (portrait), NA `Ui/Emote/*`, NA `Ui/Input` prompts; AP crests; RB `item/26.png` (goblet), `item/64.png` (laurel); SH `ui/icons.png` arrows; SH `npc/companion.png` | recolours per player (as `_style_tests/mp_ui_test.png`) |
+| Versus objects | cookpot = SH `objects/pot.png` over AP `fire.png`; coconut = NA `Items/Food/Nut.png` at 2x recoloured brown; crate = SH `objects/crate.png` under SH `pterodactyl`; goal mouth = SH `village/props/palisade.png`; Grudge Pterodactyl = SH `pterodactyl` + rider in the slot LUT | composites |
+
+Gaps deliberately designed around (no art exists): mammoth, sabre-tooth, triceratops, giant crab, eagle boss, stone
+golem boss, animated yeti, swim poses, in-style rope / zip-line / balloon / mine cart.
+
+### F.2 Audio map (all CC0; staged under `.tools/asset_candidates/{audio,expansion/audio}/`)
+
+| Context | Pick | Fix before import |
+|---|---|---|
+| 5-1 / 5-2 | Wolfgang_ "Desert Theme" (`desertbounce-trimmed`) / Spring Spring "Suez Crisis Remade" | desert theme 1.6 LU short of target under the TP cap: limit |
+| 6-1 / 6-2 / 6-2b climb | Junkala Super Action stage_7 / Wolfgang_ "Haunted House" / Tallbeard "Pixel War 1" | trim Haunted House's 123 ms tail |
+| 7-1 / 7-2 | Spring Spring "Sandy Seaside" / Tallbeard "Deep Blue" | - |
+| 8-1 / 8-2 | Junkala Super Action stage_9 / Tallbeard "Penultimate" | - |
+| 9-1 / 9-1b / 9-2 / 9-3 approach | Wolfgang_ "Upbeat Overworld" / Spring Spring "Typhoon's Theme" v3 / Junkala Retro Sports stage_final / Junkala Super Action stage_6 | trim Typhoon's 82 ms lead |
+| Bosses | Tusker nene "Boss Battle #1"; Mangrove nene #2; Inkjaw nene #4; Twin Idols Spring Spring "Egyptian Fortress Boss"; Storm Roc nene #6; Chieftains nene #3 | nene tracks cut to 60-90 s loop regions (music budget); check seams of #3; Egyptian master is hot (vol -12) |
+| Feast Land D / E, ending_b | shipped `bonus` context / Tallbeard "Box Jump" / Spring Spring "Tropical Fantasy" + shipped credits | - |
+| Co-op menu, join | Tallbeard "Connected"; ctske `square_partyjoin` | trim 84 ms lead |
+| Versus lobby, battle, sudden death | Spring Spring melon charselect; Junkala Retro Sports stage_3, Tallbeard "Out of Time", "Go (No Vocal)"; Wolfgang_ "8-Bit Battle Loop" | "Go" peaks +2.0 dBTP: limit |
+| Stingers | countdown kheetor + Junkala Blip5 / fanfare2; round win Junkala fanfare1 / MintoDog "Stage Clear Short"; match win celestialghost8 "Victory"; results Spring Spring melon win; sudden death Junkala alarm_loop1 + refereewhistle | trim Victory's 1.06 s tail |
+| New effects | swap Junkala interaction6; spear stick Spring Spring snd_enemyland; vine Junkala ladder1loop; raft / splash Skippy Fish water + waterReentry, Basto heavy_splash; geyser BMacZero bubbles-single2 + heavy_splash; tar Spring Spring glug; egg down Junkala neutral2; hatch Junkala powerup2; Shoulder Hop / Totem Ride Junkala interaction16; curl MoxieCat dashcharge; bat hit artisticdude swish-7..9 + MoxieCat dashwoosh; brace Spring Spring snd_enemyland; plate Kenney switch_002; drum Junkala Blip5; see-saw Spring Spring snd_sproing; boulder / pulley Kenney creak1 / creak3; daze Junkala nagger2; Chomper bite shipped dino_voice + food_chomp; cookpot bank Junkala powerup8; crate drop Kronbits Retro Swooosh 02; Hot Rock fuse Junkala Blip5 -> alarm_loop1; crowd eXpl0it3r applause, qubodup Well Done | loudness to the 1.0 rules (`tools/audio_loudness.py`: music -18 LUFS, effects -14, TP <= -1 dBTP) |
+
+No CC-BY file ships (owner decision 5); nothing was auditioned by ear, so one human listen-through precedes the lock.
+
+### F.3 Licences and files
+
+Every new asset goes through `docs/ASSET_MANIFEST.md`, `CREDITS.md` and `docs/THIRD_PARTY.md` exactly as 1.0. CC0
+only; never NC / ND / SA / GPL art, rips or unlicensed AI output; never Prehistorik / Titus assets, names, maps or data;
+no code from `.tools/ref`.
+
+### F.4 Production summary (details in PLAN.md)
+
+About **130 engineer-weeks** (plus or minus 30 %): phase 0 contracts and the N = 1 identity refactor (single owner,
+blocking), phase 1 systems, phase 2 entities / bosses / UI / art, phase 3 content and route proofs, phase 4 QA and the
+2.0 release.
+
+| Proof | Count |
+|---|---|
+| Book I solo routes changed | **0** of 72 (15 files byte-identical) |
+| Book II solo club routes | 31 (11 Beginner + 20 Expert cells) + about 6 featured secret / painting routes |
+| Belt-invariance replays | 4 specials x every Book II and co-op route (generated, not recorded) |
+| Co-op two-stream routes | 57 (Book I 11 + 15, Book II 11 + 20) |
+| Solo-impossibility searches | every x2 gate (about 60) |
+| Boss tests | 6 new bosses + 2 co-op forms |
+| Bot matches | every (arena, launch mode) pair the arena supports |
+
+---
+
+## Appendix: new ids, keys and actions (for the phase-0 contract owner)
+
+| Kind | Additions |
+|---|---|
+| Input | action `swap` (flag `IN_SWAP`, route key `S`); per-slot generated `p1_*`..`p4_*` actions; Settings `[bindings_p1]`..`[bindings_p4]` |
+| Meta | `book` (1 / 2); `belt = fresh\|carry`; `kind = coop` + `coop_of`, `coop_base_hash`; `kind = arena` + `players`, `round_time`, `modes`, `wrap = none\|lr\|tb`, `sudden`; `liquid = tar\|honey\|syrup`; `scroll = rising` + `rise_speed`; biomes `canyon`, `swamp`, `coast`, `ruins`, `sky` |
+| Tiles | `:` tar floor (set A, lowered surface, slow) |
+| Entity params | `coop=<trait>`, `bond=<name>` (enemies, drums); `slot=n` (hero_start); `rise_while=` / `sink_while=` / `trigger=keepers:<name>` (column) |
+| Enemies | `enemies/roller`, `guard`, `mimic`; co-op: `shellback`, `raptor`, `snatcher`, `leech`, `bull_rex`, `tar_splitter`, `shaman` |
+| Bosses | `bosses/tusker`, `mangrove`, `squid`, `idols`, `roc`, `chieftain` (two instances, `mate=<name>`); Brute and Colossus gain co-op behaviour |
+| Objects | `objects/vine`, `bark_board`, `geyser`, `raft`, `mount`, `rex_pen`, `plate`, `drum`, `seesaw`, `boulder_heavy`, `pulley`, `flower_pot`, `x2_tablet`, `hero_start`; versus: `cookpot`, `coconut`, `crate_lane`, `spawn_point`; team rules on `exit` / `gate` |
+| Items | `items/painting index=0..29`; `items/weapon kind=spear` |
+| Zones | `zones/current`; versus `zones/goal team=1\|2` |
+| Projectiles | `projectiles/hero_spear` |
+| Specs | PHYSICS.md appendix "Party and Book II rules" (belt and swap, spear, climb, tar, geyser, raft, rising scroll, mount, hop / ride / curl / bat / brace, egg, versus hurt table); GAMEPLAY.md 13 "Expansion 2.0". Sections 1-12 do not change |
