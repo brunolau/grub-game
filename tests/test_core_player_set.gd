@@ -476,6 +476,20 @@ func test_the_loader_spawns_the_party_after_p1_at_its_starts() -> void:
 			"no marker: spread from '@'")
 
 
+## An arena's `objects/spawn_point index=2..4` is the start of that player (LEVEL_DESIGN.md 15.8); a hero_start
+## marker of the same player wins.
+func test_arena_spawn_points_are_party_starts() -> void:
+	Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.VERSUS, 3)
+	var level: Level = _load_level("objects/spawn_point 20 9 index=2\nobjects/spawn_point 14 9 index=3\n"
+			+ "objects/hero_start 8 9 slot=3")
+	assert_eq(level.hero_count(), 3)
+	assert_eq(level.get_start_pos_for(1), LevelText.cell_to_feet(20.0, 9.0), "P2 at spawn point 2")
+	assert_eq(level.get_start_pos_for(2), LevelText.cell_to_feet(8.0, 9.0), "P3: his hero_start wins")
+	assert_eq(level.get_hero(1).sim_pos, LevelText.cell_to_feet(20.0, 9.0))
+	assert_eq(level.get_start_pos_for(3), level.start_pos + Vector2i(3 * PartyTuning.RESPAWN_SPREAD_PX, 0),
+			"no spawn point: spread from '@'")
+
+
 func test_two_heroes_play_from_their_own_input_slots() -> void:
 	Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.COOP, 2)
 	var level: Level = _load_level("objects/hero_start 12 9 slot=2")

@@ -78,6 +78,61 @@ var run: PlayerRun = Game.runs[0]
 ## a hero per tick (PHYSICS.md 11.4): PlatformBase tests and sets it (it was one static guard for the one hero).
 var carried_on_tick: int = -1
 
+# --- 2.0 hooks for parallel work (PLAN.md P0.8): egg, shield, curl, mount seat, launch, x fence ------------------------
+# Every member below keeps its default for a single-player hero (nothing in Book I solo calls a setter): the 1.0 code
+# paths read them only where the default reproduces 1.0 exactly. The rules that drive them are the owners' work in
+# phase 1: the egg and the curl player-A (scripts/player/hero_party.gd) with world-A's PartyDriver, the seat
+# player-B (hero_mount.gd) with objects-B's objects/mount (PHYSICS.md C.9-C.13).
+
+## Mount seats ([member mount_seat], PHYSICS.md C.9).
+const SEAT_NONE: int = 0
+const SEAT_DRIVER: int = 1
+const SEAT_GUNNER: int = 2
+## Curl states ([member curl], PHYSICS.md C.11).
+const CURL_NONE: int = 0
+## Curled up on the ground (Down + Swap in co-op and versus), waiting for a partner's bat.
+const CURL_CURLED: int = 1
+## Flying (or rolling) as a batted ball.
+const CURL_BALL: int = 2
+## Pass it to [method launch] for a velocity component that is to stay as it is (a geyser keeps xvel).
+const LAUNCH_KEEP: int = 1 << 30
+
+## True while this hero is an egg: "down" in co-op (DESIGN.md D.3, PHYSICS.md C.12) - out of play without being
+## dead: no tile collision, no contact with enemies, items, zones or exits, no target, no doze rectangle. Set by
+## [method go_down], cleared by [method hatch] and every respawn. Never true in single-player.
+var down: bool = false
+## Hatch shield (PHYSICS.md C.12 [R15]): ticks left of blinking with enemy contact skipped (as while hit_timer runs)
+## and full control. Set by [method hatch] (PartyTuning.HATCH_BLINK_TICKS), counted down in POST by the party
+## component, cleared by every respawn. Versus: the spawn shield (VersusTuning.SPAWN_SHIELD_TICKS, PHYSICS.md C.14:
+## no PvP hit, stomp or arena hazard box touches him), which the party component ends at once when he starts a strike
+## or a throw. Always 0 in single-player.
+var shield: int = 0
+## Co-op leash count (PHYSICS.md C.13): consecutive ticks his feet point has been outside the authentic view; the
+## party component counts it in POST and makes him an egg at PartyTuning.leash_egg_ticks(); the HUD's edge arrow and
+## stone countdown read it (0 = on the view). Cleared by every respawn. Always 0 in single-player.
+var leash: int = 0
+## Versus hit-stop (PHYSICS.md C.14): ticks left in which this hero skips his PLAYER phase (VersusTuning.HIT_STOP_TICKS
+## / HIT_STOP_BIG_TICKS), set by the referee on attacker and victim; counted down by the party component. Always 0
+## outside versus.
+var hit_stop: int = 0
+## Versus squash (PHYSICS.md C.14): ticks left in which a stomped hero ignores UP and FIRE (walking allowed;
+## VersusTuning.STOMP_SQUASH_TICKS), set by the referee, counted down by the party component. Always 0 outside versus.
+var squash: int = 0
+## Curl and ball state (PHYSICS.md C.11): CURL_NONE, CURL_CURLED or CURL_BALL. Always CURL_NONE in single-player.
+var curl: int = CURL_NONE
+## The hero whose strike launched this ball ([method bat]; null when not a ball): what the ball hits is credited to
+## him (Defs.hitter_slot).
+var ball_batter: PlayerBase = null
+## The mount (objects/mount, PHYSICS.md C.9) this hero sits on, null when none; [member mount_seat] says which seat.
+## The mount places its riders every tick (driver at its feet - MountTuning saddle, gunner behind).
+var mount: SimEntity = null
+var mount_seat: int = SEAT_NONE
+## x commit fence of the current tick ([method fence_x]): the rules that keep a hero inside an area (co-op edge walls
+## C.13, raft rails C.7). Off (no fence) unless something fenced him this tick.
+var _fenced: bool = false
+var _fence_left: int = 0
+var _fence_right: int = 0
+
 
 func get_kind() -> int:
 	return Defs.Kind.PLAYER
@@ -122,9 +177,10 @@ func is_striking() -> bool:
 	return attack_gate
 
 
-## True while enemy contact is ignored (hit_timer > 0) or he is dead.
+## True while enemy contact is ignored (hit_timer > 0) or he is dead. 2.0: also while the hatch shield runs
+## ([member shield] > 0) and while he is an egg ([member down]); both never happen in single-player.
 func is_immune() -> bool:
-	return hit_timer > 0 or dead
+	return hit_timer > 0 or dead or shield > 0 or down
 
 
 ## True during feast mode: enemies die on touch.
@@ -132,16 +188,37 @@ func is_feasting() -> bool:
 	return feast > 0
 
 
-## True while this hero is down (a co-op egg, DESIGN.md D.3): out of play without being dead. Always false until the
-## egg rules exist (PLAN.md P0.8 / P1, player module); a single-player hero is never down.
+## True while this hero is down (a co-op egg, DESIGN.md D.3): out of play without being dead ([member down]). A
+## single-player hero is never down.
 func is_down() -> bool:
-	return false
+	return down
+
+
+## True while curled up or flying as a ball (PHYSICS.md C.11).
+func is_curled() -> bool:
+	return curl != CURL_NONE
+
+
+## True while he sits on a mount (PHYSICS.md C.9).
+func is_mounted() -> bool:
+	return mount != null
 
 
 ## True when enemies of a party may pick this hero as their target (LevelBase.target_hero): alive and not down. A
 ## party of one never asks (1.0 targets the hero unless he is dead).
 func is_party_targetable() -> bool:
 	return not dead and not is_down()
+
+
+## Brace Wall (PHYSICS.md C.10): true when this hero and `partner` (another hero) are both alive and hatched, both in
+## the crouch state (5, not crawl), both on the ground, and stand within PartyTuning.BRACE_GAP_PX of each other. A
+## `heavy` enemy (enemies) or a boss whose rule says so tests it before its contact with either hero; a lone croucher
+## is trampled as usual. A pure query: never true without a partner, so never in single-player.
+func braces_with(partner: PlayerBase) -> bool:
+	if partner == null or partner == self or dead or partner.dead or down or partner.down:
+		return false
+	return is_crouching() and partner.is_crouching() and is_grounded() and partner.is_grounded() \
+			and absi(sim_pos.x - partner.sim_pos.x) <= PartyTuning.BRACE_GAP_PX
 
 
 # --- Calls other modules make -----------------------------------------------------------------------------------------
@@ -151,9 +228,10 @@ func is_party_targetable() -> bool:
 ## ENEMY: -1 heart or lose the glider, yvel -128, xvel = -(xvel * 4), hit_timer 44.
 ## BOSS_BODY: one bone, yvel -128, xvel +/-128 away from the source with ice = 3, hit_timer 44.
 ## BOSS_PROJECTILE: -1 heart and 6 bones scattered. TRAP: all energy scattered as bones, hurt pose, no death.
-## Once the level is completed (LevelBase.completed: the exit animation plays) every hit is ignored.
+## Once the level is completed (LevelBase.completed: the exit animation plays) every hit is ignored, and so is every
+## hit on an egg ([member down], 2.0).
 func hurt(source: SimEntity, kind: int = Defs.HurtKind.ENEMY) -> bool:
-	if dead or (Game.level != null and Game.level.completed):
+	if dead or down or (Game.level != null and Game.level.completed):
 		return false
 	if hit_timer > 0 and kind != Defs.HurtKind.TRAP and kind != Defs.HurtKind.BOSS_PROJECTILE:
 		return false
@@ -190,9 +268,10 @@ func hurt(source: SimEntity, kind: int = Defs.HurtKind.ENEMY) -> bool:
 
 ## Instant death (PHYSICS.md 10.3): costs a life regardless of energy and of hit_timer.
 ## `cause`: &"enemy", &"spikes", &"liquid", &"pit", &"crush", &"off_screen", &"give_up", &"time" (the
-## level's time limit ran out). Ignored once the level is completed (the exit animation plays).
+## level's time limit ran out). Ignored once the level is completed (the exit animation plays), and for an egg
+## ([member down], 2.0: it touches nothing).
 func kill(cause: StringName) -> void:
-	if dead or (Game.level != null and Game.level.completed):
+	if dead or down or (Game.level != null and Game.level.completed):
 		return
 	dead = true
 	control_enabled = false
@@ -275,6 +354,16 @@ func respawn_at(pos: Vector2i) -> void:
 	looking = false
 	club_box_active = false
 	last_ground_y = pos.y
+	# 2.0 (defaults in single-player): hatched, no shield, leash, hit-stop or squash, uncurled, off any mount, no fence.
+	down = false
+	shield = 0
+	leash = 0
+	hit_stop = 0
+	squash = 0
+	curl = CURL_NONE
+	ball_batter = null
+	leave_mount()
+	_fenced = false
 	if feast > 0:
 		feast = 0
 		Events.feast_changed.emit(0)
@@ -293,3 +382,110 @@ func set_control_enabled(enabled: bool) -> void:
 func notify_weapon_hit() -> void:
 	if yvel != 0:
 		yvel = Tuning.POGO_YVEL
+
+
+# --- 2.0 calls (PLAN.md P0.8; never made in single-player) --------------------------------------------------------------
+
+## The launch primitive of PHYSICS.md C.0 #4 (geysers, see-saws, vine leaps, Batter Up, dismounts, hatching): each
+## given component is clamped to +/- PartyTuning.LAUNCH_AXIS_CAP v16 (pass LAUNCH_KEEP to keep one, e.g. a geyser
+## keeps xvel); then fall_ticks = 0, no_jump = Tuning.NO_JUMP_TICKS (a launched hero never adds the jump table),
+## on_platform and grounded cleared; glide unchanged.
+func launch(p_xvel: int, p_yvel: int) -> void:
+	if p_xvel != LAUNCH_KEEP:
+		xvel = clampi(p_xvel, -PartyTuning.LAUNCH_AXIS_CAP, PartyTuning.LAUNCH_AXIS_CAP)
+	if p_yvel != LAUNCH_KEEP:
+		yvel = clampi(p_yvel, -PartyTuning.LAUNCH_AXIS_CAP, PartyTuning.LAUNCH_AXIS_CAP)
+	fall_ticks = 0
+	no_jump = Tuning.NO_JUMP_TICKS
+	on_platform = false
+	grounded = false
+
+
+## Make this hero an egg where he is (PHYSICS.md C.12: after his death toss, or at once for the leash and the
+## voluntary egg): [member down] set, `dead` cleared (an egg is not dead), no control, no strike, no glide, no curl,
+## off any mount, motion stopped; Events.hero_down(self, cause). The egg's box, drift, nudge and Expert return are
+## the party component's (player-A), the team-wipe check the PartyDriver's (world-A). `cause` as for [method kill]
+## (plus &"leash", &"voluntary").
+func go_down(cause: StringName) -> void:
+	if down:
+		return
+	down = true
+	dead = false
+	control_enabled = false
+	club_box_active = false
+	attack_gate = false
+	glide = 0
+	curl = CURL_NONE
+	ball_batter = null
+	xvel = 0
+	yvel = 0
+	leave_mount()
+	Events.hero_down.emit(self, cause)
+
+
+## Hatch this egg (PHYSICS.md C.12): hatched again with `hearts` hearts and no bones in his run, control back,
+## [member shield] = PartyTuning.HATCH_BLINK_TICKS, the pop launch(0, PartyTuning.HATCH_POP_YVEL);
+## Events.hero_revived(self, by). `by` = the partner whose box, projectile or stomp hatched it (null: a checkpoint).
+## Does nothing unless he is down.
+func hatch(by: PlayerBase, hearts: int) -> void:
+	if not down:
+		return
+	down = false
+	control_enabled = true
+	hit_timer = 0
+	shield = PartyTuning.HATCH_BLINK_TICKS
+	run.hearts = hearts
+	run.bones = 0
+	run.emit_energy()
+	launch(0, PartyTuning.HATCH_POP_YVEL)
+	Events.hero_revived.emit(self, by)
+
+
+## A partner's front strike batted this curled hero (PHYSICS.md C.11): he flies as a ball, launch(p_xvel, p_yvel)
+## (each component within PartyTuning.LAUNCH_AXIS_CAP), credited to `batter`. The flight, the grounder roll and the
+## uncurl are the party component's (player-A).
+func bat(p_xvel: int, p_yvel: int, batter: PlayerBase) -> void:
+	curl = CURL_BALL
+	ball_batter = batter
+	launch(p_xvel, p_yvel)
+
+
+## objects/mount seats this hero (PHYSICS.md C.9): `seat` SEAT_DRIVER or SEAT_GUNNER, yvel 0, no glide. The mount
+## places him every tick; his own update is the mount component's (player-B) while seated.
+func sit_on_mount(p_mount: SimEntity, seat: int) -> void:
+	mount = p_mount
+	mount_seat = seat if seat == SEAT_GUNNER else SEAT_DRIVER
+	yvel = 0
+	glide = 0
+	on_platform = false
+
+
+## Leave the seat (a dismount, the mount bolting, a stage start). Safe when not mounted.
+func leave_mount() -> void:
+	mount = null
+	mount_seat = SEAT_NONE
+
+
+## Fence this tick's x commit (PHYSICS.md 2, the rule of step 8e) into `left` <= x < `right_excl` on top of the level
+## bounds: co-op edge walls (C.13), raft rails (C.7). Several fences in one tick intersect; the fence ends with this
+## tick's x step (call it every tick it applies, before the PLAYER phase or in it before the x step). A component
+## that runs the hero's x step itself (the ball flight, a seated rider) applies [method fence_allows] and
+## [method clear_fence] the same way.
+func fence_x(left: int, right_excl: int) -> void:
+	if _fenced:
+		_fence_left = maxi(_fence_left, left)
+		_fence_right = mini(_fence_right, right_excl)
+	else:
+		_fenced = true
+		_fence_left = left
+		_fence_right = right_excl
+
+
+## True when the fence of this tick lets the x commit move him to `x` (always true without a fence: the 1.0 rule).
+func fence_allows(x: int) -> bool:
+	return not _fenced or (x >= _fence_left and x < _fence_right)
+
+
+## End this tick's fence (the hero calls it right after his x step).
+func clear_fence() -> void:
+	_fenced = false

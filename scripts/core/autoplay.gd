@@ -8,14 +8,22 @@ extends Node
 ##   --flow=<file>             OR: boot normally and play a flow script (menus, gameplay, checks, screenshots
 ##                             across scene changes; syntax at the top of scripts/core/dev/autoplay_flow.gd)
 ##   --inputs=<runs>           run-length input script "ticks:KEYS,ticks:KEYS,..." with KEYS from
-##                             L R U D F K (left right up/jump down fire look); "30:" = 30 idle ticks
-##   --inputs-file=<path>      the same script read from a text file (commas or new lines)
+##                             L R U D F K S (left right up/jump down fire look swap); "30:" = 30 idle ticks.
+##                             Several heroes: one key set per player separated by `|` ("8:R|L,4:|U"; an empty part
+##                             = that player idle), see [method parse_inputs_multi]
+##   --inputs-file=<path>      the same script read from a text file (commas or new lines; a `# route:` header
+##                             may name the number of players)
+##   --players=<n>             heroes in the level (1..4; default: as many as the script has streams). More than one
+##                             starts a co-op run (a versus run in an arena), Game.start_run
 ##   --shots=<n>               save a screenshot every n ticks (default 24), plus the first and the last tick
 ##   --out=<name>              folder under build/screenshots/ (default: the level id or scene name)
 ##   --difficulty=<name>       beginner (default) or expert
-##   --weapon=<name>           club (default, as a new run), hammer, axe or boomerang (the swirling axe): the weapon
-##                             the hero holds when the level starts, for the per-weapon routes
-##                             (tools/autoplay/routes/<id>[.expert].<weapon>.inputs)
+##   --weapon=<name>[,<name>]  club (default, as a new run), hammer, axe, boomerang (the swirling axe) or spear: the
+##                             weapon the hero holds when the level starts, for the per-weapon routes
+##                             (tools/autoplay/routes/<id>[.expert].<weapon>.inputs); one name per player, in order
+##   --record=<file>           record every player's sampled input, tick by tick, of every stage played (also in a
+##                             normal game without any other switch: two people play with pads and the file is a
+##                             tick-exact route) - see scripts/core/dev/input_recorder.gd
 ##   --seed=<n>                simulation RNG seed (default 1)
 ##   --fast                    run one tick per rendered frame instead of real time
 ##   --hold=<ticks>            idle ticks appended after the script (default 12)
@@ -33,7 +41,8 @@ extends Node
 ## Example (run the windowed console binary, NOT --headless, or no image can be captured):
 ##   godot --path . -- --autoplay=test_example --inputs=40:R,12:RU,30:R,8:F --shots=10
 ##
-## Output: build/screenshots/<out>/tick_00010.png ... and trace.json (hero position per tick). The run ends when the
+## Output: build/screenshots/<out>/tick_00010.png ... and trace.json (hero position per tick; with a party also the
+## rows of heroes 2.. under "party"). The run ends when the
 ## script (plus --hold) is played, or as soon as another stage takes over (a linked sub-stage after a `tally = false`
 ## exit, a bonus stage behind a warp, the stage after a trophy): the script belongs to the level it was written for,
 ## and that level's screenshots are never overwritten. A whole chain of stages is played with a flow script.
@@ -61,12 +70,40 @@ const SMOKE_MAX_SECONDS: float = 120.0
 ## Development files and folders that must never be inside an exported build (export_presets.cfg excludes them).
 const DEVELOPMENT_PATHS: PackedStringArray = [
 	"res://tests", "res://tools", "res://docs", "res://scenes/core/debug_level.tscn",
-	"res://scripts/core/debug_level.gd", "res://levels/test_example.lvl", FLOW_RUNNER, PERF_PROBE,
+	"res://scripts/core/debug_level.gd", "res://levels/test_example.lvl", FLOW_RUNNER, PERF_PROBE, RECORDER,
 ]
 ## The flow-script runner (development only, excluded from exports with every `dev` folder).
 const FLOW_RUNNER: String = "res://scripts/core/dev/autoplay_flow.gd"
 ## The performance probe of `--perf` (development only, like the flow runner).
 const PERF_PROBE: String = "res://scripts/core/dev/perf_probe.gd"
+## The input recorder of `--record` (development only, like the flow runner).
+const RECORDER: String = "res://scripts/core/dev/input_recorder.gd"
+## The first line of a route file that describes itself (docs/LEVEL_DESIGN.md 15.9): `# route: key=value ...`.
+const ROUTE_HEADER: String = "# route:"
+## The keys a route header may have.
+const ROUTE_HEADER_KEYS: PackedStringArray = [
+	"level", "difficulty", "players", "ends", "after", "belt", "then", "source", "prefix", "expect",
+]
+## The checks a route header's `expect` may name (the route tests implement every one): the 1.0 keys of
+## tests/test_campaign_routes.gd ROUTES and the 2.0 keys of docs/LEVEL_DESIGN.md 15.9.
+const ROUTE_EXPECT_KEYS: PackedStringArray = [
+	"hurts", "max_hurts", "deaths", "respawns", "lives_gained", "weapon_end", "secrets", "min_secrets", "gates",
+	"checkpoints", "min_checkpoints", "min_spots", "min_kills", "letters", "words", "ticks", "pair_ticks", "jackpots",
+	"min_hearts", "fight_ticks", "min_completion", "min_score", "boss_hits", "unlocked", "glider", "min_wind",
+	"view_sank", "embers", "no_enemies", "hero_min_x", "hero_y",
+	"painting", "wipes", "eggs", "hatches", "x2_gates",
+]
+## `expect` keys whose value is a range `low..high` (a single number n means n..n).
+const ROUTE_RANGE_KEYS: PackedStringArray = ["ticks", "pair_ticks", "fight_ticks"]
+## `expect` keys whose value is a list `a+b+c` (a single number is a list of one).
+const ROUTE_LIST_KEYS: PackedStringArray = ["letters", "embers"]
+## `expect` keys whose value is `true` or `false`.
+const ROUTE_BOOL_KEYS: PackedStringArray = ["unlocked", "glider", "no_enemies"]
+## Key letters of an input script, in the order format_inputs() writes them (GameInput.keys_to_flags reads them).
+const KEY_LETTERS: Array[Array] = [
+	[Defs.IN_LEFT, "L"], [Defs.IN_RIGHT, "R"], [Defs.IN_UP, "U"], [Defs.IN_DOWN, "D"], [Defs.IN_FIRE, "F"],
+	[Defs.IN_LOOK, "K"], [Defs.IN_SWAP, "S"],
+]
 ## Saves and settings of harness runs (never the player's real ones).
 const DEFAULT_USER_DIR: String = "res://build/autoplay_user"
 const USER_FILES: PackedStringArray = ["save.json", "save.json.bak", "save.json.tmp", "settings.cfg"]
@@ -100,6 +137,14 @@ var flow_mode: bool = false
 var _level_id: StringName = &""
 var _scene_path: String = ""
 var _flags: PackedInt32Array = PackedInt32Array()
+## One input stream per player slot (`_flags` is the first); all of the same length.
+var _streams: Array[PackedInt32Array] = []
+## Heroes of the scripted run (--players, or the streams of the script).
+var _players: int = 1
+## The weapon of every slot (--weapon=<name>[,<name>...]); slot 0 is `_weapon`.
+var _weapons: PackedInt32Array = PackedInt32Array()
+## Rows of heroes 2.. per tick when a party plays: tick, slot, x, y, xvel, yvel, state.
+var _party_trace: PackedInt32Array = PackedInt32Array()
 var _shot_period: int = DEFAULT_SHOT_PERIOD
 var _out_dir: String = ""
 var _fast: bool = false
@@ -127,6 +172,9 @@ func _ready() -> void:
 	if options.has("smoke"):
 		_smoke(clampf(str(options["smoke"]).to_float(), SMOKE_MIN_SECONDS, SMOKE_MAX_SECONDS))
 		return
+	if options.has("record"):
+		# Also without any other switch: the game runs normally and every stage played is recorded.
+		_start_recorder(str(options["record"]))
 	if not options.has("autoplay") and not options.has("autoplay-scene") and not options.has("flow"):
 		return
 	active = true
@@ -209,6 +257,248 @@ func parse_inputs(script: String) -> PackedInt32Array:
 	return result
 
 
+# =================================================================================================================
+# 2.0: several input streams, route headers, writing scripts (docs/expansion/TECH_AUDIT.md 4.11)
+# =================================================================================================================
+
+## Convert an input script for several heroes into one flags array per player slot (index = slot). Entries are
+## `ticks:KEYS|KEYS|...`: one key set per player separated by `|`, an empty or missing part = that player idle
+## (`8:R|R,10:RU|,4:DF|DF`). The number of streams is [method input_players]. A script without `|` and without a
+## players header is a single-player route: the result is [parse_inputs(script)], exactly the 1.0 parse. Every
+## stream has the same length; separators and `#` comment lines as in [method parse_inputs].
+func parse_inputs_multi(script: String) -> Array[PackedInt32Array]:
+	var players: int = input_players(script)
+	var entries: PackedStringArray = _script_entries(script)
+	if players <= 1 and not "".join(entries).contains("|"):
+		return [parse_inputs(script)] as Array[PackedInt32Array]
+	var streams: Array[PackedInt32Array] = []
+	for slot: int in players:
+		streams.append(PackedInt32Array())
+	for entry: String in entries:
+		var item: String = entry.strip_edges()
+		if item.is_empty():
+			continue
+		var colon: int = item.find(":")
+		var count_text: String = (item if colon < 0 else item.substr(0, colon)).strip_edges()
+		if not count_text.is_valid_int():
+			push_error("Autoplay: bad input entry '%s' (expected ticks:KEYS|KEYS)" % item)
+			continue
+		var parts: PackedStringArray = PackedStringArray() if colon < 0 else item.substr(colon + 1).split("|")
+		if parts.size() > players:
+			push_error("Autoplay: input entry '%s' has %d parts for %d player(s)" % [item, parts.size(), players])
+			continue
+		var count: int = count_text.to_int()
+		for slot: int in players:
+			var keys: String = parts[slot].strip_edges().to_upper() if slot < parts.size() else ""
+			var value: int = GameInput.keys_to_flags(keys)
+			for i: int in count:
+				streams[slot].append(value)
+	return streams
+
+
+## How many input streams (heroes) a script holds: the `players` of its `# route:` header, or of a `# players: <n>`
+## comment, else the most `|`-separated parts any entry has (1 for every 1.0 script).
+func input_players(script: String) -> int:
+	var header: Dictionary = parse_route_header(script)
+	if header.has("players") and int(header["players"]) > 0:
+		return int(header["players"])
+	var players: int = 0
+	var most: int = 1
+	for line: String in script.split("\n"):
+		var text: String = line.strip_edges()
+		if text.begins_with("#"):
+			var body: String = text.substr(1).strip_edges()
+			if players == 0 and body.begins_with("players:"):
+				var value: String = body.substr(8).strip_edges().get_slice(" ", 0)
+				if value.is_valid_int():
+					players = clampi(value.to_int(), 1, Defs.MAX_PLAYERS)
+			continue
+		for entry: String in text.split(",", false):
+			most = maxi(most, entry.split("|").size())
+	return players if players > 0 else most
+
+
+## The `# route:` header of a route file (docs/LEVEL_DESIGN.md 15.9), as an entry shaped like the ROUTES entries of
+## tests/test_campaign_routes.gd: "level", "modes" (["beginner"], ["expert"] or both), "players" (1..4), "leaves"
+## ("exit", "warp", "trophy"; "" for `ends=none`), "after" ("tally" or "level:<id>"; `expert_wall` and `the_end`
+## become "after": "tally" plus "tally_to" {mode: value}), "belt" (Defs.Weapon on the belt at the start,
+## PlayerRun.BELT_EMPTY for none), "then", "source", "prefix" ([route file, marker]) and "expect" (key -> int, bool,
+## [low, high] for ROUTE_RANGE_KEYS, [a, b, ...] for ROUTE_LIST_KEYS, a weapon name -> Defs.Weapon). Also
+## "header": true and "errors": PackedStringArray (empty for a valid header). The header is the first non-blank line
+## of `text`; a text without one gives {} (a 1.0 route, described by the ROUTES table).
+func parse_route_header(text: String) -> Dictionary:
+	var line: String = ""
+	for raw: String in text.split("\n"):
+		line = raw.strip_edges()
+		if not line.is_empty():
+			break
+	if not line.begins_with(ROUTE_HEADER):
+		return {}
+	var errors: PackedStringArray = PackedStringArray()
+	var spec: Dictionary = {"header": true, "players": 1, "belt": PlayerRun.BELT_EMPTY, "expect": {}}
+	for token: String in line.substr(ROUTE_HEADER.length()).replace("\t", " ").split(" ", false):
+		var eq: int = token.find("=")
+		var key: String = token if eq < 0 else token.substr(0, eq)
+		var value: String = "" if eq < 0 else token.substr(eq + 1)
+		if not ROUTE_HEADER_KEYS.has(key) or value.is_empty():
+			errors.append("'%s' is not key=value with a key of %s" % [token, ", ".join(ROUTE_HEADER_KEYS)])
+			continue
+		match key:
+			"level", "source":
+				spec[key] = value
+			"difficulty":
+				match value:
+					"beginner", "expert":
+						spec["modes"] = [value]
+					"both":
+						spec["modes"] = ["beginner", "expert"]
+					_:
+						errors.append("difficulty=%s (beginner, expert or both)" % value)
+			"players":
+				if value.is_valid_int() and value.to_int() >= 1 and value.to_int() <= Defs.MAX_PLAYERS:
+					spec["players"] = value.to_int()
+				else:
+					errors.append("players=%s (1..%d)" % [value, Defs.MAX_PLAYERS])
+			"ends":
+				if ["exit", "warp", "trophy", "none"].has(value):
+					spec["leaves"] = "" if value == "none" else value
+				else:
+					errors.append("ends=%s (exit, warp, trophy or none)" % value)
+			"after":
+				if value == "tally" or (value.begins_with("level:") and value.length() > 6):
+					spec["after"] = value
+				elif value == "expert_wall" or value == "the_end":
+					spec["after"] = "tally"
+					spec["tally_to"] = {"beginner": value, "expert": value}
+				else:
+					errors.append("after=%s (tally, level:<id>, expert_wall or the_end)" % value)
+			"belt":
+				var weapon: int = _weapon_from_name(value)
+				if value == "none":
+					spec["belt"] = PlayerRun.BELT_EMPTY
+				elif weapon > Defs.Weapon.CLUB:
+					spec["belt"] = weapon
+				else:
+					errors.append("belt=%s (none, hammer, axe, boomerang or spear)" % value)
+			"then":
+				spec["then"] = value
+			"prefix":
+				var at: int = value.rfind("@")
+				if at > 0 and at < value.length() - 1:
+					spec["prefix"] = [value.substr(0, at), value.substr(at + 1)]
+				else:
+					errors.append("prefix=%s (<route file>@<marker>)" % value)
+			"expect":
+				spec["expect"] = _parse_expect(value, errors)
+	for required: String in ["level", "modes", "leaves"]:
+		if not spec.has(required):
+			errors.append("no %s" % {"level": "level=", "modes": "difficulty=", "leaves": "ends="}[required])
+	spec["errors"] = errors
+	return spec
+
+
+## Keys of a flags value (Defs.IN_*), in the order L R U D F K S: flags_to_keys(Defs.IN_RIGHT | Defs.IN_UP) == "RU".
+func flags_to_keys(flags: int) -> String:
+	var keys: String = ""
+	for pair: Array in KEY_LETTERS:
+		if flags & int(pair[0]):
+			keys += str(pair[1])
+	return keys
+
+
+## Write input streams (one per player slot) as a run-length script that [method parse_inputs_multi] reads back
+## unchanged: one stream gives the 1.0 format (`ticks:KEYS`), several give `ticks:KEYS|KEYS|...`. `header_lines`
+## come first (e.g. a `# route:` header); entries are comma-separated, about 100 characters per line.
+func format_inputs(streams: Array[PackedInt32Array], header_lines: PackedStringArray = PackedStringArray()) -> String:
+	var lines: PackedStringArray = header_lines.duplicate()
+	var length: int = streams[0].size() if not streams.is_empty() else 0
+	var entries: PackedStringArray = PackedStringArray()
+	var width: int = 0
+	var start: int = 0
+	while start < length:
+		var end: int = start + 1
+		while end < length and _same_tick(streams, start, end):
+			end += 1
+		var parts: PackedStringArray = PackedStringArray()
+		for stream: PackedInt32Array in streams:
+			parts.append(flags_to_keys(stream[start]))
+		var entry: String = "%d:%s" % [end - start, "|".join(parts)]
+		if width + entry.length() > 100 and not entries.is_empty():
+			lines.append(",".join(entries))
+			entries.clear()
+			width = 0
+		entries.append(entry)
+		width += entry.length() + 1
+		start = end
+	if not entries.is_empty():
+		lines.append(",".join(entries))
+	return "\n".join(lines) + "\n"
+
+
+# True when every stream holds the same flags on ticks `a` and `b`.
+func _same_tick(streams: Array[PackedInt32Array], a: int, b: int) -> bool:
+	for stream: PackedInt32Array in streams:
+		if stream[a] != stream[b]:
+			return false
+	return true
+
+
+# The entries of an input script: commas or new lines; `#` lines are comments.
+func _script_entries(script: String) -> PackedStringArray:
+	var entries: PackedStringArray = PackedStringArray()
+	for line: String in script.split("\n"):
+		if not line.strip_edges().begins_with("#"):
+			entries.append_array(line.split(",", false))
+	return entries
+
+
+# The `expect=` value of a route header: comma-separated key:value checks.
+func _parse_expect(text: String, errors: PackedStringArray) -> Dictionary:
+	var expect: Dictionary = {}
+	for item: String in text.split(",", false):
+		var colon: int = item.find(":")
+		var key: String = item if colon < 0 else item.substr(0, colon)
+		var value: String = "" if colon < 0 else item.substr(colon + 1)
+		if not ROUTE_EXPECT_KEYS.has(key) or value.is_empty():
+			errors.append("expect '%s' is not key:value with a known key" % item)
+			continue
+		if ROUTE_BOOL_KEYS.has(key):
+			if value == "true" or value == "false":
+				expect[key] = value == "true"
+			else:
+				errors.append("expect %s:%s (true or false)" % [key, value])
+		elif ROUTE_RANGE_KEYS.has(key):
+			var bounds: PackedStringArray = value.split("..") if value.contains("..") else PackedStringArray([value, value])
+			if bounds.size() == 2 and bounds[0].is_valid_int() and bounds[1].is_valid_int():
+				expect[key] = [bounds[0].to_int(), bounds[1].to_int()]
+			else:
+				errors.append("expect %s:%s (<low>..<high>)" % [key, value])
+		elif ROUTE_LIST_KEYS.has(key):
+			var values: Array[int] = []
+			for part: String in value.split("+"):
+				if part.is_valid_int():
+					values.append(part.to_int())
+				else:
+					errors.append("expect %s:%s (numbers joined by +)" % [key, value])
+					break
+			expect[key] = values
+		elif key == "weapon_end" and _weapon_from_name(value) >= 0:
+			expect[key] = _weapon_from_name(value)
+		elif value.is_valid_int():
+			expect[key] = value.to_int()
+		else:
+			errors.append("expect %s:%s (a number)" % [key, value])
+	return expect
+
+
+# Defs.Weapon of a weapon name (Defs.weapon_name), -1 for an unknown one.
+func _weapon_from_name(weapon_name: String) -> int:
+	for weapon: int in Defs.Weapon.values():
+		if Defs.weapon_name(weapon) == weapon_name.to_lower():
+			return weapon
+	return -1
+
+
 func _smoke(seconds: float) -> void:
 	var counter: LogCounter = LogCounter.new()
 	OS.add_logger(counter)
@@ -239,21 +529,33 @@ func _configure(options: Dictionary) -> void:
 	var script: String = str(options.get("inputs", ""))
 	if options.has("inputs-file"):
 		script = FileAccess.get_file_as_string(str(options["inputs-file"]))
-	_flags = parse_inputs(script)
+	_streams = parse_inputs_multi(script)
+	_players = clampi(maxi(str(options.get("players", "0")).to_int(), _streams.size()), 1, Defs.MAX_PLAYERS)
+	while _streams.size() < _players:
+		_streams.append(PackedInt32Array())
+	var length: int = 0
+	for stream: PackedInt32Array in _streams:
+		length = maxi(length, stream.size())
 	var hold: int = str(options.get("hold", str(DEFAULT_HOLD_TICKS))).to_int()
-	for i: int in maxi(hold, 0):
-		_flags.append(0)
+	for stream: PackedInt32Array in _streams:
+		stream.resize(length + maxi(hold, 0))  # an added player idles; the hold ticks are idle
+	_flags = _streams[0]
 	_shot_period = maxi(str(options.get("shots", str(DEFAULT_SHOT_PERIOD))).to_int(), 1)
 	_seed = str(options.get("seed", "1")).to_int()
 	_fast = options.has("fast")
 	if str(options.get("difficulty", "beginner")) == "expert":
 		_difficulty = Defs.Difficulty.EXPERT
+	_weapons.resize(_players)
+	_weapons.fill(Defs.Weapon.CLUB)
 	if options.has("weapon"):
-		var weapon: int = ["club", "hammer", "axe", "boomerang"].find(str(options["weapon"]).to_lower())
-		if weapon < 0:
-			push_error("Autoplay: unknown weapon '%s' (club, hammer, axe, boomerang)" % options["weapon"])
-		else:
-			_weapon = weapon
+		var names: PackedStringArray = str(options["weapon"]).split(",")
+		for slot: int in mini(names.size(), _players):
+			var weapon: int = _weapon_from_name(names[slot].strip_edges())
+			if weapon < 0:
+				push_error("Autoplay: unknown weapon '%s' (club, hammer, axe, boomerang, spear)" % names[slot])
+			else:
+				_weapons[slot] = weapon
+		_weapon = _weapons[0]
 	var out_name: String = str(options.get("out", ""))
 	if out_name.is_empty() and options.has("flow"):
 		out_name = str(options["flow"]).get_file().get_basename()
@@ -292,6 +594,20 @@ func _start_perf(mode: String) -> void:
 	probe.call("begin", _out_dir, mode)
 
 
+## Attach the input recorder of `--record` (debug builds only; it is not exported).
+func _start_recorder(path: String) -> void:
+	var recorder_script: GDScript = load(RECORDER) as GDScript if ResourceLoader.exists(RECORDER) else null
+	if recorder_script == null:
+		push_error("Autoplay: the input recorder %s is missing" % RECORDER)
+		return
+	var recorder: Node = recorder_script.new() as Node
+	recorder.name = "InputRecorder"
+	add_child(recorder)
+	var target: String = path if path.begins_with("res://") or path.begins_with("user://") or path.is_absolute_path() \
+			else "res://" + path
+	recorder.call("begin", target)
+
+
 ## Hand the run to the flow-script runner (debug builds only; the runner is not exported).
 func _start_flow(path: String) -> void:
 	DirAccess.make_dir_recursive_absolute(_out_dir)
@@ -325,8 +641,15 @@ func _run() -> void:
 			push_error("Autoplay: unknown level '%s' (known: %s)" % [_level_id, str(Levels.all_ids())])
 			_finish(2)
 			return
-		Game.new_game(_difficulty)
+		var book: int = maxi(Levels.get_book(_level_id), 1)
+		if _players > 1 or book > 1:
+			var mode: int = Defs.GameMode.VERSUS if Levels.is_arena(_level_id) else Defs.GameMode.COOP
+			Game.start_run(_difficulty, mode if _players > 1 else Defs.GameMode.SINGLE, _players, book)
+		else:
+			Game.new_game(_difficulty)
 		Game.set_weapon(_weapon)
+		for slot: int in range(1, _players):
+			Game.runs[slot].set_weapon(_weapons[slot])
 		# The clock waits for the script's first tick: ticks run in real time while the level settles would put
 		# the level's own clock (wind script, enemies) ahead of the script, unlike the route tests and flow scripts.
 		Sim.manual = true
@@ -336,6 +659,8 @@ func _run() -> void:
 		await get_tree().process_frame
 	_stage = Game.level.get_instance_id() if Game.level != null else 0
 	GameInput.set_scripted(_flags_for_tick)
+	for slot: int in range(1, _players):
+		GameInput.set_scripted_slot(slot, _flags_for_slot.bind(slot))
 	Sim.tick_finished.connect(_on_tick_finished)
 	if not Sim.running:
 		Sim.start(_seed)
@@ -363,6 +688,16 @@ func _flags_for_tick(tick: int) -> int:
 	return _flags[index]
 
 
+# The script of player slot `slot` (1..), tick for tick like _flags_for_tick.
+func _flags_for_slot(tick: int, slot: int) -> int:
+	if _left_stage() or slot >= _streams.size():
+		return 0
+	var index: int = tick - 1
+	if index < 0 or index >= _streams[slot].size():
+		return 0
+	return _streams[slot][index]
+
+
 func _on_tick_finished(tick: int) -> void:
 	if _done:
 		return
@@ -385,6 +720,11 @@ func _on_tick_finished(tick: int) -> void:
 		_trace.append(hero.xvel)
 		_trace.append(hero.yvel)
 		_trace.append(hero.state)
+		for slot: int in range(1, level.hero_count()):
+			var other: PlayerBase = level.get_hero(slot)
+			if other != null:
+				_party_trace.append_array([tick, slot, other.sim_pos.x, other.sim_pos.y, other.xvel, other.yvel,
+						other.state])
 	var last: bool = tick >= _flags.size()
 	if last:
 		_done = true
@@ -434,14 +774,22 @@ func _write_trace() -> void:
 	var rows: Array[Array] = []
 	for i: int in _trace_rows():
 		rows.append(Array(_trace.slice(i * TRACE_COLUMNS, (i + 1) * TRACE_COLUMNS)))
-	file.store_string(JSON.stringify({
+	var trace: Dictionary = {
 		"level": String(_level_id),
 		"scene": _scene_path,
 		"seed": _seed,
 		"ticks": _flags.size(),
 		"columns": ["tick", "x", "y", "xvel", "yvel", "state"],
 		"rows": rows,
-	}))
+	}
+	if _players > 1:
+		var party: Array[Array] = []
+		for i: int in _party_trace.size() / 7:
+			party.append(Array(_party_trace.slice(i * 7, (i + 1) * 7)))
+		trace["players"] = _players
+		trace["party_columns"] = ["tick", "slot", "x", "y", "xvel", "yvel", "state"]
+		trace["party"] = party
+	file.store_string(JSON.stringify(trace))
 	file.close()
 
 

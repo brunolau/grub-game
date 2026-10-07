@@ -537,6 +537,9 @@ func test_every_level_text_is_translated() -> void:
 	assert_eq(missing, PackedStringArray(), "level texts without a translation")
 
 
+## Every 1.0 route file has its ROUTES entry. A route file whose first line is a `# route:` header (2.0, Book II,
+## co-op and arena routes, docs/LEVEL_DESIGN.md 15.9) describes itself: tests/test_book2_routes.gd and
+## tests/test_coop_routes.gd prove those.
 func test_every_route_file_is_described() -> void:
 	var dir: DirAccess = DirAccess.open(ROUTE_DIR)
 	assert_not_null(dir)
@@ -544,6 +547,8 @@ func test_every_route_file_is_described() -> void:
 	var count: int = 0
 	for file: String in files:
 		if file.get_extension() != "inputs":
+			continue
+		if not Autoplay.parse_route_header(FileAccess.get_file_as_string(ROUTE_DIR + file)).is_empty():
 			continue
 		count += 1
 		assert_true(ROUTES.has(file), "%s has an entry in ROUTES" % file)

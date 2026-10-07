@@ -31,6 +31,11 @@ var music: StringName = Sfx.MUSIC_BOSS
 var thrown_only: bool = false
 ## Ticks until the next glance-off clank may play (thrown_only bosses).
 var _glance_ticks: int = 0
+## 2.0 (PLAN.md P0.8, TECH_AUDIT.md 4.8): the hero whose weapon made the last hit [method poll_weapon_hit] counted (the
+## owner of a thrown weapon, the hero of a club box; also [member EnemyBase.last_hit_slot]); null before the first.
+## For the co-op forms (charge whoever hit it last, stagger away from him, take his glider); the 1.0 bosses read
+## their target hero instead.
+var last_hitter: PlayerBase = null
 ## What the boss drops when defeated (level parameter `drops`): content tokens such as `fire_starter`, `trophy`,
 ## `food:3`, `weapon:axe` (ARCHITECTURE.md 6.2) or full entity ids such as `items/heart`.
 var boss_drops: Array[StringName] = []
@@ -123,6 +128,7 @@ func poll_weapon_hit(weak_point: Rect2i) -> int:
 			projectile.consume()
 			if hit_cooldown > 0:
 				return 0
+			_note_hitter(level, projectile.owner_slot)
 			return 1 if thrown_only else projectile.power
 	if thrown_only:
 		for hero: PlayerBase in level.contact_order():
@@ -133,8 +139,19 @@ func poll_weapon_hit(weak_point: Rect2i) -> int:
 	for hero: PlayerBase in level.contact_order():
 		if hero.club_box_active and Overlap.rects(hero.club_box, weak_point):
 			hero.notify_weapon_hit()
+			_note_hitter(level, hero.slot)
 			return hero.club_power
 	return 0
+
+
+## 2.0: remember the hero of player slot `slot` as the one who made the hit poll_weapon_hit just counted
+## ([member last_hitter], [member EnemyBase.last_hit_slot] / [member EnemyBase.last_hit_tick]). Bookkeeping only.
+func _note_hitter(level: LevelBase, slot: int) -> void:
+	last_hitter = level.get_hero(slot)
+	if last_hitter == null and slot == 0:
+		last_hitter = level.player
+	last_hit_slot = slot
+	last_hit_tick = Sim.total_ticks
 
 
 ## A melee weapon on the weak point of a boss that only thrown weapons hurt: show that it glances off (a clank and

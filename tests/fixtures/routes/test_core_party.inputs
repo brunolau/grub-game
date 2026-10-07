@@ -1,0 +1,6 @@
+# route: level=test_core_party difficulty=both players=2 ends=none expect=hurts:0,eggs:0,wipes:0,min_score:400
+# The bare two-hero level of the phase-0 exit (docs/expansion/PLAN.md P0.10): two input streams, one per hero.
+# P1 walks right, jumps straight up at his step and onto it, waits, walks down onto his food and stops before the
+# exit; P2 walks left, jumps onto his step (his food), walks back right off it, waits, walks left again. Both jump
+# at the same time in opposite directions (ticks 15-28). It never takes the exit: a team exit is phase 1 work.
+14:R|L,6:U|LU,8:RU|L,16:|,20:|R,10:|,6:R|L,40:|L

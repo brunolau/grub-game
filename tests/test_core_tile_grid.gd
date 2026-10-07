@@ -152,6 +152,96 @@ func test_set_char_updates_collision_and_neighbours() -> void:
 	assert_eq(grid.ceiling_at(2, 2), TileGrid.CEILING_SOLID)
 
 
+## Level format 2: the tar floor ':' is '#' (floor with set A's ice, wall, solid ceiling) with a surface 6 px lower
+## and the TAR material (PHYSICS.md C.5, LEVEL_DESIGN.md 15.3).
+func test_tar_floor() -> void:
+	assert_true(TileGrid.LEGEND_CHARS.contains(TileGrid.CH_TAR), "':' is a fixed legend character")
+	assert_eq(TileGrid.resolve_char(":"), TileGrid.CH_TAR)
+	assert_eq(TileGrid.PROFILE_TAR, TileGrid.PROFILE_LOWERED_BASE + Tuning.TAR_SURFACE_DROP_PX)
+	var grid: TileGrid = TileGrid.from_rows(PackedStringArray([
+		".T.....",
+		"#::#%:T",
+	]), 1, 2, {"T": ":"})
+	for col: int in [1, 2, 5, 6]:
+		assert_eq(grid.get_char(col, 1), TileGrid.CH_TAR, "tar col %d" % col)
+		assert_eq(grid.floor_at(col, 1), TileGrid.FLOOR_ICE_1, "tar is set-A ground (ice_a) col %d" % col)
+		assert_eq(grid.side_at(col, 1), TileGrid.SIDE_WALL)
+		assert_eq(grid.ceiling_at(col, 1), TileGrid.CEILING_SOLID)
+		assert_eq(grid.profile_at(col, 1), TileGrid.PROFILE_TAR)
+		assert_true(grid.has_profile(col, 1), "a lowered surface counts as HEIGHT != 0")
+		assert_eq(grid.surface_offset(col, 1, col * 16 + 5), Tuning.TAR_SURFACE_DROP_PX, "the surface lies 6 px lower")
+		assert_true(grid.is_tar(col, 1))
+		assert_eq(grid.material_at(col, 1), TileGrid.MATERIAL_TAR)
+	assert_eq(grid.get_char(1, 0), TileGrid.CH_TAR, "a legend letter with tile=:")
+	for col: int in [0, 3, 4]:
+		assert_false(grid.is_tar(col, 1), "'#' and '%' are no tar")
+		assert_eq(grid.profile_at(col, 1), TileGrid.PROFILE_NONE, "no glue, no lowering next to tar")
+	assert_eq(grid.floor_at(4, 1), TileGrid.FLOOR_ICE_2)
+	assert_false(grid.is_tar(0, 0), "air")
+	assert_false(grid.is_tar(-1, 1), "outside the grid")
+	assert_eq(grid.material_at(99, 99), TileGrid.MATERIAL_NONE)
+	# set_char keeps the material table in step: a tar cell that is rewritten is no tar any more and back.
+	grid.set_char(2, 1, TileGrid.CH_SOLID_A)
+	assert_false(grid.is_tar(2, 1))
+	assert_eq(grid.profile_at(2, 1), TileGrid.PROFILE_NONE)
+	grid.set_char(3, 1, TileGrid.CH_TAR)
+	assert_true(grid.is_tar(3, 1))
+	assert_eq(grid.surface_offset(3, 1, 50), Tuning.TAR_SURFACE_DROP_PX)
+	# A fresh grid and a resize hold no material.
+	grid.resize(3, 2)
+	assert_false(grid.is_tar(1, 1))
+
+
+## The done-criterion of PLAN.md P0.7: the 15 Book I level files build, through the format-2 TileGrid and LevelData,
+## exactly the collision grids the 1.0 code built (tests/fixtures/book1_grid_hashes.txt, frozen before format 2), in
+## both difficulties, and none of their cells is tar.
+func test_book1_files_build_the_same_grids() -> void:
+	var text: String = FileAccess.get_file_as_string("res://tests/fixtures/book1_grid_hashes.txt")
+	var checked: int = 0
+	for line: String in text.split("\n", false):
+		var entry: String = line.strip_edges()
+		if entry.is_empty() or entry.begins_with("#"):
+			continue
+		var parts: PackedStringArray = entry.split(" ", false)
+		assert_eq(parts.size(), 4, "fixture line '%s'" % entry)
+		if parts.size() != 4:
+			continue
+		var data: LevelData = LevelData.load_file("res://levels/%s.lvl" % parts[0])
+		assert_not_null(data, parts[0])
+		if data == null:
+			continue
+		var grid: TileGrid = data.build_grid(parts[1].to_int())
+		assert_eq("%dx%d" % [grid.cols, grid.rows], parts[2], "%s size" % parts[0])
+		assert_eq(_grid_hash(grid), parts[3], "%s (%s) builds the 1.0 grid" % [parts[0], parts[1]])
+		var tar: int = 0
+		for row: int in grid.rows:
+			for col: int in grid.cols:
+				if grid.material_at(col, row) != TileGrid.MATERIAL_NONE:
+					tar += 1
+		assert_eq(tar, 0, "%s has no format-2 material" % parts[0])
+		checked += 1
+	assert_eq(checked, 30, "15 Book I files x 2 difficulties")
+
+
+## sha256 over every cell in reading order, 5 bytes per cell (floor, side, flags, profile, char), as the fixture.
+static func _grid_hash(grid: TileGrid) -> String:
+	var bytes: PackedByteArray = PackedByteArray()
+	bytes.resize(grid.cols * grid.rows * 5)
+	var i: int = 0
+	for row: int in grid.rows:
+		for col: int in grid.cols:
+			bytes[i] = grid.floor_at(col, row)
+			bytes[i + 1] = grid.side_at(col, row)
+			bytes[i + 2] = grid.flags_at(col, row)
+			bytes[i + 3] = grid.profile_at(col, row)
+			bytes[i + 4] = grid.get_char(col, row).unicode_at(0)
+			i += 5
+	var context: HashingContext = HashingContext.new()
+	context.start(HashingContext.HASH_SHA256)
+	context.update(bytes)
+	return context.finish().hex_encode()
+
+
 func test_rows_of_different_length_are_padded() -> void:
 	var grid: TileGrid = TileGrid.from_rows(PackedStringArray(["#", "###", "##"]))
 	assert_eq(grid.cols, 3)

@@ -20,6 +20,8 @@ extends Node2D
 ## per hero. The party rules themselves (eggs, the tribe camera, versus) are NOT here: a party of two or more gets
 ## only the neutral defaults documented on each member (TECH_AUDIT.md 4.7; the PartyDriver of PLAN.md P1 replaces
 ## them). A party of one never reaches a party branch: they are all behind `hero_count() > 1`.
+## Hooks for parallel work (PLAN.md P0.8): [method register_party_driver] / [member party_driver] (world-A's
+## PartyDriver after the heroes) and [method get_tagged] (the bond and keeper groups of format 2).
 
 ## Gameplay is about to start: the grid is built, the hero is spawned, Sim is started.
 signal play_started
@@ -123,6 +125,18 @@ var _shake_hero: int = 0
 ## hero_death_finished() of a party: bit `slot` = that hero's death toss has finished (cleared by every respawn).
 var _death_done: int = 0
 
+## 2.0 hooks (PLAN.md P0.8). Spawn parameters that tag an entity into a group ([method get_tagged]): `bond=<name>`
+## (linked enemies and drums, DESIGN.md D.5 / D.6) and `keeper=<name>` (the enemies a keeper door waits for, [R10]).
+const TAG_PARAMS: Array[String] = ["bond", "keeper"]
+## The PartyDriver of a party (world-A, PLAN.md P1.6), registered after the heroes ([method register_party_driver]);
+## null in single-player and until one is registered.
+var party_driver: SimEntity = null
+## Tag groups: StringName param -> { StringName value -> Array[SimEntity] in registration order }.
+var _tagged: Dictionary = {}
+var _no_entities: Array[SimEntity] = []
+## True when the registered party driver handles party deaths itself (it has `handle_hero_death(hero) -> bool`).
+var _driver_handles_deaths: bool = false
+
 
 func _init() -> void:
 	for i: int in Defs.KIND_COUNT:
@@ -176,6 +190,9 @@ func register_entity(entity: SimEntity) -> void:
 		list.append(entity)
 	if entity.spawn_params.has("name"):
 		_named[StringName(str(entity.spawn_params["name"]))] = entity
+	for tag: String in TAG_PARAMS:
+		if entity.spawn_params.has(tag):
+			_tag_add(tag, StringName(str(entity.spawn_params[tag])), entity)
 	if kind == Defs.Kind.PLAYER and entity is PlayerBase:
 		_add_hero(entity as PlayerBase)
 	if entity._level_awake_slot < 0 and not entity._sim_suspended:
@@ -195,6 +212,13 @@ func unregister_entity(entity: SimEntity) -> void:
 	list.erase(entity)
 	if entity.spawn_params.has("name"):
 		_named.erase(StringName(str(entity.spawn_params["name"])))
+	for tag: String in TAG_PARAMS:
+		if entity.spawn_params.has(tag):
+			var members: Array[SimEntity] = get_tagged(StringName(tag), StringName(str(entity.spawn_params[tag])))
+			members.erase(entity)
+	if entity == party_driver:
+		party_driver = null
+		_driver_handles_deaths = false
 	if entity == player:
 		player = null
 	if kind == Defs.Kind.PLAYER:
@@ -226,6 +250,26 @@ func get_kind(kind: int) -> Array[SimEntity]:
 func find_named(entity_name: StringName) -> SimEntity:
 	var entity: SimEntity = _named.get(entity_name)
 	return entity if is_instance_valid(entity) else null
+
+
+## 2.0 (PLAN.md P0.8): the registered entities whose spawn parameter `param` (one of TAG_PARAMS: &"bond", &"keeper")
+## equals `value`, in registration order - the bond registry of linked enemies and drums, the keepers of a keeper
+## door. Live list of the level: read it, never modify or keep it; empty when there is none.
+func get_tagged(param: StringName, value: StringName) -> Array[SimEntity]:
+	var groups: Dictionary = _tagged.get(String(param), {})
+	return groups.get(value, _no_entities)
+
+
+func _tag_add(param: String, value: StringName, entity: SimEntity) -> void:
+	if not _tagged.has(param):
+		_tagged[param] = {}
+	var groups: Dictionary = _tagged[param]
+	if not groups.has(value):
+		var fresh: Array[SimEntity] = []
+		groups[value] = fresh
+	var members: Array[SimEntity] = groups[value]
+	if not members.has(entity):
+		members.append(entity)
 
 
 # =================================================================================================================
@@ -343,6 +387,23 @@ func spawn_party_heroes() -> Array[PlayerBase]:
 			hero.respawn_at(pos)
 			spawned.append(hero)
 	return spawned
+
+
+## 2.0 (PLAN.md P0.8, TECH_AUDIT.md 4.4): register the PartyDriver (world-A, PLAN.md P1.6) - the entity that runs the
+## hero-against-hero steps of a party (Totem Ride, head contacts, egg drift, team wipe; the versus referee in an
+## arena) in the phases it registers, AFTER every hero: call it right after [method spawn_party_heroes], so the
+## registration order is level entities -> P1 -> P2 .. -> driver -> runtime spawns and Defs.Phase stays as it is.
+## Adds `driver` to the level (container "player") when it has no parent yet and keeps it in [member
+## party_driver]. A driver with a method `handle_hero_death(hero: PlayerBase) -> bool` takes over
+## [method hero_death_finished] for a party (true = handled; false = the neutral default runs). Never called in
+## single-player; a second call replaces nothing (the first driver stays).
+func register_party_driver(driver: SimEntity) -> void:
+	if driver == null or party_driver != null:
+		return
+	party_driver = driver
+	_driver_handles_deaths = driver.has_method(&"handle_hero_death")
+	if driver.get_parent() == null:
+		get_container("player").add_child(driver)
 
 
 # =================================================================================================================
@@ -692,13 +753,17 @@ func _lose_team_life() -> void:
 ## neutral default, until the PartyDriver (PLAN.md P1) turns deaths into eggs and versus respawns: the hero stays
 ## dead while any other hero still plays or still has his toss running; once every hero is dead (each toss finished)
 ## or down, Events.party_wiped, one life from the pool and [method respawn_player] for the whole party (or game
-## over), exactly the 1.0 rule. Overrides keep that last step.
+## over), exactly the 1.0 rule. Overrides keep that last step. A registered PartyDriver with `handle_hero_death`
+## ([method register_party_driver]) is asked first and replaces the default when it returns true.
 func hero_death_finished(hero: PlayerBase) -> void:
 	if hero == null:
 		return
 	if _hero_total <= 1:
 		_lose_team_life()
 		return
+	if _driver_handles_deaths and is_instance_valid(party_driver) \
+			and bool(party_driver.call(&"handle_hero_death", hero)):
+		return  # the PartyDriver (register_party_driver) took the death: an egg, a versus respawn
 	_death_done |= 1 << clampi(hero.slot, 0, Defs.MAX_PLAYERS - 1)
 	for other: PlayerBase in _orders[0]:
 		if other.is_down():

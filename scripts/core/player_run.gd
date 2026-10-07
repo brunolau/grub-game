@@ -56,6 +56,15 @@ var picked: int = 0
 ## Versus stock lives left (`Stock` option and modes with respawn); 0 elsewhere.
 var stocks: int = 0
 
+# --- Look (chosen on the join panel / in the versus lobby; nothing in the simulation reads it) -------------------
+## Colour of this player (DESIGN.md D.11, F.1): a palette name of assets/sprites/player/palettes/hero_palettes.json
+## (`yellow`, `blue`, `pink`, `green`, `white`, `gold`); &"" = the slot's default from that file (P1 yellow = the 1.0
+## look). Written by the join panel / lobby (ui-A), read by the hero's palette (player-A, hero_palette.gd), the HUD and
+## the versus screens (ui-B / ui-A). Kept by reset_run (a new run keeps the players' colours).
+var palette: StringName = &""
+## Loincloth pattern index of hero_palettes.json (`patterns`); -1 = the slot's default pattern. As [member palette].
+var pattern: int = -1
+
 
 func _init(p_slot: int = 0) -> void:
 	slot = p_slot

@@ -20,6 +20,13 @@ extends SceneTree
 ##                           (e.g. the fixture of "w2_l2b.inputs" in tests/fixtures/sp_digest/)
 ##   --dump=<level>:<tick>   print the doze state around that tick (the digest hash then also covers node names,
 ##                           so write such a run to its own --out)
+##   --route-dir=<dir>       where the 2.0 header routes are read (default res://tools/autoplay/routes/; e.g.
+##                           res://tests/fixtures/routes/): every route file whose first line is a `# route:` header
+##                           (docs/LEVEL_DESIGN.md 15.9) is played as its header says - a party of `players` heroes
+##                           with one input stream each, its `belt` - besides the 1.0 ROUTES table
+##   --belt-invariance       the belt-invariance runner (PLAN.md 8 V2.b): every selected header club route is replayed
+##                           with an empty belt and with the hammer, the axe, the swirling axe and the spear on every
+##                           hero's belt; the per-tick digests must not differ. Exit code 1 when one does
 ## Route arguments: file names of the route table ("w1_l1.inputs") or prefixes ("w2_"); default: every route that
 ## is not only played chained behind another one. Prints one line per played stage and a summary; exit code 0.
 ## Single-player identity (docs/expansion/TECH_AUDIT.md 4.12): tools/sp_identity.sh runs the digests against the

@@ -162,6 +162,27 @@ func run_inputs(runs: Array) -> void:
 	GameInput.clear_scripted()
 
 
+## The same for several heroes (docs/expansion/TECH_AUDIT.md 4.11): [[ticks, "KEYS|KEYS"], ...] with one key set per
+## player slot separated by `|` (an empty or missing part = that slot idle), e.g. [[8, "R|L"], [4, "|U"]]. Every
+## slot named by some run gets its stream (GameInput.set_scripted_slot); returns after all ticks ran. Device input
+## is restored afterwards (every slot). Returns the streams that were played (index = slot).
+func run_party_inputs(runs: Array) -> Array[PackedInt32Array]:
+	var entries: PackedStringArray = PackedStringArray()
+	for run: Variant in runs:
+		entries.append("%d:%s" % [int(run[0]), str(run[1])])
+	var streams: Array[PackedInt32Array] = Autoplay.parse_inputs_multi(",".join(entries))
+	var first_tick: int = Sim.tick + 1
+	for slot: int in streams.size():
+		var flags: PackedInt32Array = streams[slot]
+		GameInput.set_scripted_slot(slot, func(tick: int) -> int:
+			var index: int = tick - first_tick
+			return flags[index] if index >= 0 and index < flags.size() else 0
+		)
+	Sim.step(streams[0].size())
+	GameInput.clear_scripted()
+	return streams
+
+
 # --- Runner interface (do not call from tests) ------------------------------------------------------------------------
 
 func _begin_test() -> void:

@@ -54,11 +54,19 @@ enum HurtKind {
 	BOSS_BODY = 1,        ## boss body or limb: costs one bone, knock-back +/-128 v16 with ice 3
 	BOSS_PROJECTILE = 2,  ## rock / stalactite / ember: -1 heart and 6 bones scattered
 	TRAP = 3,             ## skull item: all energy scattered as bones, no death
+	## 2.0 versus only (PHYSICS.md C.14): a rival's hit, applied by the referee (world-B) with
+	## PlayerBase.hurt(source, RIVAL); the reaction (hit_timer 43, knock-back, the mode's currency) is the hero's party
+	## component (player-A, HeroParty.on_hurt). Never used in single-player or co-op.
+	RIVAL = 4,
 }
 
 ## Hero states: the numbers of the state table in PHYSICS.md 4.3.
+## 2.0 appends the states outside the 4.3 table (never entered in Book I solo; Tuning.STATE_LUT never yields them):
+## CLIMB on a vine (PHYSICS.md C.4, HeroClimb), CURL curled up or flying as a batted ball (C.11, HeroParty;
+## PlayerBase.curl tells which), RIDING on a mount's seat (C.9, HeroMount; PlayerBase.mount_seat tells which).
 enum HeroState {
 	IDLE = 0, WALK = 1, JUMP = 2, STRIKE = 3, CRAWL = 4, CROUCH = 5, HIGH_STRIKE = 6, LOW_STRIKE = 7, HURT = 8,
+	CLIMB = 9, CURL = 10, RIDING = 11,
 }
 
 ## Input device families, for glyph switching and touch overlay visibility.
@@ -242,6 +250,12 @@ static func versus_mode_name(mode: int) -> StringName:
 ## The VersusMode of a name (arena meta `modes`), -1 for an unknown name.
 static func versus_mode_from_name(mode_name: StringName) -> int:
 	return VERSUS_MODE_NAMES.find(mode_name)
+
+
+## Level scroll flag of format 2 (LevelBase.scroll_flags, beside SCROLL_LOW_BAND / NO_HORIZONTAL / AUTO_DOWN): bit 3,
+## `scroll = rising` - the rising tide of PHYSICS.md C.8 (the loader sets it; the band and its camera rule are
+## world-A's, PLAN.md P1.6). No 1.0 level has it.
+const SCROLL_RISING: int = 8
 
 
 ## The player slot credited with a hit or a kill by `source` (TECH_AUDIT.md 4.8): a hero -> his `slot`

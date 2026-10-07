@@ -35,6 +35,9 @@ const VIEW_EDGE_WALL_PX: int = 8
 ## A hero off the view becomes an egg after this long (an edge arrow with a stone countdown meanwhile). [D D.2]
 const LEASH_EGG_TICKS_BEGINNER: int = 121    ## 5 s
 const LEASH_EGG_TICKS_EXPERT: int = 73       ## 3 s
+## A locked view (arena, camera lock, gate `lock=`) pulls a partner outside it to the trigger hero's feet point
+## minus this many px times his facing (same y). [P C.13]
+const PULL_IN_BEHIND_PX: int = 24
 
 # =================================================================================================================
 # Tribe lives and the Egg Hatch [D D.3]
@@ -43,11 +46,24 @@ const TRIBE_LIVES_START: int = Tuning.LIVES_START  ## one pool, starting like so
 ## Hearts of a hatched hero.
 const HATCH_HEARTS_BEGINNER: int = 2
 const HATCH_HEARTS_EXPERT: int = 1
-const HATCH_BLINK_TICKS: int = 44            ## blinking (contact immunity) after a hatch
+const HATCH_BLINK_TICKS: int = 44            ## blinking (contact immunity) after a hatch: PlayerBase.shield [P C.12]
+const HATCH_POP_YVEL: int = -64              ## a hatched hero pops up with launch(0, -64) [P C.12]
 ## Expert: an egg not hatched within this long flies to the checkpoint and waits there (Beginner: it follows forever).
 const EGG_RETURN_TICKS_EXPERT: int = 243     ## 10 s
 const EGG_SCOUT_RADIUS_PX: int = 32          ## hidden spots within 2 tiles of an egg glint
 const VOLUNTARY_EGG_HOLD_TICKS: int = 24     ## Down + Look held 1 s turns a hero into an egg on purpose
+# The egg (PHYSICS.md C.12; tune: G1 pair playtests).
+const EGG_BOX_W: int = 24                    ## box 24 x 24, x_offset 12 (tune)
+const EGG_BOX_H: int = 24
+const EGG_BOX_XO: int = 12
+const EGG_OFFSET_X: int = -24                ## drift target: partner feet + (EGG_OFFSET_X * partner.facing, EGG_OFFSET_Y)
+const EGG_OFFSET_Y: int = -48
+const EGG_DRIFT_PX: int = 2                  ## per axis and tick towards the target (tune) ...
+const EGG_DRIFT_FAST_PX: int = 6             ## ... while farther than EGG_DRIFT_FAR_PX on that axis
+const EGG_DRIFT_FAR_PX: int = 64
+const EGG_NUDGE_PX: int = 1                  ## the owner's Left / Right nudge it this much per tick (tune)
+const EGG_VIEW_INSET_PX: int = 16            ## an egg is clamped into the view this far inside its edges
+const EGG_RETURN_SPEED_PX: int = 6           ## Expert return to the checkpoint, px per tick per axis
 ## After a team wipe slot s respawns s * this many px from the checkpoint towards the side where the floor continues;
 ## a slot without an `objects/hero_start` marker starts the same way from '@' (LevelBase.get_respawn_pos_for,
 ## get_start_pos_for; PHYSICS.md C.12).
@@ -59,14 +75,26 @@ const RESPAWN_SPREAD_PX: int = 24
 ## Every launch moves a hero at most this far per tick on each axis, or calls LevelBase.notify_hero_teleported
 ## (the doze reach of Tuning.DOZE_HERO_REACH_PX assumes it). [D D.4] [TA 4.6]
 const MOVE_MAX_PX_PER_TICK: int = 18
+## PlayerBase.launch() clamps each velocity component it sets to +/- this many v16 (= MOVE_MAX_PX_PER_TICK px per
+## tick): geysers, see-saws, vines, Batter Up, dismounts and hatching never outrun the doze reach. [P C.0 #4]
+const LAUNCH_AXIS_CAP: int = MOVE_MAX_PX_PER_TICK * 16
 # Shoulder Hop: landing on the partner's head with Up held bounces as on an enemy.
 const SHOULDER_HOP_YVEL: int = Tuning.BOUNCE_YVEL_UP  ## -224 v16: rises 105 px from his head
 const SHOULDER_HOP_RISE_PX: int = 105
 const SHOULDER_HOP_FEET_REACH_PX: int = 140  ## feet over the floor at the top (about 8.7 tiles)
 # Totem Ride: the rider stands on the carrier's head (the carrier is a moving platform, PHYSICS 11.4).
 const TOTEM_CARRIER_JUMP_SHIFT: int = 1      ## the carrier's jump impulses are halved (shift right by 1)
+const TOTEM_HEAD_PX: int = 35                ## the carrier's riding box is 32 x 35 ... [P C.10]
+const TOTEM_REST_PX: int = 34                ## ... and the rider rests 1 px inside it: R.y = K.y - 34
+const TOTEM_FOOT_REACH_PX: int = 16          ## the ride ends when |R.x + dx - K.x| > 16 ...
+const TOTEM_JUMP_OFF_YVEL: int = -16         ## ... or the rider jumped (R.yvel < -16)
+const TOTEM_DROP_LOCK_TICKS: int = 12        ## Down + Up drops through the carrier; no new ride for this long (tune)
+const TOTEM_THROW_OFF_YVEL: int = -64        ## a hurt carrier throws the rider off with launch(0, -64), no damage
 # Batter Up: Down + Swap curls a hero into a ball; the partner's strike in contact launches him. (tune all)
 const CURL_MAX_TICKS: int = 66
+const CURL_BOX_W: int = 24                   ## the curl box 24 x 20, x_offset 12 (tune) [P C.11]
+const CURL_BOX_H: int = 20
+const CURL_BOX_XO: int = 12
 const BAT_LINE_DRIVE_XVEL: int = 144         ## forward strike: +/-144, -128 (9 tiles to the same height)
 const BAT_LINE_DRIVE_YVEL: int = -128
 const BAT_LOB_XVEL: int = 32                 ## high strike: +/-32, -240 (about 7 tiles up, 4 across)
@@ -80,7 +108,7 @@ const BALL_KNOCK_HP_EXCL: int = 50           ## "small" = hp below this
 const CURL_LANDING_TICKS: int = Tuning.NO_JUMP_TICKS  ## it uncurls on landing by the 6-tick landing rule, or at a wall
 # Brace Wall: two crouching heroes stop a heavy.
 const BRACE_GAP_PX: int = 16                 ## the two crouchers stand within this many px of each other
-const BRACE_DAZE_TICKS: int = 44             ## a heavy (or Tusker's phase 3) stopped dead is dazed this long, head open
+const BRACE_DAZE_TICKS: int = 44             ## a `heavy` enemy stopped dead is dazed this long, head open (the co-op Tusker: 66, EnemyTuning) [R24]
 # Windows: twin drums, bonds, splits, twin hits. Never longer than the measured solo minimum minus the margin. [D D.8]
 const WINDOW_TICKS_BEGINNER: int = 24
 const WINDOW_TICKS_EXPERT: int = 12
@@ -92,7 +120,8 @@ const COUNT_IN_BEEPS: int = 3                ## every window has an audible coun
 # =================================================================================================================
 const PLATE_COUNT_MAX: int = 2               ## objects/plate count=1|2
 const PLATE_WEIGHT_HERO: int = 1             ## weight on a plate per hero ...
-const PLATE_WEIGHT_CHOMPER: int = 2          ## ... and of Chomper
+const PLATE_WEIGHT_CHOMPER: int = 2          ## ... and of Chomper ...
+const PLATE_WEIGHT_BOULDER: int = 2          ## ... and of a heave boulder resting on it (enemies and eggs weigh 0) [G 13.9.7]
 const PLATE_DOOR_MIN_TILES: int = 8          ## a plate stands at least this far from its door
 const PLATE_COLUMN_PERIOD: int = Tuning.COLUMN_RISE_PERIOD  ## a plate column rises / sinks 1 tile per 4 ticks
 const KEEPER_HALL_ROWS: int = 3              ## keeper and Guard halls are 3 rows high: nobody bounces over them
@@ -104,12 +133,19 @@ const SEESAW_LAUNCH_CAP: int = -288          ## ... capped here (about 10 tiles)
 # Heave boulder, pulley.
 const BOULDER_STEP_TICKS: int = 6            ## moves 1 tile per 6 ticks ...
 const BOULDER_PUSHERS: int = 2               ## ... only while two heroes push the same side
-const PULLEY_SPEED_PX: int = 2               ## the heavier side sinks 2 px/tick, the other rises
+const PULLEY_SPEED_PX: int = 2               ## the heavier side sinks 2 px/tick, the other rises ...
+const PULLEY_RANGE_ROWS: int = 3             ## ... at most this many rows (objects/pulley `range` default)
 
 # =================================================================================================================
 # Enemies in co-op and their traits [D D.6] [D D.7]
 # =================================================================================================================
 const TRAIT_SHARE_DEN: int = 3               ## at least 1 / 3 of the enemy records of a co-op stage carry a trait
+## Co-op targeting (EnemyBase._choose_target): the target stays the same hero this long (tune) [G 13.9.4] ...
+const TARGET_HOLD_TICKS: int = 22
+## ... and `lone` keeps away while the hatched heroes are within this many px of each other on both axes (flyers
+## circle LONE_CIRCLE_WIDER_PX wider); otherwise it targets the hero farther from the view centre. [R9]
+const LONE_KEEP_AWAY_PX: int = 64
+const LONE_CIRCLE_WIDER_PX: int = 32
 const SPAWNER_MAX_NUM: int = 3               ## zone spawners: `max` x1.5 in co-op
 const SPAWNER_MAX_DEN: int = 2
 const DAZE_ALERT_PX: int = 48                ## `daze`: hops back when a hero within 48 px starts a strike ...
@@ -181,7 +217,8 @@ static func boost_ledge_tiles(difficulty: int) -> int:
 	return BOOST_LEDGE_TILES_EXPERT if difficulty == Defs.Difficulty.EXPERT else BOOST_LEDGE_TILES_BEGINNER
 
 
-## Whether the `lone` trait targets the hero farther from his partner (Expert) or acts as plain targeting.
+## Whether the `lone` trait is on (Expert: it keeps away from heroes standing together and targets the hero farther
+## from the view centre, LONE_KEEP_AWAY_PX [R9]) or acts as plain targeting (Beginner).
 static func lone_trait_on(difficulty: int) -> bool:
 	return difficulty == Defs.Difficulty.EXPERT or LONE_TRAIT_BEGINNER
 

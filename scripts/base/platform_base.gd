@@ -12,6 +12,10 @@ var dx: int = 0
 var dy: int = 0
 ## True when the hero rode this platform on the previous tick (movers flagged "ride" start, droppers count down).
 var ridden: bool = false
+## 2.0 (PLAN.md P0.8): bit `slot` set for every hero this platform carried in its last ride test ([member ridden] =
+## any bit set). For weight rules (pulleys, drop platforms that count riders; DESIGN.md D.5): [method rider_count],
+## [method rider_weight]. Bookkeeping only: nothing in the 1.0 game reads it.
+var rider_mask: int = 0
 
 # The "one platform per hero per tick" guard is the hero's own PlayerBase.carried_on_tick (2.0: it was one static
 # value here for the one hero; per hero it is the same for a party of one, TECH_AUDIT.md 3.12).
@@ -52,6 +56,7 @@ func _move_tick() -> void:
 ## TECH_AUDIT.md 3.12): every hero in LevelBase.contact_order() (slot order) is tested, each carried by at most one
 ## platform per tick (PlayerBase.carried_on_tick); true when any hero rides it.
 func _ride_test() -> bool:
+	rider_mask = 0
 	var level: LevelBase = Game.level
 	if level == null or not on_screen:
 		return false
@@ -59,7 +64,29 @@ func _ride_test() -> bool:
 	for hero: PlayerBase in level.contact_order():
 		if _ride_test_hero(hero):
 			riding = true
+			rider_mask |= 1 << hero.slot
 	return riding
+
+
+## 2.0: number of heroes riding it since its last ride test ([member rider_mask]).
+func rider_count() -> int:
+	var count: int = 0
+	var mask: int = rider_mask
+	while mask != 0:
+		count += mask & 1
+		mask >>= 1
+	return count
+
+
+## 2.0: weight on it since its last ride test (DESIGN.md D.5: PartyTuning.PLATE_WEIGHT_HERO per hero, plus
+## [method _extra_weight]). The heavier side of a pulley sinks.
+func rider_weight() -> int:
+	return rider_count() * PartyTuning.PLATE_WEIGHT_HERO + _extra_weight()
+
+
+## 2.0 hook: weight on it that is no riding hero (a boulder resting on it ...). Override; 0 by default.
+func _extra_weight() -> int:
+	return 0
 
 
 ## The ride test of PHYSICS.md 11.4 for one hero: true when `hero` is now riding this platform.

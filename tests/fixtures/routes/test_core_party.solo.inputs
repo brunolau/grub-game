@@ -1,0 +1,4 @@
+# route: level=test_core_party difficulty=both ends=exit after=tally expect=hurts:0,min_score:1,ticks:80..90
+# P1 alone (in single-player the P2 start of the level is ignored): onto his step, down onto his food, into the
+# exit. The solo header route of the route-harness self-tests (tests/test_integration_harness.gd).
+14:R,6:U,8:RU,16:,20:,10:,8:R,40:R

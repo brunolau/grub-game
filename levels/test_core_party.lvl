@@ -1,0 +1,40 @@
+# Club & Grub level file - format 2 (docs/ARCHITECTURE.md 7.11). The bare two-hero level of the 2.0 contract
+# (docs/expansion/PLAN.md P0.10, TECH_AUDIT.md 6.1 exit criterion): one screen, P1 at '@' and P2 at his
+# `objects/hero_start slot=2`, a low step and a food item on each side and the exit on P1's side. Two heroes move
+# independently from two scripted input streams (tests/fixtures/routes/test_core_party.inputs,
+# tests/test_core_players.gd); in single-player the P2 start is ignored. Not part of any campaign (kind = test).
+
+[meta]
+format = 2
+id = test_core_party
+name = "Party Meadow"
+kind = test
+biome = jungle
+terrain_a = jungle/terrain_grass
+terrain_b = jungle/terrain
+background = jungle
+music = level_jungle
+author = integration
+notes = "Contract level of phase 0 (P0.10): two heroes, two scripted streams; the route harness self-tests use it too."
+
+[legend]
+E = objects/exit locked=false
+f = items/food index=3
+g = items/food index=17
+
+[tiles]
+|..................|
+|..................|
+|..................|
+|..................|
+|..................|
+|..................|
+|..................|
+|..................|
+|.g................|
+|##......@...##.f.E|
+####################
+####################
+
+[entities]
+objects/hero_start 5 9 slot=2

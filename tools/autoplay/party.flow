@@ -1,0 +1,36 @@
+# Two heroes through the flow runner (docs/expansion/PLAN.md P0.9, TECH_AUDIT.md 4.11): a co-op run of two straight
+# into the bare two-hero level, the two-stream route of the phase-0 exit played from its file, `play` with one key
+# set per player, a weapon for P2, P2 on the devices while the script drives P1, the roots hero / hero2.
+#   bash .tools/gd.sh play --flow=tools/autoplay/party.flow --fast --fresh-user
+wait_until flow.current_screen == title 600
+start_level test_core_party players=2
+expect game.party == 2
+expect level.hero_count() == 2
+expect hero.slot == 0
+expect hero2.slot == 1
+expect hero3 == null
+weapon axe 2
+expect hero2.run.weapon == 2
+expect game.weapon == 0
+shot start
+play_file tests/fixtures/routes/test_core_party.inputs
+expect hero.sim_pos:x == 268
+expect hero.sim_pos:y == 160
+expect hero2.sim_pos:x == 57
+expect hero2.sim_pos:y == 160
+expect game.score == 400
+shot after_route
+# P2 reads the devices (nothing pressed): the script moves P1 only.
+input device 2
+play 8:L|R
+expect hero.sim_pos:x < 268
+expect hero2.sim_pos:x == 57
+# Back to the script: P2 walks right and throws his axe; P1 stands.
+input script 2
+reset_events
+play 6:|R,14:|F,10:|
+expect hero2.sim_pos:x > 57
+expect events.hero_struck >= 1
+expect game.weapon == 0
+expect hero2.run.weapon == 2
+shot after_throw

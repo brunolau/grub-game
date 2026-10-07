@@ -72,14 +72,15 @@ func test_minimal_level_is_valid_and_lines_are_reported() -> void:
 	var problem: Dictionary = bad.problems[0]
 	assert_eq(int(problem["line"]), 7, "the line of the offending key")
 	assert_eq(LevelValidator.format_problem(problem),
-			"bad_line.lvl:7: error: biome 'moon' must be one of: jungle, cave, ice, volcano, feast, village")
+			"bad_line.lvl:7: error: biome 'moon' must be one of: jungle, cave, ice, volcano, feast, village, canyon, "
+			+ "swamp, coast, ruins, sky")
 
 
 func test_header_rules() -> void:
-	var text: String = _level("wrong_name", "format = 2\nmusic = disco\nnext = nowhere\nice_a = 5\nwind = 0:8,x\n" +
+	var text: String = _level("wrong_name", "format = 3\nmusic = disco\nnext = nowhere\nice_a = 5\nwind = 0:8,x\n" +
 			"password_beginner = ab\nscroll = sideways\ntime.hard = 3\nflavour = sweet")
 	var validator: LevelValidator = _validator({"header": text.replace("format = 1\n", "")})
-	assert_true(validator.has_problem("format must be 1"))
+	assert_true(validator.has_problem("format must be 1 or 2"))
 	assert_true(validator.has_problem("must equal the file name"))
 	assert_true(validator.has_problem("not a known music context"))
 	assert_true(validator.has_problem("next 'nowhere' is not a level"))
@@ -165,6 +166,75 @@ func test_hero_start_markers() -> void:
 			LevelValidator.WARNING))
 	assert_false(bad.has_problem("no scene for 'objects/hero_start'", LevelValidator.WARNING))
 	assert_false(bad.has_problem("'objects/hero_start' is not in the entity catalogue", LevelValidator.WARNING))
+
+
+## Level format 2 (2.0, ARCHITECTURE.md 7.11): the new keys and values are accepted and checked, a co-op file and an
+## arena need their keys, the tar floor ':' is a tile, the new ids are in the catalogue with their parameters.
+func test_format_2_headers() -> void:
+	var hash: String = "ab".repeat(32)
+	var book2: String = _level("book_two", "book = 2\nbelt = fresh\nbiome = canyon\nliquid = tar\nscroll = rising\n"
+			+ "rise_speed = 16\nrise_speed.expert = 24\nwind = 0:-24,40:24\nwind_loop = 80", "", PLAIN_ROWS
+			.replace(".@....", ".@:::.")).replace("format = 1", "format = 2")
+	var coop: String = _level("book_two_coop", "kind = coop\nbook = 2\ncoop_of = book_two\ncoop_base_hash = " + hash) \
+			.replace("format = 1", "format = 2").replace("kind = test\n", "")
+	var arena: String = _level("arena_ring", "kind = arena\nplayers = 4\nround_time = 60\n"
+			+ "modes = grub_stack,last_caveman\nwrap = lr\nsudden = stampede", "", PLAIN_ROWS.replace("E", ".")) \
+			.replace("format = 2", "").replace("format = 1", "format = 2").replace("kind = test\n", "") \
+			.replace("E = objects/exit\n", "")
+	var good: LevelValidator = _validator({"book_two": book2, "book_two_coop": coop, "arena_ring": arena})
+	assert_eq(good.error_count(), 0, _messages(good))
+	assert_false(good.has_problem("unknown meta key", LevelValidator.WARNING), _messages(good))
+	assert_false(good.has_problem("format 2 key", LevelValidator.WARNING), _messages(good))
+	assert_false(good.has_problem("no exit"), "an arena has no way out")
+	assert_false(good.has_problem("no exit", LevelValidator.WARNING), "an arena has no way out")
+	var bad: LevelValidator = _validator({
+		"broken": _level("broken", "book = 3\nbelt = rusty\nbiome = mars\nliquid = jam\nscroll = up\n"
+				+ "coop_of = nowhere\ncoop_base_hash = 1234\nplayers = 6\nmodes = tag\nwrap = round\nsudden = rain\n"
+				+ "rise_speed = 0\nwind_loop = -1").replace("format = 1", "format = 2"),
+		"lone_coop": _level("lone_coop").replace("kind = test", "kind = coop").replace("format = 1", "format = 2"),
+		"lone_arena": _level("lone_arena").replace("kind = test", "kind = arena").replace("format = 1", "format = 2"),
+		"old_style": _level("old_style", "book = 2", "", PLAIN_ROWS.replace(".@....", ".@:::.")),
+	})
+	for fragment: String in ["book = 3 must be 1 or 2", "belt 'rusty'", "biome 'mars'", "liquid 'jam'",
+			"scroll 'up'", "coop_of 'nowhere' is not a level", "coop_base_hash must be the sha256",
+			"players = 6 must be an integer 2..4", "modes 'tag'", "wrap 'round'", "sudden 'rain'",
+			"rise_speed = 0 must be an integer", "wind_loop = -1 must be an integer",
+			"a co-op file (kind = coop) needs meta key 'coop_of'",
+			"a co-op file (kind = coop) needs meta key 'coop_base_hash'",
+			"an arena (kind = arena) needs meta key 'players'", "an arena (kind = arena) needs meta key 'modes'"]:
+		assert_true(bad.has_problem(fragment), "%s\n%s" % [fragment, _messages(bad)])
+	assert_true(bad.has_problem("'book' is a format 2 key: set format = 2", LevelValidator.WARNING))
+	assert_true(bad.has_problem("the tar floor ':' is format 2", LevelValidator.WARNING))
+
+
+func test_format_2_entities() -> void:
+	var entities: String = "\n".join(PackedStringArray([
+		"enemies/roller 3 10 range=6 dizzy=33 coop=shell bond=pair keeper=hall",
+		"enemies/snatcher 4 4 kind=gull coop=grab perch=2,9",
+		"enemies/walker 5 10 coop=sticky",
+		"items/painting 6 10 index=30",
+		"items/weapon 7 10 kind=spear temp",
+		"objects/geyser 8 10 period=20 skin=mud deadly",
+		"objects/column 9 10 size=1,1 rise=0 trigger=keepers:hall rise_while=plate_a",
+		"objects/column 10 10 size=1,1 rise=2 trigger=drums:pair",
+		"objects/gate 11 10 name=door dest=door2 needs=pair",
+		"objects/marker 12 10 name=door2",
+		"objects/hidden_spot 13 11 kind=big contents=painting:3 tile=#",
+		"zones/current 14 5 rect=2,2,4,2 dir=l speed=4",
+		"objects/x2_tablet 15 10 gate=ledge far=20,9",
+	]))
+	var validator: LevelValidator = _validator({"cast": _level("cast", "", "", PLAIN_ROWS, entities)
+			.replace("format = 1", "format = 2")})
+	assert_false(validator.has_problem("unknown parameter", LevelValidator.WARNING), _messages(validator))
+	assert_false(validator.has_problem("is not in the entity catalogue", LevelValidator.WARNING), _messages(validator))
+	assert_false(validator.has_problem("trigger="), "keepers: and drums: name groups, not rectangles")
+	assert_false(validator.has_problem("contents token"), "a painting may hide in a big spot")
+	assert_false(validator.has_problem("items/weapon kind"), "the spear is a weapon")
+	assert_true(validator.has_problem("enemies/snatcher kind 'gull'"))
+	assert_true(validator.has_problem("enemies/walker coop 'sticky'"))
+	assert_true(validator.has_problem("items/painting index = 30 must be an integer 0..29"))
+	assert_true(validator.has_problem("objects/geyser period = 20 must be an integer 34.."))
+	assert_true(validator.has_problem("zones/current speed = 4 must be an integer 1..3"))
 
 
 func test_exit_path_rules() -> void:

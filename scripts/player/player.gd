@@ -77,12 +77,31 @@ const CHARGE_TINT: Color = Color(1.5, 1.4, 1.1)
 const CHARGE_FULL_TINT: Color = Color(1.9, 1.8, 1.4)
 var _charge_chimed: bool = false
 
+## 2.0 components (docs/expansion/PLAN.md P0.8): the files player-A / player-B fill in during phase 1 without
+## touching this one. Each runs its hooks only while its `active` is true; every one stays off for a single-player
+## Book I hero, so the 1.0 hero runs exactly the 1.0 code (a few bool tests per tick).
+## The weapon belt and Swap (player-B, scripts/player/hero_belt.gd, PHYSICS.md C.1-C.2).
+var hero_belt: HeroBelt = HeroBelt.new(self)
+## Vines and the CLIMB state (player-B, hero_climb.gd, C.4).
+var hero_climb: HeroClimb = HeroClimb.new(self)
+## The rider's side of Chomper (player-B, hero_mount.gd, C.9).
+var hero_mount: HeroMount = HeroMount.new(self)
+## The party rules on the hero's side: egg, shield, curl and ball, bat and hatch, edge walls (player-A,
+## hero_party.gd, C.10-C.14).
+var hero_party: HeroParty = HeroParty.new(self)
+
 
 func _ready() -> void:
 	_sprite = get_node_or_null(^"Sprite") as Sprite2D
 	_glider_sprite = get_node_or_null(^"GliderSprite") as Sprite2D
 	_on_weapon_changed(run.weapon)
 	_refresh_visual()
+	# 2.0: each component decides whether this level and mode need it (none does in Book I solo).
+	var level: LevelBase = Game.level
+	hero_party.setup(level)
+	hero_mount.setup(level)
+	hero_belt.setup(level)
+	hero_climb.setup(level)
 
 
 func _enter_tree() -> void:
@@ -137,13 +156,21 @@ func get_anim() -> int:
 # =================================================================================================================
 
 func hurt(source: SimEntity, kind: int = Defs.HurtKind.ENEMY) -> bool:
-	if dead or _level_completed():
+	if dead or down or _level_completed():
 		return false
 	var pierces_immunity: bool = kind == Defs.HurtKind.TRAP or kind == Defs.HurtKind.BOSS_PROJECTILE
 	if hit_timer > 0 and not pierces_immunity:
 		return false
 	if feast > 0 and kind == Defs.HurtKind.ENEMY:
 		return false
+	# 2.0 components (off in single-player): a seated rider's hit is the mount's (PHYSICS.md C.9); a climb or a curl
+	# ends on a hurt and may take it (C.4, C.11, the versus table C.14).
+	if hero_mount.active and hero_mount.on_hurt(source, kind):
+		return true
+	if hero_climb.active and hero_climb.on_hurt(source, kind):
+		return true
+	if hero_party.active and hero_party.on_hurt(source, kind):
+		return true
 	var killed: bool = false
 	var bones: int = 0
 	match kind:
@@ -179,7 +206,7 @@ func hurt(source: SimEntity, kind: int = Defs.HurtKind.ENEMY) -> bool:
 
 
 func kill(cause: StringName) -> void:
-	if dead or _level_completed():
+	if dead or down or _level_completed():
 		return
 	dead = true
 	control_enabled = false
@@ -259,6 +286,15 @@ func respawn_at(pos: Vector2i) -> void:
 	_animator.reset()
 	anim_frame = _animator.frame
 	super.respawn_at(pos)
+	# 2.0 components (off in single-player).
+	if hero_party.active:
+		hero_party.on_respawn()
+	if hero_mount.active:
+		hero_mount.on_respawn()
+	if hero_belt.active:
+		hero_belt.on_respawn()
+	if hero_climb.active:
+		hero_climb.on_respawn()
 	_refresh_visual()
 
 
@@ -270,11 +306,14 @@ func _weapon_pass() -> void:
 	# The platform pass of this tick decides again whether he rides (PHYSICS.md 11.4).
 	on_platform = false
 	var level: LevelBase = Game.level
-	if level == null:
+	if level == null or down:
 		return
 	var projectiles: Array[SimEntity] = level.get_kind(Defs.Kind.HERO_PROJECTILE)
 	if projectiles.is_empty() and not club_box_active:
 		return  # nothing in the air and no club box: the usual tick
+	if hero_party.active:
+		# 2.0 (off in single-player): a box first bats curled partners and hatches eggs (PHYSICS.md C.0 table).
+		hero_party.weapon_pass(level)
 	var enemies: Array[SimEntity] = level.get_kind(Defs.Kind.ENEMY)
 	var hittables: Array[SimEntity] = level.get_kind(Defs.Kind.HITTABLE)
 	for i: int in projectiles.size():
@@ -352,21 +391,37 @@ func _hero_update() -> void:
 		facing = 1
 	elif left and not right:
 		facing = -1
+	# 2.0 components (off in single-player, PLAN.md P0.8): the egg, the curl and the ball (party) and a seated rider
+	# (mount) run the rest of this tick themselves; the belt reads Swap. An egg without its component only waits.
+	if hero_party.active and hero_party.update(level):
+		return
+	if down:
+		return
+	if hero_mount.active and hero_mount.update(level):
+		return
+	if hero_belt.active:
+		hero_belt.update(level)
 	# 8c: state table, then the overrides swing_lock and hurt.
 	input_flags = 0 if swing_lock != 0 else _raw_flags
 	var selected: int = Tuning.STATE_LUT[input_flags & Defs.IN_STATE_MASK]
 	if hit_timer >= Tuning.HIT_STUN_MIN:
 		selected = Defs.HeroState.HURT
 	state = selected
+	# 2.0 (off without vines): the vine grab and the CLIMB state replace 8d-8g (PHYSICS.md C.4).
+	if hero_climb.active and hero_climb.update(level):
+		return
 	# 8d: handler.
 	if run.has_glider:
 		_run_glider(selected)
 	else:
 		_run_handler(selected)
-	# 8e: x step, committed only inside the level bounds; 8f: y step, unconditional.
+	# 8e: x step, committed only inside the level bounds (2.0: and inside this tick's fence - edge walls, raft rails;
+	# never fenced in single-player); 8f: y step, unconditional.
 	var next_x: int = sim_pos.x + Tuning.floor16(xvel)
-	if next_x >= Tuning.X_MIN and next_x < level.grid.x_max_excl():
+	if next_x >= Tuning.X_MIN and next_x < level.grid.x_max_excl() and (not _fenced or fence_allows(next_x)):
 		sim_pos.x = next_x
+	if _fenced:
+		clear_fence()
 	sim_pos.y += Tuning.floor16(yvel)
 	# 8g: tile collision.
 	var low: bool = selected == Defs.HeroState.CRAWL or selected == Defs.HeroState.CROUCH
@@ -959,6 +1014,15 @@ func _tick_timers(level: LevelBase) -> void:
 			_stop_feast_music()
 			Events.feast_changed.emit(0)
 			Events.hero_feast_changed.emit(self, 0)
+	# 2.0 components (off in single-player): their own 8i timers (swap lock, re-grab and remount locks).
+	if hero_belt.active:
+		hero_belt.tick_timers()
+	if hero_climb.active:
+		hero_climb.tick_timers()
+	if hero_mount.active:
+		hero_mount.tick_timers()
+	if hero_party.active:
+		hero_party.tick_timers()
 
 
 ## Sprite box of the pose of this tick, used by every sprite contact (PHYSICS.md 2.1).
@@ -984,7 +1048,9 @@ func _update_box() -> void:
 
 func _contact_pass() -> void:
 	var level: LevelBase = Game.level
-	if dead or hit_timer != 0 or level == null:
+	# 2.0: an egg touches nothing and the hatch shield skips enemy contact like the hit timer (both never in
+	# single-player).
+	if dead or hit_timer != 0 or level == null or down or shield != 0:
 		return
 	var enemies: Array[SimEntity] = level.get_kind(Defs.Kind.ENEMY)
 	for i: int in enemies.size():
@@ -1030,6 +1096,9 @@ func _bounce_on(enemy: EnemyBase, depth: int) -> void:
 func _post_step() -> void:
 	if hit_timer > 0:
 		hit_timer -= 1
+	if hero_party.active:
+		# 2.0 (off in single-player): the shield, the egg, the leash count (PHYSICS.md C.0 table, POST).
+		hero_party.post_step(Game.level)
 	if dead and death_ticks < Tuning.DEATH_ANIM_TICKS:
 		_death_step()
 	if dead and death_ticks >= Tuning.DEATH_ANIM_TICKS:

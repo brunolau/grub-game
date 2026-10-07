@@ -379,15 +379,22 @@ const SPEAR_YACC: int = 16               ## ... gaining this many v16 per tick
 const SPEAR_POWER: int = 25
 const SPEAR_LOCK: int = 6                ## recovery ticks after a throw
 const SPEAR_MAX_PER_HERO: int = 2        ## in flight or stuck; a third throw pulls out the oldest
+const SPEAR_FALL_MAX: int = 192          ## v16: the drop gains SPEAR_YACC per tick up to this [P C.3]
+const SPEAR_BOX_W: int = 24              ## the flying spear's box 24 x 6, x_offset 12 (tune with the art) [P C.3]
+const SPEAR_BOX_H: int = 6
+const SPEAR_BOX_XO: int = 12
 const BARK_BOARD_STEP_TICKS: int = 220   ## a spear stuck in a bark board is a one-way step this long ...
 const BARK_BOARD_BLINK_TICKS: int = 22   ## ... blinking for its last 22 ticks, then it falls
 const BARK_BOARD_STEP_W: int = 16        ## px: width of that one-way step
 # Vines [D C.3]
 const VINE_GRAB_DX: int = 6              ## px: Up grabs a vine while the feet column is this close to it
+const VINE_HAND_REACH_PX: int = 32       ## px: the hands reach a vine whose bottom is at most this far above the feet [P C.4]
 const VINE_CLIMB_UP_PX: int = 2          ## px per tick
 const VINE_CLIMB_DOWN_PX: int = 3        ## px per tick
-const VINE_JUMP_YVEL: int = -128         ## v16: Jump lets go upward ...
-const VINE_JUMP_XVEL: int = 32           ## ... plus this much toward the held direction
+const VINE_JUMP_YVEL: int = -128         ## v16: a direction + Up leaps off with launch(+/-VINE_JUMP_XVEL, this) [R14] ...
+const VINE_JUMP_XVEL: int = 32           ## ... toward the held direction
+const VINE_REGRAB_LOCK_TICKS: int = 12   ## after a leap or a drop the same vine cannot be grabbed this long (tune) [P C.4]
+const VINE_TOP_STEP_PX: int = 12         ## px: climbing over the top steps this far onto the ledge beside it [P C.4]
 # Tar floor `:` (honey / syrup are its Feast Land skins) [D C.4]
 const TAR_SURFACE_DROP_PX: int = 6       ## the surface lies this much lower (TileGrid lowered-surface profile)
 const TAR_WALK_CAP: int = 32             ## v16 = 2 px/tick for heroes and ground enemies (Chomper excepted)
@@ -397,6 +404,11 @@ const TAR_AIR_CAP: int = 32              ## v16: ACCEL limit of the airborne ste
 const GEYSER_BUBBLE_TICKS: int = 22      ## the telegraph (with sound) before every spout
 const GEYSER_SPOUT_TICKS: int = 12
 const GEYSER_POWER: int = -224           ## v16: default launch of heroes, enemies, rafts and drop platforms
+const GEYSER_PERIOD: int = 88            ## ticks: default cycle of objects/geyser `period` (tune) [P C.6] ...
+const GEYSER_PERIOD_MIN: int = GEYSER_BUBBLE_TICKS + GEYSER_SPOUT_TICKS  ## ... never shorter than its telegraph + spout
+const GEYSER_VENT_W: int = 24            ## px: the vent box above the anchor floor (24 x 16) [P C.6]
+const GEYSER_VENT_H: int = 16
+const GEYSER_DEADLY_H: int = 64          ## px: a `deadly` vent's spout box is 24 x 64 above the vent (tune) [P C.6]
 # Rafts and currents [D C.5]
 const RAFT_WIDTHS: Array[int] = [3, 4]   ## cells (objects/raft width=)
 const CURRENT_SPEED_MIN_PX: int = 1      ## zones/current speed range, px per tick
@@ -405,6 +417,9 @@ const RAFT_DRAG_PERIOD: int = 8          ## outside a current a raft loses 1 px/
 const RAFT_PADDLE_V16: int = 16          ## a forward strike on a raft pushes it backward by this ...
 const RAFT_PADDLE_MAX_PX: int = 3        ## ... up to 3 px/tick
 const RAFT_DIP_PX: int = 2               ## a raft dips this much under each rider (visual only)
+const RAFT_SPEED_CAP: int = RAFT_PADDLE_MAX_PX * V16_PER_PX  ## v16: the raft's own speed `rx` stays within +/-48 [P C.7]
+const RAFT_HEIGHT_PX: int = 8            ## px: a raft is 16 * width x 8 (tune) [P C.7] ...
+const RAFT_FLOAT_DEPTH_PX: int = 4       ## ... floating with its bottom this far below the top of its `~` cell
 # Rising tide [D C.6]
 const RISE_SPEED: int = 16               ## v16: default `rise_speed` of `scroll = rising` (1 px/tick)
 const RISE_CHECKPOINT_ROWS: int = 6      ## a checkpoint resets the deadly band to this many rows under itself

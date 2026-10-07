@@ -27,6 +27,9 @@ const LAVA_CHECK_SECONDS: float = 0.25
 ## `objects/hero_start slot=<2..4>`: where P2..P4 start (DESIGN.md D.5). A marker the loader reads, never spawned
 ## (it takes no spawn serial; a single-player game ignores it).
 const HERO_START_ID: StringName = &"objects/hero_start"
+## An arena's spawn of players 2..4 (`index=2..4`; LEVEL_DESIGN.md 15.8): an entity (objects-B) whose cell is also
+## read as that slot's start (_place_party_starts).
+const SPAWN_POINT_ID: StringName = &"objects/spawn_point"
 
 
 ## The smoke band along the top edge of the view on an auto-scrolling level.
@@ -413,6 +416,9 @@ func _scroll_flags_from_meta() -> int:
 			flags |= Defs.SCROLL_NO_HORIZONTAL
 		"autoscroll":
 			flags |= Defs.SCROLL_NO_HORIZONTAL | Defs.SCROLL_AUTO_DOWN
+		"rising":
+			# Format 2: the rising tide (PHYSICS.md C.8; band and camera are world-A's, PLAN.md P1.6).
+			flags |= Defs.SCROLL_RISING
 	return flags
 
 
@@ -494,21 +500,35 @@ func _place_start() -> void:
 
 
 ## The start of every player slot (LevelBase.start_positions): P1 at '@', P2..P4 at their `objects/hero_start
-## slot=<2..4>` marker (the slot parameter counts players from 1, as the level files write it), else spread from '@'
-## (LevelBase.get_start_pos_for). Only read here: a single-player game never uses the markers.
+## slot=<2..4>` marker (the slot parameter counts players from 1, as the level files write it), or else at an arena's
+## `objects/spawn_point index=<2..4>` (LEVEL_DESIGN.md 15.8: `@` is spawn 1; the spawn point is also spawned as an
+## entity), else spread from '@' (LevelBase.get_start_pos_for). Only read here: a single-player game never uses them.
 func _place_party_starts() -> void:
 	start_positions.clear()
 	start_positions.append(start_pos)
 	var markers: Dictionary = {}
+	var spawn_points: Dictionary = {}
 	for record: Dictionary in _data.entity_records():
-		if record["id"] != HERO_START_ID:
-			continue
+		var found: Dictionary
+		var player_number: int
 		var params: Dictionary = record["params"]
-		var player_number: int = int(params.get("slot", 0))
+		if record["id"] == HERO_START_ID:
+			found = markers
+			player_number = int(params.get("slot", 0))
+		elif record["id"] == SPAWN_POINT_ID:
+			found = spawn_points
+			player_number = int(params.get("index", 0))
+		else:
+			continue
 		if player_number >= 2 and player_number <= Defs.MAX_PLAYERS and LevelText.applies_to(params, Game.difficulty):
-			markers[player_number - 1] = LevelText.cell_to_feet(float(record["col"]), float(record["row"]), params)
+			found[player_number - 1] = LevelText.cell_to_feet(float(record["col"]), float(record["row"]), params)
 	for slot: int in range(1, Defs.MAX_PLAYERS):
-		start_positions.append(markers[slot] if markers.has(slot) else _spread_point(start_pos, slot))
+		if markers.has(slot):
+			start_positions.append(markers[slot])
+		elif spawn_points.has(slot):
+			start_positions.append(spawn_points[slot])
+		else:
+			start_positions.append(_spread_point(start_pos, slot))
 
 
 func _spawn_entities() -> void:

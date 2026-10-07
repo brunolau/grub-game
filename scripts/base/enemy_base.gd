@@ -14,7 +14,9 @@ extends SimEntity
 ## hero's death. A record that went to sleep wakes again only after its anchor was out of view once, so it never
 ## pops into existence in front of the player.
 ## Hooks for archetypes (all optional): `_default_skin()`, `_on_wake()`, `_on_reset()`, `_on_gone()`,
-## `_asleep_tick()`, `_should_wake()`, `_should_sleep()`.
+## `_asleep_tick()`, `_should_wake()`, `_should_sleep()`; 2.0 (PLAN.md P0.8): `accepts_hit_from()`, `_on_hit_by()`,
+## `_on_hit_refused()`, `_choose_target()`, with the fields `last_hit_slot`, `last_hit_tick`, `coop_trait`, `bond`,
+## `keeper`. Their defaults are the 1.0 behaviour.
 
 ## Emitted once when the enemy dies.
 signal died(enemy: EnemyBase, cause: StringName)
@@ -64,6 +66,23 @@ var flash: int = 0
 var expert_only: bool = false
 ## Record exists in Beginner mode only (level flag `beginner`).
 var beginner_only: bool = false
+
+# --- 2.0 hooks for parallel work (PLAN.md P0.8, TECH_AUDIT.md 4.8; the co-op traits are enemies-A's, PLAN.md P1.8) --
+## Player slot of the hero who hit it last (Defs.hitter_slot of the weapon's source: the hero, or the owner of his
+## thrown weapon); -1 = never hit since the level started. Bookkeeping only: nothing in the 1.0 game reads it.
+var last_hit_slot: int = -1
+## Sim.total_ticks of that hit (-1 = never).
+var last_hit_tick: int = -1
+## Co-op trait of this record (level parameter `coop=<trait>`, a Defs.CoopTrait; only in co-op files, DESIGN.md D.6):
+## Defs.CoopTrait.NONE for every 1.0 record. The trait rules hook into [method accepts_hit_from], [method _on_hit_by]
+## and [method _choose_target] (scripts/enemies/coop_traits.gd, phase 1).
+var coop_trait: int = Defs.CoopTrait.NONE
+## Bond of linked records (level parameter `bond=<name>`, the `bond` and `split` traits; "" = none). Its members:
+## LevelBase.get_tagged(&"bond", bond) - the bond registry, shared with `objects/drum bond=`.
+var bond: StringName = &""
+## Keeper group (level parameter `keeper=<name>`, [R10]; "" = none): a column `trigger=keepers:<name>` opens when every
+## member (LevelBase.get_tagged(&"keeper", keeper)) is dead.
+var keeper: StringName = &""
 
 ## Main picture (child node "Sprite"); null for a bare EnemyBase.
 var _sprite: Sprite2D = null
@@ -119,6 +138,13 @@ func _apply_params(params: Dictionary) -> void:
 	expert_only = param_bool("expert", expert_only)
 	beginner_only = param_bool("beginner", beginner_only)
 	_spawn_facing = facing
+	# 2.0 (format 2, co-op files only; no 1.0 record has these parameters).
+	if params.has("coop"):
+		coop_trait = maxi(Defs.coop_trait_from_name(StringName(str(params["coop"]))), Defs.CoopTrait.NONE)
+	if params.has("bond"):
+		bond = StringName(str(params["bond"]))
+	if params.has("keeper"):
+		keeper = StringName(str(params["keeper"]))
 
 
 func _sim_tick(phase: int) -> void:
@@ -187,9 +213,20 @@ func is_targetable() -> bool:
 ## A weapon box or thrown weapon overlaps this enemy (PHYSICS.md 8.3 #1). Returns true when the hit is consumed
 ## (always, for ordinary enemies). Dies when hp drops below zero, otherwise flashes and is pushed back by
 ## xvel >> 2 px.
+## 2.0 (PLAN.md P0.8): the hitter's slot is noted ([member last_hit_slot], [member last_hit_tick]); a hit that
+## [method accepts_hit_from] refuses glances (consumed, no damage: a shell's front); every other hit goes through
+## [method _on_hit_by] first. With the defaults this is the 1.0 hit.
 func take_hit(power: int, source: SimEntity) -> bool:
 	if not is_targetable():
 		return false
+	var slot: int = Defs.hitter_slot(source)
+	if slot >= 0:
+		last_hit_slot = slot
+		last_hit_tick = Sim.total_ticks
+	if not accepts_hit_from(source):
+		_on_hit_refused(source)
+		return true
+	_on_hit_by(slot, power)
 	hp -= power
 	_spawn_optional(FX_HIT, sim_pos + Vector2i(0, -(box_h >> 1)))
 	if hp < 0:
@@ -225,6 +262,14 @@ func on_glider_stomp(hero: PlayerBase) -> void:
 ## This enemy just hurt the hero: it now "holds" the stolen heart.
 func on_hurt_hero(_hero: PlayerBase) -> void:
 	stole_heart = true
+
+
+## 2.0 (TECH_AUDIT.md 4.8): may a weapon hit from `source` (a hero, or his thrown weapon: Defs.hitter_slot names the
+## hero) hurt it now? False = the hit glances ([method take_hit] consumes it without damage; [method _on_hit_refused]
+## shows it). Override for "shielded from the front", heavy enemies only a braced or charged hit breaks, the Shaman's
+## bone shields (DESIGN.md D.6). Default true: every 1.0 hit counts.
+func accepts_hit_from(_source: SimEntity) -> bool:
+	return true
 
 
 ## Points paid when it dies now: ladder value x head-bounce multiplier.
@@ -371,6 +416,29 @@ func _on_hurt(_power: int) -> void:
 	pass
 
 
+## 2.0 (TECH_AUDIT.md 4.8): a weapon hit of `power` from player slot `slot` (-1: no hero's) is about to be applied
+## ([method take_hit], before the hit points drop). Hook for the two-hero rules: twin hits of two slots within a
+## window, bonds, splits (scripts/enemies/coop_traits.gd). Override; nothing by default.
+func _on_hit_by(_slot: int, _power: int) -> void:
+	pass
+
+
+## 2.0: a hit [method accepts_hit_from] refused has just glanced off (clank and spark). Override; nothing by default.
+func _on_hit_refused(_source: SimEntity) -> void:
+	pass
+
+
+## 2.0 (TECH_AUDIT.md 4.8): the hero this enemy reacts to this tick - what [method _target_hero] returns to every
+## archetype. Default: LevelBase.target_hero(self) (a party of one: the 1.0 hero unless he is dead). Override for
+## aggro rules: stick to the hero who hit it last (EnemyTuning.TARGET_HOLD_TICKS), the `lone` straggler (GAMEPLAY.md
+## 13.9.5).
+func _choose_target() -> PlayerBase:
+	var level: LevelBase = Game.level
+	if level == null:
+		return null
+	return level.target_hero(self)
+
+
 ## One tick while asleep (no slot). The default wakes it by the activation rule; zone spawners override.
 func _asleep_tick() -> void:
 	if _must_leave_view:
@@ -415,12 +483,22 @@ func _should_sleep() -> bool:
 
 ## The hero to react to, or null when there is none (not spawned yet, or in his death sequence): the "target" idiom
 ## of LevelBase.target_hero() - in a party the nearest hero that is alive and not down (TECH_AUDIT.md 4.1); for a
-## party of one exactly 1.0's `level.player` unless he is dead.
+## party of one exactly 1.0's `level.player` unless he is dead. 2.0: the answer of the [method _choose_target] hook.
 func _target_hero() -> PlayerBase:
+	return _choose_target()
+
+
+## 2.0: the other members of this record's bond (LevelBase.get_tagged(&"bond", bond), itself left out); empty without
+## a bond or a level.
+func bond_mates() -> Array[SimEntity]:
+	var mates: Array[SimEntity] = []
 	var level: LevelBase = Game.level
-	if level == null:
-		return null
-	return level.target_hero(self)
+	if bond == &"" or level == null:
+		return mates
+	for member: SimEntity in level.get_tagged(&"bond", bond):
+		if member != self:
+			mates.append(member)
+	return mates
 
 
 ## Per-player statistics (2.0, TECH_AUDIT.md 3.8): the hero who killed it - Defs.hitter_slot() of `killer`, the hero

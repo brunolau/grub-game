@@ -108,6 +108,183 @@ func test_registry_passwords() -> void:
 	assert_eq(Levels.get_password(EXAMPLE, Defs.Difficulty.EXPERT), "6RUB")
 
 
+## Level format 2 (ARCHITECTURE.md 7.11): the same syntax; `coop_base_hash` always stays text; the book and belt
+## rules (LEVEL_DESIGN.md 15.2) shared by the registry and the loader.
+func test_format_2_header() -> void:
+	assert_eq(LevelText.FORMATS, [1, 2] as Array[int])
+	assert_eq(Levels.FORMATS, [Levels.FORMAT_VERSION, Levels.FORMAT_2] as Array[int])
+	assert_eq(Levels.FORMAT_VERSION, 1, "format 1 = the 1.0 files")
+	var digits: String = "1234567890123456789012345678901234567890123456789012345678901234"
+	var meta: Dictionary = LevelText.parse_key_values(PackedStringArray([
+		"format = 2", "book = 2", "kind = coop", "coop_of = w5_l1", "coop_base_hash = " + digits,
+		"rise_speed.expert = 24", "modes = grub_stack,hot_rock", "wind = 0:-24,40:24", "wind_loop = 80",
+	]))
+	assert_eq(meta["coop_base_hash"], digits, "a hash made of digits only stays text")
+	assert_true(meta["coop_base_hash"] is String)
+	assert_eq(meta["book"], 2)
+	assert_eq(meta["rise_speed.expert"], 24)
+	assert_eq(LevelText.to_list(meta["modes"]), PackedStringArray(["grub_stack", "hot_rock"]))
+	assert_eq(LevelText.meta_book(meta), 2)
+	assert_eq(LevelText.meta_book({}), LevelText.BOOK_1, "every 1.0 file is Book I")
+	# belt: fresh for book 2 and for co-op files, carry for every other file; the key and its variants win.
+	assert_eq(LevelText.meta_belt(meta), LevelText.BELT_FRESH)
+	assert_eq(LevelText.meta_belt({}), LevelText.BELT_CARRY, "the 1.0 weapon rule")
+	assert_eq(LevelText.meta_belt({"kind": "coop"}), LevelText.BELT_FRESH, "a Book I co-op file")
+	assert_eq(LevelText.meta_belt({"book": 2, "kind": "sub"}), LevelText.BELT_FRESH)
+	assert_eq(LevelText.meta_belt({"book": 2, "belt": "carry"}), LevelText.BELT_CARRY)
+	assert_eq(LevelText.meta_belt({"belt": "carry", "belt.expert": "fresh"}, Defs.Difficulty.EXPERT),
+			LevelText.BELT_FRESH)
+	assert_eq(LevelText.meta_belt({"belt": "carry", "belt.expert": "fresh"}, Defs.Difficulty.BEGINNER),
+			LevelText.BELT_CARRY)
+	assert_eq(LevelText.default_belt(1, "arena"), LevelText.BELT_CARRY)
+	# The loader resolves every format-2 key with its default, and the same belt rule.
+	var text: String = "[meta]\nformat = 2\nid = demo\nbook = 2\nkind = sub\nscroll = rising\nliquid = tar\n" \
+			+ "[tiles]\n.@.\n#:#\n"
+	var data: LevelData = LevelData.parse(&"demo", text)
+	var resolved: Dictionary = data.resolved_meta(Defs.Difficulty.BEGINNER)
+	assert_eq(resolved["book"], 2)
+	assert_eq(resolved["belt"], LevelText.BELT_FRESH)
+	assert_eq(resolved["rise_speed"], Tuning.RISE_SPEED)
+	assert_eq(resolved["wrap"], "none")
+	assert_eq(resolved["round_time"], 90)
+	assert_eq(resolved["wind_loop"], 0)
+	assert_eq(resolved["coop_of"], "")
+	assert_true(data.build_grid().is_tar(1, 1), "the tar floor of the text")
+	var old: Dictionary = LevelData.parse(&"old", "[meta]\nformat = 1\nid = old\n[tiles]\n.@.\n###\n") \
+			.resolved_meta(Defs.Difficulty.EXPERT)
+	assert_eq(old["book"], 1)
+	assert_eq(old["belt"], LevelText.BELT_CARRY)
+	for key: String in LevelText.META_KEYS_2:
+		assert_true(LevelData.META_KEYS.has(key), "the loader knows %s" % key)
+
+
+## Level format 2 in the registry (DESIGN.md A.1, D.9; PLAN.md P0.7): campaigns per book, co-op files by
+## substitution, arenas; co-op files and arenas never answer a solo query, and every 1.0 query of the Book I files
+## answers exactly as before. The metas are added in memory; the registry is rescanned at the end.
+func test_registry_books_coop_files_and_arenas() -> void:
+	var beginner: int = Defs.Difficulty.BEGINNER
+	var expert: int = Defs.Difficulty.EXPERT
+	var before: Dictionary = _book1_answers()
+	# Book II: A (main 110) -> A2 (sub, its linked half) -> B (main 120) -> C (main 130, Expert only) -> the
+	# ending E (C's `next`); co-op files for A, A2 and C, none for B; two arenas. A's co-op copy kept A's `next` and
+	# code and is registered first, so a solo query that looked at it would find it before A.
+	var add: Dictionary = {
+		&"zz2_a_coop": {"kind": "coop", "book": 2, "coop_of": "zz2_a", "tally": false, "next": "zz2_a2",
+				"password_beginner": "ZZA1", "bonus": "zz2_bonus"},
+		&"zz2_a": {"kind": "main", "book": 2, "order": 110, "tally": false, "next": "zz2_a2",
+				"password_beginner": "ZZA1", "password_expert": "ZZA2", "bonus": "zz2_bonus"},
+		&"zz2_a2": {"kind": "sub", "book": 2},
+		&"zz2_b": {"kind": "main", "book": 2, "order": 120},
+		&"zz2_c": {"kind": "main", "book": 2, "order": 130, "min_difficulty": "expert", "next": "zz2_e"},
+		&"zz2_e": {"kind": "ending", "book": 2, "min_difficulty": "expert"},
+		&"zz2_bonus": {"kind": "bonus", "book": 2},
+		&"zz2_a2_coop": {"kind": "coop", "book": 2, "coop_of": "zz2_a2"},
+		&"zz2_c_coop": {"kind": "coop", "book": 2, "coop_of": "zz2_c", "min_difficulty": "expert", "next": "zz2_e"},
+		&"zz_w1_l1_coop": {"kind": "coop", "coop_of": "w1_l1", "order": 5},
+		&"zz_arena_one": {"kind": "arena", "players": 4, "modes": "grub_stack,last_caveman", "order": 1},
+		&"zz_arena_two": {"kind": "arena", "players": 2, "modes": "clubball"},
+	}
+	for id: StringName in add:
+		var meta: Dictionary = add[id]
+		meta["id"] = String(id)
+		Levels._meta[id] = meta
+	Levels._index_campaign()
+	# Book I: unchanged, whatever lies beside it.
+	assert_eq(_book1_answers(), before, "every 1.0 query of the Book I files answers as in 1.0")
+	assert_false(Levels.get_campaign(expert).has(&"zz2_a"), "Book II is not in the Book I campaign")
+	assert_false(Levels.get_campaign(expert).has(&"zz_w1_l1_coop"), "a co-op file with an order is no map stop")
+	assert_false(Levels.get_campaign(expert).has(&"zz_arena_one"), "nor is an arena")
+	# Book II.
+	assert_eq(Levels.get_campaign(expert, 2), [&"zz2_a", &"zz2_b", &"zz2_c"] as Array[StringName])
+	assert_eq(Levels.get_campaign(beginner, 2), [&"zz2_a", &"zz2_b"] as Array[StringName])
+	assert_eq(Levels.first_level(2), &"zz2_a")
+	assert_eq(Levels.first_level(), &"w1_l1", "the 1.0 call is Book I")
+	assert_eq(Levels.first_level(7), &"", "a book without levels")
+	assert_eq(Levels.next_level(&"zz2_a", beginner), &"zz2_a2", "the linked half")
+	assert_eq(Levels.next_level(&"zz2_a2", beginner), &"zz2_b", "a sub-stage continues in its own book")
+	assert_eq(Levels.next_level(&"zz2_b", expert), &"zz2_c")
+	assert_eq(Levels.next_level(&"zz2_b", beginner), &"", "Beginner ends before the Expert stage ...")
+	assert_true(Levels.has_locked_successor(&"zz2_b", beginner), "... at the expert wall")
+	assert_eq(Levels.next_level(&"zz2_c", expert), &"zz2_e", "the trophy's epilogue")
+	assert_eq(Levels.parent_level(&"zz2_a2", beginner), &"zz2_a")
+	assert_eq(Levels.get_book(&"zz2_a2"), 2)
+	assert_eq(Levels.get_book(&"w1_l1"), 1)
+	assert_eq(Levels.get_book(&"no_such_level"), 0)
+	assert_eq(Levels.get_belt_rule(&"zz2_b"), LevelText.BELT_FRESH, "Book II starts every stage with the club")
+	assert_eq(Levels.get_belt_rule(&"w1_l1"), LevelText.BELT_CARRY, "Book I keeps the 1.0 weapon rule")
+	assert_eq(Levels.get_belt_rule(&"zz_w1_l1_coop"), LevelText.BELT_FRESH, "co-op files start with the club")
+	# Co-op files: by substitution, never in a solo query.
+	assert_eq(Levels.get_coop_level(&"zz2_a"), &"zz2_a_coop")
+	assert_eq(Levels.get_coop_level(&"zz2_b"), &"", "no co-op file yet")
+	assert_eq(Levels.get_coop_level(&"zz2_a_coop"), &"zz2_a_coop")
+	assert_eq(Levels.get_coop_level(&"w1_l1"), &"zz_w1_l1_coop")
+	assert_eq(Levels.get_coop_base(&"zz2_a2_coop"), &"zz2_a2")
+	assert_eq(Levels.get_coop_base(&"zz2_a"), &"", "a solo level has no base")
+	assert_eq(Levels.get_coop_campaign(expert, 2), [&"zz2_a_coop", &"zz2_c_coop"] as Array[StringName],
+			"the stops with a co-op file")
+	assert_eq(Levels.get_coop_campaign(beginner, 1), [&"zz_w1_l1_coop"] as Array[StringName])
+	assert_eq(Levels.next_level(&"zz2_a_coop", expert), &"zz2_a2_coop", "the linked half, as a co-op file")
+	assert_eq(Levels.next_level(&"zz2_a2_coop", expert), &"zz2_c_coop", "B has no co-op file: passed over")
+	assert_eq(Levels.next_level(&"zz2_a2_coop", beginner), &"", "Beginner: nothing after B")
+	assert_true(Levels.has_locked_successor(&"zz2_a2_coop", beginner))
+	assert_eq(Levels.next_level(&"zz2_c_coop", expert), &"", "no co-op ending yet")
+	assert_eq(Levels.parent_level(&"zz2_a2_coop", expert), &"zz2_a", "co-op results go to the solo map stop")
+	assert_eq(Levels.parent_level(&"zz_w1_l1_coop", expert), &"w1_l1")
+	assert_eq(Levels.parent_level(&"zz2_a2", expert), &"zz2_a", "the co-op copy's `next` never links a solo level")
+	assert_eq(Levels.find_by_password("ZZA1"), {"level_id": &"zz2_a", "difficulty": beginner},
+			"a code never leads into a co-op file")
+	assert_true(Levels.is_coop_level(&"zz2_a_coop"))
+	assert_false(Levels.is_solo_level(&"zz2_a_coop"))
+	assert_true(Levels.is_solo_level(&"zz2_a"))
+	assert_true(Levels.is_solo_level(&"test_example"), "test levels are solo levels")
+	assert_eq(Levels.get_level_kind(&"zz2_a_coop"), Levels.KIND_COOP)
+	assert_eq(Levels.get_level_kind(&"w1_l1"), Levels.KIND_MAIN)
+	assert_eq(Levels.get_level_kind(&"no_such_level"), "")
+	# Modes.
+	assert_eq(Levels.level_for_mode(&"zz2_a", Defs.GameMode.COOP), &"zz2_a_coop")
+	assert_eq(Levels.level_for_mode(&"zz2_bonus", Defs.GameMode.COOP), &"", "no co-op bonus file yet")
+	assert_eq(Levels.level_for_mode(&"zz2_a_coop", Defs.GameMode.SINGLE), &"zz2_a")
+	assert_eq(Levels.level_for_mode(&"w1_l1", Defs.GameMode.SINGLE), &"w1_l1")
+	assert_eq(Levels.level_for_mode(&"zz_arena_one", Defs.GameMode.SINGLE), &"")
+	assert_eq(Levels.level_for_mode(&"zz_arena_one", Defs.GameMode.VERSUS), &"zz_arena_one")
+	assert_eq(Levels.level_for_mode(&"w1_l1", Defs.GameMode.VERSUS), &"")
+	# Arenas.
+	assert_eq(Levels.get_arenas(), [&"zz_arena_one", &"zz_arena_two"] as Array[StringName])
+	assert_eq(Levels.get_arenas(3), [&"zz_arena_one"] as Array[StringName], "built for 3+ players")
+	assert_eq(Levels.get_arenas(0, &"clubball"), [&"zz_arena_two"] as Array[StringName])
+	assert_eq(Levels.get_arenas(2, &"hot_rock"), [] as Array[StringName])
+	assert_true(Levels.is_arena(&"zz_arena_two"))
+	assert_eq(Levels.next_level(&"zz_arena_one", expert), &"")
+	assert_eq(Levels.parent_level(&"zz_arena_one", expert), &"")
+	for book: int in [1, 2]:
+		for difficulty: int in [beginner, expert]:
+			for id: StringName in Levels.get_campaign(difficulty, book):
+				assert_true(Levels.is_solo_level(id), "%s: only solo files are map stops" % id)
+	Levels.rescan()
+	assert_eq(_book1_answers(), before, "rescanned")
+	assert_false(Levels.has_level(&"zz2_a"))
+
+
+## Every registry answer the 1.0 game asks about the solo levels of the folder, by difficulty.
+func _book1_answers() -> Dictionary:
+	var answers: Dictionary = {}
+	for difficulty: int in [Defs.Difficulty.BEGINNER, Defs.Difficulty.EXPERT]:
+		answers["campaign %d" % difficulty] = Levels.get_campaign(difficulty)
+		for id: StringName in Levels.all_ids():
+			if String(id).begins_with("zz"):
+				continue
+			answers["%s %d" % [id, difficulty]] = [
+				Levels.next_level(id, difficulty), Levels.has_locked_successor(id, difficulty),
+				Levels.parent_level(id, difficulty), Levels.is_available(id, difficulty),
+				Levels.get_password(id, difficulty),
+			]
+			var code: String = Levels.get_password(id, difficulty)
+			if code != "":
+				answers["code %s" % code] = Levels.find_by_password(code)
+	answers["first"] = Levels.first_level()
+	return answers
+
+
 func test_example_level_is_well_formed() -> void:
 	var text: String = FileAccess.get_file_as_string(Levels.get_level_path(EXAMPLE))
 	var sections: Dictionary = LevelText.split_sections(text)

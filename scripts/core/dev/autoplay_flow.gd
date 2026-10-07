@@ -16,22 +16,29 @@ extends Node
 ##                                    action event): a button index or name (a, b, x, y, back, start, up, down, left,
 ##                                    right, lb, rb) or a stick direction (lx-, lx+, ly-, ly+); `frames` held
 ##                                    (default 2). For gamepad-only menu paths through the input map
-##   play <ticks:KEYS,...>            gameplay input for the next ticks, keys L R U D F K as in `--inputs`; waits
+##   play <ticks:KEYS,...>            gameplay input for the next ticks, keys L R U D F K S as in `--inputs`; waits
 ##                                    until it is played or gameplay ends (level completed, game over, or another
 ##                                    stage starts: a linked sub-stage, a bonus stage behind a warp, the stage after a
-##                                    trophy). Outside `play` the hero gets no input.
-##   play_file <path>                 the same, read from a file (commas or new lines; `#` lines are comments)
-##   input device|script              `device`: the hero reads the real devices (keys and pads sent with `key` / `pad`,
-##                                    which then also run the clock with --fast); `script` (the default): only `play`
-##   weapon <club|hammer|axe|boomerang>   hand the hero this weapon (Game.set_weapon), e.g. the one a route was
-##                                    recorded with
+##                                    trophy). Outside `play` the hero gets no input. Several heroes: one key set per
+##                                    player separated by `|` (`play 8:R|L,4:|U`; an empty part = that player idle;
+##                                    Autoplay.parse_inputs_multi)
+##   play_file <path>                 the same, read from a file (commas or new lines; `#` lines are comments; a
+##                                    `# route:` header names the number of players)
+##   input device|script [<player>]   `device`: the hero reads the real devices (keys and pads sent with `key` / `pad`,
+##                                    which then also run the clock with --fast); `script` (the default): only `play`.
+##                                    With a player number (1..4) only that player's hero switches; the others keep
+##                                    their input
+##   weapon <name> [<player>]         hand a hero this weapon (club, hammer, axe, boomerang, spear): P1 by default
+##                                    (Game.set_weapon), or player 2..4 (Game.runs[player - 1]); e.g. the one a route
+##                                    was recorded with
 ##   shot <name>                      save a screenshot now: <out>/<NN>_<name>.png
 ##   every <ticks> [name]             also save a screenshot every <ticks> simulation ticks (0 = off):
 ##                                    <out>/t<tick count>_<name>.png
 ##   expect <expr>                    check a condition; a failure is reported and sets the exit code
 ##   log <path> [<path> ...]          print values
 ##   reset_events                     set the `events.*` counters back to zero
-##   start_level <id> [expert]        shortcut for segment work: a new run straight into a level (no menus)
+##   start_level <id> [expert] [players=<n>]   shortcut for segment work: a new run straight into a level (no
+##                                    menus); with players=2..4 a co-op run of that party (a versus run in an arena)
 ##   window <width> <height>          resize the game window (os px) and wait until the view follows: 1600 720 gives
 ##                                    the 800 x 360 view of a wide phone, 1364 1024 the 682 x 512 view of a tablet
 ##   focus out|in                     the application loses / regains the focus, as when the player switches to
@@ -52,7 +59,8 @@ extends Node
 ## time. With `--fast` a stage that has just started waits for its first `play`: its clock starts with the first
 ## scripted tick, so a route file plays exactly as in the headless route tests (tests/test_campaign_routes.gd), no
 ## matter how many frames the commands before it took. trace.json gets one row per tick: [frame, level, tick, x, y,
-## xvel, yvel, state, dead].
+## xvel, yvel, state, dead]; with a party also one "party" row per tick and further hero: [frame, level, tick, player,
+## x, y, xvel, yvel, state, dead].
 ## Exit code: 0 = the script ran to the end and every check passed, 4 = a check failed or a wait timed out,
 ## 2 = the script could not be read.
 
@@ -89,8 +97,19 @@ var _commands: Array[PackedStringArray] = []
 var _out_dir: String = ""
 var _fast: bool = false
 var _can_capture: bool = true
-var _flags: PackedInt32Array = PackedInt32Array()
+## The input of the running `play`, one stream per player slot (all of the same length `_length`).
+var _streams: Array[PackedInt32Array] = []
+var _length: int = 0
 var _flag_index: int = 0
+## Sim.total_ticks of the last sample that read the script, and the entry that sample read (every slot of one
+## tick reads the same entry, whichever slots are scripted).
+var _sampled_at: int = -1
+var _current: int = 0
+## Player slots that read the real devices (`input device [<player>]`), one bit per slot.
+var _device_slots: int = 0
+## Further heroes of a party, per tick: frame, tick, slot, x, y, xvel, yvel, state, dead (and the level of each row).
+var _party_trace: PackedInt32Array = PackedInt32Array()
+var _party_levels: Array[StringName] = []
 var _checks: int = 0
 var _failures: PackedStringArray = PackedStringArray()
 var _shots: int = 0
@@ -130,7 +149,7 @@ func begin(script_text: String, out_dir: String, fast: bool, can_capture: bool) 
 		push_error("Autoplay flow: the script has no commands")
 		_finish.call_deferred(EXIT_BAD_SCRIPT)
 		return
-	GameInput.set_scripted(_next_flags)
+	_script_slots(-1)
 	Sim.tick_finished.connect(_on_tick_finished)
 	for info: Dictionary in Events.get_signal_list():
 		var signal_name: StringName = StringName(str(info["name"]))
@@ -191,31 +210,45 @@ func _execute(command: PackedStringArray) -> bool:
 			if not await _pad(_arg(command, 1), maxi(_int_arg(command, 2, DEFAULT_PRESS_FRAMES), 1)):
 				return false
 		"input":
+			var slot: int = _player_arg(command, 2)
+			if slot < -1:
+				return false
 			match _arg(command, 1):
 				"device":
-					GameInput.clear_scripted()
-					_device_input = true
+					if slot < 0:
+						GameInput.clear_scripted()
+						_device_slots = (1 << Defs.MAX_PLAYERS) - 1
+					else:
+						GameInput.clear_scripted_slot(slot)
+						_device_slots |= 1 << slot
 				"script":
-					GameInput.set_scripted(_next_flags)
-					_device_input = false
+					_script_slots(slot)
+					_device_slots = 0 if slot < 0 else _device_slots & ~(1 << slot)
 				_:
 					push_error("Autoplay flow: 'input' needs 'device' or 'script'")
 					return false
+			_device_input = _device_slots != 0
 		"play":
 			return await _play(rest)
 		"play_file":
-			return await _play(FileAccess.get_file_as_string(_project_path(rest)))
+			return await _play(FileAccess.get_file_as_string(_project_path(rest)), true)
 		"weapon":
 			var weapon: int = -1
-			for w: int in [Defs.Weapon.CLUB, Defs.Weapon.HAMMER, Defs.Weapon.AXE, Defs.Weapon.BOOMERANG]:
+			for w: int in Defs.Weapon.values():
 				if Defs.weapon_name(w) == _arg(command, 1):
 					weapon = w
-			if weapon < 0:
-				push_error("Autoplay flow: 'weapon' needs club, hammer, axe or boomerang")
+			var slot: int = _player_arg(command, 2)
+			if weapon < 0 or slot < -1:
+				push_error("Autoplay flow: 'weapon' needs club, hammer, axe, boomerang or spear [and a player 1..%d]" %
+						Defs.MAX_PLAYERS)
 				return false
-			print("Autoplay flow: weapon %s handed over (the hero carried %s)" % [_arg(command, 1),
-					Defs.weapon_name(Game.weapon)])
-			Game.set_weapon(weapon)
+			slot = maxi(slot, 0)
+			print("Autoplay flow: weapon %s handed over to P%d (the hero carried %s)" % [_arg(command, 1), slot + 1,
+					Defs.weapon_name(Game.runs[slot].weapon)])
+			if slot == 0:
+				Game.set_weapon(weapon)
+			else:
+				Game.runs[slot].set_weapon(weapon)
 		"shot":
 			await _capture("%02d_%s" % [_shots, rest.validate_filename()])
 		"every":
@@ -232,9 +265,19 @@ func _execute(command: PackedStringArray) -> bool:
 			var idle: PackedStringArray = PackedStringArray(["wait_until", "flow.busy", "==", "false", "600"])
 			if not await _wait_until(idle):
 				return false
-			var difficulty: int = Defs.Difficulty.EXPERT if _arg(command, 2) == "expert" else Defs.Difficulty.BEGINNER
-			Game.new_game(difficulty)
-			Flow.start_level(StringName(_arg(command, 1)), Defs.Transition.NONE)
+			var difficulty: int = Defs.Difficulty.EXPERT if command.slice(2).has("expert") else Defs.Difficulty.BEGINNER
+			var level_id: StringName = StringName(_arg(command, 1))
+			var players: int = 1
+			for argument: String in command.slice(2):
+				if argument.begins_with("players="):
+					players = clampi(argument.substr(8).to_int(), 1, Defs.MAX_PLAYERS)
+			var book: int = maxi(Levels.get_book(level_id), 1)
+			if players > 1 or book > 1:
+				var mode: int = Defs.GameMode.VERSUS if Levels.is_arena(level_id) else Defs.GameMode.COOP
+				Game.start_run(difficulty, mode if players > 1 else Defs.GameMode.SINGLE, players, book)
+			else:
+				Game.new_game(difficulty)
+			Flow.start_level(level_id, Defs.Transition.NONE)
 			return await _wait_until(idle) and _check("flow.current_screen == level", true)
 		"window":
 			await _resize_window(Vector2i(_int_arg(command, 1, 0), _int_arg(command, 2, 0)))
@@ -364,10 +407,18 @@ func _pad(control: String, frames: int) -> bool:
 
 
 ## Gameplay input for the next ticks; returns when it was played or gameplay ended (true), or false when no tick
-## ran for STALL_FRAMES frames (paused, or nothing to simulate).
-func _play(script_text: String) -> bool:
-	# Entries may also be separated by spaces on a `play` line; comment lines keep their leading '#'.
-	_flags = Autoplay.parse_inputs(script_text.replace(" ", ","))
+## ran for STALL_FRAMES frames (paused, or nothing to simulate). `from_file`: the text of a route file (its comment
+## lines, the `# route:` header among them, are kept as they are).
+func _play(script_text: String, from_file: bool = false) -> bool:
+	# Entries may also be separated by spaces (on a `play` line, and between the entries of a file).
+	var lines: PackedStringArray = PackedStringArray()
+	for line: String in script_text.split("\n"):
+		lines.append(line if from_file and line.strip_edges().begins_with("#") else line.replace(" ", ","))
+	_streams = Autoplay.parse_inputs_multi("\n".join(lines))
+	_length = _streams[0].size()
+	var heroes: int = Game.level.hero_count() if is_instance_valid(Game.level) else 1
+	if _streams.size() > maxi(heroes, 1):
+		push_warning("Autoplay flow: the input has %d players, the level %d hero(es)" % [_streams.size(), heroes])
 	_flag_index = 0
 	_playing = true
 	var idle_frames: int = 0
@@ -376,19 +427,19 @@ func _play(script_text: String) -> bool:
 	var played: bool = true
 	# The stage is told apart by its instance id: a freed level compares equal to null.
 	var stage: int = Game.level.get_instance_id() if Game.level != null else 0
-	while _flag_index < _flags.size():
+	while _flag_index < _length:
 		await get_tree().process_frame
 		if Flow.current_screen != Flow.SCREEN_LEVEL and not Flow.busy:
 			idle_frames += 1
 			if idle_frames > 2:
-				print("Autoplay flow: gameplay ended after %d of %d ticks" % [_flag_index, _flags.size()])
+				print("Autoplay flow: gameplay ended after %d of %d ticks" % [_flag_index, _length])
 				break
 		var current: int = Game.level.get_instance_id() if is_instance_valid(Game.level) else 0
 		if stage == 0:
 			stage = current
 		elif current != 0 and current != stage:
 			# A linked sub-stage, a bonus stage or the stage after a trophy took over: its own input comes next.
-			print("Autoplay flow: %s started after %d of %d ticks" % [Game.level.level_id, _flag_index, _flags.size()])
+			print("Autoplay flow: %s started after %d of %d ticks" % [Game.level.level_id, _flag_index, _length])
 			break
 		stalled = 0 if _flag_index != last_index else stalled + 1
 		last_index = _flag_index
@@ -396,18 +447,51 @@ func _play(script_text: String) -> bool:
 			_failures.append("play: no tick ran for %d frames (paused?)" % STALL_FRAMES)
 			played = false
 			break
-	_flags = PackedInt32Array()
+	_streams = []
+	_length = 0
 	_flag_index = 0
 	_playing = false
 	return played
 
 
+## Script player slot `slot` (every slot for -1): its hero gets the input of `play` and nothing outside it.
+func _script_slots(slot: int) -> void:
+	for s: int in Defs.MAX_PLAYERS:
+		if slot < 0 or s == slot:
+			GameInput.set_scripted_slot(s, _next_flags if s == 0 else _slot_flags.bind(s))
+
+
 func _next_flags(_tick: int) -> int:
-	if _flag_index >= _flags.size():
+	return _scripted_flags(0)
+
+
+func _slot_flags(_tick: int, slot: int) -> int:
+	return _scripted_flags(slot)
+
+
+## The flags of player slot `slot` for the tick being sampled: one entry of the `play` per tick, the same entry for
+## every slot (the first slot sampled in a tick takes it), 0 outside a `play` and for a slot the input does not name.
+func _scripted_flags(slot: int) -> int:
+	if _sampled_at != Sim.total_ticks:
+		_sampled_at = Sim.total_ticks
+		_current = _flag_index
+		if _flag_index < _length:
+			_flag_index += 1
+	if _current >= _length or slot >= _streams.size():
 		return 0
-	var value: int = _flags[_flag_index]
-	_flag_index += 1
-	return value
+	return _streams[slot][_current]
+
+
+## Player number argument `index` of a command (1..Defs.MAX_PLAYERS) as a slot (0-based); -1 when the command has
+## none, -2 (and an error) for a bad one.
+func _player_arg(command: PackedStringArray, index: int) -> int:
+	if index >= command.size():
+		return -1
+	var text: String = command[index]
+	if text.is_valid_int() and text.to_int() >= 1 and text.to_int() <= Defs.MAX_PLAYERS:
+		return text.to_int() - 1
+	push_error("Autoplay flow: '%s' is not a player number (1..%d)" % [text, Defs.MAX_PLAYERS])
+	return -2
 
 
 func _on_tick_finished(tick: int) -> void:
@@ -426,6 +510,12 @@ func _on_tick_finished(tick: int) -> void:
 		_trace.append(hero.state)
 		_trace.append(1 if hero.dead else 0)
 		_trace_levels.append(level.level_id)
+		for slot: int in range(1, level.hero_count()):
+			var other: PlayerBase = level.get_hero(slot)
+			if other != null:
+				_party_trace.append_array([_frame, tick, slot + 1, other.sim_pos.x, other.sim_pos.y, other.xvel,
+						other.yvel, other.state, 1 if other.dead else 0])
+				_party_levels.append(level.level_id)
 	if _every > 0 and _ticks % _every == 0:
 		_capture("t%06d_%s" % [_ticks, _every_name])
 
@@ -662,9 +752,19 @@ func _finish(exit_code: int) -> void:
 			var k: int = i * 8
 			rows.append([_trace[k], String(_trace_levels[i]), _trace[k + 1], _trace[k + 2], _trace[k + 3],
 				_trace[k + 4], _trace[k + 5], _trace[k + 6], _trace[k + 7] != 0])
-		file.store_string(JSON.stringify({
+		var trace: Dictionary = {
 			"columns": ["frame", "level", "tick", "x", "y", "xvel", "yvel", "state", "dead"], "rows": rows,
-		}))
+		}
+		if not _party_levels.is_empty():
+			var party: Array[Array] = []
+			for i: int in _party_levels.size():
+				var k: int = i * 9
+				party.append([_party_trace[k], String(_party_levels[i]), _party_trace[k + 1], _party_trace[k + 2],
+					_party_trace[k + 3], _party_trace[k + 4], _party_trace[k + 5], _party_trace[k + 6],
+					_party_trace[k + 7], _party_trace[k + 8] != 0])
+			trace["party_columns"] = ["frame", "level", "tick", "player", "x", "y", "xvel", "yvel", "state", "dead"]
+			trace["party"] = party
+		file.store_string(JSON.stringify(trace))
 		file.close()
 	print("Autoplay flow: %d check(s), %d failure(s), %d screenshot(s), %d tick(s), %d frame(s)" % [
 		_checks, _failures.size(), _shots, _ticks, _frame,

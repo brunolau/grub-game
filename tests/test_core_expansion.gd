@@ -153,6 +153,57 @@ func test_book2_rules_in_tuning() -> void:
 	assert_eq(unlocks[unlocks.size() - 1], Tuning.PAINTING_COUNT)
 
 
+## The core-owned rows of the constant sheet docs/spec/PHYSICS.md C.16 (and the register GAMEPLAY.md 13.11) exist with
+## the spec's values, and the states and hurt kind the appendix names are appended after the 1.0 values.
+func test_physics_appendix_c_constant_sheet() -> void:
+	# Defs: states outside the 4.3 table, the versus hurt kind; the 1.0 values unchanged.
+	assert_ints_eq([Defs.HeroState.IDLE, Defs.HeroState.HURT], [0, 8])
+	assert_ints_eq([Defs.HeroState.CLIMB, Defs.HeroState.CURL, Defs.HeroState.RIDING], [9, 10, 11])
+	for flags: int in Tuning.STATE_LUT.size():
+		assert_true(int(Tuning.STATE_LUT[flags]) <= Defs.HeroState.HURT, "the state table never yields a 2.0 state")
+	assert_ints_eq([Defs.HurtKind.ENEMY, Defs.HurtKind.BOSS_BODY, Defs.HurtKind.BOSS_PROJECTILE, Defs.HurtKind.TRAP,
+		Defs.HurtKind.RIVAL], [0, 1, 2, 3, 4])
+	# Tuning (C.3 - C.7).
+	assert_ints_eq([Tuning.SPEAR_FALL_MAX, Tuning.SPEAR_BOX_W, Tuning.SPEAR_BOX_H, Tuning.SPEAR_BOX_XO],
+		[192, 24, 6, 12])
+	assert_ints_eq([Tuning.VINE_HAND_REACH_PX, Tuning.VINE_REGRAB_LOCK_TICKS, Tuning.VINE_TOP_STEP_PX], [32, 12, 12])
+	assert_ints_eq([Tuning.GEYSER_PERIOD, Tuning.GEYSER_PERIOD_MIN, Tuning.GEYSER_VENT_W, Tuning.GEYSER_VENT_H,
+		Tuning.GEYSER_DEADLY_H], [88, 34, 24, 16, 64])
+	assert_ints_eq([Tuning.RAFT_SPEED_CAP, Tuning.RAFT_HEIGHT_PX, Tuning.RAFT_FLOAT_DEPTH_PX], [48, 8, 4])
+	# PartyTuning (C.10 - C.13, GAMEPLAY 13.9).
+	assert_ints_eq([PartyTuning.TOTEM_HEAD_PX, PartyTuning.TOTEM_REST_PX, PartyTuning.TOTEM_FOOT_REACH_PX,
+		PartyTuning.TOTEM_JUMP_OFF_YVEL, PartyTuning.TOTEM_DROP_LOCK_TICKS, PartyTuning.TOTEM_THROW_OFF_YVEL],
+		[35, 34, 16, -16, 12, -64])
+	assert_ints_eq([PartyTuning.CURL_BOX_W, PartyTuning.CURL_BOX_H, PartyTuning.CURL_BOX_XO], [24, 20, 12])
+	assert_ints_eq([PartyTuning.EGG_BOX_W, PartyTuning.EGG_BOX_H, PartyTuning.EGG_BOX_XO, PartyTuning.EGG_OFFSET_X,
+		PartyTuning.EGG_OFFSET_Y, PartyTuning.EGG_DRIFT_PX, PartyTuning.EGG_DRIFT_FAST_PX, PartyTuning.EGG_DRIFT_FAR_PX,
+		PartyTuning.EGG_NUDGE_PX, PartyTuning.EGG_VIEW_INSET_PX, PartyTuning.EGG_RETURN_SPEED_PX],
+		[24, 24, 12, -24, -48, 2, 6, 64, 1, 16, 6])
+	assert_true(PartyTuning.EGG_RETURN_SPEED_PX <= PartyTuning.MOVE_MAX_PX_PER_TICK, "an egg stays in the doze reach")
+	assert_ints_eq([PartyTuning.PULL_IN_BEHIND_PX, PartyTuning.TARGET_HOLD_TICKS, PartyTuning.LONE_KEEP_AWAY_PX,
+		PartyTuning.LONE_CIRCLE_WIDER_PX, PartyTuning.PLATE_WEIGHT_BOULDER, PartyTuning.PULLEY_RANGE_ROWS],
+		[24, 22, 64, 32, 2, 3])
+	# VersusTuning (C.14, GAMEPLAY 13.10 / 13.11).
+	assert_ints_eq([VersusTuning.HURT_TIMER_TICKS, VersusTuning.STUN_HIT_TIMER_MIN], [43, 31])
+	# Set to 43 on the hit tick; the following ticks see 42 .. 31 (12 stunned), then 30 .. 1 (30 immune with control).
+	assert_eq(VersusTuning.HURT_TIMER_TICKS - VersusTuning.STUN_HIT_TIMER_MIN, VersusTuning.STUN_TICKS,
+		"12 stunned ticks ...")
+	assert_eq(VersusTuning.STUN_HIT_TIMER_MIN - 1, VersusTuning.IMMUNE_TICKS, "... then 30 immune")
+	assert_ints_eq([VersusTuning.CLANG_PUSH_EACH_PX, VersusTuning.STOMP_IMMUNE_TICKS, VersusTuning.TEAMMATE_BUMP_XVEL,
+		VersusTuning.CURL_GLANCE_ABOVE_PX, VersusTuning.BODY_KNOCK_XVEL, VersusTuning.BODY_KNOCK_YVEL],
+		[8, 30, 32, 16, 64, -64])
+	assert_ints_eq([VersusTuning.HOT_ROCK_FIRST_PICK_TICKS, VersusTuning.HOT_ROCK_REPICK_TICKS,
+		VersusTuning.BALL_ROLL_LOSS, VersusTuning.GIANT_BONK_DAZE_TICKS, VersusTuning.ARENA_FILE_ROWS],
+		[66, 66, 2, 12, 12])
+	# The look of a player (join panel / lobby -> hero palette, HUD): the slot default until someone picks one.
+	var run: PlayerRun = PlayerRun.new(1)
+	assert_eq(run.palette, &"", "the slot's default colour")
+	assert_eq(run.pattern, -1, "the slot's default pattern")
+	run.palette = &"pink"
+	run.reset_run()
+	assert_eq(run.palette, &"pink", "a new run keeps the players' colours")
+
+
 # =================================================================================================================
 # PartyTuning
 # =================================================================================================================
