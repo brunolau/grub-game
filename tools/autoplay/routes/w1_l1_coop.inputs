@@ -4,23 +4,25 @@
 # P2 steps up beside P1 (their starts are a cell apart).
 4:|R,36:|
 # The first walker
-12:R|,16:R|R,10:|R,2:R|R,6:R|,4:|,6:|R,2:R|R,10:R|,4:R|R,4:|R,8:RU|R,4:RU|,12:R|RU,6:|R,6:R|R,6:F|,2:F|R,4:|R
-2:|F,6:R|F,2:R|,4:|,8:|R,4:|
+12:R|,16:R|R,10:|R,2:R|R,6:R|,4:|,6:|R,2:R|R,10:R|,4:R|R,4:|R,8:RU|R,4:RU|,12:R|RU,6:|R,6:R|R,6:F|
+2:F|R,4:|R,2:|F,6:R|F,2:R|,4:|,8:|R,4:|
 # The turtle trough: each hero bounces over the turtles in turn.
 28:|,22:RU|,14:U|,18:R|,8:|,14:RU|,4:R|,22:|,22:|RU,14:|U,18:|R,8:|,14:|RU,4:|R,40:|
 # The hopper, the crate, the second bridge and the cracked wall of the tunnel
 12:R|,14:R|R,12:|R,4:|,8:F|,4:|,6:|F,2:R|F,10:R|,28:R|R,10:|R,2:F|R,6:F|,4:|,8:|F,10:|
 # Up onto the second vine bridge and off its far end; the cracked wall of the tunnel takes two blows
-12:R|,8:R|R,12:RU|R,2:RU|RU,12:R|RU,14:R|R,8:|R,4:R|R,8:R|,2:R|R,4:|R,8:F|R,4:|,2:|F,6:F|F,2:F|,4:|,8:|F,8:|
+12:R|,8:R|R,12:RU|R,2:RU|RU,12:R|RU,14:R|R,8:|R,4:R|R,8:R|,2:R|R,4:|R,8:F|R,4:|,2:|F,6:F|F,2:F|,4:|
+8:|F,8:|
 # Through the tunnel to the first checkpoint
 12:R|,28:R|R,12:|R,6:|
-# Gate 1 (hop): P1 stands in the dip under the ledge, P2 jumps on his head holding Jump (Shoulder Hop), clubs the
-# flower pot off the ledge, and P1 bounces up on the spring it grew into.
-2:R|,12:RU|,14:R|,12:|,30:|RU,10:|R,20:|,3:|L,12:|F,46:|,6:LU|,6:U|,30:RU|,20:|
+# Gate 1 (hop): at the foot of the 8-row ledge P2 jumps on P1's head holding Jump (Shoulder Hop), strikes the coiled vine at the edge down and P1 climbs it; both walk on to the bridge (closed-loop macros of the G2 integration, build/g2/rec; the rest of the route is DB1's, unchanged)
+18:|U,14:|RU,6:|R,3:|,4:|L,2:|,1:|L,2:|,1:|L,2:|,1:|L,2:|,1:|L,2:|,1:|L,2:|,1:|L,2:|,1:|L,2:|,1:|L
+2:|,1:|L,2:|,1:|L,2:|,1:|L,2:|,8:|F,19:|,1:U|,26:U|R,7:U|,1:U|R,2:U|,1:U|R,2:U|,1:U|R,24:U|,28:R|
+7:|,1:R|,40:|
 # The bat over the second bridge: a high strike; then bridge to bridge across the lake (the island checkpoint)
-6:R|,6:|,6:|R,7:|,10:UF|,2:|,4:|UF,6:RU|UF,6:RU|,6:RU|RU,12:R|RU,6:R|R,12:RU|R,10:RU|RU,10:R|RU,2:RU|RU,10:RU|R
-8:RU|RU,8:R|RU,4:RU|RU,8:RU|R,10:RU|RU,12:R|RU,1:R|R,12:RU|R,10:RU|RU,6:R|RU,1:RU|RU,5:R|RU,6:R|R,1:R|RU,8:R|R
-12:RU|R,12:RU|RU,12:R|RU,46:R|R,12:|R,8:|
+10:UF|,2:|,4:|UF,6:RU|UF,6:RU|,6:RU|RU,12:R|RU,6:R|R,12:RU|R,10:RU|RU,10:R|RU,2:RU|RU,10:RU|R
+8:RU|RU,8:R|RU,4:RU|RU,8:RU|R,10:RU|RU,12:R|RU,1:R|R,12:RU|R,10:RU|RU,6:R|RU,1:RU|RU,5:R|RU,6:R|R
+1:R|RU,8:R|R,12:RU|R,12:RU|RU,12:R|RU,46:R|R,12:|R,8:|
 # The snapper on the hollow hill: club it from just outside its reach; over the hill and down its far side
 5:R|,4:|,3:F|,5:F|R,4:|,4:|F,4:R|F,8:R|,14:R|R,2:|R,20:|
 # The two hoppers of the glade wake one after the other: P1 clubs each where it lands, P2 comes down the hill
@@ -33,15 +35,13 @@
 140:U|U,10:|
 # The canopy road leads back to the left: P1 clubs the hopper of the first treetop in the jump, P2 follows
 6:R|,8:|,8:L|,8:LU|,4:LU|R,2:LF|R,6:LF|,2:LU|,2:LU|L,10:|L,2:L|L,16:L|LU,8:|LU,52:|
-# Gate 2 (plates): P1 holds plate pa, door D1 of the lower corridor opens and P2 walks through to plate pb; door
-# D2 of the upper corridor opens, P1 jumps into it and walks through; P2 steps aside before P1 drops down.
+# Gate 2 (plates): P1 holds plate pa, door D1 of the lower corridor opens and P2 walks through to plate pb; door D2 of the upper corridor opens, P1 jumps into it and walks through; P2 steps aside before P1 drops down.
 66:|L,14:|,4:L|,10:LU|,4:L|,10:|,2:L|,30:L|L,8:L|,30:|
 # On along the vine bridge to the last treetop (the Shellback sign)
 18:|L,2:|LU,12:L|LU,6:L|L,14:L|,14:LU|,6:L|,30:|
-# The Shellbacks guard the tree house; their shells turn to the nearer hero. P2 jumps over the first and stands in
-# front of it, P1 clubs its back.
+# The Shellbacks guard the tree house; their shells turn to the nearer hero. P2 jumps over the first and stands in front of it, P1 clubs its back.
 20:|L,30:|,4:|L,14:|LU,22:|,32:L|,12:|,8:F|,20:|
 # The second Shellback: P1 stands in front of it, P2 jumps over it and clubs its back
 20:L|,2:L|L,4:|L,14:|LU,10:|,1:|R,4:|,8:|F,20:|
 # Both into the exit totem by the tree house
-26:L|L
+19:L|L

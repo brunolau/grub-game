@@ -1,0 +1,106 @@
+# Club & Grub - World 5, stage 2b: "Tusker's Wallow" (designer D5, Book II "The Far Shore").
+# The second half of Rattlesnake Gulch (difficulty 4, DESIGN.md A.2 / A.3 / B.1, GAMEPLAY.md 13.6): a short approach
+# along the canyon floor past a sand hump and a red mesa - the Cave Painting (index 2) waits in a chamber inside the
+# mesa behind a breakable wall - a rattler and a tortoise, the checkpoint and the sign, then a shaft drops into the
+# walled pit of Tusker, the Boar King: mesa banks 3 rows up in both corners (3 cells each), a 4-cell mud wallow (`:`)
+# in the middle of the pit floor and a rock ceiling the phase-3 rocks fall from (the arena of the boss owner's
+# levels/test_enemies_tusker.lvl, so the 76 px boar has dry floor to charge on). The boar drops the fire-starter; the
+# exit totem stands locked on the right bank. Nothing needs a special.
+[meta]
+format = 2
+id = w5_l2b_coop
+name = "Tusker's Wallow"
+kind = coop
+coop_of = w5_l2b
+coop_base_hash = "48c6ce2c645b508dd4238234dc5e6592238571c1cff63ed6f292c69fe42a472b"
+book = 2
+world = 5
+stage = 2
+biome = canyon
+terrain_a = canyon/terrain
+terrain_b = canyon/terrain_mesa
+background = canyon
+music = level_gulch
+liquid = water
+bonus_tier = 1
+author = D5
+
+[tiles]
+#.............................................%%%%%%%%%%%%%%
+#.............................................%%%%%%%%%%%%%%
+#.............................................%%%%%%%%%%%%%%
+#.............................................%%%%%%%%%%%%%%
+#.............................................%%%%%%%%%%%%%%
+#.............................................%%%%%%%%%%%%%%
+#..............%%%%%%%........................%%%%%%%%%%%%%%
+#..............%%%%%%%........................%%%%%%%%%%%%%%
+#..............%%%%%%%........................%%%%%%%%%%%%%%
+#............%%%.....$........................%%%%%%%%%%%%%%
+#..@../#\....%%%.....$........................%%%%%%%%%%%%%%
+###########################################...%%%%%%%%%%%%%%
+###########################################...##############
+#########################################..................#
+#########################################..................#
+#########################################..................#
+#########################################..................#
+#########################################..................#
+#########################################..................#
+############################################............####
+############################################............####
+############################################............####
+################################################::::########
+############################################################
+
+[entities]
+# --- the approach
+props/canyon/cactus_tall 2 10 layer=back
+props/canyon/grass_dry 5 10
+props/canyon/rocks_small 9 10
+objects/hidden_spot 10 11 kind=small count=3 contents=food:2,food:9,food:17 look=inset
+items/food 7 8 index=4
+items/food 8 7 index=5
+items/food 9 8 index=6
+enemies/walker 11 10 skin=turtle left=-2 right=1 hp=10 expert coop=shell
+props/canyon/dry_bush 12 10 layer=back
+items/food 13 7 index=8
+items/food 14 7 index=10
+items/food 17 4 index=12
+items/food 19 4 index=13
+items/food 21 4 index=14
+props/canyon/skull_cow 18 5
+props/canyon/cactus_small 20 5 layer=back
+# the painting chamber inside the mesa (its wall of two breakable blocks faces the floor on the right)
+zones/secret 18 10 name=painting_den rect=16,9,5,2
+items/painting 18 10 index=2
+items/food 17 10 index=15
+items/food 19 10 index=16
+props/canyon/jar_a 16 10 layer=back
+props/canyon/bone_small 20 10
+enemies/harrier 24 4 skin=eagle hp=10 expert
+props/canyon/burrow_b 28 10 layer=back
+enemies/snapper 28 10 skin=snake range=30 hp=10
+items/food 26 8 index=18
+props/canyon/pebbles 25 10
+enemies/walker 32 10 skin=turtle left=-2 right=2 hp=10 coop=shell
+props/canyon/grass_dry_b 30 10
+items/food 31 8 index=20
+items/food 33 8 index=21
+objects/sign 34 10 text=SIGN_W5_TUSKER
+objects/checkpoint 37 10
+props/canyon/signpost 39 10 layer=back
+items/heart 36 8
+props/canyon/dead_tree 41 10 layer=back
+# --- the arena (rows 12-23): the wallow pit of Tusker
+zones/arena 49 21 name=wallow rect=40,13,20,11
+bosses/tusker 47 21 arena=wallow drops=fire_starter
+objects/exit 57 18 locked=true
+props/canyon/skull_cow 42 18
+props/canyon/bone_small 44 21
+props/canyon/rocks_small 54 21
+props/canyon/skull_buried 57 18
+props/canyon/boulders 58 18 layer=back
+# --- co-op (w5_l2b_coop): P2's start; the co-op Tusker comes by itself in a co-op file (the rump pincer, the Brace
+# Wall of phase 3: DESIGN.md B.1); the tortoises of the approach carry the shell trait (they turn their shell to the
+# nearer caveman)
+objects/hero_start 2 10 slot=2
+objects/sign 36 10 text=SIGN_W5_COOP_TUSKER

@@ -919,6 +919,7 @@ New routes describe themselves in a header instead of a `ROUTES` entry. The head
 | `after` | `tally`, `level:<id>`, `expert_wall`, `the_end` |
 | `belt` | the special on the belt at the start (`none` default; featured routes only) |
 | `then`, `source`, `prefix` | as the 1.0 ROUTES keys (`prefix=<file>@<marker>`) |
+| `helper` | `1`: a co-op route recorded in Helper mode (DESIGN.md D.3) replays with it; `0` / absent: without (`--record` writes `helper=1` itself) |
 | `expect` | comma-separated `key:value` checks of the route test; lists with `+` (`letters:1+3`), ranges with `..` (`ticks:1092..2185`). The 1.0 keys (`hurts`, `min_checkpoints`, `min_spots`, `min_secrets`, `letters`, `words`, `lives_gained`, `no_enemies`, `ticks`, `min_score`, `gates`, `glider`, `boss_hits`, `unlocked`, `pair_ticks`, `min_wind`, `secrets`) plus `painting:<index>`, `wipes:<max>`, `eggs:<max>`, `hatches:<min>`, `x2_gates:<min>` |
 
 - **Names**: `<id>.inputs` (Beginner; the only route of an Expert-only stage), `<id>.expert.inputs`; featured routes

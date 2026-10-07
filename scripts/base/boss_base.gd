@@ -195,13 +195,14 @@ func defeat(drops: Array[StringName] = []) -> void:
 	fighting = false
 	sleep()
 	var origin: Vector2i = _burst_origin()
+	var drop_origin: Vector2i = _drop_origin()
 	if Game.level != null:
 		for i: int in drops.size():
 			var entry: Dictionary = _drop_entry(drops[i])
 			var params: Dictionary = entry["params"]
 			params["dropped"] = true
 			params["fan"] = i
-			_spawn_optional(entry["id"], origin, params)
+			_spawn_optional(entry["id"], drop_origin, params)
 		for i: int in Tuning.BOSS_BURST_ITEMS:
 			_spawn_optional(ITEM_RANDOM, origin, {"dropped": true, "fan": i})
 		_spawn_optional(FX_DEFEAT, origin)
@@ -250,6 +251,14 @@ func _on_lethal_hit() -> void:
 ## Where the bonus burst and the drops come out (logical px).
 func _burst_origin() -> Vector2i:
 	return sim_pos + Vector2i(0, EnemyTuning.BOSS_DROP_DY)
+
+
+## 2.0: where the level's `drops` (fire-starter, trophy ...) are thrown out; the bonus burst and the defeat effect
+## stay at [method _burst_origin]. The default is the burst origin (every 1.0 boss); a boss whose burst point lies
+## inside a wall (Old Mangrove's face) overrides it with open floor in front of it, so a dropped fire-starter can
+## always be picked up.
+func _drop_origin() -> Vector2i:
+	return _burst_origin()
 
 
 ## Called at the end of defeat(): hide, show the broken pose ... Override.

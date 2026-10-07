@@ -732,7 +732,7 @@ func _check_entity(data: LevelData, record: Dictionary, names: Dictionary) -> vo
 		_add(path, line, ERROR, "'%s' needs rect=c,r,w,h" % id)
 	if id == "zones/arena" and not params.has("name"):
 		_add(path, line, ERROR, "zones/arena needs a name (bosses refer to it with arena=)")
-	if id == "items/warp" and str(data.value("kind")) != "bonus" and str(data.value("bonus")) == "":
+	if id == "items/warp" and _stage_kind(data) != "bonus" and str(data.value("bonus")) == "":
 		_add(path, line, WARNING, "items/warp in a level without a 'bonus' stage acts as a plain exit")
 	for key: String in ["contents", "drops"]:
 		if params.has(key):
@@ -959,7 +959,7 @@ func _check_exit_path(data: LevelData, records: Array[Dictionary]) -> void:
 		var message: String = "the level has %d objects/exit (exactly one allowed)" % exits.size()
 		_add(data.path, int(exits[1]["line"]), ERROR, message)
 	elif exits.is_empty():
-		var kind: String = str(data.value("kind"))
+		var kind: String = _stage_kind(data)
 		if kind == LevelText.KIND_ARENA:
 			pass  # a versus arena has no way out (LEVEL_DESIGN.md 15.8)
 		elif kind == "bonus":
@@ -1533,6 +1533,18 @@ func _gate_area(tablet: Dictionary) -> Rect2i:
 
 
 ## The kind of the solo level `level_id` (an added level, else its file in res://levels; "" when unknown).
+## The kind of stage a file plays as: its own `kind`, or for a co-op file (`kind = coop`) the kind of its solo level
+## `coop_of` - a co-op Feast Land is left through its warp like the solo one (Flow resolves it the same way,
+## SceneFlow._campaign_kind; wf8_D5_to_world-B.txt #2).
+func _stage_kind(data: LevelData) -> String:
+	var kind: String = str(data.value("kind"))
+	if kind == LevelText.KIND_COOP:
+		var base: String = _solo_kind(str(data.value("coop_of")))
+		if base != "":
+			return base
+	return kind
+
+
 func _solo_kind(level_id: String) -> String:
 	if level_id == "":
 		return ""

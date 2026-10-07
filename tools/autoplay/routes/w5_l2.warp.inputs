@@ -1,0 +1,21 @@
+# route: level=w5_l2 difficulty=beginner belt=spear ends=warp after=level:bonus_d expect=hurts:0,letters:0,secrets:1
+# Featured route of Rattlesnake Gulch (designer D5; recorded from closed-loop macros, build/d5): the Feast Land D
+# warp on the mesa pillar of band D, reached only by two spear steps (the "aha" use of the spear, which a Book II
+# run carries on its belt from 5-1). The Beginner club line to band D, then a swap to the spear, a high throw into
+# the lower bark board, onto its step, a jump-throw into the upper board, onto that step, onto the pillar: the warp.
+# Band A: over the hump, the tortoise, the rattler from outside its reach, over the mound to the first vine
+36:R,7:,1:R,2:,1:R,2:,8:F,7:,25:R,7:,1:R,2:,1:R,2:,1:R,2:,1:R,2:,1:R,2:,1:R,2:,1:R,2:,1:R,2:,1:R,2:
+1:R,2:,1:R,2:,1:R,2:,1:R,2:,1:R,2:,1:R,2:,1:R,2:,1:R,6:F,38:R,10:RU,20:R,7:,1:R,2:,1:R,2:,1:R,2:,1:R
+2:,1:R,2:,1:R,2:,97:U
+# Band B: checkpoint 1, quickly past the burrow snakes to the second vine
+53:L,7:,97:U
+# Band C: strike the rolled vine down (the short way up after a fall), jump its hole, on to the third vine
+30:L,7:,1:L,2:,8:F,8:,8:LU,25:L,7:,97:U
+# Band D: checkpoint 2, the letter G, the rattler and the tortoise, on to the mesa pillar
+42:R,10:RU,19:R,7:,1:R,2:,1:R,2:,1:R,2:,1:R,2:,1:R,2:,1:R,2:,1:R,2:,1:R,2:,1:R,2:,1:R,2:,1:R,2:,1:R
+2:,1:R,2:,1:R,2:,1:R,2:,1:R,2:,1:R,8:F,7:,29:R,7:,4:R,6:,1:R,2:,1:R,2:,1:R,2:,1:R,2:,1:R,2:,1:R,2:
+6:F
+# Swap to the spear, a high throw into the lower bark board, onto its step
+56:R,7:,2:R,3:,1:S,9:,6:UF,14:,10:U,11:
+# Jump-throw into the upper board, onto its step, onto the pillar: the warp
+8:,2:U,6:F,20:,10:U,16:,10:RU,3:R

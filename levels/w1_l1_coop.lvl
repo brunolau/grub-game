@@ -1,8 +1,8 @@
 # Club & Grub - World 1, stage 1 co-op: "Vine Bridges" for two (designer DB1; docs/expansion/DESIGN.md D.9).
 # The co-op file of levels/w1_l1.lvl (kind = coop, coop_of, coop_base_hash; never edit the solo file). The first co-op
 # stage teaches the duo verbs gently: the egg and the x2 tablet by signs at the first checkpoint; gate 1 "hop" - the
-# springy flower became a ledge 7 rows high (Expert 8) at the lake shore: a Shoulder Hop gets one hero up, and he clubs
-# the flower pot off the ledge as a spring for his partner (the gift); gate 2 "plates" - a leapfrog of two plate doors
+# springy flower became a ledge 8 rows high at the lake shore: a Shoulder Hop gets one hero up, and he clubs the
+# coiled vine at its edge down for his partner (the gift); gate 2 "plates" - a leapfrog of two plate doors
 # through the Great Tree on the canopy road (A holds for B in the lower corridor, B holds for A in the upper one); two
 # Shellback turtles guard the tree house; the x2 secret is the High Cache over the far treetop (a Totem rider's jump
 # strike, painting 20). Bats and hoppers are loners (Expert).
@@ -25,7 +25,7 @@ music = level_jungle
 liquid = water
 bonus_tier = 0
 author = DB1
-notes = "Co-op 1-1: Shoulder Hop ledge + flower pot gift, leapfrog plate doors in the Great Tree, Shellbacks at the tree house, High Cache (painting 20)."
+notes = "Co-op 1-1: Shoulder Hop ledge + rolled vine gift, leapfrog plate doors in the Great Tree, Shellbacks at the tree house, High Cache (painting 20)."
 
 [legend]
 v = items/treasure index=13
@@ -105,15 +105,15 @@ Q = objects/hidden_spot kind=small count=3 contents=food:29,treasure:10,food:40 
 .....................................................................................................jj...........................................-------...................................................................................%%%%
 .G.l...............................................................................................-------...................................................jj..........................................................................g..%%%%
 ####===....................................................................................j..........................A....................................---------...................................................................=====%%%%
-####......................................R...............................................####n###...................gg.................................................................gg..Z...............................................%%%%
-####....f.............................h.h...h.h...........................................########........###----..-------....hh...............iii..................................../###########...........................S......h.......%%%%
-####...====...............................................................................########........###...............-------.....s....-------....hh..........gg.............../############.................................======...%%%%
-####......................................................................................########........###........................######...........-------.......---............./#############...................F......................%%%%
-####.......f..............................................................................########........###........................######...................#####................/###.........##.......................................f..%%%%
-####.......===...........g.g.....................................................iii......########........###........................######...................#####....####......./####.........##.....................................=====%%%%
-####....................c####...................................................------.......w............###........................######...................#####....####....../#####.........ww..........................................%%%%
-####.@.............b....c####...T....................r.........Y...........K.................w.....C..###.###........................######...................#####....####..D../######..B...H..ww..t.....Y....Y...............T.L..........%%%%
-###############a####################..............#######e########------#######........##################.###........................######...................#####....###################qqq#####################--------############oooo######
+####......................................R...............................................####n###....#######........gg.................................................................gg..Z...............................................%%%%
+####....f.............................h.h...h.h...........................................########....#######----..-------....hh...............iii..................................../###########...........................S......h.......%%%%
+####...====...............................................................................########....#######...............-------.....s....-------....hh..........gg.............../############.................................======...%%%%
+####......................................................................................########....#######........................######...........-------.......---............./#############...................F......................%%%%
+####.......f..............................................................................########....#######........................######...................#####................/###.........##.......................................f..%%%%
+####.......===...........g.g.....................................................iii......########....#######........................######...................#####....####......./####.........##.....................................=====%%%%
+####....................c####...................................................------.......w........#######........................######...................#####....####....../#####.........ww..........................................%%%%
+####.@.............b....c####...T....................r.........Y...........K.................w.....C..#######........................######...................#####....####..D../######..B...H..ww..t.....Y....Y...............T.L..........%%%%
+###############a####################..............#######e########------#######........######################........................######...................#####....###################qqq#####################--------############oooo######
 ####################################...U...V...X..################~~~~~~#######~~~~~~~~######################~~~~~~~~~~~~~~~~~~~~~~~~######~~~~~~~~~~~~~~~~~~~#####~~~~###########################################~~~~~~~~######################
 #########################################ddd######################~~~~~~#######~~~~~~~~######################~~~~~~~~~~~~~~~~~~~~~~~~######~~~~~~~~~~~~~~~~~~~#####~~~~###########################################~~~~~~~~######################
 ##################################################################~~~~~~#######~~~~~~~~######################~~~~~~~~~~~~~~~~~~~~~~~~######~~~~~~~~~~~~~~~~~~~#####~~~~###########################################~~~~~~~~######################
@@ -170,8 +170,8 @@ props/jungle/bush_dark 97 30
 props/jungle/skull_big 91.5 30
 props/jungle/moss_fringe 96 32
 props/jungle/vine_a 91 32
-props/jungle/fern 104 38
-props/jungle/grass_b 106 38
+props/jungle/fern 99 38
+props/jungle/grass_b 105 30
 props/jungle/grass_a 172 38
 props/jungle/fern 179 35
 props/jungle/tree_trunk 185 31
@@ -194,7 +194,6 @@ props/jungle/tree_canopy_light 221 36.75
 props/jungle/bush_light 226 38
 props/jungle/skull_big 231.5 38
 props/jungle/grass_a 233 38
-props/jungle/vine_b 104 34
 props/jungle/vine_a 109 34
 props/jungle/vine_b 117 33
 props/jungle/vine_a 120 33
@@ -247,15 +246,16 @@ objects/checkpoint 231.5 17
 # ---- co-op (DB1) ------------------------------------------------------------------------------------------------
 objects/hero_start 4 38 slot=2
 objects/sign 88 38 text=SIGN_COOP_W1_EGG
-# Gate 1 "hop": the springy flower became a ledge 8 rows over the dip beside it (Beginner: 7 - the static block
-# fills the dip's bottom row, LEVEL_DESIGN 15.7.3 / R18 the other way round, so the upper hero stands at the same
-# height in both modes and stays inside the tribe camera's view). The upper hero clubs the flower pot off the ledge:
-# it lands on the root as a spring for his partner (the gift).
-objects/sign 100 38 text=SIGN_COOP_W1_HOP
-objects/x2_tablet 102 37 gate=hop far=111,31
-objects/column 105 39 size=1,1 rise=0 beginner
-objects/flower_pot 106 31
-objects/sign 110 31 text=SIGN_COOP_W1_POT
+# Gate 1 "hop": the springy flower became a ledge 8 rows over the flat floor on both difficulties, its face where the
+# old step stood (G2 integration: a Totem Ride on an idle partner plus the corner catch climbs 7 rows, and the old
+# step beside the dip stood 6 rows under the ledge - world-B's search v2 reached it alone; LEVEL_DESIGN 15.7.2). One
+# hero Shoulder-Hops off his partner's head; up top he clubs the coiled vine at the edge, it drops down and the
+# partner climbs it (the gift). The far cell is 16 columns from the coil (a rolled vine counts as a booster within
+# reach of the far cell).
+objects/sign 97 38 text=SIGN_COOP_W1_HOP
+objects/x2_tablet 100 38 gate=hop far=117,31
+objects/vine 101 31 length=8 rolled
+objects/sign 104 30 text=SIGN_COOP_W1_VINE
 objects/checkpoint 135.5 33
 # Gate 2 "plates" (the Great Tree on the canopy road, travelled leftwards): A holds plate pa, door D1 of the lower
 # corridor opens and B walks through; B holds plate pb on the far side, door D2 of the upper corridor opens and A

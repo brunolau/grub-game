@@ -43,3 +43,10 @@ msgstr "Stand on the vent when it bubbles."
 # --- w6_l2b Heart of the Mangrove ---
 msgid "SIGN_W6_TIDE"
 msgstr "The tar is rising. Climb!"
+
+# --- w6_l2_coop Spore Hollow (co-op) ---
+msgid "SIGN_W6_COOP_SEESAW"
+msgstr "Drop onto the high end to throw your partner up!"
+
+msgid "SIGN_W6_COOP_DRUMS"
+msgstr "Strike both glowing drums at once to open the stalk."

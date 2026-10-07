@@ -149,6 +149,14 @@ func test_a_route_header_is_read_into_a_route_entry() -> void:
 	assert_eq(expect["fight_ticks"], [300, 300], "a single number is the range n..n")
 	assert_eq(Autoplay.parse_route_header("# route: level=a difficulty=expert ends=warp after=level:bonus_d " +
 			"expect=letters:2")["expect"]["letters"], [2], "a list of one")
+	# Helper mode (core-A / ui-B, DESIGN.md D.3): a co-op route recorded with it replays with it.
+	var helper: Dictionary = Autoplay.parse_route_header("# route: level=w5_l1_coop difficulty=beginner players=2 " +
+			"ends=exit helper=1")
+	assert_eq(helper["errors"], PackedStringArray())
+	assert_true(helper["helper"], "helper=1")
+	assert_false(full.has("helper"), "absent: no Helper mode")
+	var bad_helper: Dictionary = Autoplay.parse_route_header("# route: level=a difficulty=beginner ends=none helper=yes")
+	assert_eq(bad_helper["errors"].size(), 1, "helper is 0 or 1")
 
 
 func test_bad_route_headers_say_what_is_wrong() -> void:

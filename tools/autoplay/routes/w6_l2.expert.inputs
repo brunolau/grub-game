@@ -1,0 +1,9 @@
+# route: level=w6_l2 difficulty=expert ends=exit after=level:w6_l2b expect=hurts:0,min_checkpoints:4,min_kills:8
+# The Expert club route of Spore Hollow (designer D6; recorded from build/d6/bot_w6_l2.gd): the main path
+# without the letter and painting detours, through the Expert Puffcaps and bats. Never presses S.
+19:R,6:F,4:,1:R,6:F,4:,1:R,6:F,4:,1:R,6:F,4:,1:R,6:F,4:,21:R,6:F,4:,1:R,6:F,4:,1:R,6:F,4:,1:R,6:F,4:,1:R,6:F,4:
+1:R,6:F,4:,33:R,4:RU,6:R,2:,4:L,1:,35:R,1:,6:UF,4:,24:R,6:UF,4:,10:R,6:F,4:,1:R,6:F,4:,1:R,6:F,4:,1:R,6:F,4:
+52:R,3:,1:R,30:,16:R,2:,1:L,18:R,1:,6:UF,4:,51:R,6:F,4:,1:R,6:F,4:,1:R,6:F,4:,1:R,6:F,4:,23:R,7:,3:L,4:,6:RU
+44:R,1:,6:UF,4:,11:R,6:F,4:,1:R,6:F,4:,1:R,6:F,4:,1:R,6:F,4:,1:R,6:F,4:,1:R,6:F,4:,24:R,6:F,4:,2:R,6:F,4:,1:R
+6:F,4:,1:R,6:F,4:,74:R,6:F,4:,14:R,6:F,4:,1:R,6:F,4:,1:R,6:F,4:,1:R,6:F,4:,1:R,6:F,4:,37:R,6:F,4:,1:R,6:F,4:
+1:R,6:F,4:,1:R,6:F,4:,1:R,6:F,4:,1:R,6:F,4:,18:R,1:,6:UF,4:,67:R

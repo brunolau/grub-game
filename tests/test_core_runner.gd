@@ -76,6 +76,9 @@ func test_the_runner_lists_the_slow_modules_of_the_plan() -> void:
 	if not slow is PackedStringArray:
 		return
 	assert_true((slow as PackedStringArray).has("test_coop_gates.gd"), "the solo-impossibility search is slow")
+	for module: String in ["test_versus_bots.gd", "test_campaign_routes.gd", "test_book2_routes.gd",
+			"test_coop_routes.gd"]:
+		assert_true((slow as PackedStringArray).has(module), "%s is a slow module of PLAN.md V7" % module)
 	for file: String in slow as PackedStringArray:
 		assert_true(FileAccess.file_exists("res://tests/" + file), "%s exists" % file)
 		assert_true(file.begins_with("test_") and file.ends_with(".gd"))

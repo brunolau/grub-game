@@ -1,0 +1,16 @@
+# route: level=w6_l1 difficulty=beginner ends=exit after=tally expect=hurts:0,min_checkpoints:4,min_kills:8,letters:1
+# The Beginner club route of Bubbling Fen (designer D6; recorded from build/d6/bot_w6_l1.gd). Wades the first tar
+# field and hops out, climbs out of the tar pit on its vine, walks off the raised bank onto the raft, paddles it into
+# the current and, past it, with forward strikes facing back to the far bank; under the root deck; three head
+# bounces tame Chomper from the stump; rides him over the tar flats (stops and bites each slime and frog as it
+# comes, hops onto the island and the stump for letter R); off at checkpoint 3, the water bucket, the gnat thicket
+# and the exit totem. Never presses S and never takes the hammer (belt invariance).
+80:R,8:RU,7:R,6:UF,4:,14:R,6:F,4:,1:R,6:F,4:,24:R,6:F,4:,1:R,6:UF,4:,59:R,2:,1:R,2:,28:U,32:R,7:,1:L,1:F,6:,1:F
+1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,219:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:
+1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:
+1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:
+1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:
+1:F,1:,81:R,6:F,4:,2:R,6:F,4:,9:R,1:,6:UF,4:,24:R,6:F,4:,1:R,6:F,4:,1:R,6:F,4:,60:R,6:,1:R,2:,10:RU,1:R,2:,4:L
+1:,2:R,14:,16:RU,2:U,4:LU,4:U,13:RU,9:U,13:RU,9:U,13:RU,1:U,6:LU,22:U,39:R,1:,2:R,1:,1:R,1:F,1:,2:R,1:,18:R,17:
+1:F,5:,1:RU,39:R,1:RU,21:R,3:RU,33:R,1:F,1:,2:R,1:,21:R,8:,1:F,5:,18:R,1:,1:R,1:F,1:,2:R,1:,20:R,1:RU,39:R,4:
+1:F,5:,22:R,12:,2:UD,18:,12:R,6:UF,7:,6:F,4:,3:R,6:F,4:,7:R,6:F,4:,6:R,6:F,4:,1:R,6:F,4:,2:R,4:,6:F,4:,24:R

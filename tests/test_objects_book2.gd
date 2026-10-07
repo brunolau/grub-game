@@ -709,6 +709,31 @@ func test_a_raft_carries_its_rider() -> void:
 	assert_eq(hero.sim_pos.x - raft.sim_pos.x, dx, "carried along")
 
 
+## A hero falling onto a raft faster than its 4 px over the liquid cell used to die in the liquid before the ride
+## test caught him (wf8_D6_to_objects_b.txt #1): the deck catches him in his own move (Raft.catch_sinking, the G2
+## integration). Away from the raft the same fall still kills.
+func test_a_hero_falling_fast_onto_a_raft_lands_on_it() -> void:
+	_raft_level()
+	var raft: Raft = _raft(6)
+	Sim.step(1)
+	var top: int = raft.sim_pos.y - raft.box_h
+	var hero: Player = _player(Vector2i(raft.sim_pos.x, top - 4))
+	hero.yvel = 182
+	hero.grounded = false
+	run_inputs([[1, ""]])
+	assert_false(hero.dead, "caught by the deck, not drowned")
+	assert_true(hero.on_platform, "riding the raft")
+	assert_eq(hero.sim_pos.y, top + 1, "on the deck (PlayerBase.ride_platform)")
+	run_inputs([[6, ""]])
+	assert_false(hero.dead)
+	assert_true(raft.ridden, "the ride test keeps him")
+	var swimmer: Player = _player(Vector2i(14 * 16, top - 4))
+	swimmer.yvel = 182
+	swimmer.grounded = false
+	run_inputs([[1, ""]])
+	assert_true(swimmer.dead, "no raft under him: the liquid kills as before")
+
+
 func test_rails_keep_a_rider_on_the_raft() -> void:
 	_raft_level()
 	var raft: Raft = _raft(6, {"rails": true})

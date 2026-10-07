@@ -323,6 +323,42 @@ func _update_rails() -> void:
 			hero.fence_x(rail_left(), rail_right_excl())
 
 
+## A hero's own move carried his feet past a raft's deck into the liquid cell under it (the deck sits only
+## 4 px over the liquid cell; the PLATFORMS ride test ran before he moved): the raft catches him
+## instead of the liquid (wf8_D6_to_objects_b.txt #1, the G2 integration). Called by the hero's tile collision on a
+## liquid floor cell only, so a level without rafts (every 1.0 level) never gets here with a raft and still kills.
+## The feet must have been at or over the deck's ride band before this tick's y step and be at or under the deck now,
+## inside the raft's ride width (the PHYSICS.md 11.4 overlap with Tuning.HERO_BOX_RIDE). True when he was caught (he
+## rides it now: PlayerBase.ride_platform, carried this tick).
+static func catch_sinking(level: LevelBase, hero: PlayerBase) -> bool:
+	if hero.dead or hero.down or hero.yvel <= Tuning.PLATFORM_RIDE_MIN_YVEL_EXCL 			or hero.carried_on_tick == Sim.total_ticks:
+		return false
+	var before: int = hero.sim_pos.y - (hero.yvel >> 4)
+	var ride: Vector3i = Tuning.HERO_BOX_RIDE
+	for entity: SimEntity in level.get_kind(Defs.Kind.PLATFORM):
+		var raft: Raft = entity as Raft
+		if raft == null or raft.flying:
+			continue
+		var top: int = raft.sim_pos.y - raft.box_h
+		if before > top + raft.box_h or hero.sim_pos.y < top:
+			continue
+		# The 1.0 overlap (halved width for bodies) of the hero's ride box and the deck, from the deck to his feet.
+		var saved_stomp: bool = Overlap.stomp
+		var saved_depth: int = Overlap.depth
+		var hit: bool = Overlap.test(hero.sim_pos.x, hero.sim_pos.y, ride.x, ride.y, ride.z,
+				raft.sim_pos.x, hero.sim_pos.y + 1, raft.box_w, hero.sim_pos.y + 1 - top, raft.box_xo,
+				false, hero.yvel, 1)
+		Overlap.stomp = saved_stomp
+		Overlap.depth = saved_depth
+		if not hit:
+			continue
+		hero.carried_on_tick = Sim.total_ticks
+		hero.ride_platform(raft, 0, 0)
+		raft.rider_mask |= 1 << hero.slot
+		return true
+	return false
+
+
 static func _stands_on_floor(level: LevelBase, hero: PlayerBase) -> bool:
 	return hero.grounded and hero.yvel == 0 \
 			and TileGrid.is_ground(level.grid.floor_at(hero.sim_pos.x >> 4, hero.sim_pos.y >> 4))

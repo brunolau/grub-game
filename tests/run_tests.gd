@@ -9,7 +9,9 @@ extends SceneTree
 ##       methods whose name contains "world_2"; with gd.sh: bash .tools/gd.sh test campaign --only=world_2)
 ##   godot --headless --path . -s res://tests/run_tests.gd -- --user-dir=res://build/test_user_2   (parallel runs)
 ##   godot --headless --path . -s res://tests/run_tests.gd -- --slow   (also the slow modules; with gd.sh:
-##       GD_TIMEOUT=900 bash .tools/gd.sh test --slow)
+##       GD_TIMEOUT=4000 bash .tools/gd.sh test --slow - or each by name, in parallel:
+##       bash .tools/gd.sh test campaign_routes / book2_routes / coop_routes, GD_TIMEOUT=3600 ... test coop_gates
+##       (COOP_GATES_SHARD=<i>/<n> splits it), GD_TIMEOUT=1800 ... test versus_bots)
 ##
 ## Slow modules (docs/expansion/PLAN.md 8 V7: the default run stays under about 5 minutes; a slow module runs at every
 ## gate and before every merge that touches its area): SLOW_FILES are left out of a run - a `skip` line names each one
@@ -31,10 +33,16 @@ extends SceneTree
 const TEST_DIR: String = "res://tests"
 const TEST_PREFIX: String = "test_"
 const TEST_USER_DIR: String = "res://build/test_user"
-## The slow modules (see the header): the solo-impossibility search of every co-op gate (about 70 s at G1, growing
-## with every co-op file of phase 3) and the versus bot matches on every (arena, mode) (PLAN.md 8 V4.b, core-B; a
-## few minutes, growing with every arena).
-const SLOW_FILES: PackedStringArray = ["test_coop_gates.gd", "test_versus_bots.gd"]
+## The slow modules (see the header): the solo-impossibility search of every co-op gate (about 1.5 min per gate and
+## difficulty since world-B's search v2; 25 min for the 18 gates of G2, growing with every co-op file of phase 3) and
+## the versus bot matches on every (arena, mode) (PLAN.md 8 V4.b, core-B; about 12 min at G2, growing with every
+## arena) - and, since the G2 integration (PLAN.md V7 names them: `campaign_routes`, `book2`, `coop`), the route
+## replays through Flow: every Book I route (test_campaign_routes, about 1-1.5 min), every Book II solo route
+## (test_book2_routes, about 1 min and growing to 31 + featured routes) and every two-stream co-op route
+## (test_coop_routes, about 1.5 min and growing to 57 routes). The default run keeps the Book I identity guards
+## (test_core_players, test_core_book1_frozen; tools/sp_identity.sh replays every Book I route's digest).
+const SLOW_FILES: PackedStringArray = ["test_book2_routes.gd", "test_campaign_routes.gd", "test_coop_gates.gd",
+	"test_coop_routes.gd", "test_versus_bots.gd"]
 
 
 ## Counts engine errors (push_error, script errors, failed engine checks) while a test runs.

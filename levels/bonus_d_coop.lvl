@@ -1,0 +1,116 @@
+# Club & Grub - Feast Land D: "Honey Falls" (designer D5, Book II "The Far Shore"), the bonus stage of 5-2.
+# Food-made and enemy-light like Feast Lands A-C (DESIGN.md A.2 / A.3, GAMEPLAY.md 13.2): honey floors (`:` - the tar
+# rules in a candy skin, `liquid = honey`), soda geysers that lift the hero onto comb cliffs, and honeycomb walls full
+# of spots. A sign teaches the honey before its first pool and another the soda vent before the first geyser; a comb
+# mound with a big spot on top, the comb cliff with a second honey pool, the honey falls stepping down to the floor,
+# a side tower whose geyser leads to the Cave Painting (index 17) in a nook behind a breakable wall, and the spiral
+# staff (items/warp) on its stand, which ends the stage and its source level. No enemies, no pits.
+[meta]
+format = 2
+id = bonus_d_coop
+name = "Feast Land D"
+kind = coop
+coop_of = bonus_d
+coop_base_hash = "b7dc33fd079b3200e75f75eddad78c7e91ac4d4e47c35724ba2156355c61b81b"
+book = 2
+order = 0
+world = 0
+stage = 0
+biome = feast
+terrain_a = feast/terrain_honeycomb
+terrain_b = feast/terrain
+background = feast
+music = bonus
+liquid = honey
+bonus_tier = 1
+author = D5
+notes = "Bonus stage D, entered from w5_l2 (meta bonus = bonus_d). 45-90 s. No level codes: only the warp leads here."
+
+[legend]
+a = objects/hidden_spot kind=small count=3 contents=food:24,food:25,food:26 look=inset tile=#
+b = objects/hidden_spot kind=small count=2 contents=treasure:1,food:27 tile=#
+c = objects/hidden_spot kind=small count=3 contents=food:28,food:29,treasure:3 look=inset tile=#
+B = objects/hidden_spot kind=big hits=3 contents=giant:2 look=block tile=#
+
+[tiles]
+#......................................................................................................................#
+#......................................................................................................................#
+#......................................................................................................................#
+#......................................................................................................................#
+#......................................................................................................................#
+#......................................................................................................................#
+#......................................................................................................................#
+#......................................................................................................................#
+#......................................................................................................................#
+#......................................................................................................................#
+#......................................................................................................................#
+#......................................................................................................................#
+#......................................................................................................................#
+#......................................................................................................................#
+#......................................................................................................................#
+#..............................................................................................###.....................#
+#.............................................................................................$..#.....................#
+#.............................................................................................$..#.....................#
+#...................................................#########:::::::######..................######.....................#
+#...................................................######################..................######.....................#
+#............................####B####..............#########################...............######.....................#
+#............................a########..............########################c...............######.....................#
+#..........................#############............a###########################............a#####.....................#
+#..@.......................#############............b###########################............b#####..............%%%%...#
+##############::::::::::##############################################################################::::::::##########
+########################################################################################################################
+########################################################################################################################
+########################################################################################################################
+########################################################################################################################
+########################################################################################################################
+
+[entities]
+# --- the honey pool of the sign
+objects/sign 9 23 text=SIGN_W5_HONEY
+props/feast/honey_pot 6 23
+props/feast/jelly_pink 11 23
+items/food 15 21 index=30
+items/food 17 20 index=31
+items/food 19 20 index=32
+items/food 21 21 index=33
+props/feast/comb_chunk 25 23
+# --- the comb mound
+items/food 30 18 index=34
+items/food 32 17 index=35
+items/food 34 17 index=36
+items/food 36 18 index=37
+props/feast/jelly_green 41 23
+# --- the first soda geyser and the comb cliff
+objects/sign 44 23 text=SIGN_W5_SODA
+objects/geyser 49 23 skin=soda period=66
+items/food 49 16 index=38
+items/food 49 14 index=39
+objects/checkpoint 55 17
+props/feast/honey_pot 57 17
+items/food 62 15 index=40
+items/food 64 14 index=41
+items/food 66 15 index=42
+props/feast/comb_chunk 70 17
+# --- the honey falls
+items/food 75 18 index=43
+items/food 78 20 index=44
+items/food 81 22 index=45
+objects/hidden_spot 84 23 kind=small count=2 contents=food:46,food:47 prop=feast/honey_pot
+props/feast/jelly_pink 87 23
+# --- the side tower: a geyser to its top, the painting in the nook behind the wax wall
+objects/geyser 90 23 skin=soda period=66 delay=33
+zones/secret 95 17 name=honey_nook rect=95,16,2,2
+items/painting 95 17 index=17
+items/treasure 96 17 index=11
+items/food 93 16 index=0
+props/feast/comb_chunk 100 23
+# --- the last pool and the warp
+items/food 103 22 index=1
+items/food 105 21 index=2
+items/food 107 21 index=3
+items/food 109 22 index=4
+props/feast/jelly_green 111 23
+items/warp 114 22
+props/feast/honey_pot 117 23
+# --- co-op (bonus_d_coop): P2's start; a Feast Land in co-op has only the team exit (DESIGN.md D.8 / D.10)
+objects/hero_start 2 23 slot=2

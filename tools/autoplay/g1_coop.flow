@@ -24,7 +24,7 @@ key Space
 key Kp_0
 wait 10
 shot join_two
-hold Shift Kp_Enter
+hold Ctrl Kp_Enter
 # Ready = Strike held for 1 s of real time (PartyTuning.JOIN_READY_HOLD_TICKS); the panel opens the book select by
 # itself 0.6 s after both are ready (ui-A's REPLY in build/engine_requests/wf7_integration_to_ui-A.txt).
 wait_until flow.current_screen == book_select 600

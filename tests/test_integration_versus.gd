@@ -2,7 +2,7 @@ extends TestCase
 ## Versus on one keyboard, end to end (owner: integration; docs/expansion/PLAN.md P1.3, DESIGN.md D.11 / E.9: "must be
 ## proven by a scripted two-player versus match driven only by those keys").
 ##
-## Two humans share one keyboard in the classic layout - P1 W A S D + Space (jump) + Left Shift (strike) + E (swap) +
+## Two humans share one keyboard in the classic layout - P1 W A S D + Space (jump) + Left Ctrl (strike) + E (swap) +
 ## Q (look), P2 Num 8 4 5 6 + Num 0 + Num Enter + Num + + Num . - and play a Grub Stack match that Flow starts
 ## (Flow.start_versus with two human seats on the keyboard halves). Nothing is scripted: the test presses and releases
 ## physical keys through Input, tick by tick, and the heroes, the referee, the gong and the match result follow from
@@ -12,7 +12,7 @@ extends TestCase
 
 ## Classic layout: per player, flag -> physical key.
 const CLASSIC: Array[Dictionary] = [
-	{Defs.IN_LEFT: KEY_A, Defs.IN_RIGHT: KEY_D, Defs.IN_UP: KEY_SPACE, Defs.IN_DOWN: KEY_S, Defs.IN_FIRE: KEY_SHIFT,
+	{Defs.IN_LEFT: KEY_A, Defs.IN_RIGHT: KEY_D, Defs.IN_UP: KEY_SPACE, Defs.IN_DOWN: KEY_S, Defs.IN_FIRE: KEY_CTRL,
 		Defs.IN_LOOK: KEY_Q, Defs.IN_SWAP: KEY_E},
 	{Defs.IN_LEFT: KEY_KP_4, Defs.IN_RIGHT: KEY_KP_6, Defs.IN_UP: KEY_KP_0, Defs.IN_DOWN: KEY_KP_5,
 		Defs.IN_FIRE: KEY_KP_ENTER, Defs.IN_LOOK: KEY_KP_PERIOD, Defs.IN_SWAP: KEY_KP_ADD},

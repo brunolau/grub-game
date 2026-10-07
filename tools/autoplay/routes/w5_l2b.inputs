@@ -1,0 +1,19 @@
+# route: level=w5_l2b difficulty=beginner ends=exit after=tally expect=hurts:0,painting:2,secrets:1,boss_hits:6,unlocked:true,min_checkpoints:1
+# The Beginner club route of Tusker's Wallow (designer D5; recorded from closed-loop macros, build/d5). It never
+# presses S, so the belt-invariance runner sees the same digests whatever special rides on the belt.
+# Over the sand hump; three low strikes open the spot in the floor
+4:,20:R,8:,8:DF,6:,8:DF,6:,8:DF,6:
+# Onto the step and the mesa, off its far side; strikes break the wall of the painting's chamber
+8:R,10:RU,10:R,12:RU,22:R,21:,1:L,3:,8:F,8:,8:F,8:,8:F,8:,8:F,8:,17:L,2:,13:R
+# Out of the chamber; the rattler from outside its reach
+24:R,2:,8:F,6:
+# The tortoise as it comes, the checkpoint
+5:R,13:,8:F,8:,30:R
+# Down the shaft into Tusker's pit
+19:R,20:
+# The club bot of the boss test: wait on a bank, club the head while it lies open
+24:LU,12:L,3:R,19:,11:R,5:F,3:L,1:R,31:F,4:L,12:LU,12:L,3:R,53:,10:R,5:F,3:L,1:R,32:F,6:L,12:LU,12:L
+3:R,47:,2:L,5:R,17:,3:L,4:R,34:,10:R,3:F,6:L,1:R,7:F,4:L,12:LU,12:L,3:R,25:,11:R,3:F,6:L,1:R,6:F
+9:LU,12:L,2:R,22:
+# Down into the pit for the fire-starter, through the wallow, onto the right bank and into the exit totem
+13:,6:R,12:RU,33:R,10:RU,2:R

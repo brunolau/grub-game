@@ -86,7 +86,7 @@ const HEADLESS_FLOW: String = "res://scripts/core/dev/headless_flow.gd"
 const ROUTE_HEADER: String = "# route:"
 ## The keys a route header may have.
 const ROUTE_HEADER_KEYS: PackedStringArray = [
-	"level", "difficulty", "players", "ends", "after", "belt", "then", "source", "prefix", "expect",
+	"level", "difficulty", "players", "ends", "after", "belt", "then", "source", "prefix", "expect", "helper",
 ]
 ## The checks a route header's `expect` may name (the route tests implement every one): the 1.0 keys of
 ## tests/test_campaign_routes.gd ROUTES and the 2.0 keys of docs/LEVEL_DESIGN.md 15.9.
@@ -326,7 +326,8 @@ func input_players(script: String) -> int:
 ## tests/test_campaign_routes.gd: "level", "modes" (["beginner"], ["expert"] or both), "players" (1..4), "leaves"
 ## ("exit", "warp", "trophy"; "" for `ends=none`), "after" ("tally" or "level:<id>"; `expert_wall` and `the_end`
 ## become "after": "tally" plus "tally_to" {mode: value}), "belt" (Defs.Weapon on the belt at the start,
-## PlayerRun.BELT_EMPTY for none), "then", "source", "prefix" ([route file, marker]) and "expect" (key -> int, bool,
+## PlayerRun.BELT_EMPTY for none), "then", "source", "prefix" ([route file, marker]), "helper" (true for `helper=1`:
+## a co-op route recorded in Helper mode, DESIGN.md D.3) and "expect" (key -> int, bool,
 ## [low, high] for ROUTE_RANGE_KEYS, [a, b, ...] for ROUTE_LIST_KEYS, a weapon name -> Defs.Weapon). Also
 ## "header": true and "errors": PackedStringArray (empty for a valid header). The header is the first non-blank line
 ## of `text`; a text without one gives {} (a 1.0 route, described by the ROUTES table).
@@ -394,6 +395,12 @@ func parse_route_header(text: String) -> Dictionary:
 					errors.append("prefix=%s (<route file>@<marker>)" % value)
 			"expect":
 				spec["expect"] = _parse_expect(value, errors)
+			"helper":
+				# Helper mode of a co-op route (DESIGN.md D.3; Game.helper_mode after Game.start_run).
+				if value == "1" or value == "0":
+					spec["helper"] = value == "1"
+				else:
+					errors.append("helper=%s (0 or 1)" % value)
 	for required: String in ["level", "modes", "leaves"]:
 		if not spec.has(required):
 			errors.append("no %s" % {"level": "level=", "modes": "difficulty=", "leaves": "ends="}[required])

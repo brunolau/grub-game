@@ -50,6 +50,8 @@ func flush() -> String:
 	var target: String = _path if _files == 1 else "%s.%d.%s" % [_path.get_basename(), _files, _path.get_extension()]
 	var header: String = "%s level=%s difficulty=%s players=%d ends=%s" % [Autoplay.ROUTE_HEADER, _level_id,
 			Defs.difficulty_name(_difficulty), _streams.size(), _ends]
+	if Game.helper_mode:
+		header += " helper=1"  # recorded in Helper mode: the route replays with it (DESIGN.md D.3)
 	var note: String = "# recorded with --record: %d ticks of %s, seed 1; add after= and expect= to the header" % [
 			_streams[0].size(), _level_id]
 	var text: String = Autoplay.format_inputs(_streams, PackedStringArray([header, note]))

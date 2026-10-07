@@ -1,0 +1,28 @@
+# route: level=bonus_d_coop difficulty=both players=2 source=w5_l2_coop ends=warp after=tally expect=no_enemies:true,eggs:0,wipes:0,painting:17,secrets:1,min_spots:6
+# The two-stream route of Feast Land D "Honey Falls" in co-op (designer D5; P1|P2, recorded from closed-loop duo
+# macros, build/d5) on both difficulties: P1 opens the spots, P2 follows a few steps behind and takes each soda vent
+# after him; club only, no S (belt invariance).
+# Into the honey pool: wade and hop for the food
+8:R|,25:R|R,3:RU|R,4:R|R,3:R|RU,11:R|R,6:RU|R,1:R|R,6:R|RU,10:R|R,7:|R
+# P1 onto the step: three strikes at the spot in the mound's face; onto the mound, three low strikes at the big spot
+# while P2 waits; then P2 over the mound
+17:R|,7:|,4:RU|,8:U|,6:|,3:R|,4:|,8:F|,8:|,8:F|,8:|,8:F|,8:|,6:RU|,15:R|,7:|,1:L|,2:|,8:DF|,8:|
+8:DF|,6:|,2:|R,8:DF|R,17:|R,7:|,4:|RU,8:|U,13:|,8:|RU,13:|R,7:|
+# Down off the mound: P1 strikes the spots in the comb cliff's face, P2 waits by the soda vent
+16:R|,37:R|R,4:|R,3:|,8:F|,8:|,8:F|,8:|,8:F|,8:|,8:F|,8:|,8:F|,8:|
+# The vent fizzes and throws P1 up onto the cliff (checkpoint 1), then P2
+6:L|,41:|,19:R|,5:R|R,5:R|,2:|,1:|R,2:|,1:|R,2:|,1:|R,28:|,19:|R,7:|
+# Across the comb cliff and its honey pool, hopping for the food; down the honey falls
+8:R|,2:RU|,1:RU|R,12:R|R,3:R|RU,3:R|R,6:RU|R,9:R|R,6:R|RU,23:R|R,7:|R,1:L|R,2:|R,6:F|R,2:F|,8:|,8:F|
+8:|,8:F|,8:|
+# To the honey pot and its two treats, then the spots in the tower's face
+16:R|,4:|,3:|R,8:F|R,7:|R,1:|,8:F|,8:|,28:R|,1:|,8:F|,8:|,8:F|,8:|,8:F|,8:|,8:F|,8:|,8:F|,8:|
+# The second vent throws P1 onto the comb tower; he breaks the wax wall of the nook; P2 waits by the vent
+4:L|,16:|,21:|R,1:|,6:R|,1:R|R,2:R|,1:R|R,2:R|,1:|R,6:|,8:F|,8:|,8:F|,8:|,8:F|,8:|
+# P1 into the nook: the Cave Painting; the vent throws P2 onto the tower
+10:R|,1:R|R,3:|R,6:|,1:|R,2:|,1:|R,2:|,1:|R,2:|,1:|R,2:|,1:|R,2:|,1:|R,2:|,1:|R,2:|,1:|R,2:|,1:|R
+20:|,11:|R,8:|
+# Both over the wax wall and the nook's roof
+4:|,10:L|,7:|,12:RU|,7:R|,3:|,12:|RU,4:|R,7:|
+# Off the roof, through the last honey pool with hops for the food, onto the stand: the spiral staff
+14:R|,3:RU|,3:R|,6:R|R,9:R|,6:RU|,4:R|R,3:R|RU,4:R|R,5:RU|R,3:RU|RU,3:R|R,10:|R,3:|RU,2:|R,3:R|R

@@ -984,8 +984,12 @@ func _collide(level: LevelBase, body_height: int) -> void:
 			else:
 				airborne = true
 		elif floor_value == TileGrid.FLOOR_DEADLY:
-			kill(_tile_death_cause(grid, col, row))
-			return
+			# 2.0: a raft whose deck his feet just crossed catches him before the liquid under it (Raft.catch_sinking;
+			# a level without rafts - every 1.0 level - kills as before).
+			if grid.get_char(col, row) != TileGrid.CH_LIQUID or not Raft.catch_sinking(level, self):
+				kill(_tile_death_cause(grid, col, row))
+				return
+			airborne = true
 		elif floor_value == TileGrid.FLOOR_HATCH and drop_timer != 0:
 			ice = 0
 			airborne = true

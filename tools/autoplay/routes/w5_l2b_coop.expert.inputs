@@ -1,0 +1,27 @@
+# route: level=w5_l2b_coop difficulty=expert players=2 ends=exit after=tally expect=eggs:0,wipes:0,painting:2,unlocked:true
+# The Expert two-stream route of Tusker's Wallow in co-op (designer D5; P1|P2, recorded from closed-loop duo macros
+# and a duo bot, build/d5). Club only, no S (belt invariance). The co-op Tusker (DESIGN.md B.1): while it lies open
+# it faces the nearer caveman, so one hero stands at its head and the other clubs its leafy rump; in phase 3 both
+# crouch side by side (a Brace Wall) and club it while it is dazed.
+# Both jump the shellback tortoise (Expert); onto the step and the mesa, off its far side; P1 breaks the
+# wall of the painting's chamber and takes the Cave Painting
+4:|,5:R|,21:|,5:|R,1:RU|R,9:RU|,14:R|,10:RU|,15:R|,12:RU|,7:R|,10:R|RU,5:R|R,12:|R,8:|RU,1:L|RU
+1:|RU,12:|R,12:|RU,12:|R,9:|,8:UF|,8:|,1:L|,3:|,8:F|,8:|,8:F|,8:|,8:F|,8:|,8:F|,8:|,15:L|,2:L|R,2:|R
+3:R|R,9:R|
+# P1 clubs the rattler from outside its reach; both jump the shellback tortoise; checkpoint
+17:R|,7:|,1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,2:|
+1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,6:F|,4:R|R,3:|R,9:RU|R,1:RU|
+21:R|,8:R|RU,2:|RU,37:|R,7:|
+# P2 drops down the shaft into Tusker's pit (the arena takes P1 along onto the left bank); P2 to the right bank
+49:|R,10:|RU,12:|R
+# The duo bot: rump pincers while the boar lies open, then the Brace Wall of phase 3
+3:L|L,5:L|,1:|,3:R|,5:|,19:R|L,2:|F,6:L|R,6:|R,1:|L,5:|F,7:L|F,3:LU|F,6:LU|R,2:L|R,8:L|RU,1:R|RU
+2:R|R,9:|R,2:|L,98:|,18:R|L,1:R|,1:F|,1:F|R,7:L|R,2:L|,1:R|,2:F|L,6:F|,7:F|R,3:F|RU,6:L|RU,6:L|R
+4:LU|R,2:LU|L,3:LU|,12:L|,4:R|,91:|,18:R|L,1:|L,2:|F,4:L|R,7:|R,1:|L,6:|F,8:L|F,2:LU|F,7:LU|R,9:L|RU
+1:L|R,2:R|R,8:|R,1:|L,73:|,2:L|R,3:R|L,1:R|,18:|,3:L|R,1:R|L,3:R|,9:|,13:R|L,2:R|,4:R|R,1:|R,1:|
+3:L|,3:L|L,1:R|L,3:F|L,2:F|,5:F|R,2:F|,3:F|R,6:F|RU,3:L|RU,8:L|R,2:LU|R,1:LU|L,6:LU|,10:L|,3:R|,74:|
+3:L|R,2:R|L,21:|,2:L|R,3:R|L,1:|L,9:|,13:R|L,2:|L,4:L|L,2:|,2:|R,6:R|R,1:R|L,1:R|F,2:|F,5:L|F,2:|F
+3:L|F,7:LU|F,2:LU|R,7:L|R,2:L|D,1:L|L,5:R|L,3:R|D,1:|D,9:RU|D,19:R|D,20:D|D,6:R|D,2:D|D,6:L|D
+167:D|D,2:F|F,45:D|D
+# Both wait for the bonus burst to land; P1 picks up the fire-starter on the right bank; both into the exit totem
+42:|,7:R|,10:RU|,3:R|,5:R|R,10:R|RU,2:R|R

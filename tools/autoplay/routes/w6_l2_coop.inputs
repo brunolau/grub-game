@@ -1,0 +1,16 @@
+# route: level=w6_l2_coop difficulty=beginner players=2 ends=exit after=tally expect=wipes:0,eggs:0,x2_gates:2,min_checkpoints:4
+# The Beginner two-stream route of Spore Hollow in co-op (designer D6; recorded from build/d6/bot_w6_l2_coop.gd, P1|P2):
+# gate 'seesaw' (P2 springs onto the cap ledge and drops on the high end, P1 flies up and unrolls the vine, P2
+# climbs it), the geyser and the shelf passage one after the other, gate 'caps' (P1 at the floor drum, P2 on the
+# cap ledge, both strike on the same tick), the lower hall and the team exit. Club only, never S.
+12:R|,44:R|R,24:R|,7:|,4:|RU,5:|R,1:|,5:|L,1:|,22:|R,1:|,4:|L,4:|,5:|R,4:|,1:|R,4:|,6:|R,13:|,19:R|,2:|,6:L|
+7:|,1:DF|,14:|,1:DF|,14:|,1:DF|,14:|,1:DF|,14:|,1:DF|,14:|,1:DF|,14:|,1:DF|,14:|,1:DF|,14:|,1:DF|,14:|,1:DF|
+14:|,1:DF|,14:|,1:DF|,14:|,1:DF|,14:|,1:DF|,14:|,1:DF|,14:|,1:DF|,14:|,1:DF|,14:|,1:DF|,14:|,1:DF|,14:|,1:DF|
+14:|,1:DF|,14:|,1:DF|,14:|,1:DF|,14:|,1:DF|,14:|,1:DF|,14:|,1:DF|,14:|,1:DF|,10:|,16:|R,3:|,1:|R,5:|,73:|U,1:|
+29:R|,37:R|R,6:F|R,4:|R,2:R|R,6:F|R,4:|R,1:R|R,6:F|R,2:|R,2:|F,1:R|F,3:F|F,3:F|,1:|,3:|R,10:R|R,33:R|,14:|
+16:R|,2:|,1:L|,21:R|R,6:F|R,3:|R,1:|,1:R|,4:F|,1:F|R,1:F|,4:|,1:R|,6:UF|,4:|,16:R|,4:R|R,1:L|R,6:UF|R,4:|R
+1:R|R,2:R|,1:R|L,8:R|R,29:|R,28:R|R,2:UF|R,4:UF|UF,2:|UF,2:|,2:R|,17:R|R,1:UF|R,1:R|R,6:R|UF,4:R|,1:R|R,1:|R
+3:|,6:RU|,25:R|,4:R|R,6:R|,6:R|RU,4:R|R,1:|R,6:UF|R,4:|R,11:R|R,6:F|R,4:|R,1:R|R,6:F|R,4:|R,1:R|R,6:F|R,4:|R
+24:R|R,6:F|F,4:|,1:R|R,1:R|F,5:F|F,1:F|,3:|,1:|R,1:R|F,5:F|F,1:F|,3:|,1:|R,1:R|F,5:F|F,1:F|,3:|,1:|R,1:R|R
+6:UF|UF,4:|,49:R|R,1:R|F,6:F|F,4:|,15:R|R,7:|R,2:L|R,6:|R,2:R|R,11:|R,7:|,4:|RU,6:|R,1:|,5:|L,1:|,23:|R,6:|
+1:|R,2:|,1:|F,7:F|F,1:F|,61:|,1:|R,146:R|R

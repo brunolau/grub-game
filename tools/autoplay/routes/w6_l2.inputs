@@ -1,0 +1,11 @@
+# route: level=w6_l2 difficulty=beginner ends=exit after=level:w6_l2b expect=hurts:0,min_checkpoints:4,min_kills:6,letters:2,painting:4,secrets:1
+# The Beginner club route of Spore Hollow (designer D6; recorded from build/d6/bot_w6_l2.gd): the first spring
+# cap, the upper passage, the spore geyser to the shelf passage, the letter geyser's drop platform to letter U, the
+# painting's spring cap into the dark chamber (three strikes open the big spot: Cave Painting 4), the feast kit,
+# the densest stretch in feast mode, the lower hall and the exit into the Heart of the Mangrove. Never presses S.
+41:R,6:F,4:,2:R,6:F,4:,1:R,6:F,4:,1:R,6:F,4:,33:R,4:RU,6:R,2:,4:L,1:,35:R,1:,6:UF,4:,34:R,6:F,4:,1:R,6:F,4:,1:R
+6:F,4:,1:R,6:F,4:,1:R,6:F,4:,1:R,6:F,4:,52:R,3:,1:R,92:,14:R,1:,5:L,1:,30:R,1:,6:UF,4:,23:R,2:,1:R,6:,3:RU,2:U
+3:LU,30:,14:R,1:,5:L,7:,5:R,7:,38:R,11:L,7:,6:R,2:,1:R,6:,4:RU,7:R,1:,5:L,1:,17:R,1:,5:L,1:,13:R,6:,1:R,2:,1:F
+18:,1:F,18:,1:F,45:,6:RU,2:R,2:,4:L,2:,4:R,2:,1:L,6:,34:L,2:,1:R,3:L,7:,6:RU,45:R,1:,6:UF,4:,11:R,6:F,4:,1:R
+6:F,4:,1:R,6:F,4:,1:R,6:F,4:,1:R,6:F,4:,1:R,6:F,4:,24:R,6:F,4:,2:R,6:F,4:,1:R,6:UF,4:,1:R,6:F,4:,74:R,6:F,4:
+14:R,6:F,4:,1:R,6:F,4:,1:R,6:F,4:,1:R,6:F,4:,1:R,6:F,4:,57:R,1:,6:UF,4:,67:R

@@ -1,0 +1,12 @@
+# route: level=w6_l2b difficulty=expert ends=exit after=tally expect=max_hurts:1,min_checkpoints:4,boss_hits:16,unlocked:true
+# The Expert club route of Heart of the Mangrove (designer D6; recorded from build/d6/bot_w6_l2b.gd): the climb
+# without the painting detour at 1.25 px per tick of tar, Old Mangrove's Expert form (6 / 5 / 5 hits), the
+# fire-starter and the exit totem. A burrowing bug lands one hit.
+15:R,6:,1:R,2:,1:R,2:,293:U,3:L,4:,171:U,3:R,3:,1:R,3:,297:U,35:R,3:,1:R,7:,2:L,6:,3:R,4:,13:R,116:,19:R,7:,9:U
+13:,1:R,9:UF,15:L,1:,2:L,46:,17:R,10:L,9:LU,10:L,4:R,36:L,4:,10:L,4:,10:L,4:,10:L,4:,36:R,7:,9:U,13:,1:R,9:UF
+15:L,1:,3:L,5:,4:R,36:,18:R,9:UF,13:L,5:LU,12:U,89:,18:R,9:UF,13:L,5:LU,23:R,7:,9:U,13:,1:R,9:UF,15:L,1:,2:L,6:
+2:R,52:,19:R,7:,9:U,13:,1:R,9:UF,15:L,1:,2:L,88:,19:R,7:,9:U,13:,1:R,9:UF,15:L,1:,2:L,32:,18:R,9:UF,13:L,5:LU
+23:R,7:,9:U,13:,1:R,9:UF,15:L,1:,3:L,3:,34:D,3:R,1:L,1:UF,3:,11:UF,3:,11:UF,3:,8:UF,21:D,42:,59:D,44:UF,21:D
+42:,59:D,8:UF,11:R,80:L,1:R,6:F,1:,4:L,3:,132:L,6:R,2:F,122:L,1:R,6:F,1:,4:L,3:,141:L,6:R,7:F,4:L,4:,10:L,1:R
+6:F,1:,4:L,3:,162:L,6:R,2:F,94:L,1:R,6:F,1:,4:L,3:,143:L,6:R,7:F,4:L,4:,10:L,1:R,6:F,1:,4:L,3:,89:L,1:R,6:F,1:
+4:L,2:,3:L,1:,96:L,7:R,3:F,7:L,1:R,1:F,10:R,3:F,6:L,1:R,17:F,28:R,12:L,13:R,5:L,10:R,27:L

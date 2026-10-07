@@ -1,0 +1,36 @@
+# route: level=w5_l2_coop difficulty=beginner players=2 ends=exit after=level:w5_l2b_coop expect=hurts:0,eggs:0,wipes:0,x2_gates:2,letters:0,min_checkpoints:4
+# The Beginner two-stream route of Rattlesnake Gulch in co-op (designer D5; P1|P2, recorded from closed-loop duo
+# macros, build/d5). Both heroes keep the club (no S): the belt-invariance runner sees the same digests whatever
+# special rides on either belt. Both co-op gates are crossed together: 'sandgate' (the vertical leapfrog of plates pa
+# and pb with the gift vine) and 'rattlers' (the bonded keepers of the hall, one hero at each).
+# Band A: P1 jumps the shellback tortoise and clubs the rattler from outside its reach; P2 follows; up the first vine
+27:R|,3:|,24:|R,1:|,10:RU|,26:R|,7:|,1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,2:|
+1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,2:|R,1:R|R,2:|R,1:R|R,2:|,1:R|,2:|,1:R|,6:F|,18:R|,10:R|RU
+13:R|R,10:RU|R,20:R|R,7:|R,1:R|R,2:|R,1:R|R,2:|R,1:R|R,2:|R,1:R|RU,2:|RU,1:R|RU,2:|RU,1:R|RU,2:|RU
+1:U|RU,10:U|R,86:U|,12:L|R,3:|R,7:|,1:|R,2:|,1:|R,2:|,1:|R,2:|,1:|R,2:|,1:|R,2:|,97:|U
+# Gate sandgate: P1 holds plate pa (the sand gate D1 rises), P2 walks through it to plate pb in the dead end
+1:|L,25:L|L,12:|L,17:|,57:|L,7:|
+# The gate D2 at the top of the vine rises: P1 climbs the vine, walks through D2 and strikes the rolled vine down into
+13:L|,7:|,97:U|,17:L|,1:L|R,2:L|,1:L|R,2:L|,1:L|R,2:L|,1:L|R,2:L|,1:L|R,2:|,1:|R,2:|,1:|R,1:|,1:L|
+1:|R,1:|,1:F|,1:F|R,2:F|,1:F|R,2:F|,1:F|U,8:|U,45:L|U,28:|U
+# Both up the third vine to band D (P1 first)
+10:R|L,7:|L,1:R|L,2:|L,1:R|L,2:|L,1:R|L,2:|L,1:R|L,2:|,97:U|,8:R|,1:R|L,1:R|,1:|,1:|L,2:|,1:|L,2:|
+1:|L,2:|,97:|U
+# Band D: checkpoint 2, P1 takes the letter G, clubs the rattler and the tortoise
+20:R|,12:R|R,10:RU|R,8:R|R,11:R|,7:|,1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,2:|
+1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,6:F|,2:F|R,7:|R,31:R|R,7:|R
+1:R|R,1:|R,2:R|R,3:|R,1:R|R,1:|R,1:|,1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,2:|,6:F|,29:R|R,11:|R
+7:|
+# Both up the fourth vine to band E (P1 first): checkpoint 3
+4:R|,6:|,1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,2:|
+113:U|,12:L|R,7:L|,1:L|R,2:L|,1:|R,2:|,1:|R,2:|,1:|R,2:|,113:|U
+# Gate rattlers: both onto the step and the roof, down through its hole into the hall: P1 faces the left rattler,
+10:LU|L,7:L|L,5:|L,5:|,10:LU|,28:L|,4:L|LU,6:|LU,7:|L,2:|,8:L|,9:L|LU,1:|LU,6:|L,1:L|L,25:|L,15:|
+19:|R,7:|,1:|R,2:|,1:|R,2:|,1:|R,2:|,1:|R,2:|,1:|R,2:|,1:|R,2:|,1:|R,2:|,1:|R,2:|,1:|F,7:F|F,1:F|
+8:|
+# Both out through the keeper door; P1 climbs the side vine to the Cave Painting and comes back; up the fifth vine
+30:L|L,7:|L,23:U|L,42:U|,10:L|,7:|,16:R|,16:|,17:L|,2:L|L,7:|L,20:U|L,77:U|,6:R|,1:R|L,2:R|,1:R|L
+2:|,97:|U
+# Band F: both jump the shellback tortoise; P1 clubs the rattler from the mesa block; both to the exit totem
+6:R|,8:|,10:RU|,6:R|,16:R|R,1:R|RU,4:|RU,3:U|RU,2:RU|RU,3:RU|R,4:U|R,6:|R,6:R|R,5:|R,4:|,3:R|,7:|
+6:F|,10:R|RU,16:R|R,10:RU|R,2:R|R,6:R|RU,4:RU|RU,6:RU|R,7:R|R,10:R|RU,60:R|R

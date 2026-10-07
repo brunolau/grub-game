@@ -924,6 +924,13 @@ func _burst_origin() -> Vector2i:
 	return get_face_rect().get_center()
 
 
+## The level's drops come out on the floor in front of the trunk strip, half a cell out from the wall: from the face
+## (inside the bark wall) a drop without sideways speed stayed in the wall and a locked exit could never open
+## (wf8_D6_to_enemies_b.txt). The bonus burst still flies out of the face.
+func _drop_origin() -> Vector2i:
+	return Vector2i(wall_x - MANGROVE_TRUNK_PX - (Tuning.TILE >> 1), floor_y - Tuning.TILE)
+
+
 ## Wake rule (BossBase._wakes_for_any): a hero within MANGROVE_WAKE_RANGE px of the wall, at most a screen up or down.
 func _wakes_for(hero: PlayerBase) -> bool:
 	return absi(hero.sim_pos.x - wall_x) < MANGROVE_WAKE_RANGE and absi(hero.sim_pos.y - floor_y) < Tuning.VIEW_H

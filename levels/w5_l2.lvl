@@ -1,0 +1,221 @@
+# Club & Grub - World 5, stage 2: "Rattlesnake Gulch" (designer D5, Book II "The Far Shore").
+# A vertical gulch (difficulty 4, DESIGN.md A.2 / A.3): six bands of canyon floor stacked 12-14 rows apart, joined by
+# vines that hang through holes in the rock (a sign teaches the vine before the first one). The way zigzags up:
+# band A (right) - B (left, checkpoint 1, burrow snakes) - C (left, a rolled vine over band B: strike it on the way
+# and it is the short way up after a fall) - D (right, checkpoint 2, the letter G on a ledge; at its far end a mesa
+# pillar 8 rows high with two bark boards 3 rows apart on its face: the Feast Land D warp on top, reached only by two
+# spear steps - optional, the spear comes from 5-1 on the belt) - E (left, checkpoint 3, a low hall under a roof
+# with two rattlers, entered through the roof; the Cave Painting (index 1) at the top of a side vine) - F (right) to
+# the exit totem, which leads on to Tusker's Wallow. Rattlers in burrows, burrow snakes, cave bats; more of them on Expert.
+[meta]
+format = 2
+id = w5_l2
+name = "Rattlesnake Gulch"
+kind = main
+order = 115
+tally = false
+next = w5_l2b
+bonus = bonus_d
+book = 2
+world = 5
+stage = 2
+biome = canyon
+terrain_a = canyon/terrain
+terrain_b = canyon/terrain_mesa
+background = canyon
+music = level_gulch
+liquid = water
+password_beginner = "R4TL"
+password_expert = "V1NZ"
+bonus_tier = 1
+author = D5
+
+[legend]
+K = objects/bark_board face=l tile=%
+a = objects/hidden_spot kind=small count=3 contents=food:3,food:7,food:11 look=inset tile=#
+b = objects/hidden_spot kind=small count=2 contents=food:13,treasure:4 tile=#
+
+[tiles]
+#..............................................................#
+#..............................................................#
+#..............................................................#
+#..............................................................#
+#..............................................................#
+#..............................................................#
+#..............................................................#
+#..............................................................#
+#..............................................................#
+#..............................................................#
+#..............................................................#
+#..............................................................#
+#..............................................................#
+#..............................................................#
+#..............................................................#
+#.......................................%%.....................#
+#.......................%%%.............%%.....................#
+#.......................%%%.........%%..%%.....................#
+######..########################################################
+######..########################################################
+#..............................................................#
+#..............................................................#
+#........%%%%..................................................#
+#........%%%%..................................................#
+#...................%%%%%%%%%..%%%%%%%%%.......................#
+#...................%%%%%%%%%..%%%%%%%%%.......................#
+#..............................................................#
+#.......................................%%.....................#
+#.......................................%%.....................#
+#.......................................%%.....................#
+##################################################..############
+##################################################..############
+#..............................................................#
+#..............................................................#
+#..............................................................#
+#..............................................................#
+#.........................................................%%%%.#
+#.........................................................%%%%.#
+#.........................................................%%%%.#
+#.........................................................K%%%.#
+#.........................................................%%%%.#
+#...................---...................................%%%%.#
+#.........................................................K%%%.#
+#.........................................................%%%%.#
+####..######################################b###################
+####..##########################################################
+#..............................................................#
+#..............................................................#
+#..............................................................#
+#..............................................................#
+#..............................................................#
+#..............................................................#
+#..............................................................#
+#..............................................................#
+#..............................................................#
+#..............................................................#
+##############.###########..####################################
+##############.###########..####################################
+#..............................................................#
+#..............................................................#
+#..............................................................#
+#..............................................................#
+#..............................................................#
+#..............................................................#
+#..............................................................#
+#..............................................................#
+#...................................................%%.........#
+#...................................................%%.........#
+##################################b#########..##################
+############################################..##################
+#..............................................................#
+#..............................................................#
+#..............................................................#
+#..............................................................#
+#..............................................................#
+#..............................................................#
+#..............................................................#
+#..............................................................#
+#...................................%%%........................#
+#..@...../#\........................%%%........................#
+###################a############################################
+################################################################
+################################################################
+################################################################
+
+[entities]
+# --- band A: the canyon floor (start), the vine sign, a tortoise and a rattler in its burrow
+objects/sign 7 79 text=SIGN_W5_VINE
+props/canyon/cactus_tall 5 79 layer=back
+items/food 9 77 index=0
+items/food 10 76 index=1
+items/food 11 77 index=2
+enemies/walker 15 79 skin=turtle left=-2 right=2 hp=10
+props/canyon/burrow_a 26 79 layer=back
+enemies/snapper 26 79 skin=snake range=30 hp=10
+items/food 30 77 index=4
+items/food 32 77 index=5
+props/canyon/skull_cow 34 79
+items/food 37 76 index=6
+enemies/snapper 41 79 skin=snake range=30 hp=10 expert
+props/canyon/burrow_b 41 79 layer=back
+items/food 48 78 index=8
+items/food 50 78 index=9
+props/canyon/dry_bush 55 79 layer=back
+objects/hidden_spot 59 79 kind=small count=2 contents=food:10,treasure:0 prop=canyon/rock_big
+objects/vine 44 68 length=12
+# --- band B (going left): checkpoint 1, burrow snakes, a cave bat over the path
+objects/checkpoint 40 67
+props/canyon/signpost 42 67 layer=back
+items/heart 53 65
+items/food 50 66 index=12
+enemies/digger 33 67 skin=snake zone=29,62,9,6 pause=44
+props/canyon/burrow_c 33 67 layer=back
+enemies/dangler 24 58 skin=cave_bat depth=72 speed=2 hp=10
+items/food 28 65 index=14
+items/food 20 66 index=15
+items/food 16 66 index=16
+enemies/walker 9 67 skin=turtle left=-2 right=2 hp=10 expert
+props/canyon/rocks_small 6 67
+objects/vine 26 56 length=12
+# --- band C (going left): the rolled vine over band B (a shortcut after a fall), the way to band D
+objects/vine 14 56 length=12 rolled
+objects/sign 20 55 text=SIGN_W5_ROLLED
+items/food 16 53 index=17
+items/food 9 53 index=18
+props/canyon/dead_tree 11 55 layer=back
+items/food 29 54 index=19
+items/food 33 54 index=20
+props/canyon/cactus_small 36 55 layer=back
+items/treasure 52 55 index=5
+props/canyon/rock_red_a 47 55 layer=back
+objects/vine 5 44 length=12
+# --- band D (going right): checkpoint 2, the letter G on a ledge, a rattler, a tortoise; the warp pillar
+objects/checkpoint 8 43
+items/letter 21 40 index=0
+items/food 17 42 index=21
+items/food 25 42 index=22
+enemies/snapper 31 43 skin=snake range=30 hp=10
+props/canyon/burrow_a 31 43 layer=back
+enemies/walker 40 43 skin=turtle left=-2 right=2 hp=10
+enemies/walker 24 43 skin=turtle left=-2 right=2 hp=10 expert
+items/food 46 41 index=23
+items/food 48 41 index=24
+props/canyon/palisade 57 43 layer=back
+items/warp 59 35
+zones/secret 59 34 name=warp_pillar rect=58,33,4,3
+objects/vine 50 30 length=14
+# --- band E (going left): checkpoint 3, up onto the roof, down through its hole into the rattlers' hall, the painting
+objects/checkpoint 46 29
+enemies/dangler 44 20 skin=cave_bat depth=64 speed=2 hp=10
+items/food 37 22 index=25
+items/food 34 22 index=26
+items/food 27 22 index=27
+enemies/snapper 21 29 skin=snake range=30 hp=10
+enemies/snapper 39 29 skin=snake range=30 hp=10
+items/food 29 28 index=28
+items/food 30 28 index=29
+enemies/snapper 3 29 skin=snake range=30 hp=10 expert
+props/canyon/burrow_c 3 29 layer=back
+objects/vine 13 22 length=8
+items/painting 10 21 index=1
+zones/secret 10 21 name=painting_ledge rect=9,20,4,2
+items/food 11 21 index=30
+props/canyon/bone_small 12 21
+objects/vine 7 18 length=12
+items/food 4 27 index=31
+# --- band F (going right): rattler, tortoise, bats, the exit totem
+items/food 9 15 index=32
+items/food 12 15 index=33
+enemies/walker 18 17 skin=turtle left=-2 right=2 hp=10
+enemies/snapper 30 17 skin=snake range=30 hp=10
+props/canyon/burrow_b 30 17 layer=back
+enemies/dangler 34 9 skin=cave_bat depth=72 speed=2 hp=10
+items/food 38 13 index=34
+items/treasure 41 13 index=6
+enemies/snapper 45 17 skin=snake range=30 hp=10 expert
+props/canyon/burrow_a 45 17 layer=back
+enemies/walker 50 17 skin=turtle left=-2 right=2 hp=10 expert
+items/food 46 15 index=35
+items/food 52 15 index=36
+props/canyon/dead_tree_big 61 17 layer=back
+objects/exit 58 17
+props/canyon/cactus_tall 55 17 layer=back

@@ -13,16 +13,16 @@ msgstr ""
 
 # --- w1_l1_coop Vine Bridges (co-op) ---
 msgid "SIGN_COOP_W1_EGG"
-msgstr "Fall or get beaten and you float in an egg! Your partner hatches you with a whack, a bounce or a checkpoint fire."
+msgstr "Fall or get hit and you float in an egg. Whack it to hatch!"
 
 msgid "SIGN_COOP_W1_HOP"
-msgstr "A tablet with two cavemen: a deed for two! One stands under the ledge, the other jumps on his head holding Jump."
+msgstr "Stand under the ledge: your partner hops off your head!"
 
-msgid "SIGN_COOP_W1_POT"
-msgstr "Up top? Club the flower pot off the edge - it grows into a springy flower for your partner."
+msgid "SIGN_COOP_W1_VINE"
+msgstr "Up top? Club the coiled vine down for your partner."
 
 msgid "SIGN_COOP_W1_PLATES"
-msgstr "Stand on a stone plate to hold its door open. Hold one for your partner, then he holds one for you!"
+msgstr "Stand on a plate to hold its door open - then swap!"
 
 msgid "SIGN_COOP_W1_SHELL"
-msgstr "Shellbacks turn their shell to the nearer caveman. One of you stands in front, the other clubs the back!"
+msgstr "Shellbacks face the nearer caveman. Club the back!"

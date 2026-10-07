@@ -23,11 +23,11 @@ const PAD_BUTTONS: Array[Array] = [
 	[Defs.IN_DOWN, JOY_BUTTON_DPAD_DOWN], [Defs.IN_FIRE, JOY_BUTTON_X], [Defs.IN_LOOK, JOY_BUTTON_Y],
 	[Defs.IN_SWAP, JOY_BUTTON_LEFT_SHOULDER],
 ]
-## Physical keys per flag of the classic layout (DESIGN.md D.11): P1 W A S D + Space + Left Shift + E + Q, P2 the
+## Physical keys per flag of the classic layout (DESIGN.md D.11): P1 W A S D + Space + Left Ctrl + E + Q, P2 the
 ## numpad 8 4 5 6 + Num 0 + Num Enter + Num + + Num . (jump is the jump key, so Up never needs Settings' up_jumps).
 const CLASSIC_KEYS: Array[Array] = [
 	[[Defs.IN_LEFT, KEY_A], [Defs.IN_RIGHT, KEY_D], [Defs.IN_UP, KEY_SPACE], [Defs.IN_DOWN, KEY_S],
-		[Defs.IN_FIRE, KEY_SHIFT], [Defs.IN_LOOK, KEY_Q], [Defs.IN_SWAP, KEY_E]],
+		[Defs.IN_FIRE, KEY_CTRL], [Defs.IN_LOOK, KEY_Q], [Defs.IN_SWAP, KEY_E]],
 	[[Defs.IN_LEFT, KEY_KP_4], [Defs.IN_RIGHT, KEY_KP_6], [Defs.IN_UP, KEY_KP_0], [Defs.IN_DOWN, KEY_KP_5],
 		[Defs.IN_FIRE, KEY_KP_ENTER], [Defs.IN_LOOK, KEY_KP_PERIOD], [Defs.IN_SWAP, KEY_KP_ADD]],
 ]

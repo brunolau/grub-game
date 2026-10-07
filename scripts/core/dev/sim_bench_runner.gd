@@ -608,6 +608,8 @@ func _start_header_run(spec: Dictionary, mode: String) -> void:
 	if players > 1:
 		game_mode = Defs.GameMode.VERSUS if Levels.is_arena(level_id) else Defs.GameMode.COOP
 	Game.start_run(_difficulty(mode), game_mode, players, maxi(Levels.get_book(level_id), 1))
+	# A co-op route recorded in Helper mode (`helper=1`, DESIGN.md D.3) replays with it; every other route without.
+	Game.helper_mode = game_mode == Defs.GameMode.COOP and bool(spec.get("helper", false))
 
 
 ## Put the belt of the run on every hero of the party, before the first tick: the --belt-invariance / replay()

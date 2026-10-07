@@ -78,6 +78,32 @@ func test_mangrove_reads_its_chamber_and_counts_hits_by_stage() -> void:
 	assert_true(coop_expert.max_hp * PartyTuning.BOSS_HP_MAX_DEN <= 16 * PartyTuning.BOSS_HP_MAX_NUM)
 
 
+## The drops come out on the floor in front of the trunk strip (BossBase._drop_origin, the G2 integration;
+## wf8_D6_to_enemies_b.txt): from the face, inside the bark wall, a first drop without sideways speed stayed in the
+## wall and a level's locked exit could never open. The defeat effect and the bonus burst stay at the face.
+func test_the_drops_land_on_the_floor_in_front_of_the_trunk() -> void:
+	var tree: Mangrove = _open()
+	_lab.step(PackedInt32Array([0]))
+	var drops: Array[StringName] = [&"fire_starter"]
+	tree.defeat(drops)
+	for i: int in 90:
+		_lab.step(PackedInt32Array([0]))
+	var starters: Array[FireStarter] = []
+	for entity: SimEntity in _lab.level.get_kind(Defs.Kind.COLLECTIBLE):
+		if entity is FireStarter:
+			starters.append(entity as FireStarter)
+	assert_eq(starters.size(), 1, "the fire-starter was dropped")
+	if starters.is_empty():
+		return
+	var starter: FireStarter = starters[0]
+	assert_true(starter.sim_pos.x < tree.wall_x - Mangrove.MANGROVE_TRUNK_PX,
+			"in front of the trunk strip, out of the wall (x %d, wall %d)" % [starter.sim_pos.x, tree.wall_x])
+	assert_true(starter.sim_pos.y <= tree.floor_y, "not under the floor")
+	var grid: TileGrid = _lab.level.grid
+	assert_ne(grid.floor_at(starter.sim_pos.x >> 4, starter.sim_pos.y >> 4), TileGrid.FLOOR_EMPTY,
+			"at rest on ground a hero reaches (the floor or the root ledge in front of the wall) at %s" % starter.sim_pos)
+
+
 ## The resting fist launches a hero who lands on it (-160; -224 with Up held), and from the -160 launch a high strike
 ## started a tick or two after the launch reaches the face at the apex; no jump from the floor (standing or running,
 ## next to the wall) reaches the face with any strike: the springboard is the way up.

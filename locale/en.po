@@ -1091,6 +1091,15 @@ msgstr "Way Home"
 msgid "Totem Ring"
 msgstr "Totem Ring"
 
+msgid "Echo Hollow"
+msgstr "Echo Hollow"
+
+msgid "Cinder Pit"
+msgstr "Cinder Pit"
+
+msgid "Coconut Cove"
+msgstr "Coconut Cove"
+
 # --- Level texts: signs (objects/sign) and hints (zones/message) of the level files, in level order ---
 # Shown in the HUD face on a wooden board (signs) or on the hint panel (zones), wrapped to a few lines.
 msgid "SIGN_W1_CLUB"
