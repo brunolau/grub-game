@@ -1,7 +1,8 @@
-# Club & Grub - level texts of world 5, Sunbaked Canyon (Book II), English. Owner: level designer D5
-# (docs/expansion/PLAN.md 6.1). A level sub-catalogue: loaded beside locale/en.po (scripts/ui/ui_kit.gd), never
-# offered as a language. Keys: the level names and the `text=` keys of signs and hint zones of levels/w5_*.lvl and
-# their co-op files.
+# Club & Grub - level texts of world 5, Sunbaked Canyon (Book II), and Feast Land D, English. Owner: level designer
+# D5 (docs/expansion/PLAN.md 6.1). A level sub-catalogue: loaded beside locale/en.po (scripts/ui/ui_kit.gd), never
+# offered as a language. Keys: the level names and the `text=` keys of signs and hint zones of levels/w5_*.lvl,
+# levels/bonus_d.lvl and their co-op files. Every sign text takes at most 3 board lines (SignBoard.MAX_LINES, about
+# 60 characters; LEVEL_DESIGN.md 15.6 [G27]).
 msgid ""
 msgstr ""
 "Project-Id-Version: Club & Grub\n"
@@ -14,28 +15,66 @@ msgstr ""
 msgid "Red Mesa Trail"
 msgstr "Red Mesa Trail"
 
+msgid "Rattlesnake Gulch"
+msgstr "Rattlesnake Gulch"
+
+msgid "Tusker's Wallow"
+msgstr "Tusker's Wallow"
+
+msgid "Feast Land D"
+msgstr "Feast Land D"
+
 # --- w5_l1 Red Mesa Trail ---
 msgid "SIGN_W5_BELT"
-msgstr "Your club never leaves you. Press SWAP to trade it for the special on your belt!"
+msgstr "Your club never leaves you. Press SWAP."
 
 msgid "SIGN_W5_SPEAR"
-msgstr "A spear! Throw it at a bark board and it sticks - a step to stand on. Press SWAP for your club."
+msgstr "Throw the spear at a bark board: it sticks - a step!"
 
 msgid "SIGN_W5_ROLLER"
-msgstr "Rollers curl up and roll at you. Hold Jump as you land on one to bounce up to the mesa tops!"
+msgstr "Rollers roll at you. Bounce on one to reach the mesa tops!"
 
 # --- w5_l1_coop Red Mesa Trail (co-op) ---
 msgid "SIGN_W5_COOP_EGG"
-msgstr "Fall down and you become an egg! Your partner hatches you with a whack, a bounce or a checkpoint."
+msgstr "Downed? You float in an egg - your partner whacks it open!"
 
 msgid "SIGN_W5_COOP_TABLET"
-msgstr "A tablet with two cavemen marks a spot where one caveman alone cannot pass. Work together!"
+msgstr "Two cavemen on a tablet: one caveman alone cannot pass."
 
 msgid "SIGN_W5_COOP_HOP"
-msgstr "One stands still on the rock, the other jumps on his head holding Jump. Up top, club the flower pot down!"
+msgstr "One stands still, the other jumps on his head holding Jump!"
 
 msgid "SIGN_W5_COOP_PLATES"
-msgstr "Stand on a plate to hold a door open for your partner - then let him hold one for you."
+msgstr "Hold a plate down to open a door for your partner."
 
 msgid "SIGN_W5_COOP_GULLY"
-msgstr "Shellbacks turn their shield to the nearer caveman. One of you stands in front, the other drops in behind!"
+msgstr "Shellbacks face the nearer caveman - one baits, one clubs!"
+
+# --- w5_l2 Rattlesnake Gulch ---
+msgid "SIGN_W5_VINE"
+msgstr "Press Up at a vine to climb. Jump to let go."
+
+msgid "SIGN_W5_ROLLED"
+msgstr "A rolled vine? Strike it and it drops down."
+
+# --- w5_l2_coop Rattlesnake Gulch (co-op) ---
+msgid "SIGN_W5_COOP_SANDGATE"
+msgstr "One holds the plate - the sand gate opens for the climber."
+
+msgid "SIGN_W5_COOP_RATTLERS"
+msgstr "Twin rattlers: club both quickly, or one grows back!"
+
+# --- w5_l2b Tusker's Wallow ---
+msgid "SIGN_W5_TUSKER"
+msgstr "Tusker charges! Let him hit the wall, then club his head."
+
+# --- w5_l2b_coop Tusker's Wallow (co-op) ---
+msgid "SIGN_W5_COOP_TUSKER"
+msgstr "He faces the nearer caveman: the other clubs his leafy rump!"
+
+# --- bonus_d Feast Land D (Honey Falls) ---
+msgid "SIGN_W5_HONEY"
+msgstr "Honey holds your feet. Tap Jump to hop."
+
+msgid "SIGN_W5_SODA"
+msgstr "Stand on a soda vent when it fizzes!"

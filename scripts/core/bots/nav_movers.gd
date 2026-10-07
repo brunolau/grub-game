@@ -12,10 +12,12 @@ extends RefCounted
 ##  - rider: a platform that moves under weight (drop platform, see-saw end, pulley lift, mode=ride): boarding links
 ##    start with it at rest (its level-start state); links off it start after the hero stood on it STAND_TICKS ticks
 ##    (the platform sinking, falling or tilting under him), each with the state reached as its `cond`.
-## Links: **board** (a static node -> a mover node: a jump or walk-off that ends with him riding the part) and **off**
-## (a mover node -> any other node). Every start x of a window was simulated; windows on a mover node are kept in the
-## node's level-start frame (the live take-off x is the window plus the mover's offset). The bot waits in the window
-## until the live mover matches `cond` (NavMoversLive.matches), so the move starts from the verified state.
+## Links: **board** (a static node -> a mover node: a jump or walk-off that ends with him riding the part, already on
+## the tick the bot takes over) and **off** (a mover node -> any other node, from the middle OFF_MIDDLE_PX of the part
+## only, the rider standing RIDE_SINK_PX into its top as a real rider does). Every start x of a window was simulated;
+## windows on a mover node are kept in the node's level-start frame (the live take-off x is the window plus the
+## mover's offset). The bot waits in the window until the live mover matches `cond` (NavMoversLive.matches), so the
+## move starts from the verified state. Part boxes are taken where the movers were spawned (NavSim.part_homes).
 
 ## Phases of a periodic mover are sampled this far apart (ticks).
 const PHASE_STEP: int = 12
@@ -30,8 +32,12 @@ const BOARD_REACH_Y: int = 112
 const BOARD_RISE_PX: int = 60
 ## A boarding window this wide ends the search of slower scripts for that source node and phase.
 const BOARD_GOOD_WINDOW: int = 8
-## Take-off points on a part are sampled this far apart.
+## Take-off points on a part are sampled this far apart, within OFF_MIDDLE_PX of its middle.
 const PART_SAMPLE_STEP: int = 8
+const OFF_MIDDLE_PX: int = 10
+## A rider stands this far into the platform's top (PlayerBase.ride_platform: feet at top + 1, yvel 1): the take-offs
+## from a mover node start there, as a bot riding it does.
+const RIDE_SINK_PX: int = 1
 
 var baker: NavBaker = null
 ## Mover nodes found.
@@ -70,7 +76,8 @@ func find_nodes() -> void:
 		var part: Dictionary = sim.mover_parts[i]
 		var record: Dictionary = sim.mover_records[int(part["mover"])]
 		var entity: SimEntity = part["entity"]
-		var box: Rect2i = entity.get_box()
+		# Its box where it was spawned (NavSim.part_homes; the entity of the last run has moved since).
+		var box: Rect2i = Rect2i(sim.part_homes[i], entity.get_box().size)
 		if clip.size.x > 0 and not Rect2i(clip.position * Tuning.TILE, clip.size * Tuning.TILE).has_point(box.position):
 			continue
 		var params: Dictionary = record["params"]
@@ -154,7 +161,16 @@ func find_links(_weight_class: int) -> void:
 			for phase: int in phases:
 				_off_links(node_id, part, mover, phase, 0)
 		else:
+			# A rider mover may look the same after different standing times (a drop platform waits its `delay` at
+			# rest): only the first standing time of each look is baked - the one a verification finds again
+			# ([method _recipe_for]); a bot that stood longer and sees the same look may still miss, and its navigator
+			# blocks that link after two misses.
+			var looks: Array[PackedInt32Array] = []
 			for stand: int in STAND_TICKS:
+				var probe: NavSim.Outcome = _probe(part, 0, stand, graph.nodes[node_id])
+				if probe == null or probe.mover_states.size() <= part or looks.has(probe.mover_states[part]):
+					continue
+				looks.append(probe.mover_states[part])
 				_off_links(node_id, part, mover, 0, stand)
 
 
@@ -216,18 +232,22 @@ func _off_links(from: int, part: int, mover: int, phase: int, stand: int) -> voi
 		return
 	var state: PackedInt32Array = probe.mover_states[part]
 	var by_target: Dictionary = {}
-	var x: int = node.x0
+	# Take-offs from the middle of the part only: a rider waits there for the take-off state (near an end of a
+	# platform that brakes or turns, the ride rule can let him slip off; PHYSICS.md 11.4).
+	var middle: Vector2i = Vector2i(maxi(node.x0, node.center_x() - OFF_MIDDLE_PX),
+			mini(node.x1, node.center_x() + OFF_MIDDLE_PX))
+	var x: int = middle.x
 	var xs: PackedInt32Array = PackedInt32Array()
-	while x < node.x1:
+	while x < middle.y:
 		xs.append(x)
 		x += PART_SAMPLE_STEP
-	xs.append(node.x1)
+	xs.append(middle.y)
 	for s: int in baker.ground_scripts():
 		for seed_x: int in xs:
 			var to: int = _land(from, s, seed_x, phase, stand, -1)
 			if to < 0 or to == from:
 				continue
-			var window: Dictionary = _widen(from, to, s, seed_x, phase, stand, -1, Vector2i(node.x0, node.x1))
+			var window: Dictionary = _widen(from, to, s, seed_x, phase, stand, -1, middle)
 			var width: int = int(window["x1"]) - int(window["x0"]) + 1
 			if width < NavBaker.MIN_WINDOW:
 				continue
@@ -252,7 +272,7 @@ func _probe(part: int, phase: int, stand: int, node: NavGraph.NavNode) -> NavSim
 	if states.size() <= part:
 		return null
 	var s: PackedInt32Array = states[part]
-	var start: Vector2i = Vector2i(node.center_x() + s[0], node.y + s[1])
+	var start: Vector2i = Vector2i(node.center_x() + s[0], node.y + s[1] + RIDE_SINK_PX)
 	var outcome: NavSim.Outcome = sim.run(start, PackedInt32Array([0]), 1, -1, phase, stand)
 	_probes[key] = outcome
 	return outcome
@@ -292,19 +312,21 @@ func _simulate(from: int, flags: PackedInt32Array, x: int, phase: int, stand: in
 		if part < 0:
 			return {"to": -1, "ticks": 0, "land": 0, "state": PackedInt32Array()}
 		var s: PackedInt32Array = phase_states(phase)[part]
-		start = Vector2i(x + s[0], node.y + s[1])
+		start = Vector2i(x + s[0], node.y + s[1] + RIDE_SINK_PX)
 	var outcome: NavSim.Outcome = sim.run(start, flags, NavBaker.MAX_TICKS, -1, phase, stand)
 	baker.candidates += 1
 	var to: int = -1
 	if not outcome.died and (outcome.landed or outcome.walked):
+		# Where the bot takes over (the handback) and where he settles must be the same node (NavBaker.settled_node).
 		if outcome.platform != null:
 			var index: int = sim.part_index(outcome.platform)
-			for node_id: int in _node_part:
-				if int(_node_part[node_id]) == index:
-					to = node_id
-		else:
+			if outcome.handback_platform != null and sim.part_index(outcome.handback_platform) == index:
+				for node_id: int in _node_part:
+					if int(_node_part[node_id]) == index:
+						to = node_id
+		elif outcome.handback_platform == null:
 			to = graph.node_at(outcome.pos)
-			if to >= 0 and graph.nodes[to].mover >= 0:
+			if to >= 0 and (graph.nodes[to].mover >= 0 or graph.node_at(outcome.handback_pos) != to):
 				to = -1
 	var state: PackedInt32Array = PackedInt32Array()
 	if node.mover >= 0:
@@ -415,7 +437,9 @@ func _recipe_for(link: NavGraph.NavLink) -> Vector2i:
 		while phase < _periods[part]:
 			phases.append(phase)
 			phase += PHASE_STEP
-	var stands: Array[int] = [0] if periodic or graph.nodes[link.from].mover < 0 else STAND_TICKS
+	var stands: Array[int] = [0]
+	if not periodic and graph.nodes[link.from].mover >= 0:
+		stands = STAND_TICKS
 	for phase: int in phases:
 		for stand: int in stands:
 			var states: Array[PackedInt32Array] = []

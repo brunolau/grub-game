@@ -1,0 +1,84 @@
+# Club & Grub level file - format 2 (docs/ARCHITECTURE.md 7.11). Versus arena #2 of docs/expansion/DESIGN.md E.5:
+# Echo Hollow - cave, a shaft that wraps top-bottom; sudden death: the cave-in. Owner: DA (arenas,
+# docs/expansion/PLAN.md 6.1). Rules: docs/LEVEL_DESIGN.md 15.8. Dressing: art-B's hand-over
+# (.tools/asset_candidates/expansion/_handover/ARENA_DRESSING.md, "Echo Hollow"; E.5 has no sketch, the geometry is
+# DA's on art-B's proposal).
+#
+# Layout notes:
+# - The shaft: the floor (row 10) has a 4-cell hole (cols 8-11) over nothing - the bottom row is the seam (wrap = tb),
+#   so a hero who walks or is knocked into it comes in at the top and lands on the central ledge (row 7, cols 8-11)
+#   right above it: the hole is the quick way up. Rising past the top (a stomp bounce off a head on an upper ledge)
+#   comes in at the bottom, where every floor lets feet through from below (PHYSICS.md 11.2: floors are one-way).
+# - Tiers 3 rows apart: the floor (row 10), the side shelves (row 7, cols 0-3 / 16-19) and the central ledge (row 7,
+#   cols 8-11), the upper ledges (row 4, cols 3-7 / 12-16, over the gaps between the shelves and the central ledge).
+#   Every ledge is one-way; nothing stands higher than row 4, so a plain jump never reaches the top seam.
+# - Spots (7, visible, refill 15 s after they are emptied): one in the floor under each shelf (cols 2 / 17), one flush
+#   in each shelf's wall end (cols 0 / 19), one flush in each upper ledge's outer end (cols 3 / 16), and the big spot
+#   in the central ledge (col 9): its giant falls 7 rows onto the ledge over the hole.
+# - Cookpots: two (4-player arena), on the upper ledges' inner halves (cols 6 / 13).
+# - Spawns (rotate every round; 2 players use 1 and 2): 1 and 2 on the floor between the shelves and the hole (cols
+#   14 / 5), 3 and 4 on the shelves (cols 1 / 18).
+# - Modes: Hot Rock (default), Grub Stack, Last Caveman Standing; each has a green bot set in core-B's
+#   tests/test_versus_bots.gd (12 seeds x 4 rounds, four Hunters): Hot Rock 8 points worst, LCS 13, Grub Stack 15 -
+#   the edge of the +/-15. The big spot decides Grub Stack: in col 9 the left floor spawn (2) leads, in col 10 the
+#   right one (1) leads by as much; other spawn layouts (floor spawns a cell inward, shelf spawns on the upper
+#   ledges) and a crate lane were worse. A phase-3 candidate: a symmetric big spot.
+# - Not built yet (requests to world-B, build/engine_requests/wf8_DA_to_world-B.txt): the darkness pulse every 20 s,
+#   `$` walls that grow back after 15 s, the dangler springboard. The arena plays without them.
+# - Bot graph: resources/bots/arena_echo_hollow.json, baked with core-B's tool after every edit of this file:
+#   bash .tools/gd.sh script res://tools/bots/bake_nav.gd -- arena_echo_hollow
+
+[meta]
+format = 2
+id = arena_echo_hollow
+name = "Echo Hollow"
+kind = arena
+biome = cave
+terrain_a = cave/terrain
+terrain_b = cave/terrain_stone
+background = cave
+music = versus_battle_b
+players = 4
+modes = hot_rock,grub_stack,last_caveman
+round_time = 90
+wrap = tb
+sudden = cave_in
+author = DA
+notes = "Versus arena 2 (DESIGN.md E.5): cave, wrap top-bottom; the hole in the floor drops onto the central ledge from the top, shelves and upper ledges 3 rows apart, the big spot over the hole; cave-in in sudden death."
+
+[legend]
+? = objects/hidden_spot kind=small count=3 look=block tile=#
+s = objects/hidden_spot kind=small count=3 look=block tile=%
+* = objects/hidden_spot kind=big look=inset tile=%
+P = objects/cookpot
+Q = objects/cookpot
+B = objects/spawn_point index=2
+C = objects/spawn_point index=3
+D = objects/spawn_point index=4
+
+[tiles]
+....................
+....................
+....................
+......P......Q......
+...s====....====s...
+....................
+.C................D.
+s===....=*==....===s
+....................
+.....B........@.....
+##?#####....#####?##
+########....########
+
+[entities]
+props/cave/stalactite 3 0 layer=back
+props/cave/stalactite 16 0 layer=back
+props/cave/drips 9 0 layer=back
+props/cave/crystal_violet_a 1 6 layer=back
+props/cave/crystal_cyan_b 18 6 layer=back
+props/cave/drip_cap 5 8 layer=back
+props/cave/drip_cap 14 8 layer=back
+props/cave/mushrooms 6 9 layer=back
+props/cave/rocks_small 13 9 layer=back
+props/cave/skull_buried 4 9 layer=back
+props/cave/crystal_cyan_d 15 9 layer=back

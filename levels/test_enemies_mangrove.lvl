@@ -1,7 +1,7 @@
 # Old Mangrove's Test Chamber: developer level of enemies-B (PLAN.md P2.2) - the chamber of Old Mangrove, the Rooted
 # Guardian (DESIGN.md B.2) for tests/test_enemies_mangrove.gd: the club route of the solo form, the fairness checks
 # and the single-hero search against the co-op form (the test loads this file with `form=coop` on the boss and a
-# second hero at the objects/hero_start marker).
+# second hero at the objects/hero_start marker). The trophy it drops is the level's exit for the validator.
 # One screen: floor row 10, the Guardian's bark wall from column 15, one-way root ledges on the left at rows 7 and 4
 # (the upper hand rests on the end of the row 4 ledge; a hero on the row 7 ledge reaches it with a high strike).
 
@@ -37,5 +37,5 @@ author = enemies-B
 
 [entities]
 zones/arena 7 9 name=chamber rect=0,0,20,12 music=boss_mangrove
-bosses/mangrove 14 9 arena=chamber
+bosses/mangrove 14 9 arena=chamber drops=fire_starter,trophy
 objects/hero_start 4 9 slot=2

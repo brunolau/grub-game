@@ -18,8 +18,10 @@ extends PlatformBase
 ## (PlayerBase.fence_x, airborne too): nobody leaves it. Each rider dips the picture 2 px (drawing only).
 ##
 ## Owner: objects-B (docs/expansion/PLAN.md 4.1). Currents are world-A's zones; the raft finds them by their spawn
-## parameters (a Kind.ZONE entity with `dir` l|r|u|d and `speed`, its rectangle ZoneBase.rect) and applies C.7 itself.
-## A level reset (death, team wipe) puts it back where the level placed it.
+## parameters (a Kind.ZONE entity with `dir` l|r|u|d, its rectangle ZoneBase.rect, its speed the zone's `speed`
+## (CurrentZone: the parameter, clamped, default 1) or the `speed` parameter) and applies C.7 itself. It looks again
+## whenever the level's zones change, so a current spawned during play (Inkjaw's whirlpool) carries rafts that were
+## already afloat. A level reset (death, team wipe) puts it back where the level placed it.
 
 const DEFAULT_SKIN: String = "log"
 ## Picture: sprites/objects/raft.png (ASSET_MANIFEST 17.3): 1 x 4 cells of 128 x 24 art px (rows log w3, log w4,
@@ -55,6 +57,8 @@ var _railed_mask: int = 0
 var _paddle_seen_mask: int = 0
 var _currents: Array[SimEntity] = []
 var _currents_found: bool = false
+## The number of the level's zones when [member _currents] was collected: another number means a zone came or went.
+var _zone_count: int = -1
 var _drawn_riders: int = 0
 var _sprite: Sprite2D = null
 
@@ -220,16 +224,17 @@ static func _finished_forward_strike(hero: PlayerBase) -> bool:
 
 ## The px/tick drift of the l|r current its anchor is in (0 = none).
 func _current_drift(level: LevelBase) -> int:
-	if not _currents_found:
-		_find_currents(level)
+	var zones: Array[SimEntity] = level.get_kind(Defs.Kind.ZONE)
+	if not _currents_found or zones.size() != _zone_count:
+		_find_currents(zones)
 	for zone: SimEntity in _currents:
-		if not is_instance_valid(zone):
+		if not is_instance_valid(zone) or zone.is_queued_for_deletion():
 			continue
 		var rect: Variant = zone.get(&"rect")
 		if rect is Rect2i and Overlap.point_in(rect, sim_pos.x, sim_pos.y):
 			var dir: String = str(zone.spawn_params.get("dir", ""))
-			var speed: int = clampi(int(zone.spawn_params.get("speed", 1)), Tuning.CURRENT_SPEED_MIN_PX,
-					Tuning.CURRENT_SPEED_MAX_PX)
+			var speed: int = int(zone.get(&"speed")) if &"speed" in zone else int(zone.spawn_params.get("speed", 1))
+			speed = clampi(speed, Tuning.CURRENT_SPEED_MIN_PX, Tuning.CURRENT_SPEED_MAX_PX)
 			if dir.begins_with("r"):
 				return speed
 			if dir.begins_with("l"):
@@ -237,12 +242,14 @@ func _current_drift(level: LevelBase) -> int:
 	return 0
 
 
-## Every current of the level (Kind.ZONE with `dir` and `speed`), collected once during a tick.
-func _find_currents(level: LevelBase) -> void:
+## Every current among the level's `zones` (a CurrentZone, or any Kind.ZONE with `dir` and `speed` parameters),
+## collected during a tick and again whenever the number of zones changes.
+func _find_currents(zones: Array[SimEntity]) -> void:
 	_currents_found = Sim.is_in_tick()
+	_zone_count = zones.size()
 	_currents.clear()
-	for zone: SimEntity in level.get_kind(Defs.Kind.ZONE):
-		if zone.spawn_params.has("dir") and zone.spawn_params.has("speed"):
+	for zone: SimEntity in zones:
+		if zone is CurrentZone or (zone.spawn_params.has("dir") and zone.spawn_params.has("speed")):
 			_currents.append(zone)
 
 

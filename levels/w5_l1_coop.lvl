@@ -1,15 +1,17 @@
 # Club & Grub - World 5, stage 1 in co-op: "Red Mesa Trail" (designer D5). The co-op file of levels/w5_l1.lvl
 # (DESIGN.md D.10, LEVEL_DESIGN.md 15.7): the same map with P2's start, a pair of spears at the first checkpoint, signs
 # for the egg and the x2 tablet, and three co-op gates on the main path, each with its tablet and a checkpoint behind:
-#  - 'hop': the mesa steps of the solo file are one cliff 7 rows over the floor (8 on Expert: a static Expert block)
-#    over a two-row rock; one hero stands on the rock, the other Shoulder-Hops off his head, then clubs the flower pot
-#    off the edge - it lands on the rock as a spring, the way up for the partner;
+#  - 'hop': the mesa steps of the solo file are one cliff 8 rows over a flat floor on both difficulties (a lone
+#    player's idle partner is a 98 px Totem step, and its feet in a 7-row ledge's top cell catch the corner); one hero
+#    stands under it, the other Shoulder-Hops off his head (140 px), then strikes the rolled vine at the edge - it
+#    unrolls down to the floor, the way up for the partner (the coil is out of every throw from the floor);
 #  - 'plates': a leapfrog plate door - the mesa's lower tunnel opens while plate A is held, its upper tunnel while
 #    plate B beyond the mesa is held (each plate 8+ tiles from its door);
 #  - 'gully': two Shellbacks keep the gully under the plain (a hall exactly 4 rows high); one hero baits the shield
 #    while the other, dropped in through a hole behind it, clubs its back; the keeper door opens when both are dead.
-# The Rollers of the long climb are one bond; the first Roller, the plateau Roller, the Expert Roller of the plain
-# and the Expert eagle are left out (a bounce for a lone hero at the hop cliff, or a hit on a plate holder or a baiter).
+# The Rollers of the long climb are one bond; the first Roller, the plateau Roller and tortoise, the Expert Roller of
+# the plain and the Expert eagle are left out (a bounce for a lone hero at the hop cliff, or a hit on a plate holder
+# or a baiter).
 
 [meta]
 format = 2
@@ -51,14 +53,14 @@ g = objects/hidden_spot kind=small count=3 contents=food:22,food:35,food:8 look=
 ..|...............................................................%%%.......................................%%%%%%%%%%%....................................................%%%%%%%%................%%%...................%%%
 ..|...............................................................B%%.......................................%%%%%%%%%%%....................................................%%%%%%%%................%%%...................%%%
 ..|...............................................................%%%....................................===.......%.......................................................%%%%%%%%......................................%%%
-..|.............................................................%%%%%..............................................%.......................................................%%%%%%%%......................................%%%
-..|.............................................................%%%%%.................%%%%%%d%%%%%%...%%%%%%%%%%%%%%%%%%%b%%%%%%34.........................................%%%%%%%%.....................12#######g##########
+..|.............................................................%%%%%.................%%%%%%d%%%%%%................%.......................................................%%%%%%%%......................................%%%
+..|.............................................................%%%%%.................%%%%%%%%%%%%%...%%%%%%%%%%%%%%%%%%%b%%%%%%34.........................................%%%%%%%%.....................12#######g##########
 ..|.............................................................%%%%%.................%%%%%%%%%%%%%...%%%%%%%%%%%%%%%%%%%%%%%%%%##34.......................................%%%%%%%%........%%%%.......12####################
 ..|.............................................................B%%%%.................%%%%%%%%%%%%%...%%%%%%%%%%%%%%%%%%%%%%%%%%####34.....................................%%%%%%%%........%%%%.....12######################
 ..|.............................................................%%%%%.................%%%%%%%%%%%%%...%%%%%%%%%%%%%%%%%%%%%%%%%%######34...................................%%%%%%%%...............12########################
 ..|........................................................-----%%%%%.................%%%%%%%%%%%%%...%%%%%%%%%%%%%%%%%%%%%%%%%%################f#####..#######..#######..#%%%%%%%%.............12##########################
-..|..................................%%............................................%%%%%%%%%%%%%%%%...%%%%%%%%%%%%%%%%%%%%%%%%%%######################..#######..#######..#%%%%%%%%...........12############################
-..|..................................%%......./##\.................................%%%%%%%%%%%%%%%%...%%%%%%%%%%%%%%%%%%%%%%%%%%######################.....................%................12##############################
+..|..................................%%...............................................%%%%%%%%%%%%%...%%%%%%%%%%%%%%%%%%%%%%%%%%######################..#######..#######..#%%%%%%%%...........12############################
+..|..................................%%......./##\....................................%%%%%%%%%%%%%...%%%%%%%%%%%%%%%%%%%%%%%%%%######################.....................%................12##############################
 ..|.....................12###############a#########################################%%%%%%%%%%%%%%%%...%%%%%%%%%%%%%%%%%%%%%%%%%%######################.........__.......__.%..............12################################
 ..|...................12###########################################################%%%%%%%%%%%%%%%%...%%%%%%%%%%%%%%%%%%%%%%%%%%######################.....................%............12##################################
 ..|......@..........12#############################################################%%%%%%%%%%%%%%%%...%%%%%%%%%%%%%%%%%%%%%%%%%%######################.....................%..........12####################################
@@ -118,11 +120,10 @@ items/food 70 15 index=25
 items/food 71 14 index=26
 items/food 72 15 index=28
 items/food 84 16 index=29
-objects/checkpoint 95 11
+objects/checkpoint 95 10
 props/canyon/dead_tree 90 11 layer=back
 props/canyon/cactus_small 104 11 layer=back
 props/canyon/skull_buried 97 11
-enemies/walker 104 11 skin=turtle left=-1 right=1 hp=10
 enemies/snapper 125 11 skin=snake range=30 hp=10 expert
 items/food 99 9 index=31
 items/food 100 8 index=32
@@ -240,12 +241,10 @@ objects/sign 52 18 text=SIGN_W5_COOP_EGG
 objects/sign 60 18 text=SIGN_W5_COOP_TABLET
 items/weapon 62 15 kind=spear
 enemies/walker 75 18 skin=turtle left=-2 right=2 hp=10
-# --- gate 1 'hop': the boost ledge (7 rows over the floor, 8 on Expert) and its flower pot
-objects/x2_tablet 80 18 gate=hop far=90,11
+# --- gate 1 'hop': the boost ledge (8 rows over the floor) and its rolled vine (the way back)
+objects/x2_tablet 80 18 gate=hop far=96,10
 objects/sign 78 18 text=SIGN_W5_COOP_HOP
-objects/column 86 11 size=3,1 rise=0 expert
-objects/flower_pot 86 11 beginner
-objects/flower_pot 86 10 expert
+objects/vine 85 11 length=8 rolled
 # --- gate 2 'plates': the leapfrog plate doors of the mesa
 objects/x2_tablet 103 11 gate=plates far=122,11
 objects/sign 102 11 text=SIGN_W5_COOP_PLATES

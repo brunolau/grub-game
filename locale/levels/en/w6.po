@@ -1,0 +1,45 @@
+# Club & Grub - level texts of world 6, Tar Fen (Book II), English. Owner: level designer D6
+# (docs/expansion/PLAN.md 6.1). A level sub-catalogue: loaded beside locale/en.po (scripts/ui/ui_kit.gd), never
+# offered as a language. Keys: the level names and the `text=` keys of signs and hint zones of levels/w6_*.lvl and
+# their co-op files. Every sign text fits three board lines (DESIGN.md G27).
+msgid ""
+msgstr ""
+"Project-Id-Version: Club & Grub\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+# --- Level names ---
+msgid "Bubbling Fen"
+msgstr "Bubbling Fen"
+
+msgid "Spore Hollow"
+msgstr "Spore Hollow"
+
+msgid "Heart of the Mangrove"
+msgstr "Heart of the Mangrove"
+
+# --- w6_l1 Bubbling Fen ---
+msgid "SIGN_W6_TAR"
+msgstr "Tar holds your feet. Tap Jump to hop."
+
+msgid "SIGN_W6_RAFT"
+msgstr "Strike forward on a raft to paddle: it moves the other way!"
+
+msgid "SIGN_W6_REX"
+msgstr "Bounce on his head three times in a row."
+
+msgid "SIGN_W6_RIDE"
+msgstr "Down + Jump: get off."
+
+# --- w6_l2 Spore Hollow ---
+msgid "SIGN_W6_CAPS"
+msgstr "Glowing caps are springs."
+
+msgid "SIGN_W6_GEYSER"
+msgstr "Stand on the vent when it bubbles."
+
+# --- w6_l2b Heart of the Mangrove ---
+msgid "SIGN_W6_TIDE"
+msgstr "The tar is rising. Climb!"

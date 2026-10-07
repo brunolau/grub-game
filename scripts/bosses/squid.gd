@@ -16,8 +16,8 @@ extends BossBase
 ##  - Phase 2 (60 % down to 30 %) adds the Ink spit: the jaws open 10 ticks (the telegraph), then an arcing ink blob
 ##    (`projectiles/boss_ink`: xvel +/-48 towards the target, yvel -96, +8 per tick); a blob costs a heart and 6 bones
 ##    and dims the screen to the night palette for SQUID_DIM_TICKS (the surfacing bubbles stay bright).
-##  - Phase 3 (below 30 %, red), the Whirlpool: once, the middle island rumbles SQUID_RUMBLE_TICKS (the telegraph) and
-##    sinks; two log rafts (`objects/raft width=3`) take its place and ride a current over the pool
+##  - Phase 3 (below 30 %, red), the Whirlpool: once, the middle island rumbles SQUID_RUMBLE_TICKS (the telegraph; two
+##    log rafts, `objects/raft width=3`, appear lying on it) and sinks; the rafts float and ride a current over the pool
 ##    (`zones/current`) that reverses every SQUID_CURRENT_FLIP ticks; the squid then surfaces in the free water nearest
 ##    its target and slams the raft beside it (12-tick telegraph as ever; the raft shakes, nobody is hurt or falls off).
 ##    Fight from the raft or a pool-side island; paddle with a forward strike.
@@ -33,15 +33,31 @@ extends BossBase
 ##
 ## Fairness (B.0): every attack shows itself 10+ ticks ahead (bubbles 22, tentacle 12, jaws 10, rumble 22); hits never
 ## stop or lengthen a state (no stun-lock); BossBase.hit_cooldown is shared. Parameters: `arena`, `hp`, `drops`
-## [fire_starter], `form=coop|solo`. Numbers: SQUID_* below (EnemyTuning once enemies-A adopts them). Picture: until
-## art-B's sheet lands (`sprites/bosses/squid.png`, EnemySkin `squid`) the squid draws a placeholder.
+## [fire_starter], `form=coop|solo`. Numbers: SQUID_* below (EnemyTuning once enemies-A adopts them).
+## Picture (cosmetic, never read by the simulation): art-B's sheets (EnemySkin `inkjaw`, `inkjaw_rage` in phase 3,
+## `inkjaw_parts`). The body sprite stands with the foot of its tentacles SQUID_ART_SINK_PX under the water line, so the
+## 44 px of SQUID_BOX show above it; the parts draw the surfacing bubbles, the slam's shadow, the raised and the slammed
+## tentacle and the co-op lock's crossed tentacles (lightened while they flinch); the ink blob is boss_ink's.
 
 enum State { DORMANT, DIVE, BUBBLES, RISE, UP, SINK, RUMBLE, DYING }
 
 const INK_ID: StringName = &"projectiles/boss_ink"
 const RAFT_ID: StringName = &"objects/raft"
 const CURRENT_ID: StringName = &"zones/current"
-const SKIN_NAME: String = "squid"
+const SKIN_NAME: String = "inkjaw"
+const SKIN_RAGE: String = "inkjaw_rage"
+const PARTS_TEXTURE: Texture2D = preload("res://assets/sprites/bosses/inkjaw_parts.png")
+const PARTS_COLUMNS: int = 8
+const PARTS_CELL: Vector2 = Vector2(80.0, 96.0)
+const PARTS_PIVOT: Vector2 = Vector2(40.0, 80.0)
+const PART_TENTACLE_UP: int = 0
+const PART_TENTACLE_FLINCH: int = 1
+const PART_TENTACLE_SLAM: int = 2
+const PART_BUBBLES: int = 10
+const PART_BUBBLE_FRAMES: int = 3
+const PART_SHADOW: int = 13
+## The body art's foot point lies this far under the water line (art body 57 px tall, 44 above the water) [own].
+const SQUID_ART_SINK_PX: int = 13
 
 # --- Tuning [D B.3] [G 13.6] (tune) ---------------------------------------------------------------------------------
 const SQUID_HP_BEGINNER: int = 150
@@ -108,6 +124,8 @@ var _dim: int = 0
 var _was_dark: bool = false
 var _whirlpool: bool = false
 var _rafts: Array[SimEntity] = []
+## The body sprite shows (up, rising, sinking, dying); the node itself stays visible for the bubbles and the parts.
+var _body_shown: bool = false
 var _current: SimEntity = null
 var _current_clock: int = 0
 var _island: Vector2i = Vector2i(-1, -1)
@@ -148,6 +166,8 @@ func _apply_params(params: Dictionary) -> void:
 
 func _ready() -> void:
 	set_box(SQUID_BOX)
+	if _sprite != null:
+		_sprite.position = Vector2(0.0, float(SQUID_ART_SINK_PX * Tuning.ART_SCALE))
 	if Game.level != null and Game.level.grid != null:
 		_find_gaps()
 	Spawner.preload_ids([RAFT_ID, CURRENT_ID])
@@ -270,6 +290,8 @@ func _on_reset() -> void:
 	spits = 0
 	ink_hits = 0
 	flinch_log.clear()
+	if skin == SKIN_RAGE:
+		_apply_skin(SKIN_NAME)
 	set_box(SQUID_BOX)
 	_hide()
 
@@ -279,6 +301,7 @@ func _on_lethal_hit() -> void:
 	_timer = 0
 	_slam_timer = -1
 	_jaws = -1
+	_play(&"dead", true)
 	Audio.play_sfx(Sfx.BOSS_ROAR)
 	queue_redraw()
 
@@ -312,6 +335,8 @@ func _ai_tick() -> void:
 	_timer += 1
 	_tick_lock()
 	var power: int = _poll_hits()
+	if power > 0:
+		_play(&"hurt", true)
 	# The open head counts its polls: SQUID_OPEN_TICKS of them after the tick it opened on.
 	if _open > 0 and _opened_tick != Sim.total_ticks:
 		_open -= 1
@@ -338,7 +363,7 @@ func _ai_tick() -> void:
 				teleport(Vector2i(_up_x, surface_y))
 				_state = State.RISE
 				_timer = 0
-				visible = true
+				_body_shown = true
 				Audio.play_sfx(Sfx.SPLASH_HEAVY)
 				_spawn_optional(FX_SPLASH, Vector2i(_up_x, surface_y), {"kind": "water"})
 		State.RISE:
@@ -354,7 +379,29 @@ func _ai_tick() -> void:
 			if _timer >= SQUID_RISE_TICKS:
 				_begin_dive(SQUID_DIVE_TICKS)
 	_contact_every()
+	_animate()
 	queue_redraw()
+
+
+## The body's animation role this tick (cosmetic), and the red sheet from phase 3 on.
+func _animate() -> void:
+	if get_phase() == 3 and skin != SKIN_RAGE and EnemySkin.find(SKIN_RAGE) != null:
+		_apply_skin(SKIN_RAGE)
+		set_box(SQUID_BOX)
+	match _state:
+		State.RISE, State.SINK:
+			_play(&"surface")
+		State.UP:
+			if _anim_role == &"hurt" and not _anim_done():
+				return
+			if _jaws > 0:
+				_play(&"spit")
+			elif get_slam_mark() >= 0:
+				_play(&"slam")
+			elif get_slam_rect().size.x > 0:
+				_play(&"slam_hold")
+			else:
+				_play(&"idle")
 
 
 func _dive_len() -> int:
@@ -390,10 +437,12 @@ func _begin_rumble() -> void:
 
 func _up_tick(target: PlayerBase) -> void:
 	# The slam: rises over the target's spot, then comes down.
+	# The tentacle's clock starts at 0 on the tick it rises (its shadow shows SQUID_TENTACLE_RISE_TICKS ticks, 0..11),
+	# then slams on 12..15.
 	if _timer == SQUID_TENTACLE_AT:
 		_slam_x = _slam_spot(target)
 		_slam_timer = 0
-	if _slam_timer >= 0:
+	elif _slam_timer >= 0:
 		_slam_timer += 1
 		if _slam_timer == SQUID_TENTACLE_RISE_TICKS:
 			slams += 1
@@ -826,8 +875,23 @@ func _end_dim() -> void:
 
 
 func _hide() -> void:
-	visible = false
+	_body_shown = false
 	queue_redraw()
+
+
+## EnemyBase's frame / flip / flash, then the body only while it is above the water, sunk by the rise.
+func _refresh_visual() -> void:
+	super._refresh_visual()
+	if _sprite == null:
+		return
+	_sprite.visible = _body_shown
+	var rise: float = 1.0
+	if _state == State.RISE:
+		rise = float(_timer) / float(SQUID_RISE_TICKS)
+	elif _state == State.SINK:
+		rise = 1.0 - float(_timer) / float(SQUID_RISE_TICKS)
+	var sink: float = float(SQUID_ART_SINK_PX) + (1.0 - clampf(rise, 0.0, 1.0)) * float(SQUID_BOX.y)
+	_sprite.position = Vector2(0.0, sink * float(Tuning.ART_SCALE))
 
 
 func _rel(rel: Rect2i) -> Rect2i:
@@ -859,14 +923,8 @@ func _wakes_for(hero: PlayerBase) -> bool:
 
 
 # =================================================================================================================
-# Placeholder picture (until art-B's sheet lands) - cosmetic
+# Parts (cosmetic): bubbles, the slam's shadow and tentacle, the co-op lock's crossed tentacles
 # =================================================================================================================
-
-const INK_GREEN: Color = Color("3f7a4a")
-const INK_RED: Color = Color("a3402f")
-const INK_DARK: Color = Color("272018")
-const BUBBLE: Color = Color(1.6, 1.8, 2.0, 0.9)
-
 
 func _process(_delta: float) -> void:
 	if fighting and not dead:
@@ -876,37 +934,31 @@ func _process(_delta: float) -> void:
 func _draw() -> void:
 	if not fighting or dead:
 		return
-	var origin: Vector2 = position
-	var scale: float = Tuning.ART_SCALE
 	if _state == State.BUBBLES:
-		for k: int in 5:
-			var p: Vector2 = Vector2(_next_x - 12 + k * 6, surface_y - 2 - ((_timer * 2 + k * 5) % 14)) * scale - origin
-			draw_circle(p, 3.0, BUBBLE)
-	if _slam_x >= 0 and _slam_timer >= 0 and _slam_timer < SQUID_TENTACLE_RISE_TICKS:
-		var shadow: Vector2 = Vector2(_slam_x - 12, _slam_floor(_slam_x) - 3) * scale - origin
-		draw_rect(Rect2(shadow, Vector2(24.0 * scale, 3.0 * scale)), Color(0.0, 0.0, 0.0, 0.45))
+		var frame: int = PART_BUBBLES + (_timer / 3) % PART_BUBBLE_FRAMES
+		_draw_part(frame, Vector2i(_next_x, surface_y))
+	var mark: int = get_slam_mark()
+	if mark >= 0:
+		var floor_y: int = _slam_floor(mark)
+		_draw_part(PART_SHADOW, Vector2i(mark, floor_y))
+		# The tentacle hangs raised over the spot it will slam.
+		_draw_part(PART_TENTACLE_UP, Vector2i(mark, floor_y - SQUID_SLAM_BOX.y + 16), mark < _up_x)
 	var slam: Rect2i = get_slam_rect()
 	if slam.size.x > 0:
-		draw_rect(Rect2(Vector2(slam.position) * scale - origin, Vector2(slam.size) * scale), INK_GREEN)
-	if not visible:
-		return
-	var body: Color = INK_RED if get_phase() == 3 else INK_GREEN
-	var rise: float = 1.0
-	if _state == State.RISE:
-		rise = float(_timer) / float(SQUID_RISE_TICKS)
-	elif _state == State.SINK:
-		rise = 1.0 - float(_timer) / float(SQUID_RISE_TICKS)
-	var height: float = float(SQUID_BOX.y) * rise * scale
-	var width: float = float(SQUID_BOX.x) * scale
-	draw_rect(Rect2(Vector2(-width * 0.5, -height), Vector2(width, height)), body)
-	draw_rect(Rect2(Vector2(-width * 0.5, -height), Vector2(width, 6.0)), INK_DARK)
-	if rise >= 1.0:
-		draw_circle(Vector2(-10.0, -height + 24.0), 5.0, Color.WHITE)
-		draw_circle(Vector2(10.0, -height + 24.0), 5.0, Color.WHITE)
-		if _jaws > 0:
-			draw_rect(Rect2(Vector2(-12.0, -48.0), Vector2(24.0, 12.0)), INK_DARK)
-		if _locked() and _state == State.UP:
-			for side: int in [-1, 1]:
-				var t: Rect2i = get_tentacle_rect(side)
-				var col: Color = body.lightened(0.4) if _flinch[0 if side < 0 else 1] > 0 else body.darkened(0.2)
-				draw_rect(Rect2(Vector2(t.position) * scale - origin, Vector2(t.size) * scale), col)
+		_draw_part(PART_TENTACLE_SLAM, Vector2i(slam.get_center().x, slam.end.y), slam.get_center().x < _up_x)
+	if _body_shown and _locked() and _state == State.UP and _open == 0:
+		for side: int in [-1, 1]:
+			var rect: Rect2i = get_tentacle_rect(side)
+			var flinching: bool = _flinch[0 if side < 0 else 1] > 0
+			_draw_part(PART_TENTACLE_FLINCH if flinching else PART_TENTACLE_UP,
+					Vector2i(rect.get_center().x, rect.end.y + 8), side > 0)
+
+
+## One cell of inkjaw_parts.png with its pivot (bottom centre) at `feet` (logical px), mirrored when `flip`.
+func _draw_part(frame: int, feet: Vector2i, flip: bool = false) -> void:
+	var source: Rect2 = Rect2(Vector2(float(frame % PARTS_COLUMNS), float(frame / PARTS_COLUMNS)) * PARTS_CELL,
+			PARTS_CELL)
+	var at: Vector2 = Vector2(feet * Tuning.ART_SCALE) - position
+	draw_set_transform(at, 0.0, Vector2(-1.0 if flip else 1.0, 1.0))
+	draw_texture_rect_region(PARTS_TEXTURE, Rect2(-PARTS_PIVOT, PARTS_CELL), source)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)

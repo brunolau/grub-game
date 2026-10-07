@@ -286,6 +286,72 @@ func test_thrown_weapons_never_pogo() -> void:
 	assert_eq(hero.yvel, yvel + Tuning.GRAVITY, "no pogo: plain gravity")
 
 
+## 2.0 versus (PHYSICS.md C.14 "Thrown specials", DESIGN.md E.2 [G17]): the axe and the swirling axe stop where they
+## enter a wall or a floor and lie there as a temporary pick-up of their weapon - in front of a wall's face, never
+## inside it (the spear's placement, HeroSpear.lie_spot); in the campaign and co-op they pass walls as in 1.0.
+func test_a_versus_throw_lies_in_front_of_a_walls_face() -> void:
+	var rows: PackedStringArray = PackedStringArray()
+	for row: int in GROUND_ROW + WORLD_ROWS_BELOW:
+		var line: String = ""
+		for col: int in WORLD_COLS:
+			var wall: bool = col >= 66 and col <= 67 and row >= GROUND_ROW - 3
+			line += TileGrid.CH_SOLID_A if row >= GROUND_ROW or wall else TileGrid.CH_AIR
+		rows.append(line)
+	var face_cell_x: int = 65 * Tuning.TILE + Tuning.TILE / 2
+	for case: Array in [[&"projectiles/hero_axe", "axe"], [&"projectiles/hero_boomerang", "boomerang"]]:
+		for versus: bool in [true, false]:
+			world_rows(rows)
+			spawn_hero()
+			Game.mode = Defs.GameMode.VERSUS if versus else Defs.GameMode.SINGLE
+			var label: String = "%s, %s" % [case[1], "versus" if versus else "campaign"]
+			# Flat at the wall's middle row: 13 px per tick, the point enters column 66 on the fourth move.
+			var throw: ProjectileBase = level.spawn(case[0], Vector2i(63 * 16, GROUND_ROW * 16 - 24),
+					{"power": 20, "xvel": Tuning.THROW_XVEL, "yvel": 0, "yacc": 0}) as ProjectileBase
+			assert_not_null(throw)
+			play(hold("", 8))
+			var pickup: CollectibleBase = _temp_pickup(str(case[1]))
+			if not versus:
+				assert_false(throw.spent, "%s: it flies through the wall (1.0)" % label)
+				assert_null(pickup, "%s: no pick-up" % label)
+				continue
+			assert_true(throw.spent, "%s: stopped by the wall" % label)
+			assert_not_null(pickup, "%s: it lies there as a temporary pick-up" % label)
+			if pickup == null:
+				continue
+			assert_true(bool(pickup.spawn_params.get("temp", false)))
+			var ticks: int = 0
+			while not pickup.resting and ticks < 120:
+				play(hold("", 1))
+				ticks += 1
+			assert_eq(pickup.sim_pos, Vector2i(face_cell_x, GROUND_ROW * Tuning.TILE),
+					"%s: on the floor in front of the face" % label)
+			assert_true(pickup.sim_pos.x + 8 <= 66 * Tuning.TILE, "%s: its box stays out of the wall" % label)
+	# Down onto a floor: it lies on the cell's top where it came down.
+	world_rows(rows)
+	spawn_hero()
+	Game.mode = Defs.GameMode.VERSUS
+	var falling: ProjectileBase = level.spawn(&"projectiles/hero_axe", Vector2i(56 * 16 + 4, GROUND_ROW * 16 - 20),
+			{"power": 20, "xvel": 0, "yvel": 64, "yacc": 0}) as ProjectileBase
+	play(hold("", 6))
+	assert_true(falling.spent, "stopped by the floor")
+	var lying: CollectibleBase = _temp_pickup("axe")
+	assert_not_null(lying)
+	if lying != null:
+		var waited: int = 0
+		while not lying.resting and waited < 120:
+			play(hold("", 1))
+			waited += 1
+		assert_eq(lying.sim_pos, Vector2i(56 * 16 + 4, GROUND_ROW * 16), "on the floor's top where it came down")
+	Game.mode = Defs.GameMode.SINGLE
+
+
+func _temp_pickup(kind: String) -> CollectibleBase:
+	for entity: SimEntity in level.get_kind(Defs.Kind.COLLECTIBLE):
+		if entity.spawn_params.get("kind", "") == kind and bool(entity.spawn_params.get("temp", false)):
+			return entity as CollectibleBase
+	return null
+
+
 func test_at_most_four_thrown_weapons() -> void:
 	Game.set_weapon(Defs.Weapon.AXE)
 	world_flat()

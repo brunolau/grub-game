@@ -19,7 +19,10 @@ const BOLT_TICKS: int = 4
 const BURN_TICKS: int = 66
 const COLUMN_W: int = Tuning.TILE
 const BURN_H: int = 8
-## Colours of the placeholder drawing until art-B's lightning (RPG fx recoloured white-yellow).
+## art-B's sheets (EnemySkin cases): the bolt and its flash, the storm mark.
+const LIGHTNING_SHEET: String = "roc_lightning"
+const PARTS_SHEET: String = "roc_parts"
+## Colours of the drawn placeholder (and of the burning sticks, which have no picture).
 const COL_CLOUD: Color = Color(0.16, 0.16, 0.24, 0.85)
 const COL_BOLT: Color = Color(1.0, 0.97, 0.7, 0.95)
 const COL_BURN: Color = Color(1.0, 0.55, 0.15, 0.9)
@@ -112,6 +115,8 @@ func _draw() -> void:
 	var scale: float = float(Tuning.ART_SCALE)
 	var half: float = float(COLUMN_W >> 1) * scale
 	var height: float = float(strike_y - top_y) * scale
+	if _draw_sheets(height):
+		return
 	if is_marking():
 		var dark: float = clampf(float(_age + 1) / float(maxi(mark, 1)), 0.2, 1.0)
 		var cloud: Color = COL_CLOUD
@@ -121,3 +126,44 @@ func _draw() -> void:
 		draw_rect(Rect2(-half * 0.5, -height, half, height), COL_BOLT)
 	elif is_burning():
 		draw_rect(Rect2(-half, -float(BURN_H) * scale, half * 2.0, float(BURN_H) * scale), COL_BURN)
+
+
+## art-B's sheets (cosmetic): the storm mark (roc_parts `storm_mark`, lit / dim) at the top of the column while it
+## marks, the bolt segments (roc_lightning `bolt` 0 / 1 stacked down the column) and the `flash` at the struck floor
+## while it strikes. False when a sheet is missing (the drawn placeholder then) or while it burns (drawn).
+func _draw_sheets(height: float) -> bool:
+	if is_burning():
+		return false
+	if is_marking():
+		var parts: EnemySkin = EnemySkin.find(PARTS_SHEET)
+		if parts == null or not parts.has_anim(&"storm_mark"):
+			return false
+		var mark_anim: Vector4i = parts.anim(&"storm_mark")
+		var mark_frame: int = mark_anim.x + (_age / maxi(mark_anim.z, 1)) % maxi(mark_anim.y, 1)
+		_draw_cell(parts, mark_frame, Vector2(0.0, -height + float(parts.pivot.y)))
+		return true
+	var lightning: EnemySkin = EnemySkin.find(LIGHTNING_SHEET)
+	if lightning == null or not lightning.has_anim(&"bolt"):
+		return false
+	var bolt: Vector4i = lightning.anim(&"bolt")
+	var step: float = float(lightning.pivot.y)
+	var y: float = -height + step
+	var i: int = 0
+	while y < step:
+		_draw_cell(lightning, bolt.x + (i + (_age >> 1)) % maxi(bolt.y, 1), Vector2(0.0, minf(y, 0.0)))
+		y += step
+		i += 1
+	if lightning.has_anim(&"flash"):
+		_draw_cell(lightning, lightning.anim(&"flash").x, Vector2.ZERO)
+	return true
+
+
+## One cell of `sheet` with its pivot at `at` (art px, relative to the feet point).
+func _draw_cell(sheet: EnemySkin, frame: int, at: Vector2) -> void:
+	var texture: Texture2D = load(sheet.texture_path) as Texture2D
+	if texture == null:
+		return
+	var column: int = frame % maxi(sheet.columns, 1)
+	var row: int = frame / maxi(sheet.columns, 1)
+	var source: Rect2 = Rect2(Vector2(column * sheet.cell.x, row * sheet.cell.y), Vector2(sheet.cell))
+	draw_texture_rect_region(texture, Rect2(at - Vector2(sheet.pivot), Vector2(sheet.cell)), source)

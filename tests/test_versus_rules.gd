@@ -389,6 +389,7 @@ func test_teammate_and_curled_heads_are_springboards() -> void:
 	_give(heroes[1], 6)
 	heroes[0].teleport(Vector2i(160, FLOOR_Y - 30))
 	heroes[0].yvel = 64
+	heroes[0].grounded = false
 	Sim.step(1)
 	assert_eq(heroes[0].yvel, Tuning.BOUNCE_YVEL)
 	assert_eq(referee.stack_of(1), 6, "a teammate's head is free")
@@ -399,6 +400,57 @@ func test_teammate_and_curled_heads_are_springboards() -> void:
 	Sim.step(1)
 	assert_eq(referee.stack_of(1), 6, "a curled hero ignores stomps")
 	assert_eq(heroes[1].squash, 0)
+
+
+func test_a_stomp_is_a_landing() -> void:
+	# G15 (PHYSICS.md C.14): a hero standing on the one-way bridge (row 7, feet y 112) never stomps a rival whose head
+	# rises into his feet from below (a pogo under the bridge) - no steal, no bounce, no squash.
+	_arena(2, [100, 160])
+	_give(heroes[1], 6)
+	var stander: PlayerBase = heroes[0]
+	var riser: PlayerBase = heroes[1]
+	stander.teleport(Vector2i(72, 112))
+	stander.grounded = true
+	stander.yvel = 0
+	Sim.step(1)
+	riser.teleport(Vector2i(72, 112 + riser.box_h - 4))
+	riser.yvel = -96
+	riser.grounded = false
+	Sim.step(1)
+	assert_eq(referee.stack_of(1), 6, "no steal from a head that rose into standing feet")
+	assert_eq(referee.stack_of(0), 0)
+	assert_eq(stander.yvel, 0, "no bounce")
+	assert_eq(riser.squash, 0, "no squash")
+	# The same rival jumped on from above: the stomp as before.
+	stander.teleport(Vector2i(160, FLOOR_Y - 30))
+	stander.grounded = false
+	stander.yvel = 64
+	riser.teleport(Vector2i(160, FLOOR_Y))
+	riser.yvel = 0
+	riser.grounded = true
+	Sim.step(1)
+	assert_eq(stander.yvel, Tuning.BOUNCE_YVEL, "a landing on the head bounces")
+	assert_eq(referee.stack_of(0), 1, "and steals")
+
+
+func test_a_pair_ramming_each_other_is_knocked_once_not_lifted() -> void:
+	# core-B's floating pair: both hold toward each other; after a knock they are in the air and only nudged apart
+	# until they land - they never rise off the screen.
+	_arena(2, [100, 112])
+	var a: PlayerBase = heroes[0]
+	var b: PlayerBase = heroes[1]
+	a.xvel = 80
+	b.xvel = -80
+	Sim.step(1)
+	assert_eq(a.yvel, VersusTuning.BODY_KNOCK_YVEL, "the knock")
+	var gap: int = b.sim_pos.x - a.sim_pos.x
+	assert_true(gap > 12, "nudged apart on the knock tick too (%d px)" % gap)
+	a.xvel = 80
+	b.xvel = -80
+	a.yvel = 32
+	Sim.step(1)
+	assert_eq(a.yvel, 32, "airborne from the knock: no second knock")
+	assert_eq(b.xvel, -80)
 
 
 func test_body_bump_nudges_and_knocks() -> void:

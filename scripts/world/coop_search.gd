@@ -26,12 +26,13 @@ extends RefCounted
 ##     World state: every macro starts from the level-file state (Level.reset_entities: doors closed, plates up,
 ##     enemies at their posts and alive, the egg behind the hero) - unless the path so far CHANGED the world for good:
 ##     a resting point is a node of (place, world signature), where the signature lists what a reset would undo that
-##     the player could use (dead or hurt enemies, an opened spot, a pushed pot or boulder, a sprung pot, a pressed
-##     plate or a door still open, a see-saw tipped, a spear step or spring standing, Chomper ridden or moved, a
-##     picked-up weapon, changed cells). A changed node replays its path from the last unchanged one (same seed, same
-##     inputs: the same world), so changes carry from move to move exactly. Where the partner stands is not part of
-##     it: a `partner` move places him afresh where the hero stands (the player can walk his egg anywhere and hatch
-##     it), a changed node made by one keeps him there for its replay.
+##     the player could use (a dead keeper, trait or bond enemy, a pushed pot or boulder, a sprung pot, a pressed
+##     plate or a door still open, a see-saw tipped, a spear step or spring standing, Chomper ridden or moved, the
+##     glider taken, changed cells - not a plain enemy's death, which a strike-walk repeats on its way, nor spots and
+##     dropped items). A changed node replays its path from the last unchanged one (same seed, same inputs: the same
+##     world; at most MAX_PREFIX_TICKS), so changes carry from move to move exactly. Where the partner stands is not
+##     part of it: a `partner` move places him afresh where the hero stands (the player can walk his egg anywhere and
+##     hatch it), a changed node made by one keeps him there for its replay.
 ##  3. Windows (D.8 #4): every twin window and daze near the gate with the solo minimum the search measures on the
 ##     bare grid (nothing in the way: the least a hero needs) - drum bonds and enemy bonds (the ticks one hero needs
 ##     from striking one member to the other: running between their strike spots, or 0 when a thrown special from
@@ -74,7 +75,7 @@ const PARTNER_FRONT_PX: int = 0
 ## Sim.rng at the start of every run (a run and its replay draw the same numbers).
 const SEARCH_SEED: int = 0x5EA2C4
 ## A changed node's replay is at most this long (ticks from its last unchanged ancestor); longer paths are dropped.
-const MAX_PREFIX_TICKS: int = 900
+const MAX_PREFIX_TICKS: int = 360
 ## Record ids the search world leaves out: presentation, progress and flow (a checkpoint, an exit, a team gate travel
 ## through Flow), and the arena's (never in a co-op file).
 const WORLD_SKIP_IDS: Array[String] = [
@@ -95,6 +96,14 @@ const WORLD_MARGIN_COLS: int = 6
 ## the second.
 const STRIKE_REACH_CELLS: Vector2i = Vector2i(6, 4)
 const THROW_REACH_CELLS: Vector2i = Vector2i(18, 6)
+## [method Searcher.partner_useful]: the rows over the hero's feet cell (inclusive) and the columns either side where a
+## floor makes the idle partner worth a try.
+const PARTNER_LEDGE_ROWS: Vector2i = Vector2i(4, 9)
+const PARTNER_LEDGE_COLS: int = 5
+## The fastest a hero crosses the floor (px per tick: the Hot Rock holder's 96 v16, above the walk cap of 80) and the
+## columns a strike spot lies beside its target ([method strike_spots]): the lower bound of [method pair_lower_bound].
+const HERO_MAX_PX_PER_TICK: int = 6
+const STRIKE_REACH_SPOT_COLS: int = 2
 ## The specials a hero may hold for a throw (every belt special of the reference hero).
 const THROW_WEAPONS: Array[int] = [Defs.Weapon.AXE, Defs.Weapon.BOOMERANG, Defs.Weapon.SPEAR]
 ## Properties of a record entity that the world signature reads (when it has them).
@@ -112,11 +121,32 @@ class SearchLevel:
 	## Cell -> its character before the first change since the last [method restore_cells].
 	var changed: Dictionary = {}
 
-	func get_view_rect() -> Rect2i:
+	## A search world: the view is one screen around P1 (as the camera shows him: what lies off it dozes and wakes
+	## as in the game); a bare search: the whole map.
+	var follow: bool = false
+
+	func whole_rect() -> Rect2i:
 		return Rect2i(0, 0, maxi(grid.width_px(), Tuning.VIEW_W), maxi(grid.height_px(), Tuning.VIEW_H))
 
+	func get_view_rect() -> Rect2i:
+		var whole: Rect2i = whole_rect()
+		var hero: PlayerBase = get_hero(0) if follow else null
+		if hero == null:
+			return whole
+		var x: int = clampi(hero.sim_pos.x - Tuning.VIEW_W / 2, 0, maxi(whole.size.x - Tuning.VIEW_W, 0))
+		var y: int = clampi(hero.sim_pos.y - Tuning.VIEW_H * 2 / 3, 0, maxi(whole.size.y - Tuning.VIEW_H, 0))
+		return Rect2i(x, y, Tuning.VIEW_W, Tuning.VIEW_H)
+
+	## The co-op frame is the whole map: no edge walls, no leash (the partner is never left behind).
 	func get_party_frame() -> Rect2i:
-		return get_view_rect()
+		return whole_rect()
+
+	## Decide every doze area afresh (after a reset moved the entities home and the heroes were placed), as
+	## LevelBase.respawn_player does.
+	func refresh_doze() -> void:
+		_doze_full = true
+		_doze_known.fill(0)
+		_doze_update()
 
 	func set_cell(col: int, row: int, ch: String) -> void:
 		var cell: Vector2i = Vector2i(col, row)
@@ -153,6 +183,8 @@ class Searcher:
 	var simulated: int = 0
 	## Macro runs made (each from a reset world).
 	var runs: int = 0
+	## Ticks replayed to bring a changed node back (part of [member simulated]).
+	var replayed: int = 0
 	## True when the level holds the file's entities ([method build_world]).
 	var world: bool = false
 	var _saved_level: LevelBase = null
@@ -160,6 +192,11 @@ class Searcher:
 	var _saved_party: int = 1
 	var _saved_difficulty: int = 0
 	var _game_saved: bool = false
+	## A search world starts every run on the same Sim.tick (the one it was built on), so whatever counts on the clock
+	## (a geyser's period, a lift's phase) is in the same phase in a run and in its replay; [method close] puts the
+	## clock at the latest tick reached.
+	var _tick_base: int = -1
+	var _tick_max: int = 0
 	var _flags: PackedInt32Array = PackedInt32Array()
 	var _first_tick: int = 0
 	## The records spawned into the world and their entities (same index).
@@ -171,6 +208,8 @@ class Searcher:
 	var _baseline: String = ""
 	## Feet points (logical px) of what strikes and throws can act on.
 	var _targets: Array[Vector2i] = []
+	## Feet points of what an idle partner can be used on (plates to weigh, keepers and trait enemies to bait).
+	var _partner_targets: Array[Vector2i] = []
 
 	## Build a bare level from `grid` (no entity but the hero). False when the hero scene does not exist.
 	func build(level_id: StringName, meta: Dictionary, grid: TileGrid) -> bool:
@@ -200,6 +239,8 @@ class Searcher:
 		if not Spawner.exists(PLAYER_ID):
 			return false
 		_saved_level = Game.level
+		_tick_base = Sim.tick
+		_tick_max = Sim.tick
 		_saved_mode = Game.mode
 		_saved_party = Game.party
 		_saved_difficulty = Game.difficulty
@@ -213,13 +254,11 @@ class Searcher:
 		level.level_id = data.id
 		level.meta = data.resolved_meta(difficulty)
 		level.grid = grid
+		level.follow = true
 		(Engine.get_main_loop() as SceneTree).root.add_child(level)
-		for record: Dictionary in data.entity_records():
+		for record: Dictionary in CoopSearch.world_record_list(data, difficulty, columns):
 			var id: String = String(record["id"])
 			var col: int = int(record["col"])
-			if col < columns.x or col >= columns.y or not CoopSearch.world_keeps(id) \
-					or not LevelText.applies_to(record["params"], difficulty):
-				continue
 			var params: Dictionary = (record["params"] as Dictionary).duplicate()
 			var node: SimEntity = level.spawn(StringName(id), LevelText.cell_to_feet(float(col),
 					float(int(record["row"])), params), params) as SimEntity
@@ -230,6 +269,9 @@ class Searcher:
 			_kept[node.get_instance_id()] = true
 			if CoopSearch.is_target(id):
 				_targets.append(node.sim_pos)
+			if id == "objects/plate" or (record["params"] as Dictionary).has("keeper") \
+					or (record["params"] as Dictionary).has("coop"):
+				_partner_targets.append(node.sim_pos)
 		hero = level.spawn(PLAYER_ID, Vector2i(Tuning.TILE * 2, Tuning.TILE * 2), {}) as PlayerBase
 		partner = level.spawn(PLAYER_ID, Vector2i(Tuning.TILE * 3, Tuning.TILE * 2), {"slot": PARTNER_SLOT}) \
 				as PlayerBase
@@ -262,6 +304,9 @@ class Searcher:
 		partner = null
 		driver = null
 		_entities.clear()
+		if _tick_base >= 0:
+			Sim.tick = maxi(Sim.tick, _tick_max)
+			_tick_base = -1
 		if _game_saved:
 			Game.mode = _saved_mode
 			Game.party = _saved_party
@@ -295,9 +340,10 @@ class Searcher:
 				continue
 			var record: Dictionary = _records[i]
 			var old: SimEntity = _entities[i]
-			_kept.erase(old.get_instance_id())
-			level.remove_child(old)
-			old.free()
+			if old != null and is_instance_valid(old):
+				_kept.erase(old.get_instance_id())
+				level.remove_child(old)
+				old.free()
 			var params: Dictionary = (record["params"] as Dictionary).duplicate()
 			var node: SimEntity = level.spawn(StringName(String(record["id"])), LevelText.cell_to_feet(
 					float(int(record["col"])), float(int(record["row"])), params), params) as SimEntity
@@ -340,6 +386,8 @@ class Searcher:
 			partner_mode: int = PARTNER_EGG, skip: int = 0, expect: Vector2i = Vector2i(-1, -1)) -> Dictionary:
 		runs += 1
 		if world:
+			_tick_max = maxi(_tick_max, Sim.tick)
+			Sim.tick = _tick_base
 			reset_world()
 		hero.run.reset_energy()
 		hero.run.set_weapon(hand if hand >= 0 else Defs.Weapon.CLUB)
@@ -348,6 +396,7 @@ class Searcher:
 		hero.facing = facing
 		if world:
 			_place_partner(partner_mode, start, facing)
+			level.refresh_doze()
 		_flags = flags
 		_first_tick = Sim.tick + 1
 		var still: int = 0
@@ -359,6 +408,7 @@ class Searcher:
 			if hero.dead or hero.is_down():
 				return {}
 			if t < skip:
+				replayed += 1
 				continue
 			if t == skip and expect != Vector2i(-1, -1) and hero.sim_pos != expect:
 				return {}  # the replay did not come back to its node (a world that is not reset exactly): dropped
@@ -392,6 +442,25 @@ class Searcher:
 			partner.teleport(start + Vector2i(PartyTuning.EGG_OFFSET_X * facing, PartyTuning.EGG_OFFSET_Y))
 		driver.set(&"active_mask", 0)
 
+	## True when an idle partner may help at `pos`: a plate or a keeper / trait enemy within THROW_REACH_CELLS, or
+	## a floor PARTNER_LEDGE_ROWS over the hero's feet within PARTNER_LEDGE_COLS columns (higher than his own jump
+	## with its corner catch, low enough for a ride off a still carrier).
+	func partner_useful(pos: Vector2i) -> bool:
+		for target: Vector2i in _partner_targets:
+			if absi(target.x - pos.x) <= THROW_REACH_CELLS.x * Tuning.TILE \
+					and absi(target.y - pos.y) <= THROW_REACH_CELLS.y * Tuning.TILE:
+				return true
+		var grid: TileGrid = level.grid
+		var col: int = Tuning.to_cell(pos.x)
+		var row: int = Tuning.to_cell(pos.y - 1)
+		for dc: int in range(-PARTNER_LEDGE_COLS, PARTNER_LEDGE_COLS + 1):
+			for up: int in range(PARTNER_LEDGE_ROWS.x, PARTNER_LEDGE_ROWS.y + 1):
+				var cell: Vector2i = Vector2i(col + dc, row - up)
+				if grid.in_bounds(cell.x, cell.y + 1) and TileGrid.is_ground(grid.floor_at(cell.x, cell.y + 1)) \
+						and grid.side_at(cell.x, cell.y) != TileGrid.SIDE_WALL:
+					return true
+		return false
+
 	## True when something a strike (`reach` = STRIKE_REACH_CELLS) or a throw can act on lies near `pos`.
 	func target_near(pos: Vector2i, reach: Vector2i) -> bool:
 		for target: Vector2i in _targets:
@@ -417,7 +486,8 @@ class Searcher:
 			var pos: Vector2i = node["pos"]
 			var start_cell: Vector2i = Vector2i(Tuning.to_cell(pos.x), Tuning.to_cell(pos.y - 1))
 			if goals.has(start_cell):
-				return {"reached": true, "ticks": node["ticks"], "detail": node["path"], "nodes": head, "runs": runs, "simulated": simulated}
+				return {"reached": true, "ticks": node["ticks"], "detail": node["path"], "nodes": head, "runs": runs,
+					"simulated": simulated, "replayed": replayed}
 			var prefix: PackedInt32Array = node["prefix"]
 			var changed: bool = not prefix.is_empty()
 			for macro: Dictionary in macros:
@@ -436,7 +506,8 @@ class Searcher:
 					continue
 				var path: String = "%s > %s" % [node["path"], macro["name"]]
 				if outcome.has("goal"):
-					return {"reached": true, "ticks": ticks, "detail": path, "nodes": head, "runs": runs, "simulated": simulated}
+					return {"reached": true, "ticks": ticks, "detail": path, "nodes": head, "runs": runs,
+						"simulated": simulated, "replayed": replayed}
 				var rest: Vector2i = outcome["pos"]
 				var sig: String = outcome["sig"]
 				var key: String = CoopSearch.state_key(rest, sig)
@@ -459,7 +530,7 @@ class Searcher:
 				var cell: Vector2i = Vector2i(Tuning.to_cell(rest.x), Tuning.to_cell(rest.y - 1))
 				if fresh and area.has_point(cell):
 					queue.append(child)
-		return {"reached": false, "ticks": -1, "detail": "", "nodes": head, "runs": runs, "simulated": simulated}
+		return {"reached": false, "ticks": -1, "detail": "", "nodes": head, "runs": runs, "simulated": simulated, "replayed": replayed}
 
 	## Whether `macro` is worth a run from `node`: strikes where something to hit is near, throws where something to
 	## throw at is in range, the partner moves only from an unchanged node (they place him).
@@ -470,7 +541,8 @@ class Searcher:
 			"throw":
 				return target_near(node["pos"], THROW_REACH_CELLS)
 			"partner":
-				return CoopSearch.idle_partner and (node["prefix"] as PackedInt32Array).is_empty()
+				return CoopSearch.idle_partner and (node["prefix"] as PackedInt32Array).is_empty() \
+						and partner_useful(node["pos"])
 		return true
 
 
@@ -531,6 +603,8 @@ static func search_data(data: LevelData, difficulty: int, gate: String) -> Dicti
 	result["reached"] = bool(found["reached"])
 	result["explored"] = int(found["nodes"])
 	result["runs"] = int(found.get("runs", 0))
+	result["simulated"] = int(found.get("simulated", 0))
+	result["replayed"] = int(found.get("replayed", 0))
 	if result["reached"]:
 		result["detail"] = "one hero reached %d,%d in %d ticks: %s" % [far.x, far.y, int(found["ticks"]),
 			found["detail"]]
@@ -557,12 +631,65 @@ static func world_columns_of(area: Rect2i, starts: Array[Vector2i], grid: TileGr
 ## The records of `data` the search world of `difficulty` spawns in `columns` (the cache key's part), as text.
 static func world_records(data: LevelData, difficulty: int, columns: Vector2i) -> String:
 	var lines: PackedStringArray = PackedStringArray()
-	for record: Dictionary in data.entity_records():
-		var col: int = int(record["col"])
-		if col >= columns.x and col < columns.y and world_keeps(String(record["id"])) \
-				and LevelText.applies_to(record["params"], difficulty):
-			lines.append("%s %d %d %s" % [record["id"], col, int(record["row"]), str(record["params"])])
+	for record: Dictionary in world_record_list(data, difficulty, columns):
+		lines.append("%s %d %d %s" % [record["id"], int(record["col"]), int(record["row"]), str(record["params"])])
 	return "\n".join(lines)
+
+
+## The records of `data` the search world of `difficulty` spawns, in file order: those in `columns` that
+## [method world_keeps], and every record linked by a name to one of them wherever it lies - the plates of a door's
+## `rise_while` / `sink_while`, the keepers of a `trigger=keepers:<group>` door, the drums of a `trigger=drums:<bond>`
+## door and the other members of a bond (and the doors of such plates, keepers and drums) - so a mechanism is never
+## cut in half by the columns.
+static func world_record_list(data: LevelData, difficulty: int, columns: Vector2i) -> Array[Dictionary]:
+	var usable: Array[Dictionary] = []
+	for record: Dictionary in data.entity_records():
+		if world_keeps(String(record["id"])) and LevelText.applies_to(record["params"], difficulty):
+			usable.append(record)
+	var names: Dictionary = {}
+	var chosen: Dictionary = {}
+	for i: int in usable.size():
+		var col: int = int(usable[i]["col"])
+		if col >= columns.x and col < columns.y:
+			chosen[i] = true
+			for name: String in _link_names(usable[i]):
+				names[name] = true
+	for i: int in usable.size():
+		if chosen.has(i):
+			continue
+		for name: String in _link_names(usable[i]):
+			if names.has(name):
+				chosen[i] = true
+				break
+	var result: Array[Dictionary] = []
+	for i: int in usable.size():
+		if chosen.has(i):
+			result.append(usable[i])
+	return result
+
+
+## The mechanism names a record takes part in ("plate:<n>", "keepers:<g>", "drums:<b>", "bond:<b>").
+static func _link_names(record: Dictionary) -> PackedStringArray:
+	var params: Dictionary = record["params"]
+	var id: String = String(record["id"])
+	var result: PackedStringArray = PackedStringArray()
+	if id == "objects/plate" and params.has("name"):
+		result.append("plate:" + str(params["name"]))
+	for key: String in ["rise_while", "sink_while"]:
+		for name: String in LevelText.to_list(str(params.get(key, ""))):
+			result.append("plate:" + name)
+	var trigger: String = str(params.get("trigger", ""))
+	if trigger.begins_with("keepers:") or trigger.begins_with("drums:"):
+		result.append(trigger)
+	if params.has("keeper"):
+		result.append("keepers:" + str(params["keeper"]))
+	if id == "objects/drum" and params.has("bond"):
+		result.append("drums:" + str(params["bond"]))
+	elif params.has("bond"):
+		result.append("bond:" + str(params["bond"]))
+	if params.has("needs"):
+		result.append("drums:" + str(params["needs"]))
+	return result
 
 
 ## True when the search world spawns records of `id` (WORLD_SKIP_IDS, WORLD_ITEMS, WORLD_SKIP_ZONES; props never).
@@ -588,14 +715,24 @@ static func is_target(id: String) -> bool:
 		"objects/scenery_hittable"]
 
 
-## The world-signature part of one record entity: what a reset would undo. Enemies: alive or dead (where they walk
-## and the hits short of a kill are not carried); platforms and zones: nothing (their motion is momentary, a reset only adds back what fell);
+## The world-signature part of one record entity: what a reset would undo. Enemies with a co-op role (a keeper, a
+## trait, a bond): alive or dead (where they walk and the hits short of a kill are not carried; a plain enemy is not
+## carried at all - a move kills him again on its way, see the strike-walk macros); spots and dropped or placed
+## items: nothing (the reference hero holds every special; only the glider counts); platforms and zones: nothing
+## (their motion is momentary, a reset only adds back what fell);
 ## everything else: its feet point and the PROBE_PROPS it has.
 static func probe(entity: SimEntity) -> String:
 	if entity is EnemyBase:
-		return "e1" if (entity as EnemyBase).dead else "e0"
-	if entity is PlatformBase or entity is ZoneBase:
+		var enemy: EnemyBase = entity
+		if enemy.keeper == &"" and enemy.coop_trait == Defs.CoopTrait.NONE and not enemy.spawn_params.has("bond"):
+			return ""   # a plain enemy is killed again in the move that needs him gone
+		return "e1" if enemy.dead else "e0"
+	if entity is PlatformBase or entity is ZoneBase or entity is SceneryHittable:
 		return ""
+	if entity is CollectibleBase:
+		# The reference hero holds every special anyway: only the glider changes what he can do.
+		var item: CollectibleBase = entity
+		return "c%d" % (1 if item.collected else 0) if item.item_id == &"items/glider" else ""
 	var parts: PackedStringArray = PackedStringArray(["%d,%d" % [entity.sim_pos.x, entity.sim_pos.y]])
 	for prop: StringName in PROBE_PROPS:
 		if not prop in entity:
@@ -608,17 +745,13 @@ static func probe(entity: SimEntity) -> String:
 	return ",".join(parts)
 
 
-## The world-signature part of a runtime entity still standing at a rest (a spear step, a pot's spring, a weapon
-## lying on the floor): "" for everything that changes nothing (shots, effects, food).
+## The world-signature part of a runtime entity still standing at a rest (a spear step, a pot's spring): "" for
+## everything that changes nothing (shots, effects, dropped items).
 static func probe_runtime(node: Node) -> String:
 	if node is PlatformBase or node is SpringPad:
 		var entity: SimEntity = node
 		return "%s@%d,%d" % [String((entity.get_script() as Script).resource_path).get_file(), entity.sim_pos.x,
 			entity.sim_pos.y]
-	if node is CollectibleBase:
-		var item: CollectibleBase = node
-		if WORLD_ITEMS.has(String(item.item_id)) and not item.collected:
-			return "%s@%d,%d" % [item.item_id, item.sim_pos.x, item.sim_pos.y]
 	return ""
 
 
@@ -932,6 +1065,8 @@ static func make_macros(world: bool = false) -> Array[Dictionary]:
 				+ _repeat(dir, 8), "strike"))
 		result.append(_macro("pogo %s" % side, facing, _repeat(up | dir, 9) + _repeat(dir | Defs.IN_DOWN | fire, 16),
 				"strike"))
+		result.append(_macro("strike-walk %s" % side, facing, _repeat(dir, 1) + _repeat(fire, 12) + _repeat(dir, 36),
+				"strike"))
 		# Throws of every special (each held in the hand for the move, the club on the belt).
 		for weapon: int in THROW_WEAPONS:
 			var label: String = ["club", "hammer", "axe", "swirl", "spear"][weapon]
@@ -1037,17 +1172,29 @@ static func measure_windows(data: LevelData, difficulty: int, area: Rect2i, sear
 
 
 ## The least ticks one hero needs between striking the member at `a` and the member at `b` (either order): 0 when a
-## thrown special from a strike spot of one crosses the other, else the run between their strike spots (BOUND_TICKS
-## when he cannot get there).
+## thrown special from a strike spot of one crosses the other; else, for members so far apart that even the fastest
+## hero (HERO_MAX_PX_PER_TICK, nothing in his way) needs more than the largest window plus its margin to go from one
+## strike spot to the other, that lower bound (no search: D5's 731-second bond of members 60-80 columns apart);
+## else the run between their strike spots (BOUND_TICKS when he cannot get there).
 static func pair_solo_min(a: Vector2i, b: Vector2i, grid: TileGrid, area: Rect2i, searcher: Searcher) -> int:
 	var spots_a: Array[Vector2i] = strike_spots(grid, a)
 	var spots_b: Array[Vector2i] = strike_spots(grid, b)
 	if throw_crosses(spots_a, b) or throw_crosses(spots_b, a):
 		return 0
+	var bound: int = pair_lower_bound(a, b)
+	if bound > PartyTuning.WINDOW_TICKS_BEGINNER + PartyTuning.WINDOW_SOLO_MARGIN_TICKS:
+		return bound
 	var goals: Dictionary = {}
 	for spot: Vector2i in spots_b:
 		goals[Vector2i(Tuning.to_cell(spot.x), Tuning.to_cell(spot.y - 1))] = true
 	return travel_ticks(spots_a, goals, area, searcher)
+
+
+## The fewest ticks any hero needs between strike spots of members at the cells `a` and `b`: their columns less the
+## strike reach on both sides (2 cells each), at HERO_MAX_PX_PER_TICK.
+static func pair_lower_bound(a: Vector2i, b: Vector2i) -> int:
+	var gap_px: int = maxi(absi(a.x - b.x) - 2 * STRIKE_REACH_SPOT_COLS, 0) * Tuning.TILE
+	return gap_px / HERO_MAX_PX_PER_TICK
 
 
 ## Ticks of the shortest search path from `starts` into a cell of `goals` (BOUND_TICKS when none within the bound).

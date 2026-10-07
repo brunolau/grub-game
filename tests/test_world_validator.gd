@@ -752,6 +752,10 @@ func test_search_helpers() -> void:
 	assert_true(CoopSearch.throw_crosses([Vector2i(56, 224)] as Array[Vector2i], Vector2i(12, 13)))
 	assert_false(CoopSearch.throw_crosses([Vector2i(56, 224)] as Array[Vector2i], Vector2i(4, 2)),
 			"nothing thrown reaches a cell high up behind the thrower")
+	# Bond members far apart: the lower bound decides without a search (D5's 731 s bond).
+	assert_eq(CoopSearch.pair_lower_bound(Vector2i(4, 13), Vector2i(84, 13)), (80 - 4) * Tuning.TILE / 6)
+	assert_eq(CoopSearch.pair_solo_min(Vector2i(4, 13), Vector2i(84, 13), expert, Rect2i(0, 0, 30, 16), null),
+			CoopSearch.pair_lower_bound(Vector2i(4, 13), Vector2i(84, 13)), "no search for members 80 columns apart")
 
 
 func test_search_world_runs_the_real_doors_and_carries_a_latched_plate() -> void:
@@ -817,11 +821,3 @@ enemies/walker 9 13 coop=bond bond=b window=12",
 	assert_true(validator.has_problem("enemies/walker window"), "an integer: %s" % _messages(validator))
 
 
-
-func test_zz_profile_real() -> void:
-	CoopSearch.use_cache = false
-	for gate: Array in [[&"w1_l1_coop", "hop"], [&"w1_l1_coop", "plates"], [&"w5_l1_coop", "hop"], [&"w5_l1_coop", "plates"], [&"w5_l1_coop", "gully"]]:
-		var t0: int = Time.get_ticks_msec()
-		var r: Dictionary = CoopSearch.search_gate(gate[0], 0, gate[1])
-		print("PROFILE %s %s reached %s explored %d runs %d ms %d flood %s | %s" % [gate[0], gate[1], r["reached"], int(r["explored"]), int(r.get("runs", 0)), Time.get_ticks_msec() - t0, r.get("flood"), r["detail"]])
-	CoopSearch.use_cache = true

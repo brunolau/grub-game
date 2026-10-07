@@ -15,8 +15,14 @@ extends RefCounted
 ##  - deflect a rival's thrown special with a forward strike: never the Rookie, the Hunter HUNTER_DEFLECT_PERCENT of
 ##    the time, the Chief VersusTuning.BOT_CHIEF_DEFLECT_PERCENT (decided once per projectile, on the bot's SimRng);
 ##  - Chief: stomp chains - falling, he steers onto the next rival head and holds UP for the big bounce;
-##  - the Rookie hesitates (takes a micro-rule only half of the time), never charges, stomps or deflects.
+##  - the Rookie hesitates (takes a micro-rule only half of the time), never charges, stomps or deflects; the Hunter
+##    and the Chief wait a random 0-3 / 0-1 ticks before a forward strike ([method strike_now]), so two bots never
+##    swing in lockstep into clang after clang.
 ## A mode narrows them with [method worth_hitting] and [method may_contact] (Hot Rock: never touch the holder).
+## Always: a bot keeps its spawn shield - no strike or throw while it is up ([method may_strike]; PLAN.md 8 V4.b: no
+## hit within 48 ticks of a spawn); it attacks from a strike stand beside the rival ([method attack_stand]), never by
+## running into him ([method guard_ramming]: the C.14 body knock gains nothing), and runs from a chaser to the place
+## he reaches latest ([method escape_point]).
 
 ## Strike kinds: the keys pressed with the facing direction, and the frames they play.
 const STRIKE_FORWARD: int = 0

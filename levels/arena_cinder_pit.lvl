@@ -1,0 +1,88 @@
+# Club & Grub level file - format 2 (docs/ARCHITECTURE.md 7.11). Versus arena #4 of docs/expansion/DESIGN.md E.5:
+# Cinder Pit - volcano, walled, obsidian slabs over a lava pit; sudden death: the lava rises. Owner: DA (arenas,
+# docs/expansion/PLAN.md 6.1). Rules: docs/LEVEL_DESIGN.md 15.8. Dressing: art-B's hand-over
+# (.tools/asset_candidates/expansion/_handover/ARENA_DRESSING.md, "Cinder Pit").
+#
+# Layout notes (the E.5 sketch; what the sketch leaves open is filled in here):
+# - Tiers: two floor islands (row 10, cols 0-7 / 12-19, from the walls to the pit) round a 4-cell lava pit (cols
+#   8-11); the central obsidian slab (row 7, cols 7-12) 3 rows over the islands' inner ends; the high slabs (row 4,
+#   cols 3-7 / 12-16) 3 rows over the central slab's ends and 6 over the islands, where the springs (cols 2 / 17,
+#   -224 = 105 px) reach them. The pit is a 4-cell running jump; the central slab bridges it.
+# - Walls, not lava, at the ends (E.5's table says "walls, lava pit"; its sketch drew lava in cols 0-1 / 18-19): with
+#   lava there, a spring lay one cell from it and core-B's V4.b sets ended Last Caveman Standing rounds after about
+#   300 ticks, the left end taking most knock-outs (spawn 3 won 0 of 48 rounds, spawns 1 + 4 on the right 86 %).
+#   With walls the pit is the one lava, the rounds run longer and every set is within +/-15 points.
+# - Spots (7, visible, refill 15 s after they are emptied): one in each island's floor (cols 5 / 14, low strike),
+#   one flush in the outer end of each high slab (cols 3 / 16) and one in each end of the central slab (cols 7 / 12),
+#   and the big spot (col 9 of the central slab, low strike from the slab): its giant falls 7 rows onto the slab
+#   over the pit - the middle of the arena, contested from the islands and from the high slabs alike.
+# - Cookpots: two (4-player arena), one on each high slab's inner half (cols 6 / 13), over the central slab's ends.
+# - Spawns (rotate every round; 2 players use 1 and 2): 1 and 2 on the islands' middles (cols 13 / 6) and 3 and 4 on
+#   the high slabs' outer halves (cols 4 / 15). Every spawn has a small spot within a few steps and the same way to
+#   the big spot (one jump up from an island, a drop down from a high slab).
+# - Signature hazard: the lava pit (a knock-back over its edge is a ring-out); the sudden death raises the lava one
+#   row per 44 ticks with a rumble 11 ticks ahead (VersusSuddenDeath lava_rise). The E.5 ember lane is not built
+#   (no versus ember rule yet).
+# - Crates: one pterodactyl lane over the whole arena (objects/crate_lane rect=1,1,18,10: a crate lands on the first
+#   floor of a column - the islands, the slabs, the central slab over the pit; never in the lava).
+# - Modes: Last Caveman Standing (default), Hot Rock, Grub Stack; each has a green bot set in core-B's
+#   tests/test_versus_bots.gd (12 seeds x 4 rounds, four Hunters; with the crate lane Grub Stack 8 points worst,
+#   Hot Rock 4, LCS 8 - its rounds end before the first crate).
+# - Bot graph: resources/bots/arena_cinder_pit.json, baked with core-B's tool after every edit of this file:
+#   bash .tools/gd.sh script res://tools/bots/bake_nav.gd -- arena_cinder_pit
+
+[meta]
+format = 2
+id = arena_cinder_pit
+name = "Cinder Pit"
+kind = arena
+biome = volcano
+terrain_a = volcano/terrain
+terrain_b = volcano/terrain_obsidian
+background = volcano_shaft
+liquid = lava
+music = versus_battle_c
+players = 4
+modes = last_caveman,hot_rock,grub_stack
+round_time = 90
+wrap = none
+sudden = lava_rise
+author = DA
+notes = "Versus arena 4 (DESIGN.md E.5): volcano, walled; two floor islands from the walls round a lava pit, the central obsidian slab over it with the big spot, high slabs reached by springs; lava rises in sudden death."
+
+[legend]
+? = objects/hidden_spot kind=small count=3 look=block tile=#
+s = objects/hidden_spot kind=small count=3 look=block tile=%
+* = objects/hidden_spot kind=big look=inset tile=%
+J = objects/spring
+P = objects/cookpot
+Q = objects/cookpot
+B = objects/spawn_point index=2
+C = objects/spawn_point index=3
+D = objects/spawn_point index=4
+
+[tiles]
+....................
+....................
+....................
+....C.P......Q.D....
+...s====....====s...
+....................
+....................
+.......s=*==s.......
+....................
+..J...B......@...J..
+#####?##....##?#####
+########~~~~########
+
+[entities]
+objects/crate_lane 1 1 rect=1,1,18,10
+props/volcano/stalactite 9 0 layer=back
+props/volcano/drips 14 0 layer=back
+props/volcano/drips 5 0 layer=back
+props/volcano/dead_tree 4 9 layer=back
+props/volcano/skull_big 15 9 layer=back
+props/volcano/bone_pile 7 9 layer=back
+props/volcano/rocks_small 12 9 layer=back
+props/volcano/rocks_small 5 3 layer=back
+props/volcano/grass_a 14 3 layer=back

@@ -109,6 +109,20 @@ class Lab:
 		var stream: PackedInt32Array = streams[slot]
 		return stream[index] if index >= 0 and index < stream.size() else 0
 
+	## After a test: free a screen Flow changed to meanwhile (a hero's last death opens the game-over screen, which would
+	## cover the view and read ui_accept in later test files; the idiom of tests/test_ui_screens.gd _cleanup()).
+	static func cleanup_flow(tree: SceneTree) -> void:
+		tree.paused = false
+		var scene: Node = tree.current_scene
+		if scene != null:
+			scene.queue_free()
+			tree.current_scene = null
+		for layer: int in [Defs.LAYER_HUD, Defs.LAYER_TOUCH, Defs.LAYER_MENU]:
+			for child: Node in Flow.get_overlay(layer).get_children():
+				child.queue_free()
+		Flow.current_screen = Flow.SCREEN_BOOT
+		Flow.args = {}
+
 	## Keep a hero alive and topped up (watch tests: the boss is observed, not survived).
 	static func top_up(hero_node: PlayerBase) -> void:
 		if hero_node == null:
@@ -169,6 +183,7 @@ func after_each() -> void:
 	Game.new_game(Defs.Difficulty.BEGINNER)
 	Game.begin_level(&"")
 	Audio.stop_music(0.0)
+	Lab.cleanup_flow(get_tree())
 	_lab = null
 
 
@@ -189,7 +204,8 @@ func test_tusker_loads_with_its_hit_points_and_starts_in_its_arena() -> void:
 	assert_eq(boar.max_hp, Tusker.TUSKER_HP_BEGINNER, "Beginner 150 = 6 club hits")
 	assert_eq(boar.get_max_pips(), 6)
 	assert_eq(boar.music, Sfx.MUSIC_BOSS_TUSKER)
-	assert_eq(boar.boss_drops, [&"fire_starter"] as Array[StringName])
+	# The fire-starter by default; the test level adds the trophy (its exit for the level validator).
+	assert_eq(boar.boss_drops, [&"fire_starter", &"trophy"] as Array[StringName])
 	_lab.step(PackedInt32Array([0]))
 	assert_true(boar.fighting, "the hero starts inside the arena zone")
 	var paw_at: int = -1

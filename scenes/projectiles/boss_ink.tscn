@@ -1,7 +1,7 @@
 [gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/projectiles/boss_ink.gd" id="1_script"]
-[ext_resource type="Texture2D" path="res://assets/sprites/fx/projectile_rock.png" id="2_texture"]
+[ext_resource type="Texture2D" path="res://assets/sprites/bosses/inkjaw_parts.png" id="2_texture"]
 
 [node name="BossInk" type="Node2D"]
 script = ExtResource("1_script")
@@ -9,5 +9,7 @@ script = ExtResource("1_script")
 [node name="Sprite" type="Sprite2D" parent="."]
 texture = ExtResource("2_texture")
 centered = false
-offset = Vector2(-11, -21)
-hframes = 4
+offset = Vector2(-40, -78)
+hframes = 8
+vframes = 2
+frame = 6

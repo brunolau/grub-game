@@ -1,29 +1,26 @@
-# route: level=w5_l1_coop difficulty=beginner players=2 ends=exit after=tally expect=hurts:0,eggs:0,wipes:0,x2_gates:3,min_checkpoints:4,min_kills:8
-# The Beginner two-stream route of Red Mesa Trail in co-op (designer D5; duo macros written per hero and merged,
-# one key set per player: P1|P2). Both heroes keep the club (no S), so the belt-invariance runner sees the same
+# route: level=w5_l1_coop difficulty=beginner players=2 ends=exit after=tally expect=hurts:0,eggs:0,wipes:0,x2_gates:3,min_checkpoints:4,min_kills:7
+# The Beginner two-stream route of Red Mesa Trail in co-op (designer D5; one key set per player: P1|P2; recorded from
+# closed-loop duo macros, build/d5). Both heroes keep the club (no S), so the belt-invariance runner sees the same
 # digests whatever special rides on either belt. All three co-op gates are crossed together:
-# 'hop' (Shoulder Hop + the flower pot spring), 'plates' (leapfrog plate doors), 'gully' (two Shellback pincers).
+# 'hop' (Shoulder Hop + the rolled vine), 'plates' (leapfrog plate doors), 'gully' (two Shellback pincers).
 # The beach, the tortoises, the rattler, checkpoint 1, the arch, the tortoise after it (side by side, P2 behind)
-77:R|R,8:F|F,2:|,6:R|R,8:RU|RU,12:R|R,6:|,10:R|R,6:|,6:R|R,8:F|F,2:|,16:R|R,8:F|F,2:|,60:R|R,12:R|R,8:F|F
-# gate 'hop': both onto the rock, P2 hops off P1's head onto the cliff, clubs the flower pot down onto the rock
-20:R|R,5:|R,10:RU|RU,12:R|,20:|,4:|RU,9:|U,16:|RU,4:|,6:L|R,2:|L,8:|F,14:|
-# P1 takes the spring up
-3:RU|,9:U|,20:RU|
-# checkpoint 2, both over the crevasse, the plateau tortoise
-34:R|R,4:R|RU,10:RU|RU,4:RU|R,2:R|R,8:F|F
-# gate 'plates': P1 holds plate A (the lower tunnel's door opens), P2 walks through to plate B (the upper tunnel's door
-# opens), P1 jumps onto the step and walks through the upper tunnel
-14:R|R,32:|R,8:|,12:U|,10:|,6:RU|,6:U|,30:R|
+77:R|R,8:F|F,2:|,6:R|R,8:RU|RU,12:R|R,6:|,10:R|R,6:|,6:R|R,8:F|F,2:|,16:R|R,8:F|F,2:|,72:R|R,8:F|F
+# Gate hop: P1 stands under the cliff, P2 jumps on his head holding Jump (Shoulder Hop) onto the cliff top and
+28:R|R,4:R|,1:R|RU,3:|RU,9:|U,14:|RU,14:|R,12:|L,7:|,5:|F,3:U|F,8:U|,6:U|R,29:U|
+# Checkpoint 2, both over the crevasse onto the plateau (P2 first)
+16:|R,15:R|R,10:R|RU,15:R|R,10:RU|R,3:R|R,13:R|,7:|
+# Gate plates: P1 holds plate A (the lower tunnel's door opens), P2 walks through to plate B (the upper tunnel's
+# door opens), P1 jumps onto the step and walks through the upper tunnel
+12:|,26:|R,6:|,12:U|,10:|,6:RU|,6:U|,54:R|
 # P1 drops off the upper tunnel's ledge, both go down the long slope to the plain, P1 clubs the tortoise
-16:R|,62:R|R,8:F|R,4:|R,16:|
-# gate 'gully': P1 drops into the gully in front of the first Shellback, P2 runs over the crust, drops through the
-# hatch behind it and clubs its back
-22:R|R,4:R|RU,10:|RU,20:|R,30:|
-3:R|R,2:R|,14:|,10:|D,16:|,1:|L,8:|F
+10:R|,52:R|R,2:R|,8:F|,8:|
+# Gate gully: P1 drops into the gully in front of the first Shellback, P2 runs over the crust, drops through the
+# hole onto the hatch, crouches through it behind the Shellback and clubs its back
+25:R|R,13:|R,4:R|R,6:|R,8:|RU,28:|R,8:|,12:|D,2:|L,3:|,8:|F,8:|
 # P2 jumps back up through the hatch onto the crust, runs to the second hole and drops in behind the second
 # Shellback; P1 walks up in front of it; P2 clubs its back; the keeper door rises
-4:|,10:R|U,4:|U,6:|,4:|RU,8:|U,2:R|U,6:R|,10:R|R,26:|R,14:|,10:|D,14:|,3:|L,4:|,8:|F,17:|
-# through the keeper door, past checkpoint 4, both up the long slope; the first Roller comes down and is jumped
-29:R|,82:R|R,19:|,7:U|,7:U|U,7:|U,1:|
-# up onto the mesa top, both jump the second Roller, P1 clubs the last tortoise, both into the exit totem
-16:R|R,14:RU|RU,10:R|R,8:F|R,70:R|R,2:|R
+10:R|U,13:R|,4:R|RU,6:|RU,23:|R,9:|,12:|D,3:|L,4:|,8:|F,8:|
+# Through the keeper door, past checkpoint 4, both up the long slope: the Rollers roll down and are jumped
+6:|,14:R|,99:R|R,5:R|U,4:U|U,5:U|,6:|,2:R|,14:R|R,9:R|U,2:R|,6:L|,13:|,3:|R
+# P1 clubs the last tortoise as it comes, both into the exit totem
+1:R|,7:|,6:F|,30:R|R

@@ -523,18 +523,23 @@ func node_x1(node: NavNode) -> int:
 
 
 ## The node a hero whose feet point is `pos` stands on; -1 when none (in the air, or not on a known span). Mover
-## nodes are matched at their live place (any feet y within 2 px of the platform top).
-func node_at(pos: Vector2i) -> int:
+## nodes are matched at their live place (any feet y within 2 px of the platform top). `riding`: the hero rides a
+## platform now (PlayerBase.on_platform) - a mover node under him wins over a floor it overlaps.
+func node_at(pos: Vector2i, riding: bool = false) -> int:
 	var row: int = pos.y >> 4
+	var found: int = -1
 	for node: NavNode in nodes:
 		if node.mover < 0:
-			if node.row == row and node.contains_x(pos.x):
-				return node.id
+			if found < 0 and node.row == row and node.contains_x(pos.x):
+				if not riding:
+					return node.id
+				found = node.id
 		else:
 			var offset: Vector2i = mover_offset(node.mover)
 			if absi(pos.y - (node.y + offset.y)) <= 2 and pos.x >= node.x0 + offset.x and pos.x <= node.x1 + offset.x:
-				return node.id
-	return -1
+				if riding or found < 0:
+					return node.id
+	return found
 
 
 ## The node nearest to `pos` (feet point; distance in px, vertical distance weighted double so that the floor under

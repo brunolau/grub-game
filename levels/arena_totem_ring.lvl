@@ -11,26 +11,28 @@
 #   a hop (3 px forward, 6 px low, a 15 px pogo off a spot) and a hero coming down from it within about 20 px of a
 #   spring is thrown 105 px up. In the sketch the stands of both floor spots (cols 3 / 16) lay in a spring's reach;
 #   now no spot stand and no spawn does. The floor spots moved one cell inward with them (cols 4 / 15).
-# - Spots (visible, refill 15 s after they are emptied): the two floor spots, two in the totem faces (left face at
-#   body height from the left floor, right face at body height from the right bridge), and the big spot (cols 12-13,
-#   one spot of two cells) on the right floor under the right bridge: its giant falls 7 rows onto the right bridge.
-#   The sketch had it on the left; a bot values it three times a small spot and every Rookie heads for it at the
-#   round start, so it lies on the side with fewer spots, as the first spot of spawn 1 only. Food knocked out of a
-#   spot under a bridge arcs up and mostly lands on that bridge: dig on the floor, collect on the bridges.
+# - Spots (visible, refill 15 s after they are emptied): the two floor spots (cols 4 / 15), two in the totem faces -
+#   (9, 5) at head height from the left bridge, (10, 7) level with the right bridge (low strike) - and the big spot in
+#   the totem's base (9, 9), struck with a forward strike from either floor half. The hit test reaches one column past
+#   the club (PHYSICS 8.3), and the totem is two cells wide, so each totem spot is also struck from the other side.
+#   The big spot's giant falls 7 rows onto the totem top beside the signature cookpot: dig on the floor, collect on
+#   top. Food knocked out of a floor spot under a bridge arcs up and mostly lands on that bridge.
+#   (Phase 2: at G1 the big spot lay in the right floor under spawn 1's feet; core-B's V4.b set measured spawn 1
+#   winning 58-60 % of 48 Grub Stack rounds. In the totem's base it is the same walk from both floor spawns, and its
+#   giant lands where all four spawns are one or two jumps away; the set is within +/-15 points now.)
 # - Cookpots: two (4-player arena): the signature pot on the totem top (room for one banker) and one in the middle of
-#   the left bridge (x 104), opposite the big spot: contested ground - heroes land there from the wrap ledge, the
-#   floor and over the totem, and a stomp on a banker steals double. The seam, the only other mirror-symmetric
-#   place, cannot hold a pot (half of it would be off the screen).
+#   the left bridge (x 104): contested ground - heroes land there from the wrap ledge, the floor and over the totem,
+#   and a stomp on a banker steals double. The seam, the only other mirror-symmetric place, cannot hold a pot (half
+#   of it would be off the screen).
 # - Spawns (rotate every round; 2 players use 1 and 2): 1 and 2 on the floor under the bridges by the totem (x 200 /
-#   120): nothing lands on them from above, and each faces his first spot (1 the big spot, 2 the body-height totem
-#   spot); 1 is the right one so that P1 has the seam side free to his right and P2 to his left. 3 and 4 on the outer
-#   ends of the bridges (x 72 / 248), a drop above their own floor spots. No spawn stands over another spawn's first
-#   spot: a hero striking a spot under a bridge pogos and his head pokes through the one-way bridge, where whoever
-#   stands above stomps him. Only the floor under the bridges near the totem is out of
-#   reach of every drop, jump and spring link in the first 48 ticks (the bridges, the ledge, the totem top and the
-#   seam side of the floor are all landing zones of the graph).
-# - Validator: one warning by design - row 5 has 6 clear cells between the wrap ledge and the totem face (a wall, not
-#   a gap anybody jumps), as in the sketch.
+#   120, as at G1): a few steps from the big spot (a forward strike reaches col 9 from x 105 on the left and up to
+#   x 198 on the right), and nothing lands on them from above. 3 and 4 on the outer ends of the bridges (x 72 / 248),
+#   a drop above their own floor spots. A stomp is a landing (PHYSICS C.14 [G15]), so a hero pogoing under a bridge
+#   is no longer robbed by whoever stands on it. (Tried: spawn 1 at x 184, 15 px inside the reach like spawn 2 -
+#   Grub Stack evened out further, but Last Caveman Standing went to the edge of the +/-15 points.)
+# - Modes: Grub Stack (default), Last Caveman Standing (sudden death: the stampede at 60 s) and Hot Rock; each has a
+#   green bot set in core-B's tests/test_versus_bots.gd (12 seeds x 4 rounds, four Hunters).
+# - Validator: clean (a run that ends at the totem's wall face is no gap).
 # - Bot graph: resources/bots/arena_totem_ring.json, baked with core-B's tool after every edit of this file:
 #   bash .tools/gd.sh script res://tools/bots/bake_nav.gd -- arena_totem_ring
 # - Proof (G1): build/da/proof_totem_ring.gd (bash .tools/gd.sh script res://build/da/run_proof.gd -- --file=totem):
@@ -49,16 +51,16 @@ terrain_b = ruins/terrain_carved
 background = jungle
 music = versus_battle_a
 players = 4
-modes = grub_stack
+modes = grub_stack,last_caveman,hot_rock
 round_time = 90
 wrap = lr
 sudden = stampede
 author = DA
-notes = "Versus arena 1 (DESIGN.md E.5): jungle, wrap left-right, the cookpot on the totem top, springs to the wrap ledge, the big spot's giant onto the right bridge, a second pot on the left bridge."
+notes = "Versus arena 1 (DESIGN.md E.5): jungle, wrap left-right, the cookpot on the totem top, springs to the wrap ledge, the big spot in the totem base (its giant onto the totem top), a second pot on the left bridge."
 
 [legend]
 ? = objects/hidden_spot kind=small count=3 look=block tile=#
-* = objects/hidden_spot kind=big look=inset tile=#
+b = objects/hidden_spot kind=big look=inset tile=%
 t = objects/hidden_spot kind=small count=3 look=block tile=%
 J = objects/spring
 P = objects/cookpot dx=8
@@ -73,12 +75,12 @@ D = objects/spawn_point index=4
 ....................
 .........P..........
 .........%%.........
----......%t......---
+---......t%......---
 ....C.Q..%%....D....
-....-----%%-----....
-.........t%.........
-.J.....B.%%.@.....J.
-####?#######**#?####
+....-----%t-----....
+.........%%.........
+.J.....B.b%.@.....J.
+####?##########?####
 ####################
 
 [entities]

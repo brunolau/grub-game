@@ -16,7 +16,10 @@ func test_scene_layout_follows_the_manifest() -> void:
 	assert_eq(hero.weapon_sheets.size(), 4)
 	assert_eq(hero.z_index, Defs.Z_PLAYER)
 	play(hold("R", 3))
-	await get_tree().process_frame
+	# The frame's interpolation step itself (SimEntity's internal process with Sim.alpha, 1.0 after Sim.step), called
+	# directly: awaiting a frame made this depend on what earlier test files leave running in the tree (it failed only
+	# in the full run, 2026-10-07; wf8_player_a_to_integration.txt).
+	hero.notification(Node.NOTIFICATION_INTERNAL_PROCESS)
 	assert_eq(hero.position, Vector2(hero.sim_pos * Tuning.ART_SCALE), "drawn at the feet point in art px")
 
 

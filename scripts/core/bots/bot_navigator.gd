@@ -123,7 +123,7 @@ func is_busy() -> bool:
 func node_of(hero: PlayerBase) -> int:
 	if graph == null or not hero.is_grounded():
 		return -1
-	return graph.node_at(hero.sim_pos)
+	return graph.node_at(hero.sim_pos, hero.on_platform)
 
 
 ## True when the hero stands on the target node within the tolerance of target.x.
@@ -174,7 +174,7 @@ func step(hero: PlayerBase, tick: int) -> int:
 		return _toward(target.x - hero.sim_pos.x, 0)
 	if graph == null or target_node < 0:
 		return walk_to(hero, target.x, tolerance)
-	var here: int = graph.node_at(hero.sim_pos)
+	var here: int = graph.node_at(hero.sim_pos, hero.on_platform)
 	if here < 0:
 		# On a floor the graph does not know (a sliver by a wall): walk toward the target, hop when stuck.
 		return _unstick(hero, walk_to(hero, target.x, tolerance))
@@ -296,7 +296,7 @@ func _play_link(hero: PlayerBase, tick: int) -> int:
 
 
 func _finish_link(hero: PlayerBase) -> void:
-	var landed: int = graph.node_at(hero.sim_pos) if hero.is_grounded() else -1
+	var landed: int = graph.node_at(hero.sim_pos, hero.on_platform) if hero.is_grounded() else -1
 	if landed == link.to:
 		links_landed += 1
 	elif landed < 0 and hero.is_grounded():

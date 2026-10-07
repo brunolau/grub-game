@@ -1,7 +1,7 @@
 # Tusker's Test Wallow: developer level of enemies-B (PLAN.md P2.2) - the walled pit of Tusker, the Boar King
 # (DESIGN.md B.1) for tests/test_enemies_tusker.gd: the club route of the solo form, the fairness checks and the
 # single-hero search against the co-op form (the test loads this file with `form=coop` on the boss and a second
-# hero at the objects/hero_start marker).
+# hero at the objects/hero_start marker). The boar also drops the trophy: the level's exit for the validator.
 # Built one screen wide, with mesa banks 3 rows up in both corners (3 columns each, so the 76 px boar has room to
 # charge: with the 4-column banks of B.1 its feet never leave a 6-cell wallow) and a 4-cell mud wallow in the middle.
 
@@ -36,5 +36,5 @@ author = enemies-B
 
 [entities]
 zones/arena 9 9 name=wallow rect=0,0,20,12 music=boss_tusker
-bosses/tusker 7 9 arena=wallow
+bosses/tusker 7 9 arena=wallow drops=fire_starter,trophy
 objects/hero_start 17 6 slot=2

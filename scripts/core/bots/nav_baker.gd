@@ -20,7 +20,7 @@ extends RefCounted
 ##     MIN_WINDOW px; the fastest one is kept, plus the widest when it is much wider.
 ## The bake is deterministic (no RNG; fixed iteration order), so a re-bake of an unchanged level gives the same file.
 
-const VERSION: int = 2
+const VERSION: int = 3
 ## Take-off points are sampled this far apart along a node.
 const SAMPLE_STEP: int = 8
 ## Narrowest take-off window kept (px) and the widest one searched.
@@ -30,6 +30,8 @@ const MAX_WINDOW: int = 24
 const MAX_SEEDS_PER_PAIR: int = 8
 ## Simulation limit of one candidate (ticks).
 const MAX_TICKS: int = 90
+## A link's landings keep this far inside an open end of the target node ([method _lands_clear]).
+const EDGE_MARGIN_PX: int = 6
 ## Length of the open-ended scripts (ticks; the landing ends them).
 const SCRIPT_TICKS: int = 72
 ## Take-off points in a geyser vent are sampled this far apart.
@@ -342,6 +344,27 @@ func _land_node(from: int, s: int, x: int, geyser: int = -1) -> int:
 	return landed
 
 
+## True when the run of script `s` from x (cached by [method _land_node]) settled on node `to` at least
+## EDGE_MARGIN_PX inside every open end of it (an end with a wall at body height beyond it stops an overshoot by
+## itself): a landing on the very lip of a ledge works in the bake and misses in a match at the smallest difference
+## (a link that lands from the lip is fragile; the bake keeps the starts that land clear of it).
+func _lands_clear(from: int, s: int, x: int, geyser: int, to: int) -> bool:
+	var land: int = int(_memo_land.get("%d:%d:%d:%d" % [geyser, from, s, x], 0))
+	var node: NavGraph.NavNode = graph.nodes[to]
+	var lo: int = node.x0 + (0 if _walled(node.x0 >> 4, node.row, -1) else EDGE_MARGIN_PX)
+	var hi: int = node.x1 - (0 if _walled(node.x1 >> 4, node.row, 1) else EDGE_MARGIN_PX)
+	return land >= mini(lo, node.center_x()) and land <= maxi(hi, node.center_x())
+
+
+## True when the cell beside column `col` (`side` -1 left, +1 right) at body height over floor row `row` is a wall (or
+## the level's edge).
+func _walled(col: int, row: int, side: int) -> bool:
+	var c: int = col + side
+	if not _grid.in_bounds(c, row - 1):
+		return true
+	return _grid.side_at(c, row - 1) == TileGrid.SIDE_WALL
+
+
 ## The node a run ended on: he settled alive, and on the same node as on the tick the bot got control back (what
 ## HeroBot checks); -1 otherwise.
 static func settled_node(p_graph: NavGraph, outcome: NavSim.Outcome) -> int:
@@ -392,7 +415,7 @@ func _links_from(from: int, xs: PackedInt32Array, script_ids: PackedInt32Array, 
 	for x: int in xs:
 		for s: int in script_ids:
 			var to: int = _land_node(from, s, x, geyser)
-			if to < 0 or to == from:
+			if to < 0 or to == from or not _lands_clear(from, s, x, geyser, to):
 				continue
 			var pair: Vector2i = Vector2i(to, s)
 			if not hits.has(pair):
@@ -462,9 +485,9 @@ func _keep_links(from: int, to: int, seeds: Array[Vector3i], geyser: int, limits
 func _widen(from: int, to: int, s: int, seed_x: int, geyser: int, limits: Vector2i) -> Dictionary:
 	var x0: int = seed_x
 	var x1: int = seed_x
-	while x1 - x0 + 1 < MAX_WINDOW and x0 - 1 >= limits.x and _land_node(from, s, x0 - 1, geyser) == to:
+	while x1 - x0 + 1 < MAX_WINDOW and x0 - 1 >= limits.x and _land_node(from, s, x0 - 1, geyser) == to 			and _lands_clear(from, s, x0 - 1, geyser, to):
 		x0 -= 1
-	while x1 - x0 + 1 < MAX_WINDOW and x1 + 1 <= limits.y and _land_node(from, s, x1 + 1, geyser) == to:
+	while x1 - x0 + 1 < MAX_WINDOW and x1 + 1 <= limits.y and _land_node(from, s, x1 + 1, geyser) == to 			and _lands_clear(from, s, x1 + 1, geyser, to):
 		x1 += 1
 	var ticks: int = 0
 	var land0: int = 1 << 30

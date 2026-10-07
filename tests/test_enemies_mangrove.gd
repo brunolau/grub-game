@@ -29,6 +29,7 @@ func after_each() -> void:
 	Game.new_game(Defs.Difficulty.BEGINNER)
 	Game.begin_level(&"")
 	Audio.stop_music(0.0)
+	Lab.cleanup_flow(get_tree())
 	_lab = null
 
 
@@ -559,6 +560,11 @@ func _measure_solo_twin() -> Dictionary:
 							face_at = t
 						if hand_at < 0 and tree._hand_tick >= 0:
 							hand_at = t
+						if face_at >= 0 and hand_at >= 0:
+							break
+						if launched >= 0 and t - launched > first + gap + 8 and hero.is_grounded() \
+								and _lab.level.get_kind(Defs.Kind.HERO_PROJECTILE).is_empty():
+							break
 					if tree.hp < tree.max_hp:
 						result["twins"] = int(result["twins"]) + 1
 					if face_at >= 0 and hand_at >= 0 and absi(hand_at - face_at) < int(result["best"]):

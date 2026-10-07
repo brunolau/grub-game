@@ -60,9 +60,9 @@ G = objects/geyser period=88
 [entities]
 """
 
-## A walled arena whose two ledges (5 rows over the floor: out of every jump) only a moving platform joins: it
-## starts at the left ledge's edge and travels right (objects/platform dir=2, ping-pong) close to the right ledge. The
-## bot starts on the left ledge (spawn 2, slot 1); slot 0 waits on the floor.
+## A walled arena whose two ledges (over a pit of water: a fall is the end) only a moving platform joins: it starts
+## at the left ledge's edge and travels right (objects/platform dir=2, ping-pong) close to the right ledge. The bot
+## starts on the left ledge (spawn 2, slot 1); slot 0 waits on the right one.
 const LIFT_ARENA: String = """[meta]
 format = 2
 id = test_core_bots_lift
@@ -78,13 +78,41 @@ B = objects/spawn_point index=2
 |..................|
 |..................|
 |..................|
-|.B................|
+|.B..............@.|
 |####M.......######|
 |..................|
 |..................|
 |..................|
-|.@................|
+|..................|
+#~~~~~~~~~~~~~~~~~~#
 ####################
+[entities]
+"""
+
+## A rider mover: a drop platform (objects/drop_platform: it falls once a hero stood on it) beside a ledge 5 rows over
+## a floor island in a pit of water. The ledge is too high to reach from the island; the platform carries a rider down.
+const DROP_ARENA: String = """[meta]
+format = 2
+id = test_core_bots_drop
+kind = arena
+players = 2
+modes = last_caveman
+biome = jungle
+[legend]
+M = objects/drop_platform delay=8
+B = objects/spawn_point index=2
+[tiles]
+|..................|
+|..................|
+|..................|
+|..................|
+|.B.@..............|
+|####M.............|
+|..................|
+|..................|
+|..................|
+|..................|
+#~~~~#####~~~~~~~~~#
 ####################
 [entities]
 """
@@ -271,9 +299,8 @@ func test_every_baked_link_lands_from_every_x_of_its_window() -> void:
 
 
 func test_bake_is_deterministic() -> void:
-	var graph: NavGraph = _tier()
-	var again: NavGraph = NavBaker.new().bake_text(self, &"test_core_bots_tiers", TIER_ARENA,
-			Defs.Difficulty.BEGINNER, PackedInt32Array([NavGraph.WEIGHT_LIGHT, NavGraph.WEIGHT_HEAVIER]))
+	var graph: NavGraph = _geyser_graph()
+	var again: NavGraph = NavBaker.new().bake_text(self, &"test_core_bots_geyser", GEYSER_ARENA)
 	assert_eq(again.to_json(), graph.to_json())
 
 
@@ -505,6 +532,35 @@ func test_moving_platform_is_a_mover_node_with_verified_links() -> void:
 	assert_true(graph.path_cost(left, 40, right, 260) < NavGraph.UNREACHABLE, "a route across by the platform")
 	var baker: NavBaker = NavBaker.new()
 	var data: LevelData = LevelData.parse(graph.level_id, LIFT_ARENA)
+	assert_true(baker.sim.setup(self, graph.level_id, data.build_grid(0), data.resolved_meta(0), data.entity_records()))
+	var problems: PackedStringArray = baker.verify_graph(graph)
+	baker.sim.teardown()
+	assert_eq(problems.size(), 0, "; ".join(problems))
+
+
+func test_drop_platform_is_a_rider_mover_with_verified_links() -> void:
+	var graph: NavGraph = NavBaker.new().bake_text(self, &"test_core_bots_drop", DROP_ARENA)
+	assert_eq(graph.movers.size(), 1, "the drop platform is a mover")
+	if graph.movers.is_empty():
+		return
+	assert_eq(StringName(str(graph.movers[0]["kind"])), NavGraph.MOVER_RIDER, "it moves under a rider")
+	var ledge: int = graph.node_at(Vector2i(40, 80))
+	var island: int = graph.node_at(Vector2i(120, 160))
+	var platform: int = -1
+	for node: NavGraph.NavNode in graph.nodes:
+		if node.mover >= 0:
+			platform = node.id
+	assert_true(ledge >= 0 and island >= 0 and platform >= 0, "ledge, island and platform are nodes")
+	var board: bool = false
+	var down: bool = false
+	for link: NavGraph.NavLink in graph.links:
+		board = board or (link.from == ledge and link.to == platform)
+		down = down or (link.from == platform and link.to == island)
+		assert_false(link.from == island and (link.to == ledge or link.to == platform), "nothing climbs back up")
+	assert_true(board, "ledge -> platform")
+	assert_true(down, "platform -> island (it sinks under him)")
+	var baker: NavBaker = NavBaker.new()
+	var data: LevelData = LevelData.parse(graph.level_id, DROP_ARENA)
 	assert_true(baker.sim.setup(self, graph.level_id, data.build_grid(0), data.resolved_meta(0), data.entity_records()))
 	var problems: PackedStringArray = baker.verify_graph(graph)
 	baker.sim.teardown()

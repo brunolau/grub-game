@@ -768,8 +768,8 @@ func _check_lightning(path: String, line: int, params: Dictionary) -> void:
 	var period: int = period_text.to_int()
 	var mark: int = mark_text.to_int()
 	if period < mark + LIGHTNING_BOLT_TICKS:
-		_add(path, line, WARNING, "zones/lightning period %d is shorter than its mark %d + the %d-tick bolt: the strikes overlap"
-				% [period, mark, LIGHTNING_BOLT_TICKS])
+		_add(path, line, WARNING, "zones/lightning period %d is shorter than its mark %d + the %d-tick bolt: %s"
+				% [period, mark, LIGHTNING_BOLT_TICKS, "the strikes overlap"])
 
 
 ## A sign's text must fit its board: at most SignBoard.MAX_LINES lines as the board wraps it (objects-A's

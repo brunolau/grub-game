@@ -65,14 +65,14 @@ const SHOT_LOB: int = 1
 const SHOT_GROUNDER: int = 2
 const SHOT_MISSILE: int = 3
 
-# --- GAMEPLAY.md 13.10.6 (private copies until VersusTuning has them: wf8_objects_b_to_core_a.txt) -----------------
-const DRIVE_XVEL: int = 144              ## forward front box: drive [G 13.10.6]
-const DRIVE_YVEL: int = -128
-const LOB_XVEL: int = 32                 ## high front box: lob
-const LOB_YVEL: int = -240
-const GROUNDER_XVEL: int = 96            ## low front box: grounder along the floor
-const BOUNCE_MIN_YVEL: int = 32          ## a floor bounces it while yvel >= 32, else it rests and rolls
-const HEAD_BOUNCE_MIN_YVEL: int = -96    ## a head bounces it up at 3/4, at least this
+# --- GAMEPLAY.md 13.10.6: VersusTuning's values (core-A), under the names the referee and the tests use -------------
+const DRIVE_XVEL: int = VersusTuning.BALL_DRIVE_XVEL                ## forward front box: drive
+const DRIVE_YVEL: int = VersusTuning.BALL_DRIVE_YVEL
+const LOB_XVEL: int = VersusTuning.BALL_LOB_XVEL                    ## high front box: lob
+const LOB_YVEL: int = VersusTuning.BALL_LOB_YVEL
+const GROUNDER_XVEL: int = VersusTuning.BALL_GROUNDER_XVEL          ## low front box: grounder along the floor
+const BOUNCE_MIN_YVEL: int = VersusTuning.BALL_BOUNCE_MIN_YVEL      ## a floor bounces it while yvel >= 32, else rests
+const HEAD_BOUNCE_MIN_YVEL: int = VersusTuning.BALL_HEAD_BOUNCE_MIN_YVEL  ## a head bounces it up at 3/4, at least this
 ## Every velocity component stays within +/-288 (the doze reach, PHYSICS.md C.15: "the Clubball coconut at most 18").
 const AXIS_CAP: int = PartyTuning.LAUNCH_AXIS_CAP
 const BOX: Vector3i = Vector3i(16, 16, 8)

@@ -1,30 +1,36 @@
 extends TestCase
 ## PLAN.md 8 V4.b - the versus bots on every arena (slow module: tests/run_tests.gd SLOW_FILES; run it with
-## `GD_TIMEOUT=900 bash .tools/gd.sh test versus_bots`). Owner: core-B (PLAN.md P2.5).
+## `GD_TIMEOUT=1800 bash .tools/gd.sh test versus_bots`). Owner: core-B (PLAN.md P2.5).
 ##
 ## For every (arena, supported launch mode) - every levels/arena_*.lvl with the launch modes of its `modes`, world-B's
 ## test arenas (levels/test_world_arena_flat.lvl: Grub Stack, Last Caveman Standing, Hot Rock; the Totem Ring copy
 ## levels/test_world_arena_ring.lvl) and, until DA's Coconut Cove exists, a Clubball pitch of this file - Hunter
-## HeroBots fill every seat (four where the arena takes four) and play the seeded set: SEEDS.size() matches of one full
-## spawn rotation each (round r puts slot s on spawn s + r, VersusReferee.begin_round), through world-B's referee and
-## the real heroes, the bots fed through GameInput's BOT slots exactly as Flow does (HeroBot.new per seat, reset_round
-## with the round seed). Checked:
+## HeroBots fill every seat (four where the arena takes four) and play the seeded set: one match of a full spawn
+## rotation per seed (round r puts slot s on spawn s + r, VersusReferee.begin_round; SEEDS on a shipped arena,
+## TEST_ARENA_SEEDS of them on the others), through world-B's referee and the real heroes, the bots fed through
+## GameInput's BOT slots exactly as Flow does (HeroBot.new per seat, reset_round with the round seed). Checked:
 ##  - every round ends by the mode's own rule (the gong, the last one standing, five goals), within ROUND_LIMIT_TICKS;
 ##  - no bot stands idle more than VersusTuning.BOT_IDLE_MAX_TICKS (10 s) while it is in play;
 ##  - no hit and no stomp lands on a hero within VersusTuning.SPAWN_SHIELD_TICKS of his spawn (the round start, a
 ##    respawn, a Clubball kick-off);
-##  - the win rate per spawn point is within VersusTuning.BOT_WIN_RATE_SPREAD_PERCENT points of the fair share;
+##  - on a shipped arena (levels/arena_*.lvl), the win rate per spawn point is within
+##    VersusTuning.BOT_WIN_RATE_SPREAD_PERCENT points of the fair share (the test arenas print theirs);
 ##  - a match log replays identically: the first round of each set is played again from the same start with the
 ##    bots' recorded flags as plain scripted input (no bot) and gives the same digest on every tick.
-## Each set prints one line (rounds, ticks, wins per spawn, links played / failed) for the arena designers.
+## Each set prints one line (rounds, ticks, wins per spawn with the mean score, links played / failed) for the arena
+## designers. Also here (too slow for the quick tests): the rider movers of the arena kit - a see-saw's two ends and a
+## pulley's two lifts - bake as mover nodes whose every link verifies.
 
 const LEVEL_SCENE: String = "res://scenes/world/level.tscn"
 const LEVEL_DIR: String = "res://levels"
 const TEST_ARENAS: PackedStringArray = ["res://levels/test_world_arena_flat.lvl", "res://levels/test_world_arena_ring.lvl"]
 const LAUNCH_MODES: Array[int] = [Defs.VersusMode.GRUB_STACK, Defs.VersusMode.LAST_CAVEMAN, Defs.VersusMode.HOT_ROCK,
 		Defs.VersusMode.CLUBBALL]
-## The seeded set: one match (a full spawn rotation) per seed.
-const SEEDS: PackedInt32Array = [11, 23, 37, 41, 53, 67]
+## The seeded set of a shipped arena: one match (a full spawn rotation) per seed - 48 rounds on a 4-player arena, so
+## that a fair spawn stays inside the +/-15 points with a margin of about 2.4 standard deviations.
+const SEEDS: PackedInt32Array = [11, 23, 37, 41, 53, 67, 71, 89, 97, 101, 113, 127]
+## The test arenas (rules, not balance) play the first seeds only.
+const TEST_ARENA_SEEDS: int = 2
 ## A round that has not ended by the mode's rule after its clock (or this long without one) fails the check.
 const ROUND_LIMIT_TICKS: int = 5200
 ## The Clubball stand-in for Coconut Cove (DESIGN.md E.5 sketch, walls of '#'): goal mouths 3 rows high at both ends
@@ -55,9 +61,40 @@ D = objects/spawn_point index=4
 ####################
 ####################
 [entities]
-objects/coconut 9 9
+objects/coconut 9 9 dx=8
 """
 const PITCH_ID: StringName = &"test_versus_bots_pitch"
+
+## The rider movers of Floe Rink and Tar Pulleys (DESIGN.md E.5) in one room: a see-saw (two plank ends, each a mover
+## part) on the floor and two ride platforms hanging from a pulley beside two side ledges. Its graph must have every
+## part as a rider mover node and every link verified (a bake of about half a minute: here, not in the quick tests).
+const MOVERS_ROOM: String = """[meta]
+format = 2
+id = test_core_bots_seesaw
+kind = arena
+players = 2
+modes = last_caveman
+biome = jungle
+[legend]
+S = objects/seesaw len=5
+P = objects/platform name=pa mode=ride
+Q = objects/platform name=pb mode=ride
+W = objects/pulley a=pa b=pb range=3
+[tiles]
+|..................|
+|..................|
+|..................|
+|.........W........|
+|..................|
+|..................|
+|##.P......Q...####|
+|..................|
+|..................|
+|.@.......S......B.|
+####################
+####################
+[entities]
+"""
 
 ## Graphs baked in this run (level id -> JSON text), so that each arena is baked at most once.
 static var _baked: Dictionary = {}
@@ -92,6 +129,34 @@ func test_hunter_bots_play_every_arena_and_mode() -> void:
 	assert_true(sets >= 4, "%d (arena, mode) sets" % sets)
 
 
+func test_see_saw_and_pulley_lifts_bake_as_verified_rider_movers() -> void:
+	var graph: NavGraph = NavBaker.new().bake_text(self, &"test_core_bots_seesaw", MOVERS_ROOM)
+	assert_not_null(graph)
+	if graph == null:
+		return
+	var parts: Dictionary = {}
+	for mover: Dictionary in graph.movers:
+		assert_eq(StringName(str(mover["kind"])), NavGraph.MOVER_RIDER, "%s moves under its riders" % mover["key"])
+		parts[str(mover["id"])] = int(parts.get(str(mover["id"]), 0)) + 1
+	assert_eq(int(parts.get("objects/seesaw", 0)), 2, "both plank ends of the see-saw (%s)" % [parts])
+	assert_eq(int(parts.get("objects/platform", 0)), 2, "both pulley lifts (%s)" % [parts])
+	var onto: int = 0
+	var off: int = 0
+	for link: NavGraph.NavLink in graph.links:
+		if not link.cond.is_empty():
+			if graph.nodes[link.to].mover >= 0 and graph.nodes[link.from].mover < 0:
+				onto += 1
+			elif graph.nodes[link.from].mover >= 0:
+				off += 1
+	assert_true(onto >= 2 and off >= 4, "links onto (%d) and off (%d) the movers" % [onto, off])
+	var baker: NavBaker = NavBaker.new()
+	var data: LevelData = LevelData.parse(graph.level_id, MOVERS_ROOM)
+	assert_true(baker.sim.setup(self, graph.level_id, data.build_grid(0), data.resolved_meta(0), data.entity_records()))
+	var problems: PackedStringArray = baker.verify_graph(graph)
+	baker.sim.teardown()
+	assert_eq(problems.size(), 0, "; ".join(problems))
+
+
 # =================================================================================================================
 # One (arena, mode) set
 # =================================================================================================================
@@ -105,14 +170,17 @@ func _play_set(arena: Dictionary, mode: int) -> void:
 	wins.fill(0.0)
 	var rounds: int = 0
 	var ticks: int = 0
+	var scores: PackedInt32Array = PackedInt32Array()
+	scores.resize(Defs.MAX_PLAYERS)
 	var worst_idle: int = 0
-	var spawn_hits: PackedStringArray = PackedStringArray()
-	var unfinished: PackedStringArray = PackedStringArray()
+	var spawn_hits: Array[String] = []
+	var unfinished: Array[String] = []
 	var played: int = 0
 	var failed: int = 0
 	var failures: PackedStringArray = PackedStringArray()
 	var started_msec: int = Time.get_ticks_msec()
-	for seed_value: int in SEEDS:
+	var seeds: PackedInt32Array = SEEDS if bool(arena["shipped"]) else SEEDS.slice(0, TEST_ARENA_SEEDS)
+	for seed_value: int in seeds:
 		var bots: Array[HeroBot] = []
 		for slot: int in players:
 			bots.append(HeroBot.new(slot, Defs.BotLevel.HUNTER, seed_value, mode))
@@ -127,9 +195,13 @@ func _play_set(arena: Dictionary, mode: int) -> void:
 			ticks += int(result["ticks"])
 			spawn_count = int(result["spawn_count"])
 			worst_idle = maxi(worst_idle, int(result["worst_idle"]))
-			spawn_hits.append_array(result["spawn_hits"])
+			for line: String in result["spawn_hits"]:
+				spawn_hits.append(line)
 			if not bool(result["ended"]):
 				unfinished.append("seed %d round %d" % [seed_value, round_index])
+			var round_scores: PackedInt32Array = result["spawn_scores"]
+			for spawn: int in Defs.MAX_PLAYERS:
+				scores[spawn] += round_scores[spawn]
 			var winners: PackedInt32Array = result["winner_spawns"]
 			for spawn: int in winners:
 				wins[spawn] += 1.0
@@ -148,21 +220,24 @@ func _play_set(arena: Dictionary, mode: int) -> void:
 	var spread: float = float(VersusTuning.BOT_WIN_RATE_SPREAD_PERCENT) / 100.0
 	for spawn: int in spawn_count:
 		var share: float = wins[spawn] / float(maxi(rounds, 1))
-		shares.append("%d:%d%%" % [spawn + 1, roundi(share * 100.0)])
-		assert_true(absf(share - mean) <= spread + 0.0001, "%s: spawn %d wins %d%% of %d rounds (fair share %d%%, +/-%d)" % [
-			name, spawn + 1, roundi(share * 100.0), rounds, roundi(mean * 100.0),
-			VersusTuning.BOT_WIN_RATE_SPREAD_PERCENT,
-		])
+		shares.append("%d:%d%% (score %.1f)" % [spawn + 1, roundi(share * 100.0),
+				float(scores[spawn]) / float(maxi(rounds, 1))])
+		# Spawn fairness is a property of a shipped arena (mirrored layouts, DESIGN.md E.5); world-B's test arenas and
+		# this file's pitch are built for rules, not balance: their shares are printed only.
+		if bool(arena["shipped"]):
+			assert_true(absf(share - mean) <= spread + 0.0001,
+					"%s: spawn %d wins %d%% of %d rounds (fair share %d%%, +/-%d)" % [name, spawn + 1,
+					roundi(share * 100.0), rounds, roundi(mean * 100.0), VersusTuning.BOT_WIN_RATE_SPREAD_PERCENT])
 	print("    %s: %d rounds, %d ticks (%d ms), wins per spawn %s, worst idle %d, links %d played / %d failed%s" % [
 		name, rounds, ticks, Time.get_ticks_msec() - started_msec, " ".join(shares), worst_idle, played, failed,
 		"" if failures.is_empty() else " (" + "; ".join(failures) + ")",
 	])
-	assert_eq(unfinished, PackedStringArray(), "%s: every round ended by its rule" % name)
+	assert_true(unfinished.is_empty(), "%s: every round ended by its rule (not: %s)" % [name, ", ".join(PackedStringArray(unfinished))])
 	assert_true(worst_idle <= VersusTuning.BOT_IDLE_MAX_TICKS, "%s: a bot stood idle %d ticks (at most %d)" % [
 		name, worst_idle, VersusTuning.BOT_IDLE_MAX_TICKS,
 	])
-	assert_eq(spawn_hits, PackedStringArray(), "%s: no hit or stomp within %d ticks of a spawn" % [
-		name, VersusTuning.SPAWN_SHIELD_TICKS,
+	assert_true(spawn_hits.is_empty(), "%s: no hit or stomp within %d ticks of a spawn (%s)" % [
+		name, VersusTuning.SPAWN_SHIELD_TICKS, "; ".join(PackedStringArray(spawn_hits)),
 	])
 
 
@@ -178,15 +253,16 @@ func _play_round(arena: Dictionary, mode: int, players: int, round_index: int, r
 		bot.reset_round(round_seed)
 		bot.install()
 	var spawns: Array[Vector2i] = VersusArena.spawn_points(_level)
+	var spawn_hits: Array[String] = []
 	var result: Dictionary = {
-		"ticks": 0, "ended": false, "worst_idle": 0, "spawn_hits": PackedStringArray(),
+		"ticks": 0, "ended": false, "worst_idle": 0, "spawn_hits": spawn_hits,
 		"winner_spawns": PackedInt32Array(), "spawn_count": spawns.size(), "flags": PackedInt32Array(),
 		"digests": PackedInt32Array(),
 	}
 	var start_spawn: PackedInt32Array = PackedInt32Array()
 	for slot: int in players:
 		start_spawn.append(_spawn_index(spawns, _level.get_hero(slot).sim_pos))
-	var watch: Dictionary = _watch_start(players)
+	var watch: Watch = _watch_start(players)
 	var limit: int = (referee.round_length() if referee.round_length() > 0 else 0) + ROUND_LIMIT_TICKS
 	var flags: PackedInt32Array = PackedInt32Array()
 	var digests: PackedInt32Array = PackedInt32Array()
@@ -194,7 +270,7 @@ func _play_round(arena: Dictionary, mode: int, players: int, round_index: int, r
 	while t < limit and referee.phase != VersusReferee.PHASE_OVER:
 		Sim.step(1)
 		t += 1
-		_watch_tick(watch, referee, players, result["spawn_hits"])
+		_watch_tick(watch, referee, players, spawn_hits)
 		for bot: HeroBot in bots:
 			var hero: PlayerBase = _level.get_hero(bot.slot)
 			if hero != null and not hero.dead and not BotSenses.is_out(_level, bot.slot) and hero.control_enabled:
@@ -205,6 +281,12 @@ func _play_round(arena: Dictionary, mode: int, players: int, round_index: int, r
 			digests.append(_digest(referee, players))
 	result["ticks"] = t
 	result["ended"] = referee.phase == VersusReferee.PHASE_OVER
+	var spawn_scores: PackedInt32Array = PackedInt32Array()
+	spawn_scores.resize(Defs.MAX_PLAYERS)
+	for slot: int in players:
+		if start_spawn[slot] >= 0:
+			spawn_scores[start_spawn[slot]] += referee.score_of(slot)
+	result["spawn_scores"] = spawn_scores
 	var winner_spawns: PackedInt32Array = PackedInt32Array()
 	for slot: int in referee.winner_slots:
 		if slot >= 0 and slot < start_spawn.size() and start_spawn[slot] >= 0:
@@ -250,38 +332,43 @@ func _check_replay(name: String, arena: Dictionary, mode: int, players: int, rou
 # Watching a round: spawns, hits, stomps
 # =================================================================================================================
 
-func _watch_start(players: int) -> Dictionary:
-	var watch: Dictionary = {"spawn": PackedInt32Array(), "shield": PackedInt32Array(), "hurts": PackedInt32Array(),
-			"squash": PackedInt32Array()}
+## Per slot: the tick of his last spawn, and his shield, hurts count and squash of the last tick.
+class Watch:
+	extends RefCounted
+	var spawn: PackedInt32Array = PackedInt32Array()
+	var shield: PackedInt32Array = PackedInt32Array()
+	var hurts: PackedInt32Array = PackedInt32Array()
+	var squash: PackedInt32Array = PackedInt32Array()
+
+
+func _watch_start(players: int) -> Watch:
+	var watch: Watch = Watch.new()
 	for slot: int in players:
 		var hero: PlayerBase = _level.get_hero(slot)
-		(watch["spawn"] as PackedInt32Array).append(Sim.tick)
-		(watch["shield"] as PackedInt32Array).append(hero.shield)
-		(watch["hurts"] as PackedInt32Array).append(hero.run.hurts)
-		(watch["squash"] as PackedInt32Array).append(hero.squash)
+		watch.spawn.append(Sim.tick)
+		watch.shield.append(hero.shield)
+		watch.hurts.append(hero.run.hurts)
+		watch.squash.append(hero.squash)
 	return watch
 
 
 ## After a tick: a spawn is a spawn shield going up (the referee writes SPAWN_SHIELD_TICKS on every spawn); a hit is
 ## the victim's hurts count rising, a stomp his squash starting.
-func _watch_tick(watch: Dictionary, referee: VersusReferee, players: int, hits: PackedStringArray) -> void:
-	var spawn: PackedInt32Array = watch["spawn"]
-	var shield: PackedInt32Array = watch["shield"]
-	var hurts: PackedInt32Array = watch["hurts"]
-	var squash: PackedInt32Array = watch["squash"]
+func _watch_tick(watch: Watch, referee: VersusReferee, players: int, hits: Array[String]) -> void:
 	for slot: int in players:
 		var hero: PlayerBase = _level.get_hero(slot)
-		if hero.shield > shield[slot]:
-			spawn[slot] = Sim.tick
-		shield[slot] = hero.shield
-		var hit: bool = hero.run.hurts > hurts[slot]
-		var stomped: bool = hero.squash > squash[slot] and hero.squash >= VersusTuning.STOMP_SQUASH_TICKS
-		hurts[slot] = hero.run.hurts
-		squash[slot] = hero.squash
-		if (hit or stomped) and referee.phase != VersusReferee.PHASE_INTRO \
-				and Sim.tick - spawn[slot] < VersusTuning.SPAWN_SHIELD_TICKS and hits.size() < 8:
+		var hit: bool = hero.run.hurts > watch.hurts[slot]
+		var stomped: bool = hero.squash > watch.squash[slot] and hero.squash >= VersusTuning.STOMP_SQUASH_TICKS
+		watch.hurts[slot] = hero.run.hurts
+		watch.squash[slot] = hero.squash
+		# A hit counts against the spawn before it (a respawn later in the same tick - a kick-off in WORLD - comes after
+		# the hits of WEAPONS and CONTACT_*).
+		if (hit or stomped) and referee.phase != VersusReferee.PHASE_INTRO 				and Sim.tick - watch.spawn[slot] < VersusTuning.SPAWN_SHIELD_TICKS and hits.size() < 8:
 			hits.append("P%d %s %d ticks after his spawn (tick %d)" % [slot + 1, "hit" if hit else "stomped",
-					Sim.tick - spawn[slot], Sim.tick])
+					Sim.tick - watch.spawn[slot], Sim.tick])
+		if hero.shield > watch.shield[slot]:
+			watch.spawn[slot] = Sim.tick
+		watch.shield[slot] = hero.shield
 
 
 ## A digest of the tick: every hero's feet, speed, state, timers and score, the round's phase and clock.
@@ -329,7 +416,7 @@ func _arena_entry(id: StringName, text: String) -> Dictionary:
 		if LAUNCH_MODES.has(mode):
 			modes.append(mode)
 	return {"id": id, "text": text, "modes": modes, "players": mini(VersusArena.players_of(meta), Defs.MAX_PLAYERS),
-			"meta": meta}
+			"meta": meta, "shipped": String(id).begins_with("arena_")}
 
 
 ## The arena's graph: the committed one when it was baked from this text, else a bake of this run.

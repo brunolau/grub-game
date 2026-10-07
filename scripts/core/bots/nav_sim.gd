@@ -60,6 +60,9 @@ class Outcome:
 	var geysered: bool = false
 	## The platform he stands on when the run ended (null = none).
 	var platform: SimEntity = null
+	## The platform he stood on on the tick the bot got control back (null = none): a link ends where HeroBot takes
+	## over, so a landing counts only when it is the same there and after settling.
+	var handback_platform: SimEntity = null
 	## The movers' state on the tick before the script started: [offset x, offset y, motion x, motion y] per mover
 	## part ([member NavSim.mover_parts] order).
 	var mover_states: Array[PackedInt32Array] = []
@@ -289,6 +292,7 @@ func run(start: Vector2i, flags: PackedInt32Array, max_ticks: int, geyser: int =
 			# The bot takes over here: the check runs on neutral input.
 			handed_back = true
 			outcome.handback_pos = hero.sim_pos
+			outcome.handback_platform = platform_under(hero)
 			_flags = PackedInt32Array()
 			settle = 1 if standing else 0
 		else:

@@ -127,6 +127,9 @@ var _throws_left: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 var _death_pos: Array[Vector2i] = [Vector2i.ZERO, Vector2i.ZERO, Vector2i.ZERO, Vector2i.ZERO]
 var _death_cause: Array[StringName] = [&"", &"", &"", &""]
 var _walk_cap: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
+## 1 when the hero had no ground, platform or carrier under his feet as the tick began (the end of the previous tick):
+## only such a hero lands a stomp (PHYSICS.md C.14 "a stomp is a landing", G15).
+var _airborne: PackedByteArray = PackedByteArray([0, 0, 0, 0])
 ## Ticks of daze left (12 stunned ticks, then hit_timer 0: no immunity after).
 var _daze_left: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 ## Last Caveman Standing, option Stock: lives left.
@@ -889,9 +892,11 @@ func _sim_tick(sim_phase: int) -> void:
 		return
 	match sim_phase:
 		Defs.Phase.WEAPONS:
-			# The pick-up counters as the tick starts (food is collected later, in CONTACT_ITEMS).
+			# The pick-up counters as the tick starts (food is collected later, in CONTACT_ITEMS); who stands on
+			# something as the tick starts (heroes move in PLAYER, after this).
 			for hero: PlayerBase in _heroes():
 				_picked_seen[hero.slot] = hero.run.picked
+				_airborne[hero.slot] = 0 if hero.is_grounded() or hero.is_riding_totem() else 1
 			if _round_live():
 				_giant_bonks()
 				_weapons_step()
@@ -1344,7 +1349,9 @@ func _wrap_projectiles() -> void:
 
 
 ## Body bump (C.14): overlapping rivals (body test, no stomp) move 1 px apart per tick; running into each other at
-## 4+ px/tick knocks both back (+/-64, -64), no damage.
+## 4+ px/tick knocks both back (+/-64, -64), no damage - only when both stand on something (a knock while either is
+## still in the air from the last one would lift them again every tick: core-B's floating pair), and the nudge apart
+## comes on the knock tick too.
 func _body_bump(heroes: Array[PlayerBase]) -> void:
 	for i: int in heroes.size():
 		for j: int in range(i + 1, heroes.size()):
@@ -1359,17 +1366,19 @@ func _body_bump(heroes: Array[PlayerBase]) -> void:
 			if b.sim_pos.x < a.sim_pos.x or (b.sim_pos.x == a.sim_pos.x and b.slot < a.slot):
 				left = b
 				right = a
-			if left.xvel >= VersusTuning.BODY_KNOCK_MIN_XVEL and -right.xvel >= VersusTuning.BODY_KNOCK_MIN_XVEL:
+			if left.xvel >= VersusTuning.BODY_KNOCK_MIN_XVEL and -right.xvel >= VersusTuning.BODY_KNOCK_MIN_XVEL \
+					and left.is_grounded() and right.is_grounded():
 				left.xvel = -VersusTuning.BODY_KNOCK_XVEL
 				right.xvel = VersusTuning.BODY_KNOCK_XVEL
 				left.yvel = VersusTuning.BODY_KNOCK_YVEL
 				right.yvel = VersusTuning.BODY_KNOCK_YVEL
 				left.grounded = false
 				right.grounded = false
+				left.on_platform = false
+				right.on_platform = false
 				_sfx(Sfx.BOUNCE)
-			else:
-				_commit_x(left, -VersusTuning.BODY_BUMP_PX)
-				_commit_x(right, VersusTuning.BODY_BUMP_PX)
+			_commit_x(left, -VersusTuning.BODY_BUMP_PX)
+			_commit_x(right, VersusTuning.BODY_BUMP_PX)
 
 
 ## Grub Stack weight (C.14): the walk cap of the stack, written to the hero when he has the member (player-A).
@@ -1399,6 +1408,8 @@ func _stomp_step() -> void:
 	for stomper: PlayerBase in heroes:
 		if not _in_play(stomper) or stomper.yvel < 0 or stomper.is_curled() or stomper.is_gliding():
 			continue
+		if _airborne[stomper.slot] == 0:
+			continue  # a stomp is a landing: a hero standing on a tier never stomps a head rising into his feet
 		for victim: PlayerBase in heroes:
 			if victim == stomper or not _in_play(victim):
 				continue

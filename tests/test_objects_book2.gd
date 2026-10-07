@@ -672,6 +672,29 @@ func test_a_current_drifts_the_raft_and_it_keeps_its_momentum() -> void:
 	assert_eq(raft.rx, 0)
 
 
+## A current spawned during play (Inkjaw's whirlpool, B.3) carries rafts already afloat: a raft looks for its
+## currents again when the level's zones change. A real `zones/current` without `speed` drifts 1 px per tick (its
+## default), and the direction it is switched to is followed.
+func test_a_current_spawned_during_play_carries_rafts_already_afloat() -> void:
+	_raft_level()
+	var raft: Raft = _raft(6)
+	Sim.step(5)
+	assert_eq(raft.cd, 0, "no current yet")
+	var x0: int = raft.sim_pos.x
+	var current: SimEntity = level.spawn(&"zones/current", LevelText.cell_to_feet(2, 8), {"rect": "2,8,16,2", "dir": "r"})
+	assert_not_null(current, "world-A's zones/current")
+	Sim.step(4)
+	assert_eq(raft.cd, 1, "the new current: 1 px per tick by default")
+	assert_true(raft.sim_pos.x > x0, "it drifts")
+	current.spawn_params["dir"] = "l"
+	current.set(&"dir", &"l")
+	Sim.step(1)
+	assert_eq(raft.cd, -1, "and follows a reversed current")
+	current.queue_free()
+	Sim.step(2)
+	assert_eq(raft.cd, 0, "out of the current once it is gone")
+
+
 func test_a_raft_carries_its_rider() -> void:
 	_raft_level()
 	var raft: Raft = _raft(6)
