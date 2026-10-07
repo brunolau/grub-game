@@ -165,6 +165,12 @@ func test_registry_books_coop_files_and_arenas() -> void:
 	var beginner: int = Defs.Difficulty.BEGINNER
 	var expert: int = Defs.Difficulty.EXPERT
 	var before: Dictionary = _book1_answers()
+	# The registry keeps only the Book I solo files and the test levels while the in-memory metas are checked: the 2.0
+	# files that land from phase 1 on (w5_*, *_coop, arenas) would interleave with them. Rescanned at the end.
+	for id: StringName in Levels.all_ids():
+		if Levels.get_book(id) != 1 or not Levels.is_solo_level(id):
+			Levels._meta.erase(id)
+			Levels._paths.erase(id)
 	# Book II: A (main 110) -> A2 (sub, its linked half) -> B (main 120) -> C (main 130, Expert only) -> the
 	# ending E (C's `next`); co-op files for A, A2 and C, none for B; two arenas. A's co-op copy kept A's `next` and
 	# code and is registered first, so a solo query that looked at it would find it before A.
@@ -249,10 +255,13 @@ func test_registry_books_coop_files_and_arenas() -> void:
 	assert_eq(Levels.level_for_mode(&"zz_arena_one", Defs.GameMode.VERSUS), &"zz_arena_one")
 	assert_eq(Levels.level_for_mode(&"w1_l1", Defs.GameMode.VERSUS), &"")
 	# Arenas.
-	assert_eq(Levels.get_arenas(), [&"zz_arena_one", &"zz_arena_two"] as Array[StringName])
-	assert_eq(Levels.get_arenas(3), [&"zz_arena_one"] as Array[StringName], "built for 3+ players")
-	assert_eq(Levels.get_arenas(0, &"clubball"), [&"zz_arena_two"] as Array[StringName])
-	assert_eq(Levels.get_arenas(2, &"hot_rock"), [] as Array[StringName])
+	# (Only the in-memory arenas are compared: real arena files - levels/test_world_arena_*.lvl, levels/arena_*.lvl -
+	# lie beside them from phase 1 on.)
+	assert_eq(_zz(Levels.get_arenas()), [&"zz_arena_one", &"zz_arena_two"] as Array[StringName])
+	assert_eq(_zz(Levels.get_arenas(3)), [&"zz_arena_one"] as Array[StringName], "built for 3+ players")
+	assert_eq(_zz(Levels.get_arenas(0, &"clubball")), [&"zz_arena_two"] as Array[StringName])
+	assert_eq(_zz(Levels.get_arenas(2, &"hot_rock")), [] as Array[StringName])
+	assert_true(Levels.get_arenas().size() >= 2, "the arena files are listed too")
 	assert_true(Levels.is_arena(&"zz_arena_two"))
 	assert_eq(Levels.next_level(&"zz_arena_one", expert), &"")
 	assert_eq(Levels.parent_level(&"zz_arena_one", expert), &"")
@@ -271,7 +280,7 @@ func _book1_answers() -> Dictionary:
 	for difficulty: int in [Defs.Difficulty.BEGINNER, Defs.Difficulty.EXPERT]:
 		answers["campaign %d" % difficulty] = Levels.get_campaign(difficulty)
 		for id: StringName in Levels.all_ids():
-			if String(id).begins_with("zz"):
+			if String(id).begins_with("zz") or Levels.get_book(id) != 1 or not Levels.is_solo_level(id):
 				continue
 			answers["%s %d" % [id, difficulty]] = [
 				Levels.next_level(id, difficulty), Levels.has_locked_successor(id, difficulty),
@@ -319,3 +328,12 @@ func test_example_level_is_well_formed() -> void:
 	assert_eq(grid.profile_at(20, 10), TileGrid.PROFILE_UP_RIGHT_45)
 	assert_eq(grid.profile_at(19, 11), TileGrid.PROFILE_NONE, "liquid is not a slope foot")
 	assert_eq(grid.profile_at(26, 11), TileGrid.PROFILE_FLAT_GLUE, "foot of the hill")
+
+
+## The ids of `ids` that this file added in memory (prefix "zz_"), in order.
+func _zz(ids: Array[StringName]) -> Array[StringName]:
+	var result: Array[StringName] = []
+	for id: StringName in ids:
+		if String(id).begins_with("zz_"):
+			result.append(id)
+	return result

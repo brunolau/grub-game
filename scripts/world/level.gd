@@ -11,6 +11,13 @@ extends LevelBase
 ##
 ## Everything positional is in logical px; the TileMapLayers, props and camera work in art px (x Tuning.ART_SCALE),
 ## the only other place besides SimEntity where positions are scaled.
+##
+## 2.0 (PLAN.md P1.6, world-A): a co-op party (Game.mode COOP, two or more heroes) plays on the tribe camera
+## (PHYSICS.md C.13): a second, authentic 20 x 11-cell LevelCamera runs the group rules ([method get_party_frame], the
+## edge walls, the leash) and the visible camera is centred on it; its PartyDriver (scripts/world/party_driver.gd) is
+## registered right after the heroes. An arena (`kind = arena`) is handed to world-B's VersusArena (by path, so this
+## file never depends on it). `scroll = rising` runs and draws a RisingTide (C.8). A single-player level creates none
+## of these: its camera and its tick are exactly 1.0.
 
 ## Colour of the "night" palette of GAMEPLAY.md 7.10 (CanvasModulate of the whole level).
 const DARK_COLOR: Color = Color(0.30, 0.28, 0.45)
@@ -30,6 +37,9 @@ const HERO_START_ID: StringName = &"objects/hero_start"
 ## An arena's spawn of players 2..4 (`index=2..4`; LEVEL_DESIGN.md 15.8): an entity (objects-B) whose cell is also
 ## read as that slot's start (_place_party_starts).
 const SPAWN_POINT_ID: StringName = &"objects/spawn_point"
+## world-B's arena setup (PLAN.md P1.7: `static func is_arena_meta(meta) -> bool`, `static func setup(level) ->
+## SimEntity`: locks the camera, registers the versus referee as the party driver). Loaded by path when it exists.
+const VERSUS_ARENA_PATH: String = "res://scripts/world/versus/arena.gd"
 
 
 ## The smoke band along the top edge of the view on an auto-scrolling level.
@@ -69,6 +79,10 @@ var _source_text: String = ""
 var _source_id: StringName = &""
 var _looks: LevelLooks = LevelLooks.new()
 var _camera_logic: LevelCamera = LevelCamera.new()
+## 2.0 co-op: the tribe camera on the authentic 20 x 11-cell view (null outside a co-op party).
+var _frame_logic: LevelCamera = null
+## 2.0 `scroll = rising`: the deadly band (null on other levels).
+var _rising: RisingTide = null
 var _driver: LevelDriver = null
 var _base_scroll_flags: int = 0
 var _music: StringName = &""
@@ -144,6 +158,8 @@ func _process(delta: float) -> void:
 	if _lava_check <= 0.0:
 		_lava_check = LAVA_CHECK_SECONDS
 		_update_lava_loop(Rect2(top_left / float(Tuning.ART_SCALE), view_art / float(Tuning.ART_SCALE)))
+	if _rising != null:
+		_rising.draw_band(Rect2(top_left / float(Tuning.ART_SCALE), view_art / float(Tuning.ART_SCALE)), delta)
 	if _top_smoke != null:
 		_top_smoke.position = top_left
 		_top_smoke.width = view_art.x
@@ -206,23 +222,52 @@ func get_view_rect() -> Rect2i:
 	return _camera_logic.get_rect()
 
 
+## The camera cell of PHYSICS.md 12 (the off-screen death rule of 10.3 counts from it). A co-op party: the tribe
+## camera's, so the rule is the same on every device.
 func get_camera_cell() -> Vector2i:
+	if _tribe_on():
+		return _frame_logic.get_cell()
 	return _camera_logic.get_cell()
+
+
+## A co-op party: the authentic 20 x 11-cell view of the tribe camera (PHYSICS.md C.13); a camera locked to a
+## rectangle no larger than that (an arena, a one-screen room): the rectangle itself (LevelBase).
+func get_party_frame() -> Rect2i:
+	var lock: Rect2i = get_camera_lock()
+	var small_lock: bool = is_camera_locked() and lock.size.x <= Tuning.VIEW_COLS * Tuning.TILE \
+			and lock.size.y <= Tuning.VIEW_ROWS * Tuning.TILE
+	if _tribe_on() and not small_lock:
+		return _frame_logic.cell_rect()
+	return super.get_party_frame()
 
 
 func lock_camera(view_px: Rect2i) -> void:
 	super.lock_camera(view_px)
 	_camera_logic.lock(view_px)
+	if _frame_logic != null:
+		_frame_logic.lock(view_px)
 
 
 func unlock_camera() -> void:
 	super.unlock_camera()
 	_camera_logic.unlock()
+	if _frame_logic != null:
+		_frame_logic.unlock()
 
 
-## Snaps on P1 (a party too, until the tribe camera's snap exists: PLAN P1, world).
+## Places the camera around P1 (PHYSICS.md 12.5); a co-op party: the tribe camera around its first hatched hero
+## (LevelCamera.snap_group) and the visible camera centred on it.
 func snap_camera() -> void:
 	_camera_logic.scroll_flags = scroll_flags
+	if _rising != null and not _rising.started and not _rising.stopped:
+		# A stage restarted at a checkpoint (Flow: a join / leave puts the heroes there before tick 1): the band waits
+		# 6 rows under the checkpoint used (PHYSICS.md C.8).
+		_rising.restart(get_respawn_pos().y)
+	if _tribe_on():
+		_frame_logic.scroll_flags = scroll_flags
+		_frame_logic.snap_group(heroes)
+		_camera_logic.follow_frame(_frame_logic.get_rect(), true)
+		return
 	_camera_logic.snap(player)
 
 
@@ -325,6 +370,23 @@ func get_camera() -> LevelCamera:
 	return _camera_logic
 
 
+## 2.0: the tribe camera of a co-op party (the authentic view the group rules run on); null outside one.
+func get_tribe_camera() -> LevelCamera:
+	return _frame_logic
+
+
+## 2.0: the rising tide of a `scroll = rising` level; null on other levels.
+func get_rising_tide() -> RisingTide:
+	return _rising
+
+
+## 2.0 `zones/autoscroll_stop` on a rising level: the rise stops for the rest of the stage (the band stays deadly).
+func stop_rising() -> void:
+	scroll_flags &= ~Defs.SCROLL_RISING
+	if _rising != null:
+		_rising.stop()
+
+
 ## Flies join the cosmetic swarm around the hero (`zones/flies`, GAMEPLAY.md 7.9).
 func attract_flies(amount: int) -> void:
 	_flies.attract(amount)
@@ -389,6 +451,21 @@ func _load() -> void:
 	_setup_world_state()
 	_find_lava_cells()
 	_setup_camera()
+	_setup_rising()
+
+
+## 2.0 `scroll = rising` (PHYSICS.md C.8): the band starts Tuning.RISE_CHECKPOINT_ROWS rows under the start point.
+func _setup_rising() -> void:
+	if (_base_scroll_flags & Defs.SCROLL_RISING) == 0:
+		return
+	_rising = RisingTide.new()
+	_rising.name = "RisingTide"
+	add_child(_rising)
+	var liquid: String = str(meta.get("liquid", "water"))
+	if not WorldTileSet.has_liquid(liquid):
+		liquid = WorldTileSet.FALLBACK_LIQUID
+	_rising.setup(WorldTileSet.liquid_texture(liquid, str(meta.get("biome", ""))),
+			int(meta.get("rise_speed", Tuning.RISE_SPEED)), start_pos.y)
 
 
 func _read_data() -> LevelData:
@@ -432,7 +509,7 @@ func _build_visuals() -> void:
 					"terrain atlas '%s' does not exist" % atlas)
 	if not WorldTileSet.has_liquid(liquid):
 		_report_key("liquid", "liquid '%s' does not exist" % liquid)
-	var tile_set: TileSet = WorldTileSet.build(terrain_a, terrain_b, liquid)
+	var tile_set: TileSet = WorldTileSet.build(terrain_a, terrain_b, liquid, str(meta.get("biome", "")))
 	for map: TileMapLayer in [_back_tiles, _tiles, _front_tiles]:
 		map.tile_set = tile_set
 		map.clear()
@@ -580,6 +657,29 @@ func _spawn_entities() -> void:
 			hero_base.respawn_at(start_pos)
 	# P2..P4 of a party, after P1 (TECH_AUDIT.md 4.4); nothing in single-player.
 	spawn_party_heroes()
+	_setup_party()
+
+
+## 2.0, right after the heroes (TECH_AUDIT.md 4.4: level entities -> P1 -> P2 .. -> driver): an arena goes to world-B
+## (VersusArena.setup locks the camera and registers the referee); a co-op party gets the tribe camera and the
+## PartyDriver. Nothing for a single-player level.
+func _setup_party() -> void:
+	var arena_kind: bool = str(meta.get("kind", "")) == "arena"
+	if ResourceLoader.exists(VERSUS_ARENA_PATH):
+		var arena: Script = load(VERSUS_ARENA_PATH) as Script
+		if arena != null and arena.has_script_method(&"is_arena_meta") and bool(arena.call(&"is_arena_meta", meta)):
+			arena.call(&"setup", self)
+			return
+	if arena_kind:
+		# No arena module yet: the arena is one locked screen, no party driver.
+		lock_camera(Rect2i(0, 0, grid.width_px(), grid.height_px()))
+		return
+	if Game.mode != Defs.GameMode.COOP or hero_count() <= 1:
+		return
+	_frame_logic = LevelCamera.new()
+	if is_camera_locked():
+		_frame_logic.lock(get_camera_lock())
+	register_party_driver(PartyDriver.new())
 
 
 ## Music that starts in the middle of a tick (feast mode, a boss fight) is loaded with the level, not on its tick.
@@ -643,6 +743,13 @@ func _setup_camera() -> void:
 	_camera_logic.fast = bool(meta.get("fast_vscroll", true))
 	_camera_logic.smooth = Settings.get_bool("camera/smooth_follow")
 	_camera_logic.set_view_art(_viewport_size())
+	if _frame_logic != null:
+		# The tribe camera: the authentic view, always the paging camera (identical on every device and setting).
+		_frame_logic.set_view_art(Vector2i(Tuning.VIEW_W, Tuning.VIEW_H) * Tuning.ART_SCALE)
+		_frame_logic.set_bounds(Rect2i(0, 0, grid.width_px(), grid.height_px()))
+		_frame_logic.home_row = _camera_logic.home_row
+		_frame_logic.fast = _camera_logic.fast
+		_frame_logic.smooth = false
 	_paint_apron()
 	_camera.anchor_mode = Camera2D.ANCHOR_MODE_FIXED_TOP_LEFT
 	_camera.make_current()
@@ -667,10 +774,14 @@ func _start_music() -> void:
 # Simulation steps (called by the LevelDriver)
 # =================================================================================================================
 
-## Phase WORLD: wind script, darkness fade.
+## Phase WORLD: wind script, darkness fade, the rising tide (2.0).
 func _world_step() -> void:
 	_play_ticks += 1
 	_apply_wind_script()
+	if _rising != null:
+		if (scroll_flags & Defs.SCROLL_RISING) == 0 and not _rising.stopped:
+			_rising.stop()
+		_rising.tick(self, _any_hero_input())
 	_dark_ticks_prev = _dark_ticks
 	if dark and _dark_ticks < Tuning.DARKNESS_FADE_TICKS:
 		_dark_ticks += 1
@@ -678,13 +789,33 @@ func _world_step() -> void:
 		_dark_ticks -= 1
 
 
-## Phase CAMERA: PHYSICS.md 12. The camera follows P1 (a party's tribe camera, PHYSICS.md C.13, is world's PLAN P1
-## work: until then every party is framed by P1).
+## Phase CAMERA: PHYSICS.md 12 on P1; a co-op party: the tribe camera (PHYSICS.md C.13) and the visible camera
+## centred on it. On a rising level the band is kept in view once it rises (C.8).
 func _camera_step() -> void:
 	if _camera_logic.autoscroll_held and _any_hero_input():
 		_camera_logic.autoscroll_held = false
 	_camera_logic.scroll_flags = scroll_flags
+	if _tribe_on():
+		_frame_logic.autoscroll_held = _camera_logic.autoscroll_held
+		_frame_logic.scroll_flags = scroll_flags
+		_frame_logic.tick_group(heroes)
+		if _rising_camera():
+			_frame_logic.apply_rising(_rising.band_top)
+		_camera_logic.follow_frame(_frame_logic.get_rect())
+		return
 	_camera_logic.tick(player)
+	if _rising_camera():
+		_camera_logic.apply_rising(_rising.band_top)
+
+
+## True while the tribe camera runs (a co-op party of two or more).
+func _tribe_on() -> bool:
+	return _frame_logic != null and hero_count() > 1
+
+
+## True while the rising band pulls the camera up (it rises and no `zones/autoscroll_stop` ended it).
+func _rising_camera() -> bool:
+	return _rising != null and _rising.is_rising() and (scroll_flags & Defs.SCROLL_RISING) != 0
 
 
 ## True when a hero's input of this tick is held (the auto-scroll waits for the first one). Swap is no movement input
@@ -732,6 +863,11 @@ func _apply_wind_script() -> void:
 func _respawn_now() -> void:
 	_respawn_pending = false
 	scroll_flags = _base_scroll_flags
+	if _rising != null:
+		# The band waits 6 rows under the checkpoint used; a stopped rise stays stopped for the rest of the stage.
+		_rising.restart(get_respawn_pos().y)
+		if _rising.stopped:
+			scroll_flags &= ~Defs.SCROLL_RISING
 	_camera_logic.scroll_flags = scroll_flags
 	_hold_autoscroll()
 	set_time_limit(int(meta.get("time", 0)))
@@ -749,6 +885,8 @@ func _respawn_now() -> void:
 func _on_viewport_resized() -> void:
 	if _camera_logic.set_view_art(_viewport_size()):
 		_paint_apron()
+		if _tribe_on():
+			_camera_logic.follow_frame(_frame_logic.get_rect(), true)
 
 
 func _on_setting_changed(key: String, value: Variant) -> void:

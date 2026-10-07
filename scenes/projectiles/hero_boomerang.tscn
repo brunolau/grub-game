@@ -6,6 +6,7 @@
 [node name="HeroBoomerang" type="Node2D"]
 script = ExtResource("1_projectile")
 hit_box = Vector3i(13, 13, 6)
+weapon = 3
 spin_frames = 4
 spin_fps = 16
 

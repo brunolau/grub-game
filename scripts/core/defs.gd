@@ -265,6 +265,8 @@ const SCROLL_RISING: int = 8
 ## hit rules); it changes nothing in the simulation.
 ## Duck-typed (no entity class is named here): Defs is compiled by the tool scripts that run before the autoloads
 ## exist (tools/world_render_level.gd, tools/validate_levels.gd ...), and the entity classes need the autoloads.
+## A hero flying as a batted ball (PHYSICS.md C.11: `curl` == CURL_BALL with a living `ball_batter`) credits his
+## batter: "an enemy with hp < 50 takes 25 (the batter's hit)". Never the case in single-player (no hero curls there).
 static func hitter_slot(source: Variant) -> int:
 	if not is_instance_valid(source):
 		return -1
@@ -273,10 +275,19 @@ static func hitter_slot(source: Variant) -> int:
 		return -1
 	match int(object.call(&"get_kind")):
 		Kind.PLAYER:
+			var curl: Variant = object.get(&"curl")
+			if curl is int and int(curl) == CURL_BALL_STATE:
+				var batter: Variant = object.get(&"ball_batter")
+				if is_instance_valid(batter) and batter != object:
+					return _slot_field(batter as Object, &"slot")
 			return _slot_field(object, &"slot")
 		Kind.HERO_PROJECTILE:
 			return _slot_field(object, &"owner_slot")
 	return -1
+
+
+## PlayerBase.CURL_BALL (the hero flies as a batted ball, PHYSICS.md C.11), mirrored here for hitter_slot.
+const CURL_BALL_STATE: int = 2
 
 
 static func _slot_field(entity: Object, field: StringName) -> int:

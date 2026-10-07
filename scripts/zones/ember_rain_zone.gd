@@ -7,8 +7,9 @@ extends ZoneBase
 ##
 ## Parameters: `rect`; `period` ticks [Tuning.DESIGNER_SECOND]; `skin=ember|leaf` [ember].
 ##
-## A party: it rains while any living hero is inside, on the first of them in contact order (the spawn parameter
-## `rain_slot` names his slot for the ember); a stream per hero is world's PLAN P1 rule.
+## A party (TECH_AUDIT.md 3.13): every living hero inside gets his own stream - one timer per player slot, started
+## when his feet enter, an ember every `period` ticks on him (the spawn parameter `rain_slot` names his slot). One
+## hero: exactly the 1.0 stream.
 
 const EMBER_ID: StringName = &"projectiles/enemy_ember"
 const SKINS: Array[String] = ["ember", "leaf"]
@@ -20,7 +21,8 @@ var skin: String = SKINS[0]
 ## Embers released so far (diagnostics, tests).
 var released: int = 0
 
-var _timer: int = 0
+## Ticks since the last ember of each player slot's stream.
+var _timers: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 
 
 func _apply_params(params: Dictionary) -> void:
@@ -35,32 +37,25 @@ func _apply_params(params: Dictionary) -> void:
 func _sim_tick(phase: int) -> void:
 	super._sim_tick(phase)
 	var level: LevelBase = Game.level
-	var hero: PlayerBase = _rain_target(level)
-	if hero == null:
-		return
-	_timer += 1
-	if _timer < period:
-		return
-	_timer = 0
-	if Spawner.exists(EMBER_ID):
-		level.spawn(EMBER_ID, sim_pos, {"rain": true, "skin": skin, "rain_slot": hero.slot})
-		released += 1
-
-
-## The hero it rains on: the first living hero inside, in contact order (one hero: him while inside and alive).
-func _rain_target(level: LevelBase) -> PlayerBase:
 	if not inside or level == null:
-		return null
+		return
 	for hero: PlayerBase in level.contact_order():
-		if not hero.dead and (inside_mask & (1 << hero.slot)) != 0:
-			return hero
-	return null
+		var slot: int = clampi(hero.slot, 0, _timers.size() - 1)
+		if hero.dead or (inside_mask & (1 << hero.slot)) == 0:
+			continue
+		_timers[slot] += 1
+		if _timers[slot] < period:
+			continue
+		_timers[slot] = 0
+		if Spawner.exists(EMBER_ID):
+			level.spawn(EMBER_ID, sim_pos, {"rain": true, "skin": skin, "rain_slot": hero.slot})
+			released += 1
 
 
 func _on_level_reset() -> void:
 	super._on_level_reset()
-	_timer = 0
+	_timers.fill(0)
 
 
-func _on_first_entered(_level: LevelBase, _hero: PlayerBase) -> void:
-	_timer = 0
+func _on_hero_entered(_level: LevelBase, hero: PlayerBase) -> void:
+	_timers[clampi(hero.slot, 0, _timers.size() - 1)] = 0

@@ -11,7 +11,12 @@ extends PlayerBase
 ##
 ## Root of `res://scenes/player/player.tscn`; the children `Sprite` and `GliderSprite` are cosmetic.
 
+## 2.0 (co-op and versus only): an emote bubble appeared over this hero (HeroParty.Emote; DESIGN.md D.11, E.9).
+signal emoted(kind: int)
+
 const ID_AXE: StringName = &"projectiles/hero_axe"
+const SPEAR_SCRIPT: String = "res://scripts/projectiles/hero_spear.gd"
+static var _spear: Script = null
 const ID_BOOMERANG: StringName = &"projectiles/hero_boomerang"
 const ID_BONE: StringName = &"items/bone"
 const FX_DUST: StringName = &"fx/dust"
@@ -90,10 +95,39 @@ var hero_mount: HeroMount = HeroMount.new(self)
 ## hero_party.gd, C.10-C.14).
 var hero_party: HeroParty = HeroParty.new(self)
 
+## 2.0 state of the hero's own update (default = 1.0; only the party component changes them):
+## the hurt state lasts while hit_timer >= this (Tuning.HIT_STUN_MIN; a versus hurt: VersusTuning.STUN_HIT_TIMER_MIN).
+var _stun_min: int = Tuning.HIT_STUN_MIN
+## Facing before step 8b of this tick (a curled hero, a ball and an egg ignore the keys: they put it back).
+var _facing_at_tick_start: int = 1
+## True when this tick's tile collision met a wall in the wall probe (11.2 #7): a batted ball uncurls there.
+var wall_bumped: bool = false
+
+## What _refresh_visual() last wrote to the sprites (the performance pass: no engine property is read or written on a
+## tick on which the picture did not change).
+var _shown_frame: int = -1
+var _shown_flip: bool = false
+var _shown_visible: bool = true
+var _shown_alpha: float = 1.0
+var _shown_tint: Color = Color.WHITE
+var _glider_shown: bool = false
+var _glider_flip: bool = false
+var _glider_y: int = GLIDER_CARRY_Y
+
 
 func _ready() -> void:
 	_sprite = get_node_or_null(^"Sprite") as Sprite2D
 	_glider_sprite = get_node_or_null(^"GliderSprite") as Sprite2D
+	if _sprite != null:
+		_shown_frame = _sprite.frame
+		_shown_flip = _sprite.flip_h
+		_shown_visible = _sprite.visible
+		_shown_alpha = _sprite.modulate.a
+		_shown_tint = _sprite.self_modulate
+	if _glider_sprite != null:
+		_glider_shown = _glider_sprite.visible
+		_glider_flip = _glider_sprite.flip_h
+		_glider_y = int(_glider_sprite.position.y)
 	_on_weapon_changed(run.weapon)
 	_refresh_visual()
 	# 2.0: each component decides whether this level and mode need it (none does in Book I solo).
@@ -102,6 +136,18 @@ func _ready() -> void:
 	hero_mount.setup(level)
 	hero_belt.setup(level)
 	hero_climb.setup(level)
+	if hero_party.active:
+		apply_palette()
+
+
+## 2.0 (DESIGN.md D.1, E.9): paint this hero in his slot's colour and loincloth pattern (HeroPalette.resolve: his run's
+## choice or the slot default, arena swaps in versus). The 1.0 look - yellow with the spots - keeps no material at
+## all; a single-player hero never calls it.
+func apply_palette() -> void:
+	if _sprite == null:
+		return
+	var look: Array = hero_party.palette()
+	_sprite.material = HeroPalette.material_for(look[0], look[1], true)
 
 
 func _enter_tree() -> void:
@@ -161,7 +207,7 @@ func hurt(source: SimEntity, kind: int = Defs.HurtKind.ENEMY) -> bool:
 	var pierces_immunity: bool = kind == Defs.HurtKind.TRAP or kind == Defs.HurtKind.BOSS_PROJECTILE
 	if hit_timer > 0 and not pierces_immunity:
 		return false
-	if feast > 0 and kind == Defs.HurtKind.ENEMY:
+	if feast > 0 and (kind == Defs.HurtKind.ENEMY or kind == Defs.HurtKind.RIVAL):
 		return false
 	# 2.0 components (off in single-player): a seated rider's hit is the mount's (PHYSICS.md C.9); a climb or a curl
 	# ends on a hurt and may take it (C.4, C.11, the versus table C.14).
@@ -192,6 +238,7 @@ func hurt(source: SimEntity, kind: int = Defs.HurtKind.ENEMY) -> bool:
 				killed = run.lose_heart()
 			xvel = xvel * Tuning.HURT_XVEL_FACTOR
 	hit_timer = Tuning.HIT_TIMER
+	_stun_min = Tuning.HIT_STUN_MIN
 	attack_gate = false
 	_close_glider()
 	yvel = Tuning.HURT_YVEL
@@ -208,6 +255,11 @@ func hurt(source: SimEntity, kind: int = Defs.HurtKind.ENEMY) -> bool:
 func kill(cause: StringName) -> void:
 	if dead or down or _level_completed():
 		return
+	# 2.0: where and why the toss starts (the co-op egg appears there, PHYSICS.md C.12); a curl or a ride ends.
+	death_origin = sim_pos
+	death_cause = cause
+	if hero_party.active:
+		hero_party.on_killed(cause)
 	dead = true
 	control_enabled = false
 	club_box_active = false
@@ -226,7 +278,7 @@ func kill(cause: StringName) -> void:
 	_death_dx = Tuning.DEATH_DX
 	var level: LevelBase = Game.level
 	if level != null:
-		var view: Rect2i = level.get_view_rect_of(self)
+		var view: Rect2i = level.get_view_rect_of(self) if level.hero_count() <= 1 else level.get_party_frame()
 		if sim_pos.x >= view.position.x + view.size.x / 2:
 			_death_dx = -Tuning.DEATH_DX
 	Audio.play_sfx(Sfx.PLAYER_DEATH)
@@ -262,9 +314,69 @@ func set_glider(carrying: bool) -> void:
 	_refresh_visual()
 
 
+## 2.0 (PHYSICS.md C.12): an egg. After a death toss it appears where the toss started, clamped into the view; the
+## leash and the voluntary egg make it where he is. The party component draws and moves it.
+func go_down(cause: StringName) -> void:
+	if down:
+		return
+	var from_toss: bool = dead
+	super.go_down(cause)
+	state = Defs.HeroState.IDLE
+	handler = Defs.HeroState.IDLE
+	death_ticks = 0
+	looking = false
+	charge = 0
+	swing_lock = 0
+	glider_runup = 0
+	skidding = false
+	panting = false
+	land_pose = 0
+	club_frame = Tuning.ClubFrame.NONE
+	if hero_party.active:
+		hero_party.on_down(cause, from_toss)
+	else:
+		set_box(HeroParty.egg_box())
+	_refresh_visual()
+
+
+## 2.0 (PHYSICS.md C.12): hatched again - the hero's box, his first frame, the shell left behind, a doze decision for
+## his place (an egg is no hero rectangle).
+func hatch(by: PlayerBase, hearts: int) -> void:
+	if not down:
+		return
+	super.hatch(by, hearts)
+	state = Defs.HeroState.IDLE
+	handler = Defs.HeroState.IDLE
+	set_box(Tuning.HERO_BOX_STAND)
+	_animator.reset()
+	anim_frame = _animator.frame
+	if hero_party.active:
+		hero_party.on_hatched(by)
+	_refresh_visual()
+
+
+## 2.0 (PHYSICS.md C.11): batted by `batter`'s front strike - a ball (the party component flies it).
+func bat(p_xvel: int, p_yvel: int, batter: PlayerBase) -> void:
+	super.bat(p_xvel, p_yvel, batter)
+	hero_party.on_batted()
+
+
+func holds_up() -> bool:
+	return (_raw_flags & Defs.IN_UP) != 0
+
+
+func x_commit_allows(x: int) -> bool:
+	if not super.x_commit_allows(x):
+		return false
+	var level: LevelBase = Game.level
+	return not hero_party.active or level == null or hero_party.edge_walls_allow(level, x)
+
+
 func respawn_at(pos: Vector2i) -> void:
 	if feast > 0:
 		_stop_feast_music()
+	_stun_min = Tuning.HIT_STUN_MIN
+	wall_bumped = false
 	handler = Defs.HeroState.IDLE
 	input_flags = 0
 	club_frame = Tuning.ClubFrame.NONE
@@ -381,8 +493,13 @@ func _hero_update() -> void:
 	var level: LevelBase = Game.level
 	if dead or level == null:
 		return
+	if hit_stop > 0 and hero_party.active:
+		# 2.0 versus hit-stop (PHYSICS.md C.14): this hero's PLAYER phase is skipped.
+		hero_party.hold_hit_stop()
+		return
 	# 8b: input and facing (facing flips at once, even in mid-air and mid-swing). His own slot's flags (slot 0 is
 	# GameInput.flags).
+	_facing_at_tick_start = facing
 	_raw_flags = GameInput.get_flags(slot) if control_enabled else 0
 	var left: bool = (_raw_flags & Defs.IN_LEFT) != 0
 	var right: bool = (_raw_flags & Defs.IN_RIGHT) != 0
@@ -404,7 +521,7 @@ func _hero_update() -> void:
 	# 8c: state table, then the overrides swing_lock and hurt.
 	input_flags = 0 if swing_lock != 0 else _raw_flags
 	var selected: int = Tuning.STATE_LUT[input_flags & Defs.IN_STATE_MASK]
-	if hit_timer >= Tuning.HIT_STUN_MIN:
+	if hit_timer >= _stun_min:
 		selected = Defs.HeroState.HURT
 	state = selected
 	# 2.0 (off without vines): the vine grab and the CLIMB state replace 8d-8g (PHYSICS.md C.4).
@@ -548,7 +665,7 @@ func _walk_body() -> void:
 	skidding = false
 	panting = false
 	idle_timer = mini(idle_timer + 1, Tuning.IDLE_TIMER_MAX)
-	_accel(Tuning.WALK_CAP)
+	_accel(walk_cap)
 	_wind()
 	_loaded_anim = Defs.HeroState.WALK
 
@@ -559,11 +676,14 @@ func _handle_jump() -> void:
 	elif no_jump != 0:
 		_idle_body()
 	else:
-		_jump_body(false)
+		# 2.0: a Totem carrier's impulses are halved (PHYSICS.md C.10); never in single-player.
+		_jump_body(totem_rider != null)
 
 
 ## The jump handler proper. It runs whether or not he stands on the ground: the impulse table simply continues
-## where `jump_ticks` stopped, and after it gravity is applied a second time. `halved` = carrying the glider.
+## where `jump_ticks` stopped, and after it gravity is applied a second time. `halved` = carrying the glider (2.0: or
+## a Totem rider). 2.0 hooks (1.0 values in single-player): impulses only while n < jump_impulse_ticks (tar), scaled by
+## jump_impulse_quarters / 4 (a heavy versus stack).
 func _jump_body(halved: bool) -> void:
 	handler = Defs.HeroState.JUMP
 	skidding = false
@@ -572,7 +692,9 @@ func _jump_body(halved: bool) -> void:
 	var n: int = jump_ticks
 	jump_ticks += 1
 	if n < Tuning.JUMP_IMPULSE_TICKS:
-		var impulse: int = Tuning.JUMP_IMPULSES[n]
+		var impulse: int = Tuning.JUMP_IMPULSES[n] if n < jump_impulse_ticks else 0
+		if jump_impulse_quarters != 4:
+			impulse = (impulse * jump_impulse_quarters) >> 2
 		yvel += Tuning.shr(impulse, 1) if halved else impulse
 	else:
 		_gravity()
@@ -651,6 +773,9 @@ func _handle_strike(kind: int) -> void:
 		hop = Tuning.STRIKE_HOP_LOW
 	if strike_tick >= frames.size():
 		strike_tick = 0  # the script loops: FIRE held re-swings
+	if strike_tick == 0 and hero_party.active:
+		# 2.0 versus: a swing or a throw ends the hurt immunity and the spawn shield (PHYSICS.md C.14).
+		hero_party.on_strike_started()
 	var frame: int = frames[strike_tick]
 	var last: bool = strike_tick == frames.size() - 1
 	strike_tick += 1
@@ -700,6 +825,11 @@ func _create_club_box(frame: int, weapon: int) -> void:
 ## Throw the axe or the boomerang (PHYSICS.md 8.4). Returns false when Tuning.MAX_THROWN of his own are already in
 ## flight (each hero of a party has his own; a party of one owns every hero projectile, as in 1.0).
 func _throw(weapon: int) -> bool:
+	if weapon == Defs.Weapon.SPEAR:
+		# 2.0 (PHYSICS.md C.3): the spear is player-B's projectile with its own count rules; bound late, so a broken or
+		# missing spear script never stops this file from compiling.
+		var spear: Script = _spear_script()
+		return spear != null and bool(spear.call(&"throw_from", self, _weapon_anchor, club_power))
 	var level: LevelBase = Game.level
 	var id: StringName = ID_BOOMERANG if weapon == Defs.Weapon.BOOMERANG else ID_AXE
 	if level == null or not Spawner.exists(id):
@@ -867,6 +997,7 @@ func _collide(level: LevelBase, body_height: int) -> void:
 	if side == TileGrid.SIDE_WALL:
 		sim_pos.x -= Tuning.floor16(xvel)
 		xvel = 0
+		wall_bumped = true
 	elif side == TileGrid.SIDE_DEADLY:
 		kill(_tile_death_cause(grid, probe_col, row - 1))
 		return
@@ -883,8 +1014,15 @@ func _collide(level: LevelBase, body_height: int) -> void:
 
 ## Instant deaths of PHYSICS.md 10.3 that do not depend on a tile. Returns true when he died.
 func _left_the_playfield(level: LevelBase, col: int, row: int) -> bool:
+	# 2.0: a party measures against the tribe camera's authentic frame (identical on every device, PHYSICS.md C.13) and
+	# its cell, so a co-op or versus route replays the same on any screen; one hero keeps the 1.0 view and camera cell.
 	var view: Rect2i = level.get_view_rect()
-	var cell: Vector2i = level.get_camera_cell()
+	var cell: Vector2i = Vector2i.ZERO
+	if level.hero_count() <= 1:
+		cell = level.get_camera_cell()
+	else:
+		view = level.get_party_frame()
+		cell = Vector2i(view.position.x >> 4, view.position.y >> 4)
 	# The original limits are one screen (20 x 11 tiles); a larger view keeps "one screen" (ARCHITECTURE 2).
 	var max_rows: int = maxi(Tuning.DEATH_ROWS_FROM_CAMERA, Tuning.to_cell(view.size.y))
 	var max_cols: int = maxi(Tuning.DEATH_COLS_FROM_CAMERA, Tuning.to_cell(view.size.x + Tuning.TILE - 1))
@@ -928,6 +1066,10 @@ func _land(level: LevelBase, col: int, row: int, was_grounded: bool) -> bool:
 		var above: int = grid.surface_offset(col, row - 1, sim_pos.x)
 		if above < Tuning.TILE:
 			sim_pos.y += above - Tuning.TILE
+	if curl == CURL_BALL:
+		# 2.0: a batted ball lands softly (PHYSICS.md C.11); a line drive or a lob uncurls here.
+		hero_party.ball_landed()
+		return false
 	# Landing rules of PHYSICS.md 6.5.
 	if fall_ticks > Tuning.SOFT_LANDING_MAX_FALL_TICKS:
 		_spawn_fx(FX_DUST, sim_pos)
@@ -985,7 +1127,11 @@ func _ceiling_block(grid: TileGrid, col: int, row: int) -> void:
 ## No ground: air control and gravity, applied AFTER the position was integrated (PHYSICS.md 5.2). Falling
 ## arms the jump lock-out, except with the glider, whose jump ignores it.
 func _airborne_step() -> void:
-	_accel(Tuning.WALK_CAP)
+	if curl == CURL_BALL:
+		# 2.0: a batted ball flies with gravity only (PHYSICS.md C.11).
+		_gravity()
+		return
+	_accel(air_cap)
 	_gravity()
 	if yvel > 0 and not run.has_glider:
 		no_jump = Tuning.NO_JUMP_TICKS
@@ -1050,7 +1196,11 @@ func _contact_pass() -> void:
 	var level: LevelBase = Game.level
 	# 2.0: an egg touches nothing and the hatch shield skips enemy contact like the hit timer (both never in
 	# single-player).
-	if dead or hit_timer != 0 or level == null or down or shield != 0:
+	# 2.0: a seated rider's contacts are the mount's (PHYSICS.md C.9, objects/mount tests its ridden box).
+	if dead or hit_timer != 0 or level == null or down or shield != 0 or mount != null:
+		return
+	if curl == CURL_BALL and hero_party.active:
+		hero_party.ball_contacts(level)  # 2.0: a batted ball knocks small enemies (PHYSICS.md C.11)
 		return
 	var enemies: Array[SimEntity] = level.get_kind(Defs.Kind.ENEMY)
 	for i: int in enemies.size():
@@ -1072,6 +1222,8 @@ func _contact_pass() -> void:
 					enemy.on_glider_stomp(self)
 			else:
 				_bounce_on(enemy, depth)
+		elif hero_party.active and is_crouching() and _brace_stops(enemy):
+			continue  # 2.0 Brace Wall (PHYSICS.md C.10): the heavy stopped dead, neither hero is touched
 		elif hurt(enemy):
 			enemy.on_hurt_hero(self)
 		return
@@ -1089,6 +1241,22 @@ func _bounce_on(enemy: EnemyBase, depth: int) -> void:
 		Events.popup_requested.emit(&"multiplier", multiplier, Vector2i(sim_pos.x, sim_pos.y - box_h))
 
 
+## 2.0 Brace Wall (PHYSICS.md C.10), before an enemy's contact would hurt this crouching hero: when he braces with a
+## partner (PlayerBase.brace_partner) and the enemy has the brace rule - a `heavy` enemy or a boss whose rule says so
+## implements `brace_stop(hero: PlayerBase, partner: PlayerBase) -> bool` (enemies; true = it stopped dead and is
+## dazed) - the contact is ignored. A lone croucher is trampled as usual.
+func _brace_stops(enemy: EnemyBase) -> bool:
+	if not enemy.has_method(&"brace_stop"):
+		return false
+	var partner: PlayerBase = brace_partner()
+	if partner == null:
+		return false
+	if not bool(enemy.call(&"brace_stop", self, partner)):
+		return false
+	_party_cue(Sfx.BRACE)
+	return true
+
+
 # =================================================================================================================
 # Phase POST (PHYSICS.md 3 steps 14-15, 10.4)
 # =================================================================================================================
@@ -1101,7 +1269,7 @@ func _post_step() -> void:
 		hero_party.post_step(Game.level)
 	if dead and death_ticks < Tuning.DEATH_ANIM_TICKS:
 		_death_step()
-	if dead and death_ticks >= Tuning.DEATH_ANIM_TICKS:
+	if (dead and death_ticks >= Tuning.DEATH_ANIM_TICKS) or down:
 		_refresh_visual()
 		return
 	anim_frame = _animator.update(self)
@@ -1147,6 +1315,13 @@ func _scatter_bones(count: int) -> void:
 		level.spawn(ID_BONE, sim_pos + Vector2i(0, -Tuning.TILE / 2), {"dropped": true, "fan": i})
 
 
+## The spear projectile's script (player-B, scripts/projectiles/hero_spear.gd: static throw_from), loaded on first use.
+static func _spear_script() -> Script:
+	if _spear == null and ResourceLoader.exists(SPEAR_SCRIPT):
+		_spear = load(SPEAR_SCRIPT) as Script
+	return _spear
+
+
 func _spawn_fx(id: StringName, pos: Vector2i) -> void:
 	var level: LevelBase = Game.level
 	if level != null and Spawner.exists(id):
@@ -1185,31 +1360,49 @@ func _on_exit_reached(_exit_kind: StringName) -> void:
 
 ## Show the picture of this tick: sheet frame, mirroring, hurt blink, glider overlay.
 func _refresh_visual() -> void:
-	# Only changes are written: a sprite's frame and flip setters redraw (and signal) even when nothing changed,
-	# and this runs on every tick.
+	# Only changes are written, and the sprite's own properties are never read back: what was last written is kept in
+	# the _shown_* fields (the A53 performance pass, PLAN.md P1.4 - an engine property access costs far more than a
+	# script field, and this runs for every hero on every tick). 2.0: an egg hides the hero (the party component draws
+	# the egg); the hatch shield blinks like the hit timer (both never in single-player).
 	if _sprite != null:
-		if _sprite.frame != anim_frame:
+		if _shown_frame != anim_frame:
+			_shown_frame = anim_frame
 			_sprite.frame = anim_frame
 		var flip: bool = facing < 0
-		if _sprite.flip_h != flip:
+		if _shown_flip != flip:
+			_shown_flip = flip
 			_sprite.flip_h = flip
-		_sprite.visible = not dead or death_ticks < Tuning.DEATH_ANIM_TICKS
-		var ghost: bool = hit_timer > 0 and not dead and Sim.tick % Tuning.BLINK_PERIOD != 0
+		var shown: bool = (not dead or death_ticks < Tuning.DEATH_ANIM_TICKS) and not down
+		if _shown_visible != shown:
+			_shown_visible = shown
+			_sprite.visible = shown
+		var ghost: bool = (hit_timer > 0 or shield > 0) and not dead and Sim.tick % Tuning.BLINK_PERIOD != 0
 		var alpha: float = BLINK_ALPHA if ghost else 1.0
-		if _sprite.modulate.a != alpha:
-			_sprite.modulate.a = alpha
+		if _shown_alpha != alpha:
+			_shown_alpha = alpha
+			var modulation: Color = _sprite.modulate
+			modulation.a = alpha
+			_sprite.modulate = modulation
 		var tint: Color = Color.WHITE
 		if charge > 0 and not dead:
 			if _charge_chimed:
 				tint = CHARGE_FULL_TINT if (Sim.tick >> 1) & 1 == 0 else CHARGE_TINT
 			else:
 				tint = Color.WHITE.lerp(CHARGE_TINT, minf(float(charge) / float(Tuning.CHARGE_STEP_MAX_AT), 1.0))
-		if _sprite.self_modulate != tint:
+		if _shown_tint != tint:
+			_shown_tint = tint
 			_sprite.self_modulate = tint
 	if _glider_sprite != null:
-		_glider_sprite.visible = run.has_glider and not dead
-		if _glider_sprite.visible:
+		var carried: bool = run.has_glider and not dead and not down
+		if _glider_shown != carried:
+			_glider_shown = carried
+			_glider_sprite.visible = carried
+		if carried:
 			var flip: bool = facing < 0
-			if _glider_sprite.flip_h != flip:
+			if _glider_flip != flip:
+				_glider_flip = flip
 				_glider_sprite.flip_h = flip
-			_glider_sprite.position.y = float(GLIDER_HANDS_Y if is_gliding() else GLIDER_CARRY_Y)
+			var bar_y: int = GLIDER_HANDS_Y if is_gliding() else GLIDER_CARRY_Y
+			if _glider_y != bar_y:
+				_glider_y = bar_y
+				_glider_sprite.position.y = float(bar_y)

@@ -11,6 +11,9 @@ extends ProjectileBase
 
 ## Sprite box (width, height, x_offset) in logical px; the feet point is the bottom-centre of the picture.
 @export var hit_box: Vector3i = Vector3i(16, 16, 8)
+## The weapon thrown (Defs.Weapon: AXE or BOOMERANG), set in the scene. 2.0: the versus hurt table reads it (the
+## swirling axe pops the victim up, PHYSICS.md C.14); nothing in Book I does.
+@export var weapon: int = Defs.Weapon.AXE
 ## Frames of the spin animation in the sheet, and its speed (ASSET_MANIFEST 9, cosmetic).
 @export var spin_frames: int = 4
 @export var spin_fps: int = 16

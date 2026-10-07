@@ -254,7 +254,9 @@ func hold_music(context: StringName, holder: Object, fade_seconds: float = 0.2) 
 
 ## `holder` lets go of `context` ([method hold_music]). When no holder is left (holders that were freed meanwhile do
 ## not count) and `context` is still the music that plays, the interrupted track comes back ([method pop_music]).
-## Releasing a context one does not hold does nothing.
+## When another track was pushed over it meanwhile (a boss), `context` leaves the stack under that track, so the
+## track it interrupted - not `context` - comes back when the other one is popped (the feast that ended during a
+## boss fight). Releasing a context one does not hold does nothing.
 func release_music(context: StringName, holder: Object, fade_seconds: float = 0.4) -> void:
 	if holder == null or not _music_holds.has(context):
 		return
@@ -269,6 +271,12 @@ func release_music(context: StringName, holder: Object, fade_seconds: float = 0.
 	_music_holds.erase(context)
 	if _music_context == context:
 		pop_music(fade_seconds)
+		return
+	var at: int = _music_stack.rfind(context)
+	if at > 0:
+		# The track `context` interrupted continues where it was; `context`'s own resume point is dropped with it.
+		_music_stack.remove_at(at)
+		_music_resume.remove_at(at)
 
 
 ## True while `holder` holds `context` ([method hold_music]).

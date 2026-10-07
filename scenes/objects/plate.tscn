@@ -1,0 +1,13 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/objects/plate.gd" id="1_plate"]
+[ext_resource type="Texture2D" path="res://assets/sprites/objects/plate.png" id="2_plate"]
+
+[node name="Plate" type="Node2D"]
+script = ExtResource("1_plate")
+
+[node name="Sprite" type="Sprite2D" parent="."]
+texture = ExtResource("2_plate")
+centered = false
+offset = Vector2(-32, -14)
+hframes = 6

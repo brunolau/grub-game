@@ -10,7 +10,10 @@ extends Control
 ##   --ui=<name>          scene `res://scenes/ui/<name>.tscn` (screen or overlay)
 ##   --ui-args=k=v,k=v    Flow.args of the screen (integers are converted, "a|b|c" becomes a list)
 ##   --ui-state=<name>    prepared game state: progress | tally | hud | boss | paused | intro (_prepare_state); boss
-##                        starts a fight of a boss with --ui-boss-hp=<n> hit points (default 150)
+##                        starts a fight of a boss with --ui-boss-hp=<n> hit points (default 150). 2.0 (ui-B):
+##                        coop (P2's panel, belt icons, edge arrows with the stone countdown), versus (Grub Stack
+##                        corner panels, sundial, a banner), pause_p2 (the pause menu of P2 in co-op), table (two
+##                        touch players, table mode), keytest (options: the two-player keyboard test)
 ##   --ui-keys=a,b,...    input script, one step every --ui-step seconds after --ui-delay seconds:
 ##                        up down left right accept cancel pause   ui actions / the pause action
 ##                        wait                                     do nothing for one step
@@ -19,6 +22,9 @@ extends Control
 ##                        defeat                                   the boss is defeated
 ##                        intro                                    the HUD shows the level banner
 ##                        key:<name>                               press a key ("key:A", "key:Escape")
+##                        hold:<name> / free:<name>                 press / release a key and keep it so ("hold:Kp 4")
+##                        banner:<n>                               versus: round countdown n (0 = GRUB!), or
+##                        rush / win:<slots>                       the Feast Rush, a round result ("win:1", "win:0|2")
 ##                        tap:<x>:<y>                              click / tap at a view position (art px)
 ##                        press:<x>:<y> release:<x>:<y>            touch down / up (finger 0) for the touch overlay
 ##   --ui-step=<seconds>  time between input steps (default 0.35)
@@ -72,6 +78,8 @@ func _show(screen: String, state: String) -> void:
 		push_error("ui_preview: scene '%s' does not exist" % path)
 		return
 	var scene: PackedScene = load(path) as PackedScene
+	if state == "keytest":
+		_open_key_test.call_deferred()
 	if OVERLAYS.has(screen):
 		add_child(UiBackdrop.new("jungle", 0.0))
 		var layer: CanvasLayer = CanvasLayer.new()
@@ -85,8 +93,38 @@ func _show(screen: String, state: String) -> void:
 		add_child(scene.instantiate())
 
 
+## A stand-in for the versus referee: fixed numbers for the corner panels and the sundial (previews only).
+class PreviewReferee:
+	extends RefCounted
+
+	func stack_of(slot: int) -> int:
+		return [7, 23, 2, 14][slot]
+
+	func banked_of(slot: int) -> int:
+		return [12, 3, 0, 9][slot]
+
+	func round_wins_of(slot: int) -> int:
+		return [1, 2, 0, 0][slot]
+
+	func round_ticks_left() -> int:
+		return 700
+
+	func round_length() -> int:
+		return 2185
+
+
 func _after_overlay(state: String) -> void:
 	match state:
+		"coop":
+			_build_edge_level()
+		"versus":
+			var hud: Hud = get_tree().get_first_node_in_group(Defs.GROUP_HUD) as Hud
+			if hud != null and hud.get_versus() != null:
+				hud.get_versus().source = PreviewReferee.new()
+				Events.round_started.emit(1)
+		"pause_p2":
+			Flow.pause_slot = 1
+			Events.pause_changed.emit(true)
 		"boss":
 			# Without a boss object the HUD reads the energy as hit points of the maximum.
 			Events.boss_started.emit(null)
@@ -99,6 +137,29 @@ func _after_overlay(state: String) -> void:
 				hud.show_intro(Game.level_id)
 
 
+## The options' keyboard test, open (state keytest).
+func _open_key_test() -> void:
+	for node: Node in find_children("*", "OptionsPanel", true, false):
+		var panel: OptionsPanel = node as OptionsPanel
+		panel.open_bindings(0)
+		panel.open_key_test()
+		return
+
+
+## Co-op state: a bare two-hero level, P2 off the right edge with his leash counting (edge arrow + stone).
+func _build_edge_level() -> void:
+	var level: LevelBase = LevelBase.new()
+	level.level_id = Game.level_id
+	level.grid = TileGrid.from_rows(PackedStringArray(["....", "...."]))
+	add_child(level)
+	for slot: int in 2:
+		var hero: PlayerBase = PlayerBase.new()
+		hero.spawn_setup(Vector2i(120 if slot == 0 else 420, 150), {"slot": slot})
+		level.add_child(hero)
+		if slot == 1:
+			hero.leash = 40
+
+
 func _prepare_state(state: String) -> void:
 	Game.new_game(Defs.Difficulty.BEGINNER)
 	var level_id: StringName = StringName(str(Flow.args.get("level_id", "")))
@@ -108,6 +169,30 @@ func _prepare_state(state: String) -> void:
 	if level_id != &"":
 		Game.begin_level(level_id)
 	match state:
+		"coop", "pause_p2":
+			Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.COOP, 2)
+			Game.begin_level(level_id)
+			Game.add_score(12340)
+			Game.runs[0].set_weapon(Defs.Weapon.AXE)
+			Game.runs[0].set_belt(Defs.Weapon.CLUB)
+			Game.runs[1].lose_heart()
+			Game.runs[1].add_bones(2)
+			Game.runs[1].set_belt(Defs.Weapon.SPEAR)
+			Game.collect_letter(0)
+			Game.collect_letter(2)
+			if state == "pause_p2":
+				GameInput.assign_slot(0, InputSlot.keyboard(Defs.InputSlotKind.KEYBOARD_LEFT))
+				GameInput.assign_slot(1, InputSlot.keyboard(Defs.InputSlotKind.KEYBOARD_RIGHT))
+		"versus":
+			Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.VERSUS, 4)
+			Game.runs[1].set_weapon(Defs.Weapon.HAMMER)
+			Game.runs[1].set_belt(Defs.Weapon.CLUB)
+			Game.runs[3].set_belt(Defs.Weapon.SPEAR)
+		"table":
+			Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.VERSUS, 2)
+			var regions: Array[Rect2] = TouchControls.table_regions()
+			GameInput.assign_slot(0, InputSlot.touch(regions[0]))
+			GameInput.assign_slot(1, InputSlot.touch(regions[1]))
 		"progress":
 			for difficulty: int in [Defs.Difficulty.BEGINNER, Defs.Difficulty.EXPERT]:
 				var campaign: Array[StringName] = Levels.get_campaign(difficulty)
@@ -173,6 +258,24 @@ func _play_step(step: String) -> void:
 		"key":
 			if parts.size() > 1:
 				_send_key(OS.find_keycode_from_string(parts[1]))
+		"hold", "free":
+			if parts.size() > 1:
+				var key: InputEventKey = InputEventKey.new()
+				key.physical_keycode = OS.find_keycode_from_string(parts[1])
+				key.keycode = key.physical_keycode
+				key.pressed = parts[0] == "hold"
+				Input.parse_input_event(key)
+		"banner":
+			if parts.size() > 1:
+				Events.round_countdown.emit(1, parts[1].to_int())
+		"rush":
+			Events.round_feast_rush_started.emit(1)
+		"win":
+			var winners: PackedInt32Array = PackedInt32Array()
+			if parts.size() > 1:
+				for slot: String in parts[1].split("|", false):
+					winners.append(slot.to_int())
+			Events.round_ended.emit(1, winners)
 		"tap", "press", "release":
 			if parts.size() > 2:
 				_send_pointer(parts[0], Vector2(parts[1].to_float(), parts[2].to_float()))

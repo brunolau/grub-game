@@ -1,0 +1,87 @@
+class_name Guard
+extends Walker
+## `enemies/guard` - 2.0 archetype 14, shield guard (GAMEPLAY.md 13.5, DESIGN.md A.5): patrols between its limits at
+## EnemyTuning.GUARD_SPEED on the ground while its shield faces its target; the facing is re-decided only on its own
+## clock of `turn` ticks (it may walk backwards meanwhile). A weapon hit from the side it faces - the striker's x on
+## that side (or within EnemyTuning.FRONT_DX of its feet point), or a thrown weapon flying into its face - glances
+## with a clank and a spark (the raised-shield pose); hits from behind count. Its contact hurts; its head is a safe
+## bounce. Solo answer: bounce over it and strike before it turns. Co-op: with the `shell` trait (the Shellback) the
+## shield turns to the nearer hero every tick. Halls around a Guard are 4 rows high (its art is 54 logical px tall).
+## Doze rule (ARCHITECTURE.md 11.1): the default one.
+##
+## Parameters: `turn` ticks [33], `left` [-3] / `right` [3] tiles, `speed` v16 [24] (tune), `skin` [guard],
+## `hp` [25], `score` [4].
+
+## Ticks between two decisions of the shield's facing (level parameter `turn`).
+var turn: int = EnemyTuning.GUARD_TURN_TICKS
+
+## Side the shield faces (+1 right, -1 left) and the clock that turns it; ticks left of the raised-shield pose.
+var _shield: int = 1
+var _turn_clock: int = 0
+var _pose: int = 0
+
+
+func _default_skin() -> String:
+	return "guard"
+
+
+func _apply_params(params: Dictionary) -> void:
+	super._apply_params(params)
+	# Walker sets its own default score first: this archetype's default, unless the level gives `score`.
+	score_index = clampi(int(params.get("score", EnemyTuning.SCORE_GUARD)), 0, Tuning.SCORE_LADDER.size() - 1)
+	speed = absi(int(params.get("speed", EnemyTuning.GUARD_SPEED)))
+	turn = maxi(int(params.get("turn", turn)), 1)
+
+
+## Side the shield faces (+1 right, -1 left).
+func get_shield_dir() -> int:
+	return _shield
+
+
+func _on_wake() -> void:
+	super._on_wake()
+	var hero: PlayerBase = _target_hero()
+	_shield = _dir_to(hero) if hero != null else facing
+	facing = _shield
+	_turn_clock = 0
+	_pose = 0
+
+
+func _on_reset() -> void:
+	_turn_clock = 0
+	_pose = 0
+
+
+## Hits from the front glance (and whatever a co-op trait refuses).
+func accepts_hit_from(source: SimEntity) -> bool:
+	return super.accepts_hit_from(source) and not _hit_from_front(source)
+
+
+func _on_hit_refused(source: SimEntity) -> void:
+	super._on_hit_refused(source)
+	_pose = EnemyTuning.GUARD_SHIELD_POSE_TICKS
+	_play(&"guard", true)
+
+
+func _ai_tick() -> void:
+	_turn_clock += 1
+	if _shell_on():
+		# The Shellback: the shield faces the nearer hatched hero every tick (CoopTraits post_ai does the same).
+		var nearest: PlayerBase = Game.level.target_hero(self)
+		if nearest != null:
+			_shield = _dir_to(nearest)
+		_turn_clock = 0
+	elif _turn_clock >= turn:
+		_turn_clock = 0
+		var hero: PlayerBase = _target_hero()
+		if hero != null:
+			_shield = _dir_to(hero)
+	super._ai_tick()
+	facing = _shield
+	if _pose > 0:
+		_pose -= 1
+		_play(&"guard")
+
+
+func _shell_on() -> bool:
+	return _traits != null and _traits.kind == Defs.CoopTrait.SHELL and CoopTraits.party_on()

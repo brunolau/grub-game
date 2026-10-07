@@ -11,15 +11,18 @@
 #      git stores: a Windows checkout may hold CRLF copies of some route files);
 #   2. every route of the snapshot replays to the same per-tick digest as before, dozing on and off:
 #      sim_bench.gd --snapshot=res://build/mp_baseline --digest --tight [--no-doze] into
-#      build/mp_digest_after[_nodoze], compared file by file with build/mp_digest_before[_nodoze]
+#      <run dir>/digest[_nodoze], compared file by file with build/mp_digest_before[_nodoze]
 #      (bench.json holds timings and is not compared);
 #   3. the committed fixtures tests/fixtures/sp_digest/*.txt (w1_l1.inputs, w2_l2b.inputs from a fresh run,
 #      w4_l1.boomerang.inputs) replay identically from the live tree, dozing on and off
-#      (build/mp_digest_after_fixtures[_nodoze]);
+#      (<run dir>/fixtures[_nodoze]);
 #   4. on every tick of every replay the input slots hold (PLAN P0.5): slot 0 read exactly the route's flags,
 #      GameInput.flags == GameInput.get_flags(0), slots 1..3 read nothing (the "input slots" line of each run).
-# The four Godot runs go in parallel through .tools/gd.sh (GD_TIMEOUT defaults to 1800 s here); their logs are in
-# build/sp_identity/. The last line of the output is the verdict:
+# The four Godot runs go in parallel through .tools/gd.sh (GD_TIMEOUT defaults to 1800 s here). Every run of this
+# script writes its replayed digests and logs into a run dir of its own, build/sp_identity/run_<tag> (tag: $SP_ID_TAG,
+# else the pid and a random number), so several owners may run it at the same time; the frozen evidence is only read.
+# The run dir is deleted after an IDENTICAL verdict and kept otherwise (its path is printed); run dirs older than three
+# hours (left by killed runs) are removed at the start. The last line of the output is the verdict:
 #   IDENTICAL                      exit 0
 #   DIFFERENT: <first difference>  exit 1 (the lines above name the route, stage, tick and both digest lines)
 #   ERROR: <reason>                exit 2 (a run failed or the frozen evidence is missing)
@@ -41,14 +44,18 @@ BENCH="res://scripts/core/dev/sim_bench.gd"
 SNAPSHOT="build/mp_baseline"
 BEFORE="build/mp_digest_before"
 BEFORE_NODOZE="build/mp_digest_before_nodoze"
-AFTER="build/mp_digest_after"
-AFTER_NODOZE="build/mp_digest_after_nodoze"
-FIX_AFTER="build/mp_digest_after_fixtures"
-FIX_AFTER_NODOZE="build/mp_digest_after_fixtures_nodoze"
+# Per-run output (several owners run this script at once): the replayed digests and logs of this run only.
+RUNS="build/sp_identity"
+RUN_TAG="${SP_ID_TAG:-$$_${RANDOM}}"
+RUN_DIR="$RUNS/run_${RUN_TAG//[^A-Za-z0-9_-]/_}"
+AFTER="$RUN_DIR/digest"
+AFTER_NODOZE="$RUN_DIR/digest_nodoze"
+FIX_AFTER="$RUN_DIR/fixtures"
+FIX_AFTER_NODOZE="$RUN_DIR/fixtures_nodoze"
 FIXTURES="tests/fixtures/sp_digest"
 HASHES="tests/fixtures/book1_hashes.txt"
 FIXTURE_ROUTES=(w1_l1.inputs w2_l2b.inputs w4_l1.boomerang.inputs)
-LOGS="build/sp_identity"
+LOGS="$RUN_DIR/logs"
 
 error() {
 	echo "ERROR: $*"
@@ -157,7 +164,11 @@ done
 for route in "${FIXTURE_ROUTES[@]}"; do
 	ls "$FIXTURES/$route".*.txt >/dev/null 2>&1 || error "no fixture for $route in $FIXTURES"
 done
+# Run dirs of killed runs (one run takes at most GD_TIMEOUT, 30 minutes by default).
+find "$RUNS" -mindepth 1 -maxdepth 1 -type d -name 'run_*' -mmin +180 -exec rm -rf {} + 2>/dev/null
+rm -rf "${ROOT:?}/${RUN_DIR:?}"
 mkdir -p "$LOGS"
+echo "sp_identity: run dir $RUN_DIR"
 
 # --- 1. Book I files unchanged (tree and snapshot) ---------------------------------------------------------------
 echo "sp_identity: Book I files against $HASHES"
@@ -210,6 +221,7 @@ for name in "${NAMES[@]}"; do
 	esac
 done
 if [ "$DIFFERING" -gt 0 ]; then
+	echo "sp_identity: the replayed digests and the logs stay in $RUN_DIR/"
 	echo "DIFFERENT: $FIRST ($DIFFERING digest file(s) differ)"
 	exit 1
 fi
@@ -217,5 +229,6 @@ if [ -n "$input_bad" ]; then
 	echo "DIFFERENT: the input slots differ from the route flags in:$input_bad (see $LOGS/)"
 	exit 1
 fi
+rm -rf "${ROOT:?}/${RUN_DIR:?}"
 echo "IDENTICAL"
 exit 0

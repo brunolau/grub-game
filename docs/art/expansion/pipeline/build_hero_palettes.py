@@ -545,9 +545,11 @@ def build(write_previews=True):
         },
     }
     path = os.path.join(ASSETS, *OUT.split("/"), "hero_palettes.json")
-    with open(path, "w", encoding="utf-8", newline="\n") as f:
-        json.dump(meta, f, indent=1)
-        f.write("\n")
+    text = json.dumps(meta, indent=1) + "\n"
+    old = open(path, encoding="utf-8").read() if os.path.exists(path) else None
+    if old != text:                                  # unchanged: leave the file (and its mtime) alone
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(text)
     REGISTRY["assets/" + OUT + "hero_palettes.json"] = {
         "kind": "data", "license": "CC0 1.0", "source": "build_hero_palettes.py",
         "note": "colour names -> LUT roles (hex), slot defaults, arena swaps, pattern list, cloth window, UI colours"}

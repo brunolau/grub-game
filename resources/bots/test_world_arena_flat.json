@@ -1,0 +1,25 @@
+{
+  "format": 1,
+  "level": "test_world_arena_flat",
+  "source_sha256": "49236dcc46f7889e63f0c24f493fcb7201fd53846b250a19f3b8a2bb857926b0",
+  "difficulty": "beginner",
+  "cols": 20,
+  "rows": 12,
+  "wrap": "none",
+  "weight": 0,
+  "baker": {"candidates":5706,"rejected":0,"simulated_ticks":167562,"verified_starts":136,"version":1},
+  "nodes": [
+    {"id":0,"row":7,"y":112,"x0":48,"x1":127,"ice":0},
+    {"id":1,"row":7,"y":112,"x0":192,"x1":271,"ice":0},
+    {"id":2,"row":10,"y":160,"x0":8,"x1":311,"ice":0}
+  ],
+  "links": [
+    {"id":0,"from":0,"to":1,"kind":"jump","x0":95,"x1":118,"dir":1,"keys":"3:RU,18:R","ticks":21,"land_x0":196,"land_x1":219},
+    {"id":1,"from":0,"to":2,"kind":"drop","x0":48,"x1":57,"dir":-1,"keys":"4:L","ticks":14,"land_x0":17,"land_x1":30},
+    {"id":2,"from":0,"to":2,"kind":"drop","x0":108,"x1":127,"dir":1,"keys":"6:R,10:L","ticks":16,"land_x0":98,"land_x1":147},
+    {"id":3,"from":1,"to":0,"kind":"jump","x0":192,"x1":215,"dir":-1,"keys":"3:LU,18:L","ticks":21,"land_x0":93,"land_x1":116},
+    {"id":4,"from":1,"to":2,"kind":"drop","x0":192,"x1":201,"dir":-1,"keys":"4:L","ticks":14,"land_x0":161,"land_x1":174},
+    {"id":5,"from":2,"to":0,"kind":"jump","x0":17,"x1":40,"dir":1,"keys":"3:RU,8:R","ticks":11,"land_x0":68,"land_x1":91},
+    {"id":6,"from":2,"to":1,"kind":"jump","x0":145,"x1":168,"dir":1,"keys":"3:RU,8:R","ticks":11,"land_x0":196,"land_x1":219}
+  ]
+}

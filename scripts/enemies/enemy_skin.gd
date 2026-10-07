@@ -12,6 +12,8 @@ const ENEMY_DIR: String = "res://assets/sprites/enemies/"
 const BOSS_DIR: String = "res://assets/sprites/bosses/"
 const VARIANT_SUFFIX: String = "_b"
 const ENRAGED_SUFFIX: String = "_enraged"
+## 2.0: the rage palette of a Book II boss (`tusker_rage`) shares the layout of its base sheet.
+const RAGE_SUFFIX: String = "_rage"
 ## Shown when a sheet has no animation at all for a role (never the case for the shipped sheets).
 const STILL: Vector4i = Vector4i(0, 1, 1, 0)
 ## Roles tried in turn when a sheet lacks the wanted one.
@@ -33,6 +35,13 @@ const FALLBACKS: Dictionary[StringName, Array] = {
 	&"screech": [&"dive", &"fly", &"idle"],
 	&"hurt": [&"dead", &"idle", &"fly"],
 	&"dead": [&"hurt", &"idle", &"fly"],
+	# 2.0 roles (the Roller, the Guard, the co-op dazes; DESIGN.md A.5, D.6).
+	&"curl": [&"roll", &"idle", &"fly"],
+	&"uncurl": [&"curl", &"idle", &"fly"],
+	&"bump": [&"hurt", &"roll", &"idle", &"fly"],
+	&"dizzy": [&"hurt", &"idle", &"fly"],
+	&"guard": [&"hurt", &"idle", &"fly"],
+	&"rear": [&"windup", &"attack", &"idle", &"fly"],
 }
 
 ## Sheet name this skin was asked for ("turtle_b").
@@ -94,6 +103,8 @@ static func _build(skin_name: String) -> EnemySkin:
 		base = base.left(base.length() - VARIANT_SUFFIX.length())
 	elif base.ends_with(ENRAGED_SUFFIX):
 		base = base.left(base.length() - ENRAGED_SUFFIX.length())
+	elif base.ends_with(RAGE_SUFFIX):
+		base = base.left(base.length() - RAGE_SUFFIX.length())
 	var skin: EnemySkin = EnemySkin.new()
 	skin.sheet = skin_name
 	skin.texture_path = ENEMY_DIR + skin_name + ".png"
@@ -127,7 +138,7 @@ static func _build(skin_name: String) -> EnemySkin:
 			skin._add(&"hurt", 26, 2, 3, true)
 			skin._add(&"dead", 28, 5, 3, false)
 			skin._add(&"hang", 33, 4, 4, true)
-		"insect":
+		"insect", "mosquito":  # 2.0: the swamp mosquito keeps the shipped insect layout exactly (art-B)
 			skin._layout(88, 88, 8, 2, 44, 72, 35, 18, 36)
 			skin._add(&"idle", 0, 2, 12, true)
 			skin._add(&"walk", 2, 3, 2, true)
@@ -149,6 +160,7 @@ static func _build(skin_name: String) -> EnemySkin:
 			skin._add(&"air", 7, 1, 1, false)
 			skin._add(&"attack", 11, 3, 2, false)
 			skin._add(&"hurt", 14, 2, 3, false)
+			skin._add(&"dizzy", 16, 4, 3, true)  # 2.0: the Raptor's daze (DESIGN.md D.7); never shown in Book I
 			skin._add(&"dead", 20, 2, 6, false)
 		"plant":
 			skin._layout(176, 104, 8, 3, 88, 88, 30, 28, 56)
@@ -189,6 +201,104 @@ static func _build(skin_name: String) -> EnemySkin:
 			skin._add(&"walk", 4, 6, 3, true)
 			skin._add(&"hurt", 10, 6, 2, false)
 			skin._add(&"dead", 16, 5, 3, false)
+		# --- 2.0 world 5 sheets (art-B's hand-over: .tools/asset_candidates/expansion/_handover/WORLD5_HANDOVER.md;
+		# frame rates converted to ticks per frame at 24.3 Hz: 8 fps = 3, 10-16 fps = 2, 6 fps = 4) --------------------
+		"roller":
+			skin._layout(144, 96, 8, 3, 72, 80, 54, 24, 49)
+			skin._add(&"idle", 0, 5, 3, true)
+			skin._add(&"walk", 0, 5, 2, true)
+			skin._add(&"curl", 5, 4, 3, false)
+			skin._add(&"roll", 9, 4, 2, true)
+			skin._add(&"bump", 14, 1, 1, false)
+			skin._add(&"uncurl", 15, 2, 4, false)
+			skin._add(&"attack", 17, 2, 3, true)
+			skin._add(&"dizzy", 19, 2, 3, true)
+			skin._add(&"dead", 21, 1, 1, false)
+		"guard", "shellback":
+			skin._layout(304, 168, 6, 3, 152, 152, 76, 54, 109)
+			skin._add(&"idle", 0, 5, 3, true)
+			skin._add(&"walk", 0, 5, 2, true)
+			skin._add(&"attack", 5, 6, 2, false)
+			skin._add(&"guard", 11, 2, 3, false)
+			skin._add(&"hurt", 13, 2, 3, false)
+			skin._add(&"dead", 15, 1, 1, false)
+		"snake":
+			# The rattler (Snapper: idle, windup, bite, recover, hurt) and the burrow snake (Digger: walk = lunge).
+			skin._layout(208, 112, 8, 3, 104, 96, 38, 30, 59)
+			skin._add(&"idle", 0, 5, 3, true)
+			skin._add(&"windup", 5, 2, 3, false)
+			skin._add(&"bite", 7, 3, 2, false)
+			skin._add(&"recover", 0, 4, 3, false)
+			skin._add(&"rear", 10, 3, 3, false)
+			skin._add(&"walk", 13, 3, 2, true)
+			skin._add(&"lunge", 13, 3, 2, false)
+			skin._add(&"hurt", 16, 3, 3, false)
+			skin._add(&"dead", 19, 1, 1, false)
+		"cave_bat":
+			skin._layout(128, 88, 8, 3, 64, 72, 55, 28, 58)
+			skin._add(&"fly", 0, 5, 2, true)
+			skin._add(&"screech", 5, 2, 3, true)
+			skin._add(&"dive", 7, 4, 2, true)
+			skin._add(&"swoop", 7, 4, 2, true)
+			skin._add(&"roll", 11, 5, 2, true)
+			skin._add(&"spin", 11, 5, 2, true)
+			skin._add(&"hurt", 16, 2, 3, false)
+			skin._add(&"dead", 18, 1, 1, false)
+			skin._add(&"hang", 19, 1, 1, false)
+		"eagle":
+			skin._layout(80, 120, 6, 1, 40, 88, 34, 41, 82)
+			skin._add(&"fly", 0, 2, 3, true)
+			skin._add(&"dive", 2, 2, 2, true)
+			skin._add(&"hurt", 4, 1, 1, false)
+			skin._add(&"dead", 5, 1, 1, false)
+		"bear":
+			# The cave bear (Western FPS bear at 2x, a Snapper: claw = bite); recover holds the idle frames once.
+			skin._layout(128, 144, 7, 1, 64, 112, 63, 51, 102)
+			skin._add(&"idle", 0, 4, 4, true)
+			skin._add(&"walk", 0, 4, 3, true)
+			skin._add(&"windup", 4, 1, 6, false)
+			skin._add(&"bite", 5, 1, 6, false)
+			skin._add(&"recover", 0, 4, 3, false)
+			skin._add(&"hurt", 4, 1, 1, false)
+			skin._add(&"dead", 6, 1, 1, false)
+		# --- 2.0 world 6 sheets (art-B's ENEMY_SKIN_ROWS.md; ahead of phase 2) -------------------------------------
+		"slime":
+			skin._layout(120, 96, 8, 3, 60, 80, 36, 28, 55)
+			skin._add(&"idle", 0, 5, 3, true)
+			skin._add(&"walk", 0, 5, 2, true)
+			skin._add(&"squash", 5, 2, 3, false)
+			skin._add(&"attack", 7, 3, 2, false)
+			skin._add(&"recover", 10, 1, 1, false)
+			skin._add(&"air", 11, 4, 2, true)
+			skin._add(&"land", 15, 5, 2, false)
+			skin._add(&"dead", 19, 1, 1, false)
+			skin._add(&"bob", 20, 2, 3, true)
+			skin._add(&"hurt", 22, 2, 3, false)
+		"puffcap":
+			skin._layout(200, 160, 8, 5, 100, 144, 51, 42, 83)
+			skin._add(&"idle", 0, 8, 3, true)
+			skin._add(&"windup", 8, 4, 2, false)
+			skin._add(&"bite", 12, 5, 2, false)
+			skin._add(&"recover", 17, 3, 2, false)
+			skin._add(&"burst", 20, 9, 2, false)
+			skin._add(&"hurt", 29, 4, 2, false)
+			skin._add(&"dead", 33, 1, 1, false)
+		"frog":
+			skin._layout(72, 96, 8, 2, 36, 64, 26, 19, 38)
+			skin._add(&"idle", 0, 4, 3, true)
+			skin._add(&"walk", 0, 4, 2, true)
+			skin._add(&"land", 4, 1, 1, false)
+			skin._add(&"windup", 4, 1, 1, false)
+			skin._add(&"air", 5, 2, 4, false)
+			skin._add(&"hurt", 7, 1, 1, false)
+			skin._add(&"dead", 8, 1, 1, false)
+		"larva", "leech":
+			skin._layout(32, 64, 8, 2, 16, 32, 15, 13, 26)
+			skin._add(&"idle", 0, 2, 6, true)
+			skin._add(&"walk", 0, 4, 3, true)
+			skin._add(&"front", 4, 4, 3, true)
+			skin._add(&"hang", 4, 1, 1, false)
+			skin._add(&"dead", 8, 1, 1, false)
 		"brute":
 			skin.texture_path = BOSS_DIR + skin_name + ".png"
 			skin._layout(288, 176, 7, 6, 144, 144, 55, 61, 122)
@@ -203,6 +313,39 @@ static func _build(skin_name: String) -> EnemySkin:
 			skin._add(&"dead", 28, 5, 3, false)
 			skin._add(&"taunt", 33, 4, 4, true)
 			skin._add(&"pound", 37, 4, 3, true)
+		# --- 2.0 boss sheets of art-B for enemies-B's bosses (ENEMY_SKIN_ROWS.md); `tusker_rage` shares the case ---
+		"tusker":
+			skin.texture_path = BOSS_DIR + skin_name + ".png"
+			skin._layout(256, 184, 8, 5, 128, 168, 76, 57, 114)
+			skin._add(&"idle", 0, 7, 3, true)
+			skin._add(&"paw", 7, 9, 2, false)
+			skin._add(&"charge", 16, 3, 2, true)
+			skin._add(&"walk", 17, 2, 3, true)
+			skin._add(&"hurt", 19, 3, 3, false)
+			skin._add(&"squeal", 19, 3, 2, false)
+			skin._add(&"curl", 22, 4, 2, false)
+			skin._add(&"spin", 26, 2, 2, true)
+			skin._add(&"roll", 28, 4, 2, true)
+			skin._add(&"flash", 32, 2, 2, false)
+			skin._add(&"slam", 34, 1, 1, false)
+			skin._add(&"dizzy", 35, 2, 4, true)
+			skin._add(&"dead", 37, 1, 1, false)
+		"mangrove":
+			skin.texture_path = BOSS_DIR + skin_name + ".png"
+			skin._layout(112, 144, 8, 3, 56, 112, 48, 52, 104)
+			skin._add(&"idle", 0, 6, 3, true)
+			skin._add(&"attack", 6, 5, 2, false)
+			skin._add(&"charge", 11, 3, 2, false)
+			skin._add(&"hurt", 14, 4, 2, false)
+			skin._add(&"dead", 18, 1, 1, false)
+		"mangrove_parts":
+			skin.texture_path = BOSS_DIR + skin_name + ".png"
+			skin._layout(80, 80, 8, 1, 40, 64, 40, 32, 64)
+			skin._add(&"fist", 0, 1, 1, false)
+			skin._add(&"fist_flash", 1, 1, 1, false)
+			skin._add(&"hand", 2, 1, 1, false)
+			skin._add(&"arm", 3, 3, 1, false)
+			skin._add(&"leaf", 6, 2, 6, true)
 		"colossus":
 			skin.texture_path = BOSS_DIR + skin_name + ".png"
 			skin._layout(260, 224, 6, 3, 260, 208, 104, 95, 190)

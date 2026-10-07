@@ -6,7 +6,8 @@ extends Node
 ##   --autoplay=<level_id>     load this level and play the input script in it
 ##   --autoplay-scene=<path>   OR: load any scene (res://...) and only take screenshots
 ##   --flow=<file>             OR: boot normally and play a flow script (menus, gameplay, checks, screenshots
-##                             across scene changes; syntax at the top of scripts/core/dev/autoplay_flow.gd)
+##                             across scene changes; syntax at the top of scripts/core/dev/autoplay_flow.gd); without
+##                             a window: gd.sh script res://scripts/core/dev/headless_flow.gd -- --flow=<file> --fast
 ##   --inputs=<runs>           run-length input script "ticks:KEYS,ticks:KEYS,..." with KEYS from
 ##                             L R U D F K S (left right up/jump down fire look swap); "30:" = 30 idle ticks.
 ##                             Several heroes: one key set per player separated by `|` ("8:R|L,4:|U"; an empty part
@@ -71,6 +72,7 @@ const SMOKE_MAX_SECONDS: float = 120.0
 const DEVELOPMENT_PATHS: PackedStringArray = [
 	"res://tests", "res://tools", "res://docs", "res://scenes/core/debug_level.tscn",
 	"res://scripts/core/debug_level.gd", "res://levels/test_example.lvl", FLOW_RUNNER, PERF_PROBE, RECORDER,
+	HEADLESS_FLOW,
 ]
 ## The flow-script runner (development only, excluded from exports with every `dev` folder).
 const FLOW_RUNNER: String = "res://scripts/core/dev/autoplay_flow.gd"
@@ -78,6 +80,8 @@ const FLOW_RUNNER: String = "res://scripts/core/dev/autoplay_flow.gd"
 const PERF_PROBE: String = "res://scripts/core/dev/perf_probe.gd"
 ## The input recorder of `--record` (development only, like the flow runner).
 const RECORDER: String = "res://scripts/core/dev/input_recorder.gd"
+## Boots the main scene without a window, so a `--flow` runs headless (development only, like the flow runner).
+const HEADLESS_FLOW: String = "res://scripts/core/dev/headless_flow.gd"
 ## The first line of a route file that describes itself (docs/LEVEL_DESIGN.md 15.9): `# route: key=value ...`.
 const ROUTE_HEADER: String = "# route:"
 ## The keys a route header may have.

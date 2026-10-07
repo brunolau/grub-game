@@ -1,0 +1,13 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/objects/flower_pot.gd" id="1_flower_pot"]
+[ext_resource type="Texture2D" path="res://assets/sprites/objects/flower_pot.png" id="2_flower_pot"]
+
+[node name="FlowerPot" type="Node2D"]
+script = ExtResource("1_flower_pot")
+
+[node name="Sprite" type="Sprite2D" parent="."]
+texture = ExtResource("2_flower_pot")
+centered = false
+offset = Vector2(-32, -32)
+hframes = 8

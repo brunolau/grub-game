@@ -15,6 +15,8 @@ extends SimEntity
 ## per player slot. Per-hero effects override [method _on_hero_entered] / [method _on_hero_exited]; shared effects
 ## (a camera lock, a hint) override [method _on_first_entered] / [method _on_last_exited], which run when the first
 ## hero comes in and when the last one has left. With one hero both pairs fire together, as the 1.0 hooks did.
+## 2.0 co-op (PHYSICS.md C.12): an egg touches no zone - a hero who becomes an egg inside counts as leaving it (his
+## exit hooks run) and an egg never enters one; a dead hero is not tested at all (as in 1.0).
 
 ## The zone in logical px.
 var rect: Rect2i = Rect2i()
@@ -58,7 +60,7 @@ func _sim_tick(phase: int) -> void:
 		if hero.dead:
 			continue
 		var bit: int = 1 << hero.slot
-		var now: bool = Overlap.point_in(rect, hero.sim_pos.x, hero.sim_pos.y - 1)
+		var now: bool = not hero.is_down() and Overlap.point_in(rect, hero.sim_pos.x, hero.sim_pos.y - 1)
 		if now and (inside_mask & bit) == 0:
 			var first: bool = inside_mask == 0
 			inside_mask |= bit

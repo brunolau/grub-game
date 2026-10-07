@@ -6,6 +6,8 @@ extends EnemyBase
 ## Its body hurts on contact like any enemy; the lunge hurts the hero directly (enemy damage, stolen heart).
 ##
 ## Parameters: `range` px [42], `skin` [plant], `hp` [25], `score` [1].
+## 2.0 (DESIGN.md A.5): the rattler in a hole of world 5 is this enemy with `skin=snake` (or `snake_b`); its shorter
+## bite makes EnemyTuning.RATTLER_RANGE its default `range`.
 
 enum State { IDLE, WINDUP, BITE, RECOVER, HURT, REST }
 
@@ -23,6 +25,8 @@ func _default_skin() -> String:
 func _apply_params(params: Dictionary) -> void:
 	score_index = EnemyTuning.SCORE_SNAPPER
 	super._apply_params(params)
+	if EnemyTuning.RATTLER_SKINS.has(skin):
+		reach = EnemyTuning.RATTLER_RANGE
 	reach = maxi(int(params.get("range", reach)), 0)
 
 

@@ -26,7 +26,9 @@ const BIOMES: Array[String] = [
 	"jungle", "cave", "ice", "volcano", "feast", "village", "canyon", "swamp", "coast", "ruins", "sky",
 ]
 const LIQUIDS: Array[String] = ["water", "lava", "ice_water", "tar", "honey", "syrup"]
-const BACKGROUNDS: Array[String] = ["jungle", "cave", "ice", "volcano", "volcano_shaft", "feast", "none"]
+const BACKGROUNDS: Array[String] = [
+	"jungle", "cave", "ice", "volcano", "volcano_shaft", "feast", "canyon", "swamp", "mushroom", "mangrove", "none",
+]
 const SCROLLS: Array[String] = ["normal", "vertical", "autoscroll", "rising"]
 const DIFFICULTIES: Array[String] = ["beginner", "expert"]
 const OVERRIDE_LAYERS: Array[String] = ["back", "main", "front"]
@@ -37,19 +39,21 @@ const SUDDEN_DEATHS: Array[String] = [
 	"rockslide", "lightning",
 ]
 
-## Parallax set used when `background` is missing, by biome.
+## Parallax set used when `background` is missing, by biome (2.0: the Book II biomes as their backdrops arrive -
+## canyon and swamp now; coast, ruins and sky fall back to the jungle's until art-B draws them).
 const BIOME_BACKGROUND: Dictionary = {
 	"jungle": "jungle", "cave": "cave", "ice": "ice", "volcano": "volcano", "feast": "feast", "village": "jungle",
+	"canyon": "canyon", "swamp": "swamp",
 }
-## Music context used when `music` is missing, by biome.
+## Music context used when `music` is missing, by biome (2.0: world 5's theme for the canyon).
 const BIOME_MUSIC: Dictionary = {
 	"jungle": Sfx.MUSIC_JUNGLE, "cave": Sfx.MUSIC_CAVE, "ice": Sfx.MUSIC_ICE, "volcano": Sfx.MUSIC_VOLCANO,
-	"feast": Sfx.MUSIC_BONUS, "village": Sfx.MUSIC_ENDING,
+	"feast": Sfx.MUSIC_BONUS, "village": Sfx.MUSIC_ENDING, "canyon": Sfx.MUSIC_CANYON, "swamp": Sfx.MUSIC_FEN,
 }
 ## Terrain atlas used when `terrain_a` is missing or does not exist, by biome. The Book II biomes name their own
 ## sets (LEVEL_DESIGN.md 15.2); WorldTileSet falls back while an atlas is not drawn yet. (Their backdrop and music
-## defaults come with their art and AudioTable rows, world-A / core-A phase 1: until then `background` and `music`
-## fall back to the jungle's, and LEVEL_DESIGN.md 15.2 asks every Book II file to set `music` itself.)
+## defaults come with their art and AudioTable rows: BIOME_BACKGROUND / BIOME_MUSIC; LEVEL_DESIGN.md 15.2 asks every
+## Book II file to set `music` itself anyway.)
 const BIOME_TERRAIN: Dictionary = {
 	"jungle": "jungle/terrain_grass", "cave": "cave/terrain", "ice": "ice/terrain", "volcano": "volcano/terrain",
 	"feast": "feast/terrain", "village": "jungle/terrain_grass", "canyon": "canyon/terrain",

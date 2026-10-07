@@ -1,0 +1,250 @@
+# Book II "The Far Shore", Beginner, from a fresh save, through the 2.0 title path (docs/expansion/PLAN.md P1.3 / 6.2,
+# DESIGN.md A.1): title -> Play -> Solo -> book select (Book II) -> Beginner -> the Far Shore map -> every Beginner
+# stop of Book II in order, each played by its club route (`<id>.inputs`, LEVEL_DESIGN.md 15.9), the linked stages
+# without a tally, the boss fights, every tally, and the expert wall after Squid Grotto. Feast Lands D and E (warps)
+# get their featured routes in phase 3. The headless twin is the Book II campaign test of tests/test_book2_routes.gd
+# (phase 3). Checks: no life lost, the run carries the club (fresh-club rule), Book II and solo mode, the wall at the
+# end without completing the game.
+# skeleton: the stops are filled in as the Book II files and their routes land (phase 3); the lint of
+# tests/test_integration_flows.gd lists the routes and levels that are not there yet. The screens after the title are
+# core-A's Flow (title > Play > Solo: book_select > mode_select > world_map); the title's Play choice is ui-A's (P1.11).
+#   GD_TIMEOUT=1800 bash .tools/gd.sh play --flow=tools/autoplay/campaign_b2.flow --fast --fresh-user --out=campaign_b2
+
+# --- Boot, title, Play > Solo > Book II > Beginner ----------------------------------------------------------------
+wait_until flow.current_screen == title 600
+wait_until flow.busy == false 600
+wait 40
+shot title
+expect save.has_progress() == false
+# Play, then Solo (Flow.open_play(SINGLE); the keys of the title's Play / Solo / Co-op / Versus choice: ui-A, P1.11).
+press ui_accept
+wait 10
+shot play_menu
+press ui_accept
+wait_until flow.current_screen == book_select 300
+wait_until flow.busy == false 600
+press ui_right
+wait 10
+shot book_select_book2
+press ui_accept
+# Flow.choose_book(2) -> the difficulty (Beginner has the focus) -> Flow.start_selected_game -> the Far Shore map.
+wait_until flow.current_screen == mode_select 300
+wait_until flow.busy == false 600
+press ui_accept
+wait_until flow.current_screen == world_map 600
+wait_until flow.busy == false 600
+expect game.book == 2
+expect game.mode == 0
+expect game.party == 1
+expect game.difficulty == 0
+expect game.lives == 2
+expect game.score == 0
+expect game.weapon == 0
+
+# --- w5_l1 ----------------------------------------------------------------------------------------------------
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w5_l1
+wait_until scene.countdown >= 0 600
+shot map_w5_l1
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w5_l1 600
+expect hero.dead == false
+expect game.weapon == 0
+wait 2
+shot w5_l1_start
+every 480 w5_l1
+play_file tools/autoplay/routes/w5_l1.inputs
+every 0
+expect events.player_died == 0
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_w5_l1
+press ui_accept
+wait 20
+press ui_accept
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+
+# --- w5_l2 ----------------------------------------------------------------------------------------------------
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w5_l2
+wait_until scene.countdown >= 0 600
+shot map_w5_l2
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w5_l2 600
+expect hero.dead == false
+expect game.weapon == 0
+wait 2
+shot w5_l2_start
+every 480 w5_l2
+play_file tools/autoplay/routes/w5_l2.inputs
+every 0
+expect events.player_died == 0
+# The linked stage follows without a tally.
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w5_l2b 600
+wait 2
+shot w5_l2b_start
+every 480 w5_l2b
+play_file tools/autoplay/routes/w5_l2b.inputs
+every 0
+expect events.player_died == 0
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_w5_l2
+press ui_accept
+wait 20
+press ui_accept
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+
+# --- w6_l1 ----------------------------------------------------------------------------------------------------
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w6_l1
+wait_until scene.countdown >= 0 600
+shot map_w6_l1
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w6_l1 600
+expect hero.dead == false
+expect game.weapon == 0
+wait 2
+shot w6_l1_start
+every 480 w6_l1
+play_file tools/autoplay/routes/w6_l1.inputs
+every 0
+expect events.player_died == 0
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_w6_l1
+press ui_accept
+wait 20
+press ui_accept
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+
+# --- w6_l2 ----------------------------------------------------------------------------------------------------
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w6_l2
+wait_until scene.countdown >= 0 600
+shot map_w6_l2
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w6_l2 600
+expect hero.dead == false
+expect game.weapon == 0
+wait 2
+shot w6_l2_start
+every 480 w6_l2
+play_file tools/autoplay/routes/w6_l2.inputs
+every 0
+expect events.player_died == 0
+# The linked stage follows without a tally.
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w6_l2b 600
+wait 2
+shot w6_l2b_start
+every 480 w6_l2b
+play_file tools/autoplay/routes/w6_l2b.inputs
+every 0
+expect events.player_died == 0
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_w6_l2
+press ui_accept
+wait 20
+press ui_accept
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+
+# --- w7_l1 ----------------------------------------------------------------------------------------------------
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w7_l1
+wait_until scene.countdown >= 0 600
+shot map_w7_l1
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w7_l1 600
+expect hero.dead == false
+expect game.weapon == 0
+wait 2
+shot w7_l1_start
+every 480 w7_l1
+play_file tools/autoplay/routes/w7_l1.inputs
+every 0
+expect events.player_died == 0
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_w7_l1
+press ui_accept
+wait 20
+press ui_accept
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+
+# --- w7_l2 ----------------------------------------------------------------------------------------------------
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w7_l2
+wait_until scene.countdown >= 0 600
+shot map_w7_l2
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w7_l2 600
+expect hero.dead == false
+expect game.weapon == 0
+wait 2
+shot w7_l2_start
+every 480 w7_l2
+play_file tools/autoplay/routes/w7_l2.inputs
+every 0
+expect events.player_died == 0
+# The linked stage follows without a tally.
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w7_l2b 600
+wait 2
+shot w7_l2b_start
+every 480 w7_l2b
+play_file tools/autoplay/routes/w7_l2b.inputs
+every 0
+expect events.player_died == 0
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_w7_l2
+press ui_accept
+wait 20
+press ui_accept
+
+# Squid Grotto is the last Beginner stage of Book II: the expert wall, then the title.
+wait_until flow.current_screen == expert_wall 900
+wait_until flow.busy == false 600
+expect game.book == 2
+wait 90
+shot expert_wall_book2
+press ui_accept
+wait_until flow.current_screen == title 900
+wait_until flow.busy == false 600
+wait 30
+shot title_again

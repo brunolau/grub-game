@@ -71,42 +71,46 @@ const SFX: Dictionary = {
 	Sfx.LOOP_WIND: {"files": ["ice_wind_loop_a.ogg"], "db": [0.7], "loop": true},
 	Sfx.LOOP_LAVA: {"files": ["lava_bubble_loop_a.ogg"], "db": [1.9], "loop": true},
 	# --- 2.0 batch 1: every effect of Sfx.EXPANSION_SFX (DESIGN.md F.2; PLAN.md P1.1) ------------------------------
-	# "temp": true = the DESIGN F.2 pick (named in Sfx) is not imported yet; the row plays a fitting 1.0 file at that
-	# file's measured volume. The audio owner's file replaces it (file + measured db, "temp" removed) - callers never
-	# change. A file keeps one loop flag everywhere (Audio caches one stream per file).
-	Sfx.SWAP: {"files": ["menu_select_a.wav"], "db": [-4.0], "temp": true},
-	Sfx.SPEAR_STICK: {"files": ["club_hit_wood_a.wav"], "db": [-5.3], "temp": true},
-	Sfx.VINE_CLIMB: {"files": ["footstep_b.wav"], "db": [-5.0], "temp": true},
-	Sfx.RAFT_SPLASH: {"files": ["splash_a.ogg"], "db": [-0.3], "temp": true},
-	Sfx.SPLASH_HEAVY: {"files": ["splash_a.ogg"], "db": [2.7], "temp": true},
-	Sfx.GEYSER_BUBBLE: {"files": ["splash_a.ogg"], "db": [-3.3], "temp": true},
-	Sfx.GEYSER_SPOUT: {"files": ["splash_a.ogg"], "db": [2.7], "temp": true},
-	Sfx.TAR_GLUG: {"files": ["food_chomp_a.ogg"], "db": [-5.3], "temp": true},
-	Sfx.EGG_DOWN: {"files": ["player_death_a.wav"], "db": [-7.3], "temp": true},
-	Sfx.EGG_HATCH: {"files": ["energy_refill_a.wav"], "db": [-8.1], "temp": true},
-	Sfx.DUO_HOP: {"files": ["spring_bounce_a.wav"], "db": [5.0], "temp": true},
-	Sfx.CURL: {"files": ["club_swing_b.wav"], "db": [-3.7], "temp": true},
-	Sfx.BAT_HIT: {"files": ["club_hit_b.wav"], "db": [-6.2], "temp": true},
-	Sfx.BRACE: {"files": ["land_a.wav"], "db": [10.9], "temp": true},
-	Sfx.PLATE: {"files": ["menu_select_a.wav"], "db": [-4.0], "temp": true},
-	Sfx.DRUM: {"files": ["tally_tick_a.wav"], "db": [-7.2], "temp": true},
-	Sfx.COUNT_IN: {"files": ["tally_tick_a.wav"], "db": [-7.2], "temp": true},
-	Sfx.SEESAW: {"files": ["spring_bounce_a.wav"], "db": [5.0], "temp": true},
-	Sfx.BOULDER_PUSH: {"files": ["quake_a.wav"], "db": [-8.0], "temp": true},
-	Sfx.PULLEY: {"files": ["quake_a.wav"], "db": [-11.0], "temp": true},
-	Sfx.DAZE: {"files": ["enemy_hurt_a.wav"], "db": [-1.0], "temp": true},
-	# The DESIGN F.2 pick of the Chomper bite IS a shipped file (food_chomp; the caller adds Sfx.ENEMY_VOICE).
-	Sfx.CHOMPER_BITE: {"files": ["food_chomp_a.ogg"], "db": [-2.3]},
-	Sfx.COOKPOT_BANK: {"files": ["food_pickup_c.wav"], "db": [-0.4], "temp": true},
-	Sfx.CRATE_DROP: {"files": ["club_swing_a.wav"], "db": [-3.4], "temp": true},
-	Sfx.HOT_ROCK_FUSE: {"files": ["tally_tick_a.wav"], "db": [-7.2], "temp": true},
-	Sfx.LOOP_HOT_ROCK_HURRY: {"files": ["fire_loop_a.ogg"], "db": [4.3], "loop": true, "temp": true},
-	Sfx.CROWD_APPLAUSE: {"files": ["tally_end_a.wav"], "db": [-6.3], "bus": "UI", "temp": true},
-	Sfx.CROWD_CHEER: {"files": ["one_up_a.wav"], "db": [-10.2], "bus": "UI", "temp": true},
-	Sfx.PARTY_JOIN: {"files": ["checkpoint_a.wav"], "db": [-2.1], "bus": "UI", "temp": true},
-	Sfx.COUNTDOWN_BEEP: {"files": ["tally_tick_a.wav"], "db": [-7.2], "temp": true},
-	Sfx.COUNTDOWN_GO: {"files": ["bonus_reveal_b.wav"], "db": [-8.9], "temp": true},
-	Sfx.SUDDEN_DEATH: {"files": ["password_reject_a.wav"], "db": [-4.4], "temp": true},
+	# The audio owner's files (.tools/asset_candidates/expansion/_handover/audio/AUDIO_BATCH1.md: CC0, measured with
+	# tools/audio_loudness.py and its OFFSETS / LOOPS rows; every loop is a whole-file loop). A row marked "temp": true
+	# plays a stand-in 1.0 file at that file's volume until its pick is imported; callers never change. A file keeps
+	# one loop flag everywhere (Audio caches one stream per file).
+	Sfx.SWAP: {"files": ["swap_a.wav"], "db": [-5.0]},
+	Sfx.SPEAR_STICK: {"files": ["spear_stick_a.wav"], "db": [-0.9]},
+	Sfx.VINE_CLIMB: {"files": ["vine_climb_a.wav"], "db": [-4.1]},
+	Sfx.RAFT_SPLASH: {"files": ["raft_splash_a.wav", "raft_splash_b.wav"], "db": [-2.9, -1.1]},
+	Sfx.SPLASH_HEAVY: {"files": ["splash_heavy_a.wav"], "db": [2.6]},
+	Sfx.GEYSER_BUBBLE: {"files": ["geyser_bubble_a.wav"], "db": [3.6]},
+	Sfx.GEYSER_SPOUT: {"files": ["splash_heavy_a.wav"], "db": [2.6]},
+	Sfx.TAR_GLUG: {"files": ["tar_glug_a.wav"], "db": [-0.3]},
+	Sfx.EGG_DOWN: {"files": ["egg_down_a.wav"], "db": [-2.1]},
+	Sfx.EGG_HATCH: {"files": ["egg_hatch_a.wav"], "db": [-10.2]},
+	# Variant 0 = the boost (Shoulder Hop), variant 1 = a rider lands (Totem Ride): Audio.play_sfx(Sfx.DUO_HOP, 0 / 1).
+	Sfx.DUO_HOP: {"files": ["duo_hop_a.wav", "duo_hop_b.wav"], "db": [-9.1, 2.7]},
+	Sfx.CURL: {"files": ["curl_a.wav"], "db": [5.8]},
+	Sfx.BAT_HIT: {"files": ["bat_hit_a.wav", "bat_hit_b.wav", "bat_hit_c.wav"], "db": [-2.6, -2.4, -0.3]},
+	Sfx.BRACE: {"files": ["brace_a.wav"], "db": [-1.2]},
+	Sfx.PLATE: {"files": ["plate_a.ogg"], "db": [-1.4]},
+	Sfx.DRUM: {"files": ["drum_beat_a.wav"], "db": [-7.5]},
+	Sfx.COUNT_IN: {"files": ["drum_beat_a.wav"], "db": [-7.5]},
+	Sfx.SEESAW: {"files": ["seesaw_a.wav"], "db": [-2.3]},
+	Sfx.BOULDER_PUSH: {"files": ["boulder_push_a.ogg"], "db": [-1.3]},
+	Sfx.PULLEY: {"files": ["pulley_a.ogg"], "db": [-3.3]},
+	Sfx.DAZE: {"files": ["daze_a.wav"], "db": [-5.5]},
+	# The growl (the shipped dino_voice_b) and the chomp layered in one file: play it alone.
+	Sfx.CHOMPER_BITE: {"files": ["chomper_bite_a.wav"], "db": [-0.8]},
+	Sfx.COOKPOT_BANK: {"files": ["cookpot_bank_a.wav"], "db": [-12.2]},
+	Sfx.CRATE_DROP: {"files": ["crate_drop_a.wav"], "db": [-5.8]},
+	Sfx.HOT_ROCK_FUSE: {"files": ["drum_beat_a.wav"], "db": [-7.5]},
+	Sfx.LOOP_HOT_ROCK_HURRY: {"files": ["alarm_loop_a.wav"], "db": [-5.4], "loop": true},
+	Sfx.CROWD_APPLAUSE: {"files": ["crowd_applause_a.ogg"], "db": [-1.8]},
+	Sfx.CROWD_CHEER: {"files": ["crowd_cheer_a.ogg"], "db": [-0.3]},
+	Sfx.PARTY_JOIN: {"files": ["party_join_a.wav"], "db": [8.1], "bus": "UI"},
+	Sfx.COUNTDOWN_BEEP: {"files": ["countdown_beep_a.wav"], "db": [-9.2]},
+	Sfx.COUNTDOWN_GO: {"files": ["countdown_go_a.wav"], "db": [-0.9]},
+	Sfx.SUDDEN_DEATH: {"files": ["sudden_death_a.wav"], "db": [-7.0]},
+	# Versus clang (DESIGN.md E.2 "the Colossus clank"): the shipped glance-off clank of the armoured Colossus.
+	Sfx.CLANG: {"files": ["club_hit_wood_a.wav"], "db": [-5.3]},
 }
 
 ## context -> { "file", "db", "loop" }.
@@ -132,9 +136,10 @@ const MUSIC: Dictionary = {
 	Sfx.MUSIC_GAME_OVER_LOOP: {"file": "game_over_loop_a.ogg", "db": -6.3, "loop": true},
 	Sfx.MUSIC_ENDING: {"file": "ending_a.ogg", "db": -5.5, "loop": true},
 	Sfx.MUSIC_CREDITS: {"file": "credits_a.ogg", "db": -1.7, "loop": true},
-	# --- 2.0: every context of Sfx.EXPANSION_MUSIC (DESIGN.md F.2), "temp" as in SFX: a 1.0 track of the same mood at
-	# its measured volume until the audio owner's file (batch 2, PLAN.md P2.6: loop regions) replaces it. ----------
-	Sfx.MUSIC_CANYON: {"file": "level_volcano_a.ogg", "db": -6.7, "loop": true, "temp": true},
+	# --- 2.0: every context of Sfx.EXPANSION_MUSIC (DESIGN.md F.2). Batch 1 delivered the G1 slice's tracks (canyon,
+	# co-op menu, lobby, battle A, the round / match jingles, results; whole-file loops); the others are "temp" as in
+	# SFX - a 1.0 track of the same mood at its measured volume until batch 2 (PLAN.md P2.6 / P2.11) replaces it. ----
+	Sfx.MUSIC_CANYON: {"file": "level_canyon_a.ogg", "db": -0.1, "loop": true},
 	Sfx.MUSIC_GULCH: {"file": "level_jungle_a.ogg", "db": -6.2, "loop": true, "temp": true},
 	Sfx.MUSIC_FEN: {"file": "level_extra_b.ogg", "db": -8.2, "loop": true, "temp": true},
 	Sfx.MUSIC_SPORE: {"file": "level_cave_a.ogg", "db": -10.9, "loop": true, "temp": true},
@@ -155,15 +160,15 @@ const MUSIC: Dictionary = {
 	Sfx.MUSIC_BOSS_IDOLS: {"file": "boss_a.ogg", "db": -6.6, "loop": true, "temp": true},
 	Sfx.MUSIC_BOSS_ROC: {"file": "boss_final_a.ogg", "db": -6.9, "loop": true, "temp": true},
 	Sfx.MUSIC_BOSS_CHIEFTAINS: {"file": "boss_final_a.ogg", "db": -6.9, "loop": true, "temp": true},
-	Sfx.MUSIC_COOP_MENU: {"file": "password_screen_a.ogg", "db": -9.5, "loop": true, "temp": true},
-	Sfx.MUSIC_VERSUS_LOBBY: {"file": "title_b.ogg", "db": -7.0, "loop": true, "temp": true},
-	Sfx.MUSIC_VERSUS_BATTLE_A: {"file": "level_jungle_a.ogg", "db": -6.2, "loop": true, "temp": true},
+	Sfx.MUSIC_COOP_MENU: {"file": "coop_menu_a.ogg", "db": -5.9, "loop": true},
+	Sfx.MUSIC_VERSUS_LOBBY: {"file": "versus_lobby_a.ogg", "db": -2.6, "loop": true},
+	Sfx.MUSIC_VERSUS_BATTLE_A: {"file": "versus_battle_a.ogg", "db": -8.6, "loop": true},
 	Sfx.MUSIC_VERSUS_BATTLE_B: {"file": "level_volcano_a.ogg", "db": -6.7, "loop": true, "temp": true},
 	Sfx.MUSIC_VERSUS_BATTLE_C: {"file": "level_extra_a.ogg", "db": -11.1, "loop": true, "temp": true},
 	Sfx.MUSIC_VERSUS_SUDDEN_DEATH: {"file": "boss_final_a.ogg", "db": -6.9, "loop": true, "temp": true},
-	Sfx.MUSIC_ROUND_WIN: {"file": "level_complete_a.ogg", "db": -7.2, "loop": false, "temp": true},
-	Sfx.MUSIC_MATCH_WIN: {"file": "level_complete_a.ogg", "db": -7.2, "loop": false, "temp": true},
-	Sfx.MUSIC_VERSUS_RESULTS: {"file": "tally_loop_a.ogg", "db": -2.2, "loop": true, "temp": true},
+	Sfx.MUSIC_ROUND_WIN: {"file": "round_win_a.ogg", "db": -8.0, "loop": false},
+	Sfx.MUSIC_MATCH_WIN: {"file": "match_win_a.ogg", "db": 2.8, "loop": false},
+	Sfx.MUSIC_VERSUS_RESULTS: {"file": "versus_results_a.ogg", "db": -3.8, "loop": true},
 }
 
 

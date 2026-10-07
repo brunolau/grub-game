@@ -75,6 +75,11 @@ var _slot_scripted: Array[Callable] = _no_sources()
 var _slot_scripted_active: PackedByteArray = _flags_off()
 # Generated action names per slot: [slot][game action] -> &"pN_<action>".
 var _slot_action_names: Array[Dictionary] = _action_names()
+# Device id of the pad that sent the last pad event (-1 = none yet): the single player's pad when a partner joins.
+var _last_pad_device: int = -1
+# Menu clusters (set_menu_clusters): on / off, and the events added to the ui_* actions, as [action, event] pairs.
+var _menu_clusters: bool = false
+var _menu_events: Array[Array] = []
 
 
 func _ready() -> void:
@@ -454,10 +459,14 @@ func _latch_slot(slot: int, event: InputEvent) -> void:
 
 
 # (Re)build the generated actions of a slot from its binding profile; remove them when the slot reads none.
+# Godot's Input keeps an action's pressed state by name: a key held while its action is erased and released while it
+# does not exist would leave the rebuilt action "held" (a partner walking on after a join, a leave or a preset change),
+# so every generated action is released when it goes and when it comes back.
 func _build_slot_actions(slot: int) -> void:
 	var names: Dictionary = _slot_action_names[slot]
 	for action: StringName in Defs.GAME_ACTIONS:
 		if InputMap.has_action(names[action]):
+			Input.action_release(names[action])
 			InputMap.erase_action(names[action])
 	var input_slot: InputSlot = slots[slot]
 	if not input_slot.uses_generated_actions():
@@ -475,6 +484,7 @@ func _build_slot_actions(slot: int) -> void:
 			var bound: InputEvent = event.duplicate() as InputEvent
 			bound.device = input_slot.device_id if input_slot.kind == Defs.InputSlotKind.PAD else -1
 			InputMap.action_add_event(generated, bound)
+		Input.action_release(generated)
 
 
 func _on_setting_changed(key: String, _value: Variant) -> void:
@@ -483,16 +493,195 @@ func _on_setting_changed(key: String, _value: Variant) -> void:
 	for slot: int in Defs.MAX_PLAYERS:
 		if slots[slot].uses_generated_actions():
 			_build_slot_actions(slot)
+	if _menu_clusters:
+		# A reload of the project's InputMap dropped them, or the layout changed: add the clusters again.
+		_add_menu_events()
+
+
+# =================================================================================================================
+# 2.0: joining, keyboard presets, menu clusters (DESIGN.md D.11 / E.8 / E.9, PLAN.md P1.1 / P1.11 / P1.12)
+# =================================================================================================================
+
+## The input a "press Jump on any device" join event asks for (DESIGN.md D.11): the keyboard half whose Jump key of
+## the party layout ([method keyboard_layout]) was pressed (InputSlot.keyboard(KEYBOARD_LEFT / KEYBOARD_RIGHT)), or
+## the pad whose Jump button was pressed (InputSlot.pad(device)); null for anything else (a release, an echo, another
+## key, touch). Whether that input already plays is [method find_input]'s question.
+func join_input_for_event(event: InputEvent) -> InputSlot:
+	if event == null or not event.is_pressed() or event.is_echo():
+		return null
+	var key: InputEventKey = event as InputEventKey
+	if key != null:
+		var code: Key = key.physical_keycode if key.physical_keycode != KEY_NONE else key.keycode
+		var layout: int = keyboard_layout()
+		for half: int in [Defs.InputSlotKind.KEYBOARD_LEFT, Defs.InputSlotKind.KEYBOARD_RIGHT]:
+			if InputSlot.default_keys(layout, half, Defs.ACT_JUMP).has(code):
+				return InputSlot.keyboard(half)
+		return null
+	var button: InputEventJoypadButton = event as InputEventJoypadButton
+	if button != null:
+		for pad_event: InputEvent in InputSlot.default_pad_events(Defs.ACT_JUMP):
+			var jump: InputEventJoypadButton = pad_event as InputEventJoypadButton
+			if jump != null and jump.button_index == button.button_index:
+				return InputSlot.pad(button.device)
+	return null
+
+
+## The player slot that reads `input` already (the same keyboard half, the same pad, the same touch region); -1 when
+## none does. KEYBOARD_FULL counts as both halves.
+func find_input(input: InputSlot) -> int:
+	if input == null:
+		return -1
+	for slot: int in Defs.MAX_PLAYERS:
+		if _same_input(slots[slot], input):
+			return slot
+	return -1
+
+
+## The device the single player (slot 0 with ALL_DEVICES) uses now, as a party input: a pad slot for his last pad,
+## the touch overlay, or a keyboard half - the left one unless `partner` (the input of a player who joins) takes it.
+## Flow gives it to slot 0 when a partner joins a single-player game.
+func current_device_input(partner: InputSlot = null) -> InputSlot:
+	if device == Defs.Device.GAMEPAD and _last_pad_device >= 0:
+		var pad_input: InputSlot = InputSlot.pad(_last_pad_device)
+		if not _same_input(pad_input, partner):
+			return pad_input
+	if device == Defs.Device.TOUCH:
+		return InputSlot.touch()
+	var left: InputSlot = InputSlot.keyboard(Defs.InputSlotKind.KEYBOARD_LEFT)
+	if _same_input(left, partner):
+		return InputSlot.keyboard(Defs.InputSlotKind.KEYBOARD_RIGHT)
+	return left
+
+
+## The shared-keyboard layout in use (InputSlot.KeyboardLayout; Settings "controls/party_keyboard", classic by
+## default - the versus default, offered first in co-op).
+func keyboard_layout() -> int:
+	return Settings.party_keyboard_layout()
+
+
+## Choose the shared-keyboard layout (InputSlot.KeyboardLayout): stored in the settings; every keyboard slot's
+## generated actions and the menu clusters follow at once.
+func set_keyboard_layout(layout: int) -> void:
+	var index: int = clampi(layout, 0, InputSlot.KEYBOARD_LAYOUT_NAMES.size() - 1)
+	Settings.set_value(Settings.PARTY_KEYBOARD_KEY, InputSlot.KEYBOARD_LAYOUT_NAMES[index])
+
+
+## The three presets of DESIGN.md D.11 as data for the join panel, the versus lobby and the options (ui-A / ui-B), in
+## the order they are offered (classic first): one Dictionary per layout with
+##   "layout" (InputSlot.KeyboardLayout), "id" (its setting value), "name" (English label),
+##   "left" / "right": {game action: Array[Key]} - the physical keys of each half (P1 / P2),
+##   "menu_left" / "menu_right": {ui action: Array[Key]} - the keys that drive the menus from that cluster,
+##   "numpad": true when a half uses the numpad (the key test then names Num Lock when a key does not arrive).
+static func keyboard_presets() -> Array[Dictionary]:
+	var names: Array[String] = ["Classic: WASD + numpad", "Two hands each", "One hand each"]
+	var result: Array[Dictionary] = []
+	for layout: int in InputSlot.KEYBOARD_LAYOUT_NAMES.size():
+		var entry: Dictionary = {
+			"layout": layout, "id": InputSlot.KEYBOARD_LAYOUT_NAMES[layout], "name": names[layout],
+			"numpad": InputSlot.uses_numpad(layout, Defs.InputSlotKind.KEYBOARD_LEFT)
+					or InputSlot.uses_numpad(layout, Defs.InputSlotKind.KEYBOARD_RIGHT),
+		}
+		for half: int in [Defs.InputSlotKind.KEYBOARD_LEFT, Defs.InputSlotKind.KEYBOARD_RIGHT]:
+			var side: String = "left" if half == Defs.InputSlotKind.KEYBOARD_LEFT else "right"
+			var keys: Dictionary = {}
+			for action: StringName in Defs.GAME_ACTIONS:
+				keys[action] = InputSlot.default_keys(layout, half, action)
+			entry[side] = keys
+			var menu: Dictionary = {}
+			for ui_action: StringName in InputSlot.MENU_ACTIONS:
+				menu[ui_action] = InputSlot.menu_keys(layout, half, ui_action)
+			entry["menu_" + side] = menu
+		result.append(entry)
+	return result
+
+
+## Menu clusters (DESIGN.md D.11: "both players can navigate the menus from their own cluster"): while on, the menu
+## keys of both halves of the party layout (InputSlot.menu_keys: P1 W / S / Space / Q, P2 Num 8 / Num 5 / Num 0 /
+## Num . in the classic layout) are added to Godot's ui_up / ui_down / ui_left / ui_right / ui_accept / ui_cancel;
+## off removes exactly what was added. The join panel and the versus screens switch it on while they show (screens
+## that take typed letters, such as the code entry, never do). [method event_slot] tells which player pressed.
+func set_menu_clusters(on: bool) -> void:
+	_remove_menu_events()
+	_menu_clusters = on
+	if on:
+		_add_menu_events()
+
+
+## True while the menu clusters are on.
+func has_menu_clusters() -> bool:
+	return _menu_clusters
+
+
+## The keyboard half (Defs.InputSlotKind.KEYBOARD_LEFT / KEYBOARD_RIGHT) whose menu or game keys of the party layout
+## hold the key `event`; NONE for another event. For screens that ask "which cluster pressed".
+func event_half(event: InputEvent) -> int:
+	var key: InputEventKey = event as InputEventKey
+	if key == null:
+		return Defs.InputSlotKind.NONE
+	var code: Key = key.physical_keycode if key.physical_keycode != KEY_NONE else key.keycode
+	var layout: int = keyboard_layout()
+	for half: int in [Defs.InputSlotKind.KEYBOARD_LEFT, Defs.InputSlotKind.KEYBOARD_RIGHT]:
+		for action: StringName in Defs.GAME_ACTIONS:
+			if InputSlot.default_keys(layout, half, action).has(code):
+				return half
+		for ui_action: StringName in InputSlot.MENU_ACTIONS:
+			if InputSlot.menu_keys(layout, half, ui_action).has(code):
+				return half
+	return Defs.InputSlotKind.NONE
+
+
+func _add_menu_events() -> void:
+	_remove_menu_events()
+	var layout: int = keyboard_layout()
+	for half: int in [Defs.InputSlotKind.KEYBOARD_LEFT, Defs.InputSlotKind.KEYBOARD_RIGHT]:
+		for ui_action: StringName in InputSlot.MENU_ACTIONS:
+			if not InputMap.has_action(ui_action):
+				continue
+			for code: Key in InputSlot.menu_keys(layout, half, ui_action):
+				var event: InputEventKey = InputEventKey.new()
+				event.device = -1
+				event.physical_keycode = code
+				if InputMap.action_has_event(ui_action, event):
+					continue
+				InputMap.action_add_event(ui_action, event)
+				_menu_events.append([ui_action, event])
+
+
+func _remove_menu_events() -> void:
+	for pair: Array in _menu_events:
+		var action: StringName = pair[0]
+		var event: InputEvent = pair[1]
+		if InputMap.has_action(action) and InputMap.action_has_event(action, event):
+			InputMap.action_erase_event(action, event)
+	_menu_events.clear()
+
+
+# True when two inputs read the same device (a keyboard half, a pad, a touch overlay).
+static func _same_input(a: InputSlot, b: InputSlot) -> bool:
+	if a == null or b == null:
+		return false
+	var a_keys: bool = a.device_family() == Defs.Device.KEYBOARD
+	var b_keys: bool = b.device_family() == Defs.Device.KEYBOARD
+	if a_keys and b_keys:
+		return a.kind == b.kind or a.kind == Defs.InputSlotKind.KEYBOARD_FULL \
+				or b.kind == Defs.InputSlotKind.KEYBOARD_FULL
+	if a.kind == Defs.InputSlotKind.PAD and b.kind == Defs.InputSlotKind.PAD:
+		return a.device_id == b.device_id
+	if a.kind == Defs.InputSlotKind.TOUCH and b.kind == Defs.InputSlotKind.TOUCH:
+		return a.region == b.region
+	return false
 
 
 func _track_device(event: InputEvent) -> void:
 	if event is InputEventKey:
 		_set_device(Defs.Device.KEYBOARD)
 	elif event is InputEventJoypadButton:
+		_last_pad_device = event.device
 		_set_device(Defs.Device.GAMEPAD)
 	elif event is InputEventJoypadMotion:
 		var motion: InputEventJoypadMotion = event
 		if absf(motion.axis_value) > 0.5:
+			_last_pad_device = motion.device
 			_set_device(Defs.Device.GAMEPAD)
 	elif event is InputEventScreenTouch or event is InputEventScreenDrag:
 		_set_device(Defs.Device.TOUCH)

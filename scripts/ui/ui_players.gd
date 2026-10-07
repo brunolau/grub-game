@@ -30,6 +30,8 @@ const PALETTE_COLOURS: Dictionary = {
 	&"white": [Color("f7f4ec"), Color("ffffff"), Color("b7bfd2"), Color("2c2c3a")],
 	&"gold": [Color("ffc928"), Color("fff7c2"), Color("c97d10"), Color("3f2508")],
 }
+## `arena_swaps` of hero_palettes.json, by palette: biome -> the palette worn there in versus.
+const ARENA_SWAPS: Dictionary = {&"green": {"jungle": &"white", "swamp": &"white"}}
 ## Index of each colour in a PALETTE_COLOURS entry.
 const FILL: int = 0
 const LIGHT: int = 1
@@ -41,9 +43,16 @@ const DARK: int = 3
 static func palette_of(slot: int) -> StringName:
 	var index: int = clampi(slot, 0, Defs.MAX_PLAYERS - 1)
 	var run: PlayerRun = Game.get_run(index) if slot >= 0 and slot < Defs.MAX_PLAYERS else null
+	var palette: StringName = SLOT_PALETTES[index]
 	if run != null and PALETTE_COLOURS.has(run.palette):
-		return run.palette
-	return SLOT_PALETTES[index]
+		palette = run.palette
+	# The arena swaps of hero_palettes.json (as the hero wears them, HeroPalette): green turns white on a jungle or
+	# swamp arena.
+	if Game.mode == Defs.GameMode.VERSUS and Game.level_id != &"" and ARENA_SWAPS.has(palette):
+		var biome: String = str(Levels.get_value(Game.level_id, "biome", ""))
+		if (ARENA_SWAPS[palette] as Dictionary).has(biome):
+			palette = ARENA_SWAPS[palette][biome]
+	return palette
 
 
 ## One colour of player slot `slot` (FILL, LIGHT, SHADE or DARK).
@@ -98,3 +107,44 @@ static func tag_label(slot: int) -> Label:
 	label.add_theme_color_override(&"font_color", text_colour(slot))
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return label
+
+
+## The menu action (`ui_up`, `ui_down`, `ui_left`, `ui_right`, `ui_accept`, `ui_cancel`) that `event` means for player
+## slot `slot` of a party, by the slot's own game keys (DESIGN.md D.11: each player drives the menus from his own
+## cluster - classic P1: W / S / Space / Q, P2: Num 8 / Num 5 / Num 0 / Num .): move keys move, Jump and Strike
+## confirm, Look goes back. &"" when the event is none of them, is already a menu action, or the slot reads no
+## generated actions (single-player: every key keeps its 1.0 meaning). Presses only (held moves repeat).
+static func menu_action(event: InputEvent, slot: int) -> StringName:
+	if event == null or not event.is_pressed() or slot < 0 or slot >= Defs.MAX_PLAYERS:
+		return &""
+	if not GameInput.get_slot(slot).uses_generated_actions():
+		return &""
+	for ui: StringName in [&"ui_up", &"ui_down", &"ui_left", &"ui_right", &"ui_accept", &"ui_cancel"]:
+		if event.is_action(ui, true):
+			return &""
+	var moves: Dictionary = {
+		Defs.ACT_UP: &"ui_up", Defs.ACT_DOWN: &"ui_down", Defs.ACT_LEFT: &"ui_left", Defs.ACT_RIGHT: &"ui_right",
+	}
+	for action: StringName in moves:
+		var generated: StringName = GameInput.slot_action(slot, action)
+		if InputMap.has_action(generated) and event.is_action(generated, true):
+			return moves[action]
+	if event.is_echo():
+		return &""
+	for action: StringName in [Defs.ACT_JUMP, Defs.ACT_ATTACK]:
+		var generated: StringName = GameInput.slot_action(slot, action)
+		if InputMap.has_action(generated) and event.is_action(generated, true):
+			return &"ui_accept"
+	var look: StringName = GameInput.slot_action(slot, Defs.ACT_LOOK)
+	if InputMap.has_action(look) and event.is_action(look, true):
+		return &"ui_cancel"
+	return &""
+
+
+## Send the menu action `ui` as an input event (pressed, then released), as [method menu_action] found it.
+static func send_menu_action(ui: StringName) -> void:
+	for pressed: bool in [true, false]:
+		var action: InputEventAction = InputEventAction.new()
+		action.action = ui
+		action.pressed = pressed
+		Input.parse_input_event(action)

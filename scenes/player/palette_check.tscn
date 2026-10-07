@@ -1,0 +1,82 @@
+[gd_scene load_steps=2 format=3]
+
+[sub_resource type="GDScript" id="GDScript_palette_check"]
+script/source = "extends Node
+## Development check of the hero palette shader (player-A, docs/expansion/PLAN.md P1.4): every case is drawn 1:1 by
+## the real renderer into a transparent SubViewport, read back and compared with the shader's CPU twin
+## (HeroPalette.apply_image, itself pinned to the art pipeline's reference by tests/test_player_palette.gd) on every
+## opaque texel. The headless test runner has no renderer, so this is a windowed run:
+##   bash .tools/gd.sh raw --path . res://scenes/player/palette_check.tscn
+## One line per case; exit code 0 when every case matches. Never part of the game (nothing loads this scene).
+
+## [sheet, colour, pattern (-1 = the pattern step off), flip_h, modulate alpha]
+const CASES: Array = [
+	['hero', 'blue', 2, false, 1.0],
+	['hero_axe', 'pink', 3, true, 1.0],
+	['hero_hammer', 'green', 1, false, 1.0],
+	['hero_spear', 'gold', 11, false, 1.0],
+	['hero_boomerang', 'white', 4, true, 1.0],
+	['hero_egg', 'blue', -1, false, 1.0],
+	['hero', 'blue', 2, false, 0.5],
+]
+
+
+func _ready() -> void:
+	var failures: int = 0
+	for entry: Array in CASES:
+		failures += await _check(entry)
+	print('PaletteCheck: %d of %d case(s) differ' % [failures, CASES.size()])
+	get_tree().quit(1 if failures > 0 else 0)
+
+
+func _check(entry: Array) -> int:
+	var texture: Texture2D = load('res://assets/sprites/player/%s.png' % entry[0]) as Texture2D
+	var size: Vector2i = Vector2i(texture.get_size())
+	var cloth: bool = int(entry[2]) >= 0
+	var pattern: int = maxi(int(entry[2]), 0)
+	var viewport: SubViewport = SubViewport.new()
+	viewport.size = size
+	viewport.transparent_bg = true
+	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	viewport.canvas_item_default_texture_filter = Viewport.DEFAULT_CANVAS_ITEM_TEXTURE_FILTER_NEAREST
+	add_child(viewport)
+	var sprite: Sprite2D = Sprite2D.new()
+	sprite.texture = texture
+	sprite.centered = false
+	sprite.flip_h = bool(entry[3])
+	sprite.modulate.a = float(entry[4])
+	sprite.material = HeroPalette.material_for(StringName(entry[1]), pattern, cloth)
+	viewport.add_child(sprite)
+	for i: int in 3:
+		await RenderingServer.frame_post_draw
+	var shown: Image = viewport.get_texture().get_image()
+	shown.convert(Image.FORMAT_RGBA8)
+	var source: Image = texture.get_image()
+	source.convert(Image.FORMAT_RGBA8)
+	var want: Image = HeroPalette.apply_image(source, StringName(entry[1]), pattern, cloth)
+	if bool(entry[3]):
+		want.flip_x()
+	var alpha: int = roundi(float(entry[4]) * 255.0)
+	var bad: int = 0
+	var first: String = ''
+	for y: int in size.y:
+		for x: int in size.x:
+			var w: Color = want.get_pixel(x, y)
+			if w.a8 < 255:
+				continue
+			var s: Color = shown.get_pixel(x, y)
+			var ok: bool = absi(s.a8 - alpha) <= 1
+			if alpha == 255:
+				ok = ok and s.r8 == w.r8 and s.g8 == w.g8 and s.b8 == w.b8
+			if not ok:
+				bad += 1
+				if first.is_empty():
+					first = ' first at (%d, %d): shown %s want %s' % [x, y, s.to_html(), w.to_html()]
+	print('PaletteCheck %s %s pattern %d flip %s alpha %.2f: %d texel(s) differ%s' % [entry[0], entry[1], entry[2],
+			entry[3], entry[4], bad, first])
+	viewport.queue_free()
+	return 1 if bad > 0 else 0
+"
+
+[node name="PaletteCheck" type="Node"]
+script = SubResource("GDScript_palette_check")

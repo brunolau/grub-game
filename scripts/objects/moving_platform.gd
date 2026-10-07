@@ -26,6 +26,11 @@ var velocity: int = 0
 var target: int = 0
 ## Feet point the platform starts from (and returns to on a level reset).
 var home: Vector2i = Vector2i.ZERO
+## 2.0: the objects/pulley that drives this platform (null: it moves by its own parameters). While driven, its own
+## motion is off and it moves [member pulley_dy] px on its next PLATFORMS tick (set by the pulley in the WORLD phase
+## before; used once).
+var pulley: SimEntity = null
+var pulley_dy: int = 0
 
 var _counter: int = 0
 
@@ -43,6 +48,10 @@ func _apply_params(params: Dictionary) -> void:
 
 
 func _move_tick() -> void:
+	if pulley != null:
+		dy = pulley_dy
+		pulley_dy = 0
+		return
 	if velocity == 0 and target >= 0 and ride_only and not ridden:
 		return
 	if target > velocity:
@@ -61,6 +70,7 @@ func _move_tick() -> void:
 func _on_level_reset() -> void:
 	teleport(home)
 	ridden = false
+	pulley_dy = 0
 	_reset_motion()
 
 

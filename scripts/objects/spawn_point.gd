@@ -6,8 +6,9 @@ extends SimEntity
 ## exists so that the round loop and the referee can ask for the arena's spawns during play (rotation every round,
 ## the respawn after a hazard).
 ##
-## Owner: objects-B (docs/expansion/PLAN.md 4.1). Invisible in play (the heroes "burst out of spots" at a round start,
-## which is the referee's / round loop's picture); it takes no tick and never dozes.
+## Owner: objects-B (docs/expansion/PLAN.md 4.1). It takes no tick and never dozes. Picture: the pad of
+## sprites/objects/spawn_point.png (ASSET_MANIFEST 17.11: 6 frames; 0 idle, 1-4 lit in P1-P4's colour, 5 neutral);
+## the referee may light it with [method show_player] while a player waits to respawn there.
 ##
 ## For the referee (world-B) and the bots (core-B), all static and allocation-light:
 ## - [method spawn_list]: '@' first, then every spawn point by `index` (ties: spawn order);
@@ -18,6 +19,10 @@ extends SimEntity
 const FREE_RADIUS_PX: int = 24
 ## Distance used when nobody else is in the arena.
 const FAR_AWAY: int = 1 << 30
+
+## Sheet frames: idle pad, P1..P4 lit (1 + slot), neutral (round start).
+const FRAME_IDLE: int = 0
+const FRAME_NEUTRAL: int = 5
 
 ## Player number of this spawn (2..Defs.MAX_PLAYERS; `@` is player 1).
 var index: int = 2
@@ -30,6 +35,19 @@ func _init() -> void:
 
 func _apply_params(params: Dictionary) -> void:
 	index = clampi(int(params.get("index", index)), 2, Defs.MAX_PLAYERS)
+
+
+## Cosmetic: light the pad in the colour of player slot `slot` (0..3), -1 = idle, Defs.MAX_PLAYERS = neutral.
+func show_player(slot: int) -> void:
+	var sprite: Sprite2D = get_node_or_null(^"Sprite") as Sprite2D
+	if sprite == null:
+		return
+	if slot < 0:
+		sprite.frame = FRAME_IDLE
+	elif slot >= Defs.MAX_PLAYERS:
+		sprite.frame = FRAME_NEUTRAL
+	else:
+		sprite.frame = 1 + slot
 
 
 ## Every spawn of the level's arena as feet points: index 0 is `@` ([member LevelBase.start_pos], player 1), then the

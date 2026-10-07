@@ -146,7 +146,7 @@ func _render(data: LevelData, difficulty: int, collision: bool) -> Image:
 	var sets: Array[Image] = [
 		_image(LevelData.terrain_path(str(meta.get("terrain_a", WorldTileSet.FALLBACK_TERRAIN)))),
 		_image(LevelData.terrain_path(str(meta.get("terrain_b", WorldTileSet.FALLBACK_TERRAIN)))),
-		_image(LevelData.liquid_path(str(meta.get("liquid", WorldTileSet.FALLBACK_LIQUID)))),
+		_liquid_image(str(meta.get("liquid", WorldTileSet.FALLBACK_LIQUID)), str(meta.get("biome", ""))),
 	]
 	var records: Array[Dictionary] = []
 	for record: Dictionary in data.entity_records():
@@ -370,6 +370,27 @@ func _draw_collision(picture: Image, grid: TileGrid, records: Array[Dictionary],
 # =================================================================================================================
 # Image helpers
 # =================================================================================================================
+
+## The liquid set as the level paints it: the 8-cell liquid strip with the tar-floor strip of `liquid` / `biome`
+## appended (WorldTileSet.liquid_texture; LevelTiles.TAR_FLOOR_FIRST.. index the ':' cells), else the bare strip.
+func _liquid_image(liquid: String, biome: String) -> Image:
+	var key: String = "liquid:%s:%s" % [liquid, biome]
+	if _images.has(key):
+		return _images[key]
+	var image: Image = null
+	var texture: Texture2D = WorldTileSet.liquid_texture(liquid, biome)
+	if texture != null:
+		image = texture.get_image()
+		if image != null:
+			image = image.duplicate()
+			if image.is_compressed():
+				image.decompress()
+			image.convert(Image.FORMAT_RGBA8)
+	if image == null:
+		image = _image(LevelData.liquid_path(liquid))
+	_images[key] = image
+	return image
+
 
 func _image(path: String) -> Image:
 	if _images.has(path):

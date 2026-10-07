@@ -9,6 +9,8 @@ const ENEMY_IDS: Dictionary[StringName, String] = {
 	&"enemies/dart": "Dart", &"enemies/hopper": "Hopper", &"enemies/walker": "Walker", &"enemies/flyer": "Flyer",
 	&"enemies/digger": "Digger", &"enemies/leaper": "Leaper", &"enemies/charger": "Charger",
 	&"enemies/snapper": "Snapper", &"enemies/decoration": "Decoration",
+	# 2.0 (DESIGN.md A.5 / D.7; PLAN.md P1.8 pulled forward from P2.1)
+	&"enemies/roller": "Roller", &"enemies/guard": "Guard", &"enemies/shellback": "Shellback",
 }
 const BOSS_IDS: Dictionary[StringName, String] = {&"bosses/brute": "Brute", &"bosses/colossus": "Colossus"}
 const PROJECTILE_IDS: Dictionary[StringName, String] = {
@@ -24,12 +26,24 @@ const ENEMY_SKINS: Dictionary[String, Vector2i] = {
 	"plant_b": Vector2i(30, 28), "pterodactyl": Vector2i(52, 22), "pterodactyl_b": Vector2i(52, 22),
 	"rex": Vector2i(58, 35), "rex_b": Vector2i(58, 35), "rival": Vector2i(22, 26), "turtle": Vector2i(26, 15),
 	"turtle_b": Vector2i(26, 15),
+	# 2.0 world 5 sheets (art-B's hand-over, ASSET_MANIFEST.md 4 rows to add)
+	"roller": Vector2i(54, 24), "roller_b": Vector2i(54, 24), "guard": Vector2i(76, 54),
+	"shellback": Vector2i(76, 54), "snake": Vector2i(38, 30), "snake_b": Vector2i(38, 30),
+	"cave_bat": Vector2i(55, 28), "cave_bat_b": Vector2i(55, 28), "eagle": Vector2i(34, 41),
+	"bear": Vector2i(63, 51), "bear_b": Vector2i(63, 51),
+	# 2.0 world 6 sheets (art-B, ahead of phase 2)
+	"slime": Vector2i(36, 28), "slime_b": Vector2i(36, 28), "puffcap": Vector2i(51, 42),
+	"puffcap_b": Vector2i(51, 42), "frog": Vector2i(26, 19), "larva": Vector2i(15, 13), "larva_b": Vector2i(15, 13),
+	"leech": Vector2i(15, 13), "mosquito": Vector2i(35, 18),
 }
-const BOSS_SKINS: PackedStringArray = ["brute", "brute_enraged", "colossus"]
+const BOSS_SKINS: PackedStringArray = [
+	"brute", "brute_enraged", "colossus", "tusker", "tusker_rage", "mangrove", "mangrove_parts",
+]
 const MAX_TEXTURE_SIDE: int = 2048
 const ROLES: Array[StringName] = [
 	&"idle", &"walk", &"fly", &"air", &"hang", &"dive", &"leap", &"glide", &"roll", &"land", &"attack", &"windup",
 	&"bite", &"recover", &"screech", &"hurt", &"dead", &"taunt", &"pound", &"crouch", &"spit", &"slam", &"rage",
+	&"curl", &"uncurl", &"bump", &"dizzy", &"guard", &"rear",
 ]
 
 
@@ -119,3 +133,4 @@ func test_module_levels_name_existing_entities() -> void:
 			if Spawner.category(id) in ["enemies", "bosses", "projectiles"]:
 				assert_true(Spawner.exists(id), "%s: %s" % [file, id])
 	assert_true(checked >= 1, "the module has its own test levels")
+

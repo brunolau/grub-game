@@ -61,6 +61,14 @@ func _on_hit(_power: int, _source: SimEntity) -> void:
 	spray(DEBRIS_KINDS[skin], ObjTuning.BLOCK_HIT_DEBRIS >> 1, get_hit_point())
 
 
+## 2.0 versus refill (HittableBase.refill): the crate / barrel / pot stands there again.
+func _on_refilled() -> void:
+	if _sprite != null:
+		_sprite.visible = true
+	if Game.level != null:
+		Game.level.spawn_fx(ID_POOF, get_hit_point())
+
+
 func _on_opened() -> void:
 	var level: LevelBase = Game.level
 	if level == null:

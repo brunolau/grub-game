@@ -60,7 +60,7 @@ func _sim_tick(_phase: int) -> void:
 
 ## One hero: landing on it (falling, not gliding) launches him with `power`.
 func _launch_test(level: LevelBase, hero: PlayerBase) -> void:
-	if hero.dead or hero.yvel < 0 or hero.is_gliding():
+	if hero.dead or hero.down or hero.yvel < 0 or hero.is_gliding():
 		return
 	if Overlap.body(self, hero, hero) and Overlap.stomp:
 		hero.bounce(power, Overlap.depth)

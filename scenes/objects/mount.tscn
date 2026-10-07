@@ -1,0 +1,22 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/objects/mount.gd" id="1_mount"]
+[ext_resource type="Texture2D" path="res://assets/sprites/enemies/rex.png" id="2_rex"]
+[ext_resource type="Texture2D" path="res://assets/sprites/objects/rex_saddle.png" id="3_saddle"]
+
+[node name="Mount" type="Node2D"]
+script = ExtResource("1_mount")
+
+[node name="Sprite" type="Sprite2D" parent="."]
+texture = ExtResource("2_rex")
+centered = false
+offset = Vector2(-76, -96)
+hframes = 8
+vframes = 3
+
+[node name="Saddle" type="Sprite2D" parent="."]
+texture = ExtResource("3_saddle")
+centered = false
+offset = Vector2(-76, -96)
+hframes = 8
+vframes = 3

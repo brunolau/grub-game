@@ -1,0 +1,32 @@
+Race Start Countdown
+====================
+
+Author: kheetor
+Source: https://opengameart.org/content/race-start-countdown
+Licence: CC0 1.0 (tier A)
+Used in Club & Grub for: 2.0 (The Far Shore): audio/sfx/countdown_beep_a.wav. Per-file sources and edits: docs/ASSET_MANIFEST.md section 17
+Staging folder: .tools/asset_candidates/expansion/audio/kheetor_race-start-countdown
+
+---- Licence evidence recorded when the pack was downloaded ----
+
+# LICENSE_INFO - kheetor - Race Start Countdown
+
+- **Author:** kheetor (OpenGameArt)
+- **License:** CC0 1.0 (the page lists CC0 among nine licences; CC0 chosen)  (tier A)
+- **Date checked / downloaded:** 2026-10-06
+- **Source page(s) (saved copies in `../_pages/oga_<slug>.html`):**
+  - https://opengameart.org/content/race-start-countdown
+- **Download URL(s)** (every file attached to the page; the ones fetched are marked):
+  - https://opengameart.org/sites/default/files/countdown.ogg (fetched)
+
+## Exact licence wording (quoted from the source)
+
+> https://opengameart.org/content/race-start-countdown - page title "Race Start Countdown", author "kheetor", posted Thursday, February 13, 2025 - 04:09
+>
+> License(s): CC-BY 3.0 OGA-BY 3.0 OGA-BY 4.0 CC-BY 4.0 GPL 3.0 GPL 2.0 CC0 CC-BY-SA 4.0 CC-BY-SA 3.0
+>
+> Description: "Race or round start countdown with reverb beeps, 3, 2, 1, go style."
+
+---- Licence ----
+
+CC0 1.0 Universal: the full legal code ships as cc0_1.0_legal_code.txt in this folder.

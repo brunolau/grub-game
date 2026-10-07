@@ -1,10 +1,10 @@
 # Club & Grub level file - format 2 (docs/ARCHITECTURE.md 7.11). The Book II test bed of the route harness (owner:
 # integration; docs/expansion/PLAN.md P1.3): a Book II file (`book = 2`, so the fresh-club belt rule of PHYSICS.md C.2
-# applies) with what a club route meets - two turtles to club, food on a one-way ledge, a checkpoint and the exit -
-# and a P2 start for two-stream routes. The belt-invariance runner replays its header routes
-# (tests/fixtures/routes/test_integration_book2*.inputs) with every special on the belt (tests/test_integration_belt.gd);
-# no tar, vine or other Book II mechanic, so the routes stay valid while those systems land. Not part of any campaign
-# (kind = test).
+# applies) with what a club route meets - two turtles to club, food on a one-way ledge, a checkpoint and the exit. Its
+# co-op file is levels/test_integration_book2_coop.lvl (two-stream routes play there: in co-op Flow starts the co-op
+# file of a solo id). The belt-invariance runner replays their header routes (tests/fixtures/book2_routes/) with every
+# special on the belt (tests/test_integration_belt.gd); no tar, vine or other Book II mechanic, so the routes stay valid
+# while those systems land. Not part of any campaign (kind = test).
 
 [meta]
 format = 2
@@ -42,6 +42,3 @@ h = items/food index=26
 |..@........T..............T.....C....E|
 ########################################
 ########################################
-
-[entities]
-objects/hero_start 1 10 slot=2

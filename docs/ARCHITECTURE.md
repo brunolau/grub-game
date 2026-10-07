@@ -263,12 +263,41 @@ checkpoint, exit, completion, tally) stays in `Game`. A player's look lives in h
 name of `assets/sprites/player/palettes/hero_palettes.json`, `&""` = the slot default) and `PlayerRun.pattern` (a
 loincloth pattern index, -1 = the slot default), written by the join panel / lobby, read by the hero's palette, the
 HUD and the versus screens; `reset_run` keeps them.
+P1.1 (core-A): `versus_match: VersusMatch` (the match being played or set up; `match` is a keyword), `party_runs() ->
+Array[PlayerRun]` (slots 0..party - 1), `set_party(mode, party)` (a join or leave during a run: score, lives and kept
+runs stay, a joining slot starts like a new run's hero and reports through `run_*_changed`). `begin_level` zeroes the
+party's statistics when a co-op stage starts afresh (`carry_progress` false); single-player never.
 `PlayerRun` (`scripts/core/player_run.gd`, `RefCounted`): `slot`, `hearts`, `bones`, `weapon` (the hand), `belt`
 (`BELT_EMPTY` = -1), `has_glider`, stats `score`, `kills`, `deaths`, `revives`, `picked`, `stocks`; the 1.0 bodies of
 `add_bones`, `add_heart`, `lose_heart`, `lose_bone`, `scatter_energy`, `is_full_energy`, `reset_energy`,
 `set_weapon` (0..`Defs.Weapon.SPEAR`), `set_glider`; belt primitives `set_belt`, `swap_belt() -> bool`, `special() ->
 int`, `take_fresh_club()`; `emit_energy / emit_weapon / emit_belt / emit_glider`, `reset_run`, `reset_stats`; signals
 `energy_changed`, `weapon_changed`, `belt_changed`, `glider_changed`.
+Medal and award counters (P1.1; DESIGN.md D.11 co-op tally, E.8 versus results; the module that sees the deed adds to
+them, nothing in the simulation reads them): `food`, `best_chain`, `hurts`, `bats`, `plates`, `pushes`, `hits`,
+`stolen`, `dropped`, `best_stack`, `clangs`, `best_shot`, `passes`, `hazards`, `bonks`, `comeback` (written by
+`VersusMatch.finish`); `note_chain(n)`, `note_stack(units)`, `note_shot(px)` keep the longest; `STATS` (every counter,
+`get_stat(name)`), tables `COOP_MEDALS` (most_food, best_bounce_chain, hatchling, slugger, strongman, clumsiest) and
+`VERSUS_AWARDS` (leaning_tower ... pacifist, `fewest` = the lowest wins) of `{id, stats}`; `award_value(award)`,
+`static award_winners(runs, award) -> PackedInt32Array` (ties share; nobody wins with nothing done),
+`static medals(runs, table = COOP_MEDALS) -> {id: slots}`.
+
+`VersusMatch` (`scripts/core/versus_match.gd`, RefCounted, P1.1; DESIGN.md E.3-E.8, TECH_AUDIT.md 4.9): seats
+(`seats[slot]: VersusMatch.Seat` with `kind` SeatKind EMPTY / HUMAN / BOT, `input`, `bot_level`, `team` 0 / 1 / 2,
+`palette`, `pattern`, handicap `hearts` / `stack_guard` / `auto_handicap`, `ready`; `seat_human(input, slot = -1)`,
+`seat_bot(level, slot = -1)`, `unseat`, `is_seated`, `is_bot`, `get_seat`, `player_count`, `human_count`,
+`seated_slots`, `compact_seats`, `is_team_match`, `teammates`, `can_start`, `ready_all`, signal `seats_changed`);
+rules (`mode` Defs.VersusMode, `preset` Preset CLASSIC / FEAST / MAYHEM, `rounds_to_win`, `round_seconds`, `crates`,
+`weapons`, `variants`, `sudden_death`, `stock`, `arena` = an id or `ARENA_RANDOM` / `ARENA_PARTY_MIX`, `rules_owner`;
+`round_wins_needed(mode)`, `round_ticks(mode)` (0 = no clock), `crate_period_ticks`, `has_variant`, `rules_to_dict` /
+`rules_from_dict`, `remember_rules` (Settings `versus/last_rules`), `static from_settings()`); arenas
+(`static available_arenas(players, mode)` without the locked `LOCKED_ARENAS` until their Save reward,
+`static arena_modes(id)`, `arena_for_round(i)`, `mode_for_round(i, arena)` - picks from the match's own SimRng, never
+Sim.rng); the match (`match_seed`, `round_index`, `round_open`, `round_arena`, `round_mode`, `round_wins`, `history`
+[{arena, mode, winners}], `bots` (the HeroBot per bot seat); `begin_match(seed)`, `begin_round(arena)`, `round_seed()`
+= VersusTuning.round_seed, `bot_seed(slot)`, `spawn_index(slot)` (1-based, rotates every round), `record_round(winners)
+-> bool`, `is_over`, `leaders`, `rematch`, `finish(runs)` (Comeback Caveman), `hand_out_awards(runs) -> {slot:
+Array[StringName]}` (1-3 each)); `static var bot_factory` (a test / tool flags source replacing HeroBot), `HERO_BOT_PATH`.
 
 ### 3.6 `Settings` and `Save` autoloads - persistence (`user://`, versioned)
 
@@ -301,7 +330,9 @@ entries are ignored. `changed` reports bindings as key `Settings.BINDINGS_KEY` w
 `[bindings]`; `SLOT_BINDINGS_SECTION`, `slot_bindings_section(slot)`), `get_slot_bindings(slot, action, device = -1,
 half = -1)`, `rebind_slot`, `set_slot_binding(slot, action, event, index = 0, half = -1) -> StringName`,
 `reset_slot_binding(slot, action, half = -1)`, `reset_slot_bindings(slot = -1)`, `has_custom_slot_bindings(slot)`; key
-`controls/party_keyboard` (`PARTY_KEYBOARD_KEY`, `classic` | `two_hands` | `one_hand`; `party_keyboard_layout()`).
+`controls/party_keyboard` (`PARTY_KEYBOARD_KEY`, `classic` | `two_hands` | `one_hand`; `party_keyboard_layout()`;
+classic by default: the versus default, offered first in co-op). P1.1: key `versus/last_rules` (Dictionary,
+VersusMatch.rules_to_dict).
 2.0 Save (`VERSION = 2`, a 1.0 file migrates into (single, book 1); a 2.0 file written again by 1.0 is merged):
 progress per namespace `Save.space(mode, book, difficulty)` (`"single/book1/beginner"`, `get_spaces()`, consts
 `SPACE_MODES`, `BOOKS`) with the twins `is_level_unlocked_in`, `unlock_level_in`, `get_unlocked_levels_in`,
@@ -336,6 +367,17 @@ The `swap` action sets `Defs.IN_SWAP` (64, outside `IN_STATE_MASK`); `keys_to_fl
 factories `all_devices()`, `keyboard(kind)`, `pad(device_id)`, `touch(region)`, `bot(source)`; `KeyboardLayout`
 (`CLASSIC`, `TWO_HANDS`, `ONE_HAND`) with the default keys of DESIGN.md D.11 (`default_keys`, `default_events`,
 `default_pad_events`, `project_events`, `default_half`).
+P1.1: the presets as data - `InputSlot.MENU_ACTIONS`, `menu_keys(layout, half, ui_action)` (classic P1 W / S / Space /
+Q, P2 Num 8 / Num 5 / Num 0 / Num .), `NUMPAD_KEYS`, `uses_numpad(layout, half)`, `is_numpad_key(key)`;
+`GameInput.keyboard_presets()` (static: per layout `layout`, `id`, `name`, `left` / `right` {action: keys},
+`menu_left` / `menu_right` {ui action: keys}, `numpad`), `keyboard_layout()`, `set_keyboard_layout(layout)`,
+`set_menu_clusters(on)` / `has_menu_clusters()` (both clusters' menu keys added to Godot's ui_* actions while a party
+screen shows; off removes exactly them), `event_half(event)`, `join_input_for_event(event) -> InputSlot` (a Jump of a
+keyboard half or a pad: "press Jump to join"), `find_input(input) -> int`, `current_device_input(partner)` (the single
+player's device as a party input). NumLock: Godot 4.7.2 on Windows reports the numpad's physical keycode (`KEY_KP_*`,
+from the scancode) with NumLock off too - only `keycode` becomes the navigation key - so the classic layout's physical
+bindings need no alias (verified with the NumLock-off WM_KEYDOWN messages posted into a running window,
+`scenes/core/dev/key_probe.tscn`, a dev probe that logs every key event; excluded from exports by `*/dev/*`).
 
 ### 3.8 `Levels` autoload - level registry
 
@@ -381,9 +423,13 @@ actually started and jingles end at once.
 
 2.0: `hold_music(context, holder: Object, fade_seconds = 0.2)`, `release_music(context, holder: Object, fade_seconds =
 0.4)`, `is_music_held_by(context, holder) -> bool` (shared music such as the feast while any hero feasts; freed
-holders do not count; `play_music`, `play_jingle`, `stop_music` and `shutdown` clear the holds). `Sfx` gains the 32
-effect names of `Sfx.EXPANSION_SFX` and the 30 music contexts of `Sfx.EXPANSION_MUSIC` (DESIGN.md F.2); they get
-their `AudioTable` rows with the audio batches (PLAN.md P1.1 / P2.6) and must not be played before.
+holders do not count; `play_music`, `play_jingle`, `stop_music` and `shutdown` clear the holds; a context released
+while another track was pushed over it leaves the stack, so the track it interrupted comes back after that one).
+`Sfx` gains the 33 effect names of `Sfx.EXPANSION_SFX` (DESIGN.md F.2 and `CLANG`, the versus clang) and the 30 music
+contexts of `Sfx.EXPANSION_MUSIC`. AudioTable batch 1 (P1.1) gives every one of them a row: the audio owner's files
+for all effects and the G1 slice's music (canyon, co-op menu, lobby, battle A, round / match jingles, results); the
+other contexts play a 1.0 track of the same mood marked `"temp": true` (`AudioTable.is_temp(name)`, `temp_names()` =
+the work list of batch 2, P2.6) until their file lands. Callers never change when a row does.
 
 ### 3.10 `Flow` autoload - scenes, transitions, pause
 
@@ -428,8 +474,35 @@ a bonus stage entered without its source level's warp (debug level select) retur
 never to The End.
 2.0: `pause_slot` (the slot whose device paused, from `GameInput.event_slot`; 0 otherwise, reset on unpause);
 `restart_level` charges a life only when `LevelBase.all_heroes_dead_or_down()`; the iris centres on the party when
-`hero_count() > 1`. The mode-aware flow (`start_coop_game`, `start_versus`, book select, `Save.*_in`,
-`Levels.level_for_mode`) is core-A's PLAN.md P1.1.
+`hero_count() > 1`.
+P1.1 (core-A; GAMEPLAY.md 13.1 / 13.9.1 / 13.10.1). Screens `book_select`, `join`, `unlocks`, `versus_lobby`,
+`versus_rules`, `versus_arena`, `versus_scoreboard` (args `round_index`, `winners`), `versus_results` (args `winners`,
+`awards`). Front end: `open_play(Defs.GameMode)` (Solo -> book select; Co-op -> `begin_party_setup()` + join panel;
+Versus -> lobby), `choose_book(book)` (-> mode select), `start_selected_game(difficulty)` (what the difficulty screen
+calls), fields `play_mode`, `play_book` (the title resets them, and a party's input to single-player). Runs:
+`start_new_game(d)` stays the 1.0 game (Book I solo); `start_book_game(d, book = 1, at_level = "")`,
+`start_coop_game(d, party = 2, book = 1, at_level = "")` (slots nobody joined get the left / right keyboard half, then
+pads); `continue_game` starts the level's book. Mode-aware campaign: `level_to_play(id)` (co-op: a solo id's
+`<id>_coop` file; single-player and versus never change an id) is applied by `start_level` and `warm_up`; the route
+logic of `complete_level` / `finish_tally` reads a co-op file's solo kind; results, unlocks (solo map-stop ids), the
+high-score table, completion and the carried belts (Book II / co-op) go to `save_space()` = `Save.space(Game.mode,
+Game.book, difficulty)` (a Book I solo run writes exactly what 1.0 wrote, plus its namespace high score);
+`show_world_map` args add `book` and `mode` (in co-op `level_id` is the solo stop). Joining: `party_size()`,
+`join_player(input, slot = -1) -> int` (co-op 2, the versus lobby 4 seats; the single player keeps his device as P1;
+plays `Sfx.PARTY_JOIN`), `leave_player(slot) -> bool` (later players move up; back to one player = single-player
+input; the last player of a running campaign cannot leave), `finish_join()`, signal `party_changed(size)`; mid-stage
+a join or leave restarts the stage behind the curtain in the other layout (`Levels.level_for_mode`) at the checkpoint
+the player had reached (each hero at `get_respawn_pos_for(slot)` before tick 1), score kept (`Game.set_party`).
+Pads: `notify_pad_connection(device, connected)` (Input.joy_connection_changed): a pad seat lost during play pauses with
+`pause_slot` = that slot, signal `pad_lost(slot)`; the next pad that connects takes the oldest lost seat
+(`pad_reconnected(slot)`); `lost_pad_slots()`, `continue_alone(slot)` (co-op: he leaves; versus: a bot takes over).
+Versus: `open_versus_lobby()`, `add_bot(level)`, `start_versus(match = null, seed = -1) -> bool` (compacts the seats,
+remembers the rules, `Game.start_run(.., VERSUS, players)`, humans' inputs, round 0), `start_round()` (the round's arena
+behind the curtain, `Sim.rng` seeded with `round_seed()` after loading and before tick 1, every bot seat fed by its
+HeroBot - created once per match by path, `reset_round(round_seed)` each round), `end_round(winners)` (the referee's gong:
+records the round, emits `Events.round_ended` once, then scoreboard / next round / results), `next_round()`,
+`rematch()`, `leave_versus(to_title = false)`. The countdown, round clock, sudden death and the gong are the referee's
+(world-B, `scripts/world/versus/referee.gd`).
 
 ### 3.11 `LevelBase` (`scripts/base/level_base.gd`) - what everybody may ask the running level
 
@@ -467,6 +540,17 @@ last toss, `Events.party_wiped`, the 1.0 life-and-respawn rule), `respawn_hero(h
 `handle_hero_death(hero) -> bool` answers `hero_death_finished` first; `party_driver` (null in single-player).
 `get_tagged(param, value) -> Array[SimEntity]` - the group registry of the spawn parameters `TAG_PARAMS`
 (`bond=<name>`: linked enemies and drums; `keeper=<name>`: the enemies a keeper door waits for); live, read-only.
+P1.6 (world-A): `get_party_frame() -> Rect2i` (the authentic 20 x 11-cell view of the tribe camera),
+`get_edge_walls() -> Vector2i` (the co-op edge walls, ZERO = none), `pull_party_into(rect, trigger_hero)` (a locked
+view takes the party), `team_wipe()`, `party_spread_point(base, place) -> Vector2i`; `Level` adds
+`get_tribe_camera()`, `get_rising_tide()`, `stop_rising()`. The Level registers world-A's `PartyDriver`
+(`scripts/world/party_driver.gd`) for `Game.mode == COOP` with 2+ heroes: `weapon_pass(hero)`,
+`handle_hero_death(hero)` (a toss that ends while a partner plays makes an egg, no life lost; the team wipe after the
+last toss is unchanged), `exit_touched(exit, hero)`, `is_at_exit(hero)`, `team_at_exit()`, `travel_party(user, from,
+to)`, `hatch_all(by)`, `bones_to_partner(hero, n)`, `relay_bounce_count(enemy, hero, count)`,
+`static relay_multiplier(count)`, `carrier_of` / `rider_of` / `partner_of`. `CurrentZone` (`zones/current`):
+`find_at(level, pos)`, `drift_at(level, pos)`; `RisingTide` (`scroll = rising`). Flow (P1.1) restarts a stage for a
+join or leave and then puts every hero at `get_respawn_pos_for(slot)` with `respawn_hero` and `snap_camera()`.
 
 ### 3.12 `PlayerBase` (`scripts/base/player_base.gd`)
 
@@ -510,6 +594,21 @@ phases: WEAPONS `hero_party.weapon_pass` before his box and throws meet enemies;
 `hero_mount.update`, `hero_belt.update`, after 8c `hero_climb.update`; 8i the components' `tick_timers`; POST
 `hero_party.post_step` after the hit timer; `hurt` asks `hero_mount`, `hero_climb`, `hero_party` after the immunity
 checks.
+P1.4 (player-A; every member keeps its 1.0 default for a single-player hero): Totem Ride and duo moves (C.10, called
+by world-A's PartyDriver): `totem_carrier`, `totem_rider`, `totem_drop_lock`, `totem_carry_yvel`, `is_riding_totem()`,
+`is_carrying_totem()`, `holds_up()`, `can_land_on_partner()`, `land_on_partner(partner)` -> `HEAD_NONE` / `HEAD_HOP` /
+`HEAD_RIDE` / `HEAD_HATCH`, `shoulder_hop(partner, depth)`, `start_totem_ride(carrier)`, `carry_totem() -> bool`,
+`end_totem_ride()`, `drop_from_totem()`, `throw_off_totem_rider()`. Brace: `brace_partner() -> PlayerBase`,
+`is_braced()`; heavy enemies implement `brace_stop(hero, partner) -> bool`, asked by `Player._contact_pass` before a
+croucher's hurt. x commit: `x_commit_allows(x)` (level bounds; Player adds the co-op edge walls). Movement limits (tar
+C.5, versus weight C.14): `walk_cap`, `air_cap`, `jump_impulse_ticks`, `jump_impulse_quarters`, world-B's
+`walk_cap_override` / `jump_scale_3_4` (setters onto them); `respawn_at` restores all. `death_origin`, `death_cause`
+(set by `kill`: the co-op egg appears where the toss started). Hook order: a versus hit-stop skips the hero's PLAYER
+phase before 8b (`HeroParty.hold_hit_stop`); the party component's update runs right after 8b. Not contract members:
+`Player` signal `emoted(kind)`, `apply_palette()`; `HeroParty` `Emote`, `show_emote(kind)`, `palette()`; `HeroPalette`
+(`scripts/player/hero_palette.gd`): `resolve(slot, run, biome, versus)`, `material_for(colour, pattern, use_cloth)`,
+`ui_colour(colour, role)`, `apply_image(...)`. Credit: `Defs.hitter_slot` of a hero flying as a batted ball (`curl ==
+CURL_BALL` with a `ball_batter`) is the batter's slot.
 
 ### 3.13 `EnemyBase`, `BossBase`
 
@@ -530,6 +629,15 @@ parameters: `coop_trait` (`coop=<trait>`, a `Defs.CoopTrait`), `bond` (`bond=<na
 `bond_mates()`; the groups are `LevelBase.get_tagged`. 2.0 `BossBase`: `poll_weapon_hit` tests every hero's club box
 in contact order (the hero who hit pogos) and sets `last_hitter` (the hero of the counted hit; also `last_hit_slot` /
 `last_hit_tick`); `_wakes_for(hero)` / `_wakes_for_any(target)`.
+P1.8 (enemies-A, additive): `EnemyBase.coop_traits() -> CoopTraits` (null without a trait); protected helpers
+`_hit_from_front(source)` and `_show_glance(source)` (the default `_on_hit_refused` shows the clank and the spark:
+`Sfx.CLUB_HIT_SCENERY` + `fx/hit_stars`). In a party (`hero_count() > 1`) `_choose_target` keeps the nearest hatched
+hero for `PartyTuning.TARGET_HOLD_TICKS` (GAMEPLAY.md 13.9.4); a `lone` record on Expert answers
+`CoopTraits.lone_target()`. `CoopTraits` (`scripts/enemies/coop_traits.gd`): `party_on()`, `window_ticks()`,
+`bond_members(level, name)`, `bond_done(level, name)`, `keepers_done(level, name)`, `lone_target()`, fields `kind`,
+`dazed`, `held`, `host`, `split`, `mate`, `sealed`; it plays `Sfx.DAZE` and `Sfx.BRACE`. Keeper and Guard halls are
+`PartyTuning.KEEPER_HALL_ROWS` = 4 rows (64 px: the Guard and Shellback art is 54 px tall). The world-5 rattler is
+`enemies/snapper skin=snake` (no new id); `enemies/shellback` = a Guard with the shell preset.
 
 ### 3.14 `ProjectileBase`
 
@@ -597,9 +705,17 @@ bits; action names; groups; z indices; CanvasLayer numbers; physics layer bits; 
   `BODY_KNOCK_XVEL` / `_YVEL`, `HOT_ROCK_FIRST_PICK_TICKS`, `HOT_ROCK_REPICK_TICKS`, `BALL_ROLL_LOSS`,
   `GIANT_BONK_DAZE_TICKS`, `ARENA_FILE_ROWS`) with the helpers `round_seed`, `stack_round_ticks`, `spill`, `stomp_steal`,
   `stack_walk_cap`, `bot_reaction_ticks`.
-- `PlayerRun` (3.5), `InputSlot` (3.7). `Sfx`: `EXPANSION_SFX`, `EXPANSION_MUSIC` (3.9).
+- `PlayerRun` (3.5), `InputSlot` (3.7). `Sfx`: `EXPANSION_SFX`, `EXPANSION_MUSIC` (3.9). `VersusMatch` (3.5).
+  P1.1: `Defs.CURL_BALL_STATE` (= `PlayerBase.CURL_BALL`, for `hitter_slot`: a batted ball credits its batter);
+  `PartyTuning.KEEPER_HALL_ROWS = 4` (64 px halls: the Guard and Shellback art is 54 px tall).
 - Owners' tables of PHYSICS.md C.16: `EnemyTuning` (enemies), `MountTuning` (player-B,
   `scripts/player/mount_tuning.gd`), `ObjTuning` (objects).
+- Bots (core-B, `scripts/core/bots/`, PLAN.md P1.2 / P2.5): `HeroBot` (an `InputSlot.BOT` producer: `new(slot, level,
+  match_seed, mode)`, `produce(tick)`, `reset_round(seed)`, `install()` / `uninstall()`; its own SimRng, never
+  Sim.rng; reaction by `Defs.BotLevel` 10 / 6 / 3 ticks), `BotNavigator`, `NavGraph` (format: the header of
+  `scripts/core/bots/nav_graph.gd`; files `res://resources/bots/<level_id>.json`), `NavBaker` + `NavSim` (every link
+  verified by simulating `scenes/player/player.tscn`), `GrubStackBrain`. Baker: `bash .tools/gd.sh script
+  res://tools/bots/bake_nav.gd -- [ids] [--check] [--verify]`. Flow creates one HeroBot per bot seat and match (3.10).
 
 ---
 

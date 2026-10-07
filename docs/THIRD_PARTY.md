@@ -43,11 +43,12 @@ Godot imports the TTFs as font resources; the font data is embedded unchanged, s
 
 | Pack | Author | Source | Used for | Changes |
 |---|---|---|---|---|
-| Superpowers Asset Packs - Prehistoric Platformer | Pixel-boy (Sparklin Labs) | https://github.com/sparklinlabs/superpowers-asset-packs/tree/master/prehistoric-platformer (commit e8674a03) | hero, enemies, bosses, NPCs, terrain, props, backgrounds, items, effects, HUD, bitmap fonts, logo, splash, app icons; 2.0: `sprites/player/hero_spear.png`, `hero_egg.png`, `palettes/*`, the co-op objects in `sprites/objects/`, `items/weapon_spear.png`, `fx/projectile_spear.png`, the new `ui/*.png`, `tiles/canyon/**` | re-cut, re-packed, mirrored, recoloured, composited, integer scaling |
-| Superpowers Asset Packs - RPG Battle System | Pixel-boy (Sparklin Labs) | https://github.com/sparklinlabs/superpowers-asset-packs/tree/master/rpg-battle-system (commit e8674a03) | 2.0: `sprites/enemies/{roller,guard,shellback,snake,cave_bat}*.png`, `sprites/bosses/tusker*.png`, `backgrounds/canyon/layer1_far_spires.png` | re-packed, recoloured, rotated / flipped frames, pixel edits |
-| Superpowers Asset Packs - Western FPS 2D | Pixel-boy (Sparklin Labs) | https://github.com/sparklinlabs/superpowers-asset-packs/tree/master/western-fps-2d (commit e8674a03) | 2.0: `backgrounds/canyon/layer0_sky.png`, `layer2_mesas.png`, `layer3_ridge.png`, most of `tiles/canyon/props/` | 2x, recoloured, composited |
+| Superpowers Asset Packs - Prehistoric Platformer | Pixel-boy (Sparklin Labs) | https://github.com/sparklinlabs/superpowers-asset-packs/tree/master/prehistoric-platformer (commit e8674a03) | hero, enemies, bosses, NPCs, terrain, props, backgrounds, items, effects, HUD, bitmap fonts, logo, splash, app icons; 2.0: `sprites/player/hero_spear.png`, `hero_egg.png`, `palettes/*`, the co-op, Book II and versus objects in `sprites/objects/`, `items/weapon_spear.png`, `items/painting.png`, `items/golden_drumstick.png`, `fx/projectile_spear.png`, the new `ui/*.png` (incl. `ui/arena/frame_jungle.png`), `tiles/common/{tar,honey,syrup}.png` and `tiles/common/*_floor.png`, `tiles/canyon/**`, most of `tiles/swamp/**`, `tiles/ruins/terrain_carved.png` | re-cut, re-packed, mirrored, recoloured, composited, integer scaling |
+| Superpowers Asset Packs - RPG Battle System | Pixel-boy (Sparklin Labs) | https://github.com/sparklinlabs/superpowers-asset-packs/tree/master/rpg-battle-system (commit e8674a03) | 2.0: `sprites/enemies/{roller,guard,shellback,snake,cave_bat,slime,puffcap}*.png`, `sprites/bosses/tusker*.png`, `backgrounds/canyon/layer1_far_spires.png`, the fen sky of `backgrounds/swamp/`, `tiles/canyon/props/shell_*.png`; one gem in `ui/stack_food.png` (and the crown's gem colour) | re-packed, recoloured, rotated / flipped frames, pixel edits |
+| Superpowers Asset Packs - Western FPS 2D | Pixel-boy (Sparklin Labs) | https://github.com/sparklinlabs/superpowers-asset-packs/tree/master/western-fps-2d (commit e8674a03) | 2.0: `backgrounds/canyon/layer0_sky.png`, `layer2_mesas.png`, `layer3_ridge.png`, most of `tiles/canyon/props/`, `sprites/enemies/bear*.png` | 2x, recoloured, composited |
+| Ninja Adventure - Asset Pack | Pixel-boy and AAA | https://pixel-boy.itch.io/ninja-adventure-asset-pack | 2.0: `sprites/bosses/mangrove.png`, `mangrove_parts.png`, `sprites/enemies/{larva,larva_b,leech}.png`, fen props in `tiles/swamp/props/`, `tiles/canyon/props/driftwood_log.png`, `ui/emotes.png` | 2x, outline recoloured or added, gradient maps, 90 degree turns |
 | Explosion Animations Pack | ansimuz (Luis Zuno) | https://ansimuz.itch.io/explosion-animations-pack | `sprites/fx/explosion.png`, `explosion_big.png` | none |
-| SunnyLand | ansimuz (Luis Zuno) | https://ansimuz.itch.io/sunny-land-pixel-game-art; 2.0: the OpenGameArt release https://opengameart.org/content/sunny-land-2d-pixel-art-pack | `sprites/fx/hit_stars.png`; 2.0: `sprites/enemies/eagle.png` | none; eagle recoloured, outline added, 2x, mirrored |
+| SunnyLand | ansimuz (Luis Zuno) | https://ansimuz.itch.io/sunny-land-pixel-game-art; 2.0: the OpenGameArt release https://opengameart.org/content/sunny-land-2d-pixel-art-pack | `sprites/fx/hit_stars.png`; 2.0: `sprites/enemies/eagle.png`, `frog.png` | none; eagle / frog recoloured, outline added, 2x, mirrored |
 | Free Pixel foods | ghostpixxells | https://ghostpixxells.itch.io/pixelfood | `sprites/items/giant_bonus.png` | 2x, outline added |
 | 16x16 Food | ARoachIFoundOnMyPillow | https://opengameart.org/content/16x16-food | `sprites/items/food.png` 0-39, two pick-ups | 2x, re-packed |
 | 16x16 RPG Items (DB32) | ARoachIFoundOnMyPillow | https://opengameart.org/content/16x16-rpg-items-db32 | `sprites/items/treasure.png`, three pick-ups | 2x, re-packed |
@@ -70,7 +71,24 @@ Godot imports the TTFs as font resources; the font data is embedded unchanged, s
 | Ice breaking/shattering | IgnasD | https://opengameart.org/content/ice-breakingshattering | 1 sfx |
 | Icy Heights (wind.ogg) | Écrivain | https://opengameart.org/content/icy-heights | 1 loop |
 | 40 CC0 water / splash / slime SFX | rubberduck | https://opengameart.org/content/40-cc0-water-splash-slime-sfx | 1 loop |
-| 80 CC0 creature SFX | rubberduck | https://opengameart.org/content/80-cc0-creature-sfx | 1 sfx |
+| 80 CC0 creature SFX | rubberduck | https://opengameart.org/content/80-cc0-creature-sfx | 1 sfx; 2.0: part of `chomper_bite_a.wav` |
+| Desert Theme - 8bit Chiptune Theme (2.0) | Wolfgang_ (Ted Kerr) | https://opengameart.org/content/desert-theme-8bit-chiptune-theme | `music/level_canyon_a.ogg` |
+| Music Loop Bundle: Free Chiptune Loops, album 'Three Red Hearts' (2.0) | Abstraction (Benjamin Burnes, Tallbeard Studios) | https://tallbeard.itch.io/music-loop-bundle | `music/coop_menu_a.ogg` |
+| The War Over A Melon Field - Themes and Jingles (2.0) | Spring Spring (Julie Damsgaard) | https://opengameart.org/content/the-war-over-a-melon-field-themes-and-jingles | `music/versus_lobby_a.ogg`, `versus_results_a.ogg` |
+| Victory (2A03 fanfare) (2.0) | celestialghost8 | https://opengameart.org/content/victory | `music/match_win_a.ogg` |
+| Various Sound Effects (2.0) | Spring Spring | https://opengameart.org/content/various-sound-effects-0 | `sfx/{spear_stick,brace,tar_glug,seesaw}_a.wav` |
+| 8-Bit Sound Effects (2.0) | ctske (Ctskelgysth Inauaruat) | https://opengameart.org/content/8-bit-sound-effects-0 | `sfx/party_join_a.wav` |
+| Interface Sounds (2.0) | Kenney (Kenney Vleugels) | https://kenney.nl/assets/interface-sounds | `sfx/plate_a.ogg` |
+| RPG Audio (2.0) | Kenney (Kenney Vleugels) | https://kenney.nl/assets/rpg-audio | `sfx/boulder_push_a.ogg`, `pulley_a.ogg` |
+| 200 Free SFX (2.0) | Kronbits | https://kronbits.itch.io/freesfx | `sfx/crate_drop_a.wav` |
+| Race Start Countdown (2.0) | kheetor | https://opengameart.org/content/race-start-countdown | `sfx/countdown_beep_a.wav` |
+| Applause in a large hall or church (2.0) | eXpl0it3r | https://opengameart.org/content/applause-in-a-large-hall-or-church | `sfx/crowd_applause_a.ogg` |
+| Well Done (2.0) | qubodup | https://opengameart.org/content/well-done | `sfx/crowd_cheer_a.ogg` |
+| Swishes Sound Pack (2.0) | artisticdude | https://opengameart.org/content/swishes-sound-pack | `sfx/bat_hit_{a,b,c}.wav` |
+| Bubble Sound Effects (2.0) | BMacZero | https://opengameart.org/content/bubble-sound-effects | `sfx/geyser_bubble_a.wav` |
+| Skippy Fish Water Sound Collection (2.0) | jcpmcdonald | https://opengameart.org/content/skippy-fish-water-sound-collection | `sfx/raft_splash_{a,b}.wav` |
+
+2.0 audio from the 1.0 packs (Juhani Junkala's 512 effects and 12 Music Loops, MoxieCat, Baŝto, MintoDog, Superpowers, rubberduck) and every new 2.0 audio file: `docs/ASSET_MANIFEST.md` 17.7 (source and edits per file) and 17.12 (cues, loudness).
 
 ### 2.5 Development tools (not distributed)
 
@@ -159,6 +177,13 @@ the asset staging area `.tools/asset_candidates` are ignored too and never pushe
 - **Staged, not used so far**: the Emcee Flesher desert layers, Ninja Adventure, the CC0 award icons; the scout's
   baked hero recolours in `hero_colours/` (replaced by palette LUTs).
 - No CC-BY, share-alike, non-commercial, AI-generated or ripped material; nothing from Prehistorik / Titus.
+
+### 4.2 Expansion 2.0 additions (2026-10-07, phase 1, art-A)
+
+- **Inventory.** 2.0 files under `assets/` now come from three owners: art-A (built by `docs/art/expansion/pipeline/build_expansion.py`), art-B (rows through `_handover/*registry*.json`) and the audio owner (rows through `_handover/audio/*.json`, checked by sha256 against the files). Every one has its row in `docs/ASSET_MANIFEST.md` section 17 and in `registry_expansion.json`; the build prints any untracked file under `assets/` without a row.
+- **New art source: Ninja Adventure** (Pixel-boy and AAA, CC0 1.0; itch.io page and the author's own `LICENSE.txt` saved in `_handover/licenses/pixelboy_ninja_adventure/`): world 6 boss, grubs, Leech, fen props, at integer 2x as DESIGN F.1 requires. Licence text: `assets/licenses/pixelboy_ninja_adventure.txt`.
+- **New audio sources (15 packs, all CC0 1.0)**: licence texts `assets/licenses/<pack>.txt` written from the `LICENSE_INFO.md` evidence recorded at download (2026-10-04 / 2026-10-06), with the author's own `License.txt` where one was shipped (Kenney). Two flags reviewed: qubodup's "Well Done" files are still named `...CCBY3`, but the source page states "Changed to CC0 on 2024-10-05" and lists CC0 only (quoted in the licence file); kheetor's "Race Start Countdown" is offered under nine licences including CC0, and CC0 is the one used. The staged `wolfgang_8bit-themes-ccby` folder (CC-BY) is not used.
+- Still no CC-BY, share-alike, non-commercial, AI-generated or ripped material; nothing from Prehistorik / Titus.
 
 ## 5. Maintenance rules
 

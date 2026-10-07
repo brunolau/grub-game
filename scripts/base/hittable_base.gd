@@ -129,6 +129,25 @@ func open() -> void:
 	_on_opened()
 
 
+## 2.0 versus (world-B's referee, Grub Stack's spot refills, DESIGN.md E.3): put a used-up hittable back to its
+## level-file state while the round runs - its hits (items) of the level file, not opened, no cool-down, its unopened
+## look ([method _on_refilled]). It counts nothing again for the completion percentage. Never called outside versus.
+## Subclasses whose opening cannot be undone in place (a broken block left an air cell) override it to do nothing.
+func refill() -> void:
+	_doze_wake_now()
+	hits_left = hits_total
+	opened = false
+	opened_by_flood = false
+	cooldown = 0
+	_on_refilled()
+	_doze_note()
+
+
+## Restore the unopened look after [method refill]. Override.
+func _on_refilled() -> void:
+	pass
+
+
 ## Where the star puff of a hit appears: the centre of the cell (logical px). Override for free-standing things.
 func get_hit_point() -> Vector2i:
 	return Vector2i(cell.x * Tuning.TILE + Tuning.TILE / 2, cell.y * Tuning.TILE + Tuning.TILE / 2)

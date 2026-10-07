@@ -11,7 +11,12 @@ extends Node
 ##                                    failed check and ends the run)
 ##   press <action> [frames]          press an input action (ui_accept, ui_down, pause, ...) and release it after
 ##                                    `frames` frames (default 2), as a keyboard or pad would
-##   key <name> [<name> ...]          press and release keys by name (`key B R U T`, `key Enter`), for typing
+##   key <name> [<name> ...]          press and release keys by name (`key B R U T`, `key Enter`), for typing; a
+##                                    name with a space is written with `_` (`key Kp_0`, Num 0)
+##   hold <name> [<name> ...]         press keys by physical position and keep them down (`hold D Space` for P1,
+##                                    `hold Kp_4 Kp_0` for P2 of the classic layout); with `input device` the heroes
+##                                    read them, one tick per frame with --fast
+##   release <name> [<name> ...]|all  let held keys go (`release all`: every key a `hold` pressed)
 ##   pad <button> [frames]            press and release a gamepad control as a real pad reports it (device 0, no
 ##                                    action event): a button index or name (a, b, x, y, back, start, up, down, left,
 ##                                    right, lb, rb) or a stick direction (lx-, lx+, ly-, ly+); `frames` held
@@ -129,10 +134,145 @@ var _playing: bool = false
 var _stepping_level: int = 0
 ## True after `input device`: the hero reads the real devices and the clock runs without a `play`.
 var _device_input: bool = false
+## Keys a `hold` pressed and no `release` let go yet.
+var _held_keys: Array[Key] = []
 
 
 func _init() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+
+
+## The commands of a flow script and how many arguments each takes ([min, max]; -1 = any number).
+const COMMAND_ARGS: Dictionary = {
+	"wait": [1, 1], "wait_until": [1, -1], "press": [1, 2], "key": [1, -1], "hold": [1, -1], "release": [1, -1],
+	"pad": [1, 2], "play": [1, -1],
+	"play_file": [1, 1], "input": [1, 2], "weapon": [1, 2], "shot": [1, -1], "every": [1, 2], "expect": [1, -1],
+	"log": [1, -1], "reset_events": [0, 0], "start_level": [1, 3], "window": [2, 2], "focus": [1, 1],
+	"quit": [0, 0],
+}
+## Pad control names of `pad` (besides button numbers).
+const PAD_NAMES: PackedStringArray = [
+	"a", "b", "x", "y", "back", "start", "up", "down", "left", "right", "lb", "rb", "lx-", "lx+", "ly-", "ly+",
+]
+
+
+## Check a flow script without running it (tests/test_integration_flows.gd): every command known with the right
+## number of arguments, actions, keys, pad controls, weapons, player numbers and expression roots valid, `play`
+## inputs readable. Returns {"errors": PackedStringArray (a broken script), "missing": PackedStringArray (a
+## `play_file` route or a `start_level` level that does not exist yet - the open stops of a skeleton flow)}, each
+## line "line <n>: <what>".
+static func lint(script_text: String) -> Dictionary:
+	var errors: PackedStringArray = PackedStringArray()
+	var missing: PackedStringArray = PackedStringArray()
+	var number: int = 0
+	for raw: String in script_text.split("\n"):
+		number += 1
+		var line: String = raw.strip_edges()
+		if line.is_empty() or line.begins_with("#"):
+			continue
+		var command: PackedStringArray = line.split(" ", false)
+		var op: String = command[0]
+		var at: String = "line %d: " % number
+		if not COMMAND_ARGS.has(op):
+			errors.append(at + "unknown command '%s'" % op)
+			continue
+		var bounds: Array = COMMAND_ARGS[op]
+		var count: int = command.size() - 1
+		if count < int(bounds[0]) or (int(bounds[1]) >= 0 and count > int(bounds[1])):
+			errors.append(at + "'%s' takes %d..%s argument(s), not %d" % [op, bounds[0],
+					"any" if int(bounds[1]) < 0 else str(bounds[1]), count])
+			continue
+		match op:
+			"wait", "every", "window":
+				for argument: String in command.slice(1, 3 if op == "window" else 2):
+					if not argument.is_valid_int():
+						errors.append(at + "'%s' needs a number, not '%s'" % [op, argument])
+			"press":
+				if not InputMap.has_action(StringName(command[1])):
+					errors.append(at + "unknown action '%s'" % command[1])
+			"key", "hold", "release":
+				for key_name: String in command.slice(1):
+					if key_code(key_name) == KEY_NONE and not (op == "release" and key_name == "all"):
+						errors.append(at + "unknown key '%s'" % key_name)
+			"pad":
+				if not PAD_NAMES.has(command[1].to_lower()) and not command[1].is_valid_int():
+					errors.append(at + "unknown pad control '%s'" % command[1])
+			"input":
+				if command[1] != "device" and command[1] != "script":
+					errors.append(at + "'input' needs 'device' or 'script'")
+				if count == 2 and not _is_player(command[2]):
+					errors.append(at + "'%s' is not a player number" % command[2])
+			"weapon":
+				var known: bool = false
+				for weapon: int in Defs.Weapon.values():
+					known = known or Defs.weapon_name(weapon) == command[1]
+				if not known:
+					errors.append(at + "unknown weapon '%s'" % command[1])
+				if count == 2 and not _is_player(command[2]):
+					errors.append(at + "'%s' is not a player number" % command[2])
+			"play":
+				_lint_inputs(" ".join(command.slice(1)).replace(" ", ","), at, errors)
+			"play_file":
+				var path: String = command[1] if command[1].begins_with("res://") else "res://" + command[1]
+				if not FileAccess.file_exists(path):
+					missing.append(at + "route %s" % command[1])
+				else:
+					_lint_inputs(FileAccess.get_file_as_string(path), at, errors)
+			"expect", "wait_until", "log":
+				var parts: PackedStringArray = command.slice(1)
+				if op == "wait_until" and (parts.size() == 4 or parts.size() == 2) and parts[parts.size() - 1].is_valid_int():
+					parts = parts.slice(0, parts.size() - 1)
+				var paths: PackedStringArray = parts if op == "log" else PackedStringArray([parts[0]])
+				if op != "log" and parts.size() != 1 and (parts.size() != 3 or not OPERATORS.has(parts[1])):
+					errors.append(at + "'%s' needs '<path> <op> <value>' or '<path>'" % " ".join(parts))
+				for path: String in paths:
+					var root: String = path.get_slice(".", 0).get_slice(":", 0).get_slice("(", 0)
+					if not ROOTS.has(root):
+						errors.append(at + "unknown root '%s' (%s)" % [root, ", ".join(ROOTS)])
+			"start_level":
+				if not Levels.has_level(StringName(command[1])):
+					missing.append(at + "level %s" % command[1])
+				for argument: String in command.slice(2):
+					var players: String = argument.trim_prefix("players=")
+					if argument != "expert" and not (argument.begins_with("players=") and _is_player(players)):
+						errors.append(at + "'%s' is not 'expert' or 'players=<n>'" % argument)
+			"focus":
+				if command[1] != "out" and command[1] != "in":
+					errors.append(at + "'focus' needs 'out' or 'in'")
+	return {"errors": errors, "missing": missing}
+
+
+## The key of a key name (OS.find_keycode_from_string; `_` stands for a space: `Kp_0` is "Kp 0"); KEY_NONE when
+## unknown.
+static func key_code(key_name: String) -> Key:
+	var code: Key = OS.find_keycode_from_string(key_name)
+	if code == KEY_NONE and key_name.contains("_"):
+		code = OS.find_keycode_from_string(key_name.replace("_", " "))
+	return code
+
+
+static func _is_player(text: String) -> bool:
+	return text.is_valid_int() and text.to_int() >= 1 and text.to_int() <= Defs.MAX_PLAYERS
+
+
+# Input entries of a `play` / `play_file`: every entry `ticks:KEYS[|KEYS...]` with known key letters.
+static func _lint_inputs(text: String, at: String, errors: PackedStringArray) -> void:
+	for line: String in text.split("\n"):
+		if line.strip_edges().begins_with("#"):
+			continue
+		for entry: String in line.split(",", false):
+			var item: String = entry.strip_edges()
+			if item.is_empty():
+				continue
+			var colon: int = item.find(":")
+			var count: String = (item if colon < 0 else item.substr(0, colon)).strip_edges()
+			var keys: String = "" if colon < 0 else item.substr(colon + 1).replace("|", "").replace(" ", "").to_upper()
+			var bad: bool = not count.is_valid_int()
+			for letter: String in keys:
+				bad = bad or not "LRUDFKS".contains(letter)
+			if bad:
+				errors.append(at + "bad input entry '%s'" % item)
+				return
 
 
 ## Parse `script_text` and run it once the boot scene is up. `out_dir` is an absolute folder for screenshots.
@@ -206,6 +346,12 @@ func _execute(command: PackedStringArray) -> bool:
 		"key":
 			for i: int in range(1, command.size()):
 				await _key(command[i])
+		"hold", "release":
+			for i: int in range(1, command.size()):
+				if not _hold(command[i], op == "hold"):
+					return false
+			Input.flush_buffered_events()
+			await get_tree().process_frame
 		"pad":
 			if not await _pad(_arg(command, 1), maxi(_int_arg(command, 2, DEFAULT_PRESS_FRAMES), 1)):
 				return false
@@ -347,8 +493,36 @@ func _resize_window(size: Vector2i) -> void:
 			str(get_viewport().get_visible_rect().size)])
 
 
+## Press (`down`) or release one key by physical position for `hold` / `release` (`release all` lets every held key
+## go); false for an unknown name.
+func _hold(key_name: String, down: bool) -> bool:
+	if not down and key_name == "all":
+		for code: Key in _held_keys.duplicate():
+			_hold_event(code, false)
+		return true
+	var code: Key = key_code(key_name)
+	if code == KEY_NONE:
+		push_error("Autoplay flow: unknown key '%s'" % key_name)
+		return false
+	if down != _held_keys.has(code):
+		_hold_event(code, down)
+	return true
+
+
+func _hold_event(code: Key, down: bool) -> void:
+	var event: InputEventKey = InputEventKey.new()
+	event.keycode = code
+	event.physical_keycode = code
+	event.pressed = down
+	Input.parse_input_event(event)
+	if down:
+		_held_keys.append(code)
+	else:
+		_held_keys.erase(code)
+
+
 func _key(key_name: String) -> void:
-	var code: Key = OS.find_keycode_from_string(key_name)
+	var code: Key = key_code(key_name)
 	if code == KEY_NONE:
 		push_error("Autoplay flow: unknown key '%s'" % key_name)
 		return
@@ -744,6 +918,7 @@ func _finish(exit_code: int) -> void:
 	if _finished:
 		return
 	_finished = true
+	_hold("all", false)
 	GameInput.clear_scripted()
 	var file: FileAccess = FileAccess.open(_out_dir + "/trace.json", FileAccess.WRITE)
 	if file != null:

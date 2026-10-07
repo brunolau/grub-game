@@ -73,6 +73,49 @@ const SETS: Dictionary = {
 			{"file": "volcano/shaft_layer2_ceiling_near", "scroll": 0.6, "anchor": Anchor.TOP},
 		],
 	},
+	# 2.0 (world 5, Sunbaked Canyon; ASSET_MANIFEST 17.6): blue sky turning cream at the horizon, rose spires and
+	# mesas, a dark red-brown ridge in front.
+	"canyon": {
+		"fill": Color("fff1d6"),
+		"layers": [
+			{"file": "canyon/layer0_sky", "scroll": 0.0, "anchor": Anchor.SKY},
+			{"file": "canyon/layer1_far_spires", "scroll": 0.1, "anchor": Anchor.BOTTOM},
+			{"file": "canyon/layer2_mesas", "scroll": 0.25, "anchor": Anchor.BOTTOM},
+			{"file": "canyon/layer3_ridge", "scroll": 0.5, "anchor": Anchor.BOTTOM},
+		],
+	},
+	# 2.0 (world 6, Tar Fen; art-B's hand-over): the open fen, Spore Hollow's cave of caps, the hollow mangrove.
+	"swamp": {
+		"fill": Color("41605a"),
+		"layers": [
+			{"file": "swamp/layer0_sky", "scroll": 0.0, "anchor": Anchor.SKY},
+			{"file": "swamp/layer1_far_isles", "scroll": 0.1, "anchor": Anchor.BOTTOM},
+			{"file": "swamp/layer2_banks", "scroll": 0.25, "anchor": Anchor.BOTTOM},
+			{"file": "swamp/layer3_reeds", "scroll": 0.5, "anchor": Anchor.BOTTOM},
+		],
+	},
+	"mushroom": {
+		"fill": Color("1c1028"),
+		"layers": [
+			{"file": "swamp/mushroom_layer0_wall", "scroll": 0.1, "anchor": Anchor.TILE},
+			{
+				"file": "swamp/mushroom_layer1_rocks_far", "scroll": 0.3, "anchor": Anchor.SPLIT,
+				"split_top": 113, "split_bottom": 267,
+			},
+			{"file": "swamp/mushroom_layer2_ceiling_near", "scroll": 0.6, "anchor": Anchor.TOP},
+		],
+	},
+	"mangrove": {
+		"fill": Color("1e1610"),
+		"layers": [
+			{"file": "swamp/trunk_layer0_wall", "scroll": 0.1, "anchor": Anchor.TILE},
+			{
+				"file": "swamp/trunk_layer1_roots_far", "scroll": 0.3, "anchor": Anchor.SPLIT,
+				"split_top": 113, "split_bottom": 267,
+			},
+			{"file": "swamp/trunk_layer2_ceiling_near", "scroll": 0.6, "anchor": Anchor.TOP},
+		],
+	},
 	"feast": {
 		"fill": Color("feb0d1"),
 		"layers": [

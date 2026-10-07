@@ -1,0 +1,13 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/projectiles/hero_spear.gd" id="1_spear"]
+[ext_resource type="Texture2D" uid="uid://d18gmfyqyl8" path="res://assets/sprites/fx/projectile_spear.png" id="2_spear"]
+
+[node name="HeroSpear" type="Node2D"]
+script = ExtResource("1_spear")
+
+[node name="Sprite" type="Sprite2D" parent="."]
+texture = ExtResource("2_spear")
+centered = false
+offset = Vector2(-36, -34)
+hframes = 7

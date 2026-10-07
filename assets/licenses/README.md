@@ -53,6 +53,22 @@ Both files are generated from the engine's own data (`Engine.get_license_text()`
 | `misc_cc0_level_themes.txt` | Icy Heights (only `wind.ogg` is used) | Écrivain | CC0 1.0 |
 | `rubberduck_40_cc0_water_splash_slime_sfx.txt` | 40 CC0 water / splash / slime SFX | rubberduck | CC0 1.0 |
 | `rubberduck_80_cc0_creature_sfx.txt` | 80 CC0 creature SFX | rubberduck | CC0 1.0 |
+| `pixelboy_ninja_adventure.txt` | Ninja Adventure - Asset Pack (2.0) | Pixel-boy and AAA | CC0 1.0 |
+| `wolfgang_8bit_themes.txt` | Desert Theme - 8bit Chiptune Theme (2.0) | Wolfgang_ (Ted Kerr) | CC0 1.0 |
+| `tallbeard_abstraction_chiptune_loops.txt` | Music Loop Bundle: Free Chiptune Loops, album 'Three Red Hearts' (2.0) | Abstraction (Benjamin Burnes, Tallbeard Studios) | CC0 1.0 |
+| `spring_spring_chiptunes.txt` | The War Over A Melon Field - Themes and Jingles (2.0) | Spring Spring (Julie Damsgaard) | CC0 1.0 |
+| `celestialghost8_victory.txt` | Victory (2A03 fanfare) (2.0) | celestialghost8 | CC0 1.0 |
+| `spring_spring_various_sfx.txt` | Various Sound Effects (2.0) | Spring Spring | CC0 1.0 |
+| `ctske_8bit_sound_effects.txt` | 8-Bit Sound Effects (2.0) | ctske (Ctskelgysth Inauaruat) | CC0 1.0 |
+| `kenney_interface_sounds.txt` | Interface Sounds (2.0) | Kenney (Kenney Vleugels) | CC0 1.0 |
+| `kenney_rpg_audio.txt` | RPG Audio (2.0) | Kenney (Kenney Vleugels) | CC0 1.0 |
+| `kronbits_200_free_sfx.txt` | 200 Free SFX (2.0) | Kronbits | CC0 1.0 |
+| `kheetor_race_start_countdown.txt` | Race Start Countdown (2.0) | kheetor | CC0 1.0 |
+| `expl0it3r_applause_hall.txt` | Applause in a large hall or church (2.0) | eXpl0it3r | CC0 1.0 |
+| `qubodup_well_done.txt` | Well Done (2.0) | qubodup | CC0 1.0 |
+| `artisticdude_swishes.txt` | Swishes Sound Pack (2.0) | artisticdude | CC0 1.0 |
+| `bmaczero_bubble_sfx.txt` | Bubble Sound Effects (2.0) | BMacZero | CC0 1.0 |
+| `jcpmcdonald_skippy_fish_water.txt` | Skippy Fish Water Sound Collection (2.0) | jcpmcdonald | CC0 1.0 |
 
 Tier A = CC0 / public domain (no obligation). Tier B = copyright notice and licence text must ship with the game
 (the two SIL OFL fonts; the engine notices above are of the same kind). No tier C (custom, unclear, non-commercial,
@@ -62,7 +78,8 @@ share-alike or attribution-required art / audio licence) asset is used.
 enprogames); neither ships in the game.
 
 The files marked 2.0 are written by `docs/art/expansion/pipeline/build_expansion.py` in the same format, with the
-licence wording captured on 2026-10-06 (expansion staging).
+licence wording captured on 2026-10-04 / 2026-10-06 (staging); the 2.0 audio packs come with the audio owner's
+hand-over (`.tools/asset_candidates/expansion/_handover/audio/`).
 
 Keep this folder in every export. The pipeline scripts `docs/art/pipeline/build_licenses.py` and `build_manifest.py`
 rewrite the pack files, this README and `CREDITS.md` from the staging area: carry the engine files and the edits of

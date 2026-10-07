@@ -485,5 +485,5 @@ func test_sfx_names_are_unique_and_every_2_0_name_is_listed() -> void:
 		assert_true(effects.has(event), "the 1.0 effect %s is still a Sfx name" % event)
 	for context: StringName in AudioTable.MUSIC:
 		assert_true(music.has(context), "the 1.0 context %s is still a Sfx name" % context)
-	assert_eq(Sfx.EXPANSION_SFX.size(), 32)
+	assert_eq(Sfx.EXPANSION_SFX.size(), 33, "the 32 effects of DESIGN.md F.2 and the versus clang (E.2)")
 	assert_eq(Sfx.EXPANSION_MUSIC.size(), 30)

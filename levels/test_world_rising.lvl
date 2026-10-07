@@ -1,0 +1,60 @@
+# The rising tide (PHYSICS.md C.8, `scroll = rising`): a canyon shaft with ledges every four rows; the tar band
+# waits for the first input, then rises 1 px per tick; a checkpoint half way resets it 6 rows under itself; the
+# autoscroll_stop zone at the top ends the rise. Developer level of world-A (PLAN.md P1.6).
+
+[meta]
+format = 2
+id = test_world_rising
+name = "World Test: Rising Tide"
+kind = test
+book = 2
+biome = canyon
+terrain_a = canyon/terrain
+terrain_b = canyon/terrain_mesa
+liquid = tar
+background = canyon
+music = level_jungle
+scroll = rising
+rise_speed = 16
+rise_speed.expert = 24
+
+[legend]
+C = objects/checkpoint
+E = objects/exit
+
+[tiles]
+%%%%%%%%%%%%%%%%%%%%
+%..................%
+%...............E..%
+%.....-------###%%%%
+%..................%
+%..................%
+%..................%
+%######----........%
+%..................%
+%..................%
+%..................%
+%........----#######
+%..................%
+%..................%
+%........C.........%
+%######-----.......%
+%..................%
+%..................%
+%..................%
+%.........-----#####
+%..................%
+%..................%
+%..................%
+%####-----.........%
+%..................%
+%..................%
+%..................%
+%.........-----#####
+%..................%
+%..................%
+%.@................%
+%%%%%%%%%%%%%%%%%%%%
+
+[entities]
+zones/autoscroll_stop 5 2 rect=1,1,18,2

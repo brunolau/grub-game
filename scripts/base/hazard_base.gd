@@ -38,7 +38,8 @@ func _sim_tick(phase: int) -> void:
 		for hero: PlayerBase in level.contact_order():
 			if not armed:
 				return
-			if not hero.dead and Overlap.body(self, hero, hero):
+			# An egg (2.0, PlayerBase.down; never in single-player) touches no hazard.
+			if not hero.dead and not hero.down and Overlap.body(self, hero, hero):
 				touch(hero)
 
 

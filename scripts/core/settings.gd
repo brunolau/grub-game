@@ -81,6 +81,7 @@ const DEFAULTS: Dictionary = {
 	"game/locale": "",              # "" = system locale
 	"game/last_difficulty": 0,      # Defs.Difficulty
 	"controls/party_keyboard": "classic", # 2.0: "classic" | "two_hands" | "one_hand" (DESIGN.md D.11, InputSlot)
+	"versus/last_rules": {},        # 2.0: the rules of the last versus match (VersusMatch.rules_to_dict, DESIGN.md E.8)
 }
 
 ## Directory of the settings file. Tests point it at `res://build/...` so they never touch real user data.

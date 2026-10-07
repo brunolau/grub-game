@@ -171,7 +171,12 @@ static func from_dict(data: Dictionary) -> NavGraph:
 	graph.rows = int(data.get("rows", 0))
 	graph.wrap = str(data.get("wrap", "none"))
 	graph.weight = int(data.get("weight", 0))
-	graph.baker = data.get("baker", {}) if data.get("baker", {}) is Dictionary else {}
+	var stats: Variant = data.get("baker", {})
+	if stats is Dictionary:
+		for key: Variant in stats:
+			var value: Variant = (stats as Dictionary)[key]
+			# JSON numbers are floats: the statistics are counts.
+			graph.baker[str(key)] = int(value) if value is float else value
 	for item: Variant in data.get("nodes", []):
 		var entry: Dictionary = item
 		var node: NavNode = NavNode.new()
@@ -262,6 +267,8 @@ func add_link(link: NavLink) -> NavLink:
 	link.id = links.size()
 	link.flags = expand_keys(link.keys)
 	links.append(link)
+	if link.from >= 0 and link.from < _out.size():
+		_out[link.from].append(link.id)
 	return link
 
 
@@ -347,6 +354,69 @@ func find_path(from_node: int, from_x: int, to_node: int, to_x: int, blocked: Di
 ## Estimated ticks from (from_node, from_x) to (to_node, to_x); UNREACHABLE when there is no route.
 func path_cost(from_node: int, from_x: int, to_node: int, to_x: int, blocked: Dictionary = {}) -> int:
 	return int(_search(from_node, from_x, to_node, to_x, blocked)["cost"])
+
+
+## One search from (from_node, from_x) to every node: {"cost": PackedInt32Array, "x": PackedInt32Array} per node id -
+## the cheapest ticks to stand on it and the x he arrives at (UNREACHABLE / 0 when it cannot be reached). For
+## comparing many goals at once ([method reach_cost]).
+func reach_from(from_node: int, from_x: int, blocked: Dictionary = {}) -> Dictionary:
+	var cost: PackedInt32Array = PackedInt32Array()
+	cost.resize(nodes.size())
+	cost.fill(UNREACHABLE)
+	var at: PackedInt32Array = PackedInt32Array()
+	at.resize(nodes.size())
+	at.fill(0)
+	var result: Dictionary = {"cost": cost, "x": at}
+	if from_node < 0 or from_node >= nodes.size():
+		return result
+	cost[from_node] = 0
+	at[from_node] = from_x
+	var count: int = links.size()
+	var dist: PackedInt32Array = PackedInt32Array()
+	dist.resize(count)
+	dist.fill(UNREACHABLE)
+	var done: PackedByteArray = PackedByteArray()
+	done.resize(count)
+	done.fill(0)
+	for id: int in links_from(from_node):
+		if not blocked.has(id):
+			dist[id] = link_cost_from(links[id], from_x)
+	while true:
+		var current: int = -1
+		var current_cost: int = UNREACHABLE
+		for id: int in count:
+			if done[id] == 0 and dist[id] < current_cost:
+				current_cost = dist[id]
+				current = id
+		if current < 0:
+			break
+		done[current] = 1
+		var link: NavLink = links[current]
+		var land_x: int = link.land_center()
+		if current_cost < cost[link.to]:
+			cost[link.to] = current_cost
+			at[link.to] = land_x
+		for next: int in links_from(link.to):
+			if done[next] == 1 or blocked.has(next):
+				continue
+			var next_cost: int = current_cost + link_cost_from(links[next], land_x)
+			if next_cost < dist[next]:
+				dist[next] = next_cost
+	return result
+
+
+## Ticks to reach the feet point `pos` from the search of [method reach_from] (UNREACHABLE when its node is).
+func reach_cost(reach: Dictionary, pos: Vector2i) -> int:
+	var node: int = node_at(pos)
+	if node < 0:
+		node = node_below(pos)
+	if node < 0:
+		return UNREACHABLE
+	var cost: PackedInt32Array = reach["cost"]
+	if cost[node] >= UNREACHABLE:
+		return UNREACHABLE
+	var at: PackedInt32Array = reach["x"]
+	return cost[node] + walk_ticks(pos.x - at[node])
 
 
 # Edge-based Dijkstra: dist[link] = cheapest ticks until that link has landed (at its land centre).

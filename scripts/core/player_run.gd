@@ -289,7 +289,7 @@ func reset_run() -> void:
 	reset_stats()
 
 
-## Zero the statistics (a new run or a new versus match).
+## Zero the statistics (a new run, a new co-op stage, a new versus match): every counter of [constant STATS].
 func reset_stats() -> void:
 	score = 0
 	kills = 0
@@ -297,3 +297,84 @@ func reset_stats() -> void:
 	revives = 0
 	picked = 0
 	stocks = 0
+	food = 0
+	best_chain = 0
+	hurts = 0
+	bats = 0
+	plates = 0
+	pushes = 0
+	hits = 0
+	stolen = 0
+	dropped = 0
+	best_stack = 0
+	clangs = 0
+	best_shot = 0
+	passes = 0
+	hazards = 0
+	bonks = 0
+	comeback = 0
+
+
+## A chain of `length` head bounces / stomps ended (or grew): keeps the longest ([member best_chain]).
+func note_chain(length: int) -> void:
+	best_chain = maxi(best_chain, length)
+
+
+## The hero's stack holds `units` now: keeps the tallest ([member best_stack]).
+func note_stack(units: int) -> void:
+	best_stack = maxi(best_stack, units)
+
+
+## A Clubball shot of this hero travelled `px`: keeps the longest ([member best_shot]).
+func note_shot(px: int) -> void:
+	best_shot = maxi(best_shot, absi(px))
+
+
+## The value of a statistic counter by name ([constant STATS]); 0 for an unknown name.
+func get_stat(stat: StringName) -> int:
+	if not STATS.has(stat):
+		return 0
+	return int(get(stat))
+
+
+## The summed value of a medal / award's statistics (an entry of COOP_MEDALS / VERSUS_AWARDS).
+func award_value(award: Dictionary) -> int:
+	var total: int = 0
+	for stat: Variant in award.get("stats", []):
+		total += get_stat(StringName(str(stat)))
+	return total
+
+
+## The slots of `runs` that win `award` (an entry of COOP_MEDALS / VERSUS_AWARDS), in slot order: the highest summed
+## value, or the lowest for a `fewest` award. Ties share it. Nobody wins a "most" award with 0, nor a `fewest` award
+## that nobody did differently (every value equal). Empty for fewer than one run.
+static func award_winners(runs: Array[PlayerRun], award: Dictionary) -> PackedInt32Array:
+	var winners: PackedInt32Array = PackedInt32Array()
+	if runs.is_empty():
+		return winners
+	var fewest: bool = bool(award.get("fewest", false))
+	var best: int = runs[0].award_value(award)
+	var worst: int = best
+	for run: PlayerRun in runs:
+		var value: int = run.award_value(award)
+		best = mini(best, value) if fewest else maxi(best, value)
+		worst = maxi(worst, value) if fewest else mini(worst, value)
+	if fewest and best == worst:
+		return winners
+	if not fewest and best <= 0:
+		return winners
+	for run: PlayerRun in runs:
+		if run.award_value(award) == best:
+			winners.append(run.slot)
+	return winners
+
+
+## Every medal of `table` (default the co-op medals) with its winners: {id: PackedInt32Array of slots}; medals
+## nobody won are left out. For the co-op tally (ui-A): `PlayerRun.medals(Game.party_runs())`.
+static func medals(runs: Array[PlayerRun], table: Array[Dictionary] = COOP_MEDALS) -> Dictionary:
+	var result: Dictionary = {}
+	for award: Dictionary in table:
+		var winners: PackedInt32Array = award_winners(runs, award)
+		if not winners.is_empty():
+			result[award["id"]] = winners
+	return result

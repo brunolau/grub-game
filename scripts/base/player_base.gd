@@ -133,6 +133,70 @@ var _fenced: bool = false
 var _fence_left: int = 0
 var _fence_right: int = 0
 
+# --- 2.0 duo moves of the hero's side (player-A, PLAN.md P1.4; PHYSICS.md C.10) ----------------------------------------
+# The PartyDriver (world-A) runs the party-wide steps after every hero moved (PHYSICS.md C.0 table, PLAYER phase):
+# (a) [method carry_totem] for every rider, (b) [method land_on_partner] for every pair in slot order. The rules of
+# each step live here, on the hero; the driver only decides who meets whom. Never set in single-player.
+
+## Result of [method land_on_partner].
+const HEAD_NONE: int = 0
+## Shoulder Hop: he bounced off the partner's head (-224, UP held).
+const HEAD_HOP: int = 1
+## Totem Ride: he now stands on the partner's head.
+const HEAD_RIDE: int = 2
+## He fell onto an egg and hatched it (C.12 b).
+const HEAD_HATCH: int = 3
+## Sfx.DUO_HOP variants (the audio owner's two files): the boost of a Shoulder Hop, a rider landing on his carrier.
+const DUO_HOP_BOOST: int = 0
+const DUO_HOP_CARRY: int = 1
+
+## Totem Ride, the rider's side: the partner whose head this hero stands on (null = none). Set by
+## [method start_totem_ride], cleared by [method end_totem_ride] (a jump, a drop, a hurt, too far from the head, a
+## scrape, an egg, a death or a respawn of either). While set, his own update runs with `on_platform` (no gravity).
+var totem_carrier: PlayerBase = null
+## Totem Ride, the carrier's side: the partner standing on this hero's head (null = none); his jump impulses are halved
+## (PartyTuning.TOTEM_CARRIER_JUMP_SHIFT) and a hurt throws the rider off.
+var totem_rider: PlayerBase = null
+## Ticks left after a drop through the carrier (Down + Up on his head) in which this hero makes no head contact
+## (PartyTuning.TOTEM_DROP_LOCK_TICKS); counted down in step 8i by the party component.
+var totem_drop_lock: int = 0
+## The yvel the last Totem carry gave this rider (carrier dy * 16; 0 at the start of a ride): "he jumped" is measured
+## against it ([method carry_totem]).
+var totem_carry_yvel: int = 0
+
+# --- 2.0 movement limits (hooks for the Book II terrain and the versus weights; defaults = 1.0) ----------------------
+# Written by the components and rules that change them, every tick they apply (tar, PHYSICS.md C.5: player-B's
+# components; Grub Stack weight / Hot Rock holder, C.14: world-B's referee); respawn_at restores the defaults. A
+# single-player Book I hero never changes them, so his handlers use exactly the 1.0 numbers.
+
+## ACCEL limit of the walk handler (v16; Tuning.WALK_CAP = 80). Tar 32 (C.5), a heavy stack 64 / 48, the Hot Rock
+## holder 96 (C.14).
+var walk_cap: int = Tuning.WALK_CAP
+## ACCEL limit of the airborne step (v16; Tuning.WALK_CAP = 80). A tar hop 32 (C.5), a heavy stack 64 / 48 (C.14).
+var air_cap: int = Tuning.WALK_CAP
+## The jump handler adds Tuning.JUMP_IMPULSES[n] only while n < this, 0 after it (tar: 2, C.5 [R2]).
+var jump_impulse_ticks: int = Tuning.JUMP_IMPULSE_TICKS
+## Every jump impulse is (impulse * this) >> 2: 4 = the 1.0 table, 3 = a 20+ stack (C.14).
+var jump_impulse_quarters: int = 4
+## Versus weight / ember caps as world-B's referee writes them every tick (PHYSICS.md C.14): the ACCEL limit of the walk
+## handler AND of the airborne step (0 = Tuning.WALK_CAP) - it sets [member walk_cap] and [member air_cap].
+var walk_cap_override: int = 0:
+	set(value):
+		walk_cap_override = maxi(value, 0)
+		walk_cap = walk_cap_override if walk_cap_override > 0 else Tuning.WALK_CAP
+		air_cap = walk_cap
+## Versus: every jump impulse at 3 / 4 (a 20+ stack, C.14) - it sets [member jump_impulse_quarters].
+var jump_scale_3_4: bool = false:
+	set(value):
+		jump_scale_3_4 = value
+		jump_impulse_quarters = 3 if value else 4
+
+# --- 2.0 death toss bookkeeping (read by world-A's PartyDriver; never read in single-player) -------------------------
+## Feet point where the last death toss started (PHYSICS.md C.12: the egg appears there, clamped into the view).
+var death_origin: Vector2i = Vector2i.ZERO
+## Cause of the last death (as for [method kill]); Events.hero_down carries it when the toss ends in an egg.
+var death_cause: StringName = &""
+
 
 func get_kind() -> int:
 	return Defs.Kind.PLAYER
@@ -204,6 +268,22 @@ func is_mounted() -> bool:
 	return mount != null
 
 
+## True while he stands on a partner's head (Totem Ride, the rider: [member totem_carrier]).
+func is_riding_totem() -> bool:
+	return totem_carrier != null
+
+
+## True while a partner stands on his head (Totem Ride, the carrier: [member totem_rider]).
+func is_carrying_totem() -> bool:
+	return totem_rider != null
+
+
+## True when UP (= Jump) is held on this tick in his own flags (the bounce height of a head contact). The hero
+## answers with the flags he sampled this tick; a bare PlayerBase with [member input_flags].
+func holds_up() -> bool:
+	return (input_flags & Defs.IN_UP) != 0
+
+
 ## True when enemies of a party may pick this hero as their target (LevelBase.target_hero): alive and not down. A
 ## party of one never asks (1.0 targets the hero unless he is dead).
 func is_party_targetable() -> bool:
@@ -219,6 +299,26 @@ func braces_with(partner: PlayerBase) -> bool:
 		return false
 	return is_crouching() and partner.is_crouching() and is_grounded() and partner.is_grounded() \
 			and absi(sim_pos.x - partner.sim_pos.x) <= PartyTuning.BRACE_GAP_PX
+
+
+## The Brace flag (PHYSICS.md C.10): the first hero of the level's contact order with whom this hero braces
+## ([method braces_with]), or null - a lone croucher, and always in single-player. Heavy enemies and boss rules read it
+## before their contact with this hero ([method is_braced]).
+func brace_partner() -> PlayerBase:
+	if down or dead or not is_crouching():
+		return null
+	var level: LevelBase = Game.level
+	if level == null or level.hero_count() <= 1:
+		return null
+	for other: PlayerBase in level.contact_order():
+		if other != self and braces_with(other):
+			return other
+	return null
+
+
+## True while this hero is half of a Brace Wall ([method brace_partner] is not null).
+func is_braced() -> bool:
+	return brace_partner() != null
 
 
 # --- Calls other modules make -----------------------------------------------------------------------------------------
@@ -273,6 +373,8 @@ func hurt(source: SimEntity, kind: int = Defs.HurtKind.ENEMY) -> bool:
 func kill(cause: StringName) -> void:
 	if dead or down or (Game.level != null and Game.level.completed):
 		return
+	death_origin = sim_pos
+	death_cause = cause
 	dead = true
 	control_enabled = false
 	club_box_active = false
@@ -364,6 +466,13 @@ func respawn_at(pos: Vector2i) -> void:
 	ball_batter = null
 	leave_mount()
 	_fenced = false
+	end_totem_ride()
+	if totem_rider != null:
+		totem_rider.end_totem_ride()
+	totem_drop_lock = 0
+	walk_cap_override = 0
+	jump_scale_3_4 = false
+	jump_impulse_ticks = Tuning.JUMP_IMPULSE_TICKS
 	if feast > 0:
 		feast = 0
 		Events.feast_changed.emit(0)
@@ -420,6 +529,9 @@ func go_down(cause: StringName) -> void:
 	xvel = 0
 	yvel = 0
 	leave_mount()
+	end_totem_ride()
+	if totem_rider != null:
+		totem_rider.end_totem_ride()
 	Events.hero_down.emit(self, cause)
 
 
@@ -489,3 +601,170 @@ func fence_allows(x: int) -> bool:
 ## End this tick's fence (the hero calls it right after his x step).
 func clear_fence() -> void:
 	_fenced = false
+
+
+## True when the x commit rule (PHYSICS.md 2) lets this hero stand at `x` now: inside the level bounds and, in a
+## co-op party, inside the edge walls of the tribe camera (C.13; the hero answers that part). For moves that carry him
+## outside his own x step (the Totem carry). Without a level: true.
+func x_commit_allows(x: int) -> bool:
+	var level: LevelBase = Game.level
+	if level == null:
+		return true
+	return x >= Tuning.X_MIN and x < level.grid.x_max_excl()
+
+
+# --- 2.0 duo moves (PHYSICS.md C.10, C.12 b; the hero's side of the PartyDriver's steps a and b) --------------------
+
+## May this hero start a head contact this tick (PHYSICS.md C.10 step b)? yvel >= 0, alive and hatched, not gliding,
+## climbing, curled or a ball, mounted, already riding, nor in a drop lock.
+func can_land_on_partner() -> bool:
+	return yvel >= 0 and not dead and not down and not is_gliding() and state != Defs.HeroState.CLIMB \
+			and curl == CURL_NONE and mount == null and totem_carrier == null and totem_drop_lock == 0
+
+
+## The PartyDriver's step b for one pair (PHYSICS.md C.10, C.12 b), after every hero moved: this hero (A) against
+## `partner` (B), another living hero. When A may land ([method can_land_on_partner]) and Overlap.body(A, B, A) finds a
+## contact with the stomp flag (2.2: A's feet in the top half of B's box, or A falling at 8 px/tick or more):
+##  - B is an egg: A bounces as on an enemy (-224 with UP held, else -64) and hatches it ([method hatch] with
+##    PartyTuning.hatch_hearts) - HEAD_HATCH;
+##  - A holds UP: the Shoulder Hop ([method shoulder_hop]; B in any state, airborne too) - HEAD_HOP;
+##  - else the Totem Ride on B ([method start_totem_ride]; not on a curled partner) - HEAD_RIDE.
+## Returns what happened (HEAD_NONE: nothing). At most one head contact per hero per tick: the driver stops testing A
+## after a result other than HEAD_NONE. Co-op only (versus heads are the referee's stomps).
+func land_on_partner(partner: PlayerBase) -> int:
+	if partner == null or partner == self or partner.dead or not can_land_on_partner():
+		return HEAD_NONE
+	if partner.mount != null or partner.totem_carrier == self:
+		return HEAD_NONE
+	if not Overlap.body(self, partner, self) or not Overlap.stomp:
+		return HEAD_NONE
+	var depth: int = Overlap.depth
+	if partner.down:
+		bounce(Tuning.BOUNCE_YVEL_UP if holds_up() else Tuning.BOUNCE_YVEL, depth)
+		partner.hatch(self, PartyTuning.hatch_hearts(Game.difficulty))
+		return HEAD_HATCH
+	if holds_up():
+		shoulder_hop(partner, depth)
+		return HEAD_HOP
+	if partner.curl != CURL_NONE:
+		return HEAD_NONE
+	start_totem_ride(partner)
+	return HEAD_RIDE
+
+
+## Shoulder Hop (PHYSICS.md C.10): exactly the enemy bounce of section 9 off `partner`'s head - yvel -224
+## (PartyTuning.SHOULDER_HOP_YVEL), fall_ticks 0, lifted by `depth`, no_jump left armed; `partner` is unaffected.
+func shoulder_hop(partner: PlayerBase, depth: int) -> void:
+	bounce(PartyTuning.SHOULDER_HOP_YVEL, depth)
+	_party_cue(Sfx.DUO_HOP, DUO_HOP_BOOST)
+	Events.hero_bounced.emit(self, partner, 0)
+
+
+## Totem Ride start (PHYSICS.md C.10): this hero, the rider, stands on `carrier`'s head - y = carrier.y - 34
+## (PartyTuning.TOTEM_REST_PX: the carrier's 32 x 35 riding box, rest 1 px inside), yvel 0, `on_platform`, the
+## grounded bookkeeping (no_jump - 1, jump_ticks 0, fall_ticks 0, last_ground_y); the two are linked
+## ([member totem_carrier], [member totem_rider]).
+func start_totem_ride(carrier: PlayerBase) -> void:
+	if carrier == null or carrier == self:
+		return
+	end_totem_ride()
+	if carrier.totem_rider != null and carrier.totem_rider != self:
+		carrier.totem_rider.end_totem_ride()
+	totem_carrier = carrier
+	carrier.totem_rider = self
+	sim_pos.y = carrier.sim_pos.y - PartyTuning.TOTEM_REST_PX
+	yvel = 0
+	totem_carry_yvel = 0
+	_totem_bookkeeping()
+	_party_cue(Sfx.DUO_HOP, DUO_HOP_CARRY)
+
+
+## The PartyDriver's step a for this rider (PHYSICS.md C.10 Carry; every tick, before new head contacts): he follows
+## his carrier's motion of this tick (dx, dy = carrier.sim_pos - carrier.sim_prev). The ride ends - returns false, both
+## unlinked - when he jumped or was knocked up (his yvel more than 16 v16 above what the last carry gave him:
+## yvel - [member totem_carry_yvel] < PartyTuning.TOTEM_JUMP_OFF_YVEL; on a still carrier exactly C.10's yvel < -16,
+## and a rising carrier keeps his rider, which the R6 Totem launch needs), either is down or dead,
+## or |x + dx - carrier.x| > 16 (PartyTuning.TOTEM_FOOT_REACH_PX). Otherwise: x += dx (level bounds and edge walls
+## only, [method x_commit_allows]), y = carrier.y - 34, yvel = dy * 16, `on_platform` and the grounded bookkeeping;
+## then the scrape - his wall-probe cell (x +/- 9 towards dx, row - 1) a wall (SIDE 1) or his head probe
+## (col, row - 2) a ceiling: x -= dx and the ride ends (he falls off). True while he still rides.
+func carry_totem() -> bool:
+	var carrier: PlayerBase = totem_carrier
+	if carrier == null:
+		return false
+	if not is_instance_valid(carrier) or dead or down or carrier.dead or carrier.down:
+		end_totem_ride()
+		return false
+	var dx: int = carrier.sim_pos.x - carrier.sim_prev.x
+	var dy: int = carrier.sim_pos.y - carrier.sim_prev.y
+	if yvel - totem_carry_yvel < PartyTuning.TOTEM_JUMP_OFF_YVEL \
+			or absi(sim_pos.x + dx - carrier.sim_pos.x) > PartyTuning.TOTEM_FOOT_REACH_PX:
+		end_totem_ride()
+		return false
+	var moved: int = 0
+	if dx != 0 and x_commit_allows(sim_pos.x + dx):
+		sim_pos.x += dx
+		moved = dx
+	sim_pos.y = carrier.sim_pos.y - PartyTuning.TOTEM_REST_PX
+	yvel = dy * Tuning.V16_PER_PX
+	totem_carry_yvel = yvel
+	_totem_bookkeeping()
+	var level: LevelBase = Game.level
+	if level != null:
+		var row: int = Tuning.to_cell(sim_pos.y)
+		var toward: int = signi(dx) if dx != 0 else signi(xvel)
+		var probe_col: int = Tuning.to_cell(sim_pos.x + Tuning.WALL_PROBE * toward)
+		if level.grid.side_at(probe_col, row - 1) == TileGrid.SIDE_WALL \
+				or level.grid.ceiling_at(Tuning.to_cell(sim_pos.x), row - Tuning.HEAD_PROBE_ROWS) == TileGrid.CEILING_SOLID:
+			sim_pos.x -= moved
+			end_totem_ride()
+			on_platform = false
+			grounded = false
+			return false
+	return true
+
+
+## Leave the Totem Ride (called on the rider; safe when he does not ride): both links cleared.
+func end_totem_ride() -> void:
+	if totem_carrier != null:
+		if is_instance_valid(totem_carrier) and totem_carrier.totem_rider == self:
+			totem_carrier.totem_rider = null
+		totem_carrier = null
+
+
+## The rider's drop (PHYSICS.md C.10: Down + Up on the carrier's head): he leaves with yvel 0 and falls through the
+## carrier to the floor; no head contact for PartyTuning.TOTEM_DROP_LOCK_TICKS.
+func drop_from_totem() -> void:
+	end_totem_ride()
+	yvel = 0
+	on_platform = false
+	grounded = false
+	totem_drop_lock = PartyTuning.TOTEM_DROP_LOCK_TICKS
+
+
+## A hurt carrier throws his rider off (PHYSICS.md C.10): launch(0, -64), no damage. Safe without a rider.
+func throw_off_totem_rider() -> void:
+	var rider: PlayerBase = totem_rider
+	if rider == null:
+		return
+	rider.end_totem_ride()
+	if is_instance_valid(rider):
+		rider.launch(0, PartyTuning.TOTEM_THROW_OFF_YVEL)
+
+
+func _totem_bookkeeping() -> void:
+	on_platform = true
+	grounded = true
+	ice = 0
+	if no_jump > 0:
+		no_jump -= 1
+	jump_ticks = 0
+	fall_ticks = 0
+	last_ground_y = sim_pos.y
+
+
+## A 2.0 cue of the hero (Sfx names whose AudioTable rows arrive in batches, PLAN.md P1.1): played only once its row
+## exists, so a missing row is silence instead of an error. `variant` as Audio.play_sfx (-1 = the row's rotation).
+static func _party_cue(event: StringName, variant: int = -1) -> void:
+	if AudioTable.SFX.has(event):
+		Audio.play_sfx(event, variant)

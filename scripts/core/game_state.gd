@@ -55,6 +55,9 @@ var mode: int = Defs.GameMode.SINGLE
 var party: int = 1
 ## The book of the campaign being played: 1 = the 1.0 campaign, 2 = The Far Shore (DESIGN.md A).
 var book: int = 1
+## The versus match being played or set up (Flow.start_versus, the lobby); null when none. Kept after the match (the
+## results screen reads it; the lobby starts the next one from its rules). (`match` is a GDScript keyword.)
+var versus_match: VersusMatch = null
 
 ## Difficulty of the current run (Defs.Difficulty).
 var difficulty: int = Defs.Difficulty.BEGINNER
@@ -181,6 +184,27 @@ func get_run(slot: int) -> PlayerRun:
 	return runs[slot]
 
 
+## The runs of the heroes in play: slots 0..party - 1 (a new array; the runs themselves are the shared ones).
+func party_runs() -> Array[PlayerRun]:
+	return runs.slice(0, party)
+
+
+## A player joined or left during a run (Flow.join_player / leave_player, DESIGN.md D.1): the run continues as
+## `p_mode` (Defs.GameMode) with `p_party` heroes. The score, lives, letters and every kept run stay; a slot that joins
+## starts like a new run's hero (full energy, the club, an empty belt, no glider, zeroed statistics; his colour kept)
+## and reports through run_*_changed. Nothing else changes (Flow restarts the stage in the other layout).
+func set_party(p_mode: int, p_party: int) -> void:
+	var before: int = party
+	mode = p_mode
+	party = clampi(p_party, 1, Defs.MAX_PLAYERS)
+	for slot: int in range(maxi(before, 1), party):
+		runs[slot].reset_run()
+		runs[slot].emit_energy()
+		runs[slot].emit_weapon()
+		runs[slot].emit_belt()
+		runs[slot].emit_glider()
+
+
 ## Prepare the state for entering `p_level_id`. With `carry_progress` the completion counters and the tally list
 ## are kept (entering a linked sub-stage or a bonus stage, GAMEPLAY.md 1.1); otherwise they start at zero.
 ## Every hero of the party starts with full energy and without the glider.
@@ -196,6 +220,10 @@ func begin_level(p_level_id: StringName, carry_progress: bool = false) -> void:
 		runs[slot].reset_energy()
 	if not carry_progress:
 		_reset_level_progress()
+		if mode == Defs.GameMode.COOP:
+			# The tally medals count one stage (a linked sub-stage or bonus stage carries them on, as the tally list).
+			for slot: int in party:
+				runs[slot].reset_stats()
 	_entry = {
 		"level_id": level_id, "score": score, "lives": lives, "next_life_at": _next_life_at, "letters": letters,
 		"feast_kit": feast_kit, "weapon": weapon, "spots_total": spots_total, "spots_opened": spots_opened,

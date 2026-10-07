@@ -1,0 +1,4 @@
+# route: level=test_integration_book2_coop difficulty=both players=2 ends=exit after=tally expect=hurts:0,min_kills:2,eggs:0,wipes:0,min_score:1200,checkpoints:1
+# The two-stream route of the test bed's co-op file: the party route of test_integration_book2.party.inputs, then both
+# heroes walk on past the checkpoint into the exit (P2 two cells behind P1), so it ends with a team exit and a tally.
+20:R|R,40:|,8:F|F,6:|,8:R|R,14:RU|RU,31:R|R,26:|,8:F|F,6:|,60:R|R

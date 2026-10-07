@@ -1,0 +1,43 @@
+# World showcase (canyon, world 5): both canyon terrain sets, the canyon backdrop (layers of ASSET_MANIFEST 17.6),
+# the tar floor ':' in the biome's mud skin, a pool of water with a current, slopes, spikes and one-way floors.
+# Developer level of world-A (PLAN.md P1.6); not part of any campaign.
+
+[meta]
+format = 2
+id = test_world_canyon
+name = "World Showcase: Canyon"
+kind = test
+book = 2
+biome = canyon
+terrain_a = canyon/terrain
+terrain_b = canyon/terrain_mesa
+liquid = water
+background = canyon
+music = level_jungle
+
+[legend]
+C = objects/checkpoint
+E = objects/exit
+f = items/food index=3
+g = items/food index=21
+
+[tiles]
+................................................
+................................................
+..........................%%%%..................
+........................./%%%%\.................
+........................%%%%%%%%................
+.............====.......%%%%%%%%................
+................................................
+.........f..g...................................
+........--_---..........................g.....E.
+.............................................##.
+..../\.......................................##.
+.@./##\.C.......:::::::.......~~~~~~~~...$12##34
+##########^^###:::::::::#######~~~~~~~##########
+################::::::##########~~~~############
+################################################
+################################################
+
+[entities]
+zones/current 33 12 rect=30,11,8,3 dir=l speed=2

@@ -1,0 +1,91 @@
+Various Sound Effects
+=====================
+
+Author: Spring Spring
+Source: https://opengameart.org/content/various-sound-effects-0
+Licence: CC0 1.0 (tier A)
+Used in Club & Grub for: 2.0 (The Far Shore): audio/sfx/brace_a.wav, audio/sfx/seesaw_a.wav, audio/sfx/spear_stick_a.wav, audio/sfx/tar_glug_a.wav. Per-file sources and edits: docs/ASSET_MANIFEST.md section 17
+Staging folder: .tools/asset_candidates/expansion/audio/spring-spring_various-sfx
+
+---- Licence evidence recorded when the pack was downloaded ----
+
+# LICENSE_INFO - Spring Spring - Various Sound Effects (subset)
+
+- **Author:** Spring Spring (OpenGameArt)
+- **License:** CC0 1.0  (tier A)
+- **Date checked / downloaded:** 2026-10-06
+- **Source page(s) (saved copies in `../_pages/oga_<slug>.html`):**
+  - https://opengameart.org/content/various-sound-effects-0
+- **Download URL(s)** (every file attached to the page; the ones fetched are marked):
+  - https://opengameart.org/sites/default/files/bangs.wav (not fetched)
+  - https://opengameart.org/sites/default/files/beep1.wav (fetched)
+  - https://opengameart.org/sites/default/files/big_amber.wav (not fetched)
+  - https://opengameart.org/sites/default/files/break_stone.wav (not fetched)
+  - https://opengameart.org/sites/default/files/bup.wav (fetched)
+  - https://opengameart.org/sites/default/files/cannonball_tap.wav (not fetched)
+  - https://opengameart.org/sites/default/files/click_1.wav (not fetched)
+  - https://opengameart.org/sites/default/files/crush.wav (fetched)
+  - https://opengameart.org/sites/default/files/death_2.wav (not fetched)
+  - https://opengameart.org/sites/default/files/dull_explosion.wav (not fetched)
+  - https://opengameart.org/sites/default/files/fall_0.wav (fetched)
+  - https://opengameart.org/sites/default/files/get_important_item.wav (fetched)
+  - https://opengameart.org/sites/default/files/glug.wav (fetched)
+  - https://opengameart.org/sites/default/files/moan.wav (not fetched)
+  - https://opengameart.org/sites/default/files/nom.wav (fetched)
+  - https://opengameart.org/sites/default/files/player_hit.wav (not fetched)
+  - https://opengameart.org/sites/default/files/pop.wav (fetched)
+  - https://opengameart.org/sites/default/files/powered_door.wav (not fetched)
+  - https://opengameart.org/sites/default/files/rustling_of_the_weeds.wav (not fetched)
+  - https://opengameart.org/sites/default/files/scooter_p.wav (not fetched)
+  - https://opengameart.org/sites/default/files/small_amber.wav (not fetched)
+  - https://opengameart.org/sites/default/files/small_rock_impact.wav (not fetched)
+  - https://opengameart.org/sites/default/files/spear.wav (not fetched)
+  - https://opengameart.org/sites/default/files/steal.wav (fetched)
+  - https://opengameart.org/sites/default/files/swim_0.wav (fetched)
+  - https://opengameart.org/sites/default/files/tap_stone.wav (not fetched)
+  - https://opengameart.org/sites/default/files/teleport_2.wav (not fetched)
+  - https://opengameart.org/sites/default/files/tick_0.wav (fetched)
+  - https://opengameart.org/sites/default/files/uff.wav (fetched)
+  - https://opengameart.org/sites/default/files/snd_ambient_impact1.wav (not fetched)
+  - https://opengameart.org/sites/default/files/snd_batwings.wav (not fetched)
+  - https://opengameart.org/sites/default/files/snd_death1.wav (not fetched)
+  - https://opengameart.org/sites/default/files/snd_death2.wav (not fetched)
+  - https://opengameart.org/sites/default/files/snd_fillenergy.wav (fetched)
+  - https://opengameart.org/sites/default/files/snd_footsteps1.wav (not fetched)
+  - https://opengameart.org/sites/default/files/snd_fox_footstep.wav (not fetched)
+  - https://opengameart.org/sites/default/files/snd_getpowerup.wav (fetched)
+  - https://opengameart.org/sites/default/files/snd_menu_move.wav (not fetched)
+  - https://opengameart.org/sites/default/files/snd_menu_select.wav (not fetched)
+  - https://opengameart.org/sites/default/files/snd_npc_message.wav (not fetched)
+  - https://opengameart.org/sites/default/files/snd_slip_on_ice.wav (not fetched)
+  - https://opengameart.org/sites/default/files/snd_splathit.wav (not fetched)
+  - https://opengameart.org/sites/default/files/snd_splat.wav (fetched)
+  - https://opengameart.org/sites/default/files/snd_splurt.wav (not fetched)
+  - https://opengameart.org/sites/default/files/snd_sproing.wav (fetched)
+  - https://opengameart.org/sites/default/files/snd_throw1.wav (fetched)
+  - https://opengameart.org/sites/default/files/snd_treasure.wav (not fetched)
+  - https://opengameart.org/sites/default/files/snd_warp_in.wav (fetched)
+  - https://opengameart.org/sites/default/files/snd_warp_out.wav (fetched)
+  - https://opengameart.org/sites/default/files/snd_yoghurtblast.wav (not fetched)
+  - https://opengameart.org/sites/default/files/snd_birdcrash.wav (not fetched)
+  - https://opengameart.org/sites/default/files/snd_birdscream.wav (not fetched)
+  - https://opengameart.org/sites/default/files/snd_bulletcrackle.wav (not fetched)
+  - https://opengameart.org/sites/default/files/snd_enemyjump.wav (fetched)
+  - https://opengameart.org/sites/default/files/snd_bullethit.wav (not fetched)
+  - https://opengameart.org/sites/default/files/snd_enemyland.wav (fetched)
+  - https://opengameart.org/sites/default/files/snd_enemyscream.wav (not fetched)
+  - https://opengameart.org/sites/default/files/snd_enemysword.wav (not fetched)
+  - https://opengameart.org/sites/default/files/snd_flap.wav (fetched)
+  - https://opengameart.org/sites/default/files/snd_gunshot1.wav (not fetched)
+
+## Exact licence wording (quoted from the source)
+
+> https://opengameart.org/content/various-sound-effects-0 - page title "Various Sound Effects", author "Spring Spring", posted Sunday, October 6, 2024 - 23:48
+>
+> License(s): CC0
+>
+> Description: "Scraps from various old unfinished projects. Most of them are pretty good, though."
+
+---- Licence ----
+
+CC0 1.0 Universal: the full legal code ships as cc0_1.0_legal_code.txt in this folder.

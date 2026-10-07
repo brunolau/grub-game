@@ -1,0 +1,39 @@
+# Club & Grub level file - format 2. A developer copy of the Totem Ring sketch (docs/expansion/DESIGN.md E.5) for the
+# referee's wrap tests: the floor and the wrap ledges continue across the left-right seam. Owner: world-B.
+
+[meta]
+format = 2
+id = test_world_arena_ring
+name = "Totem Ring (test)"
+kind = arena
+biome = jungle
+terrain_a = jungle/terrain_grass
+music = level_jungle
+players = 4
+modes = grub_stack
+round_time = 90
+wrap = lr
+sudden = stampede
+
+[legend]
+B = objects/spawn_point index=2
+C = objects/spawn_point index=3
+D = objects/spawn_point index=4
+P = objects/cookpot
+Q = objects/cookpot
+J = objects/spring
+? = objects/hidden_spot kind=small count=3 look=block tile=#
+
+[tiles]
+....................
+....................
+....................
+.........P..........
+.........##.........
+---......#?......---
+.........##.........
+....-----##-----....
+.........?#.........
+.@J..C.Q.##..D..JB..
+###?######?#?###?###
+####################

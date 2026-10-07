@@ -1,5 +1,5 @@
 extends SceneTree
-## Level validator (docs/ARCHITECTURE.md 7.9, docs/LEVEL_DESIGN.md). Owner: world.
+## Level validator (docs/ARCHITECTURE.md 7.9, docs/LEVEL_DESIGN.md). Owner: world-B (docs/expansion/PLAN.md 4.1).
 ##
 ## Usage (from the project root):
 ##   bash .tools/gd.sh script res://tools/validate_levels.gd                       every level in res://levels
@@ -8,11 +8,17 @@ extends SceneTree
 ##   bash .tools/gd.sh script res://tools/validate_levels.gd -- w1_l1 w1_l2        the same by level id
 ##   ... -- --strict        warnings count as failures too
 ##   ... -- --quiet         print errors only
+##   ... -- --coop          co-op files only (kind = coop; the given ones, else every one), and every x2 gate of them
+##                          through the solo-impossibility search (scripts/world/coop_search.gd, LEVEL_DESIGN.md
+##                          15.7.6): a gate one hero can pass, and a window above its solo minimum - 4, are errors
 ##
 ## Prints `file:line: error: message` / `file:line: warning: message` and a summary. Exit code 0 = no errors,
 ## 1 = errors found (or, with --strict, warnings), 2 = bad arguments.
 
 const LEVEL_DIR: String = "res://levels"
+## The solo search, loaded by path when --coop asks for it: it drives the real hero through the Sim / GameInput
+## autoloads, which a tool script cannot name when it is compiled.
+const SEARCH_PATH: String = "res://scripts/world/coop_search.gd"
 
 
 func _initialize() -> void:
@@ -23,11 +29,14 @@ func _run() -> void:
 	var files: PackedStringArray = PackedStringArray()
 	var strict: bool = false
 	var quiet: bool = false
+	var coop: bool = false
 	for argument: String in OS.get_cmdline_user_args():
 		if argument == "--strict":
 			strict = true
 		elif argument == "--quiet":
 			quiet = true
+		elif argument == "--coop":
+			coop = true
 		elif argument.begins_with("--"):
 			print("validate_levels: unknown option %s" % argument)
 			_finish(2)
@@ -39,11 +48,13 @@ func _run() -> void:
 	for file: String in files:
 		if not file.begins_with(LEVEL_DIR + "/"):
 			validator.add_file(file)
+	if coop and files.is_empty():
+		files = _coop_files()
 	validator.run()
 	var errors: int = 0
 	var warnings: int = 0
 	for problem: Dictionary in validator.problems:
-		if not files.is_empty() and not files.has(str(problem["path"])):
+		if (not files.is_empty() or coop) and not files.has(str(problem["path"])):
 			continue
 		var is_error: bool = int(problem["severity"]) == LevelValidator.ERROR
 		if is_error:
@@ -52,9 +63,65 @@ func _run() -> void:
 			warnings += 1
 		if is_error or not quiet:
 			print(LevelValidator.format_problem(problem))
+	if coop:
+		errors += _search_gates(files)
 	var scope: String = "%d level file(s)" % count if files.is_empty() else "%d file(s)" % files.size()
 	print("validate_levels: %s checked, %d error(s), %d warning(s)" % [scope, errors, warnings])
 	_finish(1 if errors > 0 or (strict and warnings > 0) else 0)
+
+
+## Every co-op file of the level folder (kind = coop), sorted.
+func _coop_files() -> PackedStringArray:
+	var result: PackedStringArray = PackedStringArray()
+	var dir: DirAccess = DirAccess.open(LEVEL_DIR)
+	if dir == null:
+		return result
+	var names: PackedStringArray = dir.get_files()
+	names.sort()
+	for file_name: String in names:
+		if file_name.get_extension() != "lvl":
+			continue
+		var path: String = LEVEL_DIR.path_join(file_name)
+		if str(LevelText.parse_meta(FileAccess.get_file_as_string(path)).get("kind", "")) == LevelText.KIND_COOP:
+			result.append(path)
+	return result
+
+
+## The solo-impossibility search on every x2 gate of the co-op `files`, both difficulties. Returns the errors printed.
+func _search_gates(files: PackedStringArray) -> int:
+	var errors: int = 0
+	var search: GDScript = load(SEARCH_PATH) as GDScript
+	if search == null:
+		print("validate_levels: error: the solo search %s cannot be loaded" % SEARCH_PATH)
+		return 1
+	for path: String in files:
+		var data: LevelData = LevelData.load_file(path)
+		if data == null or str(data.value("kind")) != LevelText.KIND_COOP:
+			continue
+		for difficulty: int in [Defs.Difficulty.BEGINNER, Defs.Difficulty.EXPERT]:
+			var gates: Dictionary = {}
+			for record: Dictionary in data.entity_records():
+				if String(record["id"]) == "objects/x2_tablet" and LevelText.applies_to(record["params"], difficulty):
+					var tablet: Dictionary = LevelValidator.parse_tablet(record)
+					if tablet["gate"] != "":
+						gates[tablet["gate"]] = int(tablet["line"])
+			for gate: String in gates:
+				var result: Dictionary = search.call(&"search_gate", data.id, difficulty, gate)
+				var where: String = "%s:%d" % [path, int(gates[gate])]
+				var label: String = "gate '%s' (%s)" % [gate, Defs.difficulty_name(difficulty)]
+				if bool(result["reached"]):
+					errors += 1
+					print("%s: error: %s: a single hero gets through - %s" % [where, label, result["detail"]])
+				else:
+					print("%s: note: %s refused by the solo search (%d resting points)" % [where, label,
+						int(result["explored"])])
+				for window: Dictionary in result["windows"]:
+					var ok: bool = int(window["window"]) <= int(window["solo_min"]) - PartyTuning.WINDOW_SOLO_MARGIN_TICKS
+					if not ok:
+						errors += 1
+					print("%s: %s: %s: %s window %d, solo minimum %d" % [where, "note" if ok else "error", label,
+						window["what"], int(window["window"]), int(window["solo_min"])])
+	return errors
 
 
 func _to_resource_path(argument: String) -> String:

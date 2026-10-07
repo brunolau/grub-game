@@ -25,16 +25,18 @@ extends SimEntity
 const BANK_HALF_W: int = 12
 ## Height of the banking area (px) above the floor surface; the feet stand on that surface. [own]
 const BANK_H: int = 16
-## Drawing (art px): the pot body, rim and lid.
-const POT_HALF_W_ART: float = 30.0
-const POT_BODY_H_ART: float = 22.0
-const POT_FRONT_H_ART: float = 14.0
-const CLAY: Color = Color(0.62, 0.33, 0.18)
-const CLAY_DARK: Color = Color(0.35, 0.17, 0.09)
-const CLAY_LIGHT: Color = Color(0.80, 0.50, 0.28)
-const BROTH: Color = Color(0.86, 0.66, 0.24)
-const LID: Color = Color(0.45, 0.42, 0.38)
-const LID_DARK: Color = Color(0.22, 0.20, 0.18)
+## Picture: sprites/objects/cookpot.png (ASSET_MANIFEST 17.11): 10 x 2 cells of 80 x 72 art px, pivot (40, 72) on the
+## floor; row 0 = the back (behind the heroes), row 1 = the front (fire, bowl and near lip, drawn over a crouching
+## banker). Columns 0-3 idle fire, 4-7 banking (stew bubbles), 8-9 lid closed. Cosmetic animation at ANIM_FPS.
+const SHEET: Texture2D = preload("res://assets/sprites/objects/cookpot.png")
+const SHEET_COLUMNS: int = 10
+const CELL_ART: Vector2 = Vector2(80, 72)
+const IDLE_FIRST: int = 0
+const BANK_FIRST: int = 4
+const LOOP_FRAMES: int = 4
+const LID_FIRST: int = 8
+const LID_FRAMES: int = 2
+const ANIM_FPS: float = 8.0
 const FX_PUFF: StringName = &"fx/star_puff"
 
 ## Team allowed to bank here (`team=1|2` in a 2v2 arena); -1 = anyone.
@@ -50,7 +52,9 @@ var banked_total: int = 0
 var _crouch_ticks: PackedInt32Array = PackedInt32Array()
 ## Bit per slot crouched inside the open pot on the last tick (banking).
 var _banking_mask: int = 0
-var _front: Node2D = null
+var _back: Sprite2D = null
+var _front: Sprite2D = null
+var _anim_time: float = 0.0
 
 
 func _init() -> void:
@@ -60,12 +64,23 @@ func _init() -> void:
 
 
 func _ready() -> void:
-	# The front of the pot is drawn over the hero crouching inside it.
-	_front = Node2D.new()
-	_front.z_as_relative = false
-	_front.z_index = Defs.Z_PLAYER + 1
-	_front.draw.connect(_draw_front)
-	add_child(_front)
+	# The back behind the heroes, the front over the hero crouching inside it.
+	_back = _make_sprite(z_index)
+	_front = _make_sprite(Defs.Z_PLAYER + 1)
+	_refresh_look()
+
+
+func _make_sprite(z: int) -> Sprite2D:
+	var sprite: Sprite2D = Sprite2D.new()
+	sprite.texture = SHEET
+	sprite.centered = false
+	sprite.offset = Vector2(-CELL_ART.x / 2.0, -CELL_ART.y)
+	sprite.hframes = SHEET_COLUMNS
+	sprite.vframes = 2
+	sprite.z_as_relative = false
+	sprite.z_index = z
+	add_child(sprite)
+	return sprite
 
 
 func _sim_phases() -> PackedInt32Array:
@@ -119,18 +134,14 @@ func close_lid() -> void:
 		_crouch_ticks.fill(0)
 		_banking_mask = 0
 		_doze_wake_now()
-		queue_redraw()
-		if _front != null:
-			_front.queue_redraw()
+		_refresh_look()
 
 
 ## Open the lid again (a new round).
 func open_lid() -> void:
 	if lid_closed:
 		lid_closed = false
-		queue_redraw()
-		if _front != null:
-			_front.queue_redraw()
+		_refresh_look()
 
 
 ## Every cookpot of the level in spawn order.
@@ -244,27 +255,24 @@ static func _cue(event: StringName, fallback: StringName) -> void:
 		Audio.play_sfx(fallback)
 
 
-# --- Picture (no sheet yet: art-A request) ------------------------------------------------------------------------------
+# --- Picture ----------------------------------------------------------------------------------------------------------
 
-## Back of the pot and the broth (behind the hero).
-func _draw() -> void:
-	var w: float = POT_HALF_W_ART
-	draw_rect(Rect2(-w, -POT_BODY_H_ART, w * 2.0, POT_BODY_H_ART), CLAY_DARK)
-	if lid_closed:
+func _process(delta: float) -> void:
+	if _back == null or not is_visible_in_tree():
 		return
-	draw_rect(Rect2(-w + 4.0, -POT_BODY_H_ART - 2.0, w * 2.0 - 8.0, 4.0), BROTH)
+	_anim_time += delta
+	_refresh_look()
 
 
-## Front of the pot (over the hero), and the lid when it is shut.
-func _draw_front() -> void:
-	var w: float = POT_HALF_W_ART
-	var top: float = -POT_FRONT_H_ART
-	_front.draw_colored_polygon(PackedVector2Array([
-		Vector2(-w, top), Vector2(w, top), Vector2(w - 4.0, 0.0), Vector2(-w + 4.0, 0.0),
-	]), CLAY)
-	_front.draw_rect(Rect2(-w - 2.0, top - 3.0, w * 2.0 + 4.0, 4.0), CLAY_LIGHT)
-	_front.draw_rect(Rect2(-w + 6.0, top + 5.0, w * 2.0 - 12.0, 2.0), CLAY_DARK)
+## Lid frames while it is shut, the stew while somebody banks, else the idle fire (cosmetic).
+func _refresh_look() -> void:
+	if _back == null:
+		return
+	var step: int = int(_anim_time * ANIM_FPS)
+	var column: int = IDLE_FIRST + step % LOOP_FRAMES
 	if lid_closed:
-		var lid_top: float = -POT_BODY_H_ART - 6.0
-		_front.draw_rect(Rect2(-w - 2.0, lid_top, w * 2.0 + 4.0, 6.0), LID)
-		_front.draw_rect(Rect2(-6.0, lid_top - 6.0, 12.0, 6.0), LID_DARK)
+		column = LID_FIRST + step % LID_FRAMES
+	elif _banking_mask != 0:
+		column = BANK_FIRST + step % LOOP_FRAMES
+	_back.frame = column
+	_front.frame = SHEET_COLUMNS + column

@@ -1,4 +1,0 @@
-# route: level=test_integration_book2 difficulty=both players=2 ends=none expect=hurts:0,min_kills:2,eggs:0,wipes:0,min_score:1200
-# Two streams on the Book II test bed: P2 starts two cells behind P1 and plays the same keys, so the two stay apart
-# (no head contact, both in one view); it stops before the checkpoint and never presses S.
-20:R|R,40:|,8:F|F,6:|,8:R|R,14:RU|RU,31:R|R,26:|,8:F|F,6:|,10:R|R,20:|

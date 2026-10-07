@@ -41,6 +41,8 @@ const SCORE_DIGGER: int = 2
 const SCORE_LEAPER: int = 3
 const SCORE_CHARGER: int = 4
 const SCORE_SNAPPER: int = 1
+const SCORE_ROLLER: int = 3              ## 2.0 Book II archetypes [G 13.5]: "score [per type]" [own]
+const SCORE_GUARD: int = 4
 
 # =================================================================================================================
 # Archetype 0, sky dropper [G 5.2]
@@ -140,6 +142,57 @@ const SNAPPER_REST_TICKS: int = 22       ## pause between two bites
 const SNAPPER_SENSE_DY: int = 40         ## the hero must be within this many px vertically ...
 const SNAPPER_SENSE_EXTRA: int = 8       ## ... and within `range` + this many px in front
 const SNAPPER_BITE_HEIGHT: int = 20      ## the lunge strip covers the lowest 20 px (bite frames, ASSET_MANIFEST.md 4)
+## The rattler in a hole (DESIGN.md A.5: `enemies/snapper skin=snake` / `snake_b`): its bite frames reach about 64 art
+## px in front of the feet point, so its default `range` is shorter than the plant's. [M 4 world 5 hand-over] [own]
+const RATTLER_RANGE: int = 32
+const RATTLER_SKINS: Array[String] = ["snake", "snake_b"]
+
+# =================================================================================================================
+# 2.0 archetype 13, Roller (`enemies/roller`) [G 13.5] [D A.5]
+# =================================================================================================================
+const ROLLER_RANGE_TILES: int = 6        ## default `range`: curls when the target is this many tiles away ...
+const ROLLER_SENSE_ROWS: int = 4         ## ... and within this many rows (tune)
+const ROLLER_WALK_SPEED: int = 32        ## v16, patrol between `left` / `right` (tune)
+const ROLLER_SPEED: int = 64             ## default `speed`, v16: the roll
+const ROLLER_SLOPE_ACCEL: int = 4        ## v16 per tick while rolling down a slope ...
+const ROLLER_SPEED_CAP: int = 96         ## ... up to this
+const ROLLER_CURL_TICKS: int = 14        ## the visible tuck before the roll (no motion)
+const ROLLER_DIZZY_TICKS: int = 33       ## default `dizzy`: after hitting a wall (hittable)
+const ROLLER_BUMP_TICKS: int = 4         ## the wall-impact frame shown first while dizzy [own]
+const ROLLER_UNCURL_TICKS: int = 8
+const ROLLER_ROLL_MAX_TICKS: int = 154   ## uncurls by itself after rolling this long (tune)
+## Body box of the ball (curl, roll, dizzy): about 58 x 52 art px [M 4 world 5 hand-over].
+const ROLLER_BALL_BOX: Vector3i = Vector3i(29, 26, 14)
+
+# =================================================================================================================
+# 2.0 archetype 14, Guard (`enemies/guard`, the co-op Shellback) [G 13.5] [D A.5]
+# =================================================================================================================
+const GUARD_TURN_TICKS: int = 33         ## default `turn`: its facing is re-decided on this clock
+const GUARD_SPEED: int = 24              ## v16, patrol (tune)
+const GUARD_SHIELD_POSE_TICKS: int = 8   ## the raised-shield pose after a glance [own]
+## Front hits (Guard, `shell`, `heavy`, GAMEPLAY.md 13.9.5): a striker within this many px of the feet point counts
+## as in front.
+const FRONT_DX: int = 4
+## Least ticks between two glance clanks / sparks of one enemy (one per strike; as BossBase.GLANCE_TICKS). [own]
+const GLANCE_TICKS: int = 12
+
+# =================================================================================================================
+# 2.0 co-op traits (scripts/enemies/coop_traits.gd) [G 13.9.4] [G 13.9.5]. The shared co-op numbers (windows, daze
+# times, the lone distance, grab reel, leech drain, Brace daze, TARGET_HOLD_TICKS) are PartyTuning's.
+# =================================================================================================================
+const DAZE_ALERT_DY: int = 32            ## `daze`: a striker within PartyTuning.DAZE_ALERT_PX and this many px vertically
+const DAZE_HOP_XVEL: int = 64            ## v16: it hops away from a hero starting a strike ... (tune)
+const DAZE_HOP_YVEL: int = -96           ## ... (tune)
+const DAZE_THROW_HOP_YVEL: int = -128    ## v16: straight up over a thrown weapon coming at it within DAZE_ALERT_PX
+const REGROW_TICKS: int = 22             ## `bond`: a regrowing record is harmless (intangible) this long
+const SPLIT_RUN_XVEL: int = 48           ## `split`: the halves run apart at this speed ... (tune)
+const SPLIT_RUN_TICKS: int = 22          ## ... for this long, then act normally (tune)
+const GRAB_FREE_SHIELD_TICKS: int = 44   ## `grab`: a hero freed by his partner falls with this long of immunity
+const GRAB_HANG_DY: int = 28             ## a seized hero's feet hang this far below the grabber's feet point [own]
+const GRAB_RETURN_SPEED: int = 2         ## px per tick per axis: back to where it seized him after a drop [own]
+const LEECH_BACK_DX: int = 6             ## `leech`: it sits this far behind the host's feet point ... [own]
+const LEECH_BACK_DY: int = 10            ## ... and this far up his back [own]
+const LEECH_RELATCH_TICKS: int = 44      ## after falling off (or being clubbed off) it cannot latch on this long [own]
 
 # =================================================================================================================
 # Bosses, shared [G 6]

@@ -4,7 +4,7 @@ Sunny Land 2D Pixel Art Pack
 Author: ansimuz (Luis Zuno)
 Source: https://opengameart.org/content/sunny-land-2d-pixel-art-pack
 Licence: CC0 1.0 (tier A)
-Used in Club & Grub for: 2.0 (The Far Shore): sprites/enemies/ eagle. Per-file sources and edits: docs/ASSET_MANIFEST.md section 17
+Used in Club & Grub for: 2.0 (The Far Shore): sprites/enemies/ eagle, frog. Per-file sources and edits: docs/ASSET_MANIFEST.md section 17
 Staging folder: .tools/asset_candidates/characters/ansimuz-sunny-land-series
 
 ---- Licence evidence recorded when the pack was downloaded ----

@@ -1,0 +1,49 @@
+# Club & Grub level file - format 2 (docs/ARCHITECTURE.md 7.11). Developer level of player-B (docs/expansion/PLAN.md
+# P1.5): the hero's Book II moves left to right - a spear lying at the start (it goes into the hand, the club onto the
+# belt: press Swap to change), a vine hanging from a ledge (Up grabs, climbs 2 px/tick, steps onto the ledge; a
+# direction + Up leaps off, Down + Up drops), a tar pool (wading at 2 px/tick, a 33 px hop), a palisade too high to
+# jump with a bark board in it (throw the spear at it from the left: the step it makes is the way over) and Chomper
+# tame in his pen (land on the saddle to ride, Down + Up to dismount). tests/test_player_climb.gd validates it. Not
+# part of any campaign (kind = test).
+
+[meta]
+format = 2
+id = test_player_book2
+name = "Far Shore Moves"
+kind = test
+book = 2
+belt = fresh
+biome = jungle
+terrain_a = jungle/terrain_grass
+terrain_b = jungle/terrain
+background = jungle
+music = level_jungle
+author = player-B
+notes = "player-B test walk: spear pick-up and Swap, vine and top step, tar pool, bark board step over a palisade, Chomper."
+
+[legend]
+V = objects/vine length=5
+B = objects/bark_board face=l tile=#
+S = items/weapon kind=spear
+E = objects/exit locked=false
+f = items/food index=3
+
+[tiles]
+................................................................
+................................................................
+................................................................
+......................................f.........................
+................................................................
+................................................................
+..........####V.....................#...........................
+....................................#...........................
+....................................B...........................
+....................................#...........................
+....................................#...........................
+..@..S..f...........................#.........................E.
+################::::::::::######################################
+################################################################
+
+[entities]
+objects/rex_pen 48 11 name=chomper_pen
+objects/mount 48 11 kind=rex pen=chomper_pen

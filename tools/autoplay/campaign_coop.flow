@@ -1,0 +1,258 @@
+# Co-op, Book I, Beginner, two players from a fresh save, through the 2.0 title path (docs/expansion/PLAN.md P1.3 /
+# 6.2, DESIGN.md D.9 / D.11): title -> Play -> Co-op -> the join panel (P1 presses Jump on the left keyboard half,
+# P2 on the numpad: the classic layout, offered first in co-op) -> book select (Book I) -> Beginner -> the map ->
+# every Beginner stop of Book I as its co-op file (`<id>_coop`, Levels.level_for_mode), each played by its two-stream
+# route (`<id>_coop.inputs`), the linked stages without a tally, the co-op Brute, one tribe tally per stop, and the
+# expert wall after Crystal Grotto. The headless twin is the co-op campaign test of tests/test_coop_routes.gd
+# (phase 3). Checks: no team wipe, both heroes at every stage start, co-op mode with a party of two.
+# skeleton: the stops are filled in as the co-op files and their routes land (G1: w1_l1_coop; phase 3: the rest);
+# the lint of tests/test_integration_flows.gd lists what is not there yet. The screens are core-A's Flow (title > Play >
+# Co-op: join > book_select > mode_select > world_map); the title's Play choice and the join keys are ui-A's (P1.11).
+#   GD_TIMEOUT=1800 bash .tools/gd.sh play --flow=tools/autoplay/campaign_coop.flow --fast --fresh-user --out=campaign_coop
+
+# --- Boot, title, Play > Co-op > join two players > Book I > Beginner -----------------------------------------------
+wait_until flow.current_screen == title 600
+wait_until flow.busy == false 600
+wait 40
+shot title
+expect save.has_progress() == false
+# Play, then Co-op (Flow.open_play(COOP); the keys of the title's Play / Solo / Co-op / Versus choice: ui-A, P1.11).
+press ui_accept
+wait 10
+press ui_down
+press ui_accept
+wait_until flow.current_screen == join 300
+wait_until flow.busy == false 600
+# P1 joins with Space (left half), P2 with Num 0 (right half); both hold Strike to be ready (Flow.finish_join).
+key Space
+key Kp_0
+wait 10
+shot join_two
+hold Shift Kp_Enter
+wait 40
+release all
+wait_until flow.current_screen == book_select 300
+wait_until flow.busy == false 600
+press ui_accept
+# Flow.choose_book(1) -> the difficulty (Beginner has the focus) -> Flow.start_selected_game -> the map.
+wait_until flow.current_screen == mode_select 300
+wait_until flow.busy == false 600
+press ui_accept
+wait_until flow.current_screen == world_map 600
+wait_until flow.busy == false 600
+expect game.book == 1
+expect game.mode == 1
+expect game.party == 2
+expect game.difficulty == 0
+expect game.lives == 2
+expect game.score == 0
+
+# --- w1_l1_coop -----------------------------------------------------------------------------------------------
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w1_l1
+wait_until scene.countdown >= 0 600
+shot map_w1_l1
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w1_l1_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+expect game.weapon == 0
+wait 2
+shot w1_l1_coop_start
+every 480 w1_l1_coop
+play_file tools/autoplay/routes/w1_l1_coop.inputs
+every 0
+expect events.party_wiped == 0
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_w1_l1_coop
+press ui_accept
+wait 20
+press ui_accept
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+
+# --- w1_l2_coop -----------------------------------------------------------------------------------------------
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w1_l2
+wait_until scene.countdown >= 0 600
+shot map_w1_l2
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w1_l2_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+expect game.weapon == 0
+wait 2
+shot w1_l2_coop_start
+every 480 w1_l2_coop
+play_file tools/autoplay/routes/w1_l2_coop.inputs
+every 0
+expect events.party_wiped == 0
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_w1_l2_coop
+press ui_accept
+wait 20
+press ui_accept
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+
+# --- w2_l1_coop -----------------------------------------------------------------------------------------------
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w2_l1
+wait_until scene.countdown >= 0 600
+shot map_w2_l1
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w2_l1_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+expect game.weapon == 0
+wait 2
+shot w2_l1_coop_start
+every 480 w2_l1_coop
+play_file tools/autoplay/routes/w2_l1_coop.inputs
+every 0
+expect events.party_wiped == 0
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_w2_l1_coop
+press ui_accept
+wait 20
+press ui_accept
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+
+# --- w2_l2_coop -----------------------------------------------------------------------------------------------
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w2_l2
+wait_until scene.countdown >= 0 600
+shot map_w2_l2
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w2_l2_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+expect game.weapon == 0
+wait 2
+shot w2_l2_coop_start
+every 480 w2_l2_coop
+play_file tools/autoplay/routes/w2_l2_coop.inputs
+every 0
+expect events.party_wiped == 0
+# The linked stage follows without a tally.
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w2_l2b_coop 600
+wait 2
+shot w2_l2b_coop_start
+every 480 w2_l2b_coop
+play_file tools/autoplay/routes/w2_l2b_coop.inputs
+every 0
+expect events.party_wiped == 0
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_w2_l2_coop
+press ui_accept
+wait 20
+press ui_accept
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+
+# --- w3_l1_coop -----------------------------------------------------------------------------------------------
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w3_l1
+wait_until scene.countdown >= 0 600
+shot map_w3_l1
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w3_l1_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+expect game.weapon == 0
+wait 2
+shot w3_l1_coop_start
+every 480 w3_l1_coop
+play_file tools/autoplay/routes/w3_l1_coop.inputs
+every 0
+expect events.party_wiped == 0
+# The linked stage follows without a tally.
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w3_l1b_coop 600
+wait 2
+shot w3_l1b_coop_start
+every 480 w3_l1b_coop
+play_file tools/autoplay/routes/w3_l1b_coop.inputs
+every 0
+expect events.party_wiped == 0
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_w3_l1_coop
+press ui_accept
+wait 20
+press ui_accept
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+
+# --- w3_l2_coop -----------------------------------------------------------------------------------------------
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w3_l2
+wait_until scene.countdown >= 0 600
+shot map_w3_l2
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w3_l2_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+expect game.weapon == 0
+wait 2
+shot w3_l2_coop_start
+every 480 w3_l2_coop
+play_file tools/autoplay/routes/w3_l2_coop.inputs
+every 0
+expect events.party_wiped == 0
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_w3_l2_coop
+press ui_accept
+wait 20
+press ui_accept
+
+# Crystal Grotto is the last Beginner stop: the expert wall, then the title.
+wait_until flow.current_screen == expert_wall 900
+wait_until flow.busy == false 600
+expect game.mode == 1
+wait 90
+shot expert_wall_coop
+press ui_accept
+wait_until flow.current_screen == title 900
+wait_until flow.busy == false 600
+wait 30
+shot title_again

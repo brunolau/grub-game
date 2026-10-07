@@ -85,6 +85,11 @@ func _on_hit(_power: int, _source: SimEntity) -> void:
 	spray(_debris_kind(), ObjTuning.BLOCK_HIT_DEBRIS, get_hit_point())
 
 
+## 2.0 versus refill: a broken block stays broken (its cell is air now and a hero may stand in it).
+func refill() -> void:
+	pass
+
+
 func _on_opened() -> void:
 	var level: LevelBase = Game.level
 	if level == null:

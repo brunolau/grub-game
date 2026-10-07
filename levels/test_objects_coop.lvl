@@ -1,0 +1,73 @@
+# Club & Grub level file - format 2 (docs/ARCHITECTURE.md 7.11). The co-op objects workshop of objects-A (PLAN.md
+# P1.9): every co-op object of DESIGN.md D.5 once, left to right, for a party of two - P2's start, a spear on the
+# fresh-club belt, a plate door (A holds, B walks through), a see-saw under a drop ledge (a 4-row fall onto the high
+# end launches the partner to the ledge above), a heave boulder that fills a gap, twin drums that unlock a gate, a
+# pulley between two ride platforms with a flower pot on the ledge above, a checkpoint and a keeper hall of 4 rows
+# whose door opens when both keepers are dead, then the team exit. Every gate has its x2 tablet. tests/
+# test_objects_coop.gd plays it with two real heroes. Not part of any campaign (kind = test, so no co-op proof runs on
+# it; the keepers carry a `keeper=` group but no trait).
+
+[meta]
+format = 2
+id = test_objects_coop
+name = "Tribe Workshop"
+kind = test
+belt = fresh
+biome = jungle
+terrain_a = jungle/terrain_grass
+terrain_b = jungle/terrain
+background = jungle
+music = level_jungle
+author = objects-A
+notes = "Co-op objects of P1.9 on one strip: plate door, see-saw, heave boulder, twin drums and gate, pulley and flower pot, keeper door, team exit."
+
+[legend]
+
+[tiles]
+|...............................#.....................................................................................................#....|
+|...............................#...................-----.............................................................................#....|
+|...............................#.....................................................................................................#....|
+|...............................#.....................................................................................................#....|
+|...............................#.................................................................................######..............#....|
+|...............................#.......#####...............................................................................###########....|
+|...............................#.......#####.........................................................................................#....|
+|...............................#.......#####.........................................................................................#....|
+|...............................#.......#####.........................................................................................#....|
+|.@.............................#.......#####.........................................................................................#....|
+######################################################################..####################################################################
+######################################################################..####################################################################
+
+[entities]
+# A: the start of the tribe
+objects/hero_start 5 9 slot=2
+items/weapon 9 9 kind=spear
+objects/x2_tablet 16 9 gate=plate_door far=35,9
+# B: plate door (the plate stands 10 tiles from its door)
+objects/plate 22 9 name=plate_a
+objects/column 32 9 size=1,3 rise=3 rise_while=plate_a
+# C: see-saw under the drop ledge (a spring up to the ledge; the target ledge is row 1)
+objects/x2_tablet 36 9 gate=seesaw far=54,0
+objects/spring 38 9
+objects/seesaw 47 9 len=5 facing=l
+# D: heave boulder over a two-row gap
+objects/x2_tablet 60 9 gate=boulder far=74,9
+objects/boulder_heavy 64 9
+# E: twin drums unlock the gate between them
+objects/drum 84 9 bond=gong
+objects/x2_tablet 86 9 gate=drums far=102,9
+objects/gate 89 9 name=gong_gate dest=nest needs=gong skin=arch
+objects/drum 94 9 bond=gong
+# F: pulley between two ride platforms; the flower pot waits on the ledge above
+objects/marker 102 9 name=nest
+objects/x2_tablet 100 9 gate=pulley far=116,3
+objects/platform 104 6 name=pa mode=ride
+objects/platform 111 6 name=pb mode=ride
+objects/pulley 107.5 2 a=pa b=pb range=3
+objects/flower_pot 114 3
+# G: checkpoint, keeper hall (4 rows high) and its door, the team exit
+objects/checkpoint 121 9
+objects/x2_tablet 123 9 gate=keepers far=136,9
+enemies/walker 128 9 keeper=hall skin=turtle left=-2 right=2
+enemies/walker 131 9 keeper=hall skin=turtle left=-2 right=2
+objects/column 134 9 size=1,4 rise=4 trigger=keepers:hall
+objects/exit 137 9

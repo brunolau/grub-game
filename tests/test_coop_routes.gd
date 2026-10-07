@@ -24,11 +24,12 @@ func _table() -> Dictionary:
 		return Levels.is_coop_level(StringName(str(spec.get("level", "")))) and int(spec.get("players", 1)) >= 2)
 
 
-## The co-op files of the registry.
-func _coop_files() -> Array[StringName]:
+## The co-op files of the registry (with `tests`: also the co-op files of test levels, which the route harness's own
+## tests prove with their fixture routes, tests/test_integration_belt.gd).
+func _coop_files(tests: bool = false) -> Array[StringName]:
 	var files: Array[StringName] = []
 	for level_id: StringName in Levels.all_ids():
-		if Levels.is_coop_level(level_id):
+		if Levels.is_coop_level(level_id) and (tests 				or Levels.get_level_kind(Levels.get_coop_base(level_id)) != Levels.KIND_TEST):
 			files.append(level_id)
 	return files
 
@@ -104,7 +105,7 @@ func test_every_coop_file_is_valid() -> void:
 	validator.add_folder(Levels.LEVEL_DIR)
 	validator.run()
 	var problems: PackedStringArray = PackedStringArray()
-	var files: Array[StringName] = _coop_files()
+	var files: Array[StringName] = _coop_files(true)
 	for level_id: StringName in files:
 		for problem: Dictionary in validator.problems_of(Levels.get_level_path(level_id)):
 			if int(problem["severity"]) == LevelValidator.ERROR:

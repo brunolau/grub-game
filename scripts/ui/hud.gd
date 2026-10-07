@@ -8,9 +8,17 @@ extends Control
 ## intro banner shows waits until the banner is gone. The banner gives way early to a sign board the hero reads and
 ## to a boss that wakes up (dismiss_intro()).
 ##
-## Owner: ui. Instantiated by Flow into the HUD CanvasLayer. It only reacts to `Game` and `Events` signals and
-## never reaches into the level. Layout follows the mock-ups at 640 x 360 and stays anchored to the safe area on
-## every other view size.
+## 2.0 (DESIGN.md C.1 / D.11 / E.9, GAMEPLAY.md 13.9.9): the belt icon right of P1's hearts shows what a Swap brings
+## while he owns a special (never in Book I solo, whose belt stays empty, so the 1.0 HUD is unchanged there). In
+## co-op P1's hearts get a "P1" tag and P2's panel ([HudPlayerPanel]: tag, hearts, bone fraction, belt icon) sits
+## mirrored top-right under the letters; tribe lives, score and letters stay where they are. In a party a hero off
+## the view gets an edge arrow with the stone countdown of the leash ([HudEdgeArrows]). In versus the campaign rows
+## give way to the corner panels, the sundial and the round banners of [HudVersus].
+##
+## Owner: ui-B. Instantiated by Flow into the HUD CanvasLayer. It reacts to `Game` and `Events` signals; of the level it
+## reads only the heroes' documented HUD fields (position, leash; ARCHITECTURE.md 3.12) and the versus numbers the
+## referee offers ([HudVersus]). Layout follows the mock-ups at 640 x 360 and stays anchored to the safe area on every
+## other view size.
 
 const HEART_SPACING: float = 34.0
 const LETTER_SPACING: float = 40.0
@@ -46,6 +54,13 @@ const ROW_HEIGHT: float = 48.0
 const BOSS_TOP: float = 44.0
 const BOSS_GAP: float = 6.0
 const BOSS_UNDER_HERO_ALPHA: float = 0.35
+## Belt icon (ui/hud_belt.png, 16 logical px): gap right of P1's third heart (art px).
+const BELT_GAP: float = 6.0
+## Co-op: top of P2's panel below the safe-area top (under the bonus letters), the room P1's "P1" tag takes left of
+## his hearts, and how far the level banner and the hint panel move down so that they clear P2's panel.
+const P2_TOP: float = 46.0
+const P1_TAG_W: float = 32.0
+const PARTY_GAP: float = 6.0
 
 ## Hearts drawn (mirrors Game.hearts).
 var shown_hearts: int = 0
@@ -87,6 +102,19 @@ var _hint_shown_text: String = ""
 var _row_nodes: Array[CanvasItem] = []
 var row_alpha: float = 1.0
 var _row_area: Control = null
+## 2.0: the layout in use (Defs.GameMode of the run; co-op only with a party of two or more).
+var hud_layout: int = Defs.GameMode.SINGLE
+## Belt icon drawn right of P1's hearts: a Defs.Weapon, or PlayerRun.BELT_EMPTY (hidden).
+var shown_belt: int = PlayerRun.BELT_EMPTY
+## Alpha of P2's co-op panel (it fades like the row while a hero is behind it).
+var p2_alpha: float = 1.0
+var _hearts_row: Control = null
+var _p1_belt: TextureRect = null
+var _p1_tag: Label = null
+var _p2_panel: HudPlayerPanel = null
+var _edge_arrows: HudEdgeArrows = null
+var _versus: HudVersus = null
+var _campaign_nodes: Array[CanvasItem] = []
 
 
 func _init() -> void:
@@ -114,8 +142,10 @@ func _ready() -> void:
 	_build_letters(area)
 	for child: Node in area.get_children():
 		_row_nodes.append(child as CanvasItem)
+		_campaign_nodes.append(child as CanvasItem)
 	_build_boss_bar(area)
 	_build_hint(area)
+	_build_party(area)
 	_apply_margins()
 	get_viewport().size_changed.connect(_apply_margins)
 	Game.score_changed.connect(_on_score_changed)
@@ -125,6 +155,7 @@ func _ready() -> void:
 	Game.letters_changed.connect(_on_letters_changed)
 	Game.letters_completed.connect(_on_letters_completed)
 	Game.run_started.connect(_on_run_started)
+	Game.run_belt_changed.connect(_on_run_belt_changed)
 	Events.boss_started.connect(_on_boss_started)
 	Events.boss_energy_changed.connect(_on_boss_energy_changed)
 	Events.boss_defeated.connect(_on_boss_defeated)
@@ -134,7 +165,7 @@ func _ready() -> void:
 	refresh()
 	# The level armed its time limit before this overlay existed: show the current value.
 	_on_time_left_changed(Game.level.get_time_left_seconds() if Game.level != null else -1)
-	if Flow.current_screen == Flow.SCREEN_LEVEL and Game.level_id != &"":
+	if Flow.current_screen == Flow.SCREEN_LEVEL and Game.level_id != &"" and hud_layout != Defs.GameMode.VERSUS:
 		show_intro(Game.level_id)
 
 
@@ -166,6 +197,22 @@ func _fade_row(delta: float) -> void:
 	row_alpha = move_toward(row_alpha, ROW_UNDER_HERO_ALPHA if under else 1.0, delta / ROW_FADE_SECONDS)
 	for node: CanvasItem in _row_nodes:
 		node.modulate.a = row_alpha
+	if _p2_panel != null and _p2_panel.visible:
+		var behind: bool = level != null and _any_hero_behind(level, _p2_panel.get_global_rect())
+		p2_alpha = move_toward(p2_alpha, ROW_UNDER_HERO_ALPHA if behind else 1.0, delta / ROW_FADE_SECONDS)
+		_p2_panel.modulate.a = p2_alpha
+
+
+## True when the body of a living hero of `level` overlaps `rect` (viewport px, grown by 4).
+func _any_hero_behind(level: LevelBase, rect: Rect2) -> bool:
+	for hero: PlayerBase in level.contact_order():
+		if not hero.is_inside_tree() or hero.dead:
+			continue
+		var feet: Vector2 = hero.get_global_transform_with_canvas().origin
+		var box: Vector2 = Vector2(float(hero.box_w), float(hero.box_h)) * float(Tuning.ART_SCALE)
+		if Rect2(feet.x - box.x * 0.5, feet.y - box.y, box.x, box.y).intersects(rect.grow(4.0)):
+			return true
+	return false
 
 
 ## Fade the boss bar while the hero overlaps it (2.0: any living hero).
@@ -218,6 +265,8 @@ func refresh() -> void:
 	_set_energy(Game.hearts, Game.bones, false)
 	_show_letters(Game.letters)
 	_set_boss(0, 0)
+	_set_belt(Game.runs[0].belt)
+	_apply_layout_mode()
 
 
 ## Text of the score counter.
@@ -363,6 +412,16 @@ func _build_hearts(area: Control) -> void:
 	_bones.position = Vector2(roundf(HEART_SPACING * 1.5 - bones_width * 0.5), 37.0)
 	_bones.draw.connect(_draw_bones)
 	row.add_child(_bones)
+	_hearts_row = row
+	# 2.0: the belt icon right of the hearts (hidden while no special is owned); in co-op the "P1" tag left of them.
+	_p1_belt = UiKit.picture(null)
+	_p1_belt.position = Vector2(HEART_SPACING * float(Tuning.ENERGY_START - 1) + 32.0 + BELT_GAP, 2.0)
+	_p1_belt.visible = false
+	row.add_child(_p1_belt)
+	_p1_tag = UiPlayers.tag_label(0)
+	_p1_tag.position = Vector2(-P1_TAG_W, 7.0)
+	_p1_tag.visible = false
+	row.add_child(_p1_tag)
 
 
 func _build_letters(area: Control) -> void:
@@ -391,11 +450,97 @@ func _build_boss_bar(area: Control) -> void:
 	area.add_child(_boss_bar)
 
 
-## How far the intro banner and the hint panel move down while the boss bar is shown (art px).
+## How far the intro banner and the hint panel move down while the boss bar is shown, or in co-op to clear P2's
+## panel (art px).
 func _boss_drop() -> float:
+	var drop: float = 0.0
+	if _p2_panel != null and _p2_panel.visible:
+		drop = maxf(0.0, P2_TOP + HudPlayerPanel.PANEL_H + PARTY_GAP - HINT_TOP)
 	if _boss_bar == null or not _boss_bar.visible:
-		return 0.0
-	return maxf(0.0, BOSS_TOP + HudBossBar.FRAME_SIZE.y + BOSS_GAP - HINT_TOP)
+		return drop
+	return maxf(drop, BOSS_TOP + HudBossBar.FRAME_SIZE.y + BOSS_GAP - HINT_TOP)
+
+
+## 2.0: P2's co-op panel (top-right under the letters), the edge arrows of a party and the versus HUD; which of them
+## show is decided by [method _apply_layout_mode].
+func _build_party(area: Control) -> void:
+	_p2_panel = HudPlayerPanel.new(1, true)
+	_p2_panel.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	_p2_panel.offset_left = -HudPlayerPanel.PANEL_W
+	_p2_panel.offset_right = 0.0
+	_p2_panel.offset_top = P2_TOP
+	_p2_panel.offset_bottom = P2_TOP + HudPlayerPanel.PANEL_H
+	_p2_panel.visible = false
+	area.add_child(_p2_panel)
+	_edge_arrows = HudEdgeArrows.new()
+	_edge_arrows.visible = false
+	add_child(_edge_arrows)
+
+
+## Show the parts of the layout of the current run: single-player (the 1.0 HUD), co-op (P1 tag, P2's panel, edge
+## arrows) or versus (the campaign rows hide; corner panels, sundial and banners).
+func _apply_layout_mode() -> void:
+	var wanted: int = Defs.GameMode.SINGLE
+	if Game.mode == Defs.GameMode.VERSUS:
+		wanted = Defs.GameMode.VERSUS
+	elif Game.mode == Defs.GameMode.COOP and Game.party > 1:
+		wanted = Defs.GameMode.COOP
+	hud_layout = wanted
+	var coop: bool = wanted == Defs.GameMode.COOP
+	var versus: bool = wanted == Defs.GameMode.VERSUS
+	if _p2_panel == null:
+		return
+	_p1_tag.visible = coop
+	_p2_panel.visible = coop
+	if coop:
+		_p2_panel.refresh()
+	_edge_arrows.visible = coop or versus
+	_edge_arrows.set_process(coop or versus)
+	for node: CanvasItem in _campaign_nodes:
+		node.visible = not versus
+	if versus and _versus == null:
+		_versus = HudVersus.new()
+		add_child(_versus)
+	elif not versus and _versus != null:
+		_versus.queue_free()
+		_versus = null
+	if _time_label != null and not versus:
+		_time_label.visible = shown_time >= 0
+	_place_below_boss_bar()
+
+
+## True while the belt icon right of P1's hearts shows.
+func is_belt_visible() -> bool:
+	return _p1_belt != null and _p1_belt.visible
+
+
+## P2's co-op panel (shown in co-op only).
+func get_p2_panel() -> HudPlayerPanel:
+	return _p2_panel
+
+
+## The edge arrows of a party.
+func get_edge_arrows() -> HudEdgeArrows:
+	return _edge_arrows
+
+
+## The versus HUD (null outside versus).
+func get_versus() -> HudVersus:
+	return _versus
+
+
+func _set_belt(belt: int) -> void:
+	shown_belt = belt if belt >= 0 else PlayerRun.BELT_EMPTY
+	if _p1_belt == null:
+		return
+	_p1_belt.visible = shown_belt != PlayerRun.BELT_EMPTY
+	if _p1_belt.visible:
+		_p1_belt.texture = UiPlayers.belt_icon(shown_belt)
+
+
+func _on_run_belt_changed(slot: int, belt: int) -> void:
+	if slot == 0:
+		_set_belt(belt)
 
 
 ## Put the intro banner and the hint panel below the boss bar while it shows, back under the HUD row after.
@@ -515,7 +660,7 @@ func _on_lives_changed(lives: int) -> void:
 
 func _on_time_left_changed(seconds: int) -> void:
 	shown_time = seconds
-	_time_label.visible = seconds >= 0
+	_time_label.visible = seconds >= 0 and hud_layout != Defs.GameMode.VERSUS
 	if seconds < 0:
 		return
 	_time_label.text = tr("UI_HUD_TIME").format({"seconds": seconds})

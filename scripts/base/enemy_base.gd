@@ -17,6 +17,11 @@ extends SimEntity
 ## `_asleep_tick()`, `_should_wake()`, `_should_sleep()`; 2.0 (PLAN.md P0.8): `accepts_hit_from()`, `_on_hit_by()`,
 ## `_on_hit_refused()`, `_choose_target()`, with the fields `last_hit_slot`, `last_hit_tick`, `coop_trait`, `bond`,
 ## `keeper`. Their defaults are the 1.0 behaviour.
+## 2.0 co-op (PLAN.md P1.8): a record with a trait carries a [CoopTraits] ([method coop_traits]); this class calls it
+## from its own body (take_hit, on_bounced, kill, the ENEMIES / CONTACT_ENEMIES ticks, dozing, targeting), so every
+## archetype gets the trait rules. A party (LevelBase.hero_count() > 1) targets the nearest hatched hero, sticky for
+## PartyTuning.TARGET_HOLD_TICKS (GAMEPLAY.md 13.9.4). A record without a trait in a party of one runs exactly the
+## 1.0 code: every 2.0 branch below is behind `_traits != null` or `hero_count() > 1`.
 
 ## Emitted once when the enemy dies.
 signal died(enemy: EnemyBase, cause: StringName)
@@ -54,7 +59,8 @@ var awake: bool = false
 var dead: bool = false
 ## One-shot enemies (launched divers, edge rushers) do not come back after they despawn.
 var one_shot: bool = false
-## Head bounces received (0..Tuning.BOUNCE_COUNT_MAX): drives the score multiplier.
+## Head bounces received (0..Tuning.BOUNCE_COUNT_MAX; 2.0: up to 15 with the co-op Relay Bounce of a Feast Land):
+## drives the score multiplier.
 var bounce_count: int = 0
 ## Hang-glider dive stomps received; the third kills.
 var dive_count: int = 0
@@ -107,6 +113,14 @@ var _must_leave_view: bool = false
 var _ledge_ticks: int = 0
 var _spawn_facing: int = 1
 
+## 2.0: the co-op trait rules of this record (null without a trait: every 1.0 record).
+var _traits: CoopTraits = null
+## 2.0 party targeting (GAMEPLAY.md 13.9.4): the hero it sticks to and the Sim.total_ticks until which it does.
+var _held_target: PlayerBase = null
+var _held_until: int = 0
+## 2.0: Sim.total_ticks of the last glance clank and spark (EnemyTuning.GLANCE_TICKS apart).
+var _glance_tick: int = -1000
+
 static var _warned_skins: Dictionary[String, bool] = {}
 
 
@@ -127,6 +141,9 @@ func _notification(what: int) -> void:
 
 
 func _sim_phases() -> PackedInt32Array:
+	if _traits != null and _traits.needs_contact_phase():
+		# 2.0: heavy, grab and leech meet the heroes before their contact pass (CoopTraits.contact_tick).
+		return PackedInt32Array([Defs.Phase.ENEMIES, Defs.Phase.CONTACT_ENEMIES])
 	return PackedInt32Array([Defs.Phase.ENEMIES])
 
 
@@ -145,15 +162,23 @@ func _apply_params(params: Dictionary) -> void:
 		bond = StringName(str(params["bond"]))
 	if params.has("keeper"):
 		keeper = StringName(str(params["keeper"]))
+	# Presets set coop_trait before calling super (enemies/shellback); the level's `coop=` wins.
+	_traits = CoopTraits.create(self)
 
 
 func _sim_tick(phase: int) -> void:
 	if phase != Defs.Phase.ENEMIES:
+		if phase == Defs.Phase.CONTACT_ENEMIES and _traits != null and not dead and not _corpse:
+			_traits.contact_tick()
 		return
 	if _corpse:
 		_corpse_tick()
+		if _traits != null:
+			_traits.dead_tick()
 		return
 	if dead or _excluded_by_mode():
+		if dead and _traits != null:
+			_traits.dead_tick()
 		return
 	if flash > 0:
 		flash -= 1
@@ -163,7 +188,10 @@ func _sim_tick(phase: int) -> void:
 	if _should_sleep():
 		sleep()
 		return
-	_ai_tick()
+	if _traits == null or not _traits.pre_ai():
+		_ai_tick()
+		if _traits != null and awake and not dead:
+			_traits.post_ai()
 	if awake:
 		_refresh_visual()
 		_anim_age += 1
@@ -183,6 +211,9 @@ func _doze_area() -> Rect2i:
 
 func _can_doze() -> bool:
 	if _corpse:
+		return false
+	if _traits != null and _traits.keeps_awake():
+		# 2.0: an open bond / split window, a held hero, a regrow.
 		return false
 	if dead or _excluded_by_mode():
 		return true
@@ -216,8 +247,12 @@ func is_targetable() -> bool:
 ## 2.0 (PLAN.md P0.8): the hitter's slot is noted ([member last_hit_slot], [member last_hit_tick]); a hit that
 ## [method accepts_hit_from] refuses glances (consumed, no damage: a shell's front); every other hit goes through
 ## [method _on_hit_by] first. With the defaults this is the 1.0 hit.
+## Co-op traits (PLAN.md P1.8): a leech's host's own weapons pass through it (false, not consumed); the first hit of a
+## whole `split` record splits it without damage (CoopTraits.absorbs_hit).
 func take_hit(power: int, source: SimEntity) -> bool:
 	if not is_targetable():
+		return false
+	if _traits != null and _traits.skips_hit(source):
 		return false
 	var slot: int = Defs.hitter_slot(source)
 	if slot >= 0:
@@ -227,6 +262,8 @@ func take_hit(power: int, source: SimEntity) -> bool:
 		_on_hit_refused(source)
 		return true
 	_on_hit_by(slot, power)
+	if _traits != null and _traits.absorbs_hit(slot, source):
+		return true
 	hp -= power
 	_spawn_optional(FX_HIT, sim_pos + Vector2i(0, -(box_h >> 1)))
 	if hp < 0:
@@ -241,11 +278,19 @@ func take_hit(power: int, source: SimEntity) -> bool:
 
 
 ## The hero bounced on its head (never damages the enemy). Returns the multiplier to show above the hero
-## (0 = show nothing: a number appears on every second bounce).
-func on_bounced(_hero: PlayerBase) -> int:
-	bounce_count = mini(bounce_count + 1, Tuning.BOUNCE_COUNT_MAX)
+## (0 = show nothing: a number appears on every second bounce). 2.0: a `daze` record is dazed (CoopTraits); with a
+## party driver the count is the driver's Relay Bounce answer (GAMEPLAY.md 13.9.8: in a co-op Feast Land it rises past
+## Tuning.BOUNCE_COUNT_MAX only on a bounce by the other hero, up to 15; elsewhere exactly the 1.0 count).
+func on_bounced(hero: PlayerBase) -> int:
+	var driver: SimEntity = Game.level.party_driver if Game.level != null else null
+	if driver != null and driver.has_method(&"relay_bounce_count"):
+		bounce_count = int(driver.call(&"relay_bounce_count", self, hero, bounce_count))
+	else:
+		bounce_count = mini(bounce_count + 1, Tuning.BOUNCE_COUNT_MAX)
+	if _traits != null:
+		_traits.on_bounced(hero)
 	if (bounce_count & 1) == 0:
-		return Tuning.bounce_multiplier(bounce_count)
+		return _bounce_multiplier(bounce_count)
 	return 0
 
 
@@ -264,17 +309,37 @@ func on_hurt_hero(_hero: PlayerBase) -> void:
 	stole_heart = true
 
 
+## 2.0 Brace Wall (PHYSICS.md C.10), asked by a braced crouching hero's contact pass (player-A) before a contact would
+## hurt him: true = this is a `heavy` record of a co-op party and it is stopped dead and dazed
+## (PartyTuning.BRACE_DAZE_TICKS, head open; true again while that daze lasts), so the contact is ignored; false = the
+## normal contact (every other enemy, a party of one). The heavy also tests the wall itself (CoopTraits).
+func brace_stop(_hero: PlayerBase, _partner: PlayerBase) -> bool:
+	return _traits != null and _traits.brace_stop()
+
+
 ## 2.0 (TECH_AUDIT.md 4.8): may a weapon hit from `source` (a hero, or his thrown weapon: Defs.hitter_slot names the
 ## hero) hurt it now? False = the hit glances ([method take_hit] consumes it without damage; [method _on_hit_refused]
 ## shows it). Override for "shielded from the front", heavy enemies only a braced or charged hit breaks, the Shaman's
-## bone shields (DESIGN.md D.6). Default true: every 1.0 hit counts.
-func accepts_hit_from(_source: SimEntity) -> bool:
-	return true
+## bone shields (DESIGN.md D.6). Default true: every 1.0 hit counts; a record with a co-op trait asks its rules
+## (CoopTraits.accepts_hit: the front of `shell` / `heavy`, an undazed `daze`). Overrides call super.
+func accepts_hit_from(source: SimEntity) -> bool:
+	return _traits == null or _traits.accepts_hit(source)
 
 
 ## Points paid when it dies now: ladder value x head-bounce multiplier.
 func get_points() -> int:
-	return Tuning.SCORE_LADDER[score_index] * Tuning.bounce_multiplier(bounce_count)
+	return Tuning.SCORE_LADDER[score_index] * _bounce_multiplier(bounce_count)
+
+
+## 2.0: the multiplier of a bounce count - Tuning.bounce_multiplier up to BOUNCE_COUNT_MAX (1.0), the party driver's
+## Relay Bounce steps above it (x10 for 12-13, x12 for 14-15; world-A's PartyDriver.relay_multiplier).
+func _bounce_multiplier(count: int) -> int:
+	if count <= Tuning.BOUNCE_COUNT_MAX:
+		return Tuning.bounce_multiplier(count)
+	var driver: SimEntity = Game.level.party_driver if Game.level != null else null
+	if driver != null and driver.has_method(&"relay_multiplier"):
+		return int(driver.call(&"relay_multiplier", count))
+	return Tuning.bounce_multiplier(count)
 
 
 ## Kill it: pays the score, frees the slot, releases 6 bones when it had stolen a heart.
@@ -302,6 +367,9 @@ func kill(cause: StringName, killer: SimEntity = null) -> void:
 			_spawn_optional(FX_POOF, sim_pos + Vector2i(0, -(box_h >> 1)))
 		visible = false
 	Audio.play_sfx(Sfx.FEAST_CHOMP if cause == &"feast" else Sfx.ENEMY_DEATH)
+	if _traits != null:
+		# 2.0: a bond / split death opens or completes its window; a held hero or a host is let go.
+		_traits.on_killed()
 	Events.enemy_killed.emit(self, points, cause)
 	died.emit(self, cause)
 	if not thrown:
@@ -320,6 +388,8 @@ func burst_into_items(count: int = Tuning.GRENADE_ITEMS_PER_ENEMY) -> void:
 		_spawn_optional(FX_POOF, sim_pos + Vector2i(0, -(box_h >> 1)))
 	sleep()
 	visible = false
+	if _traits != null:
+		_traits.on_killed()
 	Events.enemy_killed.emit(self, 0, &"grenade")
 	died.emit(self, &"grenade")
 	_on_gone()
@@ -349,6 +419,9 @@ func sleep() -> void:
 	_grounded = false
 	_climbing = false
 	_ledge_ticks = 0
+	_held_target = null
+	if _traits != null:
+		_traits.on_sleep()
 	if dead:
 		return
 	if one_shot:
@@ -366,8 +439,12 @@ func sleep() -> void:
 	teleport(spawn_pos)
 
 
-## Respawn of the hero: every enemy returns to its level-file state.
+## Respawn of the hero: every enemy returns to its level-file state. 2.0: the half a `split` record spawned leaves
+## the level; the trait state is cleared.
 func _on_level_reset() -> void:
+	if _traits != null and _traits.is_copy:
+		_coop_remove()
+		return
 	sleep()
 	_corpse = false
 	dead = false
@@ -382,6 +459,9 @@ func _on_level_reset() -> void:
 	_must_leave_view = false
 	visible = not _hide_asleep
 	teleport(spawn_pos)
+	_held_target = null
+	if _traits != null:
+		_traits.on_reset()
 	_on_reset()
 	_play(&"idle", true)
 	_refresh_visual()
@@ -423,20 +503,34 @@ func _on_hit_by(_slot: int, _power: int) -> void:
 	pass
 
 
-## 2.0: a hit [method accepts_hit_from] refused has just glanced off (clank and spark). Override; nothing by default.
-func _on_hit_refused(_source: SimEntity) -> void:
-	pass
+## 2.0: a hit [method accepts_hit_from] refused has just glanced off. Default: the clank and the spark (at most one
+## per EnemyTuning.GLANCE_TICKS, so one per strike). Override (call super to keep them).
+func _on_hit_refused(source: SimEntity) -> void:
+	_show_glance(source)
 
 
 ## 2.0 (TECH_AUDIT.md 4.8): the hero this enemy reacts to this tick - what [method _target_hero] returns to every
-## archetype. Default: LevelBase.target_hero(self) (a party of one: the 1.0 hero unless he is dead). Override for
-## aggro rules: stick to the hero who hit it last (EnemyTuning.TARGET_HOLD_TICKS), the `lone` straggler (GAMEPLAY.md
-## 13.9.5).
+## archetype. A party of one: LevelBase.target_hero(self) (the 1.0 hero unless he is dead). A party (GAMEPLAY.md
+## 13.9.4): the nearest hatched hero, kept for PartyTuning.TARGET_HOLD_TICKS unless he stops being hatched; a `lone`
+## record on Expert: the straggler, or nobody while the heroes keep together (CoopTraits.lone_target). Override for
+## other aggro rules (call super for these).
 func _choose_target() -> PlayerBase:
 	var level: LevelBase = Game.level
 	if level == null:
 		return null
-	return level.target_hero(self)
+	if level.hero_count() <= 1:
+		return level.target_hero(self)
+	if _traits != null and _traits.kind == Defs.CoopTrait.LONE and CoopTraits.party_on() \
+			and PartyTuning.lone_trait_on(Game.difficulty):
+		return _traits.lone_target()
+	var now: int = Sim.total_ticks
+	if _held_target != null and is_instance_valid(_held_target) and _held_target.is_party_targetable() \
+			and now < _held_until:
+		return _held_target
+	var hero: PlayerBase = level.target_hero(self)
+	_held_target = hero
+	_held_until = now + PartyTuning.TARGET_HOLD_TICKS
+	return hero
 
 
 ## One tick while asleep (no slot). The default wakes it by the activation rule; zone spawners override.
@@ -499,6 +593,100 @@ func bond_mates() -> Array[SimEntity]:
 		if member != self:
 			mates.append(member)
 	return mates
+
+
+## 2.0 (PLAN.md P1.8): the co-op trait rules of this record (scripts/enemies/coop_traits.gd), null without a trait.
+func coop_traits() -> CoopTraits:
+	return _traits
+
+
+## 2.0: true when a weapon hit from `source` comes from the side this enemy faces (the Guard's shield, `shell`,
+## `heavy`; GAMEPLAY.md 13.9.5): a thrown weapon flying into its face, else the striker's x on the facing side or
+## within EnemyTuning.FRONT_DX of the feet point. No source: not from the front.
+func _hit_from_front(source: SimEntity) -> bool:
+	if source == null or not is_instance_valid(source):
+		return false
+	if source.get_kind() == Defs.Kind.HERO_PROJECTILE and source.xvel != 0:
+		return signi(source.xvel) == -facing
+	var dx: int = source.sim_pos.x - sim_pos.x
+	if absi(dx) < EnemyTuning.FRONT_DX:
+		return true
+	return signi(dx) == facing
+
+
+## 2.0: the clank and the spark of a glancing hit, at the side it faces (at most one per EnemyTuning.GLANCE_TICKS).
+func _show_glance(_source: SimEntity) -> void:
+	if Sim.total_ticks - _glance_tick < EnemyTuning.GLANCE_TICKS:
+		return
+	_glance_tick = Sim.total_ticks
+	Audio.play_sfx(Sfx.CLUB_HIT_SCENERY)
+	_spawn_optional(FX_HIT, sim_pos + Vector2i(facing * (box_w >> 2), -(box_h >> 1)))
+
+
+## 2.0 co-op (CoopTraits: a bond regrows, a split merges): alive again at `pos` with full hit points, awake at once
+## when a slot is free and the place is in view (else asleep, waking by the usual rule).
+func _coop_revive(pos: Vector2i) -> void:
+	_doze_wake_now()
+	_corpse = false
+	dead = false
+	hp = max_hp
+	flash = 0
+	xvel = 0
+	yvel = 0
+	stole_heart = false
+	_grounded = false
+	_climbing = false
+	_ledge_ticks = 0
+	_must_leave_view = false
+	facing = _spawn_facing
+	teleport(pos)
+	_on_reset()
+	visible = not _hide_asleep
+	_play(&"idle", true)
+	var level: LevelBase = Game.level
+	if level != null and _slot_free() and level.is_in_view(self, Tuning.ENEMY_SPAWN_MARGIN_PX):
+		wake()
+	_refresh_visual()
+	_doze_note()
+
+
+## 2.0 co-op (the `split` trait): a second record of this enemy at its feet point - the same scene (or script) with
+## its spawn parameters plus `extra`, without its `name` and `bond`; one-shot and awake at once. Null when it cannot be
+## made.
+func _coop_spawn_copy(extra: Dictionary) -> EnemyBase:
+	var level: LevelBase = Game.level
+	if level == null:
+		return null
+	var params: Dictionary = spawn_params.duplicate()
+	params.erase("name")
+	params.erase("bond")
+	params.erase("record")
+	params["facing"] = "l" if facing < 0 else "r"
+	params.merge(extra, true)
+	var copy: EnemyBase = null
+	if scene_file_path.begins_with(Spawner.SCENE_ROOT):
+		var id: StringName = StringName(scene_file_path.trim_prefix(Spawner.SCENE_ROOT).trim_suffix(".tscn"))
+		copy = level.spawn(id, sim_pos, params) as EnemyBase
+	else:
+		var script: GDScript = get_script() as GDScript
+		copy = script.new() as EnemyBase if script != null else null
+		if copy != null:
+			copy.spawn_setup(sim_pos, params)
+			level.get_container("enemies").add_child(copy)
+	if copy == null:
+		return null
+	copy.one_shot = true
+	copy.wake()
+	return copy
+
+
+## 2.0 co-op: a record made by [method _coop_spawn_copy] leaves the level for good (merged, or a team wipe).
+func _coop_remove() -> void:
+	_release_slot()
+	dead = true
+	visible = false
+	sim_active = false
+	queue_free()
 
 
 ## Per-player statistics (2.0, TECH_AUDIT.md 3.8): the hero who killed it - Defs.hitter_slot() of `killer`, the hero

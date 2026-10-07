@@ -19,20 +19,31 @@ const NAV_ENTITY_IDS: Array[StringName] = [&"objects/spring"]
 const SETTLE_GROUNDED_TICKS: int = 2
 ## Ticks after the landing in which he must settle on the landing node.
 const SETTLE_MAX_TICKS: int = 14
+## Ticks after a walk script in which he must slide to a stop (ice slides long).
+const SETTLE_WALK_MAX_TICKS: int = 96
+## The arena wrap of world-B (`static func wrap_hero(level, hero) -> bool`), looked up by class name so that this file
+## compiles without it.
+const WRAP_CLASS: StringName = &"VersusArena"
+const WRAP_METHOD: StringName = &"wrap_hero"
 
 ## Outcome of [method run].
 class Outcome:
 	extends RefCounted
 	## True when he left the ground and settled on a floor again, alive.
 	var landed: bool = false
+	## True when he never left the ground and slid to a stop after the script, alive (a walk, a wrap seam).
+	var walked: bool = false
 	## True when he died (pit, liquid, spikes, off the playfield).
 	var died: bool = false
 	## True when he never left the ground while the script ran.
 	var stayed: bool = false
-	## Tick (1-based) of the first grounded tick after being airborne; 0 = none.
+	## Tick (1-based) on which the bot gets control back: the landing, or the last tick of a script that stayed on
+	## the ground; 0 = none.
 	var landing_tick: int = 0
 	## Feet point when the run ended.
 	var pos: Vector2i = Vector2i.ZERO
+	## Feet point on the tick the bot got control back (landing_tick).
+	var handback_pos: Vector2i = Vector2i.ZERO
 	## True when an objects/spring launched him on the way.
 	var sprung: bool = false
 	## Ticks simulated.
@@ -52,13 +63,33 @@ class SimLevel:
 		return Vector2i(view.position.x >> 4, view.position.y >> 4)
 
 
+## The arena wrap in the sim: ticks in the PLAYER phase after the hero (registered after him), as the referee does
+## in a match (it calls VersusArena.wrap_hero first in its own PLAYER step).
+class WrapDriver:
+	extends SimEntity
+
+	var step: Callable = Callable()
+	var target: PlayerBase = null
+
+	func _sim_phases() -> PackedInt32Array:
+		return PackedInt32Array([Defs.Phase.PLAYER])
+
+	func _can_doze() -> bool:
+		return false
+
+	func _sim_tick(_phase: int) -> void:
+		if step.is_valid() and target != null and Game.level != null:
+			step.call(Game.level, target)
+
+
 var level: SimLevel = null
 var hero: PlayerBase = null
 ## Ticks simulated since setup (statistics).
 var ticks_simulated: int = 0
-## Called once per tick after Sim.step with (level, hero) when set: the arena wrap step of world-B (see
-## [method set_wrap_step]); null = no wrap.
+## The wrap step in use (`step.call(level, hero) -> bool`), invalid when the level does not wrap or world-B's
+## VersusArena.wrap_hero is not available.
 var wrap_step: Callable = Callable()
+var _wrap_driver: WrapDriver = null
 
 var _springs: Array[SimEntity] = []
 var _flags: PackedInt32Array = PackedInt32Array()
@@ -106,7 +137,29 @@ func setup(parent: Node, level_id: StringName, grid: TileGrid, meta: Dictionary,
 	hero = scene.instantiate() as PlayerBase
 	hero.spawn_setup(Vector2i(grid.cols * Tuning.TILE / 2, grid.rows * Tuning.TILE), {})
 	level.add_child(hero)
+	if str(meta.get("wrap", "none")) != "none":
+		wrap_step = find_wrap_step()
+		if wrap_step.is_valid():
+			_wrap_driver = WrapDriver.new()
+			_wrap_driver.step = wrap_step
+			_wrap_driver.target = hero
+			_wrap_driver.spawn_setup(Vector2i.ZERO, {})
+			level.add_child(_wrap_driver)
 	return true
+
+
+## world-B's arena wrap step (VersusArena.wrap_hero) as a callable; invalid when that class does not exist.
+static func find_wrap_step() -> Callable:
+	for entry: Dictionary in ProjectSettings.get_global_class_list():
+		if StringName(str(entry.get("class", ""))) != WRAP_CLASS:
+			continue
+		var script: Script = load(str(entry.get("path", ""))) as Script
+		if script == null:
+			continue
+		for method: Dictionary in script.get_script_method_list():
+			if StringName(str(method.get("name", ""))) == WRAP_METHOD:
+				return Callable(script, WRAP_METHOD)
+	return Callable()
 
 
 ## Remove the sim world and give the simulation back (Game.level, Sim.manual, slot 0's script, mode, party).
@@ -117,6 +170,7 @@ func teardown() -> void:
 		level.free()
 	level = null
 	hero = null
+	_wrap_driver = null
 	_springs.clear()
 	Sim.manual = _prev_manual
 	Game.mode = _prev_mode
@@ -126,16 +180,11 @@ func teardown() -> void:
 		Game.level = _prev_level
 
 
-## Use world-B's arena wrap for `wrap = lr / tb` levels: `step.call(level, hero) -> bool` once per tick.
-func set_wrap_step(step: Callable) -> void:
-	wrap_step = step
-
-
 ## Put the hero at rest at `start` (feet point; the state of NavSim.is_settled), play `flags` (one value per tick)
-## and report. The script ends at the landing - the first grounded tick after being airborne, exactly where HeroBot
-## hands control back - and the check goes on with neutral input until he stood SETTLE_GROUNDED_TICKS consecutive
-## ticks (at most SETTLE_MAX_TICKS); a death or `max_ticks` end the run too. A script that never leaves the ground
-## ends with its last tick (`stayed`).
+## and report. The script ends where HeroBot hands control back: at the landing (the first grounded tick after being
+## airborne) or, for a script that never leaves the ground (a walk, a walk across a wrap seam), at its last tick. The
+## check then goes on with neutral input until he stood still SETTLE_GROUNDED_TICKS consecutive ticks (at most
+## SETTLE_MAX_TICKS); `landed` / `walked` say he settled. A death or `max_ticks` end the run too.
 func run(start: Vector2i, flags: PackedInt32Array, max_ticks: int) -> Outcome:
 	var outcome: Outcome = Outcome.new()
 	_reset_world()
@@ -144,6 +193,7 @@ func run(start: Vector2i, flags: PackedInt32Array, max_ticks: int) -> Outcome:
 	_first_tick = Sim.tick + 1
 	GameInput.set_scripted_slot(0, _script_flags)
 	var airborne: bool = false
+	var handed_back: bool = false
 	var settle: int = 0
 	var settle_ticks: int = 0
 	var launches: int = _spring_launches()
@@ -151,30 +201,34 @@ func run(start: Vector2i, flags: PackedInt32Array, max_ticks: int) -> Outcome:
 		Sim.step(1)
 		ticks_simulated += 1
 		outcome.ticks = t
-		if wrap_step.is_valid():
-			wrap_step.call(level, hero)
 		if hero.dead:
 			outcome.died = true
 			break
-		var on_ground: bool = hero.is_grounded() and hero.yvel == 0
-		if outcome.landing_tick == 0:
+		var standing: bool = hero.is_grounded() and hero.yvel == 0 and (airborne or hero.xvel == 0)
+		if not handed_back:
 			if not hero.is_grounded():
 				airborne = true
-			elif airborne:
+				continue
+			if airborne:
 				outcome.landing_tick = t
-				# The bot takes over at the landing: the check runs on neutral input.
-				_flags = PackedInt32Array()
-				settle = 1 if on_ground else 0
 			elif t >= flags.size():
 				outcome.stayed = true
-				break
-			continue
-		settle_ticks += 1
-		settle = settle + 1 if on_ground else 0
+				outcome.landing_tick = t
+			else:
+				continue
+			# The bot takes over here: the check runs on neutral input.
+			handed_back = true
+			outcome.handback_pos = hero.sim_pos
+			_flags = PackedInt32Array()
+			settle = 1 if standing else 0
+		else:
+			settle_ticks += 1
+			settle = settle + 1 if standing else 0
 		if settle >= SETTLE_GROUNDED_TICKS:
-			outcome.landed = true
+			outcome.landed = airborne
+			outcome.walked = not airborne
 			break
-		if settle_ticks >= SETTLE_MAX_TICKS:
+		if settle_ticks >= (SETTLE_MAX_TICKS if airborne else SETTLE_WALK_MAX_TICKS):
 			break
 	outcome.pos = hero.sim_pos
 	outcome.sprung = _spring_launches() != launches
@@ -209,7 +263,8 @@ static func is_settled(p_hero: PlayerBase) -> bool:
 	return p_hero.grounded and not p_hero.on_platform and p_hero.xvel == 0 and p_hero.yvel == 0 \
 			and p_hero.no_jump == 0 and p_hero.swing_lock == 0 and not p_hero.attack_gate and p_hero.hit_timer == 0 \
 			and p_hero.charge == 0 and p_hero.drop_timer == 0 and p_hero.jump_ticks == 0 and not p_hero.dead \
-			and p_hero.state != Defs.HeroState.CROUCH and p_hero.state != Defs.HeroState.CRAWL
+			and p_hero.state != Defs.HeroState.CROUCH and p_hero.state != Defs.HeroState.CRAWL \
+			and p_hero.squash == 0 and p_hero.hit_stop == 0 and not p_hero.is_down() and not p_hero.is_curled()
 
 
 func _script_flags(tick: int) -> int:
@@ -221,6 +276,13 @@ func _reset_world() -> void:
 	level.shake = 0
 	level.shake_offset = 0
 	level.wind = 0
+	# Effects spawned by the last run (dust, rings) end with queue_free(), which needs a rendered frame; the baker
+	# runs thousands of runs without one, so they are freed here (or they would pile up and keep ticking).
+	for child: Node in level.get_children():
+		if child == hero or child == _wrap_driver or _springs.has(child):
+			continue
+		level.remove_child(child)
+		child.free()
 
 
 func _spring_launches() -> int:

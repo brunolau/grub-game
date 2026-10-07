@@ -89,9 +89,11 @@ func _extra_weight() -> int:
 	return 0
 
 
-## The ride test of PHYSICS.md 11.4 for one hero: true when `hero` is now riding this platform.
+## The ride test of PHYSICS.md 11.4 for one hero: true when `hero` is now riding this platform. An egg (2.0,
+## PlayerBase.down: never in single-player) rides nothing and weighs nothing.
 func _ride_test_hero(hero: PlayerBase) -> bool:
-	if hero.dead or hero.yvel <= Tuning.PLATFORM_RIDE_MIN_YVEL_EXCL or hero.carried_on_tick == Sim.total_ticks:
+	if hero.dead or hero.down or hero.yvel <= Tuning.PLATFORM_RIDE_MIN_YVEL_EXCL \
+			or hero.carried_on_tick == Sim.total_ticks:
 		return false
 	# The hero's feet must be inside the platform's contact band below its surface. The band is the platform's own
 	# height (8 px), but a hero falling at PLATFORM_CATCH_YVEL or faster can step across 8 px in one tick: for him

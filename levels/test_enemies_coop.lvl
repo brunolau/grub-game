@@ -1,0 +1,50 @@
+# Club & Grub level file - format 2 (docs/ARCHITECTURE.md 7.11). Co-op Trait Gallery: developer level of the
+# enemies module (docs/expansion/PLAN.md P1.8). One record of every co-op trait of DESIGN.md D.6 / GAMEPLAY.md 13.9.5
+# along one floor, left to right: a Shellback keeper (shell) in a 4-row keeper hall, a bonded pair of walkers 14 tiles
+# apart (bond), a daze hopper, a heavy in a 3-row brace corridor, a lone stinger, a grabbing bat with its perch over
+# the pit, a leech under the roof and a splitting walker. tests/test_enemies_coop.gd loads its records; play it as a
+# co-op game (two heroes) for visual QA. A party of one meets the plain archetypes. Not part of any campaign
+# (kind = test).
+
+[meta]
+format = 2
+id = test_enemies_coop
+name = "Co-op Trait Gallery"
+kind = test
+biome = jungle
+terrain_a = jungle/terrain_grass
+terrain_b = jungle/terrain
+background = jungle
+music = level_jungle
+author = enemies-A
+notes = "PLAN.md P1.8: every co-op trait once; traits act only with two heroes in a co-op game."
+
+[legend]
+S = enemies/shellback keeper=gully
+B = enemies/walker coop=bond bond=twins skin=turtle_b
+D = enemies/hopper coop=daze skin=mini_rex_b
+H = enemies/walker coop=heavy skin=rex_b left=-2 right=2
+L = enemies/stinger coop=lone
+G = enemies/dangler coop=grab skin=bat_b perch=78,9
+Q = enemies/lurker coop=leech
+T = enemies/walker coop=split skin=turtle
+E = objects/exit locked=false
+
+[tiles]
+#................................................................................................#
+#................................................................................................#
+#................................................................................................#
+#...................................................................####################.........#
+#...................................................................................Q............#
+#................................................................................................#
+#...............................................................L.......G........................#
+#.........############...........................................................................#
+#.................................................############...................................#
+#................................................................................................#
+#................................................................................................#
+#...@..........S..........B.............B.....D........H...................................T...E.#
+#############################################################################~~~##################
+##################################################################################################
+
+[entities]
+objects/hero_start 3 11 slot=2

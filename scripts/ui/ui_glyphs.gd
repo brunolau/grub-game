@@ -14,7 +14,7 @@ const SET_TOUCH: String = "touch"
 const KEY_NAMES: Dictionary = {
 	KEY_ESCAPE: "ESC",
 	KEY_ENTER: "ENTER",
-	KEY_KP_ENTER: "ENTER",
+	KEY_KP_ENTER: "NUM ENTER",
 	KEY_SPACE: "SPACE",
 	KEY_BACKSPACE: "BKSP",
 	KEY_TAB: "TAB",
@@ -29,7 +29,25 @@ const KEY_NAMES: Dictionary = {
 	KEY_INSERT: "INS",
 	KEY_PAGEUP: "PGUP",
 	KEY_PAGEDOWN: "PGDN",
-	KEY_KP_5: "KP 5",
+	KEY_KP_0: "NUM 0",
+	KEY_KP_1: "NUM 1",
+	KEY_KP_2: "NUM 2",
+	KEY_KP_3: "NUM 3",
+	KEY_KP_4: "NUM 4",
+	KEY_KP_5: "NUM 5",
+	KEY_KP_6: "NUM 6",
+	KEY_KP_7: "NUM 7",
+	KEY_KP_8: "NUM 8",
+	KEY_KP_9: "NUM 9",
+	KEY_KP_ADD: "NUM +",
+	KEY_KP_SUBTRACT: "NUM -",
+	KEY_KP_MULTIPLY: "NUM *",
+	KEY_KP_DIVIDE: "NUM /",
+	KEY_KP_PERIOD: "NUM .",
+	KEY_SEMICOLON: ";",
+	KEY_COMMA: ",",
+	KEY_PERIOD: ".",
+	KEY_SLASH: "/",
 }
 
 ## Gamepad button names in the Xbox layout (the engine's own button order).
@@ -107,10 +125,13 @@ static func event_color(event: InputEvent) -> Color:
 	return UiKit.COL_CREAM
 
 
-## Key cap text of a key event (the label printed on the user's keyboard layout where it is known).
+## Key cap text of a key event (the label printed on the user's keyboard layout where it is known). Numpad keys are
+## named by their physical key ("NUM 8"), the same whatever the NumLock state and the layout (DESIGN.md D.11).
 static func key_text(key: InputEventKey) -> String:
 	var code: Key = key.keycode
-	if code == KEY_NONE and key.physical_keycode != KEY_NONE:
+	if is_numpad(key.physical_keycode):
+		code = key.physical_keycode
+	elif code == KEY_NONE and key.physical_keycode != KEY_NONE:
 		code = key.physical_keycode
 		# The user's layout is only known to real display servers (not to headless runs).
 		if DisplayServer.get_name() != "headless":
@@ -120,6 +141,11 @@ static func key_text(key: InputEventKey) -> String:
 	if KEY_NAMES.has(code):
 		return str(KEY_NAMES[code])
 	return OS.get_keycode_string(code).to_upper()
+
+
+## True for a key of the numeric keypad (by physical key; Num Enter included).
+static func is_numpad(code: Key) -> bool:
+	return (code >= KEY_KP_MULTIPLY and code <= KEY_KP_9) or code == KEY_KP_ENTER
 
 
 ## Text of a stick direction.

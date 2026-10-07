@@ -4,7 +4,7 @@ Superpowers Asset Packs - RPG Battle System
 Author: Pixel-boy (Sparklin Labs)
 Source: https://github.com/sparklinlabs/superpowers-asset-packs/tree/master/rpg-battle-system
 Licence: CC0 1.0 (tier A)
-Used in Club & Grub for: 2.0 (The Far Shore): backgrounds/canyon/ layer1_far_spires; sprites/bosses/ tusker, tusker_rage; sprites/enemies/ cave_bat, cave_bat_b, guard, roller, roller_b, shellback, snake, snake_b. Per-file sources and edits: docs/ASSET_MANIFEST.md section 17
+Used in Club & Grub for: 2.0 (The Far Shore): backgrounds/canyon/ layer1_far_spires; backgrounds/swamp/ layer0_sky; sprites/bosses/ tusker, tusker_rage; sprites/enemies/ cave_bat, cave_bat_b, guard, puffcap, puffcap_b, roller, roller_b, shellback, slime, slime_b, snake, snake_b; tiles/canyon/props/ shell_conch, shell_snail; tiles/swamp/props/ glowcap_big; ui/ crown, stack_food. Per-file sources and edits: docs/ASSET_MANIFEST.md section 17
 Staging folder: .tools/asset_candidates/expansion/superpowers-rpg-battle-system
 
 ---- Licence evidence recorded when the pack was downloaded ----

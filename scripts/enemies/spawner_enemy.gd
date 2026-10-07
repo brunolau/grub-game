@@ -140,6 +140,11 @@ func _trigger_hero() -> PlayerBase:
 	if level == null or level.hero_count() <= 1:
 		var target: PlayerBase = _target_hero()
 		return target if target != null and _triggered(target) else null
+	if _traits != null and _traits.kind == Defs.CoopTrait.LONE and CoopTraits.party_on() \
+			and PartyTuning.lone_trait_on(Game.difficulty):
+		# 2.0 `lone` (Expert): nothing rises while the heroes keep together; else only around the straggler.
+		var straggler: PlayerBase = _traits.lone_target()
+		return straggler if straggler != null and _triggered(straggler) else null
 	for hero: PlayerBase in level.contact_order():
 		if hero.is_party_targetable() and _triggered(hero):
 			return hero

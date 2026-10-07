@@ -54,7 +54,9 @@ def _ground(out, atlas):
     return out
 
 
-def backdrop(name, x0=0):
+def backdrop(name, x0=0, ground=True):
+    """640 x 360 parallax of a biome; ground=False leaves out the terrain (scenes that cut holes into the ground
+    composite their own tiles over the bare backdrop)"""
     out = Image.new("RGBA", (W, H), (120, 170, 220, 255))
     if name in OLD:
         folder, layers, terr = OLD[name]
@@ -62,14 +64,14 @@ def backdrop(name, x0=0):
             im = load(os.path.join(ASSETS, "backgrounds", folder, l + ".png"))
             sx = (x0 * (i + 1) // 4) % max(1, im.width - W)
             out.alpha_composite(im.crop((sx, 0, sx + W, H)))
-        return _ground(out, load(os.path.join(ASSETS, "tiles", terr)))
-    shipped = sorted(glob.glob(os.path.join(ASSETS, "backgrounds", name, "*.png")))
+        return _ground(out, load(os.path.join(ASSETS, "tiles", terr))) if ground else out
+    shipped = sorted(glob.glob(os.path.join(ASSETS, "backgrounds", name, "layer*.png")))   # the main set only
     terr = os.path.join(ASSETS, "tiles", name, "terrain.png")
     if shipped and os.path.exists(terr):
         for l in shipped:
             im = load(l)
             out.alpha_composite(im.crop((0, 0, min(W, im.width), H)))
-        return _ground(out, load(terr))
+        return _ground(out, load(terr)) if ground else out
     bt = _biome_tests()
     b = bt.BIOMES[NEW[name]]
     path, y0, y1, tint = b["sky"]

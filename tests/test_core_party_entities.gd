@@ -164,7 +164,10 @@ func test_a_gate_takes_the_hero_who_entered_and_a_column_lifts_every_hero() -> v
 	Sim.step(1)
 	assert_eq(p2.sim_pos, Vector2i(600, 96), "P2 travels")
 	assert_true(p2.control_enabled)
-	assert_eq(p1.sim_pos, Vector2i(40, 160), "P1 stays where he is")
+	# A co-op gate takes the whole party (DESIGN.md D.1, objects-A P1.9): without a PartyDriver P1 arrives at the
+	# gate's partner spot behind P2.
+	assert_ne(p1.sim_pos, Vector2i(40, 160), "P1 travels with him")
+	assert_eq(p1.sim_pos, Gate.partner_spot(Game.level, Vector2i(600, 96), p2.facing), "P1 arrives behind him")
 	# A two-cell block of the ground (row 10) rises one row; both heroes stand on it (bare heroes have no gravity,
 	# and no shake nudges them).
 	var column: RisingColumn = spawn(&"objects/column", LevelText.cell_to_feet(20, 10), {

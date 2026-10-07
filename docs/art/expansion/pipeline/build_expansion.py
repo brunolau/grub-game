@@ -3,14 +3,19 @@
     .tools/venv/Scripts/python.exe docs/art/expansion/pipeline/build_expansion.py [--no-previews]
 
 Order: the spear sheet first (the palette identity check covers every hero sheet), then the hero palettes, the co-op
-objects and egg, the multiplayer UI, the art-B hand-over rows, the provenance / licence checks, the licence files of the
-2.0 packs, the 2.0 section of docs/ASSET_MANIFEST.md, and the proof sheets in docs/art/expansion/.
+objects and egg, the multiplayer UI, the Book II liquids and tar floors, the Book II objects (vine, bark board, geyser,
+raft, rex pen, paintings), the versus art (cookpot, spawn pads, crown, stack pictures, Golden Drumstick), the co-op
+skins (see-saw skins, Chomper's saddle), then the art-B hand-over rows and staged files, the audio hand-over rows, the
+provenance / licence checks, the licence files of the 2.0 packs, the 2.0 section of docs/ASSET_MANIFEST.md, and the
+proof sheets in docs/art/expansion/. A PNG is written only when its bytes change (no needless Godot re-imports).
 
 Inputs : shipped assets/** (1.0), the staged CC0 packs under .tools/asset_candidates/ (not in git),
-         .tools/asset_candidates/expansion/_handover/*registry*.json (art-B's rows for its files)
+         .tools/asset_candidates/expansion/_handover/*registry*.json (art-B's rows for its files) and staged/ (files
+         art-B made for art-A's folders), _handover/audio/*.json (the audio owner's rows)
 Outputs: art-A's files under assets/ (sprites/player/hero_spear.png, hero_egg.png, palettes/*, sprites/objects/*,
-         sprites/items/weapon_spear.png, sprites/fx/projectile_spear.png, ui/*), registry_expansion.json,
+         sprites/items/*, sprites/fx/projectile_spear.png, ui/*, tiles/common/*), registry_expansion.json,
          assets/licenses/<2.0 pack>.txt, the marked 2.0 block of docs/ASSET_MANIFEST.md, docs/art/expansion/*.png.
+Tests  : test_art_expansion.py next to this script (python -m unittest discover -s docs/art/expansion/pipeline).
 CREDITS.md, docs/THIRD_PARTY.md and assets/licenses/README.md are maintained by hand (as in 1.0): this script only
 checks that every pack a 2.0 file comes from is credited there, and exits with status 1 when one is missing.
 """
@@ -30,7 +35,16 @@ import xcommon                                    # noqa: E402
 from xcommon import ASSETS, CAND, EXP, REGISTRY, ROOT, save_registry    # noqa: E402
 
 HANDOVER = os.path.join(EXP, "_handover")
+AUDIO_HANDOVER = os.path.join(HANDOVER, "audio")
 REG1 = os.path.join(ROOT, "docs", "art", "pipeline", "registry.json")
+
+# files art-B staged for art-A to give a home under art-A's folders: staged path -> assets path
+STAGED_IMPORTS = {
+    "staged/arena/frame_jungle.png": "assets/ui/arena/frame_jungle.png",
+    "staged/common/tar_floor.png": "assets/tiles/common/tar_floor.png",
+}
+# a staged file without a "staged/..." row of its own takes the row of the shipped file it copies
+STAGED_ROW_FROM = {"staged/common/tar_floor.png": "assets/tiles/swamp/tar_floor.png"}
 
 # staging folder -> (title, author, source url, licence, licence file under assets/licenses/)
 PACKS = {
@@ -69,16 +83,22 @@ PACKS = {
 PACK_ALIASES = {"sunny-land (ansimuz)": "ansimuz-sunny-land-series"}
 
 GAPS = [
-    "See-saw: only the wood plank (lengths 3-6). The mushroom see-saw of 6-2 and the ice floes of Floe Rink are "
-    "phase-2 skins (recolours of `seesaw_plank.png`).",
-    "The pulley wheel and rope, the revive egg's oval and the two petroglyph figures of the x2 tablet are drawn by the "
-    "pipeline in the anchor palette (no pack has them); everything else is recoloured / composited pack art.",
+    "See-saw: the wood plank (lengths 3-6) and its mushroom-cap and ice-floe skins (same layout); other biomes use "
+    "the wood plank.",
+    "Drawn by the pipeline in the anchor palette (no pack has them): the pulley wheel and rope, the revive egg's oval, "
+    "the petroglyph figures of the x2 tablet and the cave-painting glyphs, the vine coil, the geyser rim and jet, the "
+    "raft's log ends, the cookpot's bowl and mouth, the spawn slab and the crown; everything else is recoloured / "
+    "composited pack art.",
     "`hero_palettes.json` is reference data (shader contract, colour names, UI colours, pattern list). If "
     "`hero_palette.gd` (player-A) reads it at runtime, check that the export carries it (an `include_filter` entry "
     "by core-A); otherwise keep the few values it needs as constants. The LUT / atlas PNGs are ordinary textures.",
-    "No emote bubbles, versus corner portraits, crown, sundial or hit sparks per player yet (E.9; phase 2, P2.11).",
+    "No versus corner portraits, sundial or hit sparks per player yet (E.9; phase 2, P2.11); the emote bubbles, the "
+    "crown and the stack pictures exist (`ui/emotes.png`, `ui/crown.png`, `ui/stack_food.png`).",
     "Belt icons crop the handle end of the longer weapons (club, spear) at the cell edge; the heads stay whole.",
     "The egg's hatch frames show the hero curled in the 1.0 spots (the pattern step is off for non-hero sheets).",
+    "The cave-painting fragment shows one of six glyphs (index % 6); the 30-piece mural and the map slab are P2.11.",
+    "Chomper's saddle: `sprites/objects/rex_saddle.png` is an overlay on the shipped rex sheets (same grid); the "
+    "riders themselves are the hero sheets drawn by code.",
 ]
 
 
@@ -136,6 +156,153 @@ def merge_handover(reg1):
             REGISTRY[rel] = e
             rows += 1
     return rows, problems
+
+
+def import_staged():
+    """files art-B staged for art-A's folders (STAGED_IMPORTS): copied byte for byte, with art-B's row from the
+    hand-over registry that names the staged path"""
+    import shutil
+    rows = {}
+    for path in sorted(glob.glob(os.path.join(HANDOVER, "*registry*.json"))):
+        with open(path, encoding="utf-8") as f:
+            for k, v in json.load(f).items():
+                if k.startswith("staged/"):
+                    rows[k] = (v, os.path.basename(path))
+    problems = []
+    for staged, rel in sorted(STAGED_IMPORTS.items()):
+        src = os.path.join(HANDOVER, *staged.split("/"))
+        if not os.path.exists(src):
+            problems.append("staged file missing: %s" % staged)
+            continue
+        dst = os.path.join(ROOT, *rel.split("/"))
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        with open(src, "rb") as f:
+            data = f.read()
+        if not os.path.exists(dst) or open(dst, "rb").read() != data:      # unchanged: keep the mtime
+            shutil.copyfile(src, dst)
+        row, reg = rows.get(staged, ({}, "-"))
+        if not row and staged in STAGED_ROW_FROM and STAGED_ROW_FROM[staged] in REGISTRY:
+            src_row = REGISTRY[STAGED_ROW_FROM[staged]]
+            row, reg = dict(src_row), src_row.get("handover", "-")
+            row["source"] = "byte copy of %s (art-B); %s" % (STAGED_ROW_FROM[staged][len("assets/"):],
+                                                            src_row.get("source", ""))
+            row["note"] = ("the ':' tar floor for `liquid = tar` on every biome (the layout of tiles/canyon/mud_floor.png: "
+                           "0 top_left, 1 top, 2 top_right, 3 fill; drawn surface at art row 6, collision at row 12); "
+                           "identical to the Tar Fen's own " + STAGED_ROW_FROM[staged][len("assets/"):])
+        e = dict(row)
+        with Image.open(dst) as im:
+            e["size"] = list(im.size)
+        e["note"] = (e.get("note", "").replace("STAGED for art-A / world-B: ", "") +
+                     " (staged by art-B as `%s`, given this home by art-A)" % staged)
+        e["owner"] = "art-B"
+        e["section"] = "worlds"
+        e.setdefault("license", "CC0 1.0")
+        e["handover"] = reg
+        REGISTRY[rel] = e
+    return problems
+
+
+def _sha256(path):
+    import hashlib
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        h.update(f.read())
+    return h.hexdigest()
+
+
+def merge_audio_handover():
+    """the audio owner's rows (_handover/audio/*.json): every file must exist with the hand-over's sha256; returns
+    (rows, problems, packs) where packs = the packs the rows name (title, author, url, licence file, folder)"""
+    problems, packs, rows = [], {}, 0
+    for path in sorted(glob.glob(os.path.join(AUDIO_HANDOVER, "*.json"))):
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        packs.update(data.get("_meta", {}).get("packs", {}))
+        for rel, e in data.items():
+            if not rel.startswith("assets/"):
+                continue
+            fp = os.path.join(ROOT, *rel.split("/"))
+            if not os.path.exists(fp):
+                problems.append("audio hand-over row without a file: %s (%s)" % (rel, os.path.basename(path)))
+                continue
+            sha = _sha256(fp)
+            if e.get("sha256") and e["sha256"] != sha:
+                problems.append("%s: sha256 differs from the hand-over (%s)" % (rel, os.path.basename(path)))
+            src = e.get("sources", [])
+            row = {
+                "owner": "audio", "section": "audio", "kind": e.get("kind"), "names": e.get("names", []),
+                "role": e.get("role", ""), "bus": e.get("bus"), "loop": bool(e.get("loop")),
+                "loop_region_frames": e.get("loop_region_frames"), "format": e.get("format"), "rate": e.get("rate"),
+                "channels": e.get("channels"), "seconds": e.get("seconds"), "bytes": os.path.getsize(fp),
+                "sha256": sha, "lufs_integrated": e.get("lufs_integrated"), "lufs_short": e.get("lufs_short"),
+                "true_peak_dbtp": e.get("true_peak_dbtp"), "volume_db": e.get("volume_db"),
+                "played_at": e.get("played_at"), "target": e.get("target"),
+                "source": "; ".join("%s: %s" % (s["pack"].split("/")[-1], s["path"].split("/", 2)[-1]) for s in src),
+                "audio_packs": sorted(set(s["pack"] for s in src)),
+                "edits": e.get("edits", "-"), "license": e.get("licence", "CC0 1.0"),
+                "handover": os.path.basename(path),
+            }
+            for s in src:
+                if s["pack"] not in packs:
+                    problems.append("%s: source pack %s has no _meta.packs entry" % (rel, s["pack"]))
+            REGISTRY[rel] = row
+            rows += 1
+    return rows, problems, packs
+
+
+def write_audio_licence(key, p, files):
+    """assets/licenses/<pack>.txt for an audio pack new in 2.0 (the 1.0 files stay as they are)"""
+    dst = os.path.join(ASSETS, "licenses", p["licence_file"])
+    if p.get("in_1_0"):
+        return dst
+    folder = os.path.join(CAND, *p["folder"].split("/"))
+    title = p["title"]
+    parts = ["%s\n%s\n" % (title, "=" * len(title)),
+             "Author: %s\nSource: %s\nLicence: %s (tier A)\nUsed in Club & Grub for: 2.0 (The Far Shore): %s. Per-file "
+             "sources and edits: docs/ASSET_MANIFEST.md section 17\nStaging folder: .tools/asset_candidates/%s\n"
+             % (p["author"], p["url"], p.get("license", "CC0 1.0"),
+                ", ".join(sorted(f[len("assets/"):] for f in files)), p["folder"])]
+    info = os.path.join(folder, "LICENSE_INFO.md")
+    if os.path.exists(info):
+        with open(info, encoding="utf-8") as f:
+            parts.append("---- Licence evidence recorded when the pack was downloaded ----\n\n" + evidence(f.read()))
+    for own in ("License.txt", "LICENSE.txt", "license.txt"):
+        fp = os.path.join(folder, own)
+        if os.path.exists(fp):
+            with open(fp, encoding="utf-8", errors="replace") as f:
+                parts.append("---- %s (shipped by the author) ----\n\n%s\n" % (own, f.read().strip()))
+            break
+    parts.append("---- Licence ----\n\nCC0 1.0 Universal: the full legal code ships as cc0_1.0_legal_code.txt in this "
+                 "folder.\n")
+    with open(dst, "w", encoding="utf-8", newline="\n") as f:
+        f.write("\n".join(parts))
+    return dst
+
+
+def check_audio_credits(packs, uses):
+    with open(os.path.join(ROOT, "CREDITS.md"), encoding="utf-8") as f:
+        credits = f.read()
+    with open(os.path.join(ASSETS, "licenses", "README.md"), encoding="utf-8") as f:
+        lic_readme = f.read()
+    with open(os.path.join(ROOT, "docs", "THIRD_PARTY.md"), encoding="utf-8") as f:
+        third = f.read()
+    missing = []
+    for key in sorted(uses):
+        p = packs.get(key)
+        if p is None:
+            missing.append("unknown audio pack %s" % key)
+            continue
+        if p.get("license", "CC0 1.0") != "CC0 1.0":
+            missing.append("audio pack %s is %s, not CC0 1.0" % (key, p.get("license")))
+        if p["url"] not in credits:
+            missing.append("CREDITS.md lacks %s (%s)" % (p["title"], p["url"]))
+        if p["url"] not in third:
+            missing.append("docs/THIRD_PARTY.md lacks %s (%s)" % (p["title"], p["url"]))
+        if p["licence_file"] not in lic_readme:
+            missing.append("assets/licenses/README.md lacks %s" % p["licence_file"])
+        if not os.path.exists(os.path.join(ASSETS, "licenses", p["licence_file"])):
+            missing.append("assets/licenses/%s is missing" % p["licence_file"])
+    return missing
 
 
 def handover_notes():
@@ -248,7 +415,7 @@ def write_licence(pack, use):
 def pack_uses(reg1):
     uses = {}
     for rel, e in REGISTRY.items():
-        if not rel.startswith("assets/"):
+        if not rel.startswith("assets/") or e.get("owner") == "audio":
             continue
         e["origin_packs"] = origin_packs(e, reg1)
         for p in e["origin_packs"]:
@@ -289,16 +456,35 @@ def main(previews=True):
     import build_hero_palettes
     import build_coop_objects
     import build_mp_ui
+    import build_liquids
+    import build_book2_objects
+    import build_versus
+    import build_coop_skins
     build_hero_spear.build()
     build_hero_palettes.build(write_previews=previews)
     build_coop_objects.build(build_hero_palettes.KEY)
     build_mp_ui.build(build_hero_palettes.PALETTES)
+    build_liquids.build()
+    build_book2_objects.build()
+    build_versus.build()
+    build_coop_skins.build()
     for k, e in REGISTRY.items():
         e.setdefault("owner", "art-A")
         if "/palettes/" in k:
             e.setdefault("section", "palettes")
     reg1 = _reg1()
     rows, problems = merge_handover(reg1)
+    problems += import_staged()
+    a_rows, a_problems, audio_packs = merge_audio_handover()
+    problems += a_problems
+    audio_uses = {}
+    for k, e in REGISTRY.items():
+        if e.get("owner") == "audio":
+            for p in e["audio_packs"]:
+                audio_uses.setdefault(p, []).append(k)
+    for p, files in sorted(audio_uses.items()):
+        if p in audio_packs:
+            write_audio_licence(p, audio_packs[p], files)
     uses = pack_uses(reg1)
     for p, files in sorted(uses.items()):
         if p in PACKS:
@@ -313,6 +499,11 @@ def main(previews=True):
         "packs": {p: {"title": PACKS[p][0], "author": PACKS[p][1], "license": PACKS[p][3],
                       "file": "assets/licenses/" + PACKS[p][4], "count": len(f)}
                   for p, f in sorted(uses.items()) if p in PACKS},
+        "audio_packs": {p: {"title": audio_packs[p]["title"], "author": audio_packs[p]["author"],
+                            "license": audio_packs[p].get("license", "CC0 1.0"),
+                            "file": "assets/licenses/" + audio_packs[p]["licence_file"], "count": len(f),
+                            "new": not audio_packs[p].get("in_1_0")}
+                        for p, f in sorted(audio_uses.items()) if p in audio_packs},
         "gaps": GAPS,
         "handover_notes": handover_notes(),
     }
@@ -325,11 +516,14 @@ def main(previews=True):
     manifest_expansion.replace_in(os.path.join(ROOT, "docs", "ASSET_MANIFEST.md"), manifest_expansion.section_lines())
     if previews:
         import build_previews
+        import build_previews_b2
         build_previews.build()
-    missing = check_credits(uses)
+        build_previews_b2.build()
+    missing = check_credits(uses) + check_audio_credits(audio_packs, audio_uses)
     loose = unregistered_new_files()
     n_a = sum(1 for k, e in REGISTRY.items() if k.startswith("assets/") and e.get("owner") == "art-A")
-    print("art-A files: %d; art-B hand-over rows: %d; packs: %s" % (n_a, rows, ", ".join(sorted(uses))))
+    print("art-A files: %d; art-B hand-over rows: %d; audio hand-over rows: %d; packs: %s; audio packs: %d"
+          % (n_a, rows, a_rows, ", ".join(sorted(uses)), len(audio_uses)))
     for p in problems:
         print("HAND-OVER:", p)
     for f in loose:

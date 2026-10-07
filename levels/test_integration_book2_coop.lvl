@@ -1,0 +1,49 @@
+# Club & Grub level file - format 2 (docs/ARCHITECTURE.md 7.11). The co-op file of the route-harness test bed
+# levels/test_integration_book2.lvl (owner: integration; docs/expansion/PLAN.md P1.3, LEVEL_DESIGN.md 15.7.1): the same
+# map as a `kind = coop` file - `coop_of`, `coop_base_hash` (sha256 of the solo file, LF line ends), no codes, the P2
+# start - so the header-route harness proves a co-op file end to end before the slice's co-op files land: a co-op run
+# of two through Flow, both heroes into the exit, the tally (tests/test_integration_belt.gd, route
+# tests/fixtures/book2_routes/test_integration_book2_coop.inputs). No co-op gate, tablet or trait: the solo search and
+# the gate tests skip the co-op files of test levels. Never in a campaign: its solo level is a test level.
+
+[meta]
+format = 2
+id = test_integration_book2_coop
+name = "Far Shore Test Bed (co-op)"
+kind = coop
+coop_of = test_integration_book2
+coop_base_hash = "8798bba26776aaea87fb585a5478e253aedb4aa214ab4def5d6b81fbfbe9dc6b"
+book = 2
+biome = jungle
+terrain_a = jungle/terrain_grass
+terrain_b = jungle/terrain
+background = jungle
+music = level_jungle
+author = integration
+notes = "Route-harness test bed of 2.0 (P1.3): the co-op file of test_integration_book2 for two-stream header routes."
+
+[legend]
+E = objects/exit locked=false
+C = objects/checkpoint
+T = enemies/walker skin=turtle left=-2 right=2 hp=10
+f = items/food index=3
+g = items/food index=17
+h = items/food index=26
+
+[tiles]
+|......................................|
+|......................................|
+|......................................|
+|......................................|
+|......................................|
+|......................................|
+|......................................|
+|..............f.g.h...................|
+|.............-------..................|
+|......................................|
+|..@........T..............T.....C....E|
+########################################
+########################################
+
+[entities]
+objects/hero_start 1 10 slot=2

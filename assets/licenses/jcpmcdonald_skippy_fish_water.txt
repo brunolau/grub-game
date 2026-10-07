@@ -1,0 +1,49 @@
+Skippy Fish Water Sound Collection
+==================================
+
+Author: jcpmcdonald
+Source: https://opengameart.org/content/skippy-fish-water-sound-collection
+Licence: CC0 1.0 (tier A)
+Used in Club & Grub for: 2.0 (The Far Shore): audio/sfx/raft_splash_a.wav, audio/sfx/raft_splash_b.wav. Per-file sources and edits: docs/ASSET_MANIFEST.md section 17
+Staging folder: .tools/asset_candidates/expansion/audio/jcpmcdonald_skippy-fish-water
+
+---- Licence evidence recorded when the pack was downloaded ----
+
+# LICENSE_INFO - jcpmcdonald - Skippy Fish Water Sound Collection
+
+- **Author:** jcpmcdonald (OpenGameArt)
+- **License:** CC0 1.0  (tier A)
+- **Date checked / downloaded:** 2026-10-06
+- **Source page(s) (saved copies in `../_pages/oga_<slug>.html`):**
+  - https://opengameart.org/content/skippy-fish-water-sound-collection
+- **Download URL(s)** (every file attached to the page; the ones fetched are marked):
+  - https://opengameart.org/sites/default/files/bubbles_0.mp3 (not fetched)
+  - https://opengameart.org/sites/default/files/bubbles.ogg (not fetched)
+  - https://opengameart.org/sites/default/files/bubbles.wav (fetched)
+  - https://opengameart.org/sites/default/files/water.mp3 (not fetched)
+  - https://opengameart.org/sites/default/files/water.ogg (not fetched)
+  - https://opengameart.org/sites/default/files/water.wav (fetched)
+  - https://opengameart.org/sites/default/files/swim.mp3 (not fetched)
+  - https://opengameart.org/sites/default/files/swim.ogg (not fetched)
+  - https://opengameart.org/sites/default/files/swim.wav (fetched)
+  - https://opengameart.org/sites/default/files/eating.mp3 (not fetched)
+  - https://opengameart.org/sites/default/files/eating.ogg (not fetched)
+  - https://opengameart.org/sites/default/files/eating.wav (fetched)
+  - https://opengameart.org/sites/default/files/waterReentry.mp3 (not fetched)
+  - https://opengameart.org/sites/default/files/waterReentry.ogg (not fetched)
+  - https://opengameart.org/sites/default/files/waterReentry.wav (fetched)
+  - https://opengameart.org/sites/default/files/scream.mp3 (not fetched)
+  - https://opengameart.org/sites/default/files/scream.ogg (not fetched)
+  - https://opengameart.org/sites/default/files/scream.wav (fetched)
+
+## Exact licence wording (quoted from the source)
+
+> https://opengameart.org/content/skippy-fish-water-sound-collection - page title "Skippy Fish Water Sound Collection", author "jcpmcdonald", posted Sunday, July 6, 2014 - 15:25
+>
+> License(s): CC0
+>
+> Description: "Here's a collection of all the sound effects used in my game Skippy Fish. I made these with a glass of water, a straw, some popsicle sticks, and my own voice."
+
+---- Licence ----
+
+CC0 1.0 Universal: the full legal code ships as cc0_1.0_legal_code.txt in this folder.

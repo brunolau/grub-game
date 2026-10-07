@@ -22,6 +22,9 @@ extends Node2D
 ## them). A party of one never reaches a party branch: they are all behind `hero_count() > 1`.
 ## Hooks for parallel work (PLAN.md P0.8): [method register_party_driver] / [member party_driver] (world-A's
 ## PartyDriver after the heroes) and [method get_tagged] (the bond and keeper groups of format 2).
+## Co-op rules of phase 1 (PLAN.md P1.6, PHYSICS.md C.12 / C.13): [method get_party_frame] (the authentic 20 x 11-cell
+## view of the tribe camera), [method get_edge_walls], [method pull_party_into] (locked views take the whole party),
+## [method team_wipe], [method party_spread_point]. Each is neutral for a party of one and outside co-op.
 
 ## Gameplay is about to start: the grid is built, the hero is spawned, Sim is started.
 signal play_started
@@ -471,6 +474,55 @@ func get_views_bounds() -> Rect2i:
 	return bounds
 
 
+## 2.0 (PHYSICS.md C.13): the authentic view of the tribe camera in logical px - Tuning.VIEW_COLS x VIEW_ROWS cells
+## at the camera cell, identical on every device (a wider screen shows more around it). The co-op edge walls
+## ([method get_edge_walls]), the leash and the egg clamp use it. A camera locked to a rectangle no larger than that
+## (an arena, a one-screen room) gives that rectangle itself, wherever a larger screen centres it. Otherwise the base
+## gives the cells of [method get_view_rect] at the camera cell; the world module's level returns its tribe camera's
+## view in co-op.
+func get_party_frame() -> Rect2i:
+	if _camera_locked and _camera_lock_rect.size.x <= Tuning.VIEW_COLS * Tuning.TILE \
+			and _camera_lock_rect.size.y <= Tuning.VIEW_ROWS * Tuning.TILE:
+		return _camera_lock_rect
+	var cell: Vector2i = get_camera_cell()
+	return Rect2i(cell * Tuning.TILE, Vector2i(Tuning.VIEW_COLS, Tuning.VIEW_ROWS) * Tuning.TILE)
+
+
+## 2.0 co-op edge walls (PHYSICS.md C.13): the x range [x, y) a hero of the tribe may commit his x step to on this
+## tick - `camera_column * 16 + 8 <= new_x < camera_column * 16 + 312` of [method get_party_frame]. Vector2i.ZERO
+## when no edge walls apply: single-player, versus, or a party of one. The PartyDriver fences every hatched hero with
+## it (PlayerBase.fence_x) before the PLAYER phase; a mount or a ball that runs its own x step reads it too.
+func get_edge_walls() -> Vector2i:
+	if _hero_total <= 1 or Game.mode != Defs.GameMode.COOP:
+		return Vector2i.ZERO
+	var frame: Rect2i = get_party_frame()
+	return Vector2i(frame.position.x + PartyTuning.VIEW_EDGE_WALL_PX, frame.end.x - PartyTuning.VIEW_EDGE_WALL_PX)
+
+
+## 2.0 locked views in co-op (PHYSICS.md C.13: `zones/arena`, `zones/camera_lock`, a gate with `lock=`): when `trigger`
+## locks the camera to `rect`, every other hatched hero whose feet are outside `rect` is moved to the trigger hero's
+## feet point - PartyTuning.PULL_IN_BEHIND_PX * his facing (same y; [method notify_hero_teleported]); an egg is
+## clamped into the rectangle (PartyTuning.EGG_VIEW_INSET_PX inside). Nothing for a party of one or outside co-op.
+func pull_party_into(rect: Rect2i, trigger: PlayerBase) -> void:
+	if _hero_total <= 1 or trigger == null or Game.mode != Defs.GameMode.COOP:
+		return
+	for hero: PlayerBase in _orders[0]:
+		if hero == trigger or hero.dead:
+			continue
+		if hero.is_down():
+			var inner: Rect2i = rect.grow(-PartyTuning.EGG_VIEW_INSET_PX)
+			var egg: Vector2i = hero.sim_pos.clamp(inner.position, inner.end - Vector2i.ONE)
+			if egg != hero.sim_pos:
+				hero.teleport(egg)
+			continue
+		if Overlap.point_in(rect, hero.sim_pos.x, hero.sim_pos.y - 1):
+			continue
+		hero.xvel = 0
+		hero.yvel = 0
+		hero.teleport(Vector2i(trigger.sim_pos.x - PartyTuning.PULL_IN_BEHIND_PX * trigger.facing, trigger.sim_pos.y))
+		notify_hero_teleported(hero)
+
+
 ## Lock the camera so that it shows exactly `view_px` (boss rooms, single-screen rooms; PHYSICS.md 12.4).
 func lock_camera(view_px: Rect2i) -> void:
 	_camera_locked = true
@@ -770,6 +822,15 @@ func hero_death_finished(hero: PlayerBase) -> void:
 			continue
 		if not other.dead or (_death_done & (1 << clampi(other.slot, 0, Defs.MAX_PLAYERS - 1))) == 0:
 			return
+	Events.party_wiped.emit()
+	_lose_team_life()
+
+
+## 2.0 team wipe of a party at once (PHYSICS.md C.12; DESIGN.md D.3): Events.party_wiped, one life from the tribe
+## pool, then [method respawn_player] (every hero at his slot's respawn point, the world reset) or the game over.
+## The PartyDriver calls it when the last hatched hero becomes an egg with no death toss running (a leash or a
+## voluntary egg while every partner is down); a wipe after a death toss goes through [method hero_death_finished].
+func team_wipe() -> void:
 	Events.party_wiped.emit()
 	_lose_team_life()
 
@@ -1172,6 +1233,13 @@ func _party_changed() -> void:
 		for k: int in present.size():
 			order.append(present[(r + k) % present.size()])
 		_orders.append(order)
+
+
+## 2.0: `base` moved PartyTuning.RESPAWN_SPREAD_PX * `place` px towards the side where the floor continues (right
+## first, then left), or `base` itself when neither side has a floor there (PHYSICS.md C.12) - the spread of the
+## team-wipe respawn, also used for a party's gate travel. `place` <= 0 returns `base`.
+func party_spread_point(base: Vector2i, place: int) -> Vector2i:
+	return _spread_point(base, place)
 
 
 ## `base` moved PartyTuning.RESPAWN_SPREAD_PX * `slot` px towards the side where the floor continues (right first,

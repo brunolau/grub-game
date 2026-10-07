@@ -1,0 +1,13 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/objects/boulder_heavy.gd" id="1_boulder_heavy"]
+[ext_resource type="Texture2D" path="res://assets/sprites/objects/boulder_heavy.png" id="2_boulder_heavy"]
+
+[node name="HeavyBoulder" type="Node2D"]
+script = ExtResource("1_boulder_heavy")
+
+[node name="Sprite" type="Sprite2D" parent="."]
+texture = ExtResource("2_boulder_heavy")
+centered = false
+offset = Vector2(-32, -64)
+hframes = 3

@@ -1,0 +1,14 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemies/shellback.gd" id="1_script"]
+[ext_resource type="Texture2D" path="res://assets/sprites/enemies/shellback.png" id="2_texture"]
+
+[node name="Shellback" type="Node2D"]
+script = ExtResource("1_script")
+
+[node name="Sprite" type="Sprite2D" parent="."]
+texture = ExtResource("2_texture")
+centered = false
+offset = Vector2(-152, -152)
+hframes = 6
+vframes = 3

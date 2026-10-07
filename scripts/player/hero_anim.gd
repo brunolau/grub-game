@@ -9,6 +9,8 @@ extends RefCounted
 enum Anim {
 	IDLE, PANT, SKID, WALK, JUMP, FALL, LAND, CROUCH, CRAWL,
 	STRIKE, STRIKE_UP, STRIKE_LOW, STRIKE_AIR, HURT, DEATH, GLIDE, VICTORY,
+	# 2.0 (never shown in Book I solo): curled up, flying as a batted ball, on a vine, seated on a mount.
+	CURL, BALL, CLIMB, RIDE,
 }
 
 # --- Sheet frames, row-major (ASSET_MANIFEST 3) ---------------------------------------------------------------------
@@ -42,6 +44,14 @@ const VICTORY_FIRST: int = 48
 const VICTORY_COUNT: int = 2
 const GLIDE_FIRST: int = 50
 const GLIDE_COUNT: int = 2
+## 2.0 poses on the shipped sheets (DESIGN.md F.1 "Hero poses"): curl = roll 24-26, climb = 44-47, a mount's rider =
+## crouch 21.
+const ROLL_FIRST: int = 24
+const ROLL_COUNT: int = 3
+const CLIMB_FIRST: int = 44
+const CLIMB_COUNT: int = 4
+## Climb frames advance one per this many px climbed (PHYSICS.md C.4: frames 44-47, one per 4 px).
+const CLIMB_PX_PER_FRAME: int = 4
 
 # --- Cadence: manifest fps converted with Tuning.ANIM_TICKS_PER_SECOND (cosmetic only) -------------------------------
 const IDLE_FPS: int = 8
@@ -55,6 +65,7 @@ const HURT_FPS: int = 8
 const DEATH_FPS: int = 8
 const VICTORY_FPS: int = 4
 const GLIDE_FPS: int = 4
+const ROLL_FPS: int = 14
 
 ## A rise slower than this that did not come from the jump handler is a hop (strike, hard landing, shake
 ## nudge): the pose is kept instead of switching to the jump frames.
@@ -116,6 +127,12 @@ func _choose(hero: Player) -> int:
 		return Anim.DEATH
 	if hero.is_gliding():
 		return Anim.GLIDE
+	if hero.curl != PlayerBase.CURL_NONE:
+		return Anim.BALL if hero.curl == PlayerBase.CURL_BALL else Anim.CURL
+	if hero.state == Defs.HeroState.CLIMB:
+		return Anim.CLIMB
+	if hero.state == Defs.HeroState.RIDING and not _is_strike(hero.handler):
+		return Anim.RIDE  # a seated rider; the gunner's strikes use the strike frames below
 	if hero.state == Defs.HeroState.HURT:
 		return Anim.HURT
 	match hero.handler:
@@ -205,7 +222,19 @@ func _frame(hero: Player) -> int:
 			return GLIDE_FIRST + _cycle(GLIDE_FPS, GLIDE_COUNT)
 		Anim.VICTORY:
 			return VICTORY_FIRST + _cycle(VICTORY_FPS, VICTORY_COUNT)
+		Anim.CURL:
+			return ROLL_FIRST
+		Anim.BALL:
+			return ROLL_FIRST + _cycle(ROLL_FPS, ROLL_COUNT)
+		Anim.CLIMB:
+			return CLIMB_FIRST + (absi(hero.hero_climb.climb_px) / CLIMB_PX_PER_FRAME) % CLIMB_COUNT
+		Anim.RIDE:
+			return CROUCH
 	return IDLE_FIRST
+
+
+static func _is_strike(handler: int) -> bool:
+	return handler == Defs.HeroState.STRIKE or handler == Defs.HeroState.HIGH_STRIKE 			or handler == Defs.HeroState.LOW_STRIKE
 
 
 ## Looping frame index of the current animation at `fps`.

@@ -48,8 +48,9 @@ def put(scene, im, x, bottom_y, pivot_x=None):
 
 # ---------------------------------------------------------------------------------------------------- frames sheet
 def frames_sheet():
+    from build_previews_b2 import PHASE1                         # those have their own sheet (book2_objects.png)
     rels = [k[len("assets/"):] for k in sorted(REGISTRY) if k.endswith(".png") and "/palettes/" not in k
-            and REGISTRY[k].get("owner", "art-A") == "art-A"]
+            and REGISTRY[k].get("owner", "art-A") == "art-A" and k[len("assets/"):] not in PHASE1]
     blocks = []
     for rel in rels:
         cs = cells(rel)

@@ -52,11 +52,27 @@ def save_registry():
         f.write("\n")
 
 
+def write_png(im, path):
+    """Save a PNG only when its bytes change: an unchanged rebuild leaves the file (and its mtime) alone, so other
+    owners' Godot runs do not re-import it."""
+    import io
+    buf = io.BytesIO()
+    im.save(buf, format="PNG", optimize=True)
+    data = buf.getvalue()
+    if os.path.exists(path):
+        with open(path, "rb") as f:
+            if f.read() == data:
+                return False
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "wb") as f:
+        f.write(data)
+    return True
+
+
 def save(im, rel, **meta):
     """Write a PNG under assets/ (RGBA unless the image is L / LA / RGB on purpose) and record it."""
     path = os.path.join(ASSETS, *rel.split("/"))
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    im.save(path, optimize=True)
+    write_png(im, path)
     entry = {"size": list(im.size)}
     entry.update(meta)
     entry.setdefault("license", "CC0 1.0")
@@ -67,8 +83,7 @@ def save(im, rel, **meta):
 def save_doc(im, name):
     """Write a preview / proof sheet under docs/art/expansion/."""
     path = os.path.join(DOCS, name)
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    im.save(path, optimize=True)
+    write_png(im, path)
     return path
 
 

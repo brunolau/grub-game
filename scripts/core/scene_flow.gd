@@ -17,6 +17,21 @@ extends Node
 ## Flow also reacts to the application losing focus or going to the background (every platform, most important
 ## on phones): gameplay is paused, all sound is suspended, and settings are written before the OS may kill the
 ## app. Sound resumes with the focus; gameplay stays paused until the player resumes it.
+##
+## 2.0 (docs/expansion/PLAN.md P1.1, GAMEPLAY.md 13.1 / 13.9.1 / 13.10.1, DESIGN.md D.1 / D.11 / E.8). The front end is
+## Title > Play > Solo / Co-op / Versus ([method open_play]): Solo and Co-op go through the book select
+## ([method choose_book]) and the difficulty ([method start_selected_game]); Co-op opens the join panel first
+## ([method join_player], [method finish_join]); Versus opens the lobby. Every campaign call works in the mode and
+## book of the run: the co-op campaign plays each stop's co-op file ([method level_to_play]: Flow.start_level maps a
+## solo id to its `<id>_coop` file in co-op), results, unlocks, high scores and the expert wall go to the save
+## namespace of (Game.mode, Game.book, difficulty) ([method save_space]). A single-player Book I run is exactly 1.0.
+## A player may join or leave from the join panel, the world map or the pause menu; mid-stage the stage restarts at its
+## checkpoint in the other layout, score kept ([method join_player], [method leave_player]). A pad that disconnects
+## during play pauses the game for its player ([signal pad_lost]; the pause menu offers "Reconnect, or continue
+## alone": [method continue_alone]); the next pad that connects takes the lost seat. Versus: [method start_versus]
+## starts a [VersusMatch] (Game.versus_match), every round is an arena start ([method start_round]) seeded from the
+## match; the referee ends a round with [method end_round]; then the scoreboard ([method next_round]) and after the
+## last round the results ([method rematch], [method leave_versus]).
 
 ## A screen or the level became active. `screen` is one of the SCREEN_* names or SCREEN_LEVEL.
 signal screen_changed(screen: StringName)
@@ -24,6 +39,13 @@ signal screen_changed(screen: StringName)
 signal transition_covered
 ## The transition finished uncovering the new scene.
 signal transition_finished
+## 2.0: the players changed (a join or a leave): `size` players now take part (party_size()).
+signal party_changed(size: int)
+## 2.0: the pad of player slot `slot` disconnected. During play the game pauses with that player's focus
+## (pause_slot); the pause menu offers "Reconnect, or continue alone" (lost_pad_slots(), continue_alone()).
+signal pad_lost(slot: int)
+## 2.0: a pad connected and took the seat of player slot `slot`, whose pad was lost.
+signal pad_reconnected(slot: int)
 
 const MAIN_SCENE: String = "res://scenes/main.tscn"
 const LEVEL_SCENE: String = "res://scenes/world/level.tscn"
@@ -55,6 +77,15 @@ const SCREEN_THE_END: StringName = &"the_end"
 const SCREEN_CREDITS: StringName = &"credits"
 const SCREEN_LEVEL: StringName = &"level"              ## gameplay (not in SCREEN_DIR)
 const SCREEN_BOOT: StringName = &"boot"                ## placeholder main scene
+# 2.0 screens (ui-A, PLAN.md P1.11 / P2.8). Arguments in the comments; each screen also reads Game / Flow state.
+const SCREEN_BOOK_SELECT: StringName = &"book_select"  ## Book I / Book II (play_mode tells Solo or Co-op)
+const SCREEN_JOIN: StringName = &"join"                ## co-op join panel "the Tribe Gathering"
+const SCREEN_UNLOCKS: StringName = &"unlocks"          ## the Cave Painting rewards
+const SCREEN_VERSUS_LOBBY: StringName = &"versus_lobby" ## seats, colours, CPUs, ready (Game.versus_match)
+const SCREEN_VERSUS_RULES: StringName = &"versus_rules" ## args: {"owner": slot whose Start opened it}
+const SCREEN_VERSUS_ARENA: StringName = &"versus_arena" ## arena thumbnails, Random, Party Mix
+const SCREEN_VERSUS_SCOREBOARD: StringName = &"versus_scoreboard" ## args: {"round_index": int, "winners": PackedInt32Array}
+const SCREEN_VERSUS_RESULTS: StringName = &"versus_results" ## args: {"winners": PackedInt32Array, "awards": {slot: [id]}}
 
 ## Active screen name.
 var current_screen: StringName = SCREEN_BOOT
@@ -77,7 +108,10 @@ var background_loading: bool = true
 ## Player slot whose device asked for the last pause (GameInput.event_slot; 0 in single-player and for a pause
 ## that did not come from a device, e.g. the focus loss). The pause menu gives that player the focus (2.0).
 var pause_slot: int = 0
-
+## 2.0: the game mode chosen on the front end (Defs.GameMode; open_play), and the book (choose_book). The title resets
+## them to Solo / Book I. They decide what start_selected_game starts; a running game's mode and book are Game's.
+var play_mode: int = Defs.GameMode.SINGLE
+var play_book: int = 1
 var _layer: CanvasLayer = null
 var _cover: TransitionCover = null
 var _cover_tween: Tween = null
@@ -91,6 +125,12 @@ var _app_focused: bool = true
 var _app_resumed: bool = true
 var _app_active: bool = true
 var _warmup: Warmup = null
+# 2.0: player slots whose pad was lost, oldest first (notify_pad_connection).
+var _lost_pads: PackedInt32Array = PackedInt32Array()
+# 2.0: what the next level start applies once the level is loaded (before its first tick): the checkpoint of a
+# party change ([has, pos]; empty = none) and the Sim.rng seed of a versus round (-1 = none).
+var _entry_checkpoint: Array = []
+var _pending_seed: int = -1
 
 
 ## Background loading of what a level start needs (ARCHITECTURE.md 11 "Loading"). The pictures, sounds and fonts
@@ -257,6 +297,7 @@ func _ready() -> void:
 	_overlay_menu = _make_overlay(Defs.LAYER_MENU)
 	_warmup = Warmup.new()
 	add_child(_warmup)
+	Input.joy_connection_changed.connect(notify_pad_connection)
 	if DisplayServer.get_name() == "headless":
 		instant_transitions = true
 		# Tests and smoke checks load what they use themselves; nothing runs behind their back.
@@ -328,14 +369,22 @@ func goto_screen(screen: StringName, transition: int = Defs.Transition.FADE, p_a
 		_change_scene(MAIN_SCENE, SCREEN_BOOT, transition, notice)
 
 
-## Title screen (also the target of "quit to title" and of the end of a run).
+## Title screen (also the target of "quit to title" and of the end of a run). 2.0: the front-end choice goes back
+## to Solo / Book I, and a party's input slots back to single-player (every device feeds P1).
 func goto_title() -> void:
 	Audio.stop_all_sfx()
+	play_mode = Defs.GameMode.SINGLE
+	play_book = 1
+	_lost_pads.clear()
+	GameInput.set_menu_clusters(false)
+	_reset_party_input()
 	goto_screen(SCREEN_TITLE)
 
 
-## Start a new run at the first campaign level (GAMEPLAY.md 11.1 steps 5-7).
+## Start a new run at the first campaign level (GAMEPLAY.md 11.1 steps 5-7). The 1.0 game: single-player, Book I
+## (see start_selected_game / start_book_game / start_coop_game for the 2.0 runs).
 func start_new_game(difficulty: int) -> void:
+	_reset_party_input()
 	Game.new_game(difficulty)
 	Settings.set_value("game/last_difficulty", difficulty)
 	var first: StringName = Levels.first_level()
@@ -348,27 +397,44 @@ func start_new_game(difficulty: int) -> void:
 
 ## Start a new run at a later level (level select / code entry). Score and lives start fresh. A level reached by
 ## its code counts as reached from then on, so the level select lists it (with its record once cleared).
+## 2.0: a single-player run of the level's book (Book II codes start Book II; the run begins with the club and an
+## empty belt, DESIGN.md C.1 rule 4). A Book I level is exactly 1.0.
 func continue_game(level_id: StringName, difficulty: int) -> void:
-	if not Save.is_level_unlocked(level_id, difficulty):
-		Save.unlock_level(level_id, difficulty)
+	_reset_party_input()
+	var book: int = maxi(Levels.get_book(level_id), 1)
+	var space_key: String = Save.space(Defs.GameMode.SINGLE, book, difficulty)
+	if not Save.is_level_unlocked_in(space_key, level_id):
+		Save.unlock_level_in(space_key, level_id)
 		Save.save_game()
-	Game.new_game(difficulty)
+	if book == 1:
+		Game.new_game(difficulty)
+	else:
+		Game.start_run(difficulty, Defs.GameMode.SINGLE, 1, book)
 	show_world_map(level_id)
 
 
 ## Show the world map with the marker on `level_id`; the map screen calls start_level(args["level_id"]) when
 ## it is done. Without a map screen the level starts directly.
+## 2.0: args also hold "book" and "mode" (Game.book, Game.mode); in co-op the marker stands on the solo map stop of
+## a co-op file (start_level plays the co-op file again).
 func show_world_map(level_id: StringName) -> void:
+	var stop: StringName = level_id
+	if Game.mode == Defs.GameMode.COOP and Levels.is_coop_level(level_id):
+		stop = Levels.get_coop_base(level_id)
 	if has_screen(SCREEN_WORLD_MAP):
-		goto_screen(SCREEN_WORLD_MAP, Defs.Transition.FADE, {"level_id": level_id})
+		goto_screen(SCREEN_WORLD_MAP, Defs.Transition.FADE, {"level_id": stop, "book": Game.book, "mode": Game.mode})
 	else:
-		start_level(level_id)
+		start_level(stop)
 
 
 ## Load a level. `carry_progress` keeps completion counters and the tally list (linked sub-stage, bonus stage).
+## 2.0: in a co-op run a solo level id starts its co-op file (level_to_play).
 func start_level(level_id: StringName, transition: int = Defs.Transition.CURTAIN, carry_progress: bool = false) -> void:
+	# 2.0: what this start applies after loading (a party change's checkpoint, a versus round's seed); {} in 1.0.
+	var extras: Dictionary = _take_level_extras()
 	if busy:
 		return
+	level_id = level_to_play(level_id)
 	if not Levels.has_level(level_id):
 		push_error("Flow.start_level: unknown level '%s'" % level_id)
 		return
@@ -378,7 +444,9 @@ func start_level(level_id: StringName, transition: int = Defs.Transition.CURTAIN
 		return
 	pending_level_id = level_id
 	Game.begin_level(level_id, carry_progress)
-	_change_scene(scene, SCREEN_LEVEL, transition, {"level_id": level_id})
+	var level_args: Dictionary = {"level_id": level_id}
+	level_args.merge(extras)
+	_change_scene(scene, SCREEN_LEVEL, transition, level_args)
 
 
 ## Reload the current level from its start (pause menu "restart level"). The run goes back to its state at the
@@ -409,7 +477,7 @@ func complete_level(exit_kind: StringName) -> void:
 	var level_id: StringName = Game.level_id
 	var difficulty: int = Game.difficulty
 	Events.level_completed.emit(level_id, exit_kind)
-	var kind: String = str(Levels.get_value(level_id, "kind", Levels.KIND_MAIN))
+	var kind: String = _campaign_kind(level_id)
 	if exit_kind == &"warp" and kind != Levels.KIND_BONUS:
 		# Warp item in a main level: straight into its bonus stage, no tally, progress carried over.
 		var bonus: StringName = StringName(str(Levels.get_value(level_id, "bonus", "", difficulty)))
@@ -430,7 +498,7 @@ func complete_level(exit_kind: StringName) -> void:
 			# stop's result now, as its tally would have.
 			var stop: StringName = Levels.parent_level(level_id, difficulty)
 			if stop != &"":
-				Save.record_level_result(stop, difficulty, Game.score, Game.completion_percent())
+				Save.record_level_result_in(save_space(), stop, Game.score, Game.completion_percent())
 				Save.save_game()
 			start_level(epilogue, Defs.Transition.CURTAIN, false)
 			return
@@ -446,45 +514,47 @@ func complete_level(exit_kind: StringName) -> void:
 func finish_tally() -> void:
 	var finished: StringName = Game.level_id
 	var difficulty: int = Game.difficulty
+	var space_key: String = save_space()
 	# A bonus stage ends its SOURCE level (GAMEPLAY.md 1.1).
 	if Game.warp_return_level != &"":
 		finished = Game.warp_return_level
 		Game.warp_return_level = &""
-	elif str(Levels.get_value(finished, "kind", Levels.KIND_MAIN)) == Levels.KIND_BONUS:
+	elif _campaign_kind(finished) == Levels.KIND_BONUS:
 		# A bonus stage entered without its source level's warp (debug level select): nothing to record or unlock,
 		# and it never ends the game. The run goes back to the title.
 		Game.clear_tally()
-		Save.submit_score(Game.score)
+		Save.submit_score_in(space_key, Game.score)
 		Save.save_game()
 		goto_title()
 		return
 	# A linked sub-stage ends the main level it belongs to: the result goes to that level's map stop (the
-	# campaign then continues after it, Levels.next_level).
+	# campaign then continues after it, Levels.next_level). A co-op file's map stop is its solo level's.
 	var parent: StringName = Levels.parent_level(finished, difficulty)
-	Save.record_level_result(parent if parent != &"" else finished, difficulty, Game.score,
+	Save.record_level_result_in(space_key, parent if parent != &"" else finished, Game.score,
 			Game.completion_percent())
 	Game.clear_tally()
-	var kind: String = str(Levels.get_value(finished, "kind", Levels.KIND_MAIN))
+	_store_belts(space_key)
+	var kind: String = _campaign_kind(finished)
 	var next: StringName = Levels.next_level(finished, difficulty)
 	if kind == Levels.KIND_ENDING or (next == &"" and not Levels.has_locked_successor(finished, difficulty)):
-		Save.set_game_completed(difficulty)
-		Save.submit_score(Game.score)
+		Save.set_game_completed_in(space_key)
+		Save.submit_score_in(space_key, Game.score)
 		Save.save_game()
 		goto_screen(SCREEN_THE_END)
 		return
 	if next == &"":
-		Save.submit_score(Game.score)
+		Save.submit_score_in(space_key, Game.score)
 		Save.save_game()
 		goto_screen(SCREEN_EXPERT_WALL)
 		return
-	Save.unlock_level(next, difficulty)
+	Save.unlock_level_in(space_key, _map_stop(next))
 	Save.save_game()
 	show_world_map(next)
 
 
 ## No lives left (GAMEPLAY.md 11.1 step 9: after the death toss the curtain closes on the level).
 func game_over() -> void:
-	Save.submit_score(Game.score)
+	Save.submit_score_in(save_space(), Game.score)
 	Save.save_game()
 	Events.game_over.emit()
 	goto_screen(SCREEN_GAME_OVER, Defs.Transition.CURTAIN)
@@ -507,6 +577,379 @@ func toggle_pause() -> void:
 
 func is_paused() -> bool:
 	return get_tree().paused
+
+
+# =================================================================================================================
+# 2.0: modes and books (GAMEPLAY.md 13.1)
+# =================================================================================================================
+
+## Title > Play > Solo / Co-op / Versus (Defs.GameMode). Solo: the book select (or, without it, the difficulty
+## select); Co-op: the join panel (begin_party_setup; without the panel two keyboard halves join at once and the book
+## select follows); Versus: the lobby (open_versus_lobby).
+func open_play(mode: int) -> void:
+	play_mode = mode
+	match mode:
+		Defs.GameMode.COOP:
+			begin_party_setup()
+			if has_screen(SCREEN_JOIN):
+				goto_screen(SCREEN_JOIN)
+			else:
+				_ensure_party_inputs(PartyTuning.COOP_PLAYERS)
+				_open_book_select()
+		Defs.GameMode.VERSUS:
+			open_versus_lobby()
+		_:
+			_reset_party_input()
+			_open_book_select()
+
+
+## The book select chose `book` (1 / 2; Book II is open from the start): on to the difficulty select (mode_select),
+## or straight into the game when that screen does not exist.
+func choose_book(book: int) -> void:
+	play_book = clampi(book, 1, Levels.BOOK_2)
+	if has_screen(SCREEN_MODE_SELECT):
+		goto_screen(SCREEN_MODE_SELECT)
+	else:
+		start_selected_game(Settings.get_int("game/last_difficulty"))
+
+
+## The difficulty select chose `difficulty`: start the run the front end prepared (play_mode, play_book) - a solo run
+## of the book (start_book_game) or a co-op run of the joined party (start_coop_game).
+func start_selected_game(difficulty: int) -> void:
+	if play_mode == Defs.GameMode.COOP:
+		start_coop_game(difficulty, maxi(party_size(), PartyTuning.COOP_PLAYERS), play_book)
+	else:
+		start_book_game(difficulty, play_book)
+
+
+## Start a single-player run of `book` at its first stop, or at `at_level` (the level select of that book; it counts
+## as reached from then on). Book I without `at_level` is start_new_game (the 1.0 game).
+func start_book_game(difficulty: int, book: int = 1, at_level: StringName = &"") -> void:
+	if book <= 1 and at_level == &"":
+		start_new_game(difficulty)
+		return
+	if at_level != &"":
+		continue_game(at_level, difficulty)
+		return
+	_reset_party_input()
+	Game.start_run(difficulty, Defs.GameMode.SINGLE, 1, book)
+	Settings.set_value("game/last_difficulty", difficulty)
+	var first: StringName = Levels.first_level(book)
+	if first == &"":
+		push_warning("Flow: book %d has no campaign level yet" % book)
+		goto_title()
+		return
+	show_world_map(first)
+
+
+## Start a co-op run (DESIGN.md D): `party` heroes (co-op is designed for PartyTuning.COOP_PLAYERS) of the players who
+## joined (GameInput slots; a slot nobody joined gets a default input: P1 the left keyboard half, P2 the right one,
+## further players the connected pads), `book`, at the book's first stop or at `at_level` (a solo map stop or its
+## co-op file; it counts as reached in the co-op save from then on). The stops play their co-op files (level_to_play);
+## a book without any co-op file yet plays its solo files with the party (development).
+func start_coop_game(difficulty: int, party: int = PartyTuning.COOP_PLAYERS, book: int = 1,
+		at_level: StringName = &"") -> void:
+	var size: int = clampi(party, 2, Defs.MAX_PLAYERS)
+	play_mode = Defs.GameMode.COOP
+	play_book = clampi(book, 1, Levels.BOOK_2)
+	_ensure_party_inputs(size)
+	Game.start_run(difficulty, Defs.GameMode.COOP, size, play_book)
+	Settings.set_value("game/last_difficulty", difficulty)
+	var first: StringName = _map_stop(at_level)
+	if first != &"":
+		var space_key: String = save_space()
+		if not Save.is_level_unlocked_in(space_key, first):
+			Save.unlock_level_in(space_key, first)
+			Save.save_game()
+	else:
+		var campaign: Array[StringName] = Levels.get_coop_campaign(difficulty, play_book)
+		first = _map_stop(campaign[0]) if not campaign.is_empty() else Levels.first_level(play_book)
+		if campaign.is_empty() and first != &"":
+			push_warning("Flow: book %d has no co-op file yet; the party plays the solo files" % play_book)
+	if first == &"":
+		push_warning("Flow: book %d has no campaign level yet" % play_book)
+		goto_title()
+		return
+	show_world_map(first)
+
+
+## The file to start for `level_id` in the running game: in co-op the co-op file of a solo level (when it has one,
+## Levels.get_coop_level), otherwise `level_id` itself (single-player and versus never change it).
+func level_to_play(level_id: StringName) -> StringName:
+	if Game.mode == Defs.GameMode.COOP:
+		var coop: StringName = Levels.get_coop_level(level_id)
+		if coop != &"":
+			return coop
+	return level_id
+
+
+## The save namespace of the running game (Save.space of Game.mode, Game.book, Game.difficulty; a versus game has
+## none and answers the single-player one).
+func save_space() -> String:
+	var mode: int = Game.mode if Save.SPACE_MODES.has(Game.mode) else Defs.GameMode.SINGLE
+	return Save.space(mode, maxi(Game.book, 1), Game.difficulty)
+
+
+# =================================================================================================================
+# 2.0: joining and leaving (DESIGN.md D.1 / D.11, GAMEPLAY.md 13.9.1)
+# =================================================================================================================
+
+## The join panel or the versus lobby opens: every player slot is free (nobody plays until he presses Jump; menus
+## still answer every device through the ui_* actions). Lost pads are forgotten.
+func begin_party_setup() -> void:
+	_lost_pads.clear()
+	for slot: int in Defs.MAX_PLAYERS:
+		GameInput.assign_slot(slot, null)
+	party_changed.emit(0)
+
+
+## Players taking part: the seated players of the versus match on its front end (lobby), else the player slots with an
+## input, counted from P1 (a party always fills slots 0..n - 1). 1 in single-player.
+func party_size() -> int:
+	if play_mode == Defs.GameMode.VERSUS and Game.versus_match != null and current_screen != SCREEN_LEVEL:
+		return Game.versus_match.player_count()
+	var count: int = 0
+	for slot: int in Defs.MAX_PLAYERS:
+		if GameInput.get_slot(slot).kind == Defs.InputSlotKind.NONE:
+			break
+		count += 1
+	return count
+
+
+## A player joins with `input` (GameInput.join_input_for_event: "press Jump on any device") at slot `slot` (-1 = the
+## first free one). Returns the slot, or -1 when that input already plays or no seat is free (co-op takes
+## PartyTuning.COOP_PLAYERS, the versus lobby Defs.MAX_PLAYERS). The single player of a running game keeps his
+## device as P1 (GameInput.current_device_input). In the versus lobby the player is also seated in Game.versus_match.
+## During a campaign stage the stage restarts at its checkpoint in the co-op file, score kept (on the world map the
+## next start plays it).
+func join_player(input: InputSlot, slot: int = -1) -> int:
+	if input == null or input.kind == Defs.InputSlotKind.NONE or GameInput.find_input(input) >= 0:
+		return -1
+	var lobby: bool = _in_versus_lobby()
+	var limit: int = Defs.MAX_PLAYERS if lobby else PartyTuning.COOP_PLAYERS
+	if lobby and Game.versus_match != null and Game.versus_match.player_count() >= limit:
+		return -1
+	if GameInput.get_slot(0).kind == Defs.InputSlotKind.ALL_DEVICES:
+		GameInput.assign_slot(0, GameInput.current_device_input(input))
+		if GameInput.find_input(input) >= 0:
+			return -1
+	var at: int = slot if slot >= 0 else _first_free_slot(lobby)
+	if at < 0 or at >= limit or GameInput.get_slot(at).kind != Defs.InputSlotKind.NONE:
+		return -1
+	if lobby and Game.versus_match != null:
+		if Game.versus_match.seat_human(input, at) < 0:
+			return -1
+	GameInput.assign_slot(at, input)
+	Audio.play_sfx(Sfx.PARTY_JOIN)
+	party_changed.emit(party_size())
+	_apply_party_change()
+	return at
+
+
+## Player slot `slot` leaves (the join panel, the pause menu, "continue alone" after a lost pad). The players after him
+## move up a slot with their input and look, so the party stays slots 0..n - 1. Back to one player the game is
+## single-player again (every device feeds P1). During a campaign stage the stage restarts at its checkpoint in the
+## solo file, score kept. Returns false when nobody plays at `slot`.
+func leave_player(slot: int) -> bool:
+	if slot < 0 or slot >= Defs.MAX_PLAYERS:
+		return false
+	var lobby: bool = _in_versus_lobby()
+	var seated: bool = lobby and Game.versus_match != null and Game.versus_match.is_seated(slot)
+	if GameInput.get_slot(slot).kind == Defs.InputSlotKind.NONE and not seated:
+		return false
+	var in_run: bool = current_screen == SCREEN_LEVEL or current_screen == SCREEN_WORLD_MAP
+	if in_run and not lobby and (party_size() <= 1 or GameInput.get_slot(slot).kind == Defs.InputSlotKind.ALL_DEVICES):
+		return false  # the last player of a running campaign quits instead
+	if lobby and Game.versus_match != null:
+		Game.versus_match.unseat(slot)
+		GameInput.assign_slot(slot, null)
+	else:
+		for at: int in range(slot, Defs.MAX_PLAYERS - 1):
+			GameInput.assign_slot(at, GameInput.get_slot(at + 1))
+			_copy_look(at + 1, at)
+		GameInput.assign_slot(Defs.MAX_PLAYERS - 1, null)
+	var lost: PackedInt32Array = PackedInt32Array()
+	for lost_slot: int in _lost_pads:
+		if lost_slot != slot:
+			lost.append(lost_slot - 1 if lost_slot > slot and not lobby else lost_slot)
+	_lost_pads = lost
+	party_changed.emit(party_size())
+	_apply_party_change()
+	return true
+
+
+## The join panel is done (every joined player held Strike): on to the book select. False (nothing happens) while fewer
+## than two players joined.
+func finish_join() -> bool:
+	if party_size() < 2:
+		return false
+	play_mode = Defs.GameMode.COOP
+	_open_book_select()
+	return true
+
+
+## Player slots whose pad was lost and is not back yet (oldest first).
+func lost_pad_slots() -> PackedInt32Array:
+	return _lost_pads.duplicate()
+
+
+## A pad connected (`connected`) or disconnected (Input.joy_connection_changed calls it; tests call it directly). A
+## lost pad of a player slot pauses running gameplay for that player ([signal pad_lost]); a pad that connects while a
+## seat waits takes the oldest lost seat (Android gives a reconnected pad a new id) - the game stays paused until the
+## player resumes it.
+func notify_pad_connection(device_id: int, connected: bool) -> void:
+	if connected:
+		if _lost_pads.is_empty():
+			return
+		var slot: int = _lost_pads[0]
+		_lost_pads.remove_at(0)
+		GameInput.assign_slot(slot, InputSlot.pad(device_id))
+		pad_reconnected.emit(slot)
+		return
+	for slot: int in Defs.MAX_PLAYERS:
+		var input: InputSlot = GameInput.get_slot(slot)
+		if input.kind != Defs.InputSlotKind.PAD or input.device_id != device_id or _lost_pads.has(slot):
+			continue
+		_lost_pads.append(slot)
+		pad_lost.emit(slot)
+		if current_screen == SCREEN_LEVEL and not busy and not get_tree().paused:
+			pause_slot = slot
+			set_paused(true)
+
+
+## "Continue alone" for player slot `slot` whose pad was lost: in a campaign he leaves (leave_player); in versus a bot
+## takes his hero for the rest of the match (an idle hero without bots). Returns false when that seat was not lost.
+func continue_alone(slot: int) -> bool:
+	var at: int = _lost_pads.find(slot)
+	if at < 0:
+		return false
+	_lost_pads.remove_at(at)
+	var versus_match: VersusMatch = Game.versus_match
+	if Game.mode == Defs.GameMode.VERSUS and versus_match != null and versus_match.is_seated(slot):
+		var seat: VersusMatch.Seat = versus_match.get_seat(slot)
+		seat.kind = VersusMatch.SeatKind.BOT
+		seat.input = null
+		seat.ready = true
+		GameInput.assign_slot(slot, InputSlot.bot(_bot_source(versus_match, slot, seat.bot_level)))
+		return true
+	return leave_player(slot)
+
+
+# =================================================================================================================
+# 2.0: versus (DESIGN.md E.8, TECH_AUDIT.md 4.9)
+# =================================================================================================================
+
+## Title > Play > Versus: the lobby with a match of the remembered rules (Game.versus_match; a match left from before
+## keeps its rules and seats). Without a lobby screen: back to the title.
+func open_versus_lobby() -> void:
+	play_mode = Defs.GameMode.VERSUS
+	if Game.versus_match == null:
+		Game.versus_match = VersusMatch.from_settings()
+	if current_screen != SCREEN_VERSUS_RULES and current_screen != SCREEN_VERSUS_ARENA:
+		_lost_pads.clear()
+		for slot: int in Defs.MAX_PLAYERS:
+			var input: InputSlot = Game.versus_match.get_seat(slot).input
+			var human: bool = Game.versus_match.get_seat(slot).kind == VersusMatch.SeatKind.HUMAN and input != null
+			GameInput.assign_slot(slot, input if human else null)
+	if has_screen(SCREEN_VERSUS_LOBBY):
+		goto_screen(SCREEN_VERSUS_LOBBY)
+	else:
+		push_warning("Flow: this build has no versus lobby")
+		goto_title()
+
+
+## Add a bot of `level` (Defs.BotLevel) to the lobby's match ("Add CPU"). Returns its slot or -1 (no match, full).
+func add_bot(level: int = Defs.BotLevel.HUNTER) -> int:
+	if Game.versus_match == null:
+		return -1
+	var slot: int = Game.versus_match.seat_bot(level)
+	if slot >= 0:
+		party_changed.emit(party_size())
+	return slot
+
+
+## Start a versus match (the arena screen's "go"; `p_match` = Game.versus_match when null): seats are compacted to
+## slots 0..n - 1, the rules remembered, the run started (Game.start_run VERSUS with the seats' colours), humans read
+## their inputs, bots their HeroBot sources, and round 0 starts. `seed_value` < 0 = a fresh match seed. Returns false
+## (nothing happens) when the match cannot start (VersusMatch.can_start).
+func start_versus(p_match: VersusMatch = null, seed_value: int = -1) -> bool:
+	var versus_match: VersusMatch = p_match if p_match != null else Game.versus_match
+	if versus_match == null or not versus_match.can_start():
+		push_warning("Flow.start_versus: the match cannot start (two players, every human ready)")
+		return false
+	play_mode = Defs.GameMode.VERSUS
+	Game.versus_match = versus_match
+	versus_match.compact_seats()
+	versus_match.remember_rules()
+	versus_match.begin_match(seed_value if seed_value >= 0 else int(Time.get_ticks_usec() & 0x7FFFFFFF))
+	_begin_versus_run(versus_match)
+	start_round()
+	return true
+
+
+## Start the current round of Game.versus_match: its arena (VersusMatch.arena_for_round) behind the curtain, Sim.rng
+## seeded with the round seed before the first tick, bot inputs fresh for the round. The referee (world-B) runs the
+## countdown, the clock and the gong in the level and calls end_round. After the last round: the results.
+func start_round() -> void:
+	var versus_match: VersusMatch = Game.versus_match
+	if versus_match == null or busy:
+		return
+	if versus_match.is_over():
+		_show_versus_results()
+		return
+	var arena_id: StringName = versus_match.arena_for_round(versus_match.round_index)
+	if arena_id == &"" or not Levels.has_level(arena_id):
+		push_warning("Flow.start_round: no arena for %d players" % versus_match.player_count())
+		leave_versus()
+		return
+	versus_match.begin_round(arena_id)
+	_assign_bot_inputs(versus_match)
+	_pending_seed = versus_match.round_seed()
+	start_level(arena_id, Defs.Transition.CURTAIN)
+
+
+## The referee's gong (callable inside a tick): the round is over, `winners` (one slot, both of a team, or none for a
+## draw) win it. Records it (VersusMatch.record_round), emits Events.round_ended, then shows the scoreboard (whose end
+## calls next_round), or the results after the last round. Ignored when no round is being played.
+func end_round(winners: PackedInt32Array) -> void:
+	var versus_match: VersusMatch = Game.versus_match
+	if Game.mode != Defs.GameMode.VERSUS or versus_match == null or not versus_match.round_open:
+		return
+	var index: int = versus_match.round_index
+	versus_match.record_round(winners)
+	var recorded: PackedInt32Array = versus_match.history[-1]["winners"]
+	Events.round_ended.emit(index, recorded)
+	if versus_match.is_over():
+		_show_versus_results()
+	elif has_screen(SCREEN_VERSUS_SCOREBOARD):
+		goto_screen(SCREEN_VERSUS_SCOREBOARD, Defs.Transition.IRIS, {"round_index": index, "winners": recorded})
+	else:
+		next_round()
+
+
+## The scoreboard is done: the next round (or the results when the match is over).
+func next_round() -> void:
+	start_round()
+
+
+## The results' default button: the same players, rules and arena choice again, from round 0 with a new seed.
+func rematch() -> void:
+	var versus_match: VersusMatch = Game.versus_match
+	if versus_match == null:
+		return
+	versus_match.rematch()
+	_begin_versus_run(versus_match)
+	start_round()
+
+
+## Leave the match: back to the lobby (seats and rules kept) or, with `to_title` or without a lobby screen, the title.
+func leave_versus(to_title: bool = false) -> void:
+	if Game.versus_match != null:
+		Game.versus_match.round_open = false
+	if to_title or not has_screen(SCREEN_VERSUS_LOBBY):
+		goto_title()
+	else:
+		open_versus_lobby()
 
 
 ## Hide the screen with a transition, call `action` while nothing is visible, then uncover again - without
@@ -558,6 +1001,7 @@ func warm_up(level_id: StringName = &"") -> void:
 			if file.get_extension() == "tscn":
 				var id: StringName = StringName(category_name + "/" + file.get_basename())
 				_warmup.request(Spawner.scene_path(id), id)
+	level_id = level_to_play(level_id)
 	if level_id == &"" or not Levels.has_level(level_id):
 		return
 	var data: LevelData = LevelData.load_file(Levels.get_level_path(level_id))
@@ -703,6 +1147,8 @@ func _change_scene(path: String, screen: StringName, transition: int, p_args: Di
 		# The level loaded what it needs and holds its pictures and music itself now.
 		_warmup.drop_queue()
 		_warmup.next_level.clear()
+		if p_args.has("seed") or p_args.has("entry_checkpoint"):
+			_apply_level_extras(p_args)
 	GameInput.enabled = true
 	screen_changed.emit(screen)
 	if background_loading and screen != SCREEN_LEVEL:
@@ -715,6 +1161,219 @@ func _change_scene(path: String, screen: StringName, transition: int, p_args: Di
 	busy = false
 	_pause_if_inactive()
 	transition_finished.emit()
+
+
+# =================================================================================================================
+# 2.0 internals
+# =================================================================================================================
+
+## The `kind` a campaign rule sees for a level: a co-op file has the kind of its solo level (bonus, ending, sub ...).
+func _campaign_kind(level_id: StringName) -> String:
+	var source: StringName = level_id
+	if Levels.is_coop_level(level_id):
+		var base: StringName = Levels.get_coop_base(level_id)
+		if Levels.has_level(base):
+			source = base
+	return str(Levels.get_value(source, "kind", Levels.KIND_MAIN))
+
+
+## The map stop id of a level: a co-op file's solo level, any other level itself.
+func _map_stop(level_id: StringName) -> StringName:
+	if Levels.is_coop_level(level_id):
+		return Levels.get_coop_base(level_id)
+	return level_id
+
+
+## Hand and belt of every hero are kept in the save of a Book II or co-op run (Save.set_belt_in, DESIGN.md C.1). A
+## Book I solo run stores nothing (its save stays as 1.0 wrote it).
+func _store_belts(space_key: String) -> void:
+	if Game.mode == Defs.GameMode.SINGLE and Game.book <= 1:
+		return
+	for slot: int in Game.party:
+		var run: PlayerRun = Game.runs[slot]
+		Save.set_belt_in(space_key, slot, run.weapon, run.belt)
+
+
+## Back to the single-player input (slot 0 reads every device) when a party's slots are set; nothing otherwise, so a
+## single-player game's input is never touched.
+func _reset_party_input() -> void:
+	var party_input: bool = GameInput.is_party_input()
+	for slot: int in range(1, Defs.MAX_PLAYERS):
+		if GameInput.get_slot(slot).kind != Defs.InputSlotKind.NONE:
+			party_input = true
+	if party_input:
+		GameInput.reset_slots()
+
+
+## Make sure player slots 0..size - 1 have an input (a slot nobody joined: the left keyboard half, the right one,
+## then the connected pads, each only when no other slot reads it) and the slots after them none.
+func _ensure_party_inputs(size: int) -> void:
+	if GameInput.get_slot(0).kind == Defs.InputSlotKind.ALL_DEVICES:
+		GameInput.assign_slot(0, null)
+	var candidates: Array[InputSlot] = [
+		InputSlot.keyboard(Defs.InputSlotKind.KEYBOARD_LEFT), InputSlot.keyboard(Defs.InputSlotKind.KEYBOARD_RIGHT),
+	]
+	for pad_id: int in Input.get_connected_joypads():
+		candidates.append(InputSlot.pad(pad_id))
+	for slot: int in Defs.MAX_PLAYERS:
+		if slot >= size:
+			GameInput.assign_slot(slot, null)
+			continue
+		if GameInput.get_slot(slot).kind != Defs.InputSlotKind.NONE:
+			continue
+		for candidate: InputSlot in candidates:
+			if GameInput.find_input(candidate) < 0:
+				GameInput.assign_slot(slot, candidate)
+				break
+
+
+func _in_versus_lobby() -> bool:
+	return play_mode == Defs.GameMode.VERSUS and Game.versus_match != null and current_screen != SCREEN_LEVEL
+
+
+## The first player slot without an input (in the versus lobby: and without a seat); -1 when all are taken.
+func _first_free_slot(lobby: bool) -> int:
+	for slot: int in Defs.MAX_PLAYERS:
+		if GameInput.get_slot(slot).kind != Defs.InputSlotKind.NONE:
+			continue
+		if lobby and Game.versus_match != null and Game.versus_match.is_seated(slot):
+			continue
+		return slot
+	return -1
+
+
+## The look and weapons of the hero of slot `from` move to slot `to` (a player left; the ones after him move up).
+func _copy_look(from: int, to: int) -> void:
+	var source: PlayerRun = Game.runs[from]
+	var target: PlayerRun = Game.runs[to]
+	target.palette = source.palette
+	target.pattern = source.pattern
+	if Game.mode != Defs.GameMode.SINGLE:
+		target.set_weapon(source.weapon)
+		target.set_belt(source.belt)
+
+
+## A join or a leave during a campaign run: the run continues with the new party (Game.set_party); mid-stage the stage
+## restarts at its checkpoint in the other layout, score kept (DESIGN.md D.1). Nothing on the front end (the run that
+## starts later takes the party) and nothing in versus.
+func _apply_party_change() -> void:
+	if play_mode == Defs.GameMode.VERSUS or Game.mode == Defs.GameMode.VERSUS:
+		return
+	if current_screen != SCREEN_LEVEL and current_screen != SCREEN_WORLD_MAP:
+		return
+	var size: int = party_size()
+	if size <= 1:
+		GameInput.reset_slots()
+		size = 1
+	var mode: int = Defs.GameMode.COOP if size >= 2 else Defs.GameMode.SINGLE
+	if mode == Game.mode and size == Game.party:
+		return
+	Game.set_party(mode, size)
+	play_mode = mode
+	if current_screen != SCREEN_LEVEL or Game.level_id == &"":
+		return
+	var target: StringName = Levels.level_for_mode(Game.level_id, mode)
+	if target == &"":
+		target = Game.level_id
+	_entry_checkpoint = [Game.has_checkpoint, Game.checkpoint_pos]
+	start_level(target, Defs.Transition.CURTAIN, false)
+
+
+## What a level start applies once the level is loaded, taken from the pending requests (and cleared): the checkpoint
+## of a party change ("entry_checkpoint": [has, pos]) and the seed of a versus round ("seed"). Empty for every 1.0 start.
+func _take_level_extras() -> Dictionary:
+	var extras: Dictionary = {}
+	if not _entry_checkpoint.is_empty():
+		extras["entry_checkpoint"] = _entry_checkpoint
+	if _pending_seed >= 0:
+		extras["seed"] = _pending_seed
+	_entry_checkpoint = []
+	_pending_seed = -1
+	return extras
+
+
+## The new level is loaded and its clock has not ticked yet: seed a versus round's Sim.rng, put the heroes of a party
+## change at the checkpoint they had reached (Game.set_checkpoint; each hero at his spread respawn point).
+func _apply_level_extras(level_args: Dictionary) -> void:
+	if level_args.has("seed"):
+		Sim.rng.reseed(int(level_args["seed"]))
+	var entry: Array = level_args.get("entry_checkpoint", [])
+	var level: LevelBase = Game.level
+	if entry.size() == 2 and bool(entry[0]) and level != null:
+		Game.set_checkpoint(entry[1])
+		for hero: PlayerBase in level.contact_order().duplicate():
+			level.respawn_hero(hero, level.get_respawn_pos_for(hero.slot))
+		level.snap_camera()
+
+
+func _open_book_select() -> void:
+	if has_screen(SCREEN_BOOK_SELECT):
+		goto_screen(SCREEN_BOOK_SELECT)
+	elif has_screen(SCREEN_MODE_SELECT):
+		goto_screen(SCREEN_MODE_SELECT)
+	else:
+		start_selected_game(Settings.get_int("game/last_difficulty"))
+
+
+## A versus run for the match's seats: Game.start_run (VERSUS, a hero per seat, zeroed statistics), the seats'
+## colours, the humans' inputs (bots get theirs per round), the rest of the slots free.
+func _begin_versus_run(versus_match: VersusMatch) -> void:
+	_lost_pads.clear()
+	Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.VERSUS, versus_match.player_count(), 1)
+	for slot: int in Defs.MAX_PLAYERS:
+		var seat: VersusMatch.Seat = versus_match.get_seat(slot)
+		if seat.is_taken():
+			Game.runs[slot].palette = seat.palette
+			Game.runs[slot].pattern = seat.pattern
+		if seat.kind == VersusMatch.SeatKind.HUMAN and seat.input != null:
+			GameInput.assign_slot(slot, seat.input)
+		elif seat.kind != VersusMatch.SeatKind.BOT:
+			GameInput.assign_slot(slot, null)
+
+
+func _assign_bot_inputs(versus_match: VersusMatch) -> void:
+	for slot: int in Defs.MAX_PLAYERS:
+		var seat: VersusMatch.Seat = versus_match.get_seat(slot)
+		if seat.kind == VersusMatch.SeatKind.BOT:
+			GameInput.assign_slot(slot, InputSlot.bot(_bot_source(versus_match, slot, seat.bot_level)))
+
+
+## The flags source of the bot of `slot` this round: VersusMatch.bot_factory (a tool's or test's source), else the
+## seat's HeroBot (core-B; created once per match, its own stream restarted from the round seed), else an idle bot.
+func _bot_source(versus_match: VersusMatch, slot: int, bot_level: int) -> Callable:
+	if VersusMatch.bot_factory.is_valid():
+		var made: Variant = VersusMatch.bot_factory.call(slot, bot_level, versus_match.bot_seed(slot))
+		if made is Callable and (made as Callable).is_valid():
+			return made
+	var bot: Object = versus_match.bots[slot] as Object
+	if bot == null and ResourceLoader.exists(VersusMatch.HERO_BOT_PATH):
+		var script: GDScript = load(VersusMatch.HERO_BOT_PATH) as GDScript
+		if script != null and script.can_instantiate():
+			bot = script.new(slot, bot_level, versus_match.match_seed, versus_match.round_mode) as Object
+			versus_match.bots[slot] = bot
+	if bot != null and bot.has_method(&"produce"):
+		if bot.has_method(&"reset_round"):
+			bot.call(&"reset_round", versus_match.round_seed())
+		return Callable(bot, &"produce")
+	return _idle_bot
+
+
+func _idle_bot(_tick: int) -> int:
+	return 0
+
+
+func _show_versus_results() -> void:
+	var versus_match: VersusMatch = Game.versus_match
+	if versus_match == null:
+		goto_title()
+		return
+	versus_match.finish(Game.runs)
+	if has_screen(SCREEN_VERSUS_RESULTS):
+		goto_screen(SCREEN_VERSUS_RESULTS, Defs.Transition.IRIS, {
+			"winners": versus_match.leaders(), "awards": versus_match.hand_out_awards(Game.runs),
+		})
+	else:
+		leave_versus()
 
 
 ## Gameplay scene of this build: the world module's level, else the debug level (development only: exports do

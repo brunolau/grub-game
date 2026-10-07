@@ -1,9 +1,30 @@
 extends TestCase
 ## ui module: options are applied at once and persist; bindings can be changed; glyphs follow the device;
-## every text key has an English translation.
+## every text key has an English translation. 2.0 (ui-B, PLAN.md P1.12): the binding profiles of P1..P4, the
+## shared-keyboard presets of DESIGN.md D.11, the Swap row, the two-player keyboard test with its NumLock check, and a
+## two-player match driven only by the physical keys of the classic layout (NumLock on and off).
+
+const ARENA: StringName = &"test_world_arena_flat"
+const LEVEL_SCENE: String = "res://scenes/world/level.tscn"
+## The keycode Windows reports for a numpad key while NumLock is off (the physical keycode stays the numpad key).
+const NUMLOCK_OFF: Dictionary = {
+	KEY_KP_8: KEY_UP, KEY_KP_4: KEY_LEFT, KEY_KP_5: KEY_CLEAR, KEY_KP_6: KEY_RIGHT, KEY_KP_0: KEY_INSERT,
+	KEY_KP_PERIOD: KEY_DELETE, KEY_KP_2: KEY_DOWN,
+}
+
+var _held: Dictionary = {}  # physical key -> true
 
 
 func after_each() -> void:
+	_release_keys()
+	GameInput.reset_slots()
+	Sim.manual = false
+	Sim.stop()
+	Flow.pending_level_id = &""
+	Flow.play_mode = Defs.GameMode.SINGLE
+	Game.versus_match = null
+	Game.new_game(Defs.Difficulty.BEGINNER)
+	Game.begin_level(&"")
 	Settings.reset()
 	Settings.set_value(OptionsPanel.KEY_TOUCH_LAYOUT, "standard")
 	Settings.save()
@@ -190,6 +211,233 @@ func test_every_text_key_has_an_english_text() -> void:
 	TranslationServer.set_locale(previous)
 
 
+## The bindings page edits one profile at a time: "One player" (the 1.0 profile) or P1..P4 of a party; Swap is a row
+## like the others (DESIGN.md C.1: V / LB alone, Num + for P2 of the classic layout).
+func test_bindings_page_has_swap_and_the_player_profiles() -> void:
+	var panel: OptionsPanel = await _panel()
+	assert_eq(OptionsPanel.ACTION_KEYS.get(&"swap"), "UI_ACTION_SWAP")
+	assert_eq(panel.bind_profile, OptionsPanel.PROFILE_SOLO, "outside a party: the single-player buttons")
+	var swap: UiOptionRow = panel.get_binding_row(&"swap")
+	assert_not_null(swap, "a Swap row")
+	assert_eq(panel.binding_text(&"swap", Defs.Device.KEYBOARD), "V")
+	assert_eq(panel.binding_text(&"swap", Defs.Device.GAMEPAD), "LB")
+	assert_false(panel.get_row(OptionsPanel.ROW_LAYOUT).visible, "no shared-keyboard preset for one player")
+	panel.set_bind_profile(1)
+	assert_eq(panel.get_row(OptionsPanel.ROW_PROFILE).index, 2, "the row shows P2")
+	assert_true(panel.get_row(OptionsPanel.ROW_LAYOUT).visible, "P1 / P2 share a keyboard")
+	assert_eq(panel.binding_text(&"swap", Defs.Device.KEYBOARD), "NUM +", "classic: P2 swaps with Num +")
+	assert_eq(panel.binding_text(&"attack", Defs.Device.KEYBOARD), "NUM ENTER")
+	assert_eq(panel.binding_text(&"move_up", Defs.Device.KEYBOARD), "NUM 8")
+	assert_eq(panel.binding_text(&"jump", Defs.Device.GAMEPAD), "A", "the solo pad layout on every slot")
+	assert_true(swap.value_text.begins_with("NUM +"), "the row shows it: %s" % swap.value_text)
+	panel.set_bind_profile(0)
+	assert_eq(panel.binding_text(&"attack", Defs.Device.KEYBOARD), "SHIFT", "classic: P1 strikes with Left Shift")
+	assert_eq(panel.binding_text(&"jump", Defs.Device.KEYBOARD), "SPACE")
+	panel.set_bind_profile(2)
+	assert_false(panel.get_row(OptionsPanel.ROW_LAYOUT).visible)
+	assert_eq(panel.binding_text(&"jump", Defs.Device.KEYBOARD), "", "P3 has no keys: a keyboard serves two")
+	assert_eq(panel.binding_text(&"jump", Defs.Device.GAMEPAD), "A")
+	panel.get_row(OptionsPanel.ROW_PROFILE).step(-1)
+	assert_eq(panel.bind_profile, 1, "Left on the player row goes back to P2")
+
+
+## Rebinding on a party profile changes that profile only; the presets of D.11 put both halves back on their keys
+## (a pad button given meanwhile stays); everything persists.
+func test_party_profiles_rebind_and_take_the_shared_keyboard_presets() -> void:
+	var panel: OptionsPanel = await _panel()
+	var solo_jump: String = UiGlyphs.action_text(&"jump", UiGlyphs.SET_KEYBOARD)
+	panel.set_bind_profile(1)
+	panel.start_listening(&"jump")
+	var key: InputEventKey = InputEventKey.new()
+	key.physical_keycode = KEY_KP_7
+	key.keycode = KEY_HOME
+	key.pressed = true
+	get_tree().root.push_input(key)
+	assert_eq(panel.listening_action, &"")
+	assert_eq(panel.binding_text(&"jump", Defs.Device.KEYBOARD), "NUM 7", "P2 jumps with Num 7 now")
+	assert_eq(UiGlyphs.action_text(&"jump", UiGlyphs.SET_KEYBOARD), solo_jump, "the single-player jump is untouched")
+	assert_true(Settings.has_custom_slot_bindings(1))
+	assert_false(Settings.has_custom_slot_bindings(0))
+	var pad: InputEventJoypadButton = InputEventJoypadButton.new()
+	pad.button_index = JOY_BUTTON_RIGHT_STICK
+	panel.bind_event(&"look", pad)
+	assert_eq(panel.binding_text(&"look", Defs.Device.GAMEPAD), "R3", "P2 looks with R3")
+	OptionsPanel.apply_keyboard_preset(InputSlot.KeyboardLayout.TWO_HANDS)
+	assert_eq(str(Settings.get_value(Settings.PARTY_KEYBOARD_KEY, "")), "two_hands")
+	assert_eq(panel.get_row(OptionsPanel.ROW_LAYOUT).index, InputSlot.KeyboardLayout.TWO_HANDS, "the row follows")
+	assert_eq(panel.binding_text(&"jump", Defs.Device.KEYBOARD), "/", "two hands: P2 jumps with /")
+	assert_eq(panel.binding_text(&"look", Defs.Device.GAMEPAD), "R3", "P2's own pad button is kept")
+	panel.set_bind_profile(0)
+	assert_eq(panel.binding_text(&"attack", Defs.Device.KEYBOARD), "F", "two hands: P1 strikes with F")
+	assert_eq(panel.binding_text(&"jump", Defs.Device.KEYBOARD), "G")
+	OptionsPanel.apply_keyboard_preset(InputSlot.KeyboardLayout.ONE_HAND)
+	assert_eq(panel.binding_text(&"jump", Defs.Device.KEYBOARD), "W", "one hand: Up jumps")
+	panel.get_row(OptionsPanel.ROW_LAYOUT).set_index(InputSlot.KeyboardLayout.CLASSIC, true)
+	assert_eq(str(Settings.get_value(Settings.PARTY_KEYBOARD_KEY, "")), "classic", "the row applies the preset")
+	panel.set_bind_profile(1)
+	assert_eq(panel.binding_text(&"jump", Defs.Device.KEYBOARD), "NUM 0", "classic again: Num 0")
+	panel.close()
+	Settings.load_settings()
+	assert_eq(str(Settings.get_value(Settings.PARTY_KEYBOARD_KEY, "")), "classic", "the preset persisted")
+	var looks: Array[InputEvent] = Settings.get_slot_bindings(1, &"look", Defs.Device.GAMEPAD)
+	assert_true(not looks.is_empty() and (looks[0] as InputEventJoypadButton).button_index == JOY_BUTTON_RIGHT_STICK,
+			"P2's pad look persisted")
+	Settings.reset_slot_bindings()
+
+
+## The keyboard test (D.11): both players hold Left + Jump + Strike + Swap; every light must stay lit. Keys are read by
+## physical position (the numpad with NumLock off arrives with navigation keycodes and still lights), and while the
+## test shows no key presses a menu entry.
+func test_key_test_lights_both_players_and_passes() -> void:
+	var panel: OptionsPanel = await _panel()
+	panel.open_bindings(OptionsPanel.PROFILE_SOLO)
+	panel.open_key_test()
+	await get_tree().process_frame
+	var test: UiKeyTest = panel.get_key_test()
+	assert_true(test.is_visible_in_tree(), "the test page shows")
+	assert_false(test.all_lit())
+	var combo: Array[Key] = [KEY_A, KEY_SPACE, KEY_SHIFT, KEY_E, KEY_KP_4, KEY_KP_0, KEY_KP_ENTER, KEY_KP_ADD]
+	for code: Key in combo:
+		# Num 4 and Num 0 arrive as NumLock off sends them (keycodes Left / Insert, physical keys of the numpad).
+		_key(code, true, code != KEY_KP_4 and code != KEY_KP_0)
+	assert_true(test.is_lit(0, &"move_left") and test.is_lit(0, &"attack"), "P1's lights")
+	assert_true(test.is_lit(1, &"move_left"), "Num 4 lights with NumLock off too (keycode Left)")
+	assert_true(test.is_lit(1, &"jump") and test.is_lit(1, &"swap"))
+	assert_true(test.all_lit(), "all eight at once")
+	assert_true(test.has_passed)
+	assert_eq(test.get_status_text(), tr("UI_KEYTEST_PASSED"))
+	assert_true(test.is_visible_in_tree(), "Num Enter and Space pressed no menu entry")
+	_key(KEY_SHIFT, false)
+	assert_false(test.is_lit(0, &"attack"))
+	assert_true(test.has_passed, "a pass is kept")
+	for i: int in 3:
+		await get_tree().process_frame
+	_key(KEY_KP_8, true, false)
+	assert_true(test.is_lit(1, &"move_up"), "the small lights: Num 8 is P2's up")
+	_release_keys()
+	assert_false(test.numlock_warning, "no Windows Shift quirk seen")
+	panel.go_back()
+	assert_false(test.is_visible_in_tree(), "back leaves the test")
+
+
+## Windows with NumLock ON lifts Shift while a numpad key is pressed with Shift held (and presses it again after):
+## in the classic layout that drops P1's strike. The test spots the pattern and asks for NumLock off.
+func test_key_test_spots_the_numlock_shift_quirk() -> void:
+	var panel: OptionsPanel = await _panel()
+	panel.open_key_test()
+	await get_tree().process_frame
+	var test: UiKeyTest = panel.get_key_test()
+	_key(KEY_SHIFT, true)
+	await get_tree().process_frame
+	assert_true(test.is_lit(0, &"attack"))
+	# What Windows sends when P2 presses Num 8 while P1 holds Shift and NumLock is on: Shift up, Num 8 (as Up), ...
+	_key(KEY_SHIFT, false)
+	_key(KEY_KP_8, true, false)
+	assert_true(test.numlock_warning)
+	assert_eq(test.get_status_text(), tr("UI_KEYTEST_NUMLOCK"))
+	assert_false(test.is_lit(0, &"attack"), "P1's strike dropped, as on the real keyboard")
+	_key(KEY_KP_8, false, false)
+	_key(KEY_SHIFT, true)
+	_key(KEY_SHIFT, false)
+	test.start()
+	assert_false(test.numlock_warning, "a new test starts clean")
+	_key(KEY_KP_8, true, false)
+	_key(KEY_KP_8, false, false)
+	await get_tree().process_frame
+	_key(KEY_SHIFT, false)
+	for i: int in 3:
+		await get_tree().process_frame
+	_key(KEY_KP_5, true)
+	_key(KEY_KP_5, false)
+	assert_false(test.numlock_warning, "an ordinary Shift release some frames earlier is no quirk")
+
+
+## DESIGN.md D.11 / E.9: a two-player Grub Stack match on world-B's flat arena, driven only by the physical keys of the
+## classic preset as the options set it up - P1 W A S D + Space + Left Shift, P2 the numpad with NumLock on and off -
+## while the versus HUD shows the referee's numbers and the round result.
+func test_a_two_player_match_from_the_classic_keys() -> void:
+	OptionsPanel.apply_keyboard_preset(InputSlot.KeyboardLayout.TWO_HANDS)
+	OptionsPanel.apply_keyboard_preset(InputSlot.KeyboardLayout.CLASSIC)
+	if not Levels.has_level(ARENA) or not ResourceLoader.exists(LEVEL_SCENE):
+		fail("the flat arena of world-B and the level scene are needed")
+		return
+	Game.versus_match = null
+	Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.VERSUS, 2)
+	GameInput.assign_slot(0, InputSlot.keyboard(Defs.InputSlotKind.KEYBOARD_LEFT))
+	GameInput.assign_slot(1, InputSlot.keyboard(Defs.InputSlotKind.KEYBOARD_RIGHT))
+	# Input keeps the pressed state of an action by name: a key another test held while these actions were removed
+	# and built again would read as held here. Start from released actions, as a fresh game does.
+	for slot: int in 2:
+		for action: StringName in Defs.GAME_ACTIONS:
+			if InputMap.has_action(GameInput.slot_action(slot, action)):
+				Input.action_release(GameInput.slot_action(slot, action))
+	Sim.manual = true
+	Flow.pending_level_id = ARENA
+	var level: LevelBase = (load(LEVEL_SCENE) as PackedScene).instantiate() as LevelBase
+	add_node(level)
+	await get_tree().process_frame
+	# The authentic view, whatever size the root viewport was left at by earlier tests.
+	if level.has_method(&"set_view_size"):
+		level.call(&"set_view_size", Vector2i(Tuning.VIEW_W, Tuning.VIEW_H) * Tuning.ART_SCALE)
+	var referee: Object = level.party_driver if level.party_driver != null else VersusArena.setup(level)
+	assert_not_null(referee, "the arena has its referee")
+	assert_eq(level.hero_count(), 2, "two heroes")
+	if referee == null or level.hero_count() != 2:
+		return
+	var hud: Hud = (load(Flow.HUD_SCENE) as PackedScene).instantiate() as Hud
+	add_node(hud)
+	await get_tree().process_frame
+	var versus: HudVersus = hud.get_versus()
+	assert_not_null(versus, "the versus HUD")
+	referee.call(&"start_round_now")
+	var p1: PlayerBase = level.get_hero(0)
+	var p2: PlayerBase = level.get_hero(1)
+	_drive({}, VersusTuning.SPAWN_SHIELD_TICKS + 2)
+	for numlock: bool in [true, false]:
+		var state: String = "NumLock %s" % ("on" if numlock else "off")
+		var x1: int = p1.sim_pos.x
+		var x2: int = p2.sim_pos.x
+		_drive({KEY_D: true}, 8, numlock)
+		assert_true(p1.sim_pos.x > x1, "%s: D walks P1 right" % state)
+		assert_eq(p2.sim_pos.x, x2, "%s: ... and not P2" % state)
+		_drive({}, 24, numlock)
+		x1 = p1.sim_pos.x
+		_drive({KEY_KP_4: true}, 8, numlock)
+		assert_true(p2.sim_pos.x < x2, "%s: Num 4 walks P2 left" % state)
+		assert_eq(p1.sim_pos.x, x1, "%s: ... and not P1" % state)
+		var y2: int = p2.sim_pos.y
+		_drive({KEY_KP_0: true}, 3, numlock)
+		assert_true(p2.sim_pos.y < y2, "%s: Num 0 jumps P2" % state)
+		_drive({}, 40, numlock)
+		_drive({KEY_KP_ENTER: true}, 1, numlock)
+		assert_eq(GameInput.get_flags(1) & Defs.IN_FIRE, Defs.IN_FIRE, "%s: Num Enter strikes" % state)
+		assert_eq(GameInput.get_flags(0), 0, "%s: P1 reads nothing of it" % state)
+		_drive({}, 16, numlock)
+		_drive({KEY_KP_ADD: true, KEY_KP_PERIOD: true}, 1, numlock)
+		assert_eq(GameInput.get_flags(1) & (Defs.IN_SWAP | Defs.IN_LOOK), Defs.IN_SWAP | Defs.IN_LOOK,
+				"%s: Num + swaps, Num . looks" % state)
+		_drive({}, 16, numlock)
+	# P1 walks up behind P2 and clubs the food off his head; the HUD shows the referee's numbers.
+	p2.teleport(Vector2i(p1.sim_pos.x + 36, p1.sim_pos.y))
+	p2.facing = 1
+	referee.call(&"add_food", p2, 10)
+	_drive({}, 2)
+	versus.refresh()
+	assert_eq(versus.get_panel(1).get_stack_text(), "10", "P2's panel shows his stack")
+	_drive({KEY_D: true}, 2)
+	_drive({KEY_SHIFT: true}, 9)
+	_drive({}, 30)
+	var left: int = int(referee.call(&"stack_of", 1))
+	assert_true(left < 10, "Left Shift: P1's club knocked food off P2's head (%d left)" % left)
+	versus.refresh()
+	assert_eq(versus.get_panel(1).get_stack_text(), str(left), "the HUD follows the stack")
+	referee.call(&"add_food", p1, 20)
+	referee.call(&"end_round", false)
+	_drive({}, 2)
+	assert_true(versus.banner_text.contains("P1"), "the gong: P1 wins the round (%s)" % versus.banner_text)
+	_release_keys()
+	assert_false(GameInput.is_scripted(), "no script drove a hero")
+
 func _panel() -> OptionsPanel:
 	var panel: OptionsPanel = OptionsPanel.new()
 	add_node(panel)
@@ -224,3 +472,35 @@ func _use_keyboard() -> void:
 	key.keycode = KEY_SHIFT
 	key.pressed = false
 	get_tree().root.push_input(key)
+
+
+## Press or release a physical key through Input, as the OS would deliver it; `numlock_on` false gives a numpad key
+## the navigation keycode Windows reports with NumLock off.
+func _key(physical: Key, pressed: bool, numlock_on: bool = true) -> void:
+	var event: InputEventKey = InputEventKey.new()
+	event.physical_keycode = physical
+	event.keycode = physical if numlock_on else NUMLOCK_OFF.get(physical, physical)
+	event.pressed = pressed
+	Input.parse_input_event(event)
+	Input.flush_buffered_events()
+	if pressed:
+		_held[physical] = numlock_on
+	else:
+		_held.erase(physical)
+
+
+## Hold exactly the keys of `keys` (physical key -> true) for `ticks` ticks of the simulation.
+func _drive(keys: Dictionary, ticks: int, numlock_on: bool = true) -> void:
+	for physical: Key in _held.keys():
+		if not keys.has(physical):
+			_key(physical, false, numlock_on)
+	for physical: Key in keys:
+		if not _held.has(physical):
+			_key(physical, true, numlock_on)
+	for i: int in ticks:
+		Sim.step(1)
+
+
+func _release_keys() -> void:
+	for physical: Key in _held.keys():
+		_key(physical, false, bool(_held[physical]))

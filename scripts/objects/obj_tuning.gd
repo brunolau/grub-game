@@ -71,6 +71,90 @@ const ATLAS_BLOCK: int = 7
 const ATLAS_INSET: int = 15
 
 # =================================================================================================================
+# Co-op objects of 2.0 [G 13.9.7] [P C] - the shared numbers are PartyTuning's; these are the objects module's own
+# =================================================================================================================
+## A party's hero counts as "standing on" a plate while his feet are at most this far above its floor (and he is not
+## rising): a screen shake lifts a standing hero for a tick without releasing the plate. [own]
+const PLATE_FEET_SLACK_PX: int = 8
+const PLATE_DEFAULT_W: int = 2           ## cells [G 13.9.7]
+const PLATE_SINK_PX: int = 2             ## a pressed plate is drawn this much lower [G 13.9.7]
+const PLATE_BLINK_TICKS: int = 24        ## a timed plate blinks in its last second ... [M plate]
+const PLATE_BLINK_FPS: int = 8           ## ... at this rate
+## A plate / drum / keeper column never moves into a hero: a hero occupies the cells his feet point lies under, this
+## far to each side of it and this high (the tile probes of PHYSICS.md 11.2 reach about as far). [own]
+const HERO_BODY_HALF_W_PX: int = 7
+const HERO_BODY_H_PX: int = 32
+## Drums: the count-in (three blips 8 ticks apart, then "go") plays while a hatched hero stands within this many px
+## of every drum of the bond. [G 13.9.3] [own reach]
+const COUNT_IN_SPACING_TICKS: int = 8
+const COUNT_IN_REACH_PX: int = 40
+const DRUM_HIT_FPS: int = 16             ## [M drum]
+## See-saw [G 13.9.7]: its two end platforms are SEESAW_STEP_PX apart in height; the low end's top lies
+## SEESAW_LOW_TOP_PX over the floor, so a hero standing on the floor there is inside its ride band (he rides it), and
+## the high end's top lies one row (+1 px) over the floor: a ledge N rows over the floor is a fall of N - 1 rows onto
+## the high end (PHYSICS.md C.17 table). [own]
+const SEESAW_DEFAULT_LEN: int = 5
+const SEESAW_STEP_PX: int = 16
+const SEESAW_LOW_TOP_PX: int = 1
+const SEESAW_FLIP_TICKS: int = 2         ## it flips within 2 ticks
+const SEESAW_LANDING_MIN_YVEL: int = 16  ## a body landing on the high end at this speed or faster flips it
+const SEESAW_LIFT_ONLY_YVEL: int = -64   ## a launch weaker than this only lifts the hero on the low end
+## Heave boulder [G 13.9.7]: falls 1 tile per 2 ticks when unsupported; a hero pushes it while his feet are at most
+## this far from its face (the wall probe stops him WALL_PROBE + 1 px away). [own reach]
+const BOULDER_FALL_TICKS: int = 2
+const BOULDER_PUSH_REACH_PX: int = Tuning.WALL_PROBE + 3
+const BOULDER_CELLS: int = 2             ## 2 x 2 cells
+## Flower pot [G 13.9.7]: a strike pushes it at this speed (v16) in the strike direction; it slides to the ledge's
+## edge (or a wall) and falls with the hero's gravity, keeping its speed, then becomes a spring where it lands.
+const FLOWER_POT_PUSH_XVEL: int = 32     ## [own]
+const FLOWER_POT_SMASH_TICKS: int = 4    ## smash frame, then the sprout [M flower_pot]
+const FLOWER_POT_ANIM_FPS: int = 12      ## [M flower_pot]
+const PULLEY_TURN_FPS: int = 12          ## [M pulley]
+## Team gate: a partner farther than one view from the hero who entered arrives as an egg [G 13.9.2].
+const GATE_PARTNER_RANGE_Y_PX: int = Tuning.VIEW_ROWS * Tuning.TILE
+
+
+## True when the co-op party rules apply (PHYSICS.md C.0 #2): co-op mode with more than one hero. A party of one,
+## single-player and versus never take the party branches of this module.
+static func coop_rules(level: LevelBase) -> bool:
+	return level != null and Game.mode == Defs.GameMode.COOP and level.hero_count() > 1
+
+
+## Play the 2.0 cue `event` when its AudioTable row exists (core adds the rows with its audio batches), else
+## `fallback` (a 1.0 cue; &"" = silence). Audio.play_sfx refuses an unknown event with an error.
+static func play_cue(event: StringName, fallback: StringName = &"") -> void:
+	if AudioTable.SFX.has(event):
+		Audio.play_sfx(event)
+	elif fallback != &"" and AudioTable.SFX.has(fallback):
+		Audio.play_sfx(fallback)
+
+
+## Number of set bits of a slot mask (bit `slot` per hero).
+static func bit_count(mask: int) -> int:
+	var count: int = 0
+	while mask != 0:
+		count += mask & 1
+		mask >>= 1
+	return count
+
+
+## True when a hatched hero (alive, not an egg) occupies tile (col, row) by the body rule of HERO_BODY_HALF_W_PX /
+## HERO_BODY_H_PX: the cells a tile mover must not move into.
+static func hero_in_cell(level: LevelBase, col: int, row: int) -> bool:
+	if level == null:
+		return false
+	for hero: PlayerBase in level.contact_order():
+		if not hero.is_party_targetable():
+			continue
+		var x: int = hero.sim_pos.x
+		var y: int = hero.sim_pos.y
+		if col < (x - HERO_BODY_HALF_W_PX) >> 4 or col > (x + HERO_BODY_HALF_W_PX) >> 4:
+			continue
+		if row <= (y - 1) >> 4 and row >= (y - HERO_BODY_H_PX) >> 4:
+			return true
+	return false
+
+# =================================================================================================================
 # Effects (cosmetic) [M 9]
 # =================================================================================================================
 const MAX_POPUPS: int = 16           ## score pop-ups alive at once [G 2]

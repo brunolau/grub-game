@@ -11,8 +11,8 @@ extends Control
 ## `party_driver` (world-B's referee in an arena) - through the optional methods below. A missing method reads 0, and
 ## the round clock then counts itself from `Events.round_started` (the arena's `round_time`, else
 ## `VersusTuning.stack_round_ticks`):
-##   stack_of(slot) -> int, banked_of(slot) -> int, round_wins_of(slot) -> int,
-##   round_ticks_left() -> int (-1 = no clock), round_length() -> int.
+##   stack_of(slot) -> int, banked_of(slot) -> int, round_wins_of(slot) -> int, leader_slot() -> int (the crown;
+##   -1 = a tie), round_ticks_left() -> int (-1 = no clock), round_length() -> int (0 = no clock).
 ## Read once per frame outside the tick; nothing is written back.
 
 ## Corner panel size (art px).
@@ -25,8 +25,12 @@ const DIAL_WARN_SECONDS: int = 10
 ## Seconds a round banner stays (the countdown numbers stay until the next one).
 const BANNER_SECONDS: float = 1.6
 const RESULT_SECONDS: float = 3.0
-## Food picture beside the stack count (sprites/items/food.png cell 40, the roast).
-const STACK_FOOD_CELL: int = 40
+## Pictures of ui/stack_food.png (32 x 28 cells): the roast beside the stack count, the clay pot beside the banked
+## count; ui/crown.png (32 x 24, frame 0) over the leader's panel (ties: no crown).
+const TEX_STACK_FOOD: String = "res://assets/ui/stack_food.png"
+const TEX_CROWN: String = "res://assets/ui/crown.png"
+const STACK_CELL: int = 3
+const POT_CELL: int = 4
 const COL_DIAL: Color = Color("d8c7a0")
 const COL_DIAL_SHADOW: Color = Color(0.153, 0.125, 0.094, 0.55)
 const COL_RUSH: Color = Color("ff6b5a")
@@ -44,11 +48,14 @@ class CornerPanel:
 	var banked: int = 0
 	var wins: int = 0
 	var belt: int = PlayerRun.BELT_EMPTY
+	## True while this player leads (the referee's leader_slot()): the crown sits on the panel.
+	var crowned: bool = false
 	var _stack_label: Label = null
 	var _banked_label: Label = null
 	var _belt_icon: TextureRect = null
 	var _food: AtlasTexture = null
-	var _pot: Texture2D = null
+	var _pot: AtlasTexture = null
+	var _crown: AtlasTexture = null
 
 	func _init(p_slot: int, p_mirrored: bool) -> void:
 		slot = p_slot
@@ -56,8 +63,9 @@ class CornerPanel:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 		custom_minimum_size = HudVersus.PANEL_SIZE
 		size = HudVersus.PANEL_SIZE
-		_food = UiKit.cell(UiKit.TEX_FOOD, Vector2i(32, 32), HudVersus.STACK_FOOD_CELL)
-		_pot = UiKit.tex("res://assets/sprites/objects/pot.png")
+		_food = UiKit.cell(HudVersus.TEX_STACK_FOOD, Vector2i(32, 28), HudVersus.STACK_CELL)
+		_pot = UiKit.cell(HudVersus.TEX_STACK_FOOD, Vector2i(32, 28), HudVersus.POT_CELL)
+		_crown = UiKit.cell(HudVersus.TEX_CROWN, Vector2i(32, 24), 0)
 		var tag: Label = UiPlayers.tag_label(slot)
 		tag.position = Vector2(HudVersus.PANEL_SIZE.x - 34.0 if mirrored else 6.0, 4.0)
 		add_child(tag)
@@ -75,9 +83,10 @@ class CornerPanel:
 		_layout()
 
 	## Show new values (only what changed is redrawn).
-	func show_values(p_stack: int, p_banked: int, p_wins: int, p_belt: int) -> void:
-		if p_stack == stack and p_banked == banked and p_wins == wins and p_belt == belt:
+	func show_values(p_stack: int, p_banked: int, p_wins: int, p_belt: int, p_crowned: bool = false) -> void:
+		if p_stack == stack and p_banked == banked and p_wins == wins and p_belt == belt and p_crowned == crowned:
 			return
+		crowned = p_crowned
 		stack = maxi(p_stack, 0)
 		banked = maxi(p_banked, 0)
 		wins = maxi(p_wins, 0)
@@ -117,10 +126,14 @@ class CornerPanel:
 		var plate: Rect2 = Rect2(Vector2.ZERO, HudVersus.PANEL_SIZE)
 		draw_rect(plate, Color(UiKit.COL_INK, 0.72))
 		draw_rect(plate.grow(-1.0), UiPlayers.colour(slot, UiPlayers.SHADE), false, 2.0)
-		if _food != null and _food.atlas != null:
-			draw_texture(_food, Vector2(w - 68.0 if mirrored else 34.0, 0.0))
-		if _pot != null:
-			draw_texture_rect(_pot, Rect2(w - 22.0 if mirrored else 6.0, 28.0, 14.0, 20.0), false)
+		if _food.atlas != null:
+			draw_texture(_food, Vector2(w - 68.0 if mirrored else 34.0, 1.0))
+		if _pot.atlas != null:
+			draw_texture_rect(_pot, Rect2(w - 24.0 if mirrored else 4.0, 30.0, 18.0, 16.0), false)
+		if crowned and _crown.atlas != null:
+			# By the tag, on the panel's edge that faces the middle of the view (the top panels' crown hangs below).
+			var crown_y: float = HudVersus.PANEL_SIZE.y - 2.0 if slot < 2 else -22.0
+			draw_texture(_crown, Vector2(w - 36.0 if mirrored else 4.0, crown_y))
 		# Round wins: pips in the player's colour beside the banked count.
 		for i: int in mini(wins, VersusTuning.STACK_ROUND_WINS):
 			var x: float = w - 72.0 - float(i) * 12.0 if mirrored else 64.0 + float(i) * 12.0
@@ -238,11 +251,14 @@ func _process(_delta: float) -> void:
 ## Read the numbers again and show them.
 func refresh() -> void:
 	var provider: Object = _provider()
+	var leader: int = -1
+	if provider != null and provider.has_method(&"leader_slot"):
+		leader = int(provider.call(&"leader_slot"))
 	for panel: CornerPanel in _panels:
 		var run: PlayerRun = Game.get_run(panel.slot)
 		var belt: int = run.special() if run != null else PlayerRun.BELT_EMPTY
 		panel.show_values(_ask(provider, &"stack_of", panel.slot), _ask(provider, &"banked_of", panel.slot),
-				_ask(provider, &"round_wins_of", panel.slot), belt)
+				_ask(provider, &"round_wins_of", panel.slot), belt, leader >= 0 and leader == panel.slot)
 	var length: int = _round_length
 	if provider != null and provider.has_method(&"round_length"):
 		length = int(provider.call(&"round_length"))
@@ -303,14 +319,30 @@ func _build() -> void:
 func _layout() -> void:
 	var margins: Vector4i = UiKit.safe_margins(get_viewport())
 	var view: Vector2 = size
+	var table: bool = _table_mode()
 	for panel: CornerPanel in _panels:
 		var right: bool = panel.slot % 2 == 1
 		var bottom: bool = panel.slot >= 2
 		var x: float = view.x - float(margins.z) - PANEL_SIZE.x if right else float(margins.x)
 		var y: float = view.y - float(margins.w) - PANEL_SIZE.y if bottom else float(margins.y)
+		if table and panel.slot < 2:
+			# Table mode (two touch players, TouchControls): the corners hold the stones; P1's panel sits bottom centre
+			# between his d-pad and stones, P2's top centre beside the sundial.
+			var beside_dial: float = roundf(view.x * 0.5 - _dial.size.x * 0.5 - 8.0 - PANEL_SIZE.x)
+			x = roundf(view.x * 0.5 - PANEL_SIZE.x * 0.5) if panel.slot == 0 else beside_dial
+			y = view.y - float(margins.w) - PANEL_SIZE.y if panel.slot == 0 else float(margins.y)
 		panel.position = Vector2(x, y).round()
 	_dial.position = Vector2(roundf((view.x - _dial.size.x) * 0.5), float(margins.y))
 	_place_banner()
+
+
+## True while two players play on touch slots (the table mode of TouchControls).
+static func _table_mode() -> bool:
+	var count: int = 0
+	for slot: int in Defs.MAX_PLAYERS:
+		if GameInput.get_slot(slot).kind == Defs.InputSlotKind.TOUCH:
+			count += 1
+	return count >= 2
 
 
 func _place_banner() -> void:

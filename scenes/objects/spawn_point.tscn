@@ -1,6 +1,13 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/objects/spawn_point.gd" id="1_spawn_point"]
+[ext_resource type="Texture2D" path="res://assets/sprites/objects/spawn_point.png" id="2_spawn_point"]
 
 [node name="SpawnPoint" type="Node2D"]
 script = ExtResource("1_spawn_point")
+
+[node name="Sprite" type="Sprite2D" parent="."]
+texture = ExtResource("2_spawn_point")
+centered = false
+offset = Vector2(-24, -16)
+hframes = 6

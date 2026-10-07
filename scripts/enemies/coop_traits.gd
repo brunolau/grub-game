@@ -1,0 +1,836 @@
+class_name CoopTraits
+extends RefCounted
+## The co-op traits of one enemy record (DESIGN.md D.6, GAMEPLAY.md 13.9.5; PLAN.md P1.8): `shell`, `bond`, `daze`,
+## `heavy`, `lone`, `grab`, `leech` and `split`, plus the bond registry they share with `objects/drum bond=` and the
+## keeper doors (LevelBase.get_tagged, the phase-0 hooks of PLAN.md P0.8).
+##
+## Owner: enemies-A. One instance per record whose level parameter `coop=<trait>` is set (or a preset that carries one,
+## `enemies/shellback`): EnemyBase._apply_params creates it, no 1.0 record ever has one. EnemyBase calls it from its
+## own body, so every archetype gets the rules without code of its own. The rules run only in a co-op party
+## ([method party_on]: Game.mode COOP with LevelBase.hero_count() > 1, PHYSICS.md C.0 #2); for a party of one every
+## trait collapses to nothing and the record is its plain archetype (TECH_AUDIT.md 2: N = 1 is the identity).
+##
+## Where each rule hooks in, in tick order (Defs.Phase):
+##  - WEAPONS (a hero's weapon pass -> EnemyBase.take_hit): [method skips_hit] (the leech host's own boxes pass
+##    through it), [method accepts_hit] (EnemyBase.accepts_hit_from: the front of a `shell` / `heavy` and an undazed
+##    `daze` record glance), [method absorbs_hit] (the first hit splits a `split` record without damage; a partner's
+##    hit frees a grabbed hero or clubs a leech off - those hits count).
+##  - ENEMIES: [method pre_ai] before the archetype's `_ai_tick()` - true when the trait ran the tick itself (the
+##    regrow, a daze, the daze hop, the grab carry, the leech ride, the split run); [method post_ai] after it (the
+##    shell turns to the nearer hero, the Brace Wall test); a dead `bond` / `split` record runs [method dead_tick]
+##    (its window: seal, regrow or merge) and does not doze meanwhile ([method keeps_awake]).
+##  - CONTACT_ENEMIES (`heavy`, `grab` and `leech` records register this phase too; level records come before the
+##    heroes, so this runs before their contact pass): [method contact_tick] - the Brace Wall test, the seize, the
+##    latch; placing a held hero, riding a host.
+##  - the hero's contact pass: EnemyBase.on_bounced -> [method on_bounced] (the `daze` head bounce).
+##  - targeting: EnemyBase._choose_target asks [method lone_target] for a `lone` record (Expert).
+##
+## Windows (bond, split): PartyTuning.window_ticks(difficulty) = 24 ticks Beginner / 12 Expert; the kills must land
+## within the window: `last kill tick - first kill tick < window`. The window opens on the first death and is decided
+## by the dead records themselves: on the first ENEMIES tick with `now - first >= window` the group regrows (bond) or
+## merges (split). A group that died in time is sealed: dead until a team wipe resets the level.
+
+enum Split { WHOLE, HALF }
+
+## The record these rules belong to.
+var enemy: EnemyBase = null
+## Its trait (Defs.CoopTrait, never NONE).
+var kind: int = Defs.CoopTrait.NONE
+
+## `daze` / `heavy`: ticks left dazed (a `daze` record after a head bounce, a `heavy` one after a Brace Wall): only
+## then do hits from every side count.
+var dazed: int = 0
+## `bond` / `split`: ticks left of the harmless regrow (intangible, blinking, no AI).
+var regrow: int = 0
+## `bond` / `split`: Sim.total_ticks of this record's death while its window is open; -1 = none.
+var died_tick: int = -1
+## `bond` / `split`: the group died within its window: it stays dead until the level resets.
+var sealed: bool = false
+## `grab`: the hero it holds (null = none) and its perch (`perch=c,r`, the feet point of that cell).
+var held: PlayerBase = null
+var perch: Vector2i = Vector2i.ZERO
+var has_perch: bool = false
+## `leech`: the hero on whose back it sits (null = none) and the ticks it has sat there.
+var host: PlayerBase = null
+var host_ticks: int = 0
+## `split`: whole or a half; the other half; true for the half that was spawned (removed again on a merge or reset).
+var split: int = Split.WHOLE
+var mate: EnemyBase = null
+var is_copy: bool = false
+
+## `daze`: hopping away (airborne until it lands); bit per player slot: that hero was striking on the last look.
+var _hop: bool = false
+var _strikers: int = 0
+## `heavy`: its run before the Brace Wall stopped it (given back when the daze ends).
+var _run_xvel: int = 0
+## `grab`: where it seized the hero (it flies back there after the drop), flying back, ticks held without a perch,
+## true when it switched the held hero's control off itself.
+var _home: Vector2i = Vector2i.ZERO
+var _returning: bool = false
+var _hold_ticks: int = 0
+var _took_control: bool = false
+## `leech`: its xvel when it latched on (given back when it falls off).
+var _latch_xvel: int = 0
+## `leech`: ticks before it may latch on again after falling off (EnemyTuning.LEECH_RELATCH_TICKS).
+var _relatch_wait: int = 0
+## `split`: ticks left of the run apart and its direction; where this half died.
+var _run: int = 0
+var _run_dir: int = 1
+var _death_pos: Vector2i = Vector2i.ZERO
+## Contact made harmless by the trait (holding a hero, riding a host, braced) and the value to give back; the
+## tangibility the regrow took away.
+var _harmless: bool = false
+var _saved_contact: bool = true
+var _saved_tangible: bool = true
+
+
+# =================================================================================================================
+# Creation, mode and the bond registry
+# =================================================================================================================
+
+## The trait rules of `p_enemy` (its coop_trait and spawn parameters), or null when it has no trait.
+static func create(p_enemy: EnemyBase) -> CoopTraits:
+	if p_enemy == null or p_enemy.coop_trait <= Defs.CoopTrait.NONE:
+		return null
+	var traits: CoopTraits = CoopTraits.new()
+	traits.enemy = p_enemy
+	traits.kind = p_enemy.coop_trait
+	traits._read_params(p_enemy.spawn_params)
+	return traits
+
+
+## True while the co-op rules run: a co-op game (Game.mode COOP) with more than one hero in the level.
+static func party_on() -> bool:
+	var level: LevelBase = Game.level
+	return level != null and Game.mode == Defs.GameMode.COOP and level.hero_count() > 1
+
+
+## The window of the bond and split traits for the current difficulty (PartyTuning.window_ticks).
+static func window_ticks() -> int:
+	return PartyTuning.window_ticks(Game.difficulty)
+
+
+## Bond registry: the enemy records of bond `bond_name` in registration order (drums of the same name left out).
+static func bond_members(level: LevelBase, bond_name: StringName) -> Array[EnemyBase]:
+	var members: Array[EnemyBase] = []
+	if level == null or bond_name == &"":
+		return members
+	for entity: SimEntity in level.get_tagged(&"bond", bond_name):
+		var member: EnemyBase = entity as EnemyBase
+		if member != null and is_instance_valid(member):
+			members.append(member)
+	return members
+
+
+## Bond registry: true when the bond has enemy records and every one of them is dead (a bond killed within its window
+## stays so until a team wipe; a late one regrows and turns this false again).
+static func bond_done(level: LevelBase, bond_name: StringName) -> bool:
+	var members: Array[EnemyBase] = bond_members(level, bond_name)
+	if members.is_empty():
+		return false
+	for member: EnemyBase in members:
+		if not member.dead:
+			return false
+	return true
+
+
+## Keeper doors ([R10], `objects/column trigger=keepers:<name>`): true when the group has enemies and every one of
+## them is dead.
+static func keepers_done(level: LevelBase, keeper_name: StringName) -> bool:
+	if level == null or keeper_name == &"":
+		return false
+	var found: bool = false
+	for entity: SimEntity in level.get_tagged(&"keeper", keeper_name):
+		var member: EnemyBase = entity as EnemyBase
+		if member == null or not is_instance_valid(member):
+			continue
+		found = true
+		if not member.dead:
+			return false
+	return found
+
+
+## True when this record ticks the CONTACT_ENEMIES phase too (EnemyBase._sim_phases).
+func needs_contact_phase() -> bool:
+	return kind == Defs.CoopTrait.HEAVY or kind == Defs.CoopTrait.GRAB or kind == Defs.CoopTrait.LEECH
+
+
+## True while the record must not doze: a bond / split window is open, a hero is held or ridden, a regrow runs.
+func keeps_awake() -> bool:
+	return (died_tick >= 0 and not sealed) or held != null or host != null or regrow > 0 or _returning
+
+
+# =================================================================================================================
+# Hits and bounces (EnemyBase.take_hit, accepts_hit_from, on_bounced)
+# =================================================================================================================
+
+## True when a hit from `source` passes through without touching it (the leech host's own weapons).
+func skips_hit(source: SimEntity) -> bool:
+	return host != null and Defs.hitter_slot(source) == host.slot
+
+
+## May a hit from `source` hurt it now? False = it glances (EnemyBase.accepts_hit_from).
+func accepts_hit(source: SimEntity) -> bool:
+	if not party_on():
+		return true
+	match kind:
+		Defs.CoopTrait.SHELL:
+			return not enemy._hit_from_front(source)
+		Defs.CoopTrait.HEAVY:
+			return dazed > 0 or not enemy._hit_from_front(source)
+		Defs.CoopTrait.DAZE:
+			return dazed > 0
+	return true
+
+
+## An accepted hit of the hero of player slot `slot` (-1: no hero's) is about to be applied. True = the trait used it
+## up without damage (the first hit of a whole `split` record).
+func absorbs_hit(slot: int, source: SimEntity) -> bool:
+	if not party_on():
+		return false
+	match kind:
+		Defs.CoopTrait.SPLIT:
+			if split == Split.WHOLE and not is_copy:
+				_split_now(source)
+				return true
+		Defs.CoopTrait.GRAB:
+			if held != null and slot >= 0 and slot != held.slot:
+				_release(true)
+		Defs.CoopTrait.LEECH:
+			if host != null and slot >= 0 and slot != host.slot:
+				_drop_host()
+	return false
+
+
+## A hero bounced on its head (the `daze` rule: dazed PartyTuning.daze_ticks, only then can it be hurt).
+func on_bounced(_hero: PlayerBase) -> void:
+	if kind != Defs.CoopTrait.DAZE or not party_on():
+		return
+	dazed = PartyTuning.daze_ticks(Game.difficulty)
+	_hop = false
+	enemy.xvel = 0
+	enemy._play(&"dizzy", true)
+	_sfx(Sfx.DAZE)
+
+
+## The record died (EnemyBase.kill, burst_into_items): let go of what it holds; a `bond` / `split` record opens or
+## completes its group's window.
+func on_killed() -> void:
+	_let_go()
+	dazed = 0
+	_hop = false
+	_run = 0
+	regrow = 0
+	if sealed or not party_on() or not _windowed():
+		return
+	died_tick = Sim.total_ticks
+	_death_pos = enemy.sim_pos
+	var first: int = died_tick
+	for member: EnemyBase in _group():
+		if not member.dead:
+			return
+		var traits: CoopTraits = member.coop_traits()
+		if traits != null and traits.died_tick >= 0:
+			first = mini(first, traits.died_tick)
+	if died_tick - first < window_ticks():
+		for member: EnemyBase in _group():
+			var traits: CoopTraits = member.coop_traits()
+			if traits != null:
+				traits.sealed = true
+				traits.died_tick = -1
+				member._doze_note()
+
+
+## The level was reset (team wipe, EnemyBase._on_level_reset): everything back to the level-file state.
+func on_reset() -> void:
+	_let_go()
+	_set_harmless(false)
+	if regrow > 0:
+		enemy.tangible = _saved_tangible
+	dazed = 0
+	regrow = 0
+	died_tick = -1
+	sealed = false
+	split = Split.WHOLE
+	mate = null
+	_hop = false
+	_strikers = 0
+	_returning = false
+	_relatch_wait = 0
+	_run = 0
+
+
+## The record went to sleep (left behind, or killed): it lets go of a held hero or a host.
+func on_sleep() -> void:
+	_let_go()
+	dazed = 0
+	_hop = false
+	_returning = false
+	_run = 0
+	if regrow > 0:
+		regrow = 0
+		enemy.tangible = _saved_tangible
+
+
+# =================================================================================================================
+# Ticks
+# =================================================================================================================
+
+## ENEMIES phase, awake and alive, before the archetype's AI. True = the trait ran this tick (no `_ai_tick()`).
+func pre_ai() -> bool:
+	if not party_on():
+		# A party of one: the plain archetype (whatever a party left behind is let go).
+		_let_go()
+		_returning = false
+		if dazed > 0:
+			dazed = 0
+			_set_harmless(false)
+		_hop = false
+		return false
+	if regrow > 0:
+		regrow -= 1
+		if regrow == 0:
+			enemy.tangible = _saved_tangible
+		enemy._play(&"idle")
+		return true
+	match kind:
+		Defs.CoopTrait.DAZE:
+			return _daze_pre()
+		Defs.CoopTrait.HEAVY:
+			return _heavy_pre()
+		Defs.CoopTrait.GRAB:
+			return _grab_pre()
+		Defs.CoopTrait.LEECH:
+			return _leech_pre()
+		Defs.CoopTrait.SPLIT:
+			return _split_pre()
+	return false
+
+
+## ENEMIES phase, after the archetype's AI ran.
+func post_ai() -> void:
+	if not party_on():
+		return
+	match kind:
+		Defs.CoopTrait.SHELL:
+			# The shield faces the nearer hatched hero every tick (not the sticky target).
+			var hero: PlayerBase = Game.level.target_hero(enemy)
+			if hero != null:
+				enemy.facing = enemy._dir_to(hero)
+		Defs.CoopTrait.HEAVY:
+			_brace_test()
+
+
+## CONTACT_ENEMIES phase, awake and alive (heavy, grab, leech), after every hero moved and before their contact pass.
+func contact_tick() -> void:
+	if not party_on() or not enemy.awake:
+		return
+	match kind:
+		Defs.CoopTrait.HEAVY:
+			_brace_test()
+		Defs.CoopTrait.GRAB:
+			if held != null:
+				_place_held()
+			elif not _returning and regrow == 0:
+				_try_seize()
+		Defs.CoopTrait.LEECH:
+			if host != null:
+				_place_on_host()
+			elif regrow == 0 and _relatch_wait == 0:
+				_try_latch()
+
+
+## ENEMIES phase while the record is dead or its corpse flies: the open window of a bond or split group.
+func dead_tick() -> void:
+	if died_tick < 0 or sealed:
+		return
+	if not party_on():
+		# The party fell apart: the record stays dead as its archetype would.
+		sealed = true
+		died_tick = -1
+		enemy._doze_note()
+		return
+	if Sim.total_ticks - _group_first() < window_ticks():
+		return
+	if kind == Defs.CoopTrait.SPLIT:
+		_merge()
+		return
+	for member: EnemyBase in _group():
+		var traits: CoopTraits = member.coop_traits()
+		if member.dead and traits != null and not traits.sealed and traits.died_tick >= 0:
+			traits._regrow_at(member.spawn_pos)
+
+
+## `lone` (Expert, PartyTuning.lone_trait_on): null while the hatched heroes keep together (within
+## PartyTuning.LONE_KEEP_AWAY_PX of each other on both axes: it keeps away), else the straggler - the hatched hero
+## farther from the view centre, ties to the higher slot [R9]. With one hatched hero: him.
+func lone_target() -> PlayerBase:
+	var level: LevelBase = Game.level
+	if level == null:
+		return null
+	var hatched: Array[PlayerBase] = []
+	for hero: PlayerBase in level.contact_order():
+		if hero.is_party_targetable():
+			hatched.append(hero)
+	if hatched.size() <= 1:
+		return hatched[0] if hatched.size() == 1 else null
+	if heroes_together(hatched):
+		return null
+	var centre: Vector2i = level.get_view_rect().get_center()
+	var best: PlayerBase = null
+	var best_distance: int = -1
+	for hero: PlayerBase in hatched:
+		var distance: int = absi(hero.sim_pos.x - centre.x) + absi(hero.sim_pos.y - centre.y)
+		if distance >= best_distance:
+			best = hero
+			best_distance = distance
+	return best
+
+
+## True when every two of `heroes` stand within PartyTuning.LONE_KEEP_AWAY_PX of each other on both axes.
+static func heroes_together(heroes: Array[PlayerBase]) -> bool:
+	for i: int in heroes.size():
+		for j: int in range(i + 1, heroes.size()):
+			if absi(heroes[i].sim_pos.x - heroes[j].sim_pos.x) > PartyTuning.LONE_KEEP_AWAY_PX \
+					or absi(heroes[i].sim_pos.y - heroes[j].sim_pos.y) > PartyTuning.LONE_KEEP_AWAY_PX:
+				return false
+	return true
+
+
+# =================================================================================================================
+# daze and heavy
+# =================================================================================================================
+
+func _daze_pre() -> bool:
+	var striker: PlayerBase = _note_strikers()
+	if dazed > 0:
+		dazed -= 1
+		_stand_still(&"dizzy")
+		return true
+	if _hop:
+		if enemy._ground_step(false, false):
+			_hop = false
+			enemy.xvel = 0
+		enemy._play(&"air")
+		return true
+	if not enemy._grounded:
+		return false
+	if striker != null:
+		_start_hop(-enemy._dir_to(striker) * EnemyTuning.DAZE_HOP_XVEL, EnemyTuning.DAZE_HOP_YVEL)
+		return true
+	if _throw_coming():
+		_start_hop(0, EnemyTuning.DAZE_THROW_HOP_YVEL)
+		return true
+	return false
+
+
+## The first hatched hero within the alert distance whose strike started since the last look (attack_gate rising);
+## remembers who strikes now.
+func _note_strikers() -> PlayerBase:
+	var found: PlayerBase = null
+	var bits: int = 0
+	for hero: PlayerBase in Game.level.contact_order():
+		if not hero.is_party_targetable() or not hero.is_striking():
+			continue
+		var bit: int = 1 << hero.slot
+		bits |= bit
+		if found == null and (_strikers & bit) == 0 \
+				and absi(hero.sim_pos.x - enemy.sim_pos.x) <= PartyTuning.DAZE_ALERT_PX \
+				and absi(hero.sim_pos.y - enemy.sim_pos.y) <= EnemyTuning.DAZE_ALERT_DY:
+			found = hero
+	_strikers = bits
+	return found
+
+
+## True when a thrown weapon flies at it within the alert distance.
+func _throw_coming() -> bool:
+	for entity: SimEntity in Game.level.get_kind(Defs.Kind.HERO_PROJECTILE):
+		var shot: ProjectileBase = entity as ProjectileBase
+		if shot == null or shot.spent or shot.xvel == 0:
+			continue
+		var dx: int = enemy.sim_pos.x - shot.sim_pos.x
+		if signi(dx) == signi(shot.xvel) and absi(dx) <= PartyTuning.DAZE_ALERT_PX \
+				and absi(shot.sim_pos.y - enemy.sim_pos.y) <= EnemyTuning.DAZE_ALERT_DY:
+			return true
+	return false
+
+
+func _start_hop(p_xvel: int, p_yvel: int) -> void:
+	_hop = true
+	enemy.xvel = p_xvel
+	enemy.yvel = p_yvel
+	enemy._grounded = false
+	if p_xvel != 0:
+		enemy.facing = -signi(p_xvel)
+	enemy._play(&"air", true)
+
+
+func _heavy_pre() -> bool:
+	if dazed <= 0:
+		return false
+	dazed -= 1
+	_stand_still(&"dizzy")
+	if dazed == 0:
+		_set_harmless(false)
+		enemy.xvel = _run_xvel
+	return true
+
+
+## Brace Wall (PHYSICS.md C.10): a hatched hero in the crouch state overlaps it while his partner crouches too, both
+## grounded and within PartyTuning.BRACE_GAP_PX: it stops dead and is dazed PartyTuning.BRACE_DAZE_TICKS with its head
+## open; neither hero is touched (its contact is harmless while dazed). A lone croucher is trampled as usual.
+func _brace_test() -> void:
+	if dazed > 0 or not enemy.is_targetable():
+		return
+	var heroes: Array[PlayerBase] = Game.level.contact_order()
+	for hero: PlayerBase in heroes:
+		if not hero.is_party_targetable() or not hero.is_crouching() or not Overlap.body(hero, enemy, hero):
+			continue
+		for partner: PlayerBase in heroes:
+			if partner != hero and hero.braces_with(partner):
+				_brace()
+				return
+
+
+## EnemyBase.brace_stop: a braced pair touches this record (the hero's contact pass asks). A `heavy` record of a
+## co-op party stops dead and is dazed, or already is: true. Everything else: false.
+func brace_stop() -> bool:
+	if kind != Defs.CoopTrait.HEAVY or not party_on():
+		return false
+	if dazed <= 0:
+		_brace()
+	return true
+
+
+func _brace() -> void:
+	if enemy.xvel != 0:
+		_run_xvel = enemy.xvel
+	enemy.xvel = 0
+	dazed = PartyTuning.BRACE_DAZE_TICKS
+	_set_harmless(true)
+	enemy._play(&"dizzy", true)
+	_sfx(Sfx.BRACE)
+
+
+func _stand_still(role: StringName) -> void:
+	enemy.xvel = 0
+	enemy._ground_step(false, false)
+	enemy._play(role)
+
+
+# =================================================================================================================
+# grab
+# =================================================================================================================
+
+func _grab_pre() -> bool:
+	if held != null:
+		if not _holdable(held):
+			_release(false)
+			return true
+		_hold_ticks += 1
+		if has_perch:
+			enemy.sim_pos += _step_towards(enemy.sim_pos, perch, PartyTuning.GRAB_REEL_PX)
+			if enemy.sim_pos == perch:
+				_release(false)
+		elif _hold_ticks >= PartyTuning.LEECH_FALL_OFF_TICKS:
+			_release(false)
+		enemy._play(&"fly")
+		return true
+	if _returning:
+		enemy.sim_pos += _step_towards(enemy.sim_pos, _home, EnemyTuning.GRAB_RETURN_SPEED)
+		_returning = enemy.sim_pos != _home
+		enemy._play(&"fly")
+		return true
+	return false
+
+
+## A hatched hero who touches it from below (his feet below its feet point) or whom it comes down on is seized.
+func _try_seize() -> void:
+	if not enemy.is_targetable():
+		return
+	for hero: PlayerBase in Game.level.contact_order():
+		if not hero.is_party_targetable() or hero.is_immune() or hero.is_feasting():
+			continue
+		if not Overlap.body(hero, enemy, hero):
+			continue
+		if hero.sim_pos.y > enemy.sim_pos.y or enemy.yvel > 0:
+			_seize(hero)
+			return
+
+
+func _seize(hero: PlayerBase) -> void:
+	held = hero
+	_hold_ticks = 0
+	_home = enemy.sim_pos
+	_returning = false
+	_took_control = hero.control_enabled
+	if _took_control:
+		hero.set_control_enabled(false)
+	enemy.xvel = 0
+	enemy.yvel = 0
+	_set_harmless(true)
+	_place_held()
+	Game.level.notify_hero_teleported(hero)
+	Audio.play_sfx(Sfx.ENEMY_VOICE)
+
+
+## The held hero hangs under it: no motion of his own, no strike.
+func _place_held() -> void:
+	if not _holdable(held):
+		_release(false)
+		return
+	held.sim_pos = enemy.sim_pos + Vector2i(0, EnemyTuning.GRAB_HANG_DY)
+	held.xvel = 0
+	held.yvel = 0
+	held.attack_gate = false
+	held.club_box_active = false
+
+
+## Let the held hero go: dropped at the perch (or after the hold ran out), or freed by his partner's hit (he falls with
+## EnemyTuning.GRAB_FREE_SHIELD_TICKS of immunity, the hatch shield of PlayerBase).
+func _release(by_partner: bool) -> void:
+	var hero: PlayerBase = held
+	held = null
+	_hold_ticks = 0
+	_set_harmless(false)
+	_returning = not enemy.dead and enemy.awake
+	if hero == null or not is_instance_valid(hero):
+		_took_control = false
+		return
+	if _took_control and not hero.dead and not hero.is_down():
+		hero.set_control_enabled(true)
+	_took_control = false
+	if by_partner and not hero.dead and not hero.is_down():
+		hero.shield = maxi(hero.shield, EnemyTuning.GRAB_FREE_SHIELD_TICKS)
+
+
+# =================================================================================================================
+# leech
+# =================================================================================================================
+
+func _leech_pre() -> bool:
+	if host == null:
+		if _relatch_wait > 0:
+			_relatch_wait -= 1
+		return false
+	if not _holdable(host):
+		_drop_host()
+		return true
+	host_ticks += 1
+	if host_ticks % PartyTuning.LEECH_DRAIN_TICKS == 0 and host.run.lose_bone():
+		# Drained empty: he goes down (the co-op death, PHYSICS.md C.12) and it falls off.
+		host.kill(&"enemy")
+		_drop_host()
+		return true
+	if host_ticks >= PartyTuning.LEECH_FALL_OFF_TICKS:
+		_drop_host()
+		return true
+	_place_on_host()
+	enemy._play(&"idle")
+	return true
+
+
+## A hatched hero who touches it (except by landing on its head) gets it on his back instead of being hurt.
+func _try_latch() -> void:
+	if not enemy.is_targetable():
+		return
+	for hero: PlayerBase in Game.level.contact_order():
+		if not hero.is_party_targetable() or hero.is_immune() or hero.is_feasting():
+			continue
+		if not Overlap.body(hero, enemy, hero) or (Overlap.stomp and hero.yvel >= 0):
+			continue
+		host = hero
+		host_ticks = 0
+		_latch_xvel = enemy.xvel
+		enemy.xvel = 0
+		enemy.yvel = 0
+		_set_harmless(true)
+		_place_on_host()
+		Audio.play_sfx(Sfx.ENEMY_VOICE)
+		return
+
+
+func _place_on_host() -> void:
+	if not _holdable(host):
+		_drop_host()
+		return
+	enemy.facing = host.facing
+	enemy.sim_pos = host.sim_pos + Vector2i(-host.facing * EnemyTuning.LEECH_BACK_DX, -EnemyTuning.LEECH_BACK_DY)
+
+
+## It falls off its host (clubbed off by the partner, after PartyTuning.LEECH_FALL_OFF_TICKS, or the host went down).
+func _drop_host() -> void:
+	host = null
+	host_ticks = 0
+	_relatch_wait = EnemyTuning.LEECH_RELATCH_TICKS
+	_set_harmless(false)
+	enemy.xvel = _latch_xvel
+	enemy.yvel = 0
+	enemy._grounded = false
+
+
+# =================================================================================================================
+# bond and split: the windows
+# =================================================================================================================
+
+## True for a trait whose deaths open a window (a bond needs its `bond=` name).
+func _windowed() -> bool:
+	if kind == Defs.CoopTrait.BOND:
+		return enemy.bond != &""
+	return kind == Defs.CoopTrait.SPLIT and split == Split.HALF
+
+
+## The records that share this record's window: its bond (registry), or the two halves of a split.
+func _group() -> Array[EnemyBase]:
+	if kind == Defs.CoopTrait.BOND:
+		return bond_members(Game.level, enemy.bond)
+	var halves: Array[EnemyBase] = [enemy]
+	if mate != null and is_instance_valid(mate):
+		halves.append(mate)
+	return halves
+
+
+## The tick the group's open window started (the earliest death of a member still waiting).
+func _group_first() -> int:
+	var first: int = died_tick
+	for member: EnemyBase in _group():
+		var traits: CoopTraits = member.coop_traits()
+		if member.dead and traits != null and traits.died_tick >= 0:
+			first = mini(first, traits.died_tick)
+	return first
+
+
+## Bond: back alive at `pos` (its anchor) with full hit points, harmless for EnemyTuning.REGROW_TICKS.
+func _regrow_at(pos: Vector2i) -> void:
+	died_tick = -1
+	enemy._coop_revive(pos)
+	if enemy.awake:
+		regrow = EnemyTuning.REGROW_TICKS
+		_saved_tangible = enemy.tangible
+		enemy.tangible = false
+		enemy.flash = EnemyTuning.REGROW_TICKS
+
+
+func _split_now(source: SimEntity) -> void:
+	split = Split.HALF
+	enemy.hp = 0
+	var away: int = 1 if source == null or source.sim_pos.x <= enemy.sim_pos.x else -1
+	_run_dir = away
+	_run = EnemyTuning.SPLIT_RUN_TICKS
+	enemy.flash = EnemyTuning.FLASH_TICKS
+	Audio.play_sfx(Sfx.ENEMY_HURT)
+	var copy: EnemyBase = enemy._coop_spawn_copy({"split_half": true, "hp": 0})
+	var other: CoopTraits = copy.coop_traits() if copy != null else null
+	if other == null:
+		return
+	other.split = Split.HALF
+	other.is_copy = true
+	other.mate = enemy
+	other._run_dir = -away
+	other._run = EnemyTuning.SPLIT_RUN_TICKS
+	mate = copy
+
+
+func _split_pre() -> bool:
+	if split == Split.HALF and not is_copy and _mate_left():
+		# The other half left without a window (it despawned far away): whole again.
+		if mate != null and is_instance_valid(mate):
+			mate._coop_remove()
+		_become_whole()
+	if _run <= 0:
+		return false
+	_run -= 1
+	enemy.xvel = EnemyTuning.SPLIT_RUN_XVEL * _run_dir
+	enemy.facing = _run_dir
+	enemy._ground_step(false, false)
+	if enemy.xvel != 0:
+		_run_dir = signi(enemy.xvel)
+	enemy._play(&"walk")
+	if _run == 0:
+		enemy.xvel = 0
+	return true
+
+
+## Split: the window closed with one half alive - the dead half regrows next to it and they merge into the whole (the
+## record, full hit points); the spawned half is removed. Both dead too late: the whole regrows where the record died.
+func _merge() -> void:
+	var record: EnemyBase = mate if is_copy else enemy
+	var copy: EnemyBase = enemy if is_copy else mate
+	if record == null or not is_instance_valid(record):
+		return
+	var record_traits: CoopTraits = record.coop_traits()
+	if record.dead:
+		var pos: Vector2i = record_traits._death_pos
+		if copy != null and is_instance_valid(copy) and not copy.dead:
+			pos = copy.sim_pos
+		record._coop_revive(pos)
+	record_traits._become_whole()
+	if copy != null and is_instance_valid(copy):
+		copy._coop_remove()
+
+
+## True when the other half is gone without dying in a window (it never existed, or it despawned).
+func _mate_left() -> bool:
+	if mate == null or not is_instance_valid(mate):
+		return true
+	var other: CoopTraits = mate.coop_traits()
+	return mate.dead and other != null and other.died_tick < 0 and not other.sealed
+
+
+func _become_whole() -> void:
+	split = Split.WHOLE
+	mate = null
+	died_tick = -1
+	_run = 0
+	enemy.hp = enemy.max_hp
+	enemy.flash = EnemyTuning.FLASH_TICKS
+
+
+# =================================================================================================================
+# Internals
+# =================================================================================================================
+
+func _read_params(params: Dictionary) -> void:
+	if params.has("perch"):
+		var cells: PackedInt32Array = LevelText.to_int_list(params["perch"])
+		if cells.size() == 2:
+			perch = LevelText.cell_to_feet(cells[0], cells[1])
+			has_perch = true
+	if params.has("split_half"):
+		split = Split.HALF
+		is_copy = true
+
+
+## Let go of a held hero or a host (no shield).
+func _let_go() -> void:
+	if held != null:
+		_release(false)
+	if host != null:
+		_drop_host()
+
+
+func _holdable(hero: PlayerBase) -> bool:
+	return hero != null and is_instance_valid(hero) and not hero.dead and not hero.is_down()
+
+
+## Contact made harmless (true) or given back (false).
+func _set_harmless(on: bool) -> void:
+	if on == _harmless:
+		return
+	_harmless = on
+	if on:
+		_saved_contact = enemy.contact_hurts
+		enemy.contact_hurts = false
+	else:
+		enemy.contact_hurts = _saved_contact
+
+
+## One step of at most `speed` px per axis from `from` towards `to`.
+static func _step_towards(from: Vector2i, to: Vector2i, speed: int) -> Vector2i:
+	return Vector2i(clampi(to.x - from.x, -speed, speed), clampi(to.y - from.y, -speed, speed))
+
+
+## Play a 2.0 effect name once AudioTable has its row (core-A's batches; Audio.play_sfx reports unknown names).
+static func _sfx(event: StringName) -> void:
+	if AudioTable.SFX.has(event):
+		Audio.play_sfx(event)

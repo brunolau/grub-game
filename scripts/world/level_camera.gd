@@ -48,6 +48,14 @@ var v_active: int = 0
 ## The stored target row of the vertical follow.
 var v_target: int = 0
 
+## 2.0 tribe camera (PHYSICS.md C.13, [method tick_group]): the heroes of H this tick (scratch, reused), the group
+## step counter and, per player slot, the last group step on which that hero had ground, a platform or a partner
+## under his feet (the vertical anchor), and the slot of the anchor of the last step (-1 = none).
+var _tribe: Array[PlayerBase] = []
+var _group_ticks: int = 0
+var _ground_step: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
+var anchor_slot: int = -1
+
 var _locked: bool = false
 var _lock_rect: Rect2i = Rect2i()
 var _min: Vector2i = Vector2i.ZERO
@@ -182,6 +190,210 @@ func snap(hero: PlayerBase) -> void:
 	h_dir = DIR_IDLE
 	v_active = 0
 	prev = pos
+
+
+# =================================================================================================================
+# 2.0: the tribe camera of a party (PHYSICS.md C.13, DESIGN.md D.2; TECH_AUDIT.md 4.5 option B)
+# =================================================================================================================
+
+## One step of the tribe camera (phase CAMERA, co-op), for `heroes` = the heroes of the party in slot order. It works
+## on H, the heroes that are alive and hatched (not dead, not in a death toss, not an egg):
+##  - |H| = 0: the view holds still; |H| = 1: PHYSICS.md 12.1-12.3 exactly on that hero (always the paging camera);
+##  - |H| >= 2, horizontally (replaces 12.1): standing still never moves the view; it pages right when a hero moving
+##    right reaches the start column (16 of 20) while the rear hero is at column 2 or more, left at column 4 while the
+##    rear (right-most) hero is at 17 or less; it stops when the front hero is back at the stop column (5 / 15) or the
+##    rear hero reaches the margin (1 / 18) or the limit. A hero in the look pose claims the camera: its look-around
+##    steps (12.3) are refused when they would put another hero of H at column < 1 or > 18;
+##  - vertically 12.2 runs on the anchor ([member anchor_slot]): the hero of H who most recently had ground, a
+##    platform or a partner under his feet (ties: the lower slot), or the hero in the look pose. A jumping or falling
+##    hero never drags the view while his partner stands.
+## Column thresholds are relative to this camera's columns, as in 12.1 (the party plays on the authentic 20 x 11 view).
+func tick_group(heroes: Array[PlayerBase]) -> void:
+	prev = pos
+	_group_ticks += 1
+	_collect_tribe(heroes)
+	if _tribe.is_empty():
+		anchor_slot = -1
+		return
+	var looker: PlayerBase = _group_looker()
+	var anchor: PlayerBase = looker if looker != null else _group_anchor()
+	anchor_slot = anchor.slot
+	var step: int = Tuning.CAM_STEP_PX
+	if pos.x < _min.x:
+		pos.x = mini(pos.x + step, _min.x)
+	elif pos.x > _max.x:
+		pos.x = maxi(pos.x - step, _max.x)
+	elif _follows_x():
+		if _tribe.size() == 1:
+			_follow_x(_tribe[0])
+		elif looker != null:
+			_look_group(looker)
+		else:
+			_follow_x_group()
+	if pos.y < _min.y:
+		pos.y = mini(pos.y + step, _min.y)
+	elif pos.y > _max.y:
+		pos.y = maxi(pos.y - step, _max.y)
+	elif _min.y < _max.y:
+		_follow_y(anchor, 0)
+
+
+## Place the tribe camera for a party that just appeared (level start, team-wipe respawn, gate): PHYSICS.md 12.5 on
+## the first hero of H in slot order (P1 when he is hatched; the first hero of `heroes` when none is), then the
+## tribe rules (C.12: "the camera of 12.5 on P1 and the tribe rules"). The anchor history starts afresh.
+func snap_group(heroes: Array[PlayerBase]) -> void:
+	_collect_tribe(heroes)
+	var first: PlayerBase = null
+	if not _tribe.is_empty():
+		first = _tribe[0]
+	else:
+		for hero: PlayerBase in heroes:
+			if hero != null:
+				first = hero
+				break
+	_group_ticks = 0
+	_ground_step.fill(0)
+	anchor_slot = first.slot if first != null else -1
+	snap(first)
+
+
+## The camera cell rectangle in logical px: the view's columns and rows (whole tiles) at the camera cell. For the
+## tribe camera this is the authentic 20 x 11-cell view of PHYSICS.md C.13 (edge walls, leash, egg clamp).
+func cell_rect() -> Rect2i:
+	return Rect2i(get_cell() * Tuning.TILE, Vector2i(cols, rows) * Tuning.TILE)
+
+
+## The visible camera of a party follows the tribe camera (2.0): the view `frame` (logical px, the tribe camera's
+## get_rect()) centred in this camera's view and kept inside its limits. With the authentic view size both are the
+## same rectangle. `jump` = no interpolation from the previous position (a snap).
+func follow_frame(frame: Rect2i, jump: bool = false) -> void:
+	prev = pos
+	h_dir = DIR_IDLE
+	v_active = 0
+	pos = (frame.position - (view - frame.size) / 2).clamp(_min, _max)
+	if jump:
+		prev = pos
+
+
+## 2.0 `scroll = rising` (PHYSICS.md C.8), after this tick's follow step: the top of the view becomes
+## min(follow, band_top + 16 - rows * 16, the previous top) - it never sinks, rises at least with the band (whose top
+## row is then the view's bottom row) and faster when a hero climbs ahead. Never above the level's top limit.
+func apply_rising(band_top: int) -> void:
+	var limit: int = band_top + Tuning.TILE - rows * Tuning.TILE
+	pos.y = maxi(mini(pos.y, mini(limit, prev.y)), _min.y)
+
+
+func _collect_tribe(heroes: Array[PlayerBase]) -> void:
+	_tribe.clear()
+	for hero: PlayerBase in heroes:
+		if hero == null or hero.dead or hero.is_down():
+			continue
+		_tribe.append(hero)
+		if hero.is_grounded():
+			_ground_step[clampi(hero.slot, 0, _ground_step.size() - 1)] = _group_ticks
+
+
+## The first hero of H (slot order) standing in the look pose (12.3: on the ground, not on a platform, no motion).
+func _group_looker() -> PlayerBase:
+	for hero: PlayerBase in _tribe:
+		if hero.looking and hero.xvel == 0 and not hero.on_platform:
+			return hero
+	return null
+
+
+## The hero of H with the latest group step on which he had ground under his feet (ties: the lower slot).
+func _group_anchor() -> PlayerBase:
+	var best: PlayerBase = _tribe[0]
+	var best_step: int = _ground_step[clampi(best.slot, 0, _ground_step.size() - 1)]
+	for i: int in range(1, _tribe.size()):
+		var hero: PlayerBase = _tribe[i]
+		var step: int = _ground_step[clampi(hero.slot, 0, _ground_step.size() - 1)]
+		if step > best_step:
+			best = hero
+			best_step = step
+	return best
+
+
+## Group paging of C.13 (see [method tick_group]).
+func _follow_x_group() -> void:
+	var cam_col: int = Tuning.to_cell(pos.x)
+	var rear: int = 1 << 30   # L: the left-most screen column of H
+	var front: int = -(1 << 30)   # Rr: the right-most
+	var moving: bool = false
+	for hero: PlayerBase in _tribe:
+		var sc: int = Tuning.to_cell(hero.sim_pos.x) - cam_col
+		rear = mini(rear, sc)
+		front = maxi(front, sc)
+		if hero.xvel != 0 or hero.on_platform:
+			moving = true
+	if not moving:
+		h_dir = DIR_IDLE
+		return
+	var margin_left: int = PartyTuning.CAM_REAR_MARGIN_COL
+	var margin_right: int = cols - (Tuning.VIEW_COLS - PartyTuning.CAM_REAR_MARGIN_COL_LEFT)
+	match h_dir:
+		DIR_IDLE:
+			var start_right: int = cols - (Tuning.VIEW_COLS - PartyTuning.CAM_FRONT_START_COL)
+			var start_left: int = PartyTuning.CAM_FRONT_START_COL_LEFT
+			if rear > margin_left:
+				for hero: PlayerBase in _tribe:
+					var sc: int = Tuning.to_cell(hero.sim_pos.x) - cam_col
+					if _group_dir(hero, sc) > 0 and sc >= start_right:
+						h_dir = DIR_RIGHT
+						return
+			if front < margin_right:
+				for hero: PlayerBase in _tribe:
+					var sc: int = Tuning.to_cell(hero.sim_pos.x) - cam_col
+					if _group_dir(hero, sc) < 0 and sc <= start_left:
+						h_dir = DIR_LEFT
+						return
+		DIR_RIGHT:
+			if front <= PartyTuning.CAM_FRONT_STOP_COL or rear <= margin_left or pos.x >= _max.x:
+				h_dir = DIR_IDLE
+			else:
+				_step_right()
+		DIR_LEFT:
+			var stop_left: int = cols - (Tuning.VIEW_COLS - PartyTuning.CAM_FRONT_STOP_COL_LEFT)
+			if rear >= stop_left or front >= margin_right or pos.x <= _min.x:
+				h_dir = DIR_IDLE
+			else:
+				_step_left()
+
+
+## Direction a hero of H moves in for the paging decision: by xvel; on a platform with xvel == 0 right from the
+## middle column on (12.1); 0 = standing (he starts nothing).
+func _group_dir(hero: PlayerBase, sc: int) -> int:
+	if hero.xvel > 0:
+		return 1
+	if hero.xvel < 0:
+		return -1
+	if hero.on_platform:
+		return 1 if sc >= cols * Tuning.CAM_IDLE_SPLIT / Tuning.VIEW_COLS else -1
+	return 0
+
+
+## Look-around (12.3) by `looker` with the other heroes of H kept on the view (C.13).
+func _look_group(looker: PlayerBase) -> void:
+	var cam_col: int = Tuning.to_cell(pos.x)
+	var sc: int = Tuning.to_cell(looker.sim_pos.x) - cam_col
+	if looker.facing > 0:
+		if sc > Tuning.CAM_LOOK_MIN_SC and _others_stay(looker, cam_col + 1):
+			_step_right()
+	elif sc < cols - (Tuning.VIEW_COLS - Tuning.CAM_LOOK_MAX_SC) and _others_stay(looker, cam_col - 1):
+		_step_left()
+	h_dir = DIR_IDLE
+
+
+## True when every hero of H but `looker` would stay within the margin columns with the camera at `new_col`.
+func _others_stay(looker: PlayerBase, new_col: int) -> bool:
+	var margin_right: int = cols - (Tuning.VIEW_COLS - PartyTuning.CAM_REAR_MARGIN_COL_LEFT)
+	for hero: PlayerBase in _tribe:
+		if hero == looker:
+			continue
+		var sc: int = Tuning.to_cell(hero.sim_pos.x) - new_col
+		if sc < PartyTuning.CAM_REAR_MARGIN_COL or sc > margin_right:
+			return false
+	return true
 
 
 ## Vertical step in px for a distance (px) between the hero and the target row line (PHYSICS.md 12.2 #5) on the

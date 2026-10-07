@@ -2,7 +2,7 @@ class_name UiKit
 extends RefCounted
 ## Shared look of every menu, screen and overlay (docs/ARCHITECTURE.md 8.6, ASSET_MANIFEST.md 12).
 ##
-## Owner: ui. One place for fonts, colours, the theme, texture cells, safe-area margins and the translation
+## Owner: ui-B. One place for fonts, colours, the theme, texture cells, safe-area margins and the translation
 ## catalogue, so that every screen is built from the same parts. All sizes are art px (the root viewport is
 ## 640 x 360 or larger, ARCHITECTURE.md 2); nothing here assumes a view size.
 
@@ -65,12 +65,17 @@ const ICON_CELL: int = 32
 
 const PANEL_MARGIN: int = 16
 const LOCALE_DIR: String = "res://locale"
+## Sub-catalogues of the level texts (PLAN.md 6.1): `locale/levels/<lang>/*.po`, one file per level designer
+## (`w5.po`, `coop_b1.po` ...), loaded beside the language file `locale/<lang>.po` but never offered as a language.
+const LEVEL_LOCALE_DIR: String = "res://locale/levels"
 
 static var _fonts: Dictionary = {}
 ## Texture paths that do not exist (tex() answers null without asking the file system again).
 static var _textures: Dictionary = {}
 static var _theme: Theme = null
 static var _locale_ready: bool = false
+## Locales that have a language file `locale/<lang>.po` (the languages Options offers).
+static var _languages: PackedStringArray = PackedStringArray()
 static var _focus_muted: bool = false
 
 
@@ -78,8 +83,10 @@ static var _focus_muted: bool = false
 # Translations
 # =================================================================================================================
 
-## Register every catalogue of `res://locale` with the TranslationServer (once). Called by every ui scene before
-## it creates text, because the project file lists no translations (adding a language = adding one .po file).
+## Register every catalogue of `res://locale` with the TranslationServer (once): the language files
+## `locale/<lang>.po`, then the level sub-catalogues `locale/levels/<lang>/*.po` ([method load_level_catalogues]).
+## Called by every ui scene before it creates text, because the project file lists no translations (adding a
+## language = adding one .po file).
 static func ensure_locale() -> void:
 	if _locale_ready:
 		return
@@ -93,12 +100,56 @@ static func ensure_locale() -> void:
 		var catalogue: Translation = load(LOCALE_DIR + "/" + file_name) as Translation
 		if catalogue != null:
 			TranslationServer.add_translation(catalogue)
+			if not _languages.has(String(catalogue.locale)):
+				_languages.append(String(catalogue.locale))
+	load_level_catalogues(LEVEL_LOCALE_DIR)
 
 
-## Locale codes that have a catalogue, sorted ("en", ...).
+## Load the sub-catalogues below `dir` (`<dir>/<lang>/*.po`, sorted) beside the language files: each one is
+## registered for the locale of its folder (`levels/en/w5.po` is English whatever its header says), so a level text
+## translates like any other key, while the language list (available_locales) stays the language files'. A
+## catalogue for a language without a language file is loaded too (its texts show once that language exists).
+## Returns the catalogues added.
+static func load_level_catalogues(dir: String) -> Array[Translation]:
+	var added: Array[Translation] = []
+	for locale: String in _list_entries(dir, true):
+		for file_name: String in _list_entries(dir.path_join(locale), false):
+			if file_name.get_extension() != "po":
+				continue
+			var catalogue: Translation = load(dir.path_join(locale).path_join(file_name)) as Translation
+			if catalogue == null:
+				continue
+			if String(catalogue.locale) != locale:
+				catalogue.locale = locale
+			TranslationServer.add_translation(catalogue)
+			added.append(catalogue)
+	return added
+
+
+## Sorted sub-folders (`folders`) or files of `dir`: through ResourceLoader (the names an exported build lists as
+## well), else the file system (a folder Godot does not scan, such as a test's under build/).
+static func _list_entries(dir: String, folders: bool) -> PackedStringArray:
+	var result: PackedStringArray = PackedStringArray()
+	if not DirAccess.dir_exists_absolute(dir):
+		return result
+	for entry: String in ResourceLoader.list_directory(dir):
+		if entry.ends_with("/") == folders:
+			result.append(entry.trim_suffix("/"))
+	if result.is_empty():
+		result = DirAccess.get_directories_at(dir) if folders else DirAccess.get_files_at(dir)
+	result.sort()
+	return result
+
+
+## Locale codes that have a language file, sorted ("en", ...): the languages Options offers. A level sub-catalogue
+## (locale/levels/<lang>/*.po) never adds one.
 static func available_locales() -> PackedStringArray:
 	ensure_locale()
-	var result: PackedStringArray = TranslationServer.get_loaded_locales()
+	var result: PackedStringArray = PackedStringArray()
+	var loaded: PackedStringArray = TranslationServer.get_loaded_locales()
+	for locale: String in _languages:
+		if loaded.has(locale) and not result.has(locale):
+			result.append(locale)
 	result.sort()
 	return result
 

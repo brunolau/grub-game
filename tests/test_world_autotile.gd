@@ -183,7 +183,8 @@ func test_tile_set_has_every_atlas_tile_and_the_liquid_animation() -> void:
 	assert_almost_eq(liquid.get_tile_animation_frame_duration(Vector2i.ZERO, 0),
 			Tuning.ticks_to_seconds(Tuning.TILE_ANIM_TICKS), 0.0001, "4 ticks per frame")
 	assert_true(liquid.has_tile(Vector2i(LevelTiles.LIQUID_BODY_BUBBLES, 0)))
-	# One shared texture (one batch per rendering quadrant): A on top, B below it, the liquid strip at the bottom.
+	# One shared texture (one batch per rendering quadrant): A on top, B below it, the liquid strip at the bottom with
+	# the 4-cell tar-floor strip of ':' to its right (2.0: 12 cells of 32 px, wider than a 256 px terrain atlas).
 	var lava: Texture2D = load(LevelData.liquid_path("lava")) as Texture2D
 	var stone: Texture2D = load(LevelData.terrain_path("cave/terrain_stone")) as Texture2D
 	var shared: Texture2D = (tile_set.get_source(A) as TileSetAtlasSource).texture
@@ -192,7 +193,10 @@ func test_tile_set_has_every_atlas_tile_and_the_liquid_animation() -> void:
 	assert_eq((tile_set.get_source(A) as TileSetAtlasSource).margins, Vector2i.ZERO)
 	assert_eq((tile_set.get_source(B) as TileSetAtlasSource).margins, Vector2i(0, stone.get_height()))
 	assert_eq(liquid.margins, Vector2i(0, stone.get_height() * 2))
-	assert_eq(shared.get_size(), Vector2(stone.get_width(), stone.get_height() * 2 + lava.get_height()))
+	var liquid_width: int = (LevelTiles.LIQUID_COLUMNS + LevelTiles.TAR_FLOOR_COLUMNS) * Tuning.TILE_ART
+	assert_eq(shared.get_size(), Vector2(maxi(stone.get_width(), liquid_width), stone.get_height() * 2
+			+ lava.get_height()))
+	assert_true(liquid.has_tile(Vector2i(LevelTiles.TAR_FILL, 0)), "the tar-floor tiles")
 	var atlas: Image = shared.get_image()
 	var strip: Image = lava.get_image()
 	for x: int in [0, 37, strip.get_width() - 1]:

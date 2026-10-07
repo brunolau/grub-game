@@ -47,6 +47,15 @@ func _inject() -> void:
 	_injected = true
 
 
+## Levels of the registry that are not test levels (what the 1.0 checks took for Book I stages).
+func _not_test_count() -> int:
+	var count: int = 0
+	for level_id: StringName in Levels.all_ids():
+		if Levels.get_level_kind(level_id) != Levels.KIND_TEST:
+			count += 1
+	return count
+
+
 ## Run test method `method` of the test file `path` on a fresh instance; returns its failures.
 func _run_other(path: String, method: StringName) -> PackedStringArray:
 	var other: TestCase = (load(path) as GDScript).new() as TestCase
@@ -60,17 +69,14 @@ func _run_other(path: String, method: StringName) -> PackedStringArray:
 
 
 func test_the_fakes_are_what_the_old_checks_tripped_over() -> void:
+	var before: int = _not_test_count()
 	_inject()
 	assert_eq(Levels.get_book(&"zz2_fake_stage"), Levels.BOOK_2)
 	assert_true(Levels.is_coop_level(&"zz_w1_l1_coop_fake"))
 	assert_true(Levels.is_arena(&"zz_arena_fake"))
-	assert_eq(Levels.get_campaign(Defs.Difficulty.EXPERT, Levels.BOOK_2), [&"zz2_fake_stage"] as Array[StringName])
-	var not_test: int = 0
-	for level_id: StringName in Levels.all_ids():
-		if Levels.get_level_kind(level_id) != Levels.KIND_TEST:
-			not_test += 1
+	assert_true(Levels.get_campaign(Defs.Difficulty.EXPERT, Levels.BOOK_2).has(&"zz2_fake_stage"))
 	var book1: Array[StringName] = (load(CAMPAIGN_TEST) as GDScript).call("book1_stages")
-	assert_eq(not_test, book1.size() + FAKES.size(), "the old filter (kind != test) would take the fakes as stages")
+	assert_eq(_not_test_count(), before + FAKES.size(), "the old filter (kind != test) would take the fakes as stages")
 	assert_eq(book1.size(), 15, "the 15 Book I stages")
 	for id: StringName in FAKES:
 		assert_false(book1.has(id), "%s is no Book I stage" % id)

@@ -1,0 +1,45 @@
+The War Over A Melon Field - Themes and Jingles
+===============================================
+
+Author: Spring Spring (Julie Damsgaard)
+Source: https://opengameart.org/content/the-war-over-a-melon-field-themes-and-jingles
+Licence: CC0 1.0 (tier A)
+Used in Club & Grub for: 2.0 (The Far Shore): audio/music/versus_lobby_a.ogg, audio/music/versus_results_a.ogg. Per-file sources and edits: docs/ASSET_MANIFEST.md section 17
+Staging folder: .tools/asset_candidates/audio/spring-spring_chiptunes
+
+---- Licence evidence recorded when the pack was downloaded ----
+
+# LICENSE_INFO - Spring Spring - chiptune singles (Tropical Fantasy, Fire Level, Sandy Seaside 2, The War Over A Melon Field jingles)
+
+- **Author:** Spring Spring (Julie Damsgaard / Spring Enterprises)
+- **License:** CC0 1.0  (tier A)
+- **Source page(s):**
+  - https://opengameart.org/content/tropical-fantasy
+  - https://opengameart.org/content/fire-level
+  - https://opengameart.org/content/sandy-seaside-2
+  - https://opengameart.org/content/the-war-over-a-melon-field-themes-and-jingles
+- **Download URL(s):**
+  - https://opengameart.org/sites/default/files/tropicalfantasy_2.ogg
+  - https://opengameart.org/sites/default/files/Danish%20Mega%20Pony%20v.%204%20OST%20-%20Track%2002%20%28Fire%20Level%29_0.mp3
+  - https://opengameart.org/sites/default/files/Fire%20Level%20%28VRC6%20Rearrange%29_2.mp3
+  - https://opengameart.org/sites/default/files/sandy%20seaside_0.ogg
+  - https://opengameart.org/sites/default/files/win_1.ogg
+  - https://opengameart.org/sites/default/files/lose_3.ogg
+  - https://opengameart.org/sites/default/files/laidback_0.ogg
+  - https://opengameart.org/sites/default/files/charselect_2.ogg
+- **Date checked / downloaded:** 2026-10-04
+- **Saved copy of the page(s):** `../_pages/oga_tropical-fantasy.html`, `../_pages/oga_fire-level.html`, `../_pages/oga_sandy-seaside-2.html`, `../_pages/oga_the-war-over-a-melon-field-themes-and-jingles.html`
+
+## Exact licence wording (quoted from the source)
+
+> Licence field on the page: "License(s): CC0" (icon links to http://creativecommons.org/publicdomain/zero/1.0/) on all four pages
+
+> Fire Level - description: "Intense chiptune suitable for a fire level. (and intended for this)"; copyright notice: "Produced by Julie Damsgaard/Spring Spring/Spring Enterprises @ https://spring-enterprises.neocities.org"
+
+> Melon Field - copyright notice: "Composer: Spring, Bicycle horn sound by AntumDeluge"
+
+> Tropical Fantasy - description: "A chiptune which has a slightly tropical and fantasy feel."
+
+---- Licence ----
+
+CC0 1.0 Universal: the full legal code ships as cc0_1.0_legal_code.txt in this folder.

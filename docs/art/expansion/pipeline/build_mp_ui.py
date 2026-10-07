@@ -187,9 +187,41 @@ def build_hero_start(palettes):
     return s
 
 
+def build_emotes():
+    """ui/emotes.png (D.11 / E.9: Look doubles as the emote): four Ninja Adventure emote bubbles, a 1 px anchor
+    outline added at 1x, then integer 2x (the pack is drawn at half the anchor's density, DESIGN F.1)"""
+    import os
+    from PIL import Image
+    from xcommon import EXP
+    from common import outline, scale
+    folder = os.path.join(EXP, "pixelboy-ninja-adventure-full", "Ninja Adventure - Asset Pack", "Ui", "Emote")
+    picks = [(21, "!"), (23, "?"), (27, "heart"), (9, "angry")]
+    W, H = 32, 32
+    frames = []
+    for n, _ in picks:
+        e = Image.open(os.path.join(folder, "emote%d.png" % n)).convert("RGBA")
+        e = swap(e, {rgb("#4e484a"): OUTLINE})                       # the pack's dark glyph ink -> anchor outline
+        e = scale(outline(e, O4, 1), 2)                               # 16 x 15 -> 32 x 30
+        f = canvas(W, H)
+        f.alpha_composite(e, ((W - e.width) // 2, H - e.height))
+        frames.append(f)
+    a = np.array(frames[0])
+    bottom = int(np.nonzero(a[..., 3].any(axis=1))[0].max())
+    tip_x = int(round(np.nonzero(a[bottom, :, 3])[0].mean()))
+    s = strip(frames)
+    save(s, "ui/emotes.png", kind="ui", frame=[W, H], grid=[len(frames), 1], pivot=[tip_x, bottom + 1],
+         source="pixelboy-ninja-adventure-full: Ui/Emote/" + ", ".join("emote%d.png" % n for n, _ in picks),
+         edits="glyph ink #4e484a -> #272018, a 1 px #272018 outline added at 1x, then integer 2x (2 px outline, the "
+               "anchor's weight); bottom-centred in 32 x 32 cells",
+         note="emote bubble over a hero (Look double tap, D.11 / E.9): cells 0 '!', 1 '?', 2 heart, 3 angry. Pivot "
+              "(%d, %d) = the tail's tip: put it a few art px over the hero's head" % (tip_x, bottom + 1),
+         section="ui")
+    return s
+
+
 def build(palettes):
     return {"belt": build_belt(), "tags": build_tags(palettes), "arrows": build_edge_arrows(palettes),
-            "countdown": build_countdown(), "hero_start": build_hero_start(palettes)}
+            "countdown": build_countdown(), "hero_start": build_hero_start(palettes), "emotes": build_emotes()}
 
 
 if __name__ == "__main__":

@@ -84,6 +84,15 @@ func _on_opened() -> void:
 		_drop_from_sky(level)
 
 
+## 2.0 versus refill (HittableBase.refill): the items start again from the first token, the inset / block look is back.
+func _on_refilled() -> void:
+	thrown = 0
+	if look != ObjTuning.ATLAS_AUTO and Game.level != null:
+		Game.level.set_cell_look(cell.x, cell.y, look)
+	if Game.level != null:
+		Game.level.spawn_fx(ID_STAR_PUFF, get_hit_point())
+
+
 ## One item out of a small spot: the next token of the contents, thrown away from the strike.
 func _throw_one(level: LevelBase) -> void:
 	var out: Vector4i = emerge(strike_dir * ObjTuning.SPOT_THROW_XVEL, ObjTuning.SPOT_THROW_YVEL)

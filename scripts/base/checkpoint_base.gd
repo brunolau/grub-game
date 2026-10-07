@@ -25,23 +25,54 @@ func _sim_phases() -> PackedInt32Array:
 
 
 func _sim_tick(phase: int) -> void:
-	if phase != Defs.Phase.CONTACT_ITEMS or active:
+	if phase != Defs.Phase.CONTACT_ITEMS:
+		return
+	if active:
+		# 2.0 co-op: the active checkpoint still hatches the eggs when a hatched hero touches it.
+		if Game.mode == Defs.GameMode.COOP and Game.level != null and Game.level.hero_count() > 1:
+			_touch_hatches(Game.level)
 		return
 	# Any living hero activates it, the first in contact order (2.0, TECH_AUDIT.md 3.12: the checkpoint is the team's;
-	# 1.0: the one hero). It stores his feet point.
+	# 1.0: the one hero). It stores his feet point. An egg touches nothing.
 	var level: LevelBase = Game.level
 	if level == null:
 		return
 	for hero: PlayerBase in level.contact_order():
-		if not hero.dead and Overlap.body(self, hero, hero):
+		if not hero.dead and not hero.down and Overlap.body(self, hero, hero):
 			activate(hero)
+			if Game.mode == Defs.GameMode.COOP and level.hero_count() > 1 and not hero.is_mounted():
+				hatch_eggs(level)
 			return
 
 
-## Make this the active restart point: stores the HERO's feet point (not the checkpoint's), deactivates every
-## other checkpoint, plays the cue. A hero who touches it in the air (jumping or falling past it) stores the
-## checkpoint's own feet point instead, which the level designer put on the floor: the hero's point could lie
-## above a gap beside the checkpoint, and every respawn would drop him into it again.
+## Co-op (GAMEPLAY.md 13.9.2, PHYSICS.md C.12 (c)): while some hero is an egg, a hatched hero touching this (active)
+## checkpoint hatches every egg in place (a mounted hero hatches nothing, C.9).
+func _touch_hatches(level: LevelBase) -> void:
+	if not level.any_hero_dead_or_down():
+		return
+	for hero: PlayerBase in level.contact_order():
+		if hero.is_party_targetable() and not hero.is_mounted() and Overlap.body(self, hero, hero):
+			hatch_eggs(level)
+			return
+
+
+## Hatch every egg of the party where it floats (PlayerBase.hatch with no hatcher: the checkpoint;
+## PartyTuning.hatch_hearts of the difficulty) - through world-A's PartyDriver (`hatch_all`, which also restarts its
+## egg clocks) when the level has one. Returns the number hatched.
+func hatch_eggs(level: LevelBase) -> int:
+	if level == null:
+		return 0
+	var driver: SimEntity = level.party_driver
+	if driver != null and driver.has_method(&"hatch_all"):
+		return int(driver.call(&"hatch_all", null))
+	var hatched: int = 0
+	for hero: PlayerBase in level.contact_order():
+		if hero.is_down() and not hero.dead:
+			hero.hatch(null, PartyTuning.hatch_hearts(Game.difficulty))
+			hatched += 1
+	return hatched
+
+
 ## Dozing (SimEntity, ARCHITECTURE.md 11): an inactive checkpoint only tests the overlap with the hero, which fails
 ## while he is far; the active one animates and ticks.
 func _doze_area() -> Rect2i:
@@ -52,6 +83,10 @@ func _can_doze() -> bool:
 	return not active
 
 
+## Make this the active restart point: stores the HERO's feet point (not the checkpoint's), deactivates every
+## other checkpoint, plays the cue. A hero who touches it in the air (jumping or falling past it) stores the
+## checkpoint's own feet point instead, which the level designer put on the floor: the hero's point could lie
+## above a gap beside the checkpoint, and every respawn would drop him into it again.
 func activate(hero: PlayerBase) -> void:
 	var level: LevelBase = Game.level
 	if level != null:

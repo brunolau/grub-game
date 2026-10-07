@@ -124,7 +124,8 @@ const PLATE_WEIGHT_CHOMPER: int = 2          ## ... and of Chomper ...
 const PLATE_WEIGHT_BOULDER: int = 2          ## ... and of a heave boulder resting on it (enemies and eggs weigh 0) [G 13.9.7]
 const PLATE_DOOR_MIN_TILES: int = 8          ## a plate stands at least this far from its door
 const PLATE_COLUMN_PERIOD: int = Tuning.COLUMN_RISE_PERIOD  ## a plate column rises / sinks 1 tile per 4 ticks
-const KEEPER_HALL_ROWS: int = 3              ## keeper and Guard halls are 3 rows high: nobody bounces over them
+const KEEPER_HALL_ROWS: int = 4              ## keeper and Guard halls are 4 rows high (64 px: the Guard and Shellback art
+                                             ## is 54 px tall; orchestrator resolution over the 3 of DESIGN D.8): nobody passes over a guard
 # See-saw: a hard landing on the high end launches whoever stands on the low end.
 const SEESAW_HARD_FALL_TILES: int = 4        ## a fall of 4+ tiles is a hard landing
 const SEESAW_LAUNCH_EXTRA: int = 32          ## launch = -(landing yvel + 32) ...

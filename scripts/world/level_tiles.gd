@@ -20,6 +20,15 @@ const LIQUID_SURFACE: int = 0
 const LIQUID_SURFACE_FRAMES: int = 6
 const LIQUID_BODY: int = 6
 const LIQUID_BODY_BUBBLES: int = 7
+## 2.0: the tar floor ':' (PHYSICS.md C.5, LEVEL_DESIGN.md 15.3) is drawn from a 4 x 1 floor strip in the level's
+## liquid skin (ASSET_MANIFEST 17.6 `tiles/canyon/mud_floor.png`: top_left, top, top_right, fill) that WorldTileSet
+## appends to the liquid strip: its tiles are the indices TAR_FLOOR_FIRST.. of SET_LIQUID (drawn on the main layer).
+const TAR_FLOOR_COLUMNS: int = 4
+const TAR_FLOOR_FIRST: int = LIQUID_COLUMNS
+const TAR_TOP_LEFT: int = TAR_FLOOR_FIRST
+const TAR_TOP: int = TAR_FLOOR_FIRST + 1
+const TAR_TOP_RIGHT: int = TAR_FLOOR_FIRST + 2
+const TAR_FILL: int = TAR_FLOOR_FIRST + 3
 
 # --- Terrain atlas indices -----------------------------------------------------------------------------------------
 const TOP_LEFT: int = 0
@@ -88,6 +97,7 @@ const C_GENTLE_UL_LOW: int = 52  # 4
 const C_SPIKES_FLOOR: int = 94   # ^
 const C_SPIKES_CEILING: int = 33 # !
 const C_LIQUID: int = 126        # ~
+const C_TAR: int = 58            # : (format 2: the tar floor)
 
 
 ## The fixed legend characters of a collision grid as bytes, row-major.
@@ -130,9 +140,14 @@ static func atlas_coords(index: int) -> Vector2i:
 	return Vector2i(index % ATLAS_COLUMNS, index / ATLAS_COLUMNS)
 
 
-## True for looks drawn in front of the actors (liquids).
+## True for looks drawn in front of the actors (liquids; not the tar floor, which is ground).
 static func is_front(look_value: int) -> bool:
-	return look_value >= 0 and look_set(look_value) == SET_LIQUID
+	return look_value >= 0 and look_set(look_value) == SET_LIQUID and look_index(look_value) < TAR_FLOOR_FIRST
+
+
+## True for the looks of the tar floor ':' (2.0).
+static func is_tar_floor(look_value: int) -> bool:
+	return look_value >= 0 and look_set(look_value) == SET_LIQUID and look_index(look_value) >= TAR_FLOOR_FIRST
 
 
 ## Code at a cell; cells outside the map read as solid ground of set A (section 7.4: "cells outside the map count
@@ -168,6 +183,8 @@ static func cell_look(codes: PackedByteArray, cols: int, col: int, row: int) -> 
 			if code_at(codes, cols, col, row - 1) != C_LIQUID:
 				return look(SET_LIQUID, LIQUID_SURFACE)
 			return look(SET_LIQUID, LIQUID_BODY_BUBBLES if cell_hash(col, row) % 4 == 0 else LIQUID_BODY)
+		C_TAR:
+			return look(SET_LIQUID, _tar_index(codes, cols, col, row))
 	var slope: int = _slope_index(code)
 	if slope >= 0:
 		var below_set: int = SET_B if code_at(codes, cols, col, row + 1) == C_SOLID_B else SET_A
@@ -188,9 +205,9 @@ static func shows_backwall(code: int) -> bool:
 	return code != C_SOLID_A and code != C_SOLID_B
 
 
-## True for '#' and '%'.
+## True for '#' and '%' (and the tar floor ':', ground whose surface lies lower: 2.0).
 static func is_solid_like(code: int) -> bool:
-	return code == C_SOLID_A or code == C_SOLID_B
+	return code == C_SOLID_A or code == C_SOLID_B or code == C_TAR
 
 
 ## True for the six slope characters.
@@ -263,6 +280,20 @@ static func _ground_index(codes: PackedByteArray, cols: int, col: int, row: int)
 	if not right:
 		return RIGHT
 	return FILL_B if cell_hash(col, row) % 8 == 0 else FILL
+
+
+## The tar floor (2.0): the surface tiles where no ground or tar lies above (the ends of a surface run where the
+## neighbour is no tar), the fill below the surface.
+static func _tar_index(codes: PackedByteArray, cols: int, col: int, row: int) -> int:
+	if is_solid_like(code_at(codes, cols, col, row - 1)):
+		return TAR_FILL
+	var left: bool = code_at(codes, cols, col - 1, row) == C_TAR
+	var right: bool = code_at(codes, cols, col + 1, row) == C_TAR
+	if right and not left:
+		return TAR_TOP_LEFT
+	if left and not right:
+		return TAR_TOP_RIGHT
+	return TAR_TOP
 
 
 ## A one-way platform ends where its neighbour is neither another thin floor (one-way or hatch) nor ground.

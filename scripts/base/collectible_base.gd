@@ -167,17 +167,21 @@ func can_be_collected() -> bool:
 
 
 ## The hero touched the item. Applies the effect, pays the points, feeds tally / completion / audio / events and
-## removes the item. Returns false when the item stays in place (e.g. a heart at full energy).
+## removes the item. Returns false when the item stays in place (e.g. a heart at full energy). An egg (2.0,
+## PlayerBase.down) never collects.
 func collect(hero: PlayerBase) -> bool:
-	if collected or hero.dead:
+	if collected or hero.dead or hero.down:
 		return false
 	if not _apply(hero):
 		return false
 	collected = true
-	# Per-player statistics (2.0): the collector's run counts the pick-up; team totals are paid as in 1.0.
+	# Per-player statistics (2.0): the collector's run counts the pick-up; team totals are paid as in 1.0. In a co-op
+	# party his run also keeps his share of the tribe score (the tally's piles, the "Rival score" option).
 	hero.run.picked += 1
 	var top: Vector2i = Vector2i(sim_pos.x, sim_pos.y - box_h)
 	if points > 0:
+		if Game.mode == Defs.GameMode.COOP and Game.level != null and Game.level.hero_count() > 1:
+			hero.run.score += points
 		Game.add_score(points)
 		Events.popup_requested.emit(&"score", points, top)
 	if counts_for_completion:

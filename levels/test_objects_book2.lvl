@@ -1,0 +1,54 @@
+# Club & Grub level file - format 2 (docs/ARCHITECTURE.md 7.11). Test walk of objects-B's Book II objects
+# (docs/expansion/PLAN.md P1.10; DESIGN.md C.2-C.9, PHYSICS.md C.3-C.9), left to right: a hanging vine from a ledge, a
+# rolled vine on the next ledge (strike the coil to unroll it), a palisade with a bark board (spear it for a step up)
+# and a Cave Painting on its top, a geyser under a ledge, a deadly tar vent, a raft on a pool with a current, and
+# Chomper waiting tame in his pen before the exit. tests/test_objects_book2.gd loads it through the real loader and
+# runs the validator on it. Not part of any campaign (kind = test).
+
+[meta]
+format = 2
+id = test_objects_book2
+name = "Far Shore Workshop"
+kind = test
+book = 2
+belt = fresh
+biome = jungle
+terrain_a = jungle/terrain_grass
+terrain_b = jungle/terrain
+background = jungle
+music = level_jungle
+author = objects-B
+notes = "objects-B test walk: vine, rolled vine, bark board, painting, geyser, deadly vent, raft + current, Chomper in his pen."
+
+[legend]
+V = objects/vine length=5
+R = objects/vine length=5 rolled=true
+B = objects/bark_board face=l tile=#
+P = items/painting index=0
+G = objects/geyser period=88 skin=mud
+D = objects/geyser period=66 delay=20 skin=mud deadly
+T = objects/raft width=3 skin=log tile=~
+E = objects/exit locked=false
+f = items/food index=3
+g = items/food index=17
+
+[tiles]
+................................................................
+................................................................
+................................................................
+................................................................
+........................P.......................................
+........................#.......g...............................
+......####V...####R.....#......###..............................
+........................#.......................................
+........................#.......................................
+........................#.......................................
+........................B.......................................
+..@.f...................#.....G......D........................E.
+########################################~~T~~~~~~~~~############
+########################################~~~~~~~~~~~~############
+
+[entities]
+zones/current 40 11 rect=40,11,8,2 dir=r speed=1
+objects/rex_pen 56 11 name=chomper_pen
+objects/mount 56 11 kind=rex pen=chomper_pen

@@ -1,7 +1,9 @@
 # Club & Grub - English catalogue (the source language).
-# Owner: ui module. One file per language: copy this file to <locale>.po (for example de.po), set "Language"
+# Owner: ui-B. One file per language: copy this file to <locale>.po (for example de.po), set "Language"
 # and translate the msgstr lines. Every .po file of this folder is loaded at start (scripts/ui/ui_kit.gd) and
 # offered in Options > Language. msgid values are stable keys; {name} parts are filled in by the game.
+# 2.0 level texts live in sub-catalogues locale/levels/<lang>/*.po (one per level designer, PLAN.md 6.1: w5.po,
+# coop_b1.po ...): loaded beside <lang>.po, never offered as languages; translate them as levels/<lang>/<file>.po.
 # Headings drawn with the carved-stone font (TITLE / HEADING keys, UI_GAME_OVER, UI_THE_END) only have the
 # letters A-Z, the digits and the space; keep them short.
 msgid ""
@@ -117,6 +119,25 @@ msgstr "Stage {number}"
 msgid "UI_HUD_TIME"
 msgstr "TIME {seconds}"
 
+# --- Versus HUD (Grub Stack round banners; {player} is a tag such as P2) ---
+msgid "UI_VS_GO"
+msgstr "GRUB!"
+
+msgid "UI_VS_FEAST_RUSH"
+msgstr "FEAST RUSH!"
+
+msgid "UI_VS_SUDDEN_DEATH"
+msgstr "SUDDEN DEATH!"
+
+msgid "UI_VS_ROUND_WIN"
+msgstr "{player} wins the round!"
+
+msgid "UI_VS_ROUND_SHARED"
+msgstr "{players} win the round!"
+
+msgid "UI_VS_DRAW"
+msgstr "Draw!"
+
 # --- Tally ---
 msgid "UI_TALLY_HEADING"
 msgstr "LEVEL COMPLETE"
@@ -192,6 +213,27 @@ msgstr "Options"
 
 msgid "UI_PAUSE_QUIT"
 msgstr "Quit to title"
+
+msgid "UI_PAUSE_BY"
+msgstr "{player} paused"
+
+msgid "UI_PAUSE_JOIN"
+msgstr "Second player joins"
+
+msgid "UI_PAUSE_JOIN_PRESS"
+msgstr "Second player: press Jump on your keys or your pad. ({seconds})"
+
+msgid "UI_PAUSE_LEAVE"
+msgstr "{player} leaves the game"
+
+msgid "UI_CONFIRM_LEAVE"
+msgstr "{player} leaves the game and the stage starts again at the checkpoint. Leave?"
+
+msgid "UI_PAUSE_PAD_LOST"
+msgstr "{player}'s pad is disconnected: reconnect it, or continue alone."
+
+msgid "UI_PAUSE_ALONE"
+msgstr "Continue without {player}"
 
 msgid "UI_CONFIRM_CHECKPOINT"
 msgstr "Give up this life and start again at the last checkpoint?"
@@ -340,6 +382,45 @@ msgstr "Look"
 
 msgid "UI_ACTION_PAUSE"
 msgstr "Pause"
+
+msgid "UI_ACTION_SWAP"
+msgstr "Swap"
+
+msgid "UI_OPT_PROFILE"
+msgstr "Player"
+
+msgid "UI_OPT_PROFILE_SOLO"
+msgstr "One player"
+
+msgid "UI_OPT_PARTY_KEYS"
+msgstr "Shared keyboard"
+
+msgid "UI_OPT_KEYS_CLASSIC"
+msgstr "WASD + numpad"
+
+msgid "UI_OPT_KEYS_TWO_HANDS"
+msgstr "Two hands"
+
+msgid "UI_OPT_KEYS_ONE_HAND"
+msgstr "One hand"
+
+msgid "UI_OPT_KEY_TEST"
+msgstr "Keyboard test"
+
+msgid "UI_KEYTEST_INTRO"
+msgstr "Both players: hold Left + Jump + Attack + Swap at the same time. All eight lights must stay lit."
+
+msgid "UI_KEYTEST_HOLD"
+msgstr "Waiting for both players' four keys..."
+
+msgid "UI_KEYTEST_PASSED"
+msgstr "Every key arrives - this keyboard works for two!"
+
+msgid "UI_KEYTEST_NUMLOCK"
+msgstr "Num Lock is on: Windows lets go of Shift while the numpad is used. Switch Num Lock off."
+
+msgid "UI_KEYTEST_NUMLOCK_HINT"
+msgstr "A numpad key stays dark? Check Num Lock."
 
 # --- Level names: the `name` of every shipped level file (levels/*.lvl) is its own msgid (UiKit.level_name) ---
 # Shown in the HUD face (capitals) by the level banner, the world map, the tally and the pause menu.

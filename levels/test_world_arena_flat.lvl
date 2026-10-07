@@ -1,0 +1,39 @@
+# Club & Grub level file - format 2. A developer arena (docs/LEVEL_DESIGN.md 15.8): one flat 20 x 11 screen with
+# two one-way ledges three rows up, four spawns and a cookpot. Owner: world-B (versus referee tests, bot walks of
+# core-B's PLAN P1.2). Not part of any arena list a player sees (kind = arena, but named test_*).
+
+[meta]
+format = 2
+id = test_world_arena_flat
+name = "Flat Arena (test)"
+kind = arena
+biome = jungle
+terrain_a = jungle/terrain_grass
+music = level_jungle
+players = 4
+modes = grub_stack,last_caveman,hot_rock
+round_time = 90
+wrap = none
+sudden = stampede
+
+[legend]
+B = objects/spawn_point index=2
+C = objects/spawn_point index=3
+D = objects/spawn_point index=4
+P = objects/cookpot
+Q = objects/cookpot
+? = objects/hidden_spot kind=small count=3 look=block tile=#
+
+[tiles]
+....................
+....................
+....................
+....................
+....................
+....................
+....................
+...-----....-----...
+....................
+.@..C....P....Q.D.B.
+###?###?####?###?###
+####################

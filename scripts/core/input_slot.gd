@@ -26,7 +26,7 @@ const KEYBOARD_LAYOUT_NAMES: Array[String] = ["classic", "two_hands", "one_hand"
 # Up-jumps scheme, where the up key is the jump key. Bindings keep no key side (the Settings token "key:<code>"):
 # KEY_SHIFT / KEY_CTRL are either Shift / Ctrl, which is safe because no layout gives both sides of one to two
 # players (CLASSIC: P1 Left Shift; ONE_HAND: P2 Right Ctrl and Right Shift). The numpad is bound by physical key,
-# so NumLock does not change it.
+# so NumLock does not change it (see NUMPAD_KEYS).
 const _LEFT_KEYS: Dictionary = {
 	&"move_left": [[KEY_A], [KEY_A], [KEY_A]],
 	&"move_right": [[KEY_D], [KEY_D], [KEY_D]],
@@ -49,6 +49,17 @@ const _RIGHT_KEYS: Dictionary = {
 	&"swap": [[KEY_KP_ADD], [KEY_SEMICOLON], [KEY_SHIFT]],
 	&"pause": [[], [], []],
 }
+
+## Godot's menu actions a keyboard cluster drives (GameInput.set_menu_clusters, [method menu_keys]).
+const MENU_ACTIONS: Array[StringName] = [&"ui_up", &"ui_down", &"ui_left", &"ui_right", &"ui_accept", &"ui_cancel"]
+## The numpad keys (physical): with NumLock off Windows sends the navigation keys (Up, Left, Clear, Right, Insert,
+## Delete) but Godot reports the physical keycode of the numpad key from its scancode (verified on Godot 4.7.2 /
+## Windows 11 with the WM_KEYDOWN messages of NumLock off, scenes/core/dev/key_probe.tscn): bindings by physical key
+## work in both NumLock states, no alias is needed. Num Enter and Num + do not depend on NumLock.
+const NUMPAD_KEYS: Array[Key] = [
+	KEY_KP_0, KEY_KP_1, KEY_KP_2, KEY_KP_3, KEY_KP_4, KEY_KP_5, KEY_KP_6, KEY_KP_7, KEY_KP_8, KEY_KP_9,
+	KEY_KP_PERIOD, KEY_KP_ENTER, KEY_KP_ADD, KEY_KP_SUBTRACT, KEY_KP_MULTIPLY, KEY_KP_DIVIDE,
+]
 
 ## Kind of input (Defs.InputSlotKind).
 var kind: int = Defs.InputSlotKind.NONE
@@ -175,6 +186,47 @@ static func default_keys(p_layout: int, half: int, action: StringName) -> Array[
 		for code: Variant in per_layout[p_layout]:
 			result.append(code as Key)
 	return result
+
+
+## The keys of a keyboard half that drive a menu action (MENU_ACTIONS) in a layout (DESIGN.md D.11: classic P1
+## W / S / Space / Q, P2 Num 8 / Num 5 / Num 0 / Num .): ui_up = the half's Up key (its Jump key where Up jumps,
+## ONE_HAND), ui_down / ui_left / ui_right = its moves, ui_accept = its Jump key (its Strike key where Jump is the Up
+## key), ui_cancel = its Look key. Empty for another half or action.
+static func menu_keys(p_layout: int, half: int, ui_action: StringName) -> Array[Key]:
+	if half != Defs.InputSlotKind.KEYBOARD_LEFT and half != Defs.InputSlotKind.KEYBOARD_RIGHT:
+		var none: Array[Key] = []
+		return none
+	var up_keys: Array[Key] = default_keys(p_layout, half, Defs.ACT_UP)
+	match ui_action:
+		&"ui_up":
+			return up_keys if not up_keys.is_empty() else default_keys(p_layout, half, Defs.ACT_JUMP)
+		&"ui_down":
+			return default_keys(p_layout, half, Defs.ACT_DOWN)
+		&"ui_left":
+			return default_keys(p_layout, half, Defs.ACT_LEFT)
+		&"ui_right":
+			return default_keys(p_layout, half, Defs.ACT_RIGHT)
+		&"ui_accept":
+			return default_keys(p_layout, half, Defs.ACT_JUMP if not up_keys.is_empty() else Defs.ACT_ATTACK)
+		&"ui_cancel":
+			return default_keys(p_layout, half, Defs.ACT_LOOK)
+	var result: Array[Key] = []
+	return result
+
+
+## True when a keyboard half of a layout uses a numpad key (the key test names Num Lock when such a key does not
+## arrive, DESIGN.md D.11).
+static func uses_numpad(p_layout: int, half: int) -> bool:
+	for action: StringName in Defs.GAME_ACTIONS:
+		for code: Key in default_keys(p_layout, half, action):
+			if is_numpad_key(code):
+				return true
+	return false
+
+
+## True for a key of the numeric keypad (NUMPAD_KEYS).
+static func is_numpad_key(code: Key) -> bool:
+	return NUMPAD_KEYS.has(code)
 
 
 ## Default gamepad events of a game action, the solo pad layout for every slot (DESIGN.md D.11: A jump, X / B

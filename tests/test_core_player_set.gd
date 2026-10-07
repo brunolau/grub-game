@@ -533,7 +533,7 @@ func test_party_feasts_share_the_music_and_deaths_wait_for_the_team() -> void:
 	assert_eq(Audio.get_music_context(), music, "the level music is back")
 	p2.kill(&"pit")
 	Sim.step(Tuning.DEATH_ANIM_TICKS + 2)
-	assert_true(p2.dead, "his toss is over; he waits while P1 plays")
+	assert_true(p2.is_down(), "his toss is over: an egg while P1 plays (DESIGN.md D.3, PHYSICS.md C.12)")
 	assert_eq(Game.lives, Tuning.LIVES_START)
 	p1.kill(&"pit")
 	Sim.step(Tuning.DEATH_ANIM_TICKS + 2)
