@@ -243,6 +243,7 @@ func kill(cause: StringName, killer: SimEntity = null) -> void:
 	dead = true
 	var points: int = get_points()
 	Game.add_score(points)
+	_credit_kill(killer)
 	Events.popup_requested.emit(&"score", points, sim_pos)
 	sleep()
 	var thrown: bool = was_awake and cause != &"feast" and not stole_heart
@@ -389,29 +390,46 @@ func _should_wake() -> bool:
 
 ## Despawn rule of GAMEPLAY.md 5.1: not drawn and farther than one screen horizontally (or one screen + 124 px
 ## vertically) from the hero. An enemy inside the activation area never sleeps (no wake / sleep flicker at the
-## edge of the view).
+## edge of the view). A party (2.0, TECH_AUDIT.md 3.8): farther than that from every hero (LevelBase.contact_order;
+## like the 1.0 hero, a hero in his death toss still counts where he is).
 func _should_sleep() -> bool:
 	var level: LevelBase = Game.level
-	if level == null or on_screen or level.player == null:
+	if level == null or on_screen:
+		return false
+	var heroes: Array[PlayerBase] = level.contact_order()
+	if heroes.is_empty():
 		return false
 	if level.is_in_view(self, Tuning.ENEMY_SPAWN_MARGIN_PX):
 		return false
 	var view: Rect2i = level.get_view_rect()
-	var hero: Vector2i = level.player.sim_pos
-	return absi(sim_pos.x - hero.x) > view.size.x \
-			or absi(sim_pos.y - hero.y) > view.size.y + Tuning.ENEMY_DESPAWN_EXTRA_Y
+	for hero: PlayerBase in heroes:
+		if absi(sim_pos.x - hero.sim_pos.x) <= view.size.x \
+				and absi(sim_pos.y - hero.sim_pos.y) <= view.size.y + Tuning.ENEMY_DESPAWN_EXTRA_Y:
+			return false
+	return true
 
 
 # =================================================================================================================
 # Helpers for archetypes
 # =================================================================================================================
 
-## The hero, or null when there is none to react to (not spawned yet, or in his death sequence).
+## The hero to react to, or null when there is none (not spawned yet, or in his death sequence): the "target" idiom
+## of LevelBase.target_hero() - in a party the nearest hero that is alive and not down (TECH_AUDIT.md 4.1); for a
+## party of one exactly 1.0's `level.player` unless he is dead.
 func _target_hero() -> PlayerBase:
 	var level: LevelBase = Game.level
-	if level == null or level.player == null or level.player.dead:
+	if level == null:
 		return null
-	return level.player
+	return level.target_hero(self)
+
+
+## Per-player statistics (2.0, TECH_AUDIT.md 3.8): the hero who killed it - Defs.hitter_slot() of `killer`, the hero
+## himself or the owner of his thrown weapon - counts the kill in his run (PlayerRun.kills). The team score
+## (Game.score) is paid as in 1.0; nothing in the simulation reads the count.
+func _credit_kill(killer: SimEntity) -> void:
+	var slot: int = Defs.hitter_slot(killer)
+	if slot >= 0:
+		Game.runs[slot].kills += 1
 
 
 ## +1 when `target` is to the right of this enemy (or exactly above it), else -1.
@@ -546,12 +564,12 @@ func _refresh_visual() -> void:
 	_sprite.modulate = FLASH_COLOR if (flash & EnemyTuning.FLASH_PERIOD_MASK) != 0 else Color.WHITE
 
 
-## True while the enemy is drawn as food (feast mode, GAMEPLAY.md 5.3).
+## True while the enemy is drawn as food (feast mode, GAMEPLAY.md 5.3; a party: while any hero feasts).
 func _shows_food() -> bool:
 	if not awake or not tangible or not contact_hurts:
 		return false
 	var level: LevelBase = Game.level
-	return level != null and level.player != null and level.player.is_feasting()
+	return level != null and level.any_hero_feasting()
 
 
 # =================================================================================================================

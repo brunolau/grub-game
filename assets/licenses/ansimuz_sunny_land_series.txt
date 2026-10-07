@@ -1,0 +1,51 @@
+Sunny Land 2D Pixel Art Pack
+============================
+
+Author: ansimuz (Luis Zuno)
+Source: https://opengameart.org/content/sunny-land-2d-pixel-art-pack
+Licence: CC0 1.0 (tier A)
+Used in Club & Grub for: 2.0 (The Far Shore): sprites/enemies/ eagle. Per-file sources and edits: docs/ASSET_MANIFEST.md section 17
+Staging folder: .tools/asset_candidates/characters/ansimuz-sunny-land-series
+
+---- Licence evidence recorded when the pack was downloaded ----
+
+# LICENSE_INFO - Sunny Land 2D Pixel Art Pack / SunnyLand - Forest / SunnyLand Woods
+
+- Pack: Sunny Land 2D Pixel Art Pack / SunnyLand - Forest / SunnyLand Woods
+- Author: ansimuz (Luis Zuno)
+- Source URL: https://opengameart.org/content/sunny-land-2d-pixel-art-pack
+- License: CC0 1.0
+- License tier (project scheme): A
+- Date checked / downloaded: 2026-10-04
+
+## Exact wording on the source page
+- OpenGameArt license field on all three submissions: "License(s): CC0"
+- https://opengameart.org/content/sunnyland-forest , https://opengameart.org/content/sunnyland-woods
+
+## Notes / flags
+Art is CC0. The demo MUSIC bundled in the zips (Pascal Belisle) carries its own licence text on the page - do not use the bundled audio without checking it; only the sprites were scouted here.
+
+---- public-license.txt (shipped by the author; the bundled music is not used by Club & Grub) ----
+
+Artwork created by Luis Zuno @ansimuz
+
+License for Everyone. 
+
+Public domain and free to use on whatever you want, personal or commercial. Credit is not required but appreciated.
+
+Feeling Grateful?
+You can support my work at https://www.patreon.com/ansimuz
+
+Get more Free Assetslike these at: http://www.pixelgameart.org
+
+Music by Pascal Belisle
+
+www.patreon.com/thetoadz
+www.soundcloud.com/thetoadz
+
+Music License
+You are free to use the music in your projects as long as you give appropriate credit.
+
+---- Licence ----
+
+CC0 1.0 Universal: the full legal code ships as cc0_1.0_legal_code.txt in this folder.

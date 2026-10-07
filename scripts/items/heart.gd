@@ -9,8 +9,9 @@ func _init() -> void:
 	pickup_sfx = Sfx.HEART
 
 
-func _apply(_hero: PlayerBase) -> bool:
-	if not Game.add_heart():
+func _apply(hero: PlayerBase) -> bool:
+	# The collector's own energy (2.0: his PlayerRun; P1's run is Game's, so Game.add_heart() in 1.0).
+	if not hero.run.add_heart():
 		return false
 	Events.popup_requested.emit(&"heart", 1, Vector2i(sim_pos.x, sim_pos.y - box_h))
 	return true

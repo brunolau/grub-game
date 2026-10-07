@@ -288,6 +288,7 @@ func _attribute_layers(key: String) -> void:
 	_layers_busy = false
 
 
+## P1's feet point (the hero positions of the report are P1's; a party's size is in the load lines).
 func _hero_pos() -> Vector2i:
 	var level: LevelBase = Game.level
 	if is_instance_valid(level) and level.player != null:
@@ -410,10 +411,14 @@ func _on_level_started(level_id: StringName) -> void:
 		"entities": Sim.get_entity_count(),
 		"nodes": int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT)),
 		"grid": "%dx%d" % [level.grid.cols, level.grid.rows] if is_instance_valid(level) else "",
+		"heroes": level.hero_count() if is_instance_valid(level) else 0,
 	})
-	print("Perf: load %s %.1f ms (level build %.1f ms), %d entities registered" % [level_id,
+	var party: String = ""
+	if is_instance_valid(level) and level.hero_count() > 1:
+		party = ", %d heroes (positions are P1's)" % level.hero_count()
+	print("Perf: load %s %.1f ms (level build %.1f ms), %d entities registered%s" % [level_id,
 			float(now - _covered_usec) / 1000.0, float(now - _added_usec) / 1000.0 if _added_usec > 0 else -1.0,
-			Sim.get_entity_count()])
+			Sim.get_entity_count(), party])
 	_covered_usec = 0
 
 

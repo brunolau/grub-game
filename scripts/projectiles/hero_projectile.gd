@@ -2,7 +2,8 @@ class_name HeroProjectile
 extends ProjectileBase
 ## A thrown weapon of the hero: the axe and the boomerang (PHYSICS.md 8.4, ARCHITECTURE.md 6.2).
 ##
-## Spawned by [Player] with the parameters `from_hero`, `power`, `xvel`, `yvel`, `yacc` and `facing`. It flies
+## Spawned by [Player] with the parameters `from_hero`, `power`, `xvel`, `yvel`, `yacc`, `facing` and `owner` (the
+## thrower's player slot, ProjectileBase.owner_slot; 2.0). It flies
 ## without tile collision (ProjectileBase), is hit-tested by the hero's weapon pass and by bosses, and is removed
 ## on a hit or when it was not drawn in the previous frame. Both scenes share this script; they differ in the
 ## picture and in the box, set in the scene.

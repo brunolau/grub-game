@@ -22,7 +22,8 @@ static func skull(hero: PlayerBase, source: SimEntity) -> bool:
 	var level: LevelBase = Game.level
 	if level == null:
 		return false
-	var energy: int = Game.hearts * Tuning.BONES_PER_HEART + Game.bones
+	# The energy of the hero it hits (2.0: his PlayerRun; P1's run is Game's, so Game.hearts / bones in 1.0).
+	var energy: int = hero.run.hearts * Tuning.BONES_PER_HEART + hero.run.bones
 	var items_before: int = level.get_kind(Defs.Kind.COLLECTIBLE).size()
 	if not hero.hurt(source, Defs.HurtKind.TRAP):
 		return false

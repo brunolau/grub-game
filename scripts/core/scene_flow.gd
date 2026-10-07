@@ -74,6 +74,9 @@ var pause_on_focus_loss: bool = true
 ## When true (default, except headless runs) the menu screens and the world map load what the next level start
 ## needs on worker threads (ARCHITECTURE.md 11 "Loading"); see [method warm_up].
 var background_loading: bool = true
+## Player slot whose device asked for the last pause (GameInput.event_slot; 0 in single-player and for a pause
+## that did not come from a device, e.g. the focus loss). The pause menu gives that player the focus (2.0).
+var pause_slot: int = 0
 
 var _layer: CanvasLayer = null
 var _cover: TransitionCover = null
@@ -298,6 +301,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		# A button that both pauses and confirms (gamepad Start) confirms the focused entry of the pause menu.
 		if get_tree().paused and event.is_action(&"ui_accept", true) and get_viewport().gui_get_focus_owner() != null:
 			return
+		if not get_tree().paused:
+			pause_slot = maxi(GameInput.event_slot(event), 0)
 		toggle_pause()
 		get_viewport().set_input_as_handled()
 
@@ -379,12 +384,13 @@ func start_level(level_id: StringName, transition: int = Defs.Transition.CURTAIN
 ## Reload the current level from its start (pause menu "restart level"). The run goes back to its state at the
 ## level entry (Game.restore_level_entry): the restart costs nothing and earns nothing, so the level's items, which
 ## all reappear, cannot be collected twice. A hero whose death toss is still playing has lost that life: it is
-## paid first, and on the last life the run ends (game over) instead. Ignored while a transition runs.
+## paid first, and on the last life the run ends (game over) instead. A party pays only for a team wipe (every hero
+## dead or down at once). Ignored while a transition runs.
 func restart_level() -> void:
 	if Game.level_id == &"" or busy:
 		return
 	var level: LevelBase = Game.level
-	if level != null and level.player != null and level.player.dead and not level.completed:
+	if level != null and level.all_heroes_dead_or_down() and not level.completed:
 		if not Game.lose_life():
 			Sim.stop()
 			game_over()
@@ -488,6 +494,8 @@ func game_over() -> void:
 func set_paused(paused: bool) -> void:
 	if current_screen != SCREEN_LEVEL or get_tree().paused == paused:
 		return
+	if not paused:
+		pause_slot = 0
 	get_tree().paused = paused
 	Audio.play_sfx(Sfx.PAUSE_IN if paused else Sfx.PAUSE_OUT)
 	Events.pause_changed.emit(paused)
@@ -757,18 +765,40 @@ func _animate_cover(target: float, transition: int) -> void:
 
 
 ## Where a transition is centred, in viewport px: the middle of the hero for the iris (when a level with a hero
-## is on screen), otherwise the middle of the screen.
+## is on screen), otherwise the middle of the screen. A party: the middle of its living heroes (of all of them when
+## none is alive).
 func _transition_focus(shape: int) -> Vector2:
 	var centre: Vector2 = _cover.size * 0.5
 	if shape != Defs.Transition.IRIS:
 		return centre
 	var level: LevelBase = Game.level
+	if level != null and level.hero_count() > 1:
+		return _party_focus(level, centre)
 	if level == null or level.player == null or not level.player.is_inside_tree():
 		return centre
 	var hero: PlayerBase = level.player
 	var at: Vector2 = hero.get_global_transform_with_canvas().origin
 	at.y -= float(hero.box_h * Tuning.ART_SCALE) * 0.5
 	return at.clamp(Vector2.ZERO, _cover.size)
+
+
+## The iris focus of a party: the mean of its heroes' middles (living heroes first), in viewport px.
+func _party_focus(level: LevelBase, centre: Vector2) -> Vector2:
+	var sum: Vector2 = Vector2.ZERO
+	var count: int = 0
+	for pass_index: int in 2:
+		for hero: PlayerBase in level.contact_order():
+			if not hero.is_inside_tree() or (pass_index == 0 and (hero.dead or hero.is_down())):
+				continue
+			var at: Vector2 = hero.get_global_transform_with_canvas().origin
+			at.y -= float(hero.box_h * Tuning.ART_SCALE) * 0.5
+			sum += at
+			count += 1
+		if count > 0:
+			break
+	if count == 0:
+		return centre
+	return (sum / float(count)).clamp(Vector2.ZERO, _cover.size)
 
 
 ## The application gained or lost the foreground (window focus and "resumed" state together).

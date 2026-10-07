@@ -8,6 +8,10 @@ extends SimEntity
 ## Parameters: `name`; `dest=<name of a gate or marker>`; `lock=c,r` camera cell of a single-screen room (the lock
 ## of the DESTINATION applies on arrival; arriving somewhere without one releases the camera);
 ## `skin=arch|hole|none` [arch].
+##
+## A party (2.0, TECH_AUDIT.md 3.12): every hero may enter (the first in contact order who asks travels); his own
+## glider blocks him, he alone waits for Down to be released after a journey, and he is the one put at the
+## destination. Taking the whole party along (party travel, TECH_AUDIT.md 4.8) is a rule of PLAN.md phase 1.
 
 const SKINS: Array[String] = ["arch", "hole", "none"]
 const TEXTURES: Array[Texture2D] = [
@@ -24,9 +28,12 @@ var travelling: bool = false
 var _cell: Vector2i = Vector2i.ZERO
 var _target: SimEntity = null
 var _warned: bool = false
+## The hero on his way to the destination (set by _begin, used by _arrive).
+var _traveller: PlayerBase = null
 
-## Set after a journey until the hero lets go of Down, so that he does not travel straight back.
-static var _wait_release: bool = false
+## Set after a journey until the hero lets go of Down, so that he does not travel straight back: bit `slot` for the
+## hero of that player slot (1.0: one flag for the one hero, bit 0).
+static var _wait_release: int = 0
 
 
 func _init() -> void:
@@ -55,21 +62,23 @@ func _apply_params(params: Dictionary) -> void:
 
 func _enter_tree() -> void:
 	# A freshly loaded level starts without a pending "let go of Down" from a previous level.
-	_wait_release = false
+	_wait_release = 0
 
 
 func _sim_tick(_phase: int) -> void:
 	var level: LevelBase = Game.level
 	if level == null or travelling:
 		return
-	var hero: PlayerBase = level.player
-	if hero != null and _wants_to_enter(hero):
-		_begin(hero)
+	for hero: PlayerBase in level.contact_order():
+		if _wants_to_enter(hero):
+			_begin(hero)
+			return
 
 
 func _on_level_reset() -> void:
 	travelling = false
-	_wait_release = false
+	_traveller = null
+	_wait_release = 0
 
 
 ## Dozing (SimEntity, ARCHITECTURE.md 11): a gate that is not in use and does not wait for Down to be released only
@@ -79,17 +88,18 @@ func _doze_area() -> Rect2i:
 
 
 func _can_doze() -> bool:
-	return not travelling and not _wait_release
+	return not travelling and _wait_release == 0
 
 
 ## True when the hero stands in front of this gate pressing Down, on the ground, without the glider.
 func _wants_to_enter(hero: PlayerBase) -> bool:
 	if hero.dead or not hero.control_enabled:
 		return false
+	var bit: int = 1 << hero.slot
 	if hero.drop_timer == 0:
-		_wait_release = false
+		_wait_release &= ~bit
 		return false
-	if _wait_release or Game.has_glider or not hero.is_grounded():
+	if (_wait_release & bit) != 0 or hero.run.has_glider or not hero.is_grounded():
 		return false
 	return hero.cell_col() == _cell.x and ((hero.sim_pos.y - 1) >> 4) == _cell.y
 
@@ -102,8 +112,9 @@ func _begin(hero: PlayerBase) -> void:
 			_warned = true
 			push_warning("objects/gate '%s': destination '%s' not found" % [param_str("name"), dest])
 		return
-	_wait_release = true
+	_wait_release |= 1 << hero.slot
 	travelling = true
+	_traveller = hero
 	hero.set_control_enabled(false)
 	hero.xvel = 0
 	if Flow.busy:
@@ -113,11 +124,12 @@ func _begin(hero: PlayerBase) -> void:
 		Flow.play_covered(_arrive, Defs.Transition.CURTAIN)
 
 
-## Runs between two ticks while the curtain covers the screen.
+## Runs between two ticks while the curtain covers the screen: the hero who entered (1.0: the hero) arrives.
 func _arrive() -> void:
 	travelling = false
 	var level: LevelBase = Game.level
-	var hero: PlayerBase = level.player if level != null else null
+	var hero: PlayerBase = _traveller if level != null and is_instance_valid(_traveller) else null
+	_traveller = null
 	if hero == null or hero.dead:
 		return
 	hero.set_control_enabled(true)
@@ -127,6 +139,7 @@ func _arrive() -> void:
 	hero.xvel = 0
 	hero.yvel = 0
 	hero.teleport(_target.sim_pos)
+	level.notify_hero_teleported(hero)
 	if _target.spawn_params.has("lock"):
 		var lock: PackedInt32Array = LevelText.to_int_list(_target.spawn_params["lock"])
 		if lock.size() == 2:

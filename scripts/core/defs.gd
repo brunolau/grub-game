@@ -9,7 +9,8 @@ extends RefCounted
 enum Difficulty { BEGINNER = 0, EXPERT = 1 }
 
 ## Weapons in the order of PHYSICS.md 8.1. BOOMERANG is our skin of the original "swirling axe".
-enum Weapon { CLUB = 0, HAMMER = 1, AXE = 2, BOOMERANG = 3 }
+## SPEAR (2.0, DESIGN.md C.2) is appended: Book II and co-op only, never carried by a Book I solo run.
+enum Weapon { CLUB = 0, HAMMER = 1, AXE = 2, BOOMERANG = 3, SPEAR = 4 }
 
 ## Simulation phases, executed in this order once per tick (PHYSICS.md 3). See ARCHITECTURE.md 4.2.
 enum Phase {
@@ -86,9 +87,9 @@ const ACT_JUMP: StringName = &"jump"
 const ACT_ATTACK: StringName = &"attack"
 const ACT_LOOK: StringName = &"look"
 const ACT_PAUSE: StringName = &"pause"
-## Actions the options menu may rebind (ui_* actions stay on Godot's defaults).
+## Actions the options menu may rebind (ui_* actions stay on Godot's defaults). 2.0 appends `swap` (ACT_SWAP).
 const GAME_ACTIONS: Array[StringName] = [
-	&"move_left", &"move_right", &"move_up", &"move_down", &"jump", &"attack", &"look", &"pause",
+	&"move_left", &"move_right", &"move_up", &"move_down", &"jump", &"attack", &"look", &"pause", &"swap",
 ]
 
 # --- Node groups -----------------------------------------------------------------------------------------------
@@ -136,6 +137,57 @@ const SCROLL_LOW_BAND: int = 1      ## bit 0: alternative vertical band, no hard
 const SCROLL_NO_HORIZONTAL: int = 2 ## bit 1: vertical-only level
 const SCROLL_AUTO_DOWN: int = 4     ## bit 2: auto-scroll down 1 px per tick
 
+# =================================================================================================================
+# 2.0 expansion "The Far Shore" (docs/expansion/DESIGN.md; contract step P0.3 of docs/expansion/PLAN.md).
+# Appended only: nothing above changes. For a party of one every 1.0 value keeps its meaning (TECH_AUDIT.md 2).
+# =================================================================================================================
+
+## Most heroes in one game: versus 2-4, co-op exactly 2 (PartyTuning.COOP_PLAYERS); slot 0 is P1 = the 1.0 hero.
+const MAX_PLAYERS: int = 4
+
+## What kind of game runs (Game.mode). SINGLE is the 1.0 game and the default everywhere.
+enum GameMode { SINGLE = 0, COOP = 1, VERSUS = 2 }
+
+## Where a player slot's input comes from (GameInput slots, TECH_AUDIT.md 4.3). NONE = the slot is free;
+## ALL_DEVICES = every keyboard / pad / touch event, the 1.0 path of slot 0 in single-player.
+enum InputSlotKind {
+	NONE = 0,
+	ALL_DEVICES = 1,     ## single-player slot 0: the unprefixed actions of project.godot
+	KEYBOARD_LEFT = 2,   ## left half of a shared keyboard (W A S D ...), DESIGN.md D.11
+	KEYBOARD_RIGHT = 3,  ## right half (arrows ...)
+	KEYBOARD_FULL = 4,   ## one player on the whole keyboard, the others on pads
+	PAD = 5,             ## one gamepad, by its device id
+	TOUCH = 6,           ## a touch overlay (one screen region per touch slot)
+	BOT = 7,             ## a HeroBot computes the flags (versus, the Rival Chieftains)
+	SCRIPT = 8,          ## a route / flow / test feeds the flags (GameInput.set_scripted_slot)
+}
+
+## Co-op trait of an enemy record (`coop=<name>` in co-op level files only, DESIGN.md D.6). NONE = plain enemy.
+enum CoopTrait { NONE = 0, SHELL = 1, BOND = 2, DAZE = 3, HEAVY = 4, LONE = 5, GRAB = 6, LEECH = 7, SPLIT = 8 }
+## Level-file names of the traits, by CoopTrait value ("" = NONE).
+const COOP_TRAIT_NAMES: Array[StringName] = [
+	&"", &"shell", &"bond", &"daze", &"heavy", &"lone", &"grab", &"leech", &"split",
+]
+
+## Versus modes (DESIGN.md E.3 / E.4): the four launch modes, then the second wave.
+enum VersusMode {
+	GRUB_STACK = 0, LAST_CAVEMAN = 1, HOT_ROCK = 2, CLUBBALL = 3, KING_OF_THE_FEAST = 4, LETTER_SNATCH = 5,
+	EGG_HEIST = 6,
+}
+## Names of the versus modes (arena meta `modes`, settings, save data), by VersusMode value.
+const VERSUS_MODE_NAMES: Array[StringName] = [
+	&"grub_stack", &"last_caveman", &"hot_rock", &"clubball", &"king_of_the_feast", &"letter_snatch", &"egg_heist",
+]
+
+## Bot levels (DESIGN.md E.7): reaction and decisions, never cheating (VersusTuning.BOT_REACTION_TICKS).
+enum BotLevel { ROOKIE = 0, HUNTER = 1, CHIEF = 2 }
+
+## Input flag of the Swap action (DESIGN.md C.1): swaps hand and belt. Outside IN_STATE_MASK, so the state table
+## never sees it; Book I solo samples it but ignores it (PLAN.md P0.5). Route key letter `S`.
+const IN_SWAP: int = 64
+## InputMap action behind IN_SWAP (project.godot: V, `;`, pad LB; the last entry of GAME_ACTIONS).
+const ACT_SWAP: StringName = &"swap"
+
 
 ## Name of a difficulty, as used in level files and save data ("beginner" / "expert").
 static func difficulty_name(difficulty: int) -> String:
@@ -151,5 +203,68 @@ static func weapon_name(weapon: int) -> String:
 			return "axe"
 		Weapon.BOOMERANG:
 			return "boomerang"
+		Weapon.SPEAR:
+			return "spear"
 		_:
 			return "club"
+
+
+## Name of a game mode, as used in save namespaces and settings ("single" / "coop" / "versus").
+static func game_mode_name(mode: int) -> String:
+	match mode:
+		GameMode.COOP:
+			return "coop"
+		GameMode.VERSUS:
+			return "versus"
+		_:
+			return "single"
+
+
+## Level-file name of a co-op trait ("" for NONE or an unknown value).
+static func coop_trait_name(coop_trait: int) -> StringName:
+	if coop_trait < 0 or coop_trait >= COOP_TRAIT_NAMES.size():
+		return &""
+	return COOP_TRAIT_NAMES[coop_trait]
+
+
+## The CoopTrait of a level-file name (`coop=shell` -> SHELL); -1 for an unknown name, NONE for "".
+static func coop_trait_from_name(trait_name: StringName) -> int:
+	return COOP_TRAIT_NAMES.find(trait_name)
+
+
+## Name of a versus mode ("" for an unknown value).
+static func versus_mode_name(mode: int) -> StringName:
+	if mode < 0 or mode >= VERSUS_MODE_NAMES.size():
+		return &""
+	return VERSUS_MODE_NAMES[mode]
+
+
+## The VersusMode of a name (arena meta `modes`), -1 for an unknown name.
+static func versus_mode_from_name(mode_name: StringName) -> int:
+	return VERSUS_MODE_NAMES.find(mode_name)
+
+
+## The player slot credited with a hit or a kill by `source` (TECH_AUDIT.md 4.8): a hero -> his `slot`
+## (PlayerBase.slot), a hero projectile -> its `owner_slot` (ProjectileBase.owner_slot), anything else (an enemy, an
+## object, null, a freed node, a non-object) -> -1. In single-player every hero source is P1 (0), as in 1.0.
+## Untyped on purpose: a stored last hitter may have been freed since. For attribution (stats, versus credit, co-op
+## hit rules); it changes nothing in the simulation.
+## Duck-typed (no entity class is named here): Defs is compiled by the tool scripts that run before the autoloads
+## exist (tools/world_render_level.gd, tools/validate_levels.gd ...), and the entity classes need the autoloads.
+static func hitter_slot(source: Variant) -> int:
+	if not is_instance_valid(source):
+		return -1
+	var object: Object = source as Object
+	if object == null or not object.has_method(&"get_kind"):
+		return -1
+	match int(object.call(&"get_kind")):
+		Kind.PLAYER:
+			return _slot_field(object, &"slot")
+		Kind.HERO_PROJECTILE:
+			return _slot_field(object, &"owner_slot")
+	return -1
+
+
+static func _slot_field(entity: Object, field: StringName) -> int:
+	var value: Variant = entity.get(field)
+	return int(value) if value is int else 0

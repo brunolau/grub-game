@@ -24,6 +24,9 @@ const SMOKE_Z: int = Defs.Z_FRONT_TILES + 5
 ## Lava ambience loop: plays while lava lies within this many tiles of the view (checked a few times a second).
 const LAVA_REACH_TILES: int = 3
 const LAVA_CHECK_SECONDS: float = 0.25
+## `objects/hero_start slot=<2..4>`: where P2..P4 start (DESIGN.md D.5). A marker the loader reads, never spawned
+## (it takes no spawn serial; a single-player game ignores it).
+const HERO_START_ID: StringName = &"objects/hero_start"
 
 
 ## The smoke band along the top edge of the view on an auto-scrolling level.
@@ -155,8 +158,11 @@ func _exit_tree() -> void:
 
 
 ## The death jingle (GAMEPLAY.md 10.1 slot 7) plays over the death toss before the respawn curtain; the level music
-## starts again after it. On the last life the game-over screen brings its own music instead.
+## starts again after it. On the last life the game-over screen brings its own music instead. A party: only for the
+## death that takes the last hero (a team wipe); one hero's death leaves the music alone.
 func _on_player_died(_cause: StringName) -> void:
+	if hero_count() > 1 and not all_heroes_dead_or_down():
+		return
 	if Game.lives > 0 and _music != &"":
 		Audio.play_jingle(Sfx.MUSIC_DEATH, _music)
 
@@ -211,6 +217,7 @@ func unlock_camera() -> void:
 	_camera_logic.unlock()
 
 
+## Snaps on P1 (a party too, until the tribe camera's snap exists: PLAN P1, world).
 func snap_camera() -> void:
 	_camera_logic.scroll_flags = scroll_flags
 	_camera_logic.snap(player)
@@ -483,6 +490,25 @@ func _place_start() -> void:
 		_report_line(int(_data.section_lines.get(LevelData.SECTION_TILES, 0)), "the level has no hero start '@'")
 		return
 	start_pos = LevelText.cell_to_feet(float(starts[0].x), float(starts[0].y))
+	_place_party_starts()
+
+
+## The start of every player slot (LevelBase.start_positions): P1 at '@', P2..P4 at their `objects/hero_start
+## slot=<2..4>` marker (the slot parameter counts players from 1, as the level files write it), else spread from '@'
+## (LevelBase.get_start_pos_for). Only read here: a single-player game never uses the markers.
+func _place_party_starts() -> void:
+	start_positions.clear()
+	start_positions.append(start_pos)
+	var markers: Dictionary = {}
+	for record: Dictionary in _data.entity_records():
+		if record["id"] != HERO_START_ID:
+			continue
+		var params: Dictionary = record["params"]
+		var player_number: int = int(params.get("slot", 0))
+		if player_number >= 2 and player_number <= Defs.MAX_PLAYERS and LevelText.applies_to(params, Game.difficulty):
+			markers[player_number - 1] = LevelText.cell_to_feet(float(record["col"]), float(record["row"]), params)
+	for slot: int in range(1, Defs.MAX_PLAYERS):
+		start_positions.append(markers[slot] if markers.has(slot) else _spread_point(start_pos, slot))
 
 
 func _spawn_entities() -> void:
@@ -490,6 +516,8 @@ func _spawn_entities() -> void:
 	var ids: Array[StringName] = []
 	for record: Dictionary in records:
 		var id: StringName = record["id"]
+		if id == HERO_START_ID:
+			continue  # a start marker of the loader (_place_party_starts), not an entity
 		if not Spawner.is_prop(id) and not ids.has(id) and LevelText.applies_to(record["params"], Game.difficulty):
 			ids.append(id)
 	# Scenes of the previous level that this one does not use are released with their textures.
@@ -501,6 +529,8 @@ func _spawn_entities() -> void:
 	var items: int = 0
 	for record: Dictionary in records:
 		var id: StringName = record["id"]
+		if id == HERO_START_ID:
+			continue
 		var params: Dictionary = (record["params"] as Dictionary).duplicate()
 		if not LevelText.applies_to(params, Game.difficulty):
 			continue
@@ -528,6 +558,8 @@ func _spawn_entities() -> void:
 		if hero is PlayerBase:
 			var hero_base: PlayerBase = hero
 			hero_base.respawn_at(start_pos)
+	# P2..P4 of a party, after P1 (TECH_AUDIT.md 4.4); nothing in single-player.
+	spawn_party_heroes()
 
 
 ## Music that starts in the middle of a tick (feast mode, a boss fight) is loaded with the level, not on its tick.
@@ -626,12 +658,26 @@ func _world_step() -> void:
 		_dark_ticks -= 1
 
 
-## Phase CAMERA: PHYSICS.md 12.
+## Phase CAMERA: PHYSICS.md 12. The camera follows P1 (a party's tribe camera, PHYSICS.md C.13, is world's PLAN P1
+## work: until then every party is framed by P1).
 func _camera_step() -> void:
-	if _camera_logic.autoscroll_held and GameInput.flags != 0:
+	if _camera_logic.autoscroll_held and _any_hero_input():
 		_camera_logic.autoscroll_held = false
 	_camera_logic.scroll_flags = scroll_flags
 	_camera_logic.tick(player)
+
+
+## True when a hero's input of this tick is held (the auto-scroll waits for the first one). Swap is no movement input
+## (DESIGN.md C.1): a Book I solo hero ignores it, so it does not end the wait either. A party: any hero's slot.
+func _any_hero_input() -> bool:
+	if (GameInput.flags & ~Defs.IN_SWAP) != 0:
+		return true
+	if hero_count() <= 1:
+		return false
+	for hero: PlayerBase in contact_order():
+		if (GameInput.get_flags(hero.slot) & ~Defs.IN_SWAP) != 0:
+			return true
+	return false
 
 
 ## An auto-scrolling level does not sink before the player's first input (at the start and after a respawn), so

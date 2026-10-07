@@ -27,10 +27,15 @@ func _sim_phases() -> PackedInt32Array:
 func _sim_tick(phase: int) -> void:
 	if phase != Defs.Phase.CONTACT_ITEMS or active:
 		return
+	# Any living hero activates it, the first in contact order (2.0, TECH_AUDIT.md 3.12: the checkpoint is the team's;
+	# 1.0: the one hero). It stores his feet point.
 	var level: LevelBase = Game.level
-	if level != null and level.player != null and not level.player.dead \
-			and Overlap.body(self, level.player, level.player):
-		activate(level.player)
+	if level == null:
+		return
+	for hero: PlayerBase in level.contact_order():
+		if not hero.dead and Overlap.body(self, hero, hero):
+			activate(hero)
+			return
 
 
 ## Make this the active restart point: stores the HERO's feet point (not the checkpoint's), deactivates every

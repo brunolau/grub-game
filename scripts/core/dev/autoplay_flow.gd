@@ -39,8 +39,9 @@ extends Node
 ##   quit                             end the run here
 ##
 ## Expressions are `<path> <op> <value>` (op: == != < <= > >=) or a single path that must be true. A path starts
-## with a root - game, flow, sim, save, input, audio, level, hero, boss, enemy (the living enemy nearest to the hero),
-## hud, scene, tree, events - followed by `.property` segments: `hero.sim_pos:x` reads a sub-property,
+## with a root - game, flow, sim, save, input, audio, level, hero (P1), hero2 .. hero4 (the heroes of player slots
+## 1..3 of a party, null without one), boss, enemy (the living enemy nearest to the hero), hud, scene, tree,
+## events - followed by `.property` segments: `hero.sim_pos:x` reads a sub-property,
 ## `game.completion_percent()` calls a method, `save.is_level_unlocked(test_integration_boss,0)` passes arguments
 ## (int, bool or text), a segment after a Dictionary reads its key. `events.<signal>` is how often that Events
 ## signal was emitted since the run started (`events.player_died`), `events.screen_<name>` how often a screen was
@@ -63,7 +64,7 @@ const RESIZE_FRAMES: int = 6
 const STALL_FRAMES: int = 600
 const ROOTS: PackedStringArray = [
 	"game", "flow", "sim", "save", "input", "audio", "level", "hero", "boss", "enemy", "hud", "scene", "tree",
-	"settings", "events",
+	"settings", "events", "hero2", "hero3", "hero4",
 ]
 const OPERATORS: PackedStringArray = ["==", "!=", "<=", ">=", "<", ">"]
 const EXIT_OK: int = 0
@@ -542,6 +543,8 @@ func _root(root_name: String) -> Variant:
 			return level
 		"hero":
 			return level.player if level != null else null
+		"hero2", "hero3", "hero4":
+			return level.get_hero(int(root_name.substr(4)) - 1) if level != null else null
 		"boss":
 			if level == null or level.get_kind(Defs.Kind.BOSS).is_empty():
 				return null

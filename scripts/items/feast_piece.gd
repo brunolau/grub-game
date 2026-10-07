@@ -10,6 +10,8 @@ func _init() -> void:
 	expires = false
 
 
+## The kit is the team's (Game); the collector feasts. (A full kit feeding every living hero of a party is the co-op
+## rule of DESIGN.md D / PLAN.md phase 1, not built here.)
 func _apply(hero: PlayerBase) -> bool:
 	if Game.collect_feast_piece(index):
 		hero.start_feast()

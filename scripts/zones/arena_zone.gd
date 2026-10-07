@@ -6,6 +6,7 @@ extends ZoneBase
 ## releases it too, and the fight starts again when the hero comes back. Owner: world.
 ##
 ## Parameters: `rect`, `name`, `music` (a Sfx music context; when given it replaces the boss's own fight music).
+## A party: the first hero in starts the fight (pulling the others into the locked room is world's PLAN P1 rule).
 
 ## Music context of the fight when the level file names one (&"" = the boss's own choice).
 var music: StringName = &""
@@ -16,7 +17,7 @@ func _apply_params(params: Dictionary) -> void:
 	music = StringName(str(params.get("music", "")))
 
 
-func _on_hero_entered(level: LevelBase, _hero: PlayerBase) -> void:
+func _on_first_entered(level: LevelBase, _hero: PlayerBase) -> void:
 	var bosses: Array[SimEntity] = level.get_kind(Defs.Kind.BOSS)
 	var started: bool = false
 	for i: int in bosses.size():

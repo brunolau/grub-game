@@ -141,6 +141,32 @@ func test_entity_rules() -> void:
 	assert_false(validator.has_problem("'objects/hidden_spot' at column 8"), "hidden spots belong in the ground")
 
 
+## `objects/hero_start slot=2..4` (2.0, TECH_AUDIT.md 3.3): a loader marker in the catalogue without a scene; the
+## slot is required and in range, one marker per slot and difficulty, standing on a floor.
+func test_hero_start_markers() -> void:
+	var good: LevelValidator = _validator({"party": _level("party", "", "", PLAIN_ROWS, "\n".join(PackedStringArray([
+		"objects/hero_start 3 10 slot=2",
+		"objects/hero_start 5 10 slot=3 expert",
+		"objects/hero_start 6 10 slot=3 beginner",
+	])))})
+	assert_eq(good.error_count(), 0, _messages(good))
+	assert_false(good.has_problem("hero_start", LevelValidator.WARNING), _messages(good))
+	var bad: LevelValidator = _validator({"bad": _level("bad", "", "", PLAIN_ROWS, "\n".join(PackedStringArray([
+		"objects/hero_start 3 10 slot=2",
+		"objects/hero_start 4 10 slot=2",
+		"objects/hero_start 5 10",
+		"objects/hero_start 6 10 slot=5",
+		"objects/hero_start 7 5 slot=4",
+	])))})
+	assert_true(bad.has_problem("objects/hero_start slot=2 is placed more than once"), _messages(bad))
+	assert_true(bad.has_problem("objects/hero_start needs slot=2..4"))
+	assert_true(bad.has_problem("objects/hero_start slot = 5 must be an integer 2..4"))
+	assert_true(bad.has_problem("'objects/hero_start' at column 7, row 5 does not stand on a floor",
+			LevelValidator.WARNING))
+	assert_false(bad.has_problem("no scene for 'objects/hero_start'", LevelValidator.WARNING))
+	assert_false(bad.has_problem("'objects/hero_start' is not in the entity catalogue", LevelValidator.WARNING))
+
+
 func test_exit_path_rules() -> void:
 	var none: LevelValidator = _validator({"no_exit": _level("no_exit", "", "", PLAIN_ROWS.replace("E", "."))
 			.replace("kind = test", "kind = main")})

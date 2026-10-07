@@ -6,7 +6,8 @@ build fair jumps. Owner: world module.
 
 Contents: 1 Workflow - 2 A level by example - 3 `[meta]` - 4 `[tiles]`: the legend - 5 Auto-tiling - 6 Placing
 entities - 7 Entity catalogue - 8 Props - 9 Zones - 10 Secrets, checkpoints, exits, bosses - 11 `[backwall]` and
-`[overrides]` - 12 Hero metrics in tiles - 13 What the player sees (camera) - 14 Checklist.
+`[overrides]` - 12 Hero metrics in tiles - 13 What the player sees (camera) - 14 Checklist - 15 Co-op and Book II
+(version 2.0).
 
 ---
 
@@ -548,3 +549,279 @@ height with high strikes. Thrown weapons (axe, boomerang) fly 13 px/tick and als
 - [ ] An autoplay run or a camera tour was looked at, on the base view and on `--size=2400x1080`.
 - [ ] Its route files are in `tools/autoplay/routes/` and described in `ROUTES` of `tests/test_campaign_routes.gd`
       (level, modes, how it ends, what it must achieve); a new map stop also goes into `CAMPAIGN` and `MAP` there.
+      (Book II, co-op and arena routes use the route header of 15.9 instead.)
+
+---
+
+## 15. Co-op and Book II
+
+Building the 2.0 content: the 20 Book II files, the 35 co-op files and the 10 versus arenas. The design is
+`docs/expansion/DESIGN.md`; the rules are `docs/spec/GAMEPLAY.md` 13 and `docs/spec/PHYSICS.md` Appendix C
+("P-C.n"); the plan and the per-level recipe are `docs/expansion/PLAN.md` 6. Sections 1-14 still hold. **The 15 Book I
+files and their 72 route files are frozen: never edit them** (a guard test checks their hashes).
+
+### 15.1 Files and ids
+
+- Book II: `w5_l1`, `w5_l2`, `w5_l2b`, `w6_l1`, `w6_l2`, `w6_l2b`, `w7_l1`, `w7_l2`, `w7_l2b`, `w8_l1`, `w8_l2`,
+  `w8_l2b`, `w9_l1`, `w9_l1b`, `w9_l2`, `w9_l2b`, `w9_l3`, `bonus_d`, `bonus_e`, `ending_b` (kinds, orders, links,
+  letters, specials and painting indices: GAMEPLAY 13.2).
+- Co-op: `levels/<id>_coop.lvl` for every one of the 35 stages (`w1_l1_coop` ... `ending_b_coop`).
+- Arenas: `levels/arena_<name>.lvl` (`arena_totem_ring`, `arena_echo_hollow`, `arena_floe_rink`, `arena_cinder_pit`,
+  `arena_tar_pulleys`, `arena_coconut_cove`, `arena_sky_picnic`, `arena_colossus_hall`, `arena_mesa_rodeo`,
+  `arena_cloud_top`).
+- New files are `format = 2` (format-1 files load unchanged). Sign texts go into your own locale file
+  (`locale/levels/en/<world>.po`, keys `SIGN_W5_*`), not into `locale/en.po`.
+
+### 15.2 New `[meta]` keys
+
+| Key | Values | Default | What it does |
+|---|---|---|---|
+| `book` | `1` `2` | `1` | which book's campaign, map and codes the file belongs to |
+| `belt` | `fresh` `carry` | `fresh` when `book = 2` or `kind = coop`, else `carry` | `fresh`: the stage starts with the club in hand (P-C.2) |
+| `kind` | + `coop`, `arena` | | `coop`: the co-op version of `coop_of`; `arena`: a versus arena. Neither ever appears in a solo campaign |
+| `coop_of` | level id | required for `coop` | the solo file this co-op file belongs to (its campaign stop) |
+| `coop_base_hash` | sha256 (hex) of the solo file | required for `coop` | the validator warns when the solo file changed since the co-op file was made |
+| `players` | `2` .. `4` | required for `arena` | most players the arena is built for |
+| `round_time` | seconds | `90` | arena round length (Grub Stack plays 60 with two players) |
+| `modes` | list of `grub_stack` `last_caveman` `hot_rock` `clubball` ... | required for `arena` | modes the arena supports (each needs a green bot test) |
+| `wrap` | `none` `lr` `tb` | `none` | arena edges joined left-right or top-bottom |
+| `sudden` | `stampede` `cave_in` `whiteout` `lava_rise` `tar_rise` `high_tide` `syrup_flood` `stalactites` `rockslide` `lightning` | by biome | the arena's sudden death |
+| `liquid` | + `tar` `honey` `syrup` | | look of `~` and `:` (all deadly as water) |
+| `scroll` | + `rising` | | the rising tide (P-C.8) |
+| `rise_speed` | v16 per tick | `16` | 16 = 1 px/tick; `.expert` variant allowed |
+| `wind` | `tick:value,...` | | values may be negative (wind to the right) |
+| `wind_loop` | ticks | `0` | the wind script restarts every that many ticks (alternating gusts) |
+| `biome` | + `canyon` `swamp` `coast` `ruins` `sky` | | default terrain, backdrop and music of the new worlds |
+
+New terrain atlases: `canyon/terrain`, `canyon/terrain_mesa`, `swamp/terrain`, `swamp/terrain_mushroom`,
+`coast/terrain`, `coast/terrain_sand`, `ruins/terrain`, `ruins/terrain_jade`, `sky/terrain`, `sky/terrain_rock` (same
+40-tile layout as every set). Set `music` explicitly in every Book II file (the contexts of DESIGN.md F.2).
+
+### 15.3 The new tile
+
+| Char | Meaning | Floor | Wall | Ceiling | Drawn as |
+|---|---|---|---|---|---|
+| `:` | tar floor (set A ground, surface 6 px lower, slow: P-C.5) | yes | yes | yes | surface tiles of the set in the level's `liquid` skin (tar, honey, syrup, mud for Tusker) |
+
+Wading out of tar onto level ground works; a step of one row out of tar can be hopped (the hop reaches 33 px from
+the tar surface, 27 px above the ground around it), two rows cannot. A tar pit with walls 2+ rows high is a trap unless
+a vine, a geyser or a partner gets the hero out.
+
+### 15.4 New entities
+
+**Enemies** (all take `skin`, `hp` [25], `score`, `expert`, and in co-op files `coop=<trait>`, `bond=<name>`,
+`keeper=<name>`, `perch=c,r` for `grab`):
+
+| Id | What it does | Parameters |
+|---|---|---|
+| `enemies/roller` | walks; curls 14 ticks and rolls at a hero in range; dizzy after a wall | `range` tiles [6], `speed` v16 [64], `dizzy` [33], `left` / `right` [-3 / 3] |
+| `enemies/guard` | patrols with a shield that turns only every `turn` ticks; front hits glance | `turn` [33], `left` / `right` [-3 / 3] |
+| `enemies/mimic` | a chest that bites within 2 cells; dies from behind or after a head bounce | `contents` [`treasure`], `range` px [42] |
+| `enemies/shellback`, `raptor`, `snatcher`, `leech`, `bull_rex`, `tar_splitter`, `shaman` | the co-op-only presets (GAMEPLAY 13.9.6); **only in co-op files** | as their archetype; `snatcher kind=dangler\|stinger` |
+
+**Bosses**: `bosses/tusker`, `bosses/mangrove`, `bosses/squid`, `bosses/idols`, `bosses/roc` (each `arena=<zone>`,
+`hp`, `drops` [`fire_starter`]), `bosses/chieftain` (two records, `name=` and `mate=<the other's name>`, `drops`
+[`trophy`] on the second). Their arenas are fixed one-screen rooms (GAMEPLAY 13.6).
+
+**Objects**:
+
+| Id | Parameters |
+|---|---|
+| `objects/vine` | `length` cells [4], `rolled` [false]; the anchor cell's top is the vine's top |
+| `objects/bark_board` | `face=l\|r` [the side with air]; place it in the wall cell (`tile=#` in a legend entry) |
+| `objects/geyser` | `period` [88], `delay` [0], `power` v16 [-224], `skin=mud\|blowhole\|steam\|soda`, `deadly` |
+| `objects/raft` | `width=3\|4` [3], `skin=log\|wafer`, `rails` (riders cannot leave it: `ending_b`); place it on the top `~` row |
+| `objects/mount` | `kind=rex`, `pen=<name>`, `wild` |
+| `objects/rex_pen` | `name` |
+| `objects/plate` | `name`, `count=1\|2` [1], `mode=hold\|timed:<ticks>\|latch` [hold], `w` cells [2] |
+| `objects/column` | + `rise_while=<plate>[,...]`, `sink_while=<plate>[,...]`, `trigger=keepers:<name>`, `trigger=drums:<bond>`; `rise=0` with `expert` makes a static Expert-only block |
+| `objects/drum` | `bond=<name>` |
+| `objects/seesaw` | `len` cells [5] |
+| `objects/boulder_heavy` | - (2 x 2 cells, anchored at its bottom-left cell) |
+| `objects/pulley` | `a=<platform name>`, `b=<platform name>`, `range` rows [3] |
+| `objects/flower_pot` | - (on a ledge's edge cell) |
+| `objects/x2_tablet` | `gate=<name>`, `far=c,r` (the cell beyond the gate), `secret` (marks an x2 secret) |
+| `objects/hero_start` | `slot=2` (co-op files) |
+| `objects/gate` | + `needs=<bond>` (locked until a drum bond succeeds) |
+| `objects/spawn_point`, `objects/cookpot`, `objects/coconut`, `objects/crate_lane` | arenas only (15.8) |
+
+**Items**: `items/painting index=0..29` (the index of the level, GAMEPLAY 13.7), `items/weapon kind=spear`.
+
+**Zones**: `zones/current rect= dir=l|r|u|d speed=1..3`; `zones/lightning rect= period= [delay]`;
+`zones/food_rain rect= period= [skin]`; arenas: `zones/goal rect= team=1|2`.
+
+### 15.5 Book II metrics in tiles
+
+| Thing | Numbers | Design with |
+|---|---|---|
+| Spear throw height | forward throw at the feet (hits a board in the row just above the floor), high throw at head height (the row two above the floor); a jump adds up to 60 px | boards in rows 1-2 above a floor are hit standing; higher ones need a jump-throw |
+| Spear step | a one-way step on the **top edge of the board's cell**, 16 px wide, 220 ticks; at most 2 per hero | a board N rows above the floor gives a step N tiles up; 3 tiles is an easy jump; two steps 3 rows apart climb 6 tiles |
+| Vine | grabbed when the hands (32 px over the feet) reach it; climb 2 px/tick up, 3 down; leap off 36 px up and 47-83 px out | a vine whose bottom hangs up to 2 rows over a floor is grabbed standing, up to 5 rows with a jump |
+| Tar | wade 2 px/tick; hop 33 px | 15.3 |
+| Geyser | -224: 105 px, the same as a spring or an Up bounce | a geyser lifts to a ledge up to 6 tiles above its vent |
+| Raft | current 1-3 px/tick; paddle up to 3 px/tick of its own; banks stop it | keep a raft's path free of cells at its surface row except the banks you want |
+| Rising tide | 1 px/tick = one row per 16 ticks | a Beginner stopping 73 ticks (3 s) loses 4.5 rows: give every climb that much spare |
+| Chomper | 4 px/tick; hop 55 px, 84 px far at full speed | mounted gaps <= 4 tiles, steps <= 3 rows, 4 rows of air in mounted corridors, no sprite platforms on mounted stretches |
+| Gusts | negative `wind` pushes right; crouching braces | alternate with `wind_loop`; give a crouching spot before every gap |
+| Lightning | the column is marked 22 ticks before the bolt | never two bolts on the only safe cell in a row |
+
+### 15.6 Book II rules
+
+- **Fresh club, no special needed**: every Book II stage starts with the club in hand; nothing on a main path needs a
+  special and every boss falls to the club. Specials open shortcuts, secrets and paintings (a spear-step secret, an
+  axe-only spot) and make fights easier. The special of each world lies where GAMEPLAY 13.2 says.
+- **One route proves every weapon**: record one club route per (stage, difficulty) (15.9); the belt-invariance test
+  replays it with each special on the belt. A secret or painting that needs a special gets a featured route.
+- **Paintings**: one per level (the index of GAMEPLAY 13.2), never on the main path (behind `$`, up spear steps, at a
+  vine top, inside a big spot, behind an x2 gate in co-op). The co-op file has the same index, maybe elsewhere.
+- **Letters** G-R-U-B-S in 5-2, 6-1, 6-2, 7-1, 7-2; one full feast kit per world.
+- **Teaching**: a sign before every new mechanic, before it can kill (the belt sign "Your club never leaves you.
+  Press SWAP." stands before the first enemy of 5-1).
+- **Boss arenas** as section 10, one walled screen each; the geometry of every arena is in GAMEPLAY 13.6.
+
+### 15.7 Co-op files
+
+#### 15.7.1 Making one
+
+1. Prove the solo file first (validator `--strict`, routes green).
+2. Copy it to `<id>_coop.lvl`; set `kind = coop`, `coop_of = <id>`, `coop_base_hash = <sha256 of the solo file>`;
+   remove the passwords; keep `book`.
+3. Add `objects/hero_start slot=2` next to `@` (P2 starts 24 px behind P1 at every respawn anyway).
+4. Build the co-op gates (15.7.3) with their x2 tablets (15.7.4), the trait enemies (15.7.5), paired specials (where
+   the solo file places a weapon item, place two), the painting and the x2 secret, signs for the egg and the tablet at
+   the first checkpoint of 1-1 and 5-1.
+5. Validator `--coop` clean; `tests/test_coop_gates.gd` green (every gate refused by the solo search); record the
+   two-stream routes (15.9).
+
+#### 15.7.2 Duo metrics in tiles
+
+| Move | Numbers (P-C.10, P-C.11) | Design with |
+|---|---|---|
+| Shoulder Hop | feet reach 140 px over the floor (8.75 tiles); at or above 8 tiles for 10 ticks | boost ledges 7 tiles (Beginner) / 8 (Expert); 11 rows of air over the hop spot |
+| Totem Ride, rider's jump | from a still carrier 98 px (6 tiles); a jump 1-5 ticks after the carrier's: 139-152 px (8.5-9.5 tiles) | a 5-tile ledge is the easy Totem ledge; 7-8 tiles need the timed Totem launch or the hop |
+| Totem Ride, rider's strikes | high strike 61-77 px, forward strike 36-49 px over the floor | targets 4-5 rows up for a rider; 5 rows of air where a rider is expected |
+| Line drive | 153 px to the same height (rise 36 px); charged 325 px | Batter Up gaps 8 tiles (Beginner; the curl spot within 25 px of the edge) / 9 tiles (Expert: within 9 px, or charged); 4 rows of air over the gap; a landing area 2+ cells deep |
+| Lob | rise 120 px; at or above 7 tiles on ticks 12-19, 24-38 px out | lob ledges 7 rows up with their face 2-3 cells from the curl spot; 9 rows of air over the curl spot |
+| Grounder | 192 px (12 tiles) along the floor in 32 ticks | rolls under low gaps, breaks `$` in its path |
+| See-saw | launch 153 px (a 4-tile drop onto the high end) to 171 px (5+ tiles) | target ledges up to 9 rows over the low end |
+| Duo reach in general | chained moves (a hop off a jumping partner, see-saw plus hop) reach 12-13 tiles | contain co-op paths with walls and roofs of 13+ rows where skipping would break the stage |
+
+#### 15.7.3 Gates
+
+Every co-op `main` file has **at least 2 co-op gates on the main path** (`w9_l3`: its boss form); every `sub` file at
+least 1 gate or its boss's co-op form; bonus stages and endings only the team exit (the Way Home adds its lookout
+gate). Every gate and every x2 secret has an `objects/x2_tablet` (15.7.4). Each gate has an easy role and a hard role,
+a way back (a drop gift: a rolled vine reaching the lower floor, or a flower pot), takes under about 30 s once
+understood, and costs at most an egg. Put a checkpoint behind every gate (a team wipe resets plates, drums, columns
+and keepers).
+
+| Kind | Recipe |
+|---|---|
+| **Boost ledge** | a ledge 7 rows (Beginner) / 8 rows (Expert) over a floor at least 3 cells wide under its face; build it at 7 and put an `expert`-flagged `objects/column rise=0` of one row on top for Expert; 11 rows of air over the hop cells; a drop gift on top |
+| **Totem ledge** | a ledge 5 rows up (Totem jump or hop, both difficulties) |
+| **Batter Up gap** | 8 (Beginner) / 9 (Expert) cells of `~` between two floors at the same height; or a 7-row lob ledge (15.7.2) |
+| **Plate door** | `objects/plate` (`count=1 mode=hold`) at least **8 tiles** from its door (`objects/column rise_while=<plate>`); the holder must reach the far side another way: a second plate beyond the door for him (**leapfrog**: A holds for B, B holds for A), or a `timed:` plate |
+| **Twin drums** | two or more `objects/drum bond=<name>` with a column `trigger=drums:<name>` (or a gate `needs=<name>`); place them so one hero needs at least 28 ticks (Beginner) / 16 (Expert) to strike both - in practice 10+ tiles apart and 4+ rows apart, out of one axe's flight line; the search decides |
+| **See-saw** | `objects/seesaw` with its high end 1 row over the floor, a ledge 4+ rows above the high end within 3 cells to drop from, the target up to 9 rows over the low end; no enemy may fall onto it |
+| **Heave boulder** | `objects/boulder_heavy` with 3+ cells of floor behind the pushed side and 2+ rows of air; it fills a 2-cell gap, plugs a vent (`objects/geyser deadly`) or presses a plate |
+| **Pulley** | `objects/pulley` with two `objects/platform mode=ride` 4+ cells apart; the rider's target `range` rows above his platform's start |
+| **Keeper door** | `objects/column trigger=keepers:<name>` behind a hall **exactly 3 rows high**; its keepers (`keeper=<name>`) carry `shell`, `bond` or `daze` |
+| **Brace corridor** | a `heavy` (Bull Rex) in a 3-row-high hall between walls |
+| **Chomper two seats** | a mounted stretch where only the gunner can clear the way (Leeches, a Snatcher) |
+
+#### 15.7.4 x2 tablets
+
+`objects/x2_tablet gate=<name> far=c,r` stands on the near side of every co-op gate (a gate is any of the kinds of
+15.7.3); `secret` marks an x2 secret instead. `far` is a cell beyond the gate that the hero reaches only through it
+(the solo search's goal). The validator pairs them: one tablet per gate name, every co-op mechanism (plate-driven or
+drum or keeper column, boulder, pulley, see-saw, boost ledge, gap) inside some tablet's gate, names unique, `far` an
+air cell above a floor.
+
+#### 15.7.5 Traits and keeper halls
+
+- At least **one third of the enemy records** of every co-op file carry a trait, and **every enemy guarding a
+  main-path chokepoint** does. Traits only in `kind = coop` files.
+- Trait choice per archetype: GAMEPLAY 13.9.4 (the "Traits used in layouts" column). Bonds: `bond=<name>` on every
+  member, members placed out of one hero's reach within the window (as twin drums). `grab` needs a `perch=c,r` next
+  to a pit. `lone` is off on Beginner: do not make a gate out of it.
+- **Keeper and Guard halls are exactly 3 rows high** (3 rows of air, a ceiling above): a hero only hops about 16 px
+  there (section 4), so nobody can jump or bounce over a keeper to get past it. The search (15.7.6) still proves it,
+  because a hero can land on a short enemy's head even there.
+
+#### 15.7.6 Solo impossibility (validator `--coop` and `tests/test_coop_gates.gd`)
+
+Static rules first (the validator), within **10 cells horizontally and 11 rows below** a boost ledge's top, a lob
+ledge, a Totem ledge, and over a Batter Up gap: no enemy record that a hero can bounce on, no `objects/spring`,
+`geyser` (other than a `deadly` vent), `seesaw` (other than the gate's own), `vine`, `bark_board`, `items/glider`,
+`objects/platform` / `drop_platform` path, column of 2+ hittables stacked vertically (a club pogo ladder), mount pen.
+No bark board within 12 cells of any gate. Plates at least 8 tiles from their doors. Keeper and Guard halls 3 rows
+high. Then **the search**: for every x2 gate a bounded single-hero search on the route tools' simulator, starting at
+the tablet and at the last checkpoint before it, with the club and every special from the belt and Chomper where a pen
+is in the stage, must **fail** to reach the tablet's `far` cell within 1 457 ticks *(tune)*. It also measures
+`solo_min` for every twin window and daze record: the window used is `min(24 B / 12 E, solo_min - 4)`.
+
+#### 15.7.7 Two heroes on one camera
+
+- Keep each gate inside one view: both heroes must see each other's role (20 x 11 cells).
+- The view edges are walls and the vertical follow uses the grounded hero; a hero left off the view becomes an egg
+  after 121 / 73 ticks. Do not build a gate where the upper hero has to wait off the view.
+- Checkpoints: keep 2 free cells on each side (P2 respawns 24 px beside P1).
+- Locked rooms (arenas, gates with `lock=`, camera locks) pull the partner in.
+
+### 15.8 Arenas
+
+- **Size**: 20 x 12 cells (floor row 10, fill row 11), camera locked; row 0 holds nothing to stand on (HUD corners
+  and the round sundial). Wider or taller screens show a decorated frame, never gameplay.
+- **Shape**: tiers 3 rows apart; rises of 5+ rows only by spring, geyser, see-saw or a head; clear gaps of at most 5
+  cells; mirrored layouts (spawns rotate every round); 4-8 visible hidden spots; one signature hazard telegraphed 10+
+  ticks ahead; geometry a bot graph can describe (no 1-row squeezes, no pixel-perfect jumps on main routes).
+- **Entities**: `@` is spawn 1, `objects/spawn_point index=2..4` the others (as many as `players`); one
+  `objects/cookpot` (two on 4-player arenas, on contested ground); `objects/crate_lane rect= ` for pterodactyl crates;
+  Clubball: `objects/coconut` (its drop point) and two `zones/goal team=1|2`, goal mouths 3 rows high. No exit, no
+  checkpoint, no co-op objects except see-saws and pulleys, no traits.
+- **Wrap**: `wrap = lr` joins the left and right edges (the floor must continue across the seam); `wrap = tb` joins top
+  and bottom (no pits: the bottom row is the seam). Sky Picnic has no deadly cell at all.
+- **Bots**: bake `resources/bots/arena_<name>.json` with `tools/bots/bake_nav.gd`; an arena ships in a mode only when
+  its bot test is green (else human-only).
+- **Validator** (`kind = arena`): the size, row 0, spawn count, cookpots, goals for `clubball`, no exit or
+  checkpoint, `modes` and `sudden` known, tier and gap rules (warnings).
+- Layouts and sketches: DESIGN.md E.5 (Totem Ring, Tar Pulleys, Coconut Cove, Cinder Pit drawn there).
+
+### 15.9 Route files and headers
+
+New routes describe themselves in a header instead of a `ROUTES` entry. The header is the first line of the file:
+
+```
+# route: level=w5_l1 difficulty=beginner players=1 ends=exit after=tally expect=hurts:0,min_checkpoints:2,painting:0
+```
+
+| Key | Values |
+|---|---|
+| `level` | the level the route starts in (a co-op route names the `_coop` file) |
+| `difficulty` | `beginner`, `expert` or `both` |
+| `players` | `1` (default) or `2` |
+| `ends` | `exit`, `warp`, `trophy` or `none` (a featured side route that stops anywhere) |
+| `after` | `tally`, `level:<id>`, `expert_wall`, `the_end` |
+| `belt` | the special on the belt at the start (`none` default; featured routes only) |
+| `then`, `source`, `prefix` | as the 1.0 ROUTES keys (`prefix=<file>@<marker>`) |
+| `expect` | comma-separated `key:value` checks of the route test; lists with `+` (`letters:1+3`), ranges with `..` (`ticks:1092..2185`). The 1.0 keys (`hurts`, `min_checkpoints`, `min_spots`, `min_secrets`, `letters`, `words`, `lives_gained`, `no_enemies`, `ticks`, `min_score`, `gates`, `glider`, `boss_hits`, `unlocked`, `pair_ticks`, `min_wind`, `secrets`) plus `painting:<index>`, `wipes:<max>`, `eggs:<max>`, `hatches:<min>`, `x2_gates:<min>` |
+
+- **Names**: `<id>.inputs` (Beginner; the only route of an Expert-only stage), `<id>.expert.inputs`; featured routes
+  `<id>.<tag>.inputs`; co-op `<id>_coop.inputs` / `<id>_coop.expert.inputs`. Book II and co-op routes never carry a
+  weapon suffix: they are club routes, and the belt-invariance runner replays each with the hammer, the axe, the
+  swirling axe and the spear on the belt and demands identical digests.
+- **Body**: run-length entries `ticks:KEYS` with the keys `L R U D F K` and **`S` (swap)**; `S` held for one tick is
+  one swap. Two players: one key set per slot separated by `|` (`8:R|R,10:RU|,4:DF|DF`); an empty part is idle. A
+  file without `|` and without `players=2` is a single-player route and is parsed exactly as in 1.0.
+- **Recording**: `--record=<file>` (debug builds) writes every slot's sampled flags and a header skeleton: two people
+  play the stage with pads in the windowed game and the file is a tick-exact proof.
+- Counts at G3: 31 solo club routes (11 Beginner + 20 Expert cells), about 6 featured routes, 57 co-op routes.
+
+### 15.10 Checklist additions
+
+- [ ] Book II: validator `--strict` clean; a club route per difficulty with a header; belt invariance green; the
+      painting at its index and off the main path; signs before every new mechanic.
+- [ ] Co-op: `coop_of` / `coop_base_hash` set; P2 start; 2+ gates on the main path (1 for a sub-stage), each with a
+      tablet and a drop gift; a third of the enemies with traits, every chokepoint guard with one; keeper halls 3 rows
+      high; validator `--coop` clean; `test_coop_gates` refuses every gate solo; co-op routes for both difficulties.
+- [ ] Arena: 20 x 12, row 0 empty, spawns for `players`, cookpots, bot graph baked and its bot test green per mode.

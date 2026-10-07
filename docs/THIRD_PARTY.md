@@ -43,9 +43,11 @@ Godot imports the TTFs as font resources; the font data is embedded unchanged, s
 
 | Pack | Author | Source | Used for | Changes |
 |---|---|---|---|---|
-| Superpowers Asset Packs - Prehistoric Platformer | Pixel-boy (Sparklin Labs) | https://github.com/sparklinlabs/superpowers-asset-packs/tree/master/prehistoric-platformer (commit e8674a03) | hero, enemies, bosses, NPCs, terrain, props, backgrounds, items, effects, HUD, bitmap fonts, logo, splash, app icons | re-cut, re-packed, mirrored, recoloured, composited, integer scaling |
+| Superpowers Asset Packs - Prehistoric Platformer | Pixel-boy (Sparklin Labs) | https://github.com/sparklinlabs/superpowers-asset-packs/tree/master/prehistoric-platformer (commit e8674a03) | hero, enemies, bosses, NPCs, terrain, props, backgrounds, items, effects, HUD, bitmap fonts, logo, splash, app icons; 2.0: `sprites/player/hero_spear.png`, `hero_egg.png`, `palettes/*`, the co-op objects in `sprites/objects/`, `items/weapon_spear.png`, `fx/projectile_spear.png`, the new `ui/*.png`, `tiles/canyon/**` | re-cut, re-packed, mirrored, recoloured, composited, integer scaling |
+| Superpowers Asset Packs - RPG Battle System | Pixel-boy (Sparklin Labs) | https://github.com/sparklinlabs/superpowers-asset-packs/tree/master/rpg-battle-system (commit e8674a03) | 2.0: `sprites/enemies/{roller,guard,shellback,snake,cave_bat}*.png`, `sprites/bosses/tusker*.png`, `backgrounds/canyon/layer1_far_spires.png` | re-packed, recoloured, rotated / flipped frames, pixel edits |
+| Superpowers Asset Packs - Western FPS 2D | Pixel-boy (Sparklin Labs) | https://github.com/sparklinlabs/superpowers-asset-packs/tree/master/western-fps-2d (commit e8674a03) | 2.0: `backgrounds/canyon/layer0_sky.png`, `layer2_mesas.png`, `layer3_ridge.png`, most of `tiles/canyon/props/` | 2x, recoloured, composited |
 | Explosion Animations Pack | ansimuz (Luis Zuno) | https://ansimuz.itch.io/explosion-animations-pack | `sprites/fx/explosion.png`, `explosion_big.png` | none |
-| SunnyLand | ansimuz (Luis Zuno) | https://ansimuz.itch.io/sunny-land-pixel-game-art | `sprites/fx/hit_stars.png` | none |
+| SunnyLand | ansimuz (Luis Zuno) | https://ansimuz.itch.io/sunny-land-pixel-game-art; 2.0: the OpenGameArt release https://opengameart.org/content/sunny-land-2d-pixel-art-pack | `sprites/fx/hit_stars.png`; 2.0: `sprites/enemies/eagle.png` | none; eagle recoloured, outline added, 2x, mirrored |
 | Free Pixel foods | ghostpixxells | https://ghostpixxells.itch.io/pixelfood | `sprites/items/giant_bonus.png` | 2x, outline added |
 | 16x16 Food | ARoachIFoundOnMyPillow | https://opengameart.org/content/16x16-food | `sprites/items/food.png` 0-39, two pick-ups | 2x, re-packed |
 | 16x16 RPG Items (DB32) | ARoachIFoundOnMyPillow | https://opengameart.org/content/16x16-rpg-items-db32 | `sprites/items/treasure.png`, three pick-ups | 2x, re-packed |
@@ -138,6 +140,26 @@ the asset staging area `.tools/asset_candidates` are ignored too and never pushe
   `docs/spec/GAMEPLAY.md` 1.6 (repository only, not shipped). The in-game Beginner-wall line "To enter you must be an
   expert eater!" (`locale/en.po`) echoes the original's "YOU MUST BE AN EXPERT EATER" picture; a short phrase, low risk.
 
+### 4.1 Expansion 2.0 additions (2026-10-07, phase 0, art-A)
+
+- **Inventory and provenance.** Every 2.0 file under `assets/` has a row in
+  `docs/art/expansion/pipeline/registry_expansion.json` (source, edits, the packs it derives from, resolved through the
+  1.0 registry for recoloured shipped files) and in `docs/ASSET_MANIFEST.md` section 17. art-A's files are rebuilt by
+  `docs/art/expansion/pipeline/build_expansion.py` from shipped 1.0 art and the staged Superpowers Prehistoric
+  Platformer items only; a few simple shapes (the revive egg's oval, the pulley wheel and rope, two petroglyph figures)
+  are drawn by that script in the anchor palette (our own work). art-B's world files arrive with their rows through
+  the hand-over folder and are checked there (file present, size, 2048 px limit, credited pack).
+- **New sources (all CC0 1.0, tier A, same evidence rules as 1.0).** Superpowers Asset Packs RPG Battle System and
+  Western FPS 2D (Pixel-boy, the anchor pack's artist, same repository and commit as the anchor pack; repo README and
+  CC0 legal code saved at download, 2026-10-06), and the OpenGameArt release of ansimuz's Sunny Land (OpenGameArt
+  licence field "CC0" and the author's own `public-license.txt`: "Public domain and free to use on whatever you want,
+  personal or commercial"; the bundled music, which has its own licence, is not used). Licence texts:
+  `assets/licenses/superpowers_rpg_battle_system.txt`, `superpowers_western_fps_2d.txt`,
+  `ansimuz_sunny_land_series.txt`.
+- **Staged, not used so far**: the Emcee Flesher desert layers, Ninja Adventure, the CC0 award icons; the scout's
+  baked hero recolours in `hero_colours/` (replaced by palette LUTs).
+- No CC-BY, share-alike, non-commercial, AI-generated or ripped material; nothing from Prehistorik / Titus.
+
 ## 5. Maintenance rules
 
 - **Pipeline.** `CREDITS.md`, `assets/licenses/README.md` and `godot_engine.txt` / `godot_third_party.txt` are
@@ -153,6 +175,11 @@ the asset staging area `.tools/asset_candidates` are ignored too and never pushe
   and every file of `assets/licenses/` into `licenses/` next to `ClubAndGrub.exe` and packs
   `build/ClubAndGrub-<version>-windows.zip` (Godot's "Complying with licenses" accepts an accompanying file; the
   in-game licence view covers platforms without one).
+- **2.0 pipeline.** `docs/art/expansion/pipeline/build_expansion.py` rebuilds art-A's 2.0 files, merges art-B's
+  hand-over rows, writes the per-pack files of the 2.0 packs and the marked section 17 of `docs/ASSET_MANIFEST.md`
+  (`build_manifest.py` keeps that section when it rewrites the file), and exits with status 1 when a pack a 2.0 file
+  derives from is missing from `CREDITS.md`, `assets/licenses/README.md` or this file. `build_all.py --clean` deletes
+  the 2.0 files too: rebuild them with `build_expansion.py` (art-A) and art-B's world pipeline.
 - **New assets.** Only CC0 or OFL-style licences with saved evidence (`LICENSE_INFO.md` + saved page); add the row to
   `CREDITS.md` (author, source, licence, changes), the licence file to `assets/licenses/`, and the registry entry.
   A CC-BY asset additionally needs its attribution line in the credits roll and the licence link.

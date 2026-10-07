@@ -45,7 +45,7 @@ func _move_tick() -> void:
 		consume()
 		return
 	var level: LevelBase = Game.level
-	if level != null and _age > 1 and not on_screen and box_top() > level.get_view_rect().end.y:
+	if level != null and _age > 1 and not on_screen and box_top() > level.get_views_bounds().end.y:
 		consume()
 
 

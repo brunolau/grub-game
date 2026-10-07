@@ -105,15 +105,28 @@ func resume() -> void:
 		_hide_menu()
 
 
-## Give up the current life: the hero dies and restarts at the last checkpoint (the documented give-up call).
+## Give up the current life: the hero dies and restarts at the last checkpoint (the documented give-up call). A party
+## (2.0): the hero of the player who paused (Flow.pause_slot); what a co-op give-up means for the team is a rule of
+## PLAN.md phase 1.
 func restart_from_checkpoint() -> void:
-	var level: LevelBase = Game.level
-	if level == null or level.player == null or level.player.dead:
+	var hero: PlayerBase = _pausing_hero()
+	if hero == null or hero.dead:
 		Audio.play_sfx(Sfx.CODE_REJECT)
 		return
-	var hero: PlayerBase = level.player
 	resume()
 	hero.kill(&"give_up")
+
+
+## The hero of the player who opened the menu: P1 (1.0: the hero); a party: the hero of Flow.pause_slot, else P1.
+func _pausing_hero() -> PlayerBase:
+	var level: LevelBase = Game.level
+	if level == null:
+		return null
+	if level.hero_count() > 1:
+		var hero: PlayerBase = level.get_hero(Flow.pause_slot)
+		if hero != null:
+			return hero
+	return level.player
 
 
 ## Start the level again from its beginning.
@@ -233,7 +246,7 @@ func _show_menu() -> void:
 	_header_name.text = "%s  %s" % [number, level_name] if number != "" else level_name
 	_header_info.text = "%s %s   %s" % [tr("UI_TALLY_SCORE"), UiKit.score_text(Game.score),
 			tr("UI_TALLY_COMPLETED").format({"percent": Game.completion_percent()})]
-	var hero: PlayerBase = Game.level.player if Game.level != null else null
+	var hero: PlayerBase = _pausing_hero()
 	_checkpoint.disabled = hero == null or hero.dead
 	_checkpoint.focus_mode = Control.FOCUS_NONE if _checkpoint.disabled else Control.FOCUS_ALL
 	visible = true

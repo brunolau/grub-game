@@ -1,0 +1,37 @@
+Superpowers Asset Packs - RPG Battle System
+===========================================
+
+Author: Pixel-boy (Sparklin Labs)
+Source: https://github.com/sparklinlabs/superpowers-asset-packs/tree/master/rpg-battle-system
+Licence: CC0 1.0 (tier A)
+Used in Club & Grub for: 2.0 (The Far Shore): backgrounds/canyon/ layer1_far_spires; sprites/bosses/ tusker, tusker_rage; sprites/enemies/ cave_bat, cave_bat_b, guard, roller, roller_b, shellback, snake, snake_b. Per-file sources and edits: docs/ASSET_MANIFEST.md section 17
+Staging folder: .tools/asset_candidates/expansion/superpowers-rpg-battle-system
+
+---- Licence evidence recorded when the pack was downloaded ----
+
+# LICENSE_INFO - superpowers-rpg-battle-system
+
+- **Pack**: Superpowers Asset Packs - RPG Battle System (part 1 + part 2)
+- **Author**: Pixel-boy (Sparklin Labs) - the SAME artist as the anchor pack "Prehistoric Platformer"
+- **License**: CC0 1.0 Universal
+- **License tier**: A
+- **Source page**: https://github.com/sparklinlabs/superpowers-asset-packs/tree/master/rpg-battle-system
+- **Download**: raw files from https://raw.githubusercontent.com/sparklinlabs/superpowers-asset-packs/master/rpg-battle-system/...
+  (repo commit e8674a03ab4456802f71f848c4df79eccca23f7a, 2019-09-21; same commit as the anchor pack staged in 1.0).
+  Art only (PNG/GIF + README); the pack's `music/` and `sound/` folders were NOT downloaded (audio scout's domain).
+- **Mirror (same files, CC0)**: https://opengameart.org/content/superpowers-assets-characters ("rpg-battle-system-part-2_1-31-17.zip")
+- **Date checked / downloaded**: 2026-10-06 (scout_art, expansion)
+
+## Exact license wording (quoted)
+- repo README.md (saved as `_evidence/REPO_README.md`):
+  > The assets in this repository are created at Sparklin Labs by Pixel-boy. They are released under the Creative Commons Zero (CC0) license. [...] You can use the assets found in this repository in your own games, even commercial ones. Attribution is not required but appreciated.
+- repo LICENSE.txt (saved as `_evidence/REPO_LICENSE_CC0.txt`):
+  > CC0 1.0 Universal [full legal code]
+
+## Flags
+- Outline colour is near-black, not the anchor's #272018: one exact colour swap fixes it.
+- `giant`, `reptile` wear metal armour; recolour armour to bone / stone / bark before use.
+
+---- Licence ----
+
+CC0 1.0 Universal: the full legal code ships as cc0_1.0_legal_code.txt in this folder.

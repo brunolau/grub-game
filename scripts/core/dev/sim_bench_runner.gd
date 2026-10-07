@@ -22,6 +22,8 @@ var _out: String = DEFAULT_OUT
 var _digest: bool = false
 var _profile: bool = false
 var _tight: bool = false
+## --alone: chained entries marked `alone` are also played from a fresh run (as tests/test_campaign_routes.gd does).
+var _alone: bool = false
 var _repeat: int = 1
 var _pass: int = 0
 var _digest_file: FileAccess = null
@@ -37,6 +39,10 @@ const SLOW_TICKS_KEPT: int = 15
 var _tick_calls: Array[Array] = []
 var _slow_ticks: Array[Array] = []
 var _stages: Array[Dictionary] = []
+## Input slots (docs/expansion/PLAN.md P0.5): ticks checked and ticks where slot 0 was not exactly the route's flags,
+## `flags` differed from get_flags(0), or a free slot read input.
+var _input_ticks: int = 0
+var _input_mismatches: int = 0
 
 
 ## Run the bench with the user arguments of the command line; returns the exit code.
@@ -71,6 +77,7 @@ func run(arguments: PackedStringArray) -> int:
 	_dump = str(options.get("dump", ""))
 	_profile = options.has("profile")
 	_tight = options.has("tight")
+	_alone = options.has("alone")
 	_repeat = maxi(int(options.get("repeat", "1")), 1)
 	LevelBase.doze_enabled = not options.has("no-doze")
 	if options.has("sleep"):
@@ -87,7 +94,8 @@ func run(arguments: PackedStringArray) -> int:
 	var jobs: Array[Array] = []
 	for file: String in _routes:
 		var spec: Dictionary = _routes[file]
-		if bool(spec.get("chained", false)) or not _selected(file, selection):
+		var chained_only: bool = bool(spec.get("chained", false)) and not (_alone and bool(spec.get("alone", false)))
+		if chained_only or not _selected(file, selection):
 			continue
 		for mode: Variant in spec["modes"]:
 			jobs.append([file, str(mode)])
@@ -262,6 +270,7 @@ func _play_stage(file: String, mode: String) -> void:
 		var start: int = Time.get_ticks_usec()
 		Sim.step(1)
 		var cost: int = Time.get_ticks_usec() - start
+		_check_input(flags[played], level_id)
 		played += 1
 		if Sim.running and Game.level == level:
 			costs.append(cost)
@@ -303,6 +312,20 @@ func _play_stage(file: String, mode: String) -> void:
 	await _settle()
 	if Flow.current_screen == Flow.SCREEN_LEVEL and Game.level != null and Game.level != level:
 		_set_view()
+
+
+## The input slots after a tick of a single-player route: slot 0 read exactly the route's flags, `flags` is
+## get_flags(0), and slots 1..3 read nothing (PLAN.md P0.5). A mismatch is counted and reported.
+func _check_input(expected: int, level_id: StringName) -> void:
+	_input_ticks += 1
+	var ok: bool = GameInput.flags == expected and GameInput.get_flags(0) == GameInput.flags
+	for slot: int in range(1, Defs.MAX_PLAYERS):
+		ok = ok and GameInput.get_flags(slot) == 0
+	if not ok:
+		_input_mismatches += 1
+		if _input_mismatches <= 3:
+			push_error("SimBench: input slots differ in %s tick %d: route %d, flags %d, slots %s" % [level_id,
+					Sim.tick, expected, GameInput.flags, str(GameInput.slot_flags)])
 
 
 ## The input text of a route: its file, after the prefix of a side path (tests/test_campaign_routes.gd).
@@ -384,6 +407,8 @@ func _redirect_user_data() -> void:
 ## One line per tick: tick, RNG state, score, the hero's feet point and a hash over the run state, the camera and
 ## every entity of the level that is not a cosmetic effect (feet point, velocities, facing, box, on_screen; enemies
 ## also awake / dead / hit points / tangible / flash; items whether collected).
+## Frozen for a party of one (docs/expansion/TECH_AUDIT.md 4.12 #3): the heroes of slots 1.. and their runs are
+## appended to the hashed state only when the level holds more than one hero.
 func _digest_line(level: LevelBase) -> String:
 	var state: Array = [
 		Sim.tick, Sim.rng.get_state(), Game.score, Game.lives, Game.hearts, Game.bones, Game.letters, Game.weapon,
@@ -399,6 +424,8 @@ func _digest_line(level: LevelBase) -> String:
 			hero.hit_timer, hero.dead, hero.box_w, hero.box_h, hero.box_xo, hero.charge, hero.feast, hero.glide,
 			hero.on_platform, hero.ice, hero.swing_lock, hero.drop_timer, hero.club_box_active, hero.club_box,
 			hero.on_screen])
+	if level.hero_count() > 1:
+		_digest_party(level, state)
 	for kind: int in Defs.KIND_COUNT:
 		if kind == Defs.Kind.FX or kind == Defs.Kind.PLAYER:
 			continue
@@ -424,8 +451,35 @@ func _digest_line(level: LevelBase) -> String:
 			if entity.is_dozing():
 				dozing.append(String(entity.name))
 		print("SimBench dump %s tick %d: view %s hero %s bounds %s dozing %s" % [_dump, Sim.tick, level.get_view_rect(),
-				hero_pos, level._doze_bounds, ",".join(dozing)])
+				hero_pos, _doze_bounds(level), ",".join(dozing)])
 	return "%d %d %d %d,%d %x" % [Sim.tick, Sim.rng.get_state(), Game.score, hero_pos.x, hero_pos.y, hash(state)]
+
+
+## The party part of the digest (more than one hero): every hero of slot 1.. in slot order with the fields hashed
+## for P1, then his run (hearts, bones, hand, belt, glider).
+func _digest_party(level: LevelBase, state: Array) -> void:
+	for hero: PlayerBase in level.heroes:
+		if hero == null or hero == level.player:
+			continue
+		var run: PlayerRun = hero.run
+		state.append_array([hero.slot, hero.sim_pos, hero.xvel, hero.yvel, hero.state, hero.facing, hero.grounded,
+			hero.hit_timer, hero.dead, hero.box_w, hero.box_h, hero.box_xo, hero.charge, hero.feast, hero.glide,
+			hero.on_platform, hero.ice, hero.swing_lock, hero.drop_timer, hero.club_box_active, hero.club_box,
+			hero.on_screen, run.hearts, run.bones, run.weapon, run.belt, run.has_glider])
+
+
+## The grid-rounded rectangles of the level's last doze decision (ARCHITECTURE.md 11.1), for --dump, as
+## "view l,t..r,b hero l,t..r,b" plus "more l,t..r,b ..." for the further views and heroes of a party: an idle
+## entity whose doze area touches none of them may doze (LevelBase._doze_far).
+func _doze_bounds(level: LevelBase) -> String:
+	var text: String = "view %d,%d..%d,%d hero %d,%d..%d,%d" % [level._dz_view_left, level._dz_view_top,
+			level._dz_view_right, level._dz_view_bottom, level._dz_hero_left, level._dz_hero_top, level._dz_hero_right,
+			level._dz_hero_bottom]
+	for r: int in level._dz_more_count:
+		var j: int = r * 4
+		text += " more %d,%d..%d,%d" % [level._dz_more[j], level._dz_more[j + 1], level._dz_more[j + 2],
+				level._dz_more[j + 3]]
+	return text
 
 
 # =================================================================================================================
@@ -483,6 +537,8 @@ func _report() -> void:
 		all_sum += float(acc[1])
 		print("  %-8s %6d ticks  avg %4d us  p99 %5d us  max %5d us  entities %3d" % [level, acc[0],
 				int(float(acc[1]) / maxf(float(acc[0]), 1.0)), acc[2], acc[3], acc[4]])
+	print("SimBench: input slots: %d tick(s), slot 0 == route flags == flags == get_flags(0), slots 1..%d silent; %d mismatch(es)" % [
+			_input_ticks, Defs.MAX_PLAYERS - 1, _input_mismatches])
 	print("SimBench: all levels %d ticks, average %.1f us per tick" % [all_ticks, all_sum / maxf(float(all_ticks), 1.0)])
 	if _profile:
 		var rows: Array[Array] = []

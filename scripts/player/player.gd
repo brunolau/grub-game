@@ -81,20 +81,21 @@ var _charge_chimed: bool = false
 func _ready() -> void:
 	_sprite = get_node_or_null(^"Sprite") as Sprite2D
 	_glider_sprite = get_node_or_null(^"GliderSprite") as Sprite2D
-	_on_weapon_changed(Game.weapon)
+	_on_weapon_changed(run.weapon)
 	_refresh_visual()
 
 
 func _enter_tree() -> void:
-	if not Game.weapon_changed.is_connected(_on_weapon_changed):
-		Game.weapon_changed.connect(_on_weapon_changed)
+	# The sheet follows this hero's own hand (Game.run_weapon_changed of his slot; P1's is Game.weapon_changed too).
+	if not Game.run_weapon_changed.is_connected(_on_run_weapon_changed):
+		Game.run_weapon_changed.connect(_on_run_weapon_changed)
 	if not Events.exit_reached.is_connected(_on_exit_reached):
 		Events.exit_reached.connect(_on_exit_reached)
 
 
 func _exit_tree() -> void:
-	if Game.weapon_changed.is_connected(_on_weapon_changed):
-		Game.weapon_changed.disconnect(_on_weapon_changed)
+	if Game.run_weapon_changed.is_connected(_on_run_weapon_changed):
+		Game.run_weapon_changed.disconnect(_on_run_weapon_changed)
 	if Events.exit_reached.is_connected(_on_exit_reached):
 		Events.exit_reached.disconnect(_on_exit_reached)
 
@@ -123,7 +124,7 @@ func _sim_tick(phase: int) -> void:
 
 ## True while he carries the hang-glider (folded or open).
 func is_carrying_glider() -> bool:
-	return Game.has_glider
+	return run.has_glider
 
 
 ## Animation playing on this tick (a [enum HeroAnim.Anim]).
@@ -147,21 +148,21 @@ func hurt(source: SimEntity, kind: int = Defs.HurtKind.ENEMY) -> bool:
 	var bones: int = 0
 	match kind:
 		Defs.HurtKind.BOSS_BODY:
-			killed = Game.lose_bone()
+			killed = run.lose_bone()
 			var toward_right: bool = source == null or source.sim_pos.x <= sim_pos.x
 			xvel = Tuning.BOSS_KNOCK_XVEL if toward_right else -Tuning.BOSS_KNOCK_XVEL
 			ice = Tuning.ICE_MAX
 		Defs.HurtKind.TRAP:
-			bones = Game.scatter_energy()
+			bones = run.scatter_energy()
 		Defs.HurtKind.BOSS_PROJECTILE:
-			killed = Game.lose_heart()
+			killed = run.lose_heart()
 			if not killed:
 				bones = Tuning.BONES_PER_HEART
 		_:
-			if Game.has_glider:
+			if run.has_glider:
 				set_glider(false)
 			else:
-				killed = Game.lose_heart()
+				killed = run.lose_heart()
 			xvel = xvel * Tuning.HURT_XVEL_FACTOR
 	hit_timer = Tuning.HIT_TIMER
 	attack_gate = false
@@ -170,6 +171,7 @@ func hurt(source: SimEntity, kind: int = Defs.HurtKind.ENEMY) -> bool:
 	grounded = false
 	Audio.play_sfx(Sfx.PLAYER_HURT if kind == Defs.HurtKind.ENEMY else Sfx.PLAYER_HURT_HEAVY)
 	Events.player_hurt.emit(kind, source)
+	Events.hero_hurt.emit(self, kind, source)
 	_scatter_bones(bones)
 	if killed:
 		kill(&"enemy")
@@ -190,13 +192,14 @@ func kill(cause: StringName) -> void:
 	xvel = 0
 	yvel = 0
 	_close_glider()
-	# Death toss (PHYSICS.md 10.4): drifts toward the middle of the screen, 14 px/tick up, then falls away.
+	# Death toss (PHYSICS.md 10.4): drifts toward the middle of the screen (the view he is drawn in), 14 px/tick up,
+	# then falls away.
 	death_ticks = 0
 	_death_vy = Tuning.DEATH_VY_START
 	_death_dx = Tuning.DEATH_DX
 	var level: LevelBase = Game.level
 	if level != null:
-		var view: Rect2i = level.get_view_rect()
+		var view: Rect2i = level.get_view_rect_of(self)
 		if sim_pos.x >= view.position.x + view.size.x / 2:
 			_death_dx = -Tuning.DEATH_DX
 	Audio.play_sfx(Sfx.PLAYER_DEATH)
@@ -208,12 +211,13 @@ func kill(cause: StringName) -> void:
 					{"kind": "lava" if str(level.meta.get("liquid", "water")) == "lava" else "water"})
 		Audio.play_sfx(Sfx.SPLASH)
 	Events.player_died.emit(cause)
+	Events.hero_died.emit(self, cause)
 
 
 func start_feast(ticks: int = Tuning.FEAST_TICKS) -> void:
 	super.start_feast(ticks)
 	if ticks > 0:
-		Audio.push_music(Sfx.MUSIC_FEAST)
+		_start_feast_music()
 	else:
 		_stop_feast_music()
 
@@ -225,8 +229,9 @@ func set_glider(carrying: bool) -> void:
 	glider_runup = 0
 	if carrying:
 		attack_gate = false  # no strikes with the glider: a swing in progress ends here
-	Game.set_glider(carrying)
+	run.set_glider(carrying)
 	Events.glider_state_changed.emit(carrying, false)
+	Events.hero_glider_state_changed.emit(self, carrying, false)
 	_refresh_visual()
 
 
@@ -273,8 +278,10 @@ func _weapon_pass() -> void:
 	var enemies: Array[SimEntity] = level.get_kind(Defs.Kind.ENEMY)
 	var hittables: Array[SimEntity] = level.get_kind(Defs.Kind.HITTABLE)
 	for i: int in projectiles.size():
+		# Only his own throws (a party of one owns every hero projectile: the 1.0 pass).
 		var projectile: ProjectileBase = projectiles[i] as ProjectileBase
-		if projectile != null and not projectile.spent and _projectile_hits(projectile, enemies, hittables):
+		if projectile != null and not projectile.spent and projectile.owner_slot == slot \
+				and _projectile_hits(projectile, enemies, hittables):
 			projectile.consume()
 	if club_box_active and not dead and _club_hits(enemies, hittables):
 		# One target per box; a hit in the air is the pogo (PHYSICS.md 9).
@@ -316,7 +323,7 @@ func _projectile_hits(
 
 
 func _on_weapon_connected(enemy: EnemyBase, power: int) -> void:
-	var heavy: bool = Game.weapon == Defs.Weapon.HAMMER or power > Tuning.WEAPON_POWER[Game.weapon]
+	var heavy: bool = run.weapon == Defs.Weapon.HAMMER or power > Tuning.WEAPON_POWER[run.weapon]
 	Audio.play_sfx(Sfx.CLUB_HIT_HEAVY if heavy else Sfx.CLUB_HIT)
 	_spawn_fx(FX_HIT_STARS, Vector2i(enemy.sim_pos.x, enemy.sim_pos.y - enemy.box_h / 2))
 
@@ -335,8 +342,9 @@ func _hero_update() -> void:
 	var level: LevelBase = Game.level
 	if dead or level == null:
 		return
-	# 8b: input and facing (facing flips at once, even in mid-air and mid-swing).
-	_raw_flags = GameInput.flags if control_enabled else 0
+	# 8b: input and facing (facing flips at once, even in mid-air and mid-swing). His own slot's flags (slot 0 is
+	# GameInput.flags).
+	_raw_flags = GameInput.get_flags(slot) if control_enabled else 0
 	var left: bool = (_raw_flags & Defs.IN_LEFT) != 0
 	var right: bool = (_raw_flags & Defs.IN_RIGHT) != 0
 	_lr_held = left or right
@@ -351,7 +359,7 @@ func _hero_update() -> void:
 		selected = Defs.HeroState.HURT
 	state = selected
 	# 8d: handler.
-	if Game.has_glider:
+	if run.has_glider:
 		_run_glider(selected)
 	else:
 		_run_handler(selected)
@@ -367,7 +375,7 @@ func _hero_update() -> void:
 		return
 	# 8h: the glider nose returns to neutral; 8i: timers.
 	var steering: bool = (_raw_flags & (Defs.IN_UP | Defs.IN_DOWN)) != 0
-	if Game.has_glider and not steering and glider_tilt != Tuning.GLIDER_TILT_NEUTRAL:
+	if run.has_glider and not steering and glider_tilt != Tuning.GLIDER_TILT_NEUTRAL:
 		glider_tilt += 1 if glider_tilt < Tuning.GLIDER_TILT_NEUTRAL else -1
 	_tick_timers(level)
 	_update_box()
@@ -523,6 +531,7 @@ func _jump_body(halved: bool) -> void:
 	if n == 0:
 		Audio.play_sfx(Sfx.JUMP)
 		Events.player_jumped.emit()
+		Events.hero_jumped.emit(self)
 
 
 func _handle_crawl() -> void:
@@ -592,7 +601,7 @@ func _handle_strike(kind: int) -> void:
 	strike_tick += 1
 	_friction()
 	idle_timer = mini(idle_timer + 1, Tuning.IDLE_TIMER_MAX)
-	var weapon: int = Game.weapon
+	var weapon: int = run.weapon
 	# The charge multiplier is evaluated on every tick of the swing (PHYSICS.md 8.5).
 	club_power = Tuning.WEAPON_POWER[weapon] * (Tuning.CHARGE_MULTIPLIER if charge != 0 else 1)
 	attack_gate = not last
@@ -603,6 +612,7 @@ func _handle_strike(kind: int) -> void:
 		if kind == Defs.HeroState.LOW_STRIKE and Sim.tick % Tuning.SKID_DUST_PERIOD == 0:
 			_spawn_fx(FX_DUST, sim_pos)
 		Events.player_struck.emit(kind, weapon)
+		Events.hero_struck.emit(self, kind, weapon)
 		if Tuning.WEAPON_THROWN[weapon]:
 			Audio.play_sfx(Sfx.THROW)
 			if _throw(weapon):
@@ -632,7 +642,8 @@ func _create_club_box(frame: int, weapon: int) -> void:
 	_weapon_anchor = club_origin
 
 
-## Throw the axe or the boomerang (PHYSICS.md 8.4). Returns false when Tuning.MAX_THROWN are already in flight.
+## Throw the axe or the boomerang (PHYSICS.md 8.4). Returns false when Tuning.MAX_THROWN of his own are already in
+## flight (each hero of a party has his own; a party of one owns every hero projectile, as in 1.0).
 func _throw(weapon: int) -> bool:
 	var level: LevelBase = Game.level
 	var id: StringName = ID_BOOMERANG if weapon == Defs.Weapon.BOOMERANG else ID_AXE
@@ -641,7 +652,7 @@ func _throw(weapon: int) -> bool:
 	var in_flight: int = 0
 	for entity: SimEntity in level.get_kind(Defs.Kind.HERO_PROJECTILE):
 		var projectile: ProjectileBase = entity as ProjectileBase
-		if projectile != null and not projectile.spent:
+		if projectile != null and not projectile.spent and projectile.owner_slot == slot:
 			in_flight += 1
 	if in_flight >= Tuning.MAX_THROWN:
 		return false
@@ -654,7 +665,7 @@ func _throw(weapon: int) -> bool:
 	var pos: Vector2i = _weapon_anchor + Vector2i(Tuning.floor16(throw_xvel), Tuning.floor16(throw_yvel))
 	level.spawn(id, pos, {
 		"from_hero": true, "power": club_power, "xvel": throw_xvel, "yvel": throw_yvel, "yacc": throw_yacc,
-		"facing": "l" if facing < 0 else "r",
+		"facing": "l" if facing < 0 else "r", "owner": slot,
 	})
 	return true
 
@@ -724,12 +735,14 @@ func _open_glider() -> void:
 	if glide == 0:
 		glide = 1
 		Events.glider_state_changed.emit(true, true)
+		Events.hero_glider_state_changed.emit(self, true, true)
 
 
 func _close_glider() -> void:
 	if glide != 0:
 		glide = 0
-		Events.glider_state_changed.emit(Game.has_glider, false)
+		Events.glider_state_changed.emit(run.has_glider, false)
+		Events.hero_glider_state_changed.emit(self, run.has_glider, false)
 
 
 # --- Tile collision (PHYSICS.md 11.2) ---------------------------------------------------------------------------------
@@ -881,9 +894,11 @@ func _land(level: LevelBase, col: int, row: int, was_grounded: bool) -> bool:
 				_hard_landed = true
 				_spawn_fx(FX_RING, sim_pos)
 				Events.player_landed.emit(true, shook)
+				Events.hero_landed.emit(self, true, shook)
 				return false
 	if yvel > 0 or not was_grounded:
 		Events.player_landed.emit(false, false)
+		Events.hero_landed.emit(self, false, false)
 	# Soft landing.
 	yvel = 0
 	no_jump = maxi(no_jump - 1, 0)
@@ -917,7 +932,7 @@ func _ceiling_block(grid: TileGrid, col: int, row: int) -> void:
 func _airborne_step() -> void:
 	_accel(Tuning.WALK_CAP)
 	_gravity()
-	if yvel > 0 and not Game.has_glider:
+	if yvel > 0 and not run.has_glider:
 		no_jump = Tuning.NO_JUMP_TICKS
 
 
@@ -934,7 +949,7 @@ func _tick_timers(level: LevelBase) -> void:
 		drop_timer -= 1
 	if land_pose > 0:
 		land_pose -= 1
-	level.tick_shake_timer()
+	level.tick_shake_timer_by(self)
 	if feast > 0:
 		feast -= 1
 		if feast == Tuning.FEAST_WARN_TICKS_BEFORE_END:
@@ -943,6 +958,7 @@ func _tick_timers(level: LevelBase) -> void:
 		elif feast == 0:
 			_stop_feast_music()
 			Events.feast_changed.emit(0)
+			Events.hero_feast_changed.emit(self, 0)
 
 
 ## Sprite box of the pose of this tick, used by every sprite contact (PHYSICS.md 2.1).
@@ -1002,6 +1018,7 @@ func _bounce_on(enemy: EnemyBase, depth: int) -> void:
 	Audio.play_sfx(Sfx.BOUNCE)
 	_spawn_fx(FX_RING, sim_pos)
 	Events.player_bounced.emit(enemy, multiplier)
+	Events.hero_bounced.emit(self, enemy, multiplier)
 	if multiplier > 0:
 		Events.popup_requested.emit(&"multiplier", multiplier, Vector2i(sim_pos.x, sim_pos.y - box_h))
 
@@ -1024,7 +1041,8 @@ func _post_step() -> void:
 	_refresh_visual()
 
 
-## One tick of the death toss: no input, no tiles. After Tuning.DEATH_ANIM_TICKS the level takes over.
+## One tick of the death toss: no input, no tiles. After Tuning.DEATH_ANIM_TICKS the level takes over: through
+## Events.player_death_finished in single-player (1.0), by LevelBase.hero_death_finished(self) in a party.
 func _death_step() -> void:
 	sim_pos.x += _death_dx
 	sim_pos.y += _death_vy
@@ -1032,9 +1050,13 @@ func _death_step() -> void:
 	death_ticks += 1
 	var level: LevelBase = Game.level
 	if level != null:
-		level.tick_shake_timer()
+		level.tick_shake_timer_by(self)
 	if death_ticks == Tuning.DEATH_ANIM_TICKS:
+		var party: bool = level != null and level.hero_count() > 1
 		Events.player_death_finished.emit()
+		Events.hero_death_finished.emit(self)
+		if party and is_instance_valid(level):
+			level.hero_death_finished(self)
 
 
 # =================================================================================================================
@@ -1062,14 +1084,30 @@ func _spawn_fx(id: StringName, pos: Vector2i) -> void:
 		level.spawn_fx(id, pos)
 
 
+## The feast music: pushed in single-player (1.0); held while any hero of a party feasts (Audio.hold_music).
+func _start_feast_music() -> void:
+	var level: LevelBase = Game.level
+	if level != null and level.hero_count() > 1:
+		Audio.hold_music(Sfx.MUSIC_FEAST, self)
+	else:
+		Audio.push_music(Sfx.MUSIC_FEAST)
+
+
 func _stop_feast_music() -> void:
-	if Audio.get_music_context() == Sfx.MUSIC_FEAST:
+	if Audio.is_music_held_by(Sfx.MUSIC_FEAST, self):
+		Audio.release_music(Sfx.MUSIC_FEAST, self)
+	elif Audio.get_music_context() == Sfx.MUSIC_FEAST:
 		Audio.pop_music()
 
 
 func _on_weapon_changed(weapon: int) -> void:
 	if _sprite != null and weapon >= 0 and weapon < weapon_sheets.size() and weapon_sheets[weapon] != null:
 		_sprite.texture = weapon_sheets[weapon]
+
+
+func _on_run_weapon_changed(run_slot: int, weapon: int) -> void:
+	if run_slot == slot:
+		_on_weapon_changed(weapon)
 
 
 func _on_exit_reached(_exit_kind: StringName) -> void:
@@ -1100,7 +1138,7 @@ func _refresh_visual() -> void:
 		if _sprite.self_modulate != tint:
 			_sprite.self_modulate = tint
 	if _glider_sprite != null:
-		_glider_sprite.visible = Game.has_glider and not dead
+		_glider_sprite.visible = run.has_glider and not dead
 		if _glider_sprite.visible:
 			var flip: bool = facing < 0
 			if _glider_sprite.flip_h != flip:

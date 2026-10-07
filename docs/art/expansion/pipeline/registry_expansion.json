@@ -1,0 +1,3993 @@
+{
+ "_meta": {
+  "gaps": [
+   "See-saw: only the wood plank (lengths 3-6). The mushroom see-saw of 6-2 and the ice floes of Floe Rink are phase-2 skins (recolours of `seesaw_plank.png`).",
+   "The pulley wheel and rope, the revive egg's oval and the two petroglyph figures of the x2 tablet are drawn by the pipeline in the anchor palette (no pack has them); everything else is recoloured / composited pack art.",
+   "`hero_palettes.json` is reference data (shader contract, colour names, UI colours, pattern list). If `hero_palette.gd` (player-A) reads it at runtime, check that the export carries it (an `include_filter` entry by core-A); otherwise keep the few values it needs as constants. The LUT / atlas PNGs are ordinary textures.",
+   "No emote bubbles, versus corner portraits, crown, sundial or hit sparks per player yet (E.9; phase 2, P2.11).",
+   "Belt icons crop the handle end of the longer weapons (club, spear) at the cell edge; the heads stay whole.",
+   "The egg's hatch frames show the hero curled in the 1.0 spots (the pattern step is off for non-hero sheets)."
+  ],
+  "handover_notes": [
+   "*World 5 (Sunbaked Canyon) - hand-over from art-B to art-A*",
+   "",
+   "Body boxes are the bounding box of the first idle frame (as 1.0 measured them) - suggestions; the Roller's ball is about 58 x 52 art px (29 x 26 logical); the Guard's head top is 98 art px above its feet, its horn tip 109.",
+   "",
+   "Tusker hit zones (logical px relative to the feet point, facing right; mirror x when it faces left; measured from idle frame 0, the same for both palettes): body x -30..+30, y -52..+0; head (weak point while dizzy / stuck) x +8..+36, y -37..-11; leafy rump (co-op weak point) x -39..-16, y -43..-3. The tusks are inside the head zone's front edge (they glance during `charge`). Unlike the 2x bosses of 1.0, Tusker is native 1x (DESIGN B.1), so its pivot is the normal `cell_h - 16`; `spin`, `roll` and `flash` balls sit on the baseline (code flies the arcs), `curl` keeps the source's hop.",
+   "",
+   "Both atlases keep the exact 8 x 5 / 40-index layout and collision table of 10.1 (they are gradient maps of shipped atlases, tile for tile).",
+   "",
+   "| Biome | Folder | Terrain | Palette / mood | Parallax set |",
+   "|---|---|---|---|---|",
+   "| Sunbaked Canyon (world 5) | `tiles/canyon` | `terrain.png` (sun-baked sandstone, straw tufts, bone-stake spikes), `terrain_mesa.png` (banded red mesa rock: walls, palisade bases, the boss arena banks), `mud_floor.png` (wallow) | sand `#d47c46` / `#e8a25d` / `#f6c97e`, mesa red `#c85e3e` / `#a8402c`, under a clear blue sky `#5ebcec` that turns cream `#fff1d6` at the horizon; rose haze spires and mesas behind, dark red-brown ridge with dusky cacti in front; saturated green cacti and red / yellow creatures for contrast; the brightest outdoor biome after the jungle | `backgrounds/canyon` layer0-3 |",
+   "",
+   "Draw at y = 0 back to front and repeat horizontally, exactly like the jungle / ice / volcano sets.",
+   "",
+   "- **Guard / Shellback height vs. 3-row halls.** At the 1x DESIGN asks for, the RPG reptile stands 109 art px (about 54 logical) from feet to horn tip; its head top is 98 art px (49 logical) up. A 3-row hall is 96 art px, so a Guard does not fit under a 3-row ceiling (`_handover/mocks/scale_board.png`). Either the Guard / keeper halls become 4 rows, or the collision body is kept at <= 46 logical px and the horn may overlap the ceiling visually. Same for the 'bounce over it' solo answer: the hero must clear about 50 logical px.",
+   "- **WF props at 2x, not 1x.** DESIGN F.1 says WF props '1x as is', but the Western FPS pack is drawn at half the anchor's density (1 px outlines next to the anchor's 2 px). At 1x they read as thin-lined toys next to the hero; at integer 2x they match the anchor outline and the size of the 1.0 props (rock_big 64x52, skull_big 54x47). All WF props and the WF sky / mesa layers are 2x.",
+   "- **Sky from WF, not RB 17.** The far layer uses RB backgrounds/17.png as DESIGN says (towers painted out); its own sky is keyed out and the opaque sky layer is the WF sky at 2x with a banded warm horizon. The Emcee Flesher desert layers were tried by the scouts but are not used (their painterly clusters fight the anchor style), so that pack needs no credit row.",
+   "- **Walk cycles.** The RPG dino and reptile have no walk frames: `walk` = the idle frames at a higher fps (the body bobs; the code moves it). Tusker's `walk` = two charge frames at 8 fps.",
+   "- **Tusker 'rage' palette** = the source's sheet 2 (dark hide) with the mane / leaf tail / spin effect recoloured fiery red-orange, so phase 3 reads as angry rather than old (sheet 2 alone has a grey mane).",
+   "- **Mud skin** is a separate 4-tile strip (`mud_floor.png`), not a full atlas: tiles 0-2 = the `:` surface (6 px lower than ground, drawn by world-A like the tar floor), 3 = body below it.",
+   "- **Not built here (not world 5 or not art-B's):** vines / rolled vines, bark board, flower pot, x2 tablet, plates (art-A objects); tar-tribe tribesman palette (shipped `rival`, belongs with the Chieftains, P2.10); bull_rex and tortoises use shipped sheets unchanged.",
+   "- **Mocks** (`_handover/mocks/`, 640x360 + x4 copies like docs/art/mock_*.png): `mock_canyon` (5-1), `mock_gulch` (5-2, with the scout's P2 colour proof, which is not a shipped file), `mock_wallow` (5-2b); `sheet_*.png` review boards with grid, frame numbers and pivots; `scale_board.png`.",
+   ""
+  ],
+  "packs": {
+   "ansimuz-sunny-land-series": {
+    "author": "ansimuz (Luis Zuno)",
+    "count": 1,
+    "file": "assets/licenses/ansimuz_sunny_land_series.txt",
+    "license": "CC0 1.0",
+    "title": "Sunny Land 2D Pixel Art Pack"
+   },
+   "superpowers-prehistoric-platformer": {
+    "author": "Pixel-boy (Sparklin Labs)",
+    "count": 35,
+    "file": "assets/licenses/superpowers_prehistoric_platformer.txt",
+    "license": "CC0 1.0",
+    "title": "Superpowers Asset Packs - Prehistoric Platformer"
+   },
+   "superpowers-rpg-battle-system": {
+    "author": "Pixel-boy (Sparklin Labs)",
+    "count": 11,
+    "file": "assets/licenses/superpowers_rpg_battle_system.txt",
+    "license": "CC0 1.0",
+    "title": "Superpowers Asset Packs - RPG Battle System"
+   },
+   "superpowers-western-fps-2d": {
+    "author": "Pixel-boy (Sparklin Labs)",
+    "count": 22,
+    "file": "assets/licenses/superpowers_western_fps_2d.txt",
+    "license": "CC0 1.0",
+    "title": "Superpowers Asset Packs - Western FPS 2D"
+   }
+  }
+ },
+ "assets/backgrounds/canyon/layer0_sky.png": {
+  "edits": "integer 2x; sky colour #5ebcec widened to 800 px; base sky pixels below y 196 replaced by five flat haze bands (#74c7f1 -> #fff1d6, the pack's own cloud colours + a warm cream) toward the horizon; positioned on a 360 px high canvas, mirrored copy appended for a seamless 1600 px loop",
+  "frame": [
+   1600,
+   360
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "handover": "world5_registry.json",
+  "kind": "background",
+  "license": "CC0 1.0",
+  "note": "SKY anchor; horizon colour #fff1d6",
+  "origin_packs": [
+   "superpowers-western-fps-2d"
+  ],
+  "owner": "art-B",
+  "scroll": 0.0,
+  "section": "worlds",
+  "size": [
+   1600,
+   360
+  ],
+  "source": "superpowers-western-fps-2d: background-elements/sky-background.png"
+ },
+ "assets/backgrounds/canyon/layer1_far_spires.png": {
+  "edits": "the two castle towers painted out into hoodoo pillars (battlements removed, top rounded, window slits filled); sky and the farthest haze colours made transparent; the frame-cut cliff on the right edge removed; both ends cut to stepped talus slopes; specks under 24 px dropped; gradient-mapped to a warm rose haze; set on a flat plain colour from y 266 down; positioned on a 360 px high canvas, mirrored copy appended for a seamless 1600 px loop",
+  "frame": [
+   1600,
+   360
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "handover": "world5_registry.json",
+  "kind": "background",
+  "license": "CC0 1.0",
+  "note": "",
+  "origin_packs": [
+   "superpowers-rpg-battle-system"
+  ],
+  "owner": "art-B",
+  "scroll": 0.1,
+  "section": "worlds",
+  "size": [
+   1600,
+   360
+  ],
+  "source": "superpowers-rpg-battle-system: backgrounds/17.png (rows 0-223, cols 0-611)"
+ },
+ "assets/backgrounds/canyon/layer2_mesas.png": {
+  "edits": "integer 2x, gradient-mapped to hazy rose mesa rock, 640 px tile + its first 160 px = 800 (the strip tiles horizontally), bottom row extended to 360; positioned on a 360 px high canvas, mirrored copy appended for a seamless 1600 px loop",
+  "frame": [
+   1600,
+   360
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "handover": "world5_registry.json",
+  "kind": "background",
+  "license": "CC0 1.0",
+  "note": "",
+  "origin_packs": [
+   "superpowers-western-fps-2d"
+  ],
+  "owner": "art-B",
+  "scroll": 0.25,
+  "section": "worlds",
+  "size": [
+   1600,
+   360
+  ],
+  "source": "superpowers-western-fps-2d: background-elements/rock-background.png"
+ },
+ "assets/backgrounds/canyon/layer3_ridge.png": {
+  "edits": "rock-3 (a ceiling band) flipped vertically into a jagged ridge, gradient-mapped to dark red-brown, flat fill below; cacti and rocks at integer 2x gradient-mapped to dusky olive-brown / red-brown and set behind the ridge line; positioned on a 360 px high canvas, mirrored copy appended for a seamless 1600 px loop",
+  "frame": [
+   1600,
+   360
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "handover": "world5_registry.json",
+  "kind": "background",
+  "license": "CC0 1.0",
+  "note": "",
+  "origin_packs": [
+   "superpowers-prehistoric-platformer",
+   "superpowers-western-fps-2d"
+  ],
+  "owner": "art-B",
+  "scroll": 0.5,
+  "section": "worlds",
+  "size": [
+   1600,
+   360
+  ],
+  "source": "superpowers-prehistoric-platformer: background-elements/rock-3.png; superpowers-western-fps-2d: background-elements/cactus-1/2/3.png, rock-1.png, rock-2.png, rock-4.png"
+ },
+ "assets/sprites/bosses/tusker.png": {
+  "anims": {
+   "charge": {
+    "fps": 12,
+    "frames": [
+     16,
+     17,
+     18
+    ],
+    "loop": true
+   },
+   "curl": {
+    "fps": 12,
+    "frames": [
+     22,
+     23,
+     24,
+     25
+    ],
+    "loop": false
+   },
+   "dead": {
+    "fps": 1,
+    "frames": [
+     37
+    ],
+    "loop": false
+   },
+   "dizzy": {
+    "fps": 6,
+    "frames": [
+     35,
+     36
+    ],
+    "loop": true
+   },
+   "flash": {
+    "fps": 12,
+    "frames": [
+     32,
+     33
+    ],
+    "loop": false
+   },
+   "hurt": {
+    "fps": 8,
+    "frames": [
+     19,
+     20,
+     21
+    ],
+    "loop": false
+   },
+   "idle": {
+    "fps": 8,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6
+    ],
+    "loop": true
+   },
+   "paw": {
+    "fps": 12,
+    "frames": [
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15
+    ],
+    "loop": false
+   },
+   "roll": {
+    "fps": 16,
+    "frames": [
+     28,
+     29,
+     30,
+     31
+    ],
+    "loop": true
+   },
+   "slam": {
+    "fps": 1,
+    "frames": [
+     34
+    ],
+    "loop": false
+   },
+   "spin": {
+    "fps": 16,
+    "frames": [
+     26,
+     27
+    ],
+    "loop": true
+   },
+   "squeal": {
+    "fps": 10,
+    "frames": [
+     19,
+     20,
+     21
+    ],
+    "loop": false
+   },
+   "walk": {
+    "fps": 8,
+    "frames": [
+     17,
+     18
+    ],
+    "loop": true
+   }
+  },
+  "body_box_art": [
+   151,
+   114
+  ],
+  "body_box_logical": [
+   76,
+   57
+  ],
+  "edits": "re-packed on a uniform 256x184 grid (8 x 5 cells), pivot (cell_w / 2, cell_h - 16); outline -> #272018; the outer tusk recoloured from teal to ivory shade (#c8b28c) and lengthened 5 px by pixel edit (tip extended upward, 2 px outline added) in every non-effect frame; roll = the brown ball of frame 32 without its swirl effects (2 px #272018 outline added), turned 0/90/180/270 degrees (lossless); spin / roll / flash balls moved down onto the baseline (the code flies the arcs); dead = idle flipped vertically (on its back)",
+  "facing": "right",
+  "frame": [
+   256,
+   184
+  ],
+  "grid": [
+   8,
+   5
+  ],
+  "handover": "world5_registry.json",
+  "kind": "boss",
+  "license": "CC0 1.0",
+  "note": "BOSS Tusker the Boar King (bosses/tusker, w5_l2b, DESIGN B.1) at native 1x, about 2x the hero's height. paw = the 22-tick wind-up (dust + snort spawned by code), charge = the run at 96 v16, spin / roll = the Spin Ball, slam = the landing burst of the high hop (screen shake), flash = wall-bounce impact, dizzy = 33 / 44 ticks with the head open, squeal = the 14-tick phase-2 telegraph; walk = charge frames slowed",
+  "origin_packs": [
+   "superpowers-rpg-battle-system"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   128,
+   168
+  ],
+  "section": "worlds",
+  "size": [
+   2048,
+   920
+  ],
+  "source": "superpowers-rpg-battle-system: monster/boar/sprite-sheet-239x178.png",
+  "zones_logical": {
+   "_doc": "[left, top, right, bottom] logical px around the feet point, facing right (mirror x when facing left); head = weak point while dizzy / stuck; rump = the leafy tail end, the co-op weak point (B.1); measured from idle frame 0",
+   "body": [
+    -30,
+    -52,
+    30,
+    0
+   ],
+   "head": [
+    8,
+    -37,
+    36,
+    -11
+   ],
+   "rump": [
+    -39,
+    -43,
+    -16,
+    -3
+   ]
+  }
+ },
+ "assets/sprites/bosses/tusker_rage.png": {
+  "anims": {
+   "charge": {
+    "fps": 12,
+    "frames": [
+     16,
+     17,
+     18
+    ],
+    "loop": true
+   },
+   "curl": {
+    "fps": 12,
+    "frames": [
+     22,
+     23,
+     24,
+     25
+    ],
+    "loop": false
+   },
+   "dead": {
+    "fps": 1,
+    "frames": [
+     37
+    ],
+    "loop": false
+   },
+   "dizzy": {
+    "fps": 6,
+    "frames": [
+     35,
+     36
+    ],
+    "loop": true
+   },
+   "flash": {
+    "fps": 12,
+    "frames": [
+     32,
+     33
+    ],
+    "loop": false
+   },
+   "hurt": {
+    "fps": 8,
+    "frames": [
+     19,
+     20,
+     21
+    ],
+    "loop": false
+   },
+   "idle": {
+    "fps": 8,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6
+    ],
+    "loop": true
+   },
+   "paw": {
+    "fps": 12,
+    "frames": [
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15
+    ],
+    "loop": false
+   },
+   "roll": {
+    "fps": 16,
+    "frames": [
+     28,
+     29,
+     30,
+     31
+    ],
+    "loop": true
+   },
+   "slam": {
+    "fps": 1,
+    "frames": [
+     34
+    ],
+    "loop": false
+   },
+   "spin": {
+    "fps": 16,
+    "frames": [
+     26,
+     27
+    ],
+    "loop": true
+   },
+   "squeal": {
+    "fps": 10,
+    "frames": [
+     19,
+     20,
+     21
+    ],
+    "loop": false
+   },
+   "walk": {
+    "fps": 8,
+    "frames": [
+     17,
+     18
+    ],
+    "loop": true
+   }
+  },
+  "body_box_art": [
+   151,
+   114
+  ],
+  "body_box_logical": [
+   76,
+   57
+  ],
+  "edits": "re-packed on a uniform 256x184 grid (8 x 5 cells), pivot (cell_w / 2, cell_h - 16); outline -> #272018; the outer tusk recoloured from teal to ivory shade (#c8b28c) and lengthened 5 px by pixel edit (tip extended upward, 2 px outline added) in every non-effect frame; roll = the brown ball of frame 32 without its swirl effects (2 px #272018 outline added), turned 0/90/180/270 degrees (lossless); spin / roll / flash balls moved down onto the baseline (the code flies the arcs); dead = idle flipped vertically (on its back); sheet 2 palette (dark hide) with the mane, leaf tail and spin-ball effect recoloured fiery red-orange",
+  "facing": "right",
+  "frame": [
+   256,
+   184
+  ],
+  "grid": [
+   8,
+   5
+  ],
+  "handover": "world5_registry.json",
+  "kind": "boss",
+  "license": "CC0 1.0",
+  "note": "BOSS Tusker the Boar King (bosses/tusker, w5_l2b, DESIGN B.1) at native 1x, about 2x the hero's height. paw = the 22-tick wind-up (dust + snort spawned by code), charge = the run at 96 v16, spin / roll = the Spin Ball, slam = the landing burst of the high hop (screen shake), flash = wall-bounce impact, dizzy = 33 / 44 ticks with the head open, squeal = the 14-tick phase-2 telegraph; walk = charge frames slowed; RAGE palette (phase 3 / Expert)",
+  "origin_packs": [
+   "superpowers-rpg-battle-system"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   128,
+   168
+  ],
+  "section": "worlds",
+  "size": [
+   2048,
+   920
+  ],
+  "source": "superpowers-rpg-battle-system: monster/boar/sprite-sheet-2-239x178.png",
+  "zones_logical": {
+   "_doc": "[left, top, right, bottom] logical px around the feet point, facing right (mirror x when facing left); head = weak point while dizzy / stuck; rump = the leafy tail end, the co-op weak point (B.1); measured from idle frame 0",
+   "body": [
+    -30,
+    -52,
+    30,
+    0
+   ],
+   "head": [
+    8,
+    -37,
+    36,
+    -11
+   ],
+   "rump": [
+    -39,
+    -43,
+    -16,
+    -3
+   ]
+  }
+ },
+ "assets/sprites/enemies/cave_bat.png": {
+  "anims": {
+   "dead": {
+    "fps": 1,
+    "frames": [
+     18
+    ],
+    "loop": false
+   },
+   "fly": {
+    "fps": 10,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4
+    ],
+    "loop": true
+   },
+   "hang": {
+    "fps": 1,
+    "frames": [
+     19
+    ],
+    "loop": false
+   },
+   "hit": {
+    "fps": 8,
+    "frames": [
+     16,
+     17
+    ],
+    "loop": false
+   },
+   "screech": {
+    "fps": 8,
+    "frames": [
+     5,
+     6
+    ],
+    "loop": true
+   },
+   "spin": {
+    "fps": 14,
+    "frames": [
+     11,
+     12,
+     13,
+     14,
+     15
+    ],
+    "loop": true
+   },
+   "swoop": {
+    "fps": 10,
+    "frames": [
+     7,
+     8,
+     9,
+     10
+    ],
+    "loop": true
+   }
+  },
+  "body_box_art": [
+   110,
+   55
+  ],
+  "body_box_logical": [
+   55,
+   28
+  ],
+  "edits": "re-packed on a uniform 128x88 grid (8 x 3 cells), pivot (cell_w / 2, cell_h - 16); outline -> #272018; hang = a fly frame flipped vertically (the thread attaches at the top centre); dead = hit frame flipped vertically; palette teal (sheet 1)",
+  "facing": "front",
+  "frame": [
+   128,
+   88
+  ],
+  "grid": [
+   8,
+   3
+  ],
+  "handover": "world5_registry.json",
+  "kind": "actor",
+  "license": "CC0 1.0",
+  "note": "cave bat of the gulch (Dangler, archetype 2: hang, fly, dead; also an air Patroller)",
+  "origin_packs": [
+   "superpowers-rpg-battle-system"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   64,
+   72
+  ],
+  "section": "worlds",
+  "size": [
+   1024,
+   264
+  ],
+  "source": "superpowers-rpg-battle-system: monster/bat/sprite-sheet-121x89.png"
+ },
+ "assets/sprites/enemies/cave_bat_b.png": {
+  "anims": {
+   "dead": {
+    "fps": 1,
+    "frames": [
+     18
+    ],
+    "loop": false
+   },
+   "fly": {
+    "fps": 10,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4
+    ],
+    "loop": true
+   },
+   "hang": {
+    "fps": 1,
+    "frames": [
+     19
+    ],
+    "loop": false
+   },
+   "hit": {
+    "fps": 8,
+    "frames": [
+     16,
+     17
+    ],
+    "loop": false
+   },
+   "screech": {
+    "fps": 8,
+    "frames": [
+     5,
+     6
+    ],
+    "loop": true
+   },
+   "spin": {
+    "fps": 14,
+    "frames": [
+     11,
+     12,
+     13,
+     14,
+     15
+    ],
+    "loop": true
+   },
+   "swoop": {
+    "fps": 10,
+    "frames": [
+     7,
+     8,
+     9,
+     10
+    ],
+    "loop": true
+   }
+  },
+  "body_box_art": [
+   110,
+   55
+  ],
+  "body_box_logical": [
+   55,
+   28
+  ],
+  "edits": "re-packed on a uniform 128x88 grid (8 x 3 cells), pivot (cell_w / 2, cell_h - 16); outline -> #272018; hang = a fly frame flipped vertically (the thread attaches at the top centre); dead = hit frame flipped vertically; palette yellow (sheet 2)",
+  "facing": "front",
+  "frame": [
+   128,
+   88
+  ],
+  "grid": [
+   8,
+   3
+  ],
+  "handover": "world5_registry.json",
+  "kind": "actor",
+  "license": "CC0 1.0",
+  "note": "cave bat of the gulch (Dangler, archetype 2: hang, fly, dead; also an air Patroller)",
+  "origin_packs": [
+   "superpowers-rpg-battle-system"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   64,
+   72
+  ],
+  "section": "worlds",
+  "size": [
+   1024,
+   264
+  ],
+  "source": "superpowers-rpg-battle-system: monster/bat/sprite-sheet-2-121x89.png"
+ },
+ "assets/sprites/enemies/eagle.png": {
+  "anims": {
+   "dead": {
+    "fps": 1,
+    "frames": [
+     5
+    ],
+    "loop": false
+   },
+   "dive": {
+    "fps": 10,
+    "frames": [
+     2,
+     3
+    ],
+    "loop": true
+   },
+   "fly": {
+    "fps": 8,
+    "frames": [
+     0,
+     1
+    ],
+    "loop": true
+   },
+   "hit": {
+    "fps": 1,
+    "frames": [
+     4
+    ],
+    "loop": false
+   }
+  },
+  "body_box_art": [
+   68,
+   82
+  ],
+  "body_box_logical": [
+   34,
+   41
+  ],
+  "edits": "re-packed on a uniform 80x120 grid (6 x 1 cells), pivot (cell_w / 2, cell_h - 32); recoloured to a desert eagle (dark brown body, tan wing light, white head, yellow beak); 1 px #272018 outer outline added, then integer 2x (2 px like the anchor); mirrored to face right; hit / dead = frames flipped vertically",
+  "facing": "right",
+  "frame": [
+   80,
+   120
+  ],
+  "grid": [
+   6,
+   1
+  ],
+  "handover": "world5_registry.json",
+  "kind": "actor",
+  "license": "CC0 1.0",
+  "note": "desert eagle: Harrier (archetype 6) with fly, Dart (archetype 7) with dive",
+  "origin_packs": [
+   "ansimuz-sunny-land-series"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   40,
+   88
+  ],
+  "section": "worlds",
+  "size": [
+   480,
+   120
+  ],
+  "source": "sunny-land (ansimuz): PNG/spritesheets/eagle-attack.png"
+ },
+ "assets/sprites/enemies/guard.png": {
+  "anims": {
+   "attack": {
+    "fps": 12,
+    "frames": [
+     5,
+     6,
+     7,
+     8,
+     9,
+     10
+    ],
+    "loop": false
+   },
+   "dead": {
+    "fps": 1,
+    "frames": [
+     15
+    ],
+    "loop": false
+   },
+   "guard": {
+    "fps": 8,
+    "frames": [
+     11,
+     12
+    ],
+    "loop": false
+   },
+   "hit": {
+    "fps": 8,
+    "frames": [
+     13,
+     14
+    ],
+    "loop": false
+   },
+   "idle": {
+    "fps": 8,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4
+    ],
+    "loop": true
+   },
+   "walk": {
+    "fps": 10,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4
+    ],
+    "loop": true
+   }
+  },
+  "body_box_art": [
+   151,
+   109
+  ],
+  "body_box_logical": [
+   76,
+   54
+  ],
+  "edits": "re-packed on a uniform 304x168 grid (6 x 3 cells), pivot (cell_w / 2, cell_h - 16); outline -> #272018; walk = the idle frames at 10 fps (the source has no walk cycle); dead = hit frame flipped vertically; the white slash arcs of the attack frames are kept; armour recoloured to stone (DESIGN A.5)",
+  "facing": "right",
+  "frame": [
+   304,
+   168
+  ],
+  "grid": [
+   6,
+   3
+  ],
+  "handover": "world5_registry.json",
+  "kind": "actor",
+  "license": "CC0 1.0",
+  "note": "Guard (new archetype 14, enemies/guard): the shield is the front (faces right = facing); guard = shield raised (front hits glance); turns are a flip_h every `turn` ticks",
+  "origin_packs": [
+   "superpowers-rpg-battle-system"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   152,
+   152
+  ],
+  "section": "worlds",
+  "size": [
+   1824,
+   504
+  ],
+  "source": "superpowers-rpg-battle-system: monster/reptile/sprite-sheet- 248x151.png"
+ },
+ "assets/sprites/enemies/roller.png": {
+  "anims": {
+   "bump": {
+    "fps": 1,
+    "frames": [
+     14
+    ],
+    "loop": false
+   },
+   "curl": {
+    "fps": 14,
+    "frames": [
+     5,
+     6,
+     7,
+     8
+    ],
+    "loop": false
+   },
+   "dash": {
+    "fps": 1,
+    "frames": [
+     13
+    ],
+    "loop": false
+   },
+   "dead": {
+    "fps": 1,
+    "frames": [
+     21
+    ],
+    "loop": false
+   },
+   "dizzy": {
+    "fps": 8,
+    "frames": [
+     19,
+     20
+    ],
+    "loop": true
+   },
+   "idle": {
+    "fps": 8,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4
+    ],
+    "loop": true
+   },
+   "roar": {
+    "fps": 8,
+    "frames": [
+     17,
+     18
+    ],
+    "loop": true
+   },
+   "roll": {
+    "fps": 16,
+    "frames": [
+     9,
+     10,
+     11,
+     12
+    ],
+    "loop": true
+   },
+   "uncurl": {
+    "fps": 10,
+    "frames": [
+     15,
+     16
+    ],
+    "loop": false
+   },
+   "walk": {
+    "fps": 12,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4
+    ],
+    "loop": true
+   }
+  },
+  "body_box_art": [
+   109,
+   49
+  ],
+  "body_box_logical": [
+   54,
+   24
+  ],
+  "edits": "re-packed on a uniform 144x96 grid (8 x 3 cells), pivot (cell_w / 2, cell_h - 16); outline -> #272018; walk = the idle frames at 12 fps (the source has no walk); roll = the curled ball frame 9 turned 0/90/180/270 degrees (lossless); the source's mid-air curl / ball / dash / bump poses moved down onto the baseline (they roll on the ground here); dead = dizzy frame flipped vertically; palette red-orange (sheet 1)",
+  "facing": "right",
+  "frame": [
+   144,
+   96
+  ],
+  "grid": [
+   8,
+   3
+  ],
+  "handover": "world5_registry.json",
+  "kind": "actor",
+  "license": "CC0 1.0",
+  "note": "Roller (new archetype 13, enemies/roller): walk, curl = the 14-tick visible tuck, roll loop, bump = wall impact flash, dizzy 33 ticks, uncurl; the ball's head is bounce-safe",
+  "origin_packs": [
+   "superpowers-rpg-battle-system"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   72,
+   80
+  ],
+  "section": "worlds",
+  "size": [
+   1152,
+   288
+  ],
+  "source": "superpowers-rpg-battle-system: monster/dino/sprite-sheet-154x118.png"
+ },
+ "assets/sprites/enemies/roller_b.png": {
+  "anims": {
+   "bump": {
+    "fps": 1,
+    "frames": [
+     14
+    ],
+    "loop": false
+   },
+   "curl": {
+    "fps": 14,
+    "frames": [
+     5,
+     6,
+     7,
+     8
+    ],
+    "loop": false
+   },
+   "dash": {
+    "fps": 1,
+    "frames": [
+     13
+    ],
+    "loop": false
+   },
+   "dead": {
+    "fps": 1,
+    "frames": [
+     21
+    ],
+    "loop": false
+   },
+   "dizzy": {
+    "fps": 8,
+    "frames": [
+     19,
+     20
+    ],
+    "loop": true
+   },
+   "idle": {
+    "fps": 8,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4
+    ],
+    "loop": true
+   },
+   "roar": {
+    "fps": 8,
+    "frames": [
+     17,
+     18
+    ],
+    "loop": true
+   },
+   "roll": {
+    "fps": 16,
+    "frames": [
+     9,
+     10,
+     11,
+     12
+    ],
+    "loop": true
+   },
+   "uncurl": {
+    "fps": 10,
+    "frames": [
+     15,
+     16
+    ],
+    "loop": false
+   },
+   "walk": {
+    "fps": 12,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4
+    ],
+    "loop": true
+   }
+  },
+  "body_box_art": [
+   109,
+   49
+  ],
+  "body_box_logical": [
+   54,
+   24
+  ],
+  "edits": "re-packed on a uniform 144x96 grid (8 x 3 cells), pivot (cell_w / 2, cell_h - 16); outline -> #272018; walk = the idle frames at 12 fps (the source has no walk); roll = the curled ball frame 9 turned 0/90/180/270 degrees (lossless); the source's mid-air curl / ball / dash / bump poses moved down onto the baseline (they roll on the ground here); dead = dizzy frame flipped vertically; palette yellow (sheet 2)",
+  "facing": "right",
+  "frame": [
+   144,
+   96
+  ],
+  "grid": [
+   8,
+   3
+  ],
+  "handover": "world5_registry.json",
+  "kind": "actor",
+  "license": "CC0 1.0",
+  "note": "Roller (new archetype 13, enemies/roller): walk, curl = the 14-tick visible tuck, roll loop, bump = wall impact flash, dizzy 33 ticks, uncurl; the ball's head is bounce-safe",
+  "origin_packs": [
+   "superpowers-rpg-battle-system"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   72,
+   80
+  ],
+  "section": "worlds",
+  "size": [
+   1152,
+   288
+  ],
+  "source": "superpowers-rpg-battle-system: monster/dino/sprite-sheet-2-154x118.png"
+ },
+ "assets/sprites/enemies/shellback.png": {
+  "anims": {
+   "attack": {
+    "fps": 12,
+    "frames": [
+     5,
+     6,
+     7,
+     8,
+     9,
+     10
+    ],
+    "loop": false
+   },
+   "dead": {
+    "fps": 1,
+    "frames": [
+     15
+    ],
+    "loop": false
+   },
+   "guard": {
+    "fps": 8,
+    "frames": [
+     11,
+     12
+    ],
+    "loop": false
+   },
+   "hit": {
+    "fps": 8,
+    "frames": [
+     13,
+     14
+    ],
+    "loop": false
+   },
+   "idle": {
+    "fps": 8,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4
+    ],
+    "loop": true
+   },
+   "walk": {
+    "fps": 10,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4
+    ],
+    "loop": true
+   }
+  },
+  "body_box_art": [
+   151,
+   109
+  ],
+  "body_box_logical": [
+   76,
+   54
+  ],
+  "edits": "re-packed on a uniform 304x168 grid (6 x 3 cells), pivot (cell_w / 2, cell_h - 16); outline -> #272018; walk = the idle frames at 10 fps (the source has no walk cycle); dead = hit frame flipped vertically; the white slash arcs of the attack frames are kept; armour recoloured to bone, skin recoloured desert ochre (DESIGN D.6)",
+  "facing": "right",
+  "frame": [
+   304,
+   168
+  ],
+  "grid": [
+   6,
+   3
+  ],
+  "handover": "world5_registry.json",
+  "kind": "actor",
+  "license": "CC0 1.0",
+  "note": "co-op Shellback (Guard + shell trait, enemies/shellback): same layout as guard.png",
+  "origin_packs": [
+   "superpowers-rpg-battle-system"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   152,
+   152
+  ],
+  "section": "worlds",
+  "size": [
+   1824,
+   504
+  ],
+  "source": "superpowers-rpg-battle-system: monster/reptile/sprite-sheet- 248x151.png"
+ },
+ "assets/sprites/enemies/snake.png": {
+  "anims": {
+   "bite": {
+    "fps": 12,
+    "frames": [
+     7,
+     8,
+     9
+    ],
+    "loop": false
+   },
+   "dead": {
+    "fps": 1,
+    "frames": [
+     19
+    ],
+    "loop": false
+   },
+   "hit": {
+    "fps": 8,
+    "frames": [
+     16,
+     17,
+     18
+    ],
+    "loop": false
+   },
+   "idle": {
+    "fps": 8,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4
+    ],
+    "loop": true
+   },
+   "lunge": {
+    "fps": 12,
+    "frames": [
+     13,
+     14,
+     15
+    ],
+    "loop": false
+   },
+   "rear": {
+    "fps": 10,
+    "frames": [
+     10,
+     11,
+     12
+    ],
+    "loop": false
+   },
+   "windup": {
+    "fps": 10,
+    "frames": [
+     5,
+     6
+    ],
+    "loop": false
+   }
+  },
+  "body_box_art": [
+   76,
+   59
+  ],
+  "body_box_logical": [
+   38,
+   30
+  ],
+  "edits": "re-packed on a uniform 208x112 grid (8 x 3 cells), pivot (cell_w / 2, cell_h - 16); outline -> #272018; dead = hit frame flipped vertically; palette red (sheet 1)",
+  "facing": "right",
+  "frame": [
+   208,
+   112
+  ],
+  "grid": [
+   8,
+   3
+  ],
+  "handover": "world5_registry.json",
+  "kind": "actor",
+  "license": "CC0 1.0",
+  "note": "rattler (Snapper skin, 5-2 burrows: idle / windup / bite / hit) and burrow snake (Digger skin: reveal bottom-up with a clip rect, lunge along the ground)",
+  "origin_packs": [
+   "superpowers-rpg-battle-system"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   104,
+   96
+  ],
+  "section": "worlds",
+  "size": [
+   1664,
+   336
+  ],
+  "source": "superpowers-rpg-battle-system: monster/snake/sprite-sheet-147x94.png"
+ },
+ "assets/sprites/enemies/snake_b.png": {
+  "anims": {
+   "bite": {
+    "fps": 12,
+    "frames": [
+     7,
+     8,
+     9
+    ],
+    "loop": false
+   },
+   "dead": {
+    "fps": 1,
+    "frames": [
+     19
+    ],
+    "loop": false
+   },
+   "hit": {
+    "fps": 8,
+    "frames": [
+     16,
+     17,
+     18
+    ],
+    "loop": false
+   },
+   "idle": {
+    "fps": 8,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4
+    ],
+    "loop": true
+   },
+   "lunge": {
+    "fps": 12,
+    "frames": [
+     13,
+     14,
+     15
+    ],
+    "loop": false
+   },
+   "rear": {
+    "fps": 10,
+    "frames": [
+     10,
+     11,
+     12
+    ],
+    "loop": false
+   },
+   "windup": {
+    "fps": 10,
+    "frames": [
+     5,
+     6
+    ],
+    "loop": false
+   }
+  },
+  "body_box_art": [
+   76,
+   59
+  ],
+  "body_box_logical": [
+   38,
+   30
+  ],
+  "edits": "re-packed on a uniform 208x112 grid (8 x 3 cells), pivot (cell_w / 2, cell_h - 16); outline -> #272018; dead = hit frame flipped vertically; palette green (sheet 2)",
+  "facing": "right",
+  "frame": [
+   208,
+   112
+  ],
+  "grid": [
+   8,
+   3
+  ],
+  "handover": "world5_registry.json",
+  "kind": "actor",
+  "license": "CC0 1.0",
+  "note": "rattler (Snapper skin, 5-2 burrows: idle / windup / bite / hit) and burrow snake (Digger skin: reveal bottom-up with a clip rect, lunge along the ground)",
+  "origin_packs": [
+   "superpowers-rpg-battle-system"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   104,
+   96
+  ],
+  "section": "worlds",
+  "size": [
+   1664,
+   336
+  ],
+  "source": "superpowers-rpg-battle-system: monster/snake/sprite-sheet-2-147x94.png"
+ },
+ "assets/sprites/fx/projectile_spear.png": {
+  "anims": {
+   "drop": {
+    "fps": 1,
+    "frames": [
+     1,
+     2,
+     3
+    ],
+    "loop": false
+   },
+   "fly": {
+    "fps": 1,
+    "frames": [
+     0
+    ],
+    "loop": false
+   },
+   "quiver": {
+    "fps": 16,
+    "frames": [
+     5,
+     4,
+     6,
+     4
+    ],
+    "loop": false
+   },
+   "stuck": {
+    "fps": 1,
+    "frames": [
+     4
+    ],
+    "loop": false
+   }
+  },
+  "edits": "90 degree lossless turn (tip right); 15 / 30 / 45 degree nose-down turns with the outline rebuilt; stuck frames: tip cropped 9 px (inside the board), +-3 degree quiver about the board face",
+  "frame": [
+   72,
+   56
+  ],
+  "grid": [
+   7,
+   1
+  ],
+  "kind": "fx",
+  "license": "CC0 1.0",
+  "note": "thrown spear (`projectiles/hero_spear`, C.2): frame 0 = flat flight, 1-3 = pick by the flight angle while it drops (15 / 30 / 45 deg), 4 = stuck in a bark board (draw as the 16 px one-way step), 5-6 = quiver on impact. Faces right: flip_h for a throw to the left. Tip point per frame (cell px): 0:(69,27) 1:(67,35) 2:(64,42) 3:(59,48) 4:(60,28) 5:(60,28) 6:(60,28)",
+  "origin_packs": [
+   "superpowers-prehistoric-platformer"
+  ],
+  "owner": "art-A",
+  "pivot": [
+   36,
+   28
+  ],
+  "section": "fx",
+  "size": [
+   504,
+   56
+  ],
+  "source": "superpowers-prehistoric-platformer: items/12.png",
+  "tips": [
+   [
+    69,
+    27
+   ],
+   [
+    67,
+    35
+   ],
+   [
+    64,
+    42
+   ],
+   [
+    59,
+    48
+   ],
+   [
+    60,
+    28
+   ],
+   [
+    60,
+    28
+   ],
+   [
+    60,
+    28
+   ]
+  ]
+ },
+ "assets/sprites/items/weapon_spear.png": {
+  "edits": "rotated 14 degrees about the butt, 2 px outline rebuilt, bottom-centred in 32x72",
+  "frame": [
+   32,
+   72
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "item",
+  "license": "CC0 1.0",
+  "note": "weapon pick-up: spear (`items/weapon kind=spear`), planted in the ground; 1 x 2.25 tiles",
+  "origin_packs": [
+   "superpowers-prehistoric-platformer"
+  ],
+  "owner": "art-A",
+  "pivot": [
+   16,
+   72
+  ],
+  "section": "items",
+  "size": [
+   32,
+   72
+  ],
+  "source": "superpowers-prehistoric-platformer: items/12.png"
+ },
+ "assets/sprites/objects/boulder_heavy.png": {
+  "anims": {
+   "idle": {
+    "fps": 1,
+    "frames": [
+     0
+    ],
+    "loop": false
+   },
+   "strain": {
+    "fps": 16,
+    "frames": [
+     1,
+     0,
+     2,
+     0
+    ],
+    "loop": true
+   }
+  },
+  "edits": "gradient map to granite greys (outline kept), bottom flattened at row 58 with the outline redrawn, two ochre hand prints painted on; strain frames shifted 1 px",
+  "frame": [
+   64,
+   64
+  ],
+  "grid": [
+   3,
+   1
+  ],
+  "kind": "object",
+  "license": "CC0 1.0",
+  "note": "`objects/boulder_heavy` (D.5), 2 x 2 tiles, flat bottom: slides 1 tile per 6 ticks while two heroes push one side (draw dust with fx/smoke.png); `strain` = one hero pushing alone",
+  "origin_packs": [
+   "superpowers-prehistoric-platformer"
+  ],
+  "owner": "art-A",
+  "pivot": [
+   32,
+   64
+  ],
+  "section": "objects",
+  "size": [
+   192,
+   64
+  ],
+  "source": "shipped sprites/objects/boulder.png"
+ },
+ "assets/sprites/objects/drum.png": {
+  "anims": {
+   "hit": {
+    "fps": 16,
+    "frames": [
+     1,
+     2,
+     0
+    ],
+    "loop": false
+   },
+   "idle": {
+    "fps": 1,
+    "frames": [
+     0
+    ],
+    "loop": false
+   },
+   "lit": {
+    "fps": 1,
+    "frames": [
+     3
+    ],
+    "loop": false
+   },
+   "lit_hit": {
+    "fps": 16,
+    "frames": [
+     4,
+     3
+    ],
+    "loop": false
+   }
+  },
+  "edits": "barrel lid rim cut, hide ellipse drawn in the barrel's own band colours, cream lacing over the staves, crest mask composited at 1x; struck = 1 px squash + pressed hide; lit = crest recoloured yellow",
+  "frame": [
+   40,
+   44
+  ],
+  "grid": [
+   5,
+   1
+  ],
+  "kind": "object",
+  "license": "CC0 1.0",
+  "note": "`objects/drum bond=<name>` (D.5): 0 idle, 1-2 struck (hit anim, then idle), 3 lit = struck and waiting for its bond partners inside the window, 4 struck while lit; 1 x 1.4 tiles",
+  "origin_packs": [
+   "superpowers-prehistoric-platformer"
+  ],
+  "owner": "art-A",
+  "pivot": [
+   20,
+   44
+  ],
+  "section": "objects",
+  "size": [
+   200,
+   44
+  ],
+  "source": "shipped sprites/objects/barrel.png; superpowers-prehistoric-platformer: background-elements/tileset-1.png (crest icon, 16 px strip at 656, 536)"
+ },
+ "assets/sprites/objects/flower_pot.png": {
+  "anims": {
+   "idle": {
+    "fps": 1,
+    "frames": [
+     0
+    ],
+    "loop": false
+   },
+   "smash": {
+    "fps": 1,
+    "frames": [
+     4
+    ],
+    "loop": false
+   },
+   "sprout": {
+    "fps": 12,
+    "frames": [
+     5,
+     6,
+     7
+    ],
+    "loop": false
+   },
+   "tumble": {
+    "fps": 12,
+    "frames": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "loop": true
+   }
+  },
+  "edits": "blue rose recoloured to the spring flower's oranges (exact swaps); tumble = lossless 90 degree turns; smash = the clay cut into two shards turned aside; sprout = spring frame 0 revealed bottom-up",
+  "frame": [
+   64,
+   32
+  ],
+  "grid": [
+   8,
+   1
+  ],
+  "kind": "object",
+  "license": "CC0 1.0",
+  "note": "`objects/flower_pot` drop gift (D.5): 0 idle on the ledge, 1-3 + 0 tumble while it falls, 4 smash on landing, 5-7 sprout; frame 7 = objects/spring frame 0, swap to the spring there",
+  "origin_packs": [
+   "superpowers-prehistoric-platformer"
+  ],
+  "owner": "art-A",
+  "pivot": [
+   32,
+   32
+  ],
+  "section": "objects",
+  "size": [
+   512,
+   32
+  ],
+  "source": "shipped tiles/village/props/flower_pot.png; shipped sprites/objects/spring.png (frame 0)"
+ },
+ "assets/sprites/objects/hero_start.png": {
+  "edits": "the stone's carved dashes filled; the slot digit in the HUD font, recoloured to the slot's loincloth colour, on the pebble",
+  "frame": [
+   32,
+   32
+  ],
+  "grid": [
+   4,
+   1
+  ],
+  "kind": "object",
+  "license": "CC0 1.0",
+  "note": "`objects/hero_start slot=n` marker (D.5; ignored in solo): cell = slot - 1. For the level preview / editor; the game need not draw it",
+  "origin_packs": [
+   "superpowers-prehistoric-platformer"
+  ],
+  "owner": "art-A",
+  "pivot": [
+   16,
+   32
+  ],
+  "section": "objects",
+  "size": [
+   128,
+   32
+  ],
+  "source": "shipped sprites/objects/code_stone.png + fonts/font_hud.png digits"
+ },
+ "assets/sprites/objects/plate.png": {
+  "anims": {
+   "blink_1": {
+    "fps": 8,
+    "frames": [
+     1,
+     2
+    ],
+    "loop": true
+   },
+   "blink_2": {
+    "fps": 8,
+    "frames": [
+     4,
+     5
+    ],
+    "loop": true
+   },
+   "pressed_1": {
+    "fps": 1,
+    "frames": [
+     1
+    ],
+    "loop": false
+   },
+   "pressed_2": {
+    "fps": 1,
+    "frames": [
+     4
+    ],
+    "loop": false
+   },
+   "up_1": {
+    "fps": 1,
+    "frames": [
+     0
+    ],
+    "loop": false
+   },
+   "up_2": {
+    "fps": 1,
+    "frames": [
+     3
+    ],
+    "loop": false
+   }
+  },
+  "edits": "slab = rows 0-4 + 27-31 of the carved block (spiral left out), middle columns repeated to 60 px; pressed slab = rows 0-2 + 29-31; base strip in the block's own dark / brown; 1 or 2 ochre pips (count); lit = face recoloured to the anchor's amber / yellow",
+  "frame": [
+   64,
+   14
+  ],
+  "grid": [
+   6,
+   1
+  ],
+  "kind": "object",
+  "license": "CC0 1.0",
+  "note": "`objects/plate` (D.5), 2 tiles wide. Frames 0-2 count=1: 0 up (surface 10 art px over the floor), 1 pressed + lit, 2 pressed unlit (timed plates blink 1 / 2 in the last second); frames 3-5 the same for count=2 (two pips). Pivot = floor line, bottom-centre",
+  "origin_packs": [
+   "superpowers-prehistoric-platformer"
+  ],
+  "owner": "art-A",
+  "pivot": [
+   32,
+   14
+  ],
+  "section": "objects",
+  "size": [
+   384,
+   14
+  ],
+  "source": "shipped sprites/objects/carved_block.png (superpowers-prehistoric-platformer: tileset-1.png)"
+ },
+ "assets/sprites/objects/pulley.png": {
+  "anims": {
+   "turn": {
+    "fps": 12,
+    "frames": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "loop": true
+   }
+  },
+  "edits": "wheel = barrel-end disc: band rim, groove, 4 dark spokes turned 22.5 deg per frame, hub; rope = 2 px two-tone twist between 1 px outlines (tiles vertically every 32 px); knot = rope end tied to a platform; strap = wooden hanger from a beam to the axle bolt",
+  "frame": [
+   32,
+   32
+  ],
+  "grid": [
+   7,
+   1
+  ],
+  "kind": "object",
+  "license": "CC0 1.0",
+  "note": "`objects/pulley a= b=` (D.5) pieces, pivot = cell centre: 0-3 wheel `turn` (play forwards when side a sinks, backwards when b sinks), 4 rope (stack vertically, x 14-17 of the cell), 5 knot (rope enters at the top, ties onto the platform's top edge at the cell bottom), 6 hanger strap (its top row hangs from the beam; draw it over the wheel with the wheel's centre on its bolt at (16, 22), i.e. the wheel cell 6 px lower). The rope runs over the wheel tops (cell rows 1-2) and down its left / right rims (cell x 1 / 30)",
+  "origin_packs": [
+   "own",
+   "superpowers-prehistoric-platformer"
+  ],
+  "owner": "art-A",
+  "pivot": [
+   16,
+   16
+  ],
+  "section": "objects",
+  "size": [
+   224,
+   32
+  ],
+  "source": "drawn by the pipeline in the colours of shipped sprites/objects/barrel.png (wood, bands, hub)"
+ },
+ "assets/sprites/objects/seesaw_pivot.png": {
+  "edits": "stone texture of the carved block cut to a wedge with a 2 px #271710 rim; the skull composited at 1x in front",
+  "frame": [
+   48,
+   30
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "object",
+  "license": "CC0 1.0",
+  "note": "see-saw fulcrum: 48 x 30, its top row is where the plank's underside rests (30 art px over the floor)",
+  "origin_packs": [
+   "superpowers-prehistoric-platformer"
+  ],
+  "owner": "art-A",
+  "pivot": [
+   24,
+   30
+  ],
+  "section": "objects",
+  "size": [
+   48,
+   30
+  ],
+  "source": "shipped sprites/objects/carved_block.png (stone wedge); superpowers-prehistoric-platformer: items/58.png (dinosaur skull)"
+ },
+ "assets/sprites/objects/seesaw_plank.png": {
+  "edits": "board rows of the wood platform, middle columns repeated to len x 32 px, bottom outline closed, bone knobs at both ends; tilted copies rotated about the plank centre with the 2 px outline rebuilt",
+  "frame": [
+   208,
+   88
+  ],
+  "grid": [
+   5,
+   4
+  ],
+  "kind": "object",
+  "lengths": {
+   "3": {
+    "rest_deg": 38.7,
+    "row": 0
+   },
+   "4": {
+    "rest_deg": 28.0,
+    "row": 1
+   },
+   "5": {
+    "rest_deg": 22.0,
+    "row": 2
+   },
+   "6": {
+    "rest_deg": 18.2,
+    "row": 3
+   }
+  },
+  "license": "CC0 1.0",
+  "note": "`objects/seesaw len=<cells>` plank (D.5): one row per len 3 / 4 / 5 / 6 cells, columns = left end down (rest), left half down, level, right half down, right end down (rest). Pivot (104, 40) = the plank's underside at its centre: put it on the fulcrum's top, 30 art px over the floor (the turn centre is the plank centre, 4 px above). Rest angles (low end on the floor): len 3 = 38.7 deg, len 4 = 28.0 deg, len 5 = 22.0 deg, len 6 = 18.2 deg",
+  "origin_packs": [
+   "superpowers-prehistoric-platformer"
+  ],
+  "owner": "art-A",
+  "pivot": [
+   104,
+   40
+  ],
+  "section": "objects",
+  "size": [
+   1040,
+   352
+  ],
+  "source": "shipped sprites/objects/platform_wood.png (board rows); superpowers-prehistoric-platformer: items/15.png (bone knob ends)"
+ },
+ "assets/sprites/objects/x2_tablet.png": {
+  "edits": "tablet 9-sliced from 30 x 22 to 56 x 40, the source's carved dashes filled; two 14 x 19 petroglyph cavemen (2 px strokes, one mirrored, holding hands) painted in ochre with a 1 px groove shadow",
+  "frame": [
+   56,
+   40
+  ],
+  "grid": [
+   3,
+   1
+  ],
+  "kind": "object",
+  "license": "CC0 1.0",
+  "note": "`objects/x2_tablet gate=<name>` (D.5): diegetic co-op marker (`objects/sign` skin) beside every co-op gate (frame 0) and co-op secret (1, a gem above the joined hands); 2 = solved (marks lit). 1.75 x 1.25 tiles",
+  "origin_packs": [
+   "own",
+   "superpowers-prehistoric-platformer"
+  ],
+  "owner": "art-A",
+  "pivot": [
+   28,
+   40
+  ],
+  "section": "objects",
+  "size": [
+   168,
+   40
+  ],
+  "source": "shipped tiles/village/props/stone_tablet.png; petroglyph figures drawn by the pipeline"
+ },
+ "assets/sprites/player/hero_egg.png": {
+  "anims": {
+   "crack": {
+    "fps": 12,
+    "frames": [
+     4,
+     5
+    ],
+    "loop": false
+   },
+   "float": {
+    "fps": 4,
+    "frames": [
+     0,
+     3
+    ],
+    "loop": true
+   },
+   "hatch": {
+    "fps": 12,
+    "frames": [
+     6,
+     7
+    ],
+    "loop": false
+   },
+   "nudge": {
+    "fps": 12,
+    "frames": [
+     1,
+     0,
+     2,
+     0
+    ],
+    "loop": false
+   }
+  },
+  "edits": "oval narrowed at the top, 2 px #272018 outline, shade = the oval minus its copy moved up-left, six spots, two highlights; nudge = the oval drawn tilted 10 deg; crack = zigzag line; hatch = shell split along the zigzag, the top half turned away with the outline rebuilt, the curled hero rising",
+  "frame": [
+   64,
+   88
+  ],
+  "grid": [
+   8,
+   1
+  ],
+  "kind": "actor",
+  "license": "CC0 1.0",
+  "lut": "hero palette LUT, pattern step OFF",
+  "note": "Egg Hatch revive egg (D.3), 20 x 24 logical, pivot = the egg's foot (cell_h - 16). Painted with the KEY colours of palettes/hero_lut_key.png (cloth, cloth shadow, ink, outline; the curled hero in its own key colours), so the hero palette shader turns it into the slot colour: run it with the loincloth-pattern step OFF. 0 float (alternate with 3, 2 px higher), 1 / 2 nudged left / right, 4-5 crack, 6-7 hatch (then show the hero)",
+  "origin_packs": [
+   "own",
+   "superpowers-prehistoric-platformer"
+  ],
+  "owner": "art-A",
+  "pivot": [
+   32,
+   72
+  ],
+  "section": "player",
+  "size": [
+   512,
+   88
+  ],
+  "source": "drawn by the pipeline in the hero LUT key colours; shipped sprites/player/hero.png frame 24 (curl, rising out of the shell)"
+ },
+ "assets/sprites/player/hero_spear.png": {
+  "anims": {
+   "attack": {
+    "fps": 16,
+    "frames": [
+     27,
+     28,
+     29,
+     30
+    ],
+    "loop": false
+   },
+   "attack_air": {
+    "fps": 12,
+    "frames": [
+     35,
+     36
+    ],
+    "loop": false
+   },
+   "attack_crouch": {
+    "fps": 12,
+    "frames": [
+     33,
+     34
+    ],
+    "loop": false
+   },
+   "attack_up": {
+    "fps": 12,
+    "frames": [
+     31,
+     32
+    ],
+    "loop": false
+   },
+   "climb": {
+    "fps": 6,
+    "frames": [
+     44,
+     45,
+     46,
+     47
+    ],
+    "loop": true
+   },
+   "crawl": {
+    "fps": 6,
+    "frames": [
+     22,
+     23
+    ],
+    "loop": true
+   },
+   "crouch": {
+    "fps": 1,
+    "frames": [
+     21
+    ],
+    "loop": false
+   },
+   "death": {
+    "fps": 8,
+    "frames": [
+     39,
+     40,
+     41,
+     42,
+     43
+    ],
+    "loop": false
+   },
+   "fall": {
+    "fps": 10,
+    "frames": [
+     17,
+     18,
+     19
+    ],
+    "loop": true
+   },
+   "glide": {
+    "fps": 4,
+    "frames": [
+     50,
+     51
+    ],
+    "loop": true
+   },
+   "hurt": {
+    "fps": 8,
+    "frames": [
+     37,
+     38
+    ],
+    "loop": true
+   },
+   "idle": {
+    "fps": 8,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5
+    ],
+    "loop": true
+   },
+   "jump": {
+    "fps": 10,
+    "frames": [
+     14,
+     15,
+     16
+    ],
+    "loop": false
+   },
+   "land": {
+    "fps": 1,
+    "frames": [
+     20
+    ],
+    "loop": false
+   },
+   "roll": {
+    "fps": 14,
+    "frames": [
+     24,
+     25,
+     26
+    ],
+    "loop": true
+   },
+   "victory": {
+    "fps": 4,
+    "frames": [
+     48,
+     49
+    ],
+    "loop": true
+   },
+   "walk": {
+    "fps": 12,
+    "frames": [
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13
+    ],
+    "loop": true
+   }
+  },
+  "body_box_logical": [
+   22,
+   28
+  ],
+  "edits": "the 1.0 hero builder (docs/art/pipeline/build_sprites.py hero_frames) with the spear as a fifth weapon: spear rotated about its balance point (5, 42), 2 px outline rebuilt, composited behind the body in idle / walk / jump / fall / crouch (carried on the shoulder) and the wind-up frames; thrown weapon: the release frames are bare-handed",
+  "facing": "right",
+  "frame": [
+   176,
+   112
+  ],
+  "grid": [
+   8,
+   7
+  ],
+  "kind": "actor",
+  "license": "CC0 1.0",
+  "note": "weapon variant: spear (same 8 x 7 layout, pivots and cloth pixels as hero.png)",
+  "origin_packs": [
+   "superpowers-prehistoric-platformer"
+  ],
+  "owner": "art-A",
+  "pivot": [
+   88,
+   96
+  ],
+  "section": "player",
+  "size": [
+   1408,
+   784
+  ],
+  "source": "superpowers-prehistoric-platformer: characters/playable/caverman.png + items/12.png + fx/effects/1.png"
+ },
+ "assets/sprites/player/palettes/hero_cloth.png": {
+  "edits": "per cloth pixel R/G = pattern bits, B = tone under the pixel (1 main, 2 shadow), A = 255",
+  "frame": [
+   42,
+   36
+  ],
+  "grid": [
+   8,
+   7
+  ],
+  "kind": "data",
+  "license": "CC0 1.0",
+  "note": "loincloth pattern atlas: one 42 x 36 window per hero cell at (69, 62) of the 176 x 112 cell",
+  "origin_packs": [
+   "superpowers-prehistoric-platformer"
+  ],
+  "owner": "art-A",
+  "section": "palettes",
+  "size": [
+   336,
+   252
+  ],
+  "source": "computed from the cloth pixels of sprites/player/hero.png"
+ },
+ "assets/sprites/player/palettes/hero_lut_blue.png": {
+  "edits": "16 x 1, same order as the key",
+  "frame": [
+   16,
+   1
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "lut",
+  "license": "CC0 1.0",
+  "note": "hero colour 'blue'",
+  "origin_packs": [],
+  "owner": "art-A",
+  "section": "palettes",
+  "size": [
+   16,
+   1
+  ],
+  "source": "hand-picked ramp (see build_hero_palettes.py)"
+ },
+ "assets/sprites/player/palettes/hero_lut_gold.png": {
+  "edits": "16 x 1, same order as the key",
+  "frame": [
+   16,
+   1
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "lut",
+  "license": "CC0 1.0",
+  "note": "hero colour 'gold'",
+  "origin_packs": [],
+  "owner": "art-A",
+  "section": "palettes",
+  "size": [
+   16,
+   1
+  ],
+  "source": "hand-picked ramp (see build_hero_palettes.py)"
+ },
+ "assets/sprites/player/palettes/hero_lut_green.png": {
+  "edits": "16 x 1, same order as the key",
+  "frame": [
+   16,
+   1
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "lut",
+  "license": "CC0 1.0",
+  "note": "hero colour 'green'",
+  "origin_packs": [],
+  "owner": "art-A",
+  "section": "palettes",
+  "size": [
+   16,
+   1
+  ],
+  "source": "hand-picked ramp (see build_hero_palettes.py)"
+ },
+ "assets/sprites/player/palettes/hero_lut_key.png": {
+  "edits": "16 x 1 colour key, entries 0-9 used",
+  "frame": [
+   16,
+   1
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "lut",
+  "license": "CC0 1.0",
+  "note": "the 1.0 hero colours the palette shader replaces (alpha 0 = unused entry)",
+  "origin_packs": [
+   "superpowers-prehistoric-platformer"
+  ],
+  "owner": "art-A",
+  "section": "palettes",
+  "size": [
+   16,
+   1
+  ],
+  "source": "measured from sprites/player/hero.png (1.0)"
+ },
+ "assets/sprites/player/palettes/hero_lut_pink.png": {
+  "edits": "16 x 1, same order as the key",
+  "frame": [
+   16,
+   1
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "lut",
+  "license": "CC0 1.0",
+  "note": "hero colour 'pink'",
+  "origin_packs": [],
+  "owner": "art-A",
+  "section": "palettes",
+  "size": [
+   16,
+   1
+  ],
+  "source": "hand-picked ramp (see build_hero_palettes.py)"
+ },
+ "assets/sprites/player/palettes/hero_lut_white.png": {
+  "edits": "16 x 1, same order as the key",
+  "frame": [
+   16,
+   1
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "lut",
+  "license": "CC0 1.0",
+  "note": "hero colour 'white'",
+  "origin_packs": [],
+  "owner": "art-A",
+  "section": "palettes",
+  "size": [
+   16,
+   1
+  ],
+  "source": "hand-picked ramp (see build_hero_palettes.py)"
+ },
+ "assets/sprites/player/palettes/hero_lut_yellow.png": {
+  "edits": "16 x 1, same order as the key",
+  "frame": [
+   16,
+   1
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "kind": "lut",
+  "license": "CC0 1.0",
+  "note": "hero colour 'yellow' (= key: the 1.0 look)",
+  "origin_packs": [],
+  "owner": "art-A",
+  "section": "palettes",
+  "size": [
+   16,
+   1
+  ],
+  "source": "hand-picked ramp (see build_hero_palettes.py)"
+ },
+ "assets/sprites/player/palettes/hero_palettes.json": {
+  "checks": {
+   "alt_rows": [
+    [
+     "white",
+     "yellow",
+     [
+      25.5,
+      26.5,
+      24.9,
+      12.1,
+      25.6,
+      25.7
+     ]
+    ],
+    [
+     "white",
+     "blue",
+     [
+      23.2,
+      16.9,
+      21.7,
+      28.5,
+      18.8,
+      23.8
+     ]
+    ],
+    [
+     "white",
+     "pink",
+     [
+      50.9,
+      52.5,
+      38.4,
+      46.6,
+      56.6,
+      39.3
+     ]
+    ],
+    [
+     "gold",
+     "blue",
+     [
+      45.8,
+      43.9,
+      47.8,
+      47.2,
+      46.8,
+      52.7
+     ]
+    ],
+    [
+     "gold",
+     "pink",
+     [
+      70.9,
+      65.7,
+      50.5,
+      33.2,
+      73.7,
+      53.8
+     ]
+    ],
+    [
+     "gold",
+     "green",
+     [
+      43.3,
+      25.6,
+      33.0,
+      51.9,
+      25.0,
+      33.1
+     ]
+    ]
+   ],
+   "biome_camouflage": {
+    "canyon": {
+     "blue": 0.077,
+     "gold": 0.041,
+     "green": 0.0,
+     "pink": 0.0,
+     "white": 0.0,
+     "yellow": 0.0
+    },
+    "cave": {
+     "blue": 0.0,
+     "gold": 0.0,
+     "green": 0.0,
+     "pink": 0.0,
+     "white": 0.0,
+     "yellow": 0.0
+    },
+    "coast": {
+     "blue": 0.0,
+     "gold": 0.401,
+     "green": 0.0,
+     "pink": 0.0,
+     "white": 0.04,
+     "yellow": 0.428
+    },
+    "feast": {
+     "blue": 0.0,
+     "gold": 0.08,
+     "green": 0.0,
+     "pink": 0.0,
+     "white": 0.431,
+     "yellow": 0.041
+    },
+    "ice": {
+     "blue": 0.153,
+     "gold": 0.0,
+     "green": 0.0,
+     "pink": 0.0,
+     "white": 0.038,
+     "yellow": 0.0
+    },
+    "jungle": {
+     "blue": 0.004,
+     "gold": 0.0,
+     "green": 0.164,
+     "pink": 0.0,
+     "white": 0.0,
+     "yellow": 0.0
+    },
+    "mushroom": {
+     "blue": 0.0,
+     "gold": 0.0,
+     "green": 0.0,
+     "pink": 0.121,
+     "white": 0.0,
+     "yellow": 0.0
+    },
+    "ruins": {
+     "blue": 0.0,
+     "gold": 0.0,
+     "green": 0.0,
+     "pink": 0.0,
+     "white": 0.0,
+     "yellow": 0.0
+    },
+    "sky": {
+     "blue": 0.0,
+     "gold": 0.0,
+     "green": 0.0,
+     "pink": 0.0,
+     "white": 0.038,
+     "yellow": 0.0
+    },
+    "swamp": {
+     "blue": 0.0,
+     "gold": 0.0,
+     "green": 0.0,
+     "pink": 0.0,
+     "white": 0.0,
+     "yellow": 0.0
+    },
+    "volcano": {
+     "blue": 0.0,
+     "gold": 0.0,
+     "green": 0.0,
+     "pink": 0.0,
+     "white": 0.0,
+     "yellow": 0.0
+    }
+   },
+   "cvd_min_de2000": {
+    "cloth": 29.0,
+    "cloth_shadow": 21.9
+   },
+   "cvd_rows": [
+    [
+     "cloth",
+     "yellow",
+     "blue",
+     [
+      44.7,
+      43.4,
+      47.6,
+      37.2,
+      46.3,
+      52.2
+     ]
+    ],
+    [
+     "cloth",
+     "yellow",
+     "pink",
+     [
+      78.1,
+      68.9,
+      52.6,
+      41.5,
+      76.7,
+      55.7
+     ]
+    ],
+    [
+     "cloth",
+     "yellow",
+     "green",
+     [
+      41.4,
+      31.0,
+      36.3,
+      47.3,
+      30.4,
+      36.6
+     ]
+    ],
+    [
+     "cloth",
+     "blue",
+     "pink",
+     [
+      61.5,
+      43.6,
+      29.0,
+      82.5,
+      46.6,
+      29.1
+     ]
+    ],
+    [
+     "cloth",
+     "blue",
+     "green",
+     [
+      44.3,
+      45.5,
+      46.2,
+      29.7,
+      47.1,
+      49.4
+     ]
+    ],
+    [
+     "cloth",
+     "pink",
+     "green",
+     [
+      80.8,
+      46.8,
+      30.0,
+      64.9,
+      53.4,
+      33.8
+     ]
+    ],
+    [
+     "cloth_shadow",
+     "yellow",
+     "blue",
+     [
+      51.0,
+      54.0,
+      58.0,
+      50.8,
+      59.2,
+      65.3
+     ]
+    ],
+    [
+     "cloth_shadow",
+     "yellow",
+     "pink",
+     [
+      66.7,
+      66.2,
+      56.7,
+      42.3,
+      71.9,
+      59.1
+     ]
+    ],
+    [
+     "cloth_shadow",
+     "yellow",
+     "green",
+     [
+      53.9,
+      37.7,
+      46.0,
+      60.7,
+      36.8,
+      46.0
+     ]
+    ],
+    [
+     "cloth_shadow",
+     "blue",
+     "pink",
+     [
+      54.1,
+      39.8,
+      30.3,
+      74.9,
+      39.8,
+      31.4
+     ]
+    ],
+    [
+     "cloth_shadow",
+     "blue",
+     "green",
+     [
+      48.3,
+      49.7,
+      45.7,
+      32.6,
+      52.0,
+      49.6
+     ]
+    ],
+    [
+     "cloth_shadow",
+     "pink",
+     "green",
+     [
+      64.4,
+      35.3,
+      21.9,
+      53.4,
+      40.5,
+      25.2
+     ]
+    ]
+   ],
+   "identity": "yellow + spots == 1.0 on hero, hero_axe, hero_boomerang, hero_hammer, hero_spear",
+   "sims": [
+    "normal/machado",
+    "protan/machado",
+    "deutan/machado",
+    "tritan/machado",
+    "protan/vienot",
+    "deutan/vienot"
+   ],
+   "skin_rows": [
+    [
+     "yellow",
+     [
+      24.4,
+      14.1,
+      9.8,
+      19.6,
+      14.5,
+      10.0
+     ]
+    ],
+    [
+     "blue",
+     [
+      46.2,
+      43.2,
+      46.4,
+      56.8,
+      45.4,
+      51.2
+     ]
+    ],
+    [
+     "pink",
+     [
+      56.7,
+      59.7,
+      46.5,
+      24.8,
+      66.8,
+      49.8
+     ]
+    ],
+    [
+     "green",
+     [
+      49.1,
+      17.4,
+      27.5,
+      57.2,
+      16.4,
+      27.5
+     ]
+    ],
+    [
+     "white",
+     [
+      29.0,
+      29.4,
+      26.8,
+      27.7,
+      28.5,
+      27.6
+     ]
+    ],
+    [
+     "gold",
+     [
+      14.9,
+      8.5,
+      5.8,
+      9.7,
+      8.9,
+      5.9
+     ]
+    ]
+   ]
+  },
+  "kind": "data",
+  "license": "CC0 1.0",
+  "note": "colour names -> LUT roles (hex), slot defaults, arena swaps, pattern list, cloth window, UI colours",
+  "origin_packs": [],
+  "owner": "art-A",
+  "section": "palettes",
+  "source": "build_hero_palettes.py"
+ },
+ "assets/tiles/canyon/mud_floor.png": {
+  "edits": "surface tiles shifted down 6 px (the tile's lowest 6 rows drop out), wet-mud gradient map, glossy dashes along the surface, two bubbles and a few dark pits in the fill tile",
+  "frame": [
+   32,
+   32
+  ],
+  "grid": [
+   4,
+   1
+  ],
+  "handover": "world5_registry.json",
+  "kind": "terrain",
+  "license": "CC0 1.0",
+  "note": "canyon skin of the ':' tar-floor tile (Tusker's wallow, mud flats); collision = the tar floor's, drawn by world",
+  "origin_packs": [],
+  "owner": "art-B",
+  "section": "worlds",
+  "size": [
+   128,
+   32
+  ],
+  "source": "assets/tiles/canyon/terrain.png tiles 0, 1, 2, 9 (built above)",
+  "tiles_inline": {
+   "0": "mud top_left (surface 6 px lower than ground)",
+   "1": "mud top (repeatable)",
+   "2": "mud top_right",
+   "3": "mud fill (below the surface row)"
+  }
+ },
+ "assets/tiles/canyon/props/bone_small.png": {
+  "edits": "integer 2x (the pack draws at half the anchor density); outline #000000 -> #272018",
+  "frame": [
+   20,
+   20
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "handover": "world5_registry.json",
+  "kind": "prop",
+  "license": "CC0 1.0",
+  "note": "",
+  "origin_packs": [
+   "superpowers-western-fps-2d"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   10,
+   20
+  ],
+  "section": "worlds",
+  "size": [
+   20,
+   20
+  ],
+  "source": "superpowers-western-fps-2d: background-elements/bone.png"
+ },
+ "assets/tiles/canyon/props/boulders.png": {
+  "edits": "luminance gradient map to the canyon palette, outline kept",
+  "frame": [
+   64,
+   32
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "handover": "world5_registry.json",
+  "kind": "prop",
+  "license": "CC0 1.0",
+  "note": "",
+  "origin_packs": [
+   "superpowers-prehistoric-platformer"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   32,
+   32
+  ],
+  "section": "worlds",
+  "size": [
+   64,
+   32
+  ],
+  "source": "shipped assets/tiles/jungle/props/boulders.png"
+ },
+ "assets/tiles/canyon/props/branch_dead.png": {
+  "edits": "integer 2x (the pack draws at half the anchor density); outline #000000 -> #272018",
+  "frame": [
+   72,
+   38
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "handover": "world5_registry.json",
+  "kind": "prop",
+  "license": "CC0 1.0",
+  "note": "dry branch",
+  "origin_packs": [
+   "superpowers-western-fps-2d"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   36,
+   38
+  ],
+  "section": "worlds",
+  "size": [
+   72,
+   38
+  ],
+  "source": "superpowers-western-fps-2d: background-elements/branch.png"
+ },
+ "assets/tiles/canyon/props/burrow_a.png": {
+  "edits": "luminance gradient map to the canyon palette, outline kept",
+  "frame": [
+   44,
+   48
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "handover": "world5_registry.json",
+  "kind": "prop",
+  "license": "CC0 1.0",
+  "note": "snake burrow (rattlers, 5-2)",
+  "origin_packs": [
+   "superpowers-prehistoric-platformer"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   22,
+   48
+  ],
+  "section": "worlds",
+  "size": [
+   44,
+   48
+  ],
+  "source": "shipped assets/tiles/cave/props/cave_hole_a.png"
+ },
+ "assets/tiles/canyon/props/burrow_b.png": {
+  "edits": "luminance gradient map to the canyon palette, outline kept",
+  "frame": [
+   44,
+   48
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "handover": "world5_registry.json",
+  "kind": "prop",
+  "license": "CC0 1.0",
+  "note": "snake burrow",
+  "origin_packs": [
+   "superpowers-prehistoric-platformer"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   22,
+   48
+  ],
+  "section": "worlds",
+  "size": [
+   44,
+   48
+  ],
+  "source": "shipped assets/tiles/cave/props/cave_hole_b.png"
+ },
+ "assets/tiles/canyon/props/burrow_c.png": {
+  "edits": "luminance gradient map to the canyon palette, outline kept",
+  "frame": [
+   44,
+   48
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "handover": "world5_registry.json",
+  "kind": "prop",
+  "license": "CC0 1.0",
+  "note": "snake burrow",
+  "origin_packs": [
+   "superpowers-prehistoric-platformer"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   22,
+   48
+  ],
+  "section": "worlds",
+  "size": [
+   44,
+   48
+  ],
+  "source": "shipped assets/tiles/cave/props/cave_hole_c.png"
+ },
+ "assets/tiles/canyon/props/cactus_short.png": {
+  "edits": "integer 2x (the pack draws at half the anchor density); outline #000000 -> #272018",
+  "frame": [
+   64,
+   42
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "handover": "world5_registry.json",
+  "kind": "prop",
+  "license": "CC0 1.0",
+  "note": "barrel cactus",
+  "origin_packs": [
+   "superpowers-western-fps-2d"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   32,
+   42
+  ],
+  "section": "worlds",
+  "size": [
+   64,
+   42
+  ],
+  "source": "superpowers-western-fps-2d: background-elements/cactus-2.png"
+ },
+ "assets/tiles/canyon/props/cactus_small.png": {
+  "edits": "integer 2x (the pack draws at half the anchor density); outline #000000 -> #272018",
+  "frame": [
+   48,
+   84
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "handover": "world5_registry.json",
+  "kind": "prop",
+  "license": "CC0 1.0",
+  "note": "young saguaro",
+  "origin_packs": [
+   "superpowers-western-fps-2d"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   24,
+   84
+  ],
+  "section": "worlds",
+  "size": [
+   48,
+   84
+  ],
+  "source": "superpowers-western-fps-2d: background-elements/cactus-3.png"
+ },
+ "assets/tiles/canyon/props/cactus_tall.png": {
+  "edits": "integer 2x (the pack draws at half the anchor density); outline #000000 -> #272018",
+  "frame": [
+   86,
+   122
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "handover": "world5_registry.json",
+  "kind": "prop",
+  "license": "CC0 1.0",
+  "note": "saguaro, about 2 tiles tall",
+  "origin_packs": [
+   "superpowers-western-fps-2d"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   43,
+   122
+  ],
+  "section": "worlds",
+  "size": [
+   86,
+   122
+  ],
+  "source": "superpowers-western-fps-2d: background-elements/cactus-1.png"
+ },
+ "assets/tiles/canyon/props/cave_mouth.png": {
+  "edits": "luminance gradient map to the canyon palette, outline kept",
+  "frame": [
+   144,
+   80
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "handover": "world5_registry.json",
+  "kind": "prop",
+  "license": "CC0 1.0",
+  "note": "canyon cave entrance",
+  "origin_packs": [
+   "superpowers-prehistoric-platformer"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   72,
+   80
+  ],
+  "section": "worlds",
+  "size": [
+   144,
+   80
+  ],
+  "source": "shipped assets/tiles/cave/props/cave_mouth.png"
+ },
+ "assets/tiles/canyon/props/dead_tree.png": {
+  "edits": "luminance gradient map to the canyon palette, outline kept",
+  "frame": [
+   112,
+   96
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "handover": "world5_registry.json",
+  "kind": "prop",
+  "license": "CC0 1.0",
+  "note": "",
+  "origin_packs": [
+   "superpowers-prehistoric-platformer"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   56,
+   96
+  ],
+  "section": "worlds",
+  "size": [
+   112,
+   96
+  ],
+  "source": "shipped assets/tiles/volcano/props/dead_tree.png"
+ },
+ "assets/tiles/canyon/props/dead_tree_big.png": {
+  "edits": "integer 2x (the pack draws at half the anchor density); outline #000000 -> #272018; gradient-mapped (luminance) to sun-bleached wood",
+  "frame": [
+   252,
+   194
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "handover": "world5_registry.json",
+  "kind": "prop",
+  "license": "CC0 1.0",
+  "note": "gnarled sun-bleached tree (landmark, 6 tiles tall)",
+  "origin_packs": [
+   "superpowers-western-fps-2d"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   126,
+   194
+  ],
+  "section": "worlds",
+  "size": [
+   252,
+   194
+  ],
+  "source": "superpowers-western-fps-2d: background-elements/tree-1.png"
+ },
+ "assets/tiles/canyon/props/dry_bush.png": {
+  "edits": "integer 2x (the pack draws at half the anchor density); outline #000000 -> #272018; gradient-mapped (luminance) to dry sage",
+  "frame": [
+   76,
+   54
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "handover": "world5_registry.json",
+  "kind": "prop",
+  "license": "CC0 1.0",
+  "note": "sage brush",
+  "origin_packs": [
+   "superpowers-western-fps-2d"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   38,
+   54
+  ],
+  "section": "worlds",
+  "size": [
+   76,
+   54
+  ],
+  "source": "superpowers-western-fps-2d: background-elements/bush.png"
+ },
+ "assets/tiles/canyon/props/grass_dry.png": {
+  "edits": "integer 2x (the pack draws at half the anchor density); outline #000000 -> #272018; gradient-mapped (luminance) to dry straw",
+  "frame": [
+   44,
+   26
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "handover": "world5_registry.json",
+  "kind": "prop",
+  "license": "CC0 1.0",
+  "note": "dry tuft",
+  "origin_packs": [
+   "superpowers-western-fps-2d"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   22,
+   26
+  ],
+  "section": "worlds",
+  "size": [
+   44,
+   26
+  ],
+  "source": "superpowers-western-fps-2d: background-elements/grass-1.png"
+ },
+ "assets/tiles/canyon/props/grass_dry_b.png": {
+  "edits": "integer 2x (the pack draws at half the anchor density); outline #000000 -> #272018; gradient-mapped (luminance) to dry straw",
+  "frame": [
+   38,
+   22
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "handover": "world5_registry.json",
+  "kind": "prop",
+  "license": "CC0 1.0",
+  "note": "dry tuft",
+  "origin_packs": [
+   "superpowers-western-fps-2d"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   19,
+   22
+  ],
+  "section": "worlds",
+  "size": [
+   38,
+   22
+  ],
+  "source": "superpowers-western-fps-2d: background-elements/grass-2.png"
+ },
+ "assets/tiles/canyon/props/jar_a.png": {
+  "edits": "integer 2x (the pack draws at half the anchor density); outline #000000 -> #272018; gradient-mapped (luminance) to fired clay",
+  "frame": [
+   42,
+   36
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "handover": "world5_registry.json",
+  "kind": "prop",
+  "license": "CC0 1.0",
+  "note": "clay jar",
+  "origin_packs": [
+   "superpowers-western-fps-2d"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   21,
+   36
+  ],
+  "section": "worlds",
+  "size": [
+   42,
+   36
+  ],
+  "source": "superpowers-western-fps-2d: background-elements/jar-1.png"
+ },
+ "assets/tiles/canyon/props/jar_b.png": {
+  "edits": "integer 2x (the pack draws at half the anchor density); outline #000000 -> #272018; gradient-mapped (luminance) to fired clay",
+  "frame": [
+   32,
+   60
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "handover": "world5_registry.json",
+  "kind": "prop",
+  "license": "CC0 1.0",
+  "note": "tall clay jar",
+  "origin_packs": [
+   "superpowers-western-fps-2d"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   16,
+   60
+  ],
+  "section": "worlds",
+  "size": [
+   32,
+   60
+  ],
+  "source": "superpowers-western-fps-2d: background-elements/jar-2.png"
+ },
+ "assets/tiles/canyon/props/mound_sand.png": {
+  "edits": "luminance gradient map to the canyon palette, outline kept",
+  "frame": [
+   47,
+   27
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "handover": "world5_registry.json",
+  "kind": "prop",
+  "license": "CC0 1.0",
+  "note": "",
+  "origin_packs": [
+   "superpowers-prehistoric-platformer"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   23,
+   27
+  ],
+  "section": "worlds",
+  "size": [
+   47,
+   27
+  ],
+  "source": "shipped assets/tiles/cave/props/mound_brown.png"
+ },
+ "assets/tiles/canyon/props/palisade.png": {
+  "edits": "luminance gradient map to the canyon palette, outline kept",
+  "frame": [
+   82,
+   69
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "handover": "world5_registry.json",
+  "kind": "prop",
+  "license": "CC0 1.0",
+  "note": "sun-bleached stake wall (5-1 palisades)",
+  "origin_packs": [
+   "superpowers-prehistoric-platformer"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   41,
+   69
+  ],
+  "section": "worlds",
+  "size": [
+   82,
+   69
+  ],
+  "source": "shipped assets/tiles/village/props/palisade.png"
+ },
+ "assets/tiles/canyon/props/pebble_small.png": {
+  "edits": "integer 2x (the pack draws at half the anchor density); outline #000000 -> #272018",
+  "frame": [
+   34,
+   20
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "handover": "world5_registry.json",
+  "kind": "prop",
+  "license": "CC0 1.0",
+  "note": "",
+  "origin_packs": [
+   "superpowers-western-fps-2d"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   17,
+   20
+  ],
+  "section": "worlds",
+  "size": [
+   34,
+   20
+  ],
+  "source": "superpowers-western-fps-2d: background-elements/rock-6.png"
+ },
+ "assets/tiles/canyon/props/pebbles.png": {
+  "edits": "integer 2x (the pack draws at half the anchor density); outline #000000 -> #272018",
+  "frame": [
+   48,
+   30
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "handover": "world5_registry.json",
+  "kind": "prop",
+  "license": "CC0 1.0",
+  "note": "",
+  "origin_packs": [
+   "superpowers-western-fps-2d"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   24,
+   30
+  ],
+  "section": "worlds",
+  "size": [
+   48,
+   30
+  ],
+  "source": "superpowers-western-fps-2d: background-elements/rock-5.png"
+ },
+ "assets/tiles/canyon/props/rock_arch.png": {
+  "edits": "integer 2x (the pack draws at half the anchor density); outline #000000 -> #272018",
+  "frame": [
+   60,
+   38
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "handover": "world5_registry.json",
+  "kind": "prop",
+  "license": "CC0 1.0",
+  "note": "tiny rock arch",
+  "origin_packs": [
+   "superpowers-western-fps-2d"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   30,
+   38
+  ],
+  "section": "worlds",
+  "size": [
+   60,
+   38
+  ],
+  "source": "superpowers-western-fps-2d: background-elements/rock-3.png"
+ },
+ "assets/tiles/canyon/props/rock_arch_big.png": {
+  "edits": "luminance gradient map to the canyon palette, outline kept",
+  "frame": [
+   80,
+   63
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "handover": "world5_registry.json",
+  "kind": "prop",
+  "license": "CC0 1.0",
+  "note": "mesa arch / tunnel mouth",
+  "origin_packs": [
+   "superpowers-prehistoric-platformer"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   40,
+   63
+  ],
+  "section": "worlds",
+  "size": [
+   80,
+   63
+  ],
+  "source": "shipped assets/tiles/jungle/props/root_arch.png"
+ },
+ "assets/tiles/canyon/props/rock_big.png": {
+  "edits": "luminance gradient map to the canyon palette, outline kept",
+  "frame": [
+   64,
+   52
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "handover": "world5_registry.json",
+  "kind": "prop",
+  "license": "CC0 1.0",
+  "note": "",
+  "origin_packs": [
+   "superpowers-prehistoric-platformer"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   32,
+   52
+  ],
+  "section": "worlds",
+  "size": [
+   64,
+   52
+  ],
+  "source": "shipped assets/tiles/jungle/props/rock_big.png"
+ },
+ "assets/tiles/canyon/props/rock_red_a.png": {
+  "edits": "integer 2x (the pack draws at half the anchor density); outline #000000 -> #272018",
+  "frame": [
+   50,
+   54
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "handover": "world5_registry.json",
+  "kind": "prop",
+  "license": "CC0 1.0",
+  "note": "small red rock",
+  "origin_packs": [
+   "superpowers-western-fps-2d"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   25,
+   54
+  ],
+  "section": "worlds",
+  "size": [
+   50,
+   54
+  ],
+  "source": "superpowers-western-fps-2d: background-elements/rock-1.png"
+ },
+ "assets/tiles/canyon/props/rock_red_b.png": {
+  "edits": "integer 2x (the pack draws at half the anchor density); outline #000000 -> #272018",
+  "frame": [
+   62,
+   50
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "handover": "world5_registry.json",
+  "kind": "prop",
+  "license": "CC0 1.0",
+  "note": "small red rock",
+  "origin_packs": [
+   "superpowers-western-fps-2d"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   31,
+   50
+  ],
+  "section": "worlds",
+  "size": [
+   62,
+   50
+  ],
+  "source": "superpowers-western-fps-2d: background-elements/rock-2.png"
+ },
+ "assets/tiles/canyon/props/rock_ridge.png": {
+  "edits": "luminance gradient map to the canyon palette, outline kept",
+  "frame": [
+   154,
+   29
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "handover": "world5_registry.json",
+  "kind": "prop",
+  "license": "CC0 1.0",
+  "note": "low ridge / ground crack",
+  "origin_packs": [
+   "superpowers-prehistoric-platformer"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   77,
+   29
+  ],
+  "section": "worlds",
+  "size": [
+   154,
+   29
+  ],
+  "source": "shipped assets/tiles/cave/props/rock_ridge.png"
+ },
+ "assets/tiles/canyon/props/rock_spire.png": {
+  "edits": "integer 2x (the pack draws at half the anchor density); outline #000000 -> #272018; gradient-mapped (luminance) to canyon sandstone",
+  "frame": [
+   66,
+   72
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "handover": "world5_registry.json",
+  "kind": "prop",
+  "license": "CC0 1.0",
+  "note": "sandstone hoodoo",
+  "origin_packs": [
+   "superpowers-western-fps-2d"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   33,
+   72
+  ],
+  "section": "worlds",
+  "size": [
+   66,
+   72
+  ],
+  "source": "superpowers-western-fps-2d: background-elements/rock-4.png"
+ },
+ "assets/tiles/canyon/props/rocks_small.png": {
+  "edits": "luminance gradient map to the canyon palette, outline kept",
+  "frame": [
+   32,
+   37
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "handover": "world5_registry.json",
+  "kind": "prop",
+  "license": "CC0 1.0",
+  "note": "",
+  "origin_packs": [
+   "superpowers-prehistoric-platformer"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   16,
+   37
+  ],
+  "section": "worlds",
+  "size": [
+   32,
+   37
+  ],
+  "source": "shipped assets/tiles/cave/props/rocks_small.png"
+ },
+ "assets/tiles/canyon/props/signpost.png": {
+  "edits": "luminance gradient map to the canyon palette, outline kept",
+  "frame": [
+   44,
+   30
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "handover": "world5_registry.json",
+  "kind": "prop",
+  "license": "CC0 1.0",
+  "note": "",
+  "origin_packs": [
+   "superpowers-prehistoric-platformer"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   22,
+   30
+  ],
+  "section": "worlds",
+  "size": [
+   44,
+   30
+  ],
+  "source": "shipped assets/tiles/village/props/signpost.png"
+ },
+ "assets/tiles/canyon/props/skull_buried.png": {
+  "edits": "none (copied into the canyon set)",
+  "frame": [
+   56,
+   24
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "handover": "world5_registry.json",
+  "kind": "prop",
+  "license": "CC0 1.0",
+  "note": "",
+  "origin_packs": [
+   "superpowers-prehistoric-platformer"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   28,
+   24
+  ],
+  "section": "worlds",
+  "size": [
+   56,
+   24
+  ],
+  "source": "shipped assets/tiles/cave/props/skull_buried.png"
+ },
+ "assets/tiles/canyon/props/skull_cow.png": {
+  "edits": "integer 2x (the pack draws at half the anchor density); outline #000000 -> #272018",
+  "frame": [
+   40,
+   22
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "handover": "world5_registry.json",
+  "kind": "prop",
+  "license": "CC0 1.0",
+  "note": "horned skull",
+  "origin_packs": [
+   "superpowers-western-fps-2d"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   20,
+   22
+  ],
+  "section": "worlds",
+  "size": [
+   40,
+   22
+  ],
+  "source": "superpowers-western-fps-2d: background-elements/skull.png"
+ },
+ "assets/tiles/canyon/props/tumbleweed.png": {
+  "edits": "integer 2x (the pack draws at half the anchor density); outline #000000 -> #272018",
+  "frame": [
+   56,
+   48
+  ],
+  "grid": [
+   1,
+   1
+  ],
+  "handover": "world5_registry.json",
+  "kind": "prop",
+  "license": "CC0 1.0",
+  "note": "can also roll as an effect",
+  "origin_packs": [
+   "superpowers-western-fps-2d"
+  ],
+  "owner": "art-B",
+  "pivot": [
+   28,
+   48
+  ],
+  "section": "worlds",
+  "size": [
+   56,
+   48
+  ],
+  "source": "superpowers-western-fps-2d: background-elements/rolling-bush.png"
+ },
+ "assets/tiles/canyon/terrain.png": {
+  "edits": "luminance gradient map to sun-baked sandstone (#4a2418-#f6c97e, as proven by _style_tests/terrain_canyon.png); grass tufts on the cap tiles mapped to dry straw; back wall (35-37) mapped to a dim alcove brown; spikes (38-39) mapped to bone stakes; 40-tile layout unchanged",
+  "frame": [
+   32,
+   32
+  ],
+  "grid": [
+   8,
+   5
+  ],
+  "handover": "world5_registry.json",
+  "kind": "terrain",
+  "license": "CC0 1.0",
+  "note": "world 5 terrain set A: sand ground, slopes, ledges (terrain_a of w5_* levels)",
+  "origin_packs": [
+   "superpowers-prehistoric-platformer"
+  ],
+  "owner": "art-B",
+  "section": "worlds",
+  "size": [
+   256,
+   160
+  ],
+  "source": "shipped assets/tiles/volcano/terrain.png (superpowers-prehistoric-platformer: background-elements/tileset-1.png, orange volcanic set)",
+  "tiles": "TERRAIN_TILES"
+ },
+ "assets/tiles/canyon/terrain_mesa.png": {
+  "edits": "luminance gradient map to red mesa rock (#4a2418-#f6b886); back wall (35-37) mapped to dark red-brown; spikes (38-39) mapped to bone stakes; 40-tile layout unchanged",
+  "frame": [
+   32,
+   32
+  ],
+  "grid": [
+   8,
+   5
+  ],
+  "handover": "world5_registry.json",
+  "kind": "terrain",
+  "license": "CC0 1.0",
+  "note": "world 5 terrain set B: red mesa walls, palisade bases, boss arena banks (terrain_b of w5_* levels)",
+  "origin_packs": [
+   "superpowers-prehistoric-platformer"
+  ],
+  "owner": "art-B",
+  "section": "worlds",
+  "size": [
+   256,
+   160
+  ],
+  "source": "shipped assets/tiles/cave/terrain_stone.png (superpowers-prehistoric-platformer: background-elements/tileset-1.png, tan stone set)",
+  "tiles": "TERRAIN_TILES"
+ },
+ "assets/ui/countdown_stones.png": {
+  "edits": "the stone's carved dashes filled, a HUD-font digit carved in (dark fill + light groove)",
+  "frame": [
+   32,
+   32
+  ],
+  "grid": [
+   5,
+   1
+  ],
+  "kind": "ui",
+  "license": "CC0 1.0",
+  "note": "stone countdown beside an edge arrow before a hero off the view turns into an egg (D.2: 5 s Beginner, 3 s Expert). Cell = digit - 1 (0 = '1' ... 4 = '5')",
+  "origin_packs": [
+   "superpowers-prehistoric-platformer"
+  ],
+  "owner": "art-A",
+  "pivot": [
+   16,
+   32
+  ],
+  "section": "ui",
+  "size": [
+   160,
+   32
+  ],
+  "source": "shipped sprites/objects/code_stone.png + fonts/font_hud.png digits"
+ },
+ "assets/ui/hud_belt.png": {
+  "edits": "each weapon rotated 45 degrees with the 2 px outline rebuilt, over a strip of stitched leather belt in the barrel's browns; the handle end may leave the cell",
+  "frame": [
+   32,
+   32
+  ],
+  "grid": [
+   5,
+   1
+  ],
+  "kind": "ui",
+  "license": "CC0 1.0",
+  "note": "belt icon next to the hearts (C.1 rule 5, 16 x 16 logical): what a Swap brings. Cells: 0 club, 1 hammer, 2 axe, 3 boomerang (= the swirling axe), 4 spear",
+  "origin_packs": [],
+  "owner": "art-A",
+  "section": "ui",
+  "size": [
+   160,
+   32
+  ],
+  "source": "shipped sprites/items/weapon_club / hammer / axe / boomerang.png and the 2.0 weapon_spear.png"
+ },
+ "assets/ui/player_arrows.png": {
+  "edits": "recoloured per slot like player_tags.png; outline -> #272018",
+  "frame": [
+   32,
+   32
+  ],
+  "grid": [
+   4,
+   4
+  ],
+  "kind": "ui",
+  "license": "CC0 1.0",
+  "note": "edge arrows for a hero outside the view (D.2) and hit-direction cues: row = slot (P1-P4), column = left, right, up, down (cell = row * 4 + column). Show the stone countdown (countdown_stones.png) next to it",
+  "origin_packs": [
+   "superpowers-prehistoric-platformer"
+  ],
+  "owner": "art-A",
+  "pivot": [
+   16,
+   16
+  ],
+  "section": "ui",
+  "size": [
+   128,
+   128
+  ],
+  "source": "shipped ui/icons.png cells 0-3 (arrows)"
+ },
+ "assets/ui/player_tags.png": {
+  "edits": "'P1'..'P4' in the HUD font over the arrow recoloured to the slot's loincloth ramp (fill = cloth, light = the lighter of cloth / ink, shade = cloth shadow, outline #272018)",
+  "frame": [
+   32,
+   48
+  ],
+  "grid": [
+   4,
+   1
+  ],
+  "kind": "ui",
+  "license": "CC0 1.0",
+  "note": "P1-P4 tag + colour arrow over a hero (D.1: at stage start and whenever heroes overlap; E.9 versus round start). Pivot = arrow tip: place it about 4 art px over the hero's head. Cells 0-3 = P1 yellow, P2 blue, P3 pink, P4 green (the slot defaults; a lobby colour choice re-tints with palettes/hero_palettes.json ui_colours)",
+  "origin_packs": [
+   "superpowers-prehistoric-platformer"
+  ],
+  "owner": "art-A",
+  "pivot": [
+   16,
+   48
+  ],
+  "section": "ui",
+  "size": [
+   128,
+   48
+  ],
+  "source": "shipped fonts/font_hud.png + ui/icons.png cell 2 (arrow_down)"
+ }
+}

@@ -21,16 +21,16 @@ func _exit_tree() -> void:
 	_set_shown(false)
 
 
-## True while the hint is requested (the hero's feet are inside).
+## True while the hint is requested (the hero's feet are inside; a party: any hero's).
 func is_shown() -> bool:
 	return _shown
 
 
-func _on_hero_entered(_level: LevelBase, _hero: PlayerBase) -> void:
+func _on_first_entered(_level: LevelBase, _hero: PlayerBase) -> void:
 	_set_shown(true)
 
 
-func _on_hero_exited(_level: LevelBase, _hero: PlayerBase) -> void:
+func _on_last_exited(_level: LevelBase, _hero: PlayerBase) -> void:
 	_set_shown(false)
 
 

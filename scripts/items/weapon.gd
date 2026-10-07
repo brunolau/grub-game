@@ -36,8 +36,9 @@ func _apply_params(params: Dictionary) -> void:
 	index = weapon
 
 
-func _apply(_hero: PlayerBase) -> bool:
-	Game.set_weapon(weapon)
+func _apply(hero: PlayerBase) -> bool:
+	# The collector's own weapon (2.0: his PlayerRun; P1's run is Game's, so Game.set_weapon() in 1.0).
+	hero.run.set_weapon(weapon)
 	return true
 
 

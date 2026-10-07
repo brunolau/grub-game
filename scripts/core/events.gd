@@ -89,3 +89,57 @@ signal pause_changed(paused: bool)
 signal level_respawned
 ## No lives left.
 signal game_over
+
+# =====================================================================================================================
+# 2.0 expansion (docs/expansion/PLAN.md P0.3, TECH_AUDIT.md 3.17). Appended only; every 1.0 signal above keeps its
+# meaning and is still emitted for every hero, so P1 listeners keep working.
+# =====================================================================================================================
+
+# --- Heroes by slot: the twins of the hero signals above, the hero first (`hero.slot` tells the player) ---------------
+# The hero emits each twin right after its 1.0 signal, for every hero including P1. Nothing inside a tick listens.
+## Twin of player_hurt.
+signal hero_hurt(hero: PlayerBase, kind: int, source: SimEntity)
+## Twin of player_died.
+signal hero_died(hero: PlayerBase, cause: StringName)
+## Twin of player_death_finished (in multiplayer the level is called directly instead, TECH_AUDIT.md 4.7).
+signal hero_death_finished(hero: PlayerBase)
+## Twin of player_landed.
+signal hero_landed(hero: PlayerBase, hard: bool, shake: bool)
+## Twin of player_jumped.
+signal hero_jumped(hero: PlayerBase)
+## Twin of player_struck.
+signal hero_struck(hero: PlayerBase, strike: int, weapon: int)
+## Twin of player_bounced.
+signal hero_bounced(hero: PlayerBase, target: SimEntity, multiplier: int)
+## Twin of glider_state_changed.
+signal hero_glider_state_changed(hero: PlayerBase, carrying: bool, gliding: bool)
+## Twin of feast_changed: this hero's feast started (`ticks` long) or ended (0).
+signal hero_feast_changed(hero: PlayerBase, ticks: int)
+
+# --- Co-op party (DESIGN.md D.3) ---------------------------------------------------------------------------------
+## A co-op hero who would have died became an egg (no life lost while a partner stands). `cause` as player_died;
+## &"voluntary" for an egg on purpose (Down + Look).
+signal hero_down(hero: PlayerBase, cause: StringName)
+## An egg hatched. `by` is the partner who hatched it, or null when a checkpoint hatched it.
+signal hero_revived(hero: PlayerBase, by: PlayerBase)
+## Every hero of the party was dead or in an egg at once: the tribe loses one life and respawns at the checkpoint.
+signal party_wiped
+
+# --- Versus rounds (DESIGN.md E) ---------------------------------------------------------------------------------
+## A hero was knocked out. `killer` is the credited rival (last hitter within VersusTuning.KO_CREDIT_TICKS) or null;
+## `cause` e.g. &"hit", &"stomp", &"hazard", &"hot_rock".
+signal hero_ko(victim: PlayerBase, killer: PlayerBase, cause: StringName)
+## The round intro counts down: `count` 3, 2, 1, then 0 = "GRUB!" (the heroes are released by round_started).
+signal round_countdown(round_index: int, count: int)
+## Round `round_index` (0-based within the match) started: the heroes are free.
+signal round_started(round_index: int)
+## Grub Stack's Feast Rush began (the last VersusTuning.FEAST_RUSH_TICKS of the round).
+signal round_feast_rush_started(round_index: int)
+## The arena's themed sudden death began. `kind` e.g. &"stampede", &"cave_in", &"lava_rise" (DESIGN.md E.6).
+signal round_sudden_death_started(round_index: int, kind: StringName)
+## The round is over. `winner_slots` holds the winning slot(s): one, both of a 2v2 team, or none for a draw.
+signal round_ended(round_index: int, winner_slots: PackedInt32Array)
+
+# --- Book II -----------------------------------------------------------------------------------------------------
+## A Cave Painting fragment (items/painting, `index` 0..29, DESIGN.md C.9) was collected.
+signal painting_found(index: int)

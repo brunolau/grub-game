@@ -63,6 +63,21 @@ var club_origin: Vector2i = Vector2i.ZERO
 ## Power stored with the box (already x4 when charged).
 var club_power: int = 0
 
+# --- 2.0 party (docs/expansion/TECH_AUDIT.md 4.1, PLAN.md P0.6) -----------------------------------------------------
+## Player slot 0..Defs.MAX_PLAYERS - 1 (spawn parameter `slot`, default 0). Slot 0 is P1 = LevelBase.player, the 1.0
+## hero. Set it before the hero enters the tree (the level registers him in `LevelBase.heroes[slot]`); setting it
+## also points [member run] at that slot's run.
+var slot: int = 0:
+	set(value):
+		slot = clampi(value, 0, Defs.MAX_PLAYERS - 1)
+		run = Game.runs[slot]
+## This hero's run state: `Game.runs[slot]` (hearts, bones, hand + belt, glider, statistics). For P1 it is the run
+## behind the frozen `Game.hearts` / `bones` / `weapon` / `has_glider`, so `run.lose_heart()` is `Game.lose_heart()`.
+var run: PlayerRun = Game.runs[0]
+## Sim.total_ticks of the tick on which a platform last carried this hero (-1 = never). At most one platform carries
+## a hero per tick (PHYSICS.md 11.4): PlatformBase tests and sets it (it was one static guard for the one hero).
+var carried_on_tick: int = -1
+
 
 func get_kind() -> int:
 	return Defs.Kind.PLAYER
@@ -71,6 +86,13 @@ func get_kind() -> int:
 func _init() -> void:
 	set_box(Tuning.HERO_BOX_STAND)
 	z_index = Defs.Z_PLAYER
+
+
+## Spawn parameter `slot` (player slot, 0 = P1; Defs.MAX_PLAYERS - 1 at most).
+func _apply_params(params: Dictionary) -> void:
+	super._apply_params(params)
+	if params.has("slot"):
+		slot = int(params["slot"])
 
 
 # --- Queries ----------------------------------------------------------------------------------------------------------
@@ -110,6 +132,18 @@ func is_feasting() -> bool:
 	return feast > 0
 
 
+## True while this hero is down (a co-op egg, DESIGN.md D.3): out of play without being dead. Always false until the
+## egg rules exist (PLAN.md P0.8 / P1, player module); a single-player hero is never down.
+func is_down() -> bool:
+	return false
+
+
+## True when enemies of a party may pick this hero as their target (LevelBase.target_hero): alive and not down. A
+## party of one never asks (1.0 targets the hero unless he is dead).
+func is_party_targetable() -> bool:
+	return not dead and not is_down()
+
+
 # --- Calls other modules make -----------------------------------------------------------------------------------------
 
 ## Damage the hero (PHYSICS.md 10.1). `kind` is a Defs.HurtKind; `source` is the enemy / boss / projectile / item
@@ -126,21 +160,21 @@ func hurt(source: SimEntity, kind: int = Defs.HurtKind.ENEMY) -> bool:
 	var killed: bool = false
 	match kind:
 		Defs.HurtKind.BOSS_BODY:
-			killed = Game.lose_bone()
+			killed = run.lose_bone()
 			var away: int = 1
 			if source != null and source.sim_pos.x > sim_pos.x:
 				away = -1
 			xvel = Tuning.BOSS_KNOCK_XVEL * away
 			ice = Tuning.ICE_MAX
 		Defs.HurtKind.TRAP:
-			Game.scatter_energy()
+			run.scatter_energy()
 		Defs.HurtKind.BOSS_PROJECTILE:
-			killed = Game.lose_heart()
+			killed = run.lose_heart()
 		_:
-			if Game.has_glider:
-				Game.set_glider(false)
+			if run.has_glider:
+				run.set_glider(false)
 			else:
-				killed = Game.lose_heart()
+				killed = run.lose_heart()
 			xvel = xvel * Tuning.HURT_XVEL_FACTOR
 	hit_timer = Tuning.HIT_TIMER
 	attack_gate = false
@@ -148,6 +182,7 @@ func hurt(source: SimEntity, kind: int = Defs.HurtKind.ENEMY) -> bool:
 	yvel = Tuning.HURT_YVEL
 	grounded = false
 	Events.player_hurt.emit(kind, source)
+	Events.hero_hurt.emit(self, kind, source)
 	if killed:
 		kill(&"enemy")
 	return true
@@ -163,6 +198,7 @@ func kill(cause: StringName) -> void:
 	control_enabled = false
 	club_box_active = false
 	Events.player_died.emit(cause)
+	Events.hero_died.emit(self, cause)
 
 
 ## Bounce off an enemy or boss head (PHYSICS.md 9): yvel is set, fall_ticks cleared, the hero is lifted by
@@ -203,14 +239,16 @@ func apply_shake_nudge(px: int) -> void:
 func start_feast(ticks: int = Tuning.FEAST_TICKS) -> void:
 	feast = ticks
 	Events.feast_changed.emit(feast)
+	Events.hero_feast_changed.emit(self, feast)
 
 
 ## Give (true) or take away (false) the hang-glider.
 func set_glider(carrying: bool) -> void:
 	if not carrying:
 		glide = 0
-	Game.set_glider(carrying)
+	run.set_glider(carrying)
 	Events.glider_state_changed.emit(carrying, is_gliding())
+	Events.hero_glider_state_changed.emit(self, carrying, is_gliding())
 
 
 ## Put the hero at `pos` with zero velocity and all timers cleared (level start, respawn, gate travel keeps
@@ -240,6 +278,7 @@ func respawn_at(pos: Vector2i) -> void:
 	if feast > 0:
 		feast = 0
 		Events.feast_changed.emit(0)
+		Events.hero_feast_changed.emit(self, 0)
 	teleport(pos)
 	Events.player_spawned.emit(self)
 

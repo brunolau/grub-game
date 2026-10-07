@@ -9,8 +9,9 @@ extends Node
 ## may be made from inside a tick, nothing is ever read back.
 ##
 ## push_music() / pop_music() remember where the interrupted track was, so the level music continues after a
-## feast or a boss instead of starting over. set_suspended() halts everything while the application is in the
-## background (called by Flow).
+## feast or a boss instead of starting over. hold_music() / release_music() (2.0) are the same for music that several
+## holders share (the feast music while any hero of a party feasts). set_suspended() halts everything while the
+## application is in the background (called by Flow).
 
 ## The music context changed ("" = silence).
 signal music_changed(context: StringName)
@@ -31,6 +32,8 @@ var _music_context: StringName = &""
 var _music_stack: Array[StringName] = []
 ## Parallel to _music_stack: where each interrupted track continues (seconds).
 var _music_resume: Array[float] = []
+## hold_music(): context -> {holder instance id: true}. Cleared with the stack (play_music, play_jingle, shutdown).
+var _music_holds: Dictionary = {}
 var _music_after_jingle: StringName = &""
 var _fade: Tween = null
 var _next_voice: int = 0
@@ -77,6 +80,7 @@ func shutdown() -> void:
 		_fade.kill()
 	_music_stack.clear()
 	_music_resume.clear()
+	_music_holds.clear()
 	_music_after_jingle = &""
 	_music_context = &""
 	_suspended = false
@@ -202,6 +206,7 @@ func stop_all_loops() -> void:
 func play_music(context: StringName, fade_seconds: float = 0.4, restart: bool = false) -> void:
 	_music_stack.clear()
 	_music_resume.clear()
+	_music_holds.clear()
 	_music_after_jingle = &""
 	_switch_music(context, fade_seconds, restart)
 
@@ -211,6 +216,7 @@ func play_music(context: StringName, fade_seconds: float = 0.4, restart: bool = 
 func play_jingle(context: StringName, then_context: StringName = &"") -> void:
 	_music_stack.clear()
 	_music_resume.clear()
+	_music_holds.clear()
 	_switch_music(context, 0.1, true)
 	_music_after_jingle = then_context
 
@@ -231,6 +237,46 @@ func pop_music(fade_seconds: float = 0.4) -> void:
 	var previous: StringName = _music_stack.pop_back()
 	var position: float = _music_resume.pop_back()
 	_switch_music(previous, fade_seconds, false, position)
+
+
+## [method push_music] shared by several holders (2.0, TECH_AUDIT.md 3.17): music that plays while ANY of them wants
+## it, e.g. the feast music while any hero of a party feasts. `holder` (a hero, any Object) joins the holders of
+## `context`; the context is pushed when it does not play yet. Holding twice is holding once. Single-player keeps
+## push_music / pop_music; one holder behaves exactly like them.
+func hold_music(context: StringName, holder: Object, fade_seconds: float = 0.2) -> void:
+	if holder == null:
+		return
+	var holders: Dictionary = _music_holds.get(context, {})
+	holders[holder.get_instance_id()] = true
+	_music_holds[context] = holders
+	push_music(context, fade_seconds)
+
+
+## `holder` lets go of `context` ([method hold_music]). When no holder is left (holders that were freed meanwhile do
+## not count) and `context` is still the music that plays, the interrupted track comes back ([method pop_music]).
+## Releasing a context one does not hold does nothing.
+func release_music(context: StringName, holder: Object, fade_seconds: float = 0.4) -> void:
+	if holder == null or not _music_holds.has(context):
+		return
+	var holders: Dictionary = _music_holds[context]
+	if not holders.erase(holder.get_instance_id()):
+		return
+	for id: int in holders.keys():
+		if not is_instance_id_valid(id):
+			holders.erase(id)
+	if not holders.is_empty():
+		return
+	_music_holds.erase(context)
+	if _music_context == context:
+		pop_music(fade_seconds)
+
+
+## True while `holder` holds `context` ([method hold_music]).
+func is_music_held_by(context: StringName, holder: Object) -> bool:
+	if holder == null or not _music_holds.has(context):
+		return false
+	var holders: Dictionary = _music_holds[context]
+	return holders.has(holder.get_instance_id())
 
 
 ## Fade the music out and forget the stack.

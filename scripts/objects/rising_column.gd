@@ -61,11 +61,12 @@ func _sim_tick(_phase: int) -> void:
 	if level == null:
 		return
 	if not triggered:
-		var hero: PlayerBase = level.player
-		# The cell the hero stands in: the point just above his feet (the feet of a hero on a floor are already
-		# on the top edge of the floor cell below).
-		if hero != null and not hero.dead and Overlap.point_in(trigger, hero.sim_pos.x, hero.sim_pos.y - 1):
-			_start(level)
+		# The cell a hero stands in: the point just above his feet (the feet of a hero on a floor are already on the
+		# top edge of the floor cell below). Any living hero triggers it (2.0, TECH_AUDIT.md 3.12).
+		for hero: PlayerBase in level.contact_order():
+			if not hero.dead and Overlap.point_in(trigger, hero.sim_pos.x, hero.sim_pos.y - 1):
+				_start(level)
+				return
 		return
 	level.request_shake(shake)
 	_timer += 1
@@ -113,17 +114,25 @@ func _start(level: LevelBase) -> void:
 func _rise_one(level: LevelBase) -> void:
 	var top: int = block.position.y - risen
 	var bottom: int = block.end.y - 1 - risen
-	var hero: PlayerBase = level.player
-	var carry: bool = hero != null and not hero.dead and (hero.sim_pos.y >> 4) == top \
-			and hero.cell_col() >= block.position.x and hero.cell_col() < block.end.x
+	# Every living hero standing on top rides up with it (2.0, TECH_AUDIT.md 3.12; 1.0: the one hero): bit k = the
+	# k-th hero of the contact order.
+	var heroes: Array[PlayerBase] = level.contact_order()
+	var carry: int = 0
+	for k: int in heroes.size():
+		var hero: PlayerBase = heroes[k]
+		if not hero.dead and (hero.sim_pos.y >> 4) == top \
+				and hero.cell_col() >= block.position.x and hero.cell_col() < block.end.x:
+			carry |= 1 << k
 	for c: int in block.size.x:
 		var col: int = block.position.x + c
 		for row: int in range(top - 1, bottom):
 			level.set_cell(col, row, level.get_cell(col, row + 1))
 		level.set_cell(col, bottom, _below[c])
 	risen += 1
-	if carry:
-		hero.teleport(Vector2i(hero.sim_pos.x, hero.sim_pos.y - Tuning.TILE))
+	for k: int in heroes.size():
+		if (carry & (1 << k)) != 0:
+			var hero: PlayerBase = heroes[k]
+			hero.teleport(Vector2i(hero.sim_pos.x, hero.sim_pos.y - Tuning.TILE))
 	var surface: int = (top - 1) * Tuning.TILE
 	for c: int in block.size.x:
 		level.spawn_fx(ID_DUST, Vector2i((block.position.x + c) * Tuning.TILE + Tuning.TILE / 2, surface))

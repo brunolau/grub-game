@@ -1,0 +1,250 @@
+{
+ "lut_roles": [
+  "cloth",
+  "cloth_shadow",
+  "ink",
+  "outline",
+  "hair_a",
+  "hair_b",
+  "skin",
+  "skin_shadow",
+  "skin_dark",
+  "cheek"
+ ],
+ "palettes": {
+  "yellow": {
+   "cloth": "#ffe94f",
+   "cloth_shadow": "#f3aa39",
+   "ink": "#63513a",
+   "outline": "#272018",
+   "hair_a": "#351f21",
+   "hair_b": "#362022",
+   "skin": "#ffa43a",
+   "skin_shadow": "#f07731",
+   "skin_dark": "#ec6c2f",
+   "cheek": "#eb6439"
+  },
+  "blue": {
+   "cloth": "#8ae6ff",
+   "cloth_shadow": "#3f9fe8",
+   "ink": "#1b4a8c",
+   "outline": "#142a55",
+   "hair_a": "#1f3a70",
+   "hair_b": "#1f3a70",
+   "skin": "#ffa43a",
+   "skin_shadow": "#f07731",
+   "skin_dark": "#ec6c2f",
+   "cheek": "#eb6439"
+  },
+  "pink": {
+   "cloth": "#c41f8f",
+   "cloth_shadow": "#861465",
+   "ink": "#ffa8de",
+   "outline": "#3d0d33",
+   "hair_a": "#5a1650",
+   "hair_b": "#5a1650",
+   "skin": "#ffa43a",
+   "skin_shadow": "#f07731",
+   "skin_dark": "#ec6c2f",
+   "cheek": "#eb6439"
+  },
+  "green": {
+   "cloth": "#13893d",
+   "cloth_shadow": "#0b5c35",
+   "ink": "#a6ee7c",
+   "outline": "#0e321d",
+   "hair_a": "#17462a",
+   "hair_b": "#17462a",
+   "skin": "#ffa43a",
+   "skin_shadow": "#f07731",
+   "skin_dark": "#ec6c2f",
+   "cheek": "#eb6439"
+  },
+  "white": {
+   "cloth": "#f7f4ec",
+   "cloth_shadow": "#b7bfd2",
+   "ink": "#4c5a86",
+   "outline": "#2c2c3a",
+   "hair_a": "#3e3e52",
+   "hair_b": "#3e3e52",
+   "skin": "#ffa43a",
+   "skin_shadow": "#f07731",
+   "skin_dark": "#ec6c2f",
+   "cheek": "#eb6439"
+  },
+  "gold": {
+   "cloth": "#ffc928",
+   "cloth_shadow": "#c97d10",
+   "ink": "#fff7c2",
+   "outline": "#3f2508",
+   "hair_a": "#5a360c",
+   "hair_b": "#5a360c",
+   "skin": "#ffa43a",
+   "skin_shadow": "#f07731",
+   "skin_dark": "#ec6c2f",
+   "cheek": "#eb6439"
+  }
+ },
+ "slot_defaults": {
+  "p1": {
+   "colour": "yellow",
+   "pattern": "spots"
+  },
+  "p2": {
+   "colour": "blue",
+   "pattern": "stripes"
+  },
+  "p3": {
+   "colour": "pink",
+   "pattern": "zigzag"
+  },
+  "p4": {
+   "colour": "green",
+   "pattern": "plain"
+  }
+ },
+ "arena_swaps": {
+  "jungle": {
+   "green": "white"
+  },
+  "swamp": {
+   "green": "white"
+  }
+ },
+ "patterns": [
+  {
+   "index": 0,
+   "name": "spots",
+   "rule": "the 1.0 leopard spots (the sheet's own ink pixels)",
+   "unlock": "default"
+  },
+  {
+   "index": 1,
+   "name": "plain",
+   "rule": "no pattern",
+   "unlock": "default"
+  },
+  {
+   "index": 2,
+   "name": "stripes",
+   "rule": "2 px bands every 5 px",
+   "unlock": "default"
+  },
+  {
+   "index": 3,
+   "name": "zigzag",
+   "rule": "2 px zigzag band every 6 px, 8 px wavelength",
+   "unlock": "default"
+  },
+  {
+   "index": 4,
+   "name": "checks",
+   "rule": "4 px checkerboard",
+   "unlock": "paintings_10"
+  },
+  {
+   "index": 5,
+   "name": "dots",
+   "rule": "2 x 2 dots on a staggered 5 px grid",
+   "unlock": "paintings_10"
+  },
+  {
+   "index": 6,
+   "name": "tiger",
+   "rule": "2 px diagonal stripes every 6 px",
+   "unlock": "paintings_10"
+  },
+  {
+   "index": 7,
+   "name": "pinstripes",
+   "rule": "2 px vertical stripes every 5 px",
+   "unlock": "paintings_10"
+  },
+  {
+   "index": 8,
+   "name": "diamonds",
+   "rule": "diamonds of radius 2 on an 8 px grid",
+   "unlock": "paintings_10"
+  },
+  {
+   "index": 9,
+   "name": "waves",
+   "rule": "2 px rounded wave every 6 px",
+   "unlock": "paintings_10"
+  },
+  {
+   "index": 10,
+   "name": "sash",
+   "rule": "one 5 px diagonal sash across the cloth",
+   "unlock": "paintings_10"
+  },
+  {
+   "index": 11,
+   "name": "trim",
+   "rule": "2 px border along the cloth edge",
+   "unlock": "paintings_10"
+  }
+ ],
+ "cloth_window": {
+  "x": 69,
+  "y": 62,
+  "w": 42,
+  "h": 36,
+  "cell_w": 176,
+  "cell_h": 112,
+  "columns": 8,
+  "rows": 7
+ },
+ "cloth_entries": [
+  0,
+  1,
+  2
+ ],
+ "ui_colours": {
+  "yellow": {
+   "fill": "#ffe94f",
+   "light": "#ffffff",
+   "shade": "#f3aa39",
+   "dark": "#272018"
+  },
+  "blue": {
+   "fill": "#8ae6ff",
+   "light": "#ffffff",
+   "shade": "#3f9fe8",
+   "dark": "#142a55"
+  },
+  "pink": {
+   "fill": "#c41f8f",
+   "light": "#ffa8de",
+   "shade": "#861465",
+   "dark": "#3d0d33"
+  },
+  "green": {
+   "fill": "#13893d",
+   "light": "#a6ee7c",
+   "shade": "#0b5c35",
+   "dark": "#0e321d"
+  },
+  "white": {
+   "fill": "#f7f4ec",
+   "light": "#ffffff",
+   "shade": "#b7bfd2",
+   "dark": "#2c2c3a"
+  },
+  "gold": {
+   "fill": "#ffc928",
+   "light": "#fff7c2",
+   "shade": "#c97d10",
+   "dark": "#3f2508"
+  }
+ },
+ "shader": {
+  "key_lut": "hero_lut_key.png",
+  "slot_lut": "hero_lut_<colour>.png",
+  "cloth_atlas": "hero_cloth.png",
+  "match": "a texel whose RGB equals key entry i (all 8-bit channels equal; in a shader |d| < 0.5 / 255) becomes slot_lut[i] with the texel's own alpha; key entries with alpha 0 are unused",
+  "pattern": "for entries 0-2 (cloth, shadow, ink) inside the cell's cloth window: t = cloth texel at (column * w + x - window.x, row * h + y - window.y); bits = t.r + 256 * t.g (bytes); entry = bit(pattern) ? 2 : (t.b == 2 ? 1 : 0)",
+  "sampling": "all three textures: filter nearest, no repeat, no mipmaps, read as raw bytes (no sRGB conversion)",
+  "non_hero_sheets": "hero_egg.png and any other sprite drawn in key colours: LUT only, pattern step off"
+ }
+}

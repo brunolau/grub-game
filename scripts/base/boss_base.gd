@@ -106,6 +106,8 @@ func start_fight() -> void:
 ## then the club box created on the previous tick. Returns the power of the first hit (0 = none) and consumes a
 ## thrown weapon that hit. Honours `thrown_only` and the hit cooldown; a club hit makes the hero pogo. On a
 ## `thrown_only` boss a club or hammer on the weak point glances off: a clank and a spark, no damage, no pogo.
+## A party (2.0, TECH_AUDIT.md 3.9): every hero's thrown weapons (newest first, as in 1.0), then every hero's club
+## box in LevelBase.contact_order() (slot order); the first box that hits counts and that hero pogos.
 func poll_weapon_hit(weak_point: Rect2i) -> int:
 	if hit_cooldown > 0:
 		hit_cooldown -= 1
@@ -122,15 +124,16 @@ func poll_weapon_hit(weak_point: Rect2i) -> int:
 			if hit_cooldown > 0:
 				return 0
 			return 1 if thrown_only else projectile.power
-	var hero: PlayerBase = level.player
 	if thrown_only:
-		_glance(level, hero, weak_point)
+		for hero: PlayerBase in level.contact_order():
+			_glance(level, hero, weak_point)
 		return 0
-	if hero == null or not hero.club_box_active or hit_cooldown > 0:
+	if hit_cooldown > 0:
 		return 0
-	if Overlap.rects(hero.club_box, weak_point):
-		hero.notify_weapon_hit()
-		return hero.club_power
+	for hero: PlayerBase in level.contact_order():
+		if hero.club_box_active and Overlap.rects(hero.club_box, weak_point):
+			hero.notify_weapon_hit()
+			return hero.club_power
 	return 0
 
 
@@ -235,6 +238,25 @@ func _burst_origin() -> Vector2i:
 ## Called at the end of defeat(): hide, show the broken pose ... Override.
 func _on_defeated() -> void:
 	visible = false
+
+
+## True when `hero` is close enough to start the fight (the boss's own wake rule). Override; used by
+## [method _wakes_for_any].
+func _wakes_for(_hero: PlayerBase) -> bool:
+	return false
+
+
+## True when a hero starts the fight by the boss's [method _wakes_for] rule: the target hero `target` (1.0, null =
+## none); a party (2.0, TECH_AUDIT.md 3.9): any hero that enemies may target (PlayerBase.is_party_targetable), in
+## LevelBase.contact_order().
+func _wakes_for_any(target: PlayerBase) -> bool:
+	var level: LevelBase = Game.level
+	if level == null or level.hero_count() <= 1:
+		return target != null and _wakes_for(target)
+	for hero: PlayerBase in level.contact_order():
+		if hero.is_party_targetable() and _wakes_for(hero):
+			return true
+	return false
 
 
 # =================================================================================================================

@@ -6,6 +6,13 @@ extends Node
 ## Everything here is plain integer state changed through methods; each change emits one signal so the HUD never
 ## polls. Scores are DISPLAYED points (the original's internal score x 10). The per-tick hero state (velocities,
 ## timers) lives in PlayerBase, not here.
+##
+## 2.0 (docs/expansion/PLAN.md P0.4, TECH_AUDIT.md 4.2): the per-hero state lives in `runs` (one [PlayerRun] per
+## player slot). `hearts`, `bones`, `weapon` and `has_glider` are properties of `runs[0]` (P1), and the energy,
+## weapon and glider methods act on `runs[0]` with the 1.0 bodies, field writes and signal order; `energy_changed`,
+## `weapon_changed`, `glider_changed` keep meaning P1 and are emitted the moment `runs[0]` changes, however it was
+## changed. Team state (score, lives, letters, feast kit, checkpoint, exit, completion, tally) stays here. A party
+## of one (`mode` SINGLE, `party` 1, `book` 1, the defaults) is the 1.0 game.
 
 ## Displayed score changed.
 signal score_changed(score: int)
@@ -31,6 +38,23 @@ signal extra_life_awarded(lives: int)
 signal checkpoint_changed(pos: Vector2i)
 ## A new run started (title -> new game or continue).
 signal run_started(difficulty: int)
+## Hearts or bones of the hero in player slot `slot` changed (every slot, P1 included, after `energy_changed`).
+signal run_energy_changed(slot: int, hearts: int, bones: int)
+## The hand weapon of slot `slot` changed (Defs.Weapon; P1 also emits `weapon_changed` first).
+signal run_weapon_changed(slot: int, weapon: int)
+## The belt of slot `slot` changed (Defs.Weapon or PlayerRun.BELT_EMPTY).
+signal run_belt_changed(slot: int, belt: int)
+## The hero of slot `slot` picked up or lost the hang-glider (P1 also emits `glider_changed` first).
+signal run_glider_changed(slot: int, carrying: bool)
+
+## Per-hero run state, one per player slot (Defs.MAX_PLAYERS, always allocated, never replaced); slot 0 = P1.
+var runs: Array[PlayerRun] = _make_runs()
+## What kind of game runs (Defs.GameMode). SINGLE is the 1.0 game.
+var mode: int = Defs.GameMode.SINGLE
+## Heroes in the run, 1..Defs.MAX_PLAYERS (slots 0..party - 1). 1 in single-player.
+var party: int = 1
+## The book of the campaign being played: 1 = the 1.0 campaign, 2 = The Far Shore (DESIGN.md A).
+var book: int = 1
 
 ## Difficulty of the current run (Defs.Difficulty).
 var difficulty: int = Defs.Difficulty.BEGINNER
@@ -38,18 +62,34 @@ var difficulty: int = Defs.Difficulty.BEGINNER
 var score: int = 0
 ## Spare lives (starts at Tuning.LIVES_START; dying at 0 is game over).
 var lives: int = Tuning.LIVES_START
-## Hearts, 0..Tuning.ENERGY_START. A hit at 0 hearts kills (PHYSICS.md 10.2).
-var hearts: int = Tuning.ENERGY_START
-## Bones toward the next heart, 0..Tuning.BONES_PER_HEART - 1 (never shown on the HUD).
-var bones: int = 0
+## Hearts, 0..Tuning.ENERGY_START. A hit at 0 hearts kills (PHYSICS.md 10.2). Property of runs[0] (P1).
+var hearts: int:
+	get:
+		return runs[0].hearts
+	set(value):
+		runs[0].hearts = value
+## Bones toward the next heart, 0..Tuning.BONES_PER_HEART - 1 (never shown on the HUD). Property of runs[0].
+var bones: int:
+	get:
+		return runs[0].bones
+	set(value):
+		runs[0].bones = value
 ## Collected letters bit mask.
 var letters: int = 0
 ## Collected feast-kit pieces bit mask.
 var feast_kit: int = 0
-## Current weapon (Defs.Weapon); kept through deaths and levels until game over.
-var weapon: int = Defs.Weapon.CLUB
-## True while the hero carries the hang-glider.
-var has_glider: bool = false
+## Current weapon (Defs.Weapon); kept through deaths and levels until game over. Property of runs[0] (P1's hand).
+var weapon: int:
+	get:
+		return runs[0].weapon
+	set(value):
+		runs[0].weapon = value
+## True while the hero carries the hang-glider. Property of runs[0].
+var has_glider: bool:
+	get:
+		return runs[0].has_glider
+	set(value):
+		runs[0].has_glider = value
 ## True once the exit of the current level is unlocked (fire-starter).
 var exit_unlocked: bool = false
 
@@ -83,32 +123,67 @@ var _next_life_at: int = Tuning.EXTRA_LIFE_EVERY
 var _entry: Dictionary = {}
 
 
-## Start a fresh run: score 0, 2 spare lives, club, no letters (GAMEPLAY.md 11.1 step 9).
+func _init() -> void:
+	# Every run reports through Game: P1's changes as the frozen 1.0 signals, every slot's as run_*_changed.
+	for run: PlayerRun in runs:
+		run.energy_changed.connect(_on_run_energy_changed.bind(run.slot))
+		run.weapon_changed.connect(_on_run_weapon_changed.bind(run.slot))
+		run.belt_changed.connect(_on_run_belt_changed.bind(run.slot))
+		run.glider_changed.connect(_on_run_glider_changed.bind(run.slot))
+
+
+## Start a fresh run: score 0, 2 spare lives, club, no letters (GAMEPLAY.md 11.1 step 9). This is the 1.0 game:
+## single-player, a party of one, Book I (start_run(p_difficulty)).
 func new_game(p_difficulty: int) -> void:
+	start_run(p_difficulty)
+
+
+## Start a fresh run of any mode (2.0): `p_mode` (Defs.GameMode), `p_party` heroes (clamped to
+## 1..Defs.MAX_PLAYERS), campaign book `p_book` (1 or 2). Every run of every slot is reset (full energy, the club,
+## an empty belt, no glider, zeroed statistics); the team state as in new_game(). Emits the 1.0 signals of
+## new_game() in their order, then run_*_changed for slots 1..party - 1.
+func start_run(p_difficulty: int, p_mode: int = Defs.GameMode.SINGLE, p_party: int = 1, p_book: int = 1) -> void:
+	mode = p_mode
+	party = clampi(p_party, 1, Defs.MAX_PLAYERS)
+	book = maxi(p_book, 1)
 	difficulty = p_difficulty
 	score = 0
 	lives = Tuning.LIVES_START
 	letters = 0
 	feast_kit = 0
-	weapon = Defs.Weapon.CLUB
-	has_glider = false
 	warp_return_level = &""
 	level_id = &""
 	_next_life_at = Tuning.EXTRA_LIFE_EVERY
 	_entry = {}
-	_reset_energy()
+	# P1 (the 1.0 weapon, glider and energy) and every other slot: club, empty belt, no glider, full energy.
+	for run: PlayerRun in runs:
+		run.reset_run()
 	_reset_level_progress()
 	run_started.emit(difficulty)
 	score_changed.emit(score)
 	lives_changed.emit(lives)
 	letters_changed.emit(letters)
 	feast_kit_changed.emit(feast_kit)
-	weapon_changed.emit(weapon)
-	glider_changed.emit(has_glider)
+	runs[0].emit_weapon()
+	runs[0].emit_glider()
+	for slot: int in range(1, party):
+		runs[slot].emit_energy()
+		runs[slot].emit_weapon()
+		runs[slot].emit_belt()
+		runs[slot].emit_glider()
+
+
+## The run of player slot `slot` (0..Defs.MAX_PLAYERS - 1); null (and an error) for another value.
+func get_run(slot: int) -> PlayerRun:
+	if slot < 0 or slot >= runs.size():
+		push_error("Game.get_run: no player slot %d" % slot)
+		return null
+	return runs[slot]
 
 
 ## Prepare the state for entering `p_level_id`. With `carry_progress` the completion counters and the tally list
 ## are kept (entering a linked sub-stage or a bonus stage, GAMEPLAY.md 1.1); otherwise they start at zero.
+## Every hero of the party starts with full energy and without the glider.
 func begin_level(p_level_id: StringName, carry_progress: bool = false) -> void:
 	level_id = p_level_id
 	has_checkpoint = false
@@ -116,6 +191,9 @@ func begin_level(p_level_id: StringName, carry_progress: bool = false) -> void:
 	exit_unlocked = false
 	has_glider = false
 	_reset_energy()
+	for slot: int in range(1, party):
+		runs[slot].has_glider = false
+		runs[slot].reset_energy()
 	if not carry_progress:
 		_reset_level_progress()
 	_entry = {
@@ -123,11 +201,14 @@ func begin_level(p_level_id: StringName, carry_progress: bool = false) -> void:
 		"feast_kit": feast_kit, "weapon": weapon, "spots_total": spots_total, "spots_opened": spots_opened,
 		"items_total": items_total, "items_collected": items_collected, "secrets_found": secrets_found,
 		"tally_ids": tally_item_ids.duplicate(), "tally_indices": tally_item_indices.duplicate(),
-		"tally_points": tally_item_points.duplicate(),
+		"tally_points": tally_item_points.duplicate(), "hands": _party_hands(), "belts": _party_belts(),
 	}
-	energy_changed.emit(hearts, bones)
-	glider_changed.emit(has_glider)
+	runs[0].emit_energy()
+	runs[0].emit_glider()
 	completion_changed.emit(completion_percent())
+	for slot: int in range(1, party):
+		runs[slot].emit_energy()
+		runs[slot].emit_glider()
 
 
 ## Put the run back to how it was when the current level was entered (pause menu "restart level", see
@@ -154,12 +235,22 @@ func restore_level_entry() -> bool:
 	tally_item_ids = (_entry["tally_ids"] as Array[StringName]).duplicate()
 	tally_item_indices = (_entry["tally_indices"] as PackedInt32Array).duplicate()
 	tally_item_points = (_entry["tally_points"] as PackedInt32Array).duplicate()
+	var hands: PackedInt32Array = _entry["hands"]
+	var belts: PackedInt32Array = _entry["belts"]
+	runs[0].belt = belts[0]
+	for slot: int in range(1, mini(party, hands.size())):
+		runs[slot].weapon = hands[slot]
+		runs[slot].belt = belts[slot]
 	score_changed.emit(score)
 	lives_changed.emit(lives)
 	letters_changed.emit(letters)
 	feast_kit_changed.emit(feast_kit)
-	weapon_changed.emit(weapon)
+	runs[0].emit_weapon()
 	completion_changed.emit(completion_percent())
+	runs[0].emit_belt()
+	for slot: int in range(1, mini(party, hands.size())):
+		runs[slot].emit_weapon()
+		runs[slot].emit_belt()
 	return true
 
 
@@ -193,57 +284,29 @@ func lose_life() -> bool:
 
 
 ## Add bones; every Tuning.BONES_PER_HEART bones restore one heart while below the maximum (GAMEPLAY.md 4.2).
-## Returns the number of hearts restored.
+## Returns the number of hearts restored. (P1: PlayerRun.add_bones of runs[0].)
 func add_bones(count: int = 1) -> int:
-	var restored: int = 0
-	bones += count
-	while bones >= Tuning.BONES_PER_HEART:
-		bones -= Tuning.BONES_PER_HEART
-		if hearts < Tuning.ENERGY_START:
-			hearts += 1
-			restored += 1
-	energy_changed.emit(hearts, bones)
-	return restored
+	return runs[0].add_bones(count)
 
 
-## Heart item: +1 heart if below the maximum. Returns false (item stays in place) when already full.
+## Heart item: +1 heart if below the maximum. Returns false (item stays in place) when already full. (P1)
 func add_heart() -> bool:
-	if hearts >= Tuning.ENERGY_START:
-		return false
-	hearts += 1
-	energy_changed.emit(hearts, bones)
-	return true
+	return runs[0].add_heart()
 
 
-## Enemy hit: lose one heart. Returns true when the hero is DEAD (he was at 0 hearts; PHYSICS.md 10.2).
+## Enemy hit: lose one heart. Returns true when the hero is DEAD (he was at 0 hearts; PHYSICS.md 10.2). (P1)
 func lose_heart() -> bool:
-	if hearts <= 0:
-		return true
-	hearts -= 1
-	energy_changed.emit(hearts, bones)
-	return false
+	return runs[0].lose_heart()
 
 
-## Boss body hit: lose one bone (borrowing from a heart). Returns true when the hero is DEAD.
+## Boss body hit: lose one bone (borrowing from a heart). Returns true when the hero is DEAD. (P1)
 func lose_bone() -> bool:
-	if bones > 0:
-		bones -= 1
-	elif hearts > 0:
-		hearts -= 1
-		bones = Tuning.BONES_PER_HEART - 1
-	else:
-		return true
-	energy_changed.emit(hearts, bones)
-	return false
+	return runs[0].lose_bone()
 
 
-## Skull item: all energy is thrown out. Returns the number of bones to scatter (hearts x 6 + spare bones).
+## Skull item: all energy is thrown out. Returns the number of bones to scatter (hearts x 6 + spare bones). (P1)
 func scatter_energy() -> int:
-	var count: int = hearts * Tuning.BONES_PER_HEART + bones
-	hearts = 0
-	bones = 0
-	energy_changed.emit(hearts, bones)
-	return count
+	return runs[0].scatter_energy()
 
 
 ## Collect letter `index` (0..4). Returns true when this completed the word (mask is cleared, jackpot is the
@@ -271,18 +334,14 @@ func collect_feast_piece(index: int) -> bool:
 	return false
 
 
-## Switch weapon (Defs.Weapon).
+## Switch weapon (Defs.Weapon). (P1's hand: PlayerRun.set_weapon of runs[0].)
 func set_weapon(p_weapon: int) -> void:
-	weapon = clampi(p_weapon, 0, Defs.Weapon.BOOMERANG)
-	weapon_changed.emit(weapon)
+	runs[0].set_weapon(p_weapon)
 
 
-## Give or remove the hang-glider.
+## Give or remove the hang-glider. (P1)
 func set_glider(carrying: bool) -> void:
-	if has_glider == carrying:
-		return
-	has_glider = carrying
-	glider_changed.emit(has_glider)
+	runs[0].set_glider(carrying)
 
 
 ## Unlock the exit of the current level (fire-starter collected or dropped by a boss).
@@ -301,13 +360,20 @@ func set_checkpoint(pos: Vector2i) -> void:
 
 
 ## State changes of a respawn after a death (PHYSICS.md 10.4 step 3): 3 hearts, no bones, glider lost,
-## tally list cleared. Weapon, letters, score, collected counters are kept.
+## tally list cleared. Weapon, letters, score, collected counters are kept. With a party (a team wipe) every hero
+## of the party is refilled; the revive of one hero is that hero's run (PlayerRun.reset_energy, set_glider).
 func on_respawn() -> void:
 	_reset_energy()
 	has_glider = false
+	for slot: int in range(1, party):
+		runs[slot].reset_energy()
+		runs[slot].has_glider = false
 	clear_tally()
-	energy_changed.emit(hearts, bones)
-	glider_changed.emit(has_glider)
+	runs[0].emit_energy()
+	runs[0].emit_glider()
+	for slot: int in range(1, party):
+		runs[slot].emit_energy()
+		runs[slot].emit_glider()
 
 
 ## Register level totals for the completion percentage (called by the level loader; adds to the totals so a
@@ -357,14 +423,57 @@ func tally_count() -> int:
 	return tally_item_ids.size()
 
 
-## True when the hero is on full energy.
+## True when the hero is on full energy. (P1)
 func is_full_energy() -> bool:
-	return hearts >= Tuning.ENERGY_START
+	return runs[0].is_full_energy()
+
+
+static func _make_runs() -> Array[PlayerRun]:
+	var result: Array[PlayerRun] = []
+	for slot: int in Defs.MAX_PLAYERS:
+		result.append(PlayerRun.new(slot))
+	return result
 
 
 func _reset_energy() -> void:
-	hearts = Tuning.ENERGY_START
-	bones = 0
+	runs[0].reset_energy()
+
+
+func _party_hands() -> PackedInt32Array:
+	var result: PackedInt32Array = PackedInt32Array()
+	for run: PlayerRun in runs:
+		result.append(run.weapon)
+	return result
+
+
+func _party_belts() -> PackedInt32Array:
+	var result: PackedInt32Array = PackedInt32Array()
+	for run: PlayerRun in runs:
+		result.append(run.belt)
+	return result
+
+
+# The legacy signals mean P1 and come first, as in 1.0; then the per-slot twin.
+func _on_run_energy_changed(p_hearts: int, p_bones: int, slot: int) -> void:
+	if slot == 0:
+		energy_changed.emit(p_hearts, p_bones)
+	run_energy_changed.emit(slot, p_hearts, p_bones)
+
+
+func _on_run_weapon_changed(p_weapon: int, slot: int) -> void:
+	if slot == 0:
+		weapon_changed.emit(p_weapon)
+	run_weapon_changed.emit(slot, p_weapon)
+
+
+func _on_run_belt_changed(p_belt: int, slot: int) -> void:
+	run_belt_changed.emit(slot, p_belt)
+
+
+func _on_run_glider_changed(carrying: bool, slot: int) -> void:
+	if slot == 0:
+		glider_changed.emit(carrying)
+	run_glider_changed.emit(slot, carrying)
 
 
 func _reset_level_progress() -> void:

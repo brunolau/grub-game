@@ -29,7 +29,7 @@ func _should_wake() -> bool:
 	var hero: PlayerBase = _target_hero()
 	if hero == null or not _slot_free():
 		return false
-	var view: Vector2i = Game.level.get_view_rect().size
+	var view: Vector2i = Game.level.get_view_rect_of(hero).size
 	var dy: int = hero.sim_pos.y - spawn_pos.y
 	var dx: int = absi(hero.sim_pos.x - spawn_pos.x)
 	if dy <= 0 or dx >= view.x * 2:

@@ -84,6 +84,8 @@ func _load(path: String) -> void:
 		if hero is PlayerBase:
 			var hero_base: PlayerBase = hero
 			hero_base.respawn_at(start_pos)
+		# P2..P4 of a party after P1, spread from '@' (the camera follows P1); nothing in single-player.
+		spawn_party_heroes()
 	else:
 		_note_skipped(&"player/player")
 

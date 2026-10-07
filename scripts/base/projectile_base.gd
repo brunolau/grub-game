@@ -19,6 +19,9 @@ var life: int = 0
 var hurt_kind: int = Defs.HurtKind.BOSS_PROJECTILE
 ## True once it hit something or left the screen; it is freed at the end of the tick.
 var spent: bool = false
+## Player slot of the hero who threw it (spawn parameter `owner`, default 0 = P1); hero projectiles only. Each hero's
+## weapon pass tests only his own projectiles; Defs.hitter_slot() credits a hit to this slot (2.0, TECH_AUDIT.md 3.10).
+var owner_slot: int = 0
 
 var _age: int = 0
 
@@ -42,6 +45,7 @@ func _apply_params(params: Dictionary) -> void:
 	yvel = int(params.get("yvel", yvel))
 	yacc = int(params.get("yacc", yacc))
 	life = int(params.get("life", life))
+	owner_slot = clampi(int(params.get("owner", owner_slot)), 0, Defs.MAX_PLAYERS - 1)
 
 
 func _sim_tick(phase: int) -> void:
@@ -73,14 +77,19 @@ func _move_tick() -> void:
 
 
 ## Enemy projectile versus hero: a touch hurts him with `hurt_kind` and uses the projectile up. When the hurt is
-## ignored (feast, death sequence, immunity against that kind) the projectile flies on.
+## ignored (feast, death sequence, immunity against that kind) the projectile flies on. A party (2.0, TECH_AUDIT.md
+## 3.10): every living hero in LevelBase.contact_order(); the first one it hurts uses it up.
 func _test_hero() -> void:
 	var level: LevelBase = Game.level
-	if level == null or level.player == null or level.player.dead:
+	if level == null:
 		return
-	if Overlap.body(self, level.player, level.player) and level.player.hurt(self, hurt_kind):
-		_on_hit_hero()
-		consume()
+	for hero: PlayerBase in level.contact_order():
+		if hero.dead:
+			continue
+		if Overlap.body(self, hero, hero) and hero.hurt(self, hurt_kind):
+			_on_hit_hero()
+			consume()
+			return
 
 
 ## The projectile just hurt the hero (before it is consumed). Override for impact effects.

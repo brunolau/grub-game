@@ -9,14 +9,21 @@ extends SimEntity
 ##
 ## Parameters: `rect=c,r,w,h` in tiles (required; a zone without a valid rect covers the cell of its anchor and
 ## reports the problem once), `name`. The test runs in phase CONTACT_ITEMS like every other "tests itself
-## against the hero" entity; a dead hero is ignored. Subclasses override the two hooks.
+## against the hero" entity; a dead hero is ignored. Subclasses override the hooks.
+##
+## A party (2.0, TECH_AUDIT.md 3.13): every hero is tested, in LevelBase.contact_order(); `inside_mask` has one bit
+## per player slot. Per-hero effects override [method _on_hero_entered] / [method _on_hero_exited]; shared effects
+## (a camera lock, a hint) override [method _on_first_entered] / [method _on_last_exited], which run when the first
+## hero comes in and when the last one has left. With one hero both pairs fire together, as the 1.0 hooks did.
 
 ## The zone in logical px.
 var rect: Rect2i = Rect2i()
 ## Level-file parameter `name` (&"" when none).
 var zone_name: StringName = &""
-## True while the hero's feet are inside (as of the last test).
+## True while the hero's feet are inside (as of the last test). A party: while any hero's feet are inside.
 var inside: bool = false
+## Bit `slot` set while the feet of the hero of that player slot are inside (as of the last test).
+var inside_mask: int = 0
 
 
 func get_kind() -> int:
@@ -45,17 +52,27 @@ func _sim_tick(phase: int) -> void:
 	if phase != Defs.Phase.CONTACT_ITEMS:
 		return
 	var level: LevelBase = Game.level
-	if level == null or level.player == null or level.player.dead:
+	if level == null:
 		return
-	var hero: PlayerBase = level.player
-	var now: bool = Overlap.point_in(rect, hero.sim_pos.x, hero.sim_pos.y - 1)
-	if now and not inside:
-		inside = true
-		_on_hero_entered(level, hero)
-	elif not now and inside:
-		inside = false
-		_on_hero_exited(level, hero)
-		_doze_note()
+	for hero: PlayerBase in level.contact_order():
+		if hero.dead:
+			continue
+		var bit: int = 1 << hero.slot
+		var now: bool = Overlap.point_in(rect, hero.sim_pos.x, hero.sim_pos.y - 1)
+		if now and (inside_mask & bit) == 0:
+			var first: bool = inside_mask == 0
+			inside_mask |= bit
+			inside = true
+			if first:
+				_on_first_entered(level, hero)
+			_on_hero_entered(level, hero)
+		elif not now and (inside_mask & bit) != 0:
+			inside_mask &= ~bit
+			inside = inside_mask != 0
+			_on_hero_exited(level, hero)
+			if inside_mask == 0:
+				_on_last_exited(level, hero)
+				_doze_note()
 
 
 ## Dozing (SimEntity, ARCHITECTURE.md 11): a zone the hero is not in only tests his feet point, which cannot enter
@@ -70,13 +87,25 @@ func _can_doze() -> bool:
 
 func _on_level_reset() -> void:
 	inside = false
+	inside_mask = 0
 
 
-## The hero's feet just entered the rectangle. Override.
+## The hero's feet just entered the rectangle (every hero of a party, each time his own feet enter). Override.
 func _on_hero_entered(_level: LevelBase, _hero: PlayerBase) -> void:
 	pass
 
 
-## The hero's feet just left the rectangle. Override.
+## The hero's feet just left the rectangle (every hero of a party). Override.
 func _on_hero_exited(_level: LevelBase, _hero: PlayerBase) -> void:
+	pass
+
+
+## The first hero's feet entered while no hero was inside (`hero`; called before his _on_hero_entered). Override for
+## effects the party shares.
+func _on_first_entered(_level: LevelBase, _hero: PlayerBase) -> void:
+	pass
+
+
+## The last hero inside (`hero`) just left (called after his _on_hero_exited). Override for shared effects.
+func _on_last_exited(_level: LevelBase, _hero: PlayerBase) -> void:
 	pass

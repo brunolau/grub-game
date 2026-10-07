@@ -6,7 +6,8 @@ extends ProjectileBase
 ##
 ## Parameters: `skin=ember|leaf` [ember]; `yvel` v16 [random 1..4 px per tick]; `life` ticks [198];
 ## `rain` flag: ignore the spawn position and appear 150 px above the hero with a random x offset of up to 124 px
-## (the way an emitter or a boss drops them).
+## (the way an emitter or a boss drops them); `rain_slot` [0]: in a party, the player slot of that hero (2.0).
+## It is gone once it fell below every view (LevelBase.get_views_bounds).
 
 const SKIN_EMBER: String = "ember"
 const SKIN_LEAF: String = "leaf"
@@ -34,10 +35,23 @@ func _apply_params(params: Dictionary) -> void:
 	set_box(EnemyTuning.EMBER_BOX)
 	if param_bool("rain"):
 		var level: LevelBase = Game.level
-		if level != null and level.player != null:
-			var hero: Vector2i = level.player.sim_pos
+		var target: PlayerBase = _rain_target(level, int(params.get("rain_slot", 0)))
+		if target != null:
+			var hero: Vector2i = target.sim_pos
 			var dx: int = Sim.rng.range_int(-EnemyTuning.EMBER_DROP_SPREAD, EnemyTuning.EMBER_DROP_SPREAD)
 			teleport(Vector2i(hero.x + dx, hero.y - EnemyTuning.EMBER_DROP_ABOVE_HERO))
+
+
+## The hero a `rain` ember falls on: P1 (1.0: the hero); a party (2.0, TECH_AUDIT.md 3.10): the hero of player slot
+## `rain_slot` (spawn parameter, the slot of the hero inside the rain zone), P1 when that slot has no hero.
+static func _rain_target(level: LevelBase, rain_slot: int) -> PlayerBase:
+	if level == null:
+		return null
+	if level.hero_count() > 1:
+		var hero: PlayerBase = level.get_hero(rain_slot)
+		if hero != null:
+			return hero
+	return level.player
 
 
 func _ready() -> void:
@@ -67,7 +81,7 @@ func _move_tick() -> void:
 		level.grid.floor_at(Tuning.to_cell(sim_pos.x), Tuning.to_cell(sim_pos.y))
 	)
 	if on_floor or (life > 0 and _age >= life) \
-			or (_age > 1 and not on_screen and box_top() > level.get_view_rect().end.y):
+			or (_age > 1 and not on_screen and box_top() > level.get_views_bounds().end.y):
 		consume()
 
 

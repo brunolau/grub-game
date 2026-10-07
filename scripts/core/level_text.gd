@@ -6,15 +6,47 @@ extends RefCounted
 ## CONTRACT FILE. Owner: core. This is the single implementation of how level text is split and typed; the level
 ## registry, the world loader, the level validator and the debug level all go through it, so level designers and
 ## engineers cannot disagree about syntax. It knows nothing about what entities or tiles mean.
+## Level format 2 (2.0, ARCHITECTURE.md 7.11) has exactly the syntax of format 1: new [meta] keys, one new tile
+## character and new entity ids, no new rule here except that `coop_base_hash` stays a String (STRING_KEYS).
 
 ## Sections whose lines are kept verbatim (every character is a tile; no comments, no trimming).
 const RAW_SECTIONS: Array[String] = ["tiles"]
 ## Characters a [legend] line may define: letters, plus the three shortcut characters that have built-in defaults.
 const LEGEND_KEYS: String = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz?*$"
+## [meta] keys whose values always stay Strings (besides every key starting with "password"): format 2's
+## `coop_base_hash`, a sha256 in hex that must never be read as a number.
+const STRING_KEYS: Array[String] = ["coop_base_hash"]
 ## Every problem reported since the last clear_problems() (the level validator prints them with file names).
 static var problems: PackedStringArray = PackedStringArray()
 ## When true problems are only collected, not sent to push_error (validator runs, error-path tests).
 static var quiet: bool = false
+
+# --- Level format 2 (2.0, docs/expansion/DESIGN.md appendix, ARCHITECTURE.md 7.11): facts every reader shares -----
+## `format` of the 1.0 files.
+const FORMAT_1: int = 1
+## `format` of the 2.0 files: format 1 plus the [meta] keys, the tar floor ':' and the entity ids of 7.11.
+const FORMAT_2: int = 2
+## Every format this build reads (a format-1 file loads exactly as in 1.0).
+const FORMATS: Array[int] = [FORMAT_1, FORMAT_2]
+## Meta `book`: 1 = Book I "The First Feast" (the default: every 1.0 file), 2 = Book II "The Far Shore".
+const BOOK_1: int = 1
+const BOOK_2: int = 2
+const BOOKS: Array[int] = [BOOK_1, BOOK_2]
+## Meta `belt` (PHYSICS.md C.2): `fresh` = every stage starts with the club in hand and a special on the belt;
+## `carry` = the 1.0 rule (one weapon, carried and replaced on pick-up; Swap ignored).
+const BELT_FRESH: String = "fresh"
+const BELT_CARRY: String = "carry"
+const BELTS: Array[String] = [BELT_FRESH, BELT_CARRY]
+## Meta `kind` values added by format 2 (the 1.0 kinds are the KIND_* constants of the `Levels` registry):
+## `coop` = the co-op version of the solo level named by `coop_of`; `arena` = a versus arena. Neither ever appears in
+## a solo registry query.
+const KIND_COOP: String = "coop"
+const KIND_ARENA: String = "arena"
+## The [meta] keys format 2 adds (each may take a `.beginner` / `.expert` variant like every key).
+const META_KEYS_2: Array[String] = [
+	"book", "belt", "coop_of", "coop_base_hash", "players", "round_time", "modes", "wrap", "sudden", "rise_speed",
+	"wind_loop",
+]
 
 ## Built-in legend entries (a level may override them by defining the same character in [legend]).
 const DEFAULT_LEGEND: Dictionary = {
@@ -100,7 +132,7 @@ static func parse_value(text: String) -> Variant:
 
 
 ## Parse `key = value` lines (already split by split_sections) into a Dictionary. Keys starting with
-## "password" always stay Strings.
+## "password" and the keys of STRING_KEYS always stay Strings.
 static func parse_key_values(lines: PackedStringArray) -> Dictionary:
 	var result: Dictionary = {}
 	for line: String in lines:
@@ -110,7 +142,7 @@ static func parse_key_values(lines: PackedStringArray) -> Dictionary:
 			continue
 		var key: String = line.substr(0, eq).strip_edges()
 		var value_text: String = line.substr(eq + 1).strip_edges()
-		if key.begins_with("password"):
+		if key.begins_with("password") or STRING_KEYS.has(key.get_slice(".", 0)):
 			result[key] = value_text.trim_prefix("\"").trim_suffix("\"")
 		else:
 			result[key] = parse_value(value_text)
@@ -212,6 +244,29 @@ static func applies_to(params: Dictionary, difficulty: int) -> bool:
 	if params.has("beginner") and bool(params["beginner"]) and difficulty != Defs.Difficulty.BEGINNER:
 		return false
 	return true
+
+
+## The `belt` rule of a level that does not set the key (PHYSICS.md C.2, LEVEL_DESIGN.md 15.2): BELT_FRESH for
+## book 2 and for every co-op file, else BELT_CARRY (so every 1.0 file keeps the 1.0 weapon rule).
+static func default_belt(book: int, kind: String) -> String:
+	return BELT_FRESH if book == BOOK_2 or kind == KIND_COOP else BELT_CARRY
+
+
+## The book of a parsed [meta] section (`book`, default BOOK_1).
+static func meta_book(meta: Dictionary) -> int:
+	return int(meta.get("book", BOOK_1))
+
+
+## The belt rule of a parsed [meta] section for a difficulty (-1 = none): `belt` with its difficulty variant, else
+## [method default_belt] of its book and kind.
+static func meta_belt(meta: Dictionary, difficulty: int = -1) -> String:
+	if difficulty >= 0:
+		var variant_key: String = "belt.%s" % Defs.difficulty_name(difficulty)
+		if meta.has(variant_key):
+			return str(meta[variant_key])
+	if meta.has("belt"):
+		return str(meta["belt"])
+	return default_belt(meta_book(meta), str(meta.get("kind", "main")))
 
 
 ## Split a list value `a,b,c` into Strings (a single value yields one element; "" yields none).

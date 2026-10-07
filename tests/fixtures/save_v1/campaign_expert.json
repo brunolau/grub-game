@@ -1,0 +1,96 @@
+{
+  "code_stones": [
+    "w1_l1:3",
+    "w1_l2:0",
+    "w1_l2:1",
+    "w2_l1:3",
+    "w2_l1:0",
+    "w2_l1:1",
+    "w2_l1:2",
+    "w2_l2:1",
+    "w3_l1:0",
+    "w3_l1:1",
+    "w3_l1b:3",
+    "w3_l2:0",
+    "w3_l2:1",
+    "w3_l2:2",
+    "w3_l2:3",
+    "w4_l1:0",
+    "w4_l1:1",
+    "w4_l1:3",
+    "w4_l1:2",
+    "w4_l2:1",
+    "w4_l2:0",
+    "w4_l2:2",
+    "w4_l2:3"
+  ],
+  "completed": {
+    "beginner": false,
+    "expert": true
+  },
+  "high_score": 3069500,
+  "results": {
+    "beginner": {},
+    "expert": {
+      "ending": {
+        "clears": 1,
+        "percent": 94,
+        "score": 3069500
+      },
+      "w1_l1": {
+        "clears": 1,
+        "percent": 54,
+        "score": 124400
+      },
+      "w1_l2": {
+        "clears": 1,
+        "percent": 51,
+        "score": 563100
+      },
+      "w2_l1": {
+        "clears": 1,
+        "percent": 92,
+        "score": 1018800
+      },
+      "w2_l2": {
+        "clears": 1,
+        "percent": 63,
+        "score": 1242300
+      },
+      "w3_l1": {
+        "clears": 1,
+        "percent": 77,
+        "score": 1842800
+      },
+      "w3_l2": {
+        "clears": 1,
+        "percent": 84,
+        "score": 2225300
+      },
+      "w4_l1": {
+        "clears": 1,
+        "percent": 72,
+        "score": 2697100
+      },
+      "w4_l2": {
+        "clears": 1,
+        "percent": 96,
+        "score": 2836900
+      }
+    }
+  },
+  "stats": {},
+  "unlocked": {
+    "beginner": [],
+    "expert": [
+      "w1_l2",
+      "w2_l1",
+      "w2_l2",
+      "w3_l1",
+      "w3_l2",
+      "w4_l1",
+      "w4_l2"
+    ]
+  },
+  "version": 1
+}

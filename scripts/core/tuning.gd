@@ -165,10 +165,11 @@ const CLUB_ORIGIN: Array[Vector2i] = [
 const HAMMER_FRONT_BOX: Rect2i = Rect2i(2, -16, 48, 26)
 const HAMMER_FRONT_ORIGIN: Vector2i = Vector2i(26, 10)
 
-## Per weapon (index = Defs.Weapon): power, swing_lock, thrown. [P 8.1]
-const WEAPON_POWER: Array[int] = [25, 30, 20, 30]
-const WEAPON_LOCK: Array[int] = [2, 6, 6, 12]
-const WEAPON_THROWN: Array[bool] = [false, false, true, true]
+## Per weapon (index = Defs.Weapon): power, swing_lock, thrown. [P 8.1] The fifth entry is the 2.0 spear
+## (SPEAR_POWER, SPEAR_LOCK below, DESIGN.md C.2).
+const WEAPON_POWER: Array[int] = [25, 30, 20, 30, 25]
+const WEAPON_LOCK: Array[int] = [2, 6, 6, 12, 6]
+const WEAPON_THROWN: Array[bool] = [false, false, true, true, true]
 const CHARGE_STEP: int = 2           ## per crouch / crawl tick while charge <= CHARGE_STEP_MAX_AT [P 8.5]
 const CHARGE_STEP_MAX_AT: int = 48
 const CHARGE_MULTIPLIER: int = 4     ## power x4 while charge > 0 [P 8.5]
@@ -306,6 +307,8 @@ const CAM_SMOOTH_MARGIN: int = 128
 ## spring's or a head's bounce lift (up to a hero box height) earlier in the same phase; teleports decide again at
 ## once. The view reach is the enemy activation margin: the view is read only by the wake rule of asleep enemies
 ## (ENEMY_SPAWN_MARGIN_PX), in phase ENEMIES, with the view of the last decision. [own]
+## A party (2.0): the reach applies to every hero; a party move faster than 18 px per tick (a throw, a launch, an
+## egg's return, a leash pull) calls LevelBase.notify_hero_teleported (PartyTuning.MOVE_MAX_PX_PER_TICK).
 const DOZE_HERO_REACH_PX: int = 128
 const DOZE_VIEW_REACH_PX: int = ENEMY_SPAWN_MARGIN_PX
 ## Both doze rectangles are rounded outwards to this grid, so they are only looked at again when they cross a line.
@@ -359,6 +362,64 @@ const MAX_FLIES: int = 20            ## cosmetic flies around a hero who walked 
 const ANIM_TICKS_PER_SECOND: int = 24
 ## v16 of a speed of 1 px per tick: converts level parameters given in px per tick (enemy catalogue). [P 2]
 const V16_PER_PX: int = 16
+
+# =================================================================================================================
+# 2.0 expansion: Book II hero and world rules (docs/expansion/DESIGN.md C; the PHYSICS.md appendix "Party and
+# Book II rules" of PLAN.md P0.2 takes them over). Appended only: Book I never reads them. Co-op numbers live in
+# [PartyTuning], versus numbers in [VersusTuning], mount numbers in MountTuning (player), Book II enemy and boss
+# numbers in EnemyTuning (enemies). [D x] = DESIGN.md section x; (tune) = a playtest starting value, changed only
+# through DESIGN.md.
+# =================================================================================================================
+# Weapon belt and Swap [D C.1]
+const SWAP_LOCKOUT_TICKS: int = 8        ## after a swap the next one waits this long (tune)
+# Spear and bark boards [D C.2]
+const SPEAR_XVEL: int = 192              ## v16: thrown flat at 12 px/tick, signed by facing ...
+const SPEAR_FLAT_TICKS: int = 8          ## ... for this many ticks, then it drops ...
+const SPEAR_YACC: int = 16               ## ... gaining this many v16 per tick
+const SPEAR_POWER: int = 25
+const SPEAR_LOCK: int = 6                ## recovery ticks after a throw
+const SPEAR_MAX_PER_HERO: int = 2        ## in flight or stuck; a third throw pulls out the oldest
+const BARK_BOARD_STEP_TICKS: int = 220   ## a spear stuck in a bark board is a one-way step this long ...
+const BARK_BOARD_BLINK_TICKS: int = 22   ## ... blinking for its last 22 ticks, then it falls
+const BARK_BOARD_STEP_W: int = 16        ## px: width of that one-way step
+# Vines [D C.3]
+const VINE_GRAB_DX: int = 6              ## px: Up grabs a vine while the feet column is this close to it
+const VINE_CLIMB_UP_PX: int = 2          ## px per tick
+const VINE_CLIMB_DOWN_PX: int = 3        ## px per tick
+const VINE_JUMP_YVEL: int = -128         ## v16: Jump lets go upward ...
+const VINE_JUMP_XVEL: int = 32           ## ... plus this much toward the held direction
+# Tar floor `:` (honey / syrup are its Feast Land skins) [D C.4]
+const TAR_SURFACE_DROP_PX: int = 6       ## the surface lies this much lower (TileGrid lowered-surface profile)
+const TAR_WALK_CAP: int = 32             ## v16 = 2 px/tick for heroes and ground enemies (Chomper excepted)
+const TAR_JUMP_IMPULSE_TICKS: int = 2    ## jump thrust only on the first 2 jump ticks: a 33 px hop (tune) [R2] [P C.5]
+const TAR_AIR_CAP: int = 32              ## v16: ACCEL limit of the airborne step after a take-off from tar (tune) [R2]
+# Geysers [D C.4]
+const GEYSER_BUBBLE_TICKS: int = 22      ## the telegraph (with sound) before every spout
+const GEYSER_SPOUT_TICKS: int = 12
+const GEYSER_POWER: int = -224           ## v16: default launch of heroes, enemies, rafts and drop platforms
+# Rafts and currents [D C.5]
+const RAFT_WIDTHS: Array[int] = [3, 4]   ## cells (objects/raft width=)
+const CURRENT_SPEED_MIN_PX: int = 1      ## zones/current speed range, px per tick
+const CURRENT_SPEED_MAX_PX: int = 3
+const RAFT_DRAG_PERIOD: int = 8          ## outside a current a raft loses 1 px/tick of speed every 8 ticks
+const RAFT_PADDLE_V16: int = 16          ## a forward strike on a raft pushes it backward by this ...
+const RAFT_PADDLE_MAX_PX: int = 3        ## ... up to 3 px/tick
+const RAFT_DIP_PX: int = 2               ## a raft dips this much under each rider (visual only)
+# Rising tide [D C.6]
+const RISE_SPEED: int = 16               ## v16: default `rise_speed` of `scroll = rising` (1 px/tick)
+const RISE_CHECKPOINT_ROWS: int = 6      ## a checkpoint resets the deadly band to this many rows under itself
+# Rules shared by several modules [D B.0] [D C.9]
+const TELEGRAPH_MIN_TICKS: int = 10      ## every boss attack and versus hazard shows itself at least this early
+const PAINTING_COUNT: int = 30           ## items/painting index 0..29: 0-19 Book II levels, 20-29 Book I co-op
+const PAINTING_BOOK2_COUNT: int = 20
+const PAINTING_POINTS: int = 5000        ## displayed points per painting
+## Paintings found (per profile, across modes) that unlock each reward. [D C.9]
+const PAINTING_UNLOCK_MESA_RODEO: int = 5     ## arena 9
+const PAINTING_UNLOCK_LOINCLOTHS: int = 10    ## eight loincloth patterns for P1-P4
+const PAINTING_UNLOCK_VARIANTS: int = 15      ## Big Bounce, Lights Out, Giant Rain
+const PAINTING_UNLOCK_CLOUD_TOP: int = 20     ## arena 10
+const PAINTING_UNLOCK_SPEAR_PARTY: int = 25   ## the Spear Party variant and the golden loincloth palette
+const PAINTING_UNLOCK_MURAL: int = 30         ## the mural at the end of The Long Raft Home
 
 
 # =================================================================================================================

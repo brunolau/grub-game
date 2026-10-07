@@ -58,7 +58,7 @@ func _ai_tick() -> void:
 				_play(&"bite", true)
 				Audio.play_sfx(Sfx.ENEMY_VOICE)
 		State.BITE:
-			_bite(hero)
+			_bite()
 			if _anim_done():
 				_state = State.RECOVER
 				_play(&"recover", true)
@@ -78,9 +78,15 @@ func _on_hurt(_power: int) -> void:
 	_play(&"hurt", true)
 
 
-func _bite(hero: PlayerBase) -> void:
-	if hero == null or hero.is_feasting() or hero.is_immune():
+## The lunge bites every hero in its strip (2.0, TECH_AUDIT.md 3.8: every living hero in LevelBase.contact_order();
+## 1.0 tested the one hero, the target, unless he was dead). It senses only the target.
+func _bite() -> void:
+	var level: LevelBase = Game.level
+	if level == null:
 		return
-	var bite: Rect2i = get_bite_rect()
-	if bite.size.x > 0 and Overlap.rects(bite, hero.get_box()) and hero.hurt(self, Defs.HurtKind.ENEMY):
-		on_hurt_hero(hero)
+	for hero: PlayerBase in level.contact_order():
+		if hero.dead or hero.is_feasting() or hero.is_immune():
+			continue
+		var bite: Rect2i = get_bite_rect()
+		if bite.size.x > 0 and Overlap.rects(bite, hero.get_box()) and hero.hurt(self, Defs.HurtKind.ENEMY):
+			on_hurt_hero(hero)

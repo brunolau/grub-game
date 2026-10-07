@@ -6,7 +6,9 @@ extends RefCounted
 ## level-file tile character means physically; the world loader must build collision with [method from_rows] and
 ## the hero / enemies must query collision through the getters below (never through TileMapLayer or physics).
 ##
-## Cells are 16 x 16 logical px. Out-of-range cells read as empty (FLOOR 0, SIDE 0, FLAGS 0, no profile).
+## Cells are 16 x 16 logical px. Out-of-range cells read as empty (FLOOR 0, SIDE 0, FLAGS 0, no profile, no material).
+## Level format 2 (2.0) adds one character, the tar floor ':' (CH_TAR), and a fifth per-cell table, the material
+## (MATERIAL_TAR = the TAR flag of PHYSICS.md C.5); a format-1 level builds exactly the 1.0 tables.
 ##
 ## Difference to the original engine: the HEIGHT byte is replaced by a `profile` id, because our art has 45 degree
 ## and half-gradient slopes instead of the original 1:3 gradient. `has_profile()` is the original's
@@ -72,8 +74,22 @@ const CH_PLAYER_START: String = "@"
 const CH_SPOT_SMALL: String = "?"
 const CH_SPOT_BIG: String = "*"
 const CH_BREAKABLE: String = "$"
+## Tar floor (level format 2, PHYSICS.md C.5): set-A ground (floor, wall, ceiling as '#') whose flat surface lies
+## Tuning.TAR_SURFACE_DROP_PX lower (profile PROFILE_TAR) and whose material is MATERIAL_TAR. Honey and syrup are
+## its Feast Land skins (meta `liquid`); the rules are the same.
+const CH_TAR: String = ":"
 ## Every fixed (non-letter) legend character.
-const LEGEND_CHARS: String = ". #%;-=_/\\1234^!~|+@?*$"
+const LEGEND_CHARS: String = ". #%;-=_/\\1234^!~|+@?*$:"
+
+# --- Materials (level format 2): the TAR flag of PHYSICS.md C.5, kept beside the four 1.0 tables -----------------------
+## Ordinary cell (every cell of a format-1 level).
+const MATERIAL_NONE: int = 0
+## Tar floor ':' : heroes wade (Tuning.TAR_WALK_CAP, TAR_AIR_CAP after a tar take-off, TAR_JUMP_IMPULSE_TICKS of
+## jump thrust), ground enemies are slowed the same way, dropped items stop dead (PHYSICS.md C.5). Read it with
+## [method is_tar].
+const MATERIAL_TAR: int = 1
+## Surface profile of the tar floor: a flat surface lowered by Tuning.TAR_SURFACE_DROP_PX (6) px.
+const PROFILE_TAR: int = PROFILE_LOWERED_BASE + Tuning.TAR_SURFACE_DROP_PX
 
 ## Width in tiles.
 var cols: int = 0
@@ -89,6 +105,8 @@ var _side: PackedByteArray = PackedByteArray()
 var _flags: PackedByteArray = PackedByteArray()
 var _profile: PackedByteArray = PackedByteArray()
 var _chars: PackedByteArray = PackedByteArray()
+## MATERIAL_* per cell (format 2; all MATERIAL_NONE in a format-1 level).
+var _material: PackedByteArray = PackedByteArray()
 
 
 ## Create an empty (all air) grid.
@@ -111,6 +129,8 @@ func resize(p_cols: int, p_rows: int) -> void:
 	_profile.fill(0)
 	_chars.resize(count)
 	_chars.fill(46)  # '.'
+	_material.resize(count)
+	_material.fill(MATERIAL_NONE)
 
 
 ## Build a grid from the rows of a level file's [tiles] section.
@@ -238,6 +258,19 @@ static func profile_offset(profile: int, x: int) -> int:
 	return 0
 
 
+## Material of a cell (MATERIAL_NONE outside the grid): MATERIAL_TAR for a tar floor ':'.
+func material_at(col: int, row: int) -> int:
+	if col < 0 or row < 0 or col >= cols or row >= rows:
+		return MATERIAL_NONE
+	return _material[row * cols + col]
+
+
+## True when (col, row) is a tar floor ':' (PHYSICS.md C.5): a hero whose grounded feet tile is tar wades; ground
+## enemies on it move at most Tuning.TAR_WALK_CAP; dropped items landing on it stop dead. False outside the grid.
+func is_tar(col: int, row: int) -> bool:
+	return material_at(col, row) == MATERIAL_TAR
+
+
 ## True when a FLOOR value is a walkable floor for something that ignores hatches (enemies, dropped items,
 ## drop platforms: "FLOOR not 0 and not 6", PHYSICS.md 11.4).
 static func is_ground(floor_value: int) -> bool:
@@ -274,7 +307,8 @@ func set_char(col: int, row: int, ch: String) -> void:
 				_update_glue(c, r)
 
 
-## Low-level setter for one cell (does not touch the stored legend character). For tests and special tiles.
+## Low-level setter for one cell (does not touch the stored legend character nor the material). For tests and
+## special tiles.
 func set_props(col: int, row: int, floor_value: int, side_value: int, flags_value: int, profile: int) -> void:
 	if not in_bounds(col, row):
 		return
@@ -322,11 +356,19 @@ func _apply_char(col: int, row: int) -> void:
 	var side_value: int = SIDE_OPEN
 	var flags_value: int = 0
 	var profile: int = PROFILE_NONE
+	var material: int = MATERIAL_NONE
 	match ch:
 		CH_SOLID_A:
 			floor_value = _floor_for_set(false)
 			side_value = SIDE_WALL
 			flags_value = CEILING_SOLID
+		CH_TAR:
+			# Format 2: '#' with a surface 6 px lower and the TAR material (PHYSICS.md C.5).
+			floor_value = _floor_for_set(false)
+			side_value = SIDE_WALL
+			flags_value = CEILING_SOLID
+			profile = PROFILE_TAR
+			material = MATERIAL_TAR
 		CH_SOLID_B:
 			floor_value = _floor_for_set(true)
 			side_value = SIDE_WALL
@@ -378,6 +420,7 @@ func _apply_char(col: int, row: int) -> void:
 	_side[i] = side_value
 	_flags[i] = flags_value
 	_profile[i] = profile
+	_material[i] = material
 
 
 ## A flat floor at the foot of a slope becomes PROFILE_FLAT_GLUE so that the step-down rule of PHYSICS.md 11.1

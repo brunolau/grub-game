@@ -61,8 +61,8 @@ func alive_copies() -> int:
 func _asleep_tick() -> void:
 	if _is_copy:
 		return
-	var hero: PlayerBase = _target_hero()
-	if hero == null or not _triggered(hero):
+	var hero: PlayerBase = _trigger_hero()
+	if hero == null:
 		return
 	if _cooldown > 0:
 		_cooldown -= 1
@@ -131,6 +131,20 @@ func _on_spawned(_by: SpawnerEnemy) -> void:
 # =================================================================================================================
 # Internals
 # =================================================================================================================
+
+## The hero for whom the trigger holds this tick (the next copy appears around him), or null: the target hero
+## (1.0); a party (2.0, TECH_AUDIT.md 3.8): the first hero in LevelBase.contact_order() that enemies may target
+## (PlayerBase.is_party_targetable) and for whom `_triggered()` holds - any hero triggers.
+func _trigger_hero() -> PlayerBase:
+	var level: LevelBase = Game.level
+	if level == null or level.hero_count() <= 1:
+		var target: PlayerBase = _target_hero()
+		return target if target != null and _triggered(target) else null
+	for hero: PlayerBase in level.contact_order():
+		if hero.is_party_targetable() and _triggered(hero):
+			return hero
+	return null
+
 
 func _child_gone() -> void:
 	_alive = maxi(_alive - 1, 0)

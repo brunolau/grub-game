@@ -13,7 +13,8 @@ func _init() -> void:
 
 
 func _apply(hero: PlayerBase) -> bool:
-	if Game.has_glider:
+	# The collector's own glider (2.0: his PlayerRun; P1's run is Game's, so Game.has_glider in 1.0).
+	if hero.run.has_glider:
 		return false
 	hero.set_glider(true)
 	return true

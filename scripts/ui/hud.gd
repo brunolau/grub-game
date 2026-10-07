@@ -152,19 +152,23 @@ func _process(delta: float) -> void:
 		_show_letters(Game.letters)
 
 
-## Fade the top row while the hero's head is under it (see ROW_UNDER_HERO_ALPHA).
+## Fade the top row while the hero's head is under it (see ROW_UNDER_HERO_ALPHA; 2.0: any living hero's head).
 func _fade_row(delta: float) -> void:
 	var level: LevelBase = Game.level
 	var under: bool = false
-	if level != null and level.player != null and level.player.is_inside_tree() and not level.player.dead:
-		var feet: Vector2 = level.player.get_global_transform_with_canvas().origin
-		under = is_under_row(feet.y - float(level.player.box_h * Tuning.ART_SCALE))
+	if level != null:
+		for hero: PlayerBase in level.contact_order():
+			if hero.is_inside_tree() and not hero.dead:
+				var feet: Vector2 = hero.get_global_transform_with_canvas().origin
+				if is_under_row(feet.y - float(hero.box_h * Tuning.ART_SCALE)):
+					under = true
+					break
 	row_alpha = move_toward(row_alpha, ROW_UNDER_HERO_ALPHA if under else 1.0, delta / ROW_FADE_SECONDS)
 	for node: CanvasItem in _row_nodes:
 		node.modulate.a = row_alpha
 
 
-## Fade the boss bar while the hero overlaps it.
+## Fade the boss bar while the hero overlaps it (2.0: any living hero).
 func _fade_boss_bar(delta: float) -> void:
 	if _boss_bar.visible != _boss_bar_was_visible:
 		# The bar appeared or finished fading out: move the banner and the hint panel.
@@ -175,11 +179,16 @@ func _fade_boss_bar(delta: float) -> void:
 		return
 	var behind: bool = false
 	var level: LevelBase = Game.level
-	if level != null and level.player != null and level.player.is_inside_tree() and not level.player.dead:
-		var feet: Vector2 = level.player.get_global_transform_with_canvas().origin
-		var box: Vector2 = Vector2(float(level.player.box_w), float(level.player.box_h)) * float(Tuning.ART_SCALE)
-		var hero: Rect2 = Rect2(feet.x - box.x * 0.5, feet.y - box.y, box.x, box.y)
-		behind = hero.intersects(get_boss_bar_rect().grow(4.0))
+	if level != null:
+		for hero: PlayerBase in level.contact_order():
+			if not hero.is_inside_tree() or hero.dead:
+				continue
+			var feet: Vector2 = hero.get_global_transform_with_canvas().origin
+			var box: Vector2 = Vector2(float(hero.box_w), float(hero.box_h)) * float(Tuning.ART_SCALE)
+			var body: Rect2 = Rect2(feet.x - box.x * 0.5, feet.y - box.y, box.x, box.y)
+			if body.intersects(get_boss_bar_rect().grow(4.0)):
+				behind = true
+				break
 	var target: float = BOSS_UNDER_HERO_ALPHA if behind else 1.0
 	_boss_bar.self_modulate.a = move_toward(_boss_bar.self_modulate.a, target, delta / ROW_FADE_SECONDS)
 

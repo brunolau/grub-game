@@ -16,16 +16,26 @@ const SECTION_TILES: String = "tiles"
 const SECTION_ENTITIES: String = "entities"
 const SECTION_BACKWALL: String = "backwall"
 const SECTION_OVERRIDES: String = "overrides"
-## Every section of format 1.
+## Every section of format 1 (format 2 adds none).
 const SECTIONS: Array[String] = ["meta", "legend", "tiles", "entities", "backwall", "overrides"]
 
-const KINDS: Array[String] = ["main", "sub", "bonus", "ending", "test"]
-const BIOMES: Array[String] = ["jungle", "cave", "ice", "volcano", "feast", "village"]
-const LIQUIDS: Array[String] = ["water", "lava", "ice_water"]
+## Allowed [meta] values. Format 2 (2.0, ARCHITECTURE.md 7.11) appends: kinds `coop` / `arena`, the five Book II
+## biomes, the liquids `tar` / `honey` / `syrup` (looks of the deadly `~` and of the tar floor ':'), `scroll = rising`.
+const KINDS: Array[String] = ["main", "sub", "bonus", "ending", "test", "coop", "arena"]
+const BIOMES: Array[String] = [
+	"jungle", "cave", "ice", "volcano", "feast", "village", "canyon", "swamp", "coast", "ruins", "sky",
+]
+const LIQUIDS: Array[String] = ["water", "lava", "ice_water", "tar", "honey", "syrup"]
 const BACKGROUNDS: Array[String] = ["jungle", "cave", "ice", "volcano", "volcano_shaft", "feast", "none"]
-const SCROLLS: Array[String] = ["normal", "vertical", "autoscroll"]
+const SCROLLS: Array[String] = ["normal", "vertical", "autoscroll", "rising"]
 const DIFFICULTIES: Array[String] = ["beginner", "expert"]
 const OVERRIDE_LAYERS: Array[String] = ["back", "main", "front"]
+## Format 2 values: arena edges (`wrap`) and the arena's themed sudden death (`sudden`, DESIGN.md E.6).
+const WRAPS: Array[String] = ["none", "lr", "tb"]
+const SUDDEN_DEATHS: Array[String] = [
+	"stampede", "cave_in", "whiteout", "lava_rise", "tar_rise", "high_tide", "syrup_flood", "stalactites",
+	"rockslide", "lightning",
+]
 
 ## Parallax set used when `background` is missing, by biome.
 const BIOME_BACKGROUND: Dictionary = {
@@ -36,25 +46,35 @@ const BIOME_MUSIC: Dictionary = {
 	"jungle": Sfx.MUSIC_JUNGLE, "cave": Sfx.MUSIC_CAVE, "ice": Sfx.MUSIC_ICE, "volcano": Sfx.MUSIC_VOLCANO,
 	"feast": Sfx.MUSIC_BONUS, "village": Sfx.MUSIC_ENDING,
 }
-## Terrain atlas used when `terrain_a` is missing or does not exist, by biome.
+## Terrain atlas used when `terrain_a` is missing or does not exist, by biome. The Book II biomes name their own
+## sets (LEVEL_DESIGN.md 15.2); WorldTileSet falls back while an atlas is not drawn yet. (Their backdrop and music
+## defaults come with their art and AudioTable rows, world-A / core-A phase 1: until then `background` and `music`
+## fall back to the jungle's, and LEVEL_DESIGN.md 15.2 asks every Book II file to set `music` itself.)
 const BIOME_TERRAIN: Dictionary = {
 	"jungle": "jungle/terrain_grass", "cave": "cave/terrain", "ice": "ice/terrain", "volcano": "volcano/terrain",
-	"feast": "feast/terrain", "village": "jungle/terrain_grass",
+	"feast": "feast/terrain", "village": "jungle/terrain_grass", "canyon": "canyon/terrain",
+	"swamp": "swamp/terrain", "coast": "coast/terrain", "ruins": "ruins/terrain", "sky": "sky/terrain",
 }
-## Plain defaults of the [meta] keys (section 7.3). Keys whose default depends on other keys (`name`,
-## `terrain_a`, `terrain_b`, `background`, `music`, `fast_vscroll`, `bonus_tier`) are resolved in [method value].
+## Plain defaults of the [meta] keys (section 7.3, format 2: 7.11). Keys whose default depends on other keys (`name`,
+## `terrain_a`, `terrain_b`, `background`, `music`, `fast_vscroll`, `bonus_tier`, `belt`) are resolved in
+## [method value]. `players` 0 = not an arena; `sudden` "" = the arena's biome decides (world-B).
 const META_DEFAULTS: Dictionary = {
 	"format": 0, "id": "", "kind": "main", "world": 0, "stage": 0, "biome": "jungle", "ice_a": 0, "ice_b": 0,
 	"liquid": "water", "time": 0, "password_beginner": "", "password_expert": "", "next": "", "tally": true,
 	"bonus": "", "min_difficulty": "beginner", "scroll": "normal", "low_band": false, "home_row": -1,
 	"dark": false, "wind": "",
+	"book": LevelText.BOOK_1, "coop_of": "", "coop_base_hash": "", "players": 0, "round_time": 90, "modes": "",
+	"wrap": "none", "sudden": "", "rise_speed": Tuning.RISE_SPEED, "wind_loop": 0,
 }
 ## Every key a [meta] section may contain (a difficulty suffix `.beginner` / `.expert` may follow any of them).
+## The last row is format 2 (LevelText.META_KEYS_2).
 const META_KEYS: Array[String] = [
 	"format", "id", "name", "kind", "order", "world", "stage", "biome", "terrain_a", "terrain_b", "ice_a", "ice_b",
 	"liquid", "background", "music", "time", "password_beginner", "password_expert", "next", "tally", "bonus",
 	"min_difficulty", "scroll", "low_band", "home_row", "fast_vscroll", "dark", "wind", "bonus_tier", "author",
 	"notes",
+	"book", "belt", "coop_of", "coop_base_hash", "players", "round_time", "modes", "wrap", "sudden", "rise_speed",
+	"wind_loop",
 ]
 const TERRAIN_DIR: String = "res://assets/tiles/"
 
@@ -140,6 +160,8 @@ func value(key: String, difficulty: int = -1) -> Variant:
 			return str(value("background", difficulty)) != "none"
 		"bonus_tier":
 			return clampi(int(value("world", difficulty)) - 1, 0, 2)
+		"belt":
+			return LevelText.default_belt(int(value("book", difficulty)), str(value("kind", difficulty)))
 	return META_DEFAULTS.get(key, "")
 
 

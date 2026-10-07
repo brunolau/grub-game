@@ -65,9 +65,11 @@ func _apply_params(params: Dictionary) -> void:
 func _sim_tick(_phase: int) -> void:
 	_age += 1
 	if turn:
+		# The hero it turns to: the nearest one enemies would target (2.0, LevelBase.target_hero; 1.0: the hero
+		# unless dead).
 		var level: LevelBase = Game.level
-		var hero: PlayerBase = level.player if level != null else null
-		if hero != null and not hero.dead:
+		var hero: PlayerBase = level.target_hero(self) if level != null else null
+		if hero != null:
 			var dx: int = hero.sim_pos.x - sim_pos.x
 			if absi(dx) < TURN_RANGE_X and absi(hero.sim_pos.y - sim_pos.y) < TURN_RANGE_Y and dx != 0:
 				facing = 1 if dx > 0 else -1

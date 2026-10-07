@@ -8,6 +8,18 @@ extends Node2D
 ##
 ## Everything positional is in logical px (feet points); the level node itself and all entity containers must
 ## stay at the canvas origin with identity transform, because SimEntity writes `position = sim_pos * ART_SCALE`.
+##
+## 2.0 PlayerSet (docs/expansion/TECH_AUDIT.md 4.1, PLAN.md P0.6): a level may hold up to Defs.MAX_PLAYERS heroes,
+## one per player slot ([member heroes]; slot 0 = P1 = [member player]). Every reader of "the hero" uses one of three
+## idioms, and each reduces to the 1.0 code for a party of one (the single-player game, TECH_AUDIT.md 2):
+##  - target: `level.target_hero(self)` - the hero an enemy reacts to (1.0: `player` unless dead);
+##  - every:  `for hero: PlayerBase in level.contact_order(): ...` - every hero in contact order (1.0: `[player]`);
+##  - P1:     `level.player` - genuinely player 1 (the camera of 1.0, a P1 HUD panel, traces).
+## Views: [method get_view_count], [method get_view_rect_at], [method get_view_rect_of], [method get_views_bounds];
+## `is_in_view` and the `on_screen` flags mean "in any view" (one view in 1.0). The doze manager keeps one rectangle
+## per hero. The party rules themselves (eggs, the tribe camera, versus) are NOT here: a party of two or more gets
+## only the neutral defaults documented on each member (TECH_AUDIT.md 4.7; the PartyDriver of PLAN.md P1 replaces
+## them). A party of one never reaches a party branch: they are all behind `hero_count() > 1`.
 
 ## Gameplay is about to start: the grid is built, the hero is spawned, Sim is started.
 signal play_started
@@ -20,12 +32,22 @@ var level_id: StringName = &""
 var meta: Dictionary = {}
 ## Collision grid. Never null once the level is ready.
 var grid: TileGrid = TileGrid.new(0, 0)
-## The hero (null until spawned).
+## The hero: P1, the hero of player slot 0 (null until spawned). In single-player the only hero.
 var player: PlayerBase = null
-## Where the hero starts when no checkpoint is active (feet point, logical px).
+## Where the hero (P1) starts when no checkpoint is active (feet point, logical px).
 var start_pos: Vector2i = Vector2i(Tuning.TILE * 2, Tuning.TILE * 2)
+## Every hero of the level in slot order: `heroes[s]` is the hero of player slot `s` (PlayerBase.slot), slot 0 = P1 =
+## [member player]. A single-player level holds `[player]`. Kept by the registry (a hero registers himself when he
+## enters the tree): read it, never write it. Within 0..hero_count() - 1 an entry is null only while the level is
+## built or torn down. For loops use [method contact_order] (no null entries, the order contested contacts use).
+var heroes: Array[PlayerBase] = []
+## Feet points (logical px) where each player slot starts, filled by the level loader (index = slot): [0] = '@' =
+## [member start_pos], [s] = the `objects/hero_start slot=<s + 1>` marker or the spread of
+## PartyTuning.RESPAWN_SPREAD_PX per slot from '@'. Ask [method get_start_pos_for]: it also answers for a slot the
+## loader did not fill (and for slot 0 always returns [member start_pos]).
+var start_positions: Array[Vector2i] = []
 ## Screen-shake counter of PHYSICS.md 13.3. Write it through request_shake(); the hero decrements it with
-## tick_shake_timer() in his timer step.
+## tick_shake_timer() in his timer step (a party: tick_shake_timer_by(), once per tick).
 var shake: int = 0
 ## Vertical view offset in logical px produced by the shake this tick (0 = none). The camera adds it when drawing.
 var shake_offset: int = 0
@@ -78,6 +100,28 @@ var _doze_view: Rect2i = Rect2i()
 var _doze_at_tick_end: bool = false
 var _doze_screen_pending: Array[SimEntity] = []
 var _doze_hero: Vector2i = Vector2i(-1, -1)
+## Doze rectangles beyond view 0 and the first hero, for a party or a level with several views (none in
+## single-player): 4 ints each (left, top, right, bottom; the extra views first, then every other hero), their count,
+## a scratch buffer, the feet point of every hero (x, y in slot order) and every view (index = view) of the last
+## decision.
+var _dz_more: PackedInt32Array = PackedInt32Array()
+var _dz_more_count: int = 0
+var _dz_scratch: PackedInt32Array = PackedInt32Array()
+var _doze_feet: PackedInt32Array = PackedInt32Array()
+var _doze_views: Array[Rect2i] = []
+
+## PlayerSet bookkeeping: the number of registered heroes (non-null entries of `heroes`), the contact orders of a
+## party (index r = the heroes in slot order rotated by r; rebuilt when the party changes, so contact_order() never
+## allocates), the one-entry order of a party of one (always `player`, as 1.0 read it) and the empty order.
+var _hero_total: int = 0
+var _orders: Array[Array] = []
+var _solo_order: Array[PlayerBase] = [null]
+var _no_heroes: Array[PlayerBase] = []
+## tick_shake_timer_by(): the Sim.total_ticks value and the hero (instance id) that own this tick's decrement.
+var _shake_tick: int = -1
+var _shake_hero: int = 0
+## hero_death_finished() of a party: bit `slot` = that hero's death toss has finished (cleared by every respawn).
+var _death_done: int = 0
 
 
 func _init() -> void:
@@ -133,7 +177,7 @@ func register_entity(entity: SimEntity) -> void:
 	if entity.spawn_params.has("name"):
 		_named[StringName(str(entity.spawn_params["name"]))] = entity
 	if kind == Defs.Kind.PLAYER and entity is PlayerBase:
-		player = entity
+		_add_hero(entity as PlayerBase)
 	if entity._level_awake_slot < 0 and not entity._sim_suspended:
 		entity._level_awake_slot = _awake.size()
 		_awake.append(entity)
@@ -146,12 +190,15 @@ func register_entity(entity: SimEntity) -> void:
 
 ## Called by SimEntity when it leaves the tree.
 func unregister_entity(entity: SimEntity) -> void:
-	var list: Array = _by_kind[entity.get_kind()]
+	var kind: int = entity.get_kind()
+	var list: Array = _by_kind[kind]
 	list.erase(entity)
 	if entity.spawn_params.has("name"):
 		_named.erase(StringName(str(entity.spawn_params["name"])))
 	if entity == player:
 		player = null
+	if kind == Defs.Kind.PLAYER:
+		_remove_hero(entity)
 	_awake_remove(entity)
 	var slot: int = entity._doze_slot
 	if slot >= 0 and slot < _doze.size() and _doze[slot] == entity:
@@ -182,10 +229,128 @@ func find_named(entity_name: StringName) -> SimEntity:
 
 
 # =================================================================================================================
+# PlayerSet: the heroes of the party (2.0, docs/expansion/TECH_AUDIT.md 4.1)
+# =================================================================================================================
+
+## Number of heroes in the level (registered heroes; 1 in single-player once the hero is spawned). The party
+## branches of every module test `hero_count() > 1`; a party of one runs the 1.0 code.
+func hero_count() -> int:
+	return _hero_total
+
+
+## The hero of player slot `slot` (0 = P1 = [member player]); null when that slot has no hero.
+func get_hero(slot: int) -> PlayerBase:
+	if slot < 0 or slot >= heroes.size():
+		return null
+	return heroes[slot]
+
+
+## The heroes in the order contested contacts test them this tick ("every hero" idiom): slot order, rotated by
+## `Sim.tick % hero_count()` in versus (Game.mode VERSUS) so that no slot wins every tie. A party of one: exactly
+## `[player]` (empty without a hero), the 1.0 contact. Dead heroes are included (callers skip them as 1.0 skipped a
+## dead hero). The array is the level's own (no allocation per call): read it, never modify it or keep it across
+## ticks; iterate a copy when the loop body may free a hero.
+func contact_order() -> Array[PlayerBase]:
+	if _hero_total <= 1:
+		if player == null:
+			return _no_heroes
+		_solo_order[0] = player
+		return _solo_order
+	if Game.mode == Defs.GameMode.VERSUS:
+		return _orders[Sim.tick % _orders.size()]
+	return _orders[0]
+
+
+## The hero an enemy at `from` reacts to ("target" idiom). A party of one: [member player] unless he is dead, else
+## null - exactly 1.0's EnemyBase._target_hero(). A party: the nearest hero that is targetable
+## (PlayerBase.is_party_targetable(): alive and hatched) by |dx| + |dy| between feet points, ties to the lower slot
+## (GAMEPLAY.md 13.9.4); null when none is. Stateless: stickiness (TARGET_HOLD_TICKS) is the enemy's own business
+## (EnemyBase target hook). `from` null = the first targetable hero in slot order.
+func target_hero(from: SimEntity) -> PlayerBase:
+	if _hero_total <= 1:
+		if player == null or player.dead:
+			return null
+		return player
+	var best: PlayerBase = null
+	var best_distance: int = 0
+	for hero: PlayerBase in _orders[0]:
+		if not hero.is_party_targetable():
+			continue
+		if from == null:
+			return hero
+		var distance: int = absi(hero.sim_pos.x - from.sim_pos.x) + absi(hero.sim_pos.y - from.sim_pos.y)
+		if best == null or distance < best_distance:
+			best = hero
+			best_distance = distance
+	return best
+
+
+## True when some hero is dead (death toss) or down (an egg, PlayerBase.is_down()). A party of one: P1 is dead.
+func any_hero_dead_or_down() -> bool:
+	if _hero_total <= 1:
+		return player != null and (player.dead or player.is_down())
+	for hero: PlayerBase in _orders[0]:
+		if hero.dead or hero.is_down():
+			return true
+	return false
+
+
+## True when there is a hero and every hero is dead or down at once (a party of one: P1 is dead) - the team wipe of
+## DESIGN.md D.3. Flow's restart and the death jingle use it.
+func all_heroes_dead_or_down() -> bool:
+	if _hero_total <= 1:
+		return player != null and (player.dead or player.is_down())
+	for hero: PlayerBase in _orders[0]:
+		if not hero.dead and not hero.is_down():
+			return false
+	return true
+
+
+## True while some hero feasts (enemies are drawn as food, GAMEPLAY.md 8.3). A party of one: P1 feasts.
+func any_hero_feasting() -> bool:
+	if _hero_total <= 1:
+		return player != null and player.is_feasting()
+	for hero: PlayerBase in _orders[0]:
+		if hero.is_feasting():
+			return true
+	return false
+
+
+## Feet point where the hero of player slot `slot` starts: [member start_pos] for slot 0 (P1, '@'), else
+## [member start_positions] when the loader filled the slot, else the spread from '@' (PartyTuning.RESPAWN_SPREAD_PX
+## per slot towards the side where the floor continues).
+func get_start_pos_for(slot: int) -> Vector2i:
+	if slot <= 0:
+		return start_pos
+	if slot < start_positions.size():
+		return start_positions[slot]
+	return _spread_point(start_pos, slot)
+
+
+## Spawn the heroes of player slots 1..Game.party - 1 at their starts (party only; a party of one spawns nothing),
+## after P1 and after every level entity, as TECH_AUDIT.md 4.4 orders them (level entities -> P1 -> P2 ...): call it
+## right after spawning P1. Slots that already have a hero are skipped. Returns the heroes spawned.
+func spawn_party_heroes() -> Array[PlayerBase]:
+	var spawned: Array[PlayerBase] = []
+	if Game.party <= 1 or not Spawner.exists(&"player/player"):
+		return spawned
+	for slot: int in range(1, mini(Game.party, Defs.MAX_PLAYERS)):
+		if get_hero(slot) != null:
+			continue
+		var pos: Vector2i = get_start_pos_for(slot)
+		var hero: PlayerBase = spawn(&"player/player", pos, {"slot": slot}) as PlayerBase
+		if hero != null:
+			hero.respawn_at(pos)
+			spawned.append(hero)
+	return spawned
+
+
+# =================================================================================================================
 # View
 # =================================================================================================================
 
 ## Visible rectangle of the level in logical px. The world module overrides it with the camera rectangle.
+## With several views (split screen; none yet) this is view 0.
 func get_view_rect() -> Rect2i:
 	return Rect2i(0, 0, Tuning.VIEW_W, Tuning.VIEW_H)
 
@@ -196,10 +361,53 @@ func get_camera_cell() -> Vector2i:
 	return Vector2i(view.position.x >> 4, view.position.y >> 4)
 
 
-## True when the sprite box of `entity`, grown by `margin` px, intersects the view.
+## True when the sprite box of `entity`, grown by `margin` px, intersects a view (any view; 1.0: the view).
 func is_in_view(entity: SimEntity, margin: int = 0) -> bool:
-	var view: Rect2i = get_view_rect().grow(margin)
-	return Overlap.rects(entity.get_box(), view)
+	var count: int = get_view_count()
+	if count <= 1:
+		var view: Rect2i = get_view_rect().grow(margin)
+		return Overlap.rects(entity.get_box(), view)
+	var box: Rect2i = entity.get_box()
+	for i: int in count:
+		if Overlap.rects(box, get_view_rect_at(i).grow(margin)):
+			return true
+	return false
+
+
+## Number of views the level is drawn in: 1 (the shared camera of single-player, co-op and versus). A split screen
+## (TECH_AUDIT.md 4.5 option C) would override it together with [method get_view_rect_at].
+func get_view_count() -> int:
+	return 1
+
+
+## View `index` in logical px: 0 = [method get_view_rect]; an empty Rect2i for an index that does not exist.
+func get_view_rect_at(index: int) -> Rect2i:
+	if index == 0:
+		return get_view_rect()
+	return Rect2i()
+
+
+## The view `entity` is drawn in (the first view its sprite box meets), else view 0. One view: [method
+## get_view_rect]. For "the view this hero is in" (the death toss drifts to its middle, a drop from its top edge).
+func get_view_rect_of(entity: SimEntity) -> Rect2i:
+	var count: int = get_view_count()
+	if count <= 1 or entity == null:
+		return get_view_rect()
+	var box: Rect2i = entity.get_box()
+	for i: int in count:
+		var view: Rect2i = get_view_rect_at(i)
+		if Overlap.rects(box, view):
+			return view
+	return get_view_rect()
+
+
+## The smallest rectangle that contains every view (one view: [method get_view_rect]). "Below every view" is
+## `y >= get_views_bounds().end.y`.
+func get_views_bounds() -> Rect2i:
+	var bounds: Rect2i = get_view_rect()
+	for i: int in range(1, get_view_count()):
+		bounds = bounds.merge(get_view_rect_at(i))
+	return bounds
 
 
 ## Lock the camera so that it shows exactly `view_px` (boss rooms, single-screen rooms; PHYSICS.md 12.4).
@@ -295,6 +503,20 @@ func tick_shake_timer() -> void:
 		shake -= 1
 
 
+## [method tick_shake_timer] for hero `hero`, once per tick for the whole party (TECH_AUDIT.md 3.4, 5.1): the first
+## hero that calls it on a tick owns that tick's decrement; further calls by the same hero in the same tick count
+## again, exactly as in 1.0 (his timer step and, on the tick he dies, his death step), and calls by any other hero in
+## that tick are ignored. A party of one is therefore exactly tick_shake_timer(). Heroes call this one.
+func tick_shake_timer_by(hero: PlayerBase) -> void:
+	var now: int = Sim.total_ticks
+	var id: int = hero.get_instance_id() if hero != null else 0
+	if _shake_tick == now and _shake_hero != id:
+		return
+	_shake_tick = now
+	_shake_hero = id
+	tick_shake_timer()
+
+
 ## Switch darkness on or off (fades over Tuning.DARKNESS_FADE_TICKS in the world module).
 func set_darkness(p_dark: bool) -> void:
 	if dark == p_dark:
@@ -326,8 +548,12 @@ func set_time_limit(seconds: int) -> void:
 
 ## One tick of the time limit (phase POST; called by the world module's level). Counts down while the hero is
 ## alive and the level is not completed, tells listeners when the displayed second changes and kills the hero
-## with cause &"time" when it reaches zero.
+## with cause &"time" when it reaches zero. A party: counts while any hero is alive and kills every living hero
+## (slot order) at zero.
 func tick_time_limit() -> void:
+	if _hero_total > 1:
+		_tick_party_time_limit()
+		return
 	if time_left <= 0 or completed or player == null or player.dead:
 		return
 	var before: int = get_time_left_seconds()
@@ -360,11 +586,16 @@ func start_play(seed_value: int = 1) -> void:
 	play_started.emit()
 
 
-## The hero reached an exit (`exit_kind`: &"exit", &"warp", &"trophy"). Hands over to Flow once.
+## The hero reached an exit (`exit_kind`: &"exit", &"warp", &"trophy"). Hands over to Flow once. The caller froze
+## the controls of the hero who reached it; a party (2.0, TECH_AUDIT.md 3.11 / 3.12): every other hero's controls
+## are frozen here too, since the level ends for the whole team.
 func complete(exit_kind: StringName) -> void:
 	if completed:
 		return
 	completed = true
+	if _hero_total > 1:
+		for hero: PlayerBase in _orders[0]:
+			hero.set_control_enabled(false)
 	Events.exit_reached.emit(exit_kind)
 	Flow.complete_level(exit_kind)
 
@@ -374,10 +605,23 @@ func get_respawn_pos() -> Vector2i:
 	return Game.checkpoint_pos if Game.has_checkpoint else start_pos
 
 
+## Feet point where the hero of player slot `slot` reappears after a team wipe (PHYSICS.md C.12): slot 0 =
+## [method get_respawn_pos]; another slot = the active checkpoint moved PartyTuning.RESPAWN_SPREAD_PX * slot px
+## towards the side where the floor continues (the same point when both sides are blocked), or that slot's start
+## ([method get_start_pos_for]) without a checkpoint.
+func get_respawn_pos_for(slot: int) -> Vector2i:
+	if slot <= 0:
+		return get_respawn_pos()
+	if not Game.has_checkpoint:
+		return get_start_pos_for(slot)
+	return _spread_point(get_respawn_pos(), slot)
+
+
 ## Respawn after a death (PHYSICS.md 10.4 step 3): reset enemies / platforms / columns, put the hero at the
 ## respawn point with full energy. Collected items and opened spots stay as they are. The darkness goes back to
 ## what it was when the active checkpoint was touched (at the level start without one), so a checkpoint before a
-## `zones/dark` trigger is lit again.
+## `zones/dark` trigger is lit again. A party: the team wipe - every hero at [method get_respawn_pos_for] his slot
+## (Game.on_respawn refills every run of the party); one hero alone comes back with [method respawn_hero].
 func respawn_player() -> void:
 	Game.on_respawn()
 	shake = 0
@@ -388,7 +632,11 @@ func respawn_player() -> void:
 		dark = _respawn_dark
 		Events.darkness_changed.emit(dark)
 	reset_entities()
-	if player != null:
+	_death_done = 0
+	if _hero_total > 1:
+		for hero: PlayerBase in _orders[0].duplicate():
+			hero.respawn_at(get_respawn_pos_for(hero.slot))
+	elif player != null:
 		player.respawn_at(get_respawn_pos())
 	snap_camera()
 	# The reset moved entities back to their anchors and the hero far away: decide every doze area afresh.
@@ -423,12 +671,65 @@ func get_respawn_darkness() -> bool:
 	return _respawn_dark
 
 
+## Events.player_death_finished: the hero's death toss ended (PHYSICS.md 10.4) - one life, then the respawn or the
+## game over. A party never comes here: its heroes call [method hero_death_finished] themselves.
 func _on_player_death_finished() -> void:
+	if _hero_total > 1:
+		return
+	_lose_team_life()
+
+
+func _lose_team_life() -> void:
 	if Game.lose_life():
 		respawn_player()
 	else:
 		Sim.stop()
 		Flow.game_over()
+
+
+## Death routing of a party (TECH_AUDIT.md 4.7): a hero of a party of two or more calls this when his death toss
+## has ended (a party of one goes through Events.player_death_finished, which this also falls back to). The
+## neutral default, until the PartyDriver (PLAN.md P1) turns deaths into eggs and versus respawns: the hero stays
+## dead while any other hero still plays or still has his toss running; once every hero is dead (each toss finished)
+## or down, Events.party_wiped, one life from the pool and [method respawn_player] for the whole party (or game
+## over), exactly the 1.0 rule. Overrides keep that last step.
+func hero_death_finished(hero: PlayerBase) -> void:
+	if hero == null:
+		return
+	if _hero_total <= 1:
+		_lose_team_life()
+		return
+	_death_done |= 1 << clampi(hero.slot, 0, Defs.MAX_PLAYERS - 1)
+	for other: PlayerBase in _orders[0]:
+		if other.is_down():
+			continue
+		if not other.dead or (_death_done & (1 << clampi(other.slot, 0, Defs.MAX_PLAYERS - 1))) == 0:
+			return
+	Events.party_wiped.emit()
+	_lose_team_life()
+
+
+## Put one hero back at `pos` without resetting the world (a co-op hatch, a versus respawn; TECH_AUDIT.md 4.7):
+## PlayerBase.respawn_at(pos) (tick state cleared, Events.player_spawned), his finished death forgotten and a doze
+## decision for his new place ([method notify_hero_teleported]). His run (energy, glider) is the caller's business
+## (`hero.run`); a team wipe uses [method respawn_player] instead.
+func respawn_hero(hero: PlayerBase, pos: Vector2i) -> void:
+	if hero == null:
+		return
+	hero.respawn_at(pos)
+	_death_done &= ~(1 << clampi(hero.slot, 0, Defs.MAX_PLAYERS - 1))
+	notify_hero_teleported(hero)
+
+
+## A hero of a party moved farther in one go than the doze reach allows for (Tuning.DOZE_HERO_REACH_PX assumes at
+## most PartyTuning.MOVE_MAX_PX_PER_TICK px per tick): a throw, a launch, an egg's return, a leash pull, a gate's
+## party travel, a respawn. Decides the doze state at once (safe inside a tick: entities near his new place wake
+## before the next phase reads them; ARCHITECTURE.md 11.1, TECH_AUDIT.md 4.6). A party of one: nothing - the 1.0
+## teleports are covered by the decisions at the end and at the start of every tick.
+func notify_hero_teleported(_hero: PlayerBase) -> void:
+	if _hero_total <= 1 or not doze_enabled or _doze.is_empty():
+		return
+	_doze_update()
 
 
 ## End of every tick (after phase POST): the screen-shake step 18 of PHYSICS.md 3, the doze decisions for the next
@@ -439,12 +740,19 @@ func _on_tick_finished(tick: int) -> void:
 	if shake > 1 and (tick & 1) == 1:
 		shake += 1
 		shake_offset = shake
-		if player != null:
+		if _hero_total > 1:
+			# Every hero of the party is nudged, in slot order.
+			for hero: PlayerBase in _orders[0]:
+				hero.apply_shake_nudge(Tuning.SHAKE_NUDGE)
+		elif player != null:
 			player.apply_shake_nudge(Tuning.SHAKE_NUDGE)
 	if doze_enabled:
 		_doze_at_tick_end = true
 		_doze_update()
 		_doze_at_tick_end = false
+	if get_view_count() > 1:
+		_update_on_screen_views()
+		return
 	# Overlap.rects(entity.get_box(), view) for every entity, written out: this loop runs over every ticking
 	# entity every tick, and the two calls per entity were a large share of the tick on slow devices. The doze
 	# decision has just read the view.
@@ -468,14 +776,65 @@ func _on_tick_finished(tick: int) -> void:
 		_doze_screen_pending.clear()
 
 
+## The on_screen pass with several views: an entity is on screen when its box meets any view.
+func _update_on_screen_views() -> void:
+	var count: int = get_view_count()
+	if _doze_views.size() != count:
+		_doze_views.resize(count)
+	for i: int in count:
+		_doze_views[i] = get_view_rect_at(i)
+	for entity: SimEntity in _awake:
+		entity.on_screen = _box_in_views(entity)
+	if not _doze_screen_pending.is_empty():
+		for entity: SimEntity in _doze_screen_pending:
+			if is_instance_valid(entity) and entity._sim_suspended:
+				entity.on_screen = _box_in_views(entity)
+		_doze_screen_pending.clear()
+
+
+func _box_in_views(entity: SimEntity) -> bool:
+	var feet: Vector2i = entity.sim_pos
+	var box_left: int = feet.x - entity.box_xo
+	for view: Rect2i in _doze_views:
+		if box_left < view.position.x + view.size.x and view.position.x < box_left + entity.box_w \
+				and feet.y - entity.box_h < view.position.y + view.size.y and view.position.y < feet.y:
+			return true
+	return false
+
+
 ## Start of every tick: when the view or the hero moved since the last doze decision (a respawn behind the curtain,
-## a resized window), decide again before anything reads them.
+## a resized window), decide again before anything reads them. A party: any hero or any view.
 func _on_tick_started(_tick: int) -> void:
 	if not doze_enabled or _doze.is_empty():
+		return
+	if _hero_total > 1 or get_view_count() > 1:
+		if _party_moved():
+			_doze_update()
 		return
 	var hero: Vector2i = player.sim_pos if player != null else Vector2i(-1, -1)
 	if hero != _doze_hero or get_view_rect() != _doze_view:
 		_doze_update()
+
+
+## A party: true when a hero or a view moved since the last doze decision.
+func _party_moved() -> bool:
+	if get_view_rect() != _doze_view:
+		return true
+	var count: int = get_view_count()
+	for i: int in range(1, count):
+		if i >= _doze_views.size() or get_view_rect_at(i) != _doze_views[i]:
+			return true
+	if _hero_total <= 1:
+		var hero: Vector2i = player.sim_pos if player != null else Vector2i(-1, -1)
+		return hero != _doze_hero
+	var order: Array = _orders[0]
+	if _doze_feet.size() != order.size() * 2:
+		return true
+	for k: int in order.size():
+		var hero: PlayerBase = order[k]
+		if hero.sim_pos.x != _doze_feet[k * 2] or hero.sim_pos.y != _doze_feet[k * 2 + 1]:
+			return true
+	return false
 
 
 # =================================================================================================================
@@ -509,7 +868,9 @@ func get_dozing_count() -> int:
 
 ## Decide which entities doze: a full pass when a doze rectangle crossed a grid line (or after a respawn), else
 ## only the entities whose state changed. The two rectangles: the view grown by Tuning.DOZE_VIEW_REACH_PX and the
-## hero's box and feet point grown by Tuning.DOZE_HERO_REACH_PX, each rounded outwards to Tuning.DOZE_GRID_PX.
+## hero's box and feet point grown by Tuning.DOZE_HERO_REACH_PX, each rounded outwards to Tuning.DOZE_GRID_PX. A
+## party (or several views) adds one rectangle per further hero and view (`_dz_more`): an entity dozes only when it
+## is far from all of them.
 func _doze_update() -> void:
 	var view: Rect2i = get_view_rect()
 	_doze_view = view
@@ -524,22 +885,31 @@ func _doze_update() -> void:
 	var hero_top: int = view_top
 	var hero_right: int = view_right
 	var hero_bottom: int = view_bottom
-	if player != null:
-		# player._doze_box() written out (box and feet point together): this runs at the end of every tick.
-		var feet: Vector2i = player.sim_pos
+	var first: PlayerBase = player
+	if _hero_total > 1:
+		first = _orders[0][0]
+	if first != null:
+		# first._doze_box() written out (box and feet point together): this runs at the end of every tick.
+		var feet: Vector2i = first.sim_pos
 		_doze_hero = feet
-		var box_left: int = feet.x - player.box_xo
-		var box_top: int = feet.y - player.box_h
+		var box_left: int = feet.x - first.box_xo
+		var box_top: int = feet.y - first.box_h
 		reach = Tuning.DOZE_HERO_REACH_PX
 		hero_left = (mini(feet.x, box_left) - reach) & mask
 		hero_top = (mini(feet.y, box_top) - reach) & mask
-		hero_right = (maxi(feet.x + 1, box_left + maxi(player.box_w, 1)) + reach + grid - 1) & mask
-		hero_bottom = (maxi(feet.y + 1, box_top + maxi(player.box_h, 1)) + reach + grid - 1) & mask
+		hero_right = (maxi(feet.x + 1, box_left + maxi(first.box_w, 1)) + reach + grid - 1) & mask
+		hero_bottom = (maxi(feet.y + 1, box_top + maxi(first.box_h, 1)) + reach + grid - 1) & mask
 	else:
 		_doze_hero = Vector2i(-1, -1)
-	if _doze_full or view_left != _dz_view_left or view_top != _dz_view_top or view_right != _dz_view_right \
-			or view_bottom != _dz_view_bottom or hero_left != _dz_hero_left or hero_top != _dz_hero_top \
-			or hero_right != _dz_hero_right or hero_bottom != _dz_hero_bottom:
+	var more_changed: bool = false
+	if _hero_total > 1 or get_view_count() > 1:
+		more_changed = _doze_party_rects(first)
+	elif _dz_more_count > 0:
+		_dz_more_count = 0
+		more_changed = true
+	if _doze_full or more_changed or view_left != _dz_view_left or view_top != _dz_view_top \
+			or view_right != _dz_view_right or view_bottom != _dz_view_bottom or hero_left != _dz_hero_left \
+			or hero_top != _dz_hero_top or hero_right != _dz_hero_right or hero_bottom != _dz_hero_bottom:
 		_doze_full = false
 		_dz_view_left = view_left
 		_dz_view_top = view_top
@@ -562,15 +932,74 @@ func _doze_update() -> void:
 			_doze_check(entity._doze_slot)
 
 
-## True when the area in slot `slot` touches neither doze rectangle.
+## The rectangles of the further views (1..) and heroes (all but `first`) into `_dz_more`, the feet points of every
+## hero into `_doze_feet` and every view into `_doze_views`. Returns true when the rectangles changed.
+func _doze_party_rects(first: PlayerBase) -> bool:
+	var grid: int = Tuning.DOZE_GRID_PX
+	var mask: int = ~(grid - 1)
+	var views: int = get_view_count()
+	var order: Array = _orders[0] if _hero_total > 1 else _no_heroes
+	var needed: int = (maxi(views - 1, 0) + order.size()) * 4
+	if _dz_scratch.size() < needed:
+		_dz_scratch.resize(needed)
+	if _doze_views.size() != views:
+		_doze_views.resize(views)
+	var n: int = 0
+	var reach: int = Tuning.DOZE_VIEW_REACH_PX
+	for i: int in views:
+		var view: Rect2i = get_view_rect_at(i)
+		_doze_views[i] = view
+		if i == 0:
+			continue
+		_dz_scratch[n] = (view.position.x - reach) & mask
+		_dz_scratch[n + 1] = (view.position.y - reach) & mask
+		_dz_scratch[n + 2] = (view.position.x + view.size.x + reach + grid - 1) & mask
+		_dz_scratch[n + 3] = (view.position.y + view.size.y + reach + grid - 1) & mask
+		n += 4
+	reach = Tuning.DOZE_HERO_REACH_PX
+	if _doze_feet.size() != order.size() * 2:
+		_doze_feet.resize(order.size() * 2)
+	for k: int in order.size():
+		var hero: PlayerBase = order[k]
+		var feet: Vector2i = hero.sim_pos
+		_doze_feet[k * 2] = feet.x
+		_doze_feet[k * 2 + 1] = feet.y
+		if hero == first:
+			continue
+		var box_left: int = feet.x - hero.box_xo
+		var box_top: int = feet.y - hero.box_h
+		_dz_scratch[n] = (mini(feet.x, box_left) - reach) & mask
+		_dz_scratch[n + 1] = (mini(feet.y, box_top) - reach) & mask
+		_dz_scratch[n + 2] = (maxi(feet.x + 1, box_left + maxi(hero.box_w, 1)) + reach + grid - 1) & mask
+		_dz_scratch[n + 3] = (maxi(feet.y + 1, box_top + maxi(hero.box_h, 1)) + reach + grid - 1) & mask
+		n += 4
+	var changed: bool = n != _dz_more_count * 4
+	if not changed:
+		for j: int in n:
+			if _dz_scratch[j] != _dz_more[j]:
+				changed = true
+				break
+	if changed:
+		_dz_more = _dz_scratch.slice(0, n)
+		_dz_more_count = n / 4
+	return changed
+
+
+## True when the area in slot `slot` touches no doze rectangle.
 func _doze_far(slot: int) -> bool:
 	var k: int = slot * 4
 	var left: int = _doze_rects[k]
 	var top: int = _doze_rects[k + 1]
 	var right: int = _doze_rects[k + 2]
 	var bottom: int = _doze_rects[k + 3]
-	return (right <= _dz_view_left or left >= _dz_view_right or bottom <= _dz_view_top or top >= _dz_view_bottom) \
-			and (right <= _dz_hero_left or left >= _dz_hero_right or bottom <= _dz_hero_top or top >= _dz_hero_bottom)
+	if not ((right <= _dz_view_left or left >= _dz_view_right or bottom <= _dz_view_top or top >= _dz_view_bottom) \
+			and (right <= _dz_hero_left or left >= _dz_hero_right or bottom <= _dz_hero_top or top >= _dz_hero_bottom)):
+		return false
+	for r: int in _dz_more_count:
+		var j: int = r * 4
+		if not (right <= _dz_more[j] or left >= _dz_more[j + 2] or bottom <= _dz_more[j + 1] or top >= _dz_more[j + 3]):
+			return false
+	return true
 
 
 ## One entity against the doze rectangles.
@@ -637,3 +1066,91 @@ func _awake_remove(entity: SimEntity) -> void:
 		last._level_awake_slot = slot
 		_awake.resize(_awake.size() - 1)
 	entity._level_awake_slot = -1
+
+
+# =================================================================================================================
+# PlayerSet internals
+# =================================================================================================================
+
+## A hero registered: he takes his slot (PlayerBase.slot); slot 0 is also `player` (1.0: the hero that registered
+## last, which a party of one still is).
+func _add_hero(hero: PlayerBase) -> void:
+	var slot: int = clampi(hero.slot, 0, Defs.MAX_PLAYERS - 1)
+	while heroes.size() <= slot:
+		heroes.append(null)
+	heroes[slot] = hero
+	if slot == 0:
+		player = hero
+	_party_changed()
+
+
+func _remove_hero(entity: SimEntity) -> void:
+	var at: int = heroes.find(entity)
+	if at < 0:
+		return
+	heroes[at] = null
+	while not heroes.is_empty() and heroes[heroes.size() - 1] == null:
+		heroes.resize(heroes.size() - 1)
+	_party_changed()
+
+
+## Count the heroes and build the contact orders (slot order and its rotations) once per change of the party.
+func _party_changed() -> void:
+	var present: Array[PlayerBase] = []
+	for hero: PlayerBase in heroes:
+		if hero != null:
+			present.append(hero)
+	_hero_total = present.size()
+	_orders.clear()
+	for r: int in present.size():
+		var order: Array[PlayerBase] = []
+		for k: int in present.size():
+			order.append(present[(r + k) % present.size()])
+		_orders.append(order)
+
+
+## `base` moved PartyTuning.RESPAWN_SPREAD_PX * `slot` px towards the side where the floor continues (right first,
+## then left), or `base` itself when neither side has a floor to stand on there (PHYSICS.md C.12).
+func _spread_point(base: Vector2i, slot: int) -> Vector2i:
+	if slot <= 0:
+		return base
+	var step: int = PartyTuning.RESPAWN_SPREAD_PX * slot
+	if _stands_at(base.x + step, base.y):
+		return Vector2i(base.x + step, base.y)
+	if _stands_at(base.x - step, base.y):
+		return Vector2i(base.x - step, base.y)
+	return base
+
+
+## True when a hero's feet at (x, y) would stand on a floor (not a hole, a hatch or a deadly tile) with free space
+## above it, inside the level.
+func _stands_at(x: int, y: int) -> bool:
+	if x < Tuning.X_MIN or x >= grid.x_max_excl():
+		return false
+	var col: int = Tuning.to_cell(x)
+	var row: int = Tuning.to_cell(y)
+	var floor_value: int = grid.floor_at(col, row)
+	if floor_value < TileGrid.FLOOR_SOLID or floor_value > TileGrid.FLOOR_ICE_3:
+		return false
+	return grid.side_at(col, row - 1) == TileGrid.SIDE_OPEN
+
+
+## tick_time_limit() of a party: counts while any hero is alive, kills every living hero (slot order) at zero.
+func _tick_party_time_limit() -> void:
+	if time_left <= 0 or completed:
+		return
+	var alive: bool = false
+	for hero: PlayerBase in _orders[0]:
+		alive = alive or not hero.dead
+	if not alive:
+		return
+	var before: int = get_time_left_seconds()
+	time_left -= 1
+	var after: int = get_time_left_seconds()
+	if after != before:
+		time_left_changed.emit(after)
+		Events.time_left_changed.emit(after)
+	if time_left == 0:
+		for hero: PlayerBase in _orders[0].duplicate():
+			if not hero.dead:
+				hero.kill(&"time")

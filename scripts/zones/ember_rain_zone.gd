@@ -6,6 +6,9 @@ extends ZoneBase
 ## five alive. Owner: world.
 ##
 ## Parameters: `rect`; `period` ticks [Tuning.DESIGNER_SECOND]; `skin=ember|leaf` [ember].
+##
+## A party: it rains while any living hero is inside, on the first of them in contact order (the spawn parameter
+## `rain_slot` names his slot for the ember); a stream per hero is world's PLAN P1 rule.
 
 const EMBER_ID: StringName = &"projectiles/enemy_ember"
 const SKINS: Array[String] = ["ember", "leaf"]
@@ -32,15 +35,26 @@ func _apply_params(params: Dictionary) -> void:
 func _sim_tick(phase: int) -> void:
 	super._sim_tick(phase)
 	var level: LevelBase = Game.level
-	if not inside or level == null or level.player == null or level.player.dead:
+	var hero: PlayerBase = _rain_target(level)
+	if hero == null:
 		return
 	_timer += 1
 	if _timer < period:
 		return
 	_timer = 0
 	if Spawner.exists(EMBER_ID):
-		level.spawn(EMBER_ID, sim_pos, {"rain": true, "skin": skin})
+		level.spawn(EMBER_ID, sim_pos, {"rain": true, "skin": skin, "rain_slot": hero.slot})
 		released += 1
+
+
+## The hero it rains on: the first living hero inside, in contact order (one hero: him while inside and alive).
+func _rain_target(level: LevelBase) -> PlayerBase:
+	if not inside or level == null:
+		return null
+	for hero: PlayerBase in level.contact_order():
+		if not hero.dead and (inside_mask & (1 << hero.slot)) != 0:
+			return hero
+	return null
 
 
 func _on_level_reset() -> void:
@@ -48,5 +62,5 @@ func _on_level_reset() -> void:
 	_timer = 0
 
 
-func _on_hero_entered(_level: LevelBase, _hero: PlayerBase) -> void:
+func _on_first_entered(_level: LevelBase, _hero: PlayerBase) -> void:
 	_timer = 0

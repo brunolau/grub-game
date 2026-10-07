@@ -105,9 +105,14 @@ func _apply_params(params: Dictionary) -> void:
 func _sim_tick(_phase: int) -> void:
 	if _label == null or text_key.is_empty():
 		return
+	# Shown while any living hero is at the board (2.0, TECH_AUDIT.md 3.12; 1.0: the one hero).
 	var level: LevelBase = Game.level
-	var near: bool = level != null and level.player != null and not level.player.dead \
-			and Overlap.body(self, level.player, level.player)
+	var near: bool = false
+	if level != null:
+		for hero: PlayerBase in level.contact_order():
+			if not hero.dead and Overlap.body(self, hero, hero):
+				near = true
+				break
 	_near = near
 	if near:
 		_label.visible = true

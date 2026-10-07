@@ -49,10 +49,11 @@ func _trigger_area() -> Rect2i:
 
 
 ## Above the top of the view, 192 px to one side of the hero (the other side next time); falls back to the other
-## side when that column is inside rock or outside the level.
+## side when that column is inside rock or outside the level. A party: beside the hero who triggered it, above the
+## view he is drawn in (LevelBase.get_view_rect_of; one view: the view).
 func _pick_spawn(hero_node: PlayerBase) -> bool:
 	var level: LevelBase = Game.level
-	var top: int = level.get_view_rect().position.y - EnemyTuning.DROPPER_ABOVE_VIEW_PX
+	var top: int = level.get_view_rect_of(hero_node).position.y - EnemyTuning.DROPPER_ABOVE_VIEW_PX
 	for _attempt: int in 2:
 		_side = -_side
 		var x: int = hero_node.sim_pos.x + _side * EnemyTuning.DROPPER_SIDE_PX

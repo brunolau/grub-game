@@ -96,11 +96,11 @@ func _on_level_reset() -> void:
 # Dozing (ARCHITECTURE.md 11): far from the hero and the view, an idle entity costs nothing per tick
 # =================================================================================================================
 # The level's doze manager takes an entity out of the tick (Sim.suspend) while `_can_doze()` holds and its
-# `_doze_area()` touches neither the hero's box and feet point grown by Tuning.DOZE_HERO_REACH_PX nor the view
-# grown by Tuning.DOZE_VIEW_REACH_PX (decided at the end of every tick, and between ticks when the view or the hero
-# moved). It is put back as soon as one of them reaches the area again. The contract an entity signs by overriding
-# the two:
-#   while `_can_doze()` is true and the area stays that far from the hero and the view, every `_sim_tick` call
+# `_doze_area()` touches neither the box and feet point of any hero (2.0: every hero of a party) grown by
+# Tuning.DOZE_HERO_REACH_PX nor any view grown by Tuning.DOZE_VIEW_REACH_PX (decided at the end of every tick, and
+# between ticks when a view or a hero moved). It is put back as soon as one of them reaches the area again. The
+# contract an entity signs by overriding the two:
+#   while `_can_doze()` is true and the area stays that far from every hero and every view, every `_sim_tick` call
 #   would change nothing but counters that `_on_doze_wake()` restores; whatever makes that false later (a hit, a
 #   reset) calls `_doze_wake_now()` first.
 # A dozing entity is never drawn (its on_screen is false), keeps its feet point, and has no interpolation.

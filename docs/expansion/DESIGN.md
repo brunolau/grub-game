@@ -15,8 +15,10 @@ reach (LEVEL_DESIGN 12): standing jump 3 tiles, running gap 4 tiles (5 with a ru
 Up held 105 px (6 tiles). Gravity 16 v16/tick, terminal fall 192 v16. Club power 25.
 
 Order of authority is unchanged (ARCHITECTURE header): PHYSICS > GAMEPLAY > ASSET_MANIFEST > ARCHITECTURE. The
-per-tick rules of every new system below go into a PHYSICS.md appendix and a GAMEPLAY.md section 13 in phase 0 of
-the plan; until then this document is their source.
+per-tick rules of every new system below are specified in `docs/spec/PHYSICS.md` Appendix C, the feature rules in
+`docs/spec/GAMEPLAY.md` 13 and the level-building rules in `docs/LEVEL_DESIGN.md` 15 (plan step P0.2); the
+ambiguities resolved on the way are listed in "Appendix: P0.2 spec resolutions" at the end (markers [Rn] in the
+text). A playtest change of a *(tune)* value is made here first, then in those specs.
 
 ---
 
@@ -251,7 +253,7 @@ Hit points are in club hits (25 each; a charged hit counts 4). Archetype 6.2 / 6
   dust trickle 14 ticks ahead; shorter idles.
 - **Weak point**: the head while dizzy or stuck; tusks glance during a charge.
 - **Hit points**: Beginner 150 (6 hits), Expert 225 (9).
-- **Co-op form** (190 / 280): it charges whoever hit it last; while dizzy it swings to face the nearer hero, so only
+- **Co-op form** (187 / 280 [R8]): it charges whoever hit it last; while dizzy it swings to face the nearer hero, so only
   the partner behind can strike the **leafy rump** (the co-op weak point). In phase 3 its charges no longer crash: it
   skids and turns 2 tiles before a wall, and only a **Brace Wall** (D.4) of two crouching heroes stops it dead
   (dazed 66 ticks, flanks open). One crouching hero is trampled.
@@ -295,7 +297,7 @@ The original's tree-stump archetype (GAMEPLAY 6.2; 12.1 stretch goal).
   squid surfaces beside a raft and slams it (the raft dips and shakes, nobody is thrown off). Fight from the raft;
   paddle with a strike on the water side.
 - **Hit points**: Beginner 150 (6), Expert 225 (9).
-- **Co-op form, Tentacle Lock** (190 / 280): on surfacing it crosses **two** tentacles over its head. A strike makes
+- **Co-op form, Tentacle Lock** (187 / 280 [R8]): on surfacing it crosses **two** tentacles over its head. A strike makes
   a tentacle flinch 16 ticks (Expert) / 24 (Beginner); the head opens for 33 ticks only while **both** flinch - one
   hero on each flanking island, striking on a count of three. Phase 3: one hero paddles the raft into position while
   the other strikes.
@@ -444,8 +446,8 @@ spare **Y stone** of `ui/touch_buttons.png` (cells 7 / 15). Shared-keyboard layo
 ### C.4 Tar and geysers
 
 - **Tar floor** `:` (new tile character, terrain set A in a tar skin): a ground cell whose surface sits 6 px lower
-  (the existing lowered-surface profile of `TileGrid`). Walking capped at 32 v16 (2 px/tick); jump thrust only 3
-  ticks (a hop of about 30 px); crouch and strikes normal; ground enemies slowed the same way; dropped items stop dead.
+  (the existing lowered-surface profile of `TileGrid`). Walking capped at 32 v16 (2 px/tick); jump thrust only 2
+  ticks (a hop of 33 px; air control capped at 32 v16 too) [R2]; crouch and strikes normal; ground enemies slowed the same way; dropped items stop dead.
   Chomper ignores the slowdown. `liquid = tar` draws `~` as deadly tar; `liquid = honey` / `syrup` are the Feast Land
   skins of the same rule.
 - **Geysers** `objects/geyser period=<ticks> delay=<ticks> power=<v16> skin=mud|blowhole|steam|soda`: bubble 22
@@ -566,8 +568,8 @@ eggs a hero while his partner lives. No zoom, no split screen.
 | Move | Rule | Easy role / hard role |
 |---|---|---|
 | **Shoulder Hop** | landing on the partner's head with Up (jump) held bounces -224 v16, as on an enemy: rises 105 px from his head, feet reach about 140 px (8.7 tiles) over the floor. Co-op ledges for it are 7 tiles (Beginner) / 8 tiles (Expert) | stand still / one held jump |
-| **Totem Ride** | landing on the partner without Up held: stand on his head (the carrier is a moving platform, PHYSICS 11.4, resolved in the party driver after both heroes moved). The carrier's jump impulses are halved. The rider can strike (a high strike reaches about 4-5 tiles over the floor), jump off (Up), or drop (Down + Jump) | walk / strike |
-| **Batter Up** | Down + Swap (co-op and versus only) curls the hero into a ball (roll frames 24-26) for up to 66 ticks. The partner's strike in contact launches him: **forward = line drive** (xvel ±144, yvel -128: 9 tiles to the same height), **high = lob** (xvel ±32, yvel -240: about 7 tiles up, 4 across), **low = grounder** (rolls at 6 px/tick for 32 ticks: 12 tiles), a charged strike x1.5. The ball breaks `$` blocks (one hit), opens spots it touches, knocks small enemies (hp < 50, power 25). It uncurls on landing (the 6-tick landing rule) or against a wall. A curled hero is hurt by enemies as usual *(tune all)* | curl / aim and strike |
+| **Totem Ride** | landing on the partner without Up held: stand on his head (the carrier is a moving platform, PHYSICS 11.4, resolved in the party driver after both heroes moved). The carrier's jump impulses are halved. The rider can strike (a high strike reaches about 4-5 tiles over the floor), jump off (Up: 6 tiles from a still carrier, 8.5-9.5 tiles when timed 1-5 ticks after the carrier's jump [R6]), or drop (Down + Jump) | walk / strike |
+| **Batter Up** | Down + Swap (co-op and versus only) curls the hero into a ball (roll frames 24-26) for up to 66 ticks. The partner's strike in contact launches him: **forward = line drive** (xvel ±144, yvel -128: 9 tiles to the same height), **high = lob** (xvel ±32, yvel -240: about 7 tiles up, 4 across), **low = grounder** (rolls at 6 px/tick for 32 ticks: 12 tiles), a charged strike x1.5 (each component clamped to +/-288 v16, the doze limit [R17]). The ball breaks `$` blocks (one hit), opens spots it touches, knocks small enemies (hp < 50, power 25). It uncurls on landing (the 6-tick landing rule) or against a wall. A curled hero is hurt by enemies as usual *(tune all)* | curl / aim and strike |
 | **Brace Wall** | two heroes crouching within 16 px of each other in a heavy's path are a wall: a `heavy` enemy (or Tusker's phase 3) stops dead and is dazed 44 ticks with its head open; a lone croucher is trampled (hurt, thrown back). Reuses crouch-bracing (wind, earthquakes) | crouch / crouch and line up |
 | **Egg Hatch** | D.3 | be carried / strike the egg |
 
@@ -581,8 +583,8 @@ inputs on the same tick. Every launch move moves at most 18 px/tick or calls `no
 |---|---|---|
 | `objects/plate name= count=1\|2 mode=hold\|timed:<ticks>\|latch` | pressed while the weight on it (heroes; Chomper counts 2) >= `count`; drives columns by name | the step-on test |
 | `objects/column` + `rise_while=<plate>[,...]` / `sink_while=` | the 1.0 rising column driven by plates: rises or sinks 1 tile per 4 ticks while held, returns when released. A plate stands **8+ tiles** from its door | `objects/column` |
-| `objects/column trigger=keepers:<name>` | the **keeper door**: rises when every enemy named `<name>` is dead. Keepers carry `shell`, `bond` or `daze` and stand in a hall **3 rows high**, so nobody can bounce over them | `objects/column` |
-| `objects/drum bond=<name>` | struck drums of one bond must all be hit within the window, then they open a column or gate | `HittableBase` |
+| `objects/column trigger=keepers:<name>` | the **keeper door**: rises when every enemy tagged `keeper=<name>` is dead [R10]. Keepers carry `shell`, `bond` or `daze` and stand in a hall **3 rows high**, so nobody can bounce over them | `objects/column` |
+| `objects/drum bond=<name>` | struck drums of one bond must all be hit within the window, then they open a column (`trigger=drums:<bond>`) or gate (`needs=<bond>`) [R10] | `HittableBase` |
 | `objects/seesaw len=<cells>` | a hard landing (4+ tiles fall) on the high end launches whoever stands on the low end: launch = -(landing yvel + 32), +64 on a hard landing, cap -288 (about 10 tiles). Enemies on the low end are thrown off | `PlatformBase`, the hard-landing rule |
 | `objects/boulder_heavy` | moves 1 tile per 6 ticks only while **two** heroes push the same side; fills a gap, plugs a vent, presses a plate | column-style tile mover |
 | `objects/pulley a=<platform> b=<platform>` | two linked ride platforms; the heavier side sinks 2 px/tick, the other rises | `PlatformBase` |
@@ -609,7 +611,7 @@ unchanged (two heroes already deal double damage).
 | `bond` (bond) | linked records (`bond=<name>`): when one dies, the others must die within the window or the dead one regrows | targets are placed out of one hero's reach in the window |
 | `daze` (daze-gate) | hops back out of reach when any hero within 48 px starts a strike and jumps low throws; a head bounce **dazes** it 12 ticks (Expert) / 14 (Beginner); only a dazed one can be hurt | one hero needs about 15 ticks from his bounce to a damaging strike |
 | `heavy` (heavy) | front hits glance; stopped only by a **Brace Wall**, which dazes it 44 ticks with its head open | needs two braced bodies |
-| `lone` (pack) | targets the hero **farther from his partner** | staying together is the defence |
+| `lone` (pack) | keeps away while the heroes are within 64 px of each other; otherwise targets the **straggler**, the hero farther from the view centre [R9] | staying together is the defence |
 | `grab` (grabber) | seizes a hero who touches it from below or that it dives on and reels / carries him toward a pit-side perch at 1 px/tick; the partner frees him with any hit on it | a grabbed hero cannot strike |
 | `leech` (grabber) | lands on a hero's back and drains one bone per 44 ticks; only the partner can club it off (alone it falls off after 220 ticks) | a hero cannot hit his own back |
 | `split` (bond on the fly) | a hit splits it into two halves that run apart; both must die within the window or they merge back | the halves run in opposite directions |
@@ -658,8 +660,8 @@ from the nearer hero, so he has to be pinned from both sides.
    its boss form); every co-op `sub` file has at least 1 gate or its boss's co-op form; bonus stages and endings need
    only the team exit (the Way Home adds its lookout gate). Every gate is marked by an
    `objects/x2_tablet gate=<name>`.
-2. **Gate kinds**: boost ledge (7 tiles Beginner / 8 Expert, Shoulder Hop or Totem Ride), Batter Up gap (8-9 tiles of
-   deadly liquid, or a 7-tile lob ledge), plate door, twin drums, see-saw, heave boulder, pulley, keeper door, Brace
+2. **Gate kinds**: boost ledge (7 tiles Beginner / 8 Expert, Shoulder Hop or a timed Totem launch [R6]), Batter Up gap
+   (8 tiles Beginner / 9 Expert of deadly liquid [R17], or a 7-tile lob ledge), plate door, twin drums, see-saw, heave boulder, pulley, keeper door, Brace
    Wall corridor (a `heavy` in a 3-row-high hall, so nobody can bounce over it), Chomper two-seat stretch.
 3. **Solo-impossibility checks** (validator `--coop` + `tests/test_coop_gates.gd`): for every x2 gate, a bounded search
    with the reference hero (the route tools' simulator), alone, with every weapon including every special from the
@@ -765,7 +767,7 @@ and adds the co-op gates, traits and the P2 start.
   | Setting | Co-op Beginner | Co-op Expert |
   |---|---|---|
   | Twin windows | 24 ticks (or solo minimum - 4) | 12 ticks |
-  | Raptor daze | 14 ticks | 12 ticks |
+  | Raptor daze | 14 ticks (or solo minimum - 4 [R12]) | 12 ticks (or solo minimum - 4) |
   | Leash before the egg | 5 s (121 ticks) | 3 s (73 ticks) |
   | Hatch hearts | 2 | 1 |
   | Unhatched egg | follows forever | returns to the checkpoint after 10 s |
@@ -850,7 +852,7 @@ untouched.
 | Mode | Rules | Launch |
 |---|---|---|
 | **Last Caveman Standing** | the literal deathmatch: 3 hearts; hit = 1 heart, charged = 2 + launch, stomp = 1 + squash, hazard = out. **A lost heart bursts into 6 bones** anyone can grab (6 bones heal a heart, max 3). Last alive wins the round; first to 5. At 60 s the arena's **themed sudden death** starts (E.6). Eliminated players ride **Grudge Pterodactyls** along the top and drop a rock with Strike (one per 3 s, 10-tick squawk first; a rock dazes 12 ticks, costs no heart). Option *Stock*: 3 lives with respawn | yes |
-| **Hot Rock** | a glowing ember sticks to one player and passes on any touch, hit or stomp; whoever passed it is immune to it for 44 ticks; the holder walks at most 96 v16; the fuse is 12-20 s (`Sim.rng`, round seed) and bubbles faster in the last 3 s; the holder pops (the death toss). Last one standing; first to 3 | yes |
+| **Hot Rock** | a glowing ember sticks to one player and passes on any touch, hit or stomp; whoever passed it is immune to it for 44 ticks; the holder walks up to 96 v16 (faster than the others' 80) [R7]; the fuse is 12-20 s (`Sim.rng`, round seed) and bubbles faster in the last 3 s; the holder pops (the death toss). Last one standing; first to 3 | yes |
 | **Clubball** | 1v1, 2v1 or 2v2 on Coconut Cove: a coconut (gravity 16 v16, bounces at 3/4, rolls) and a goal mouth 3 rows high at each end. The strike direction is the shot: forward = drive, high = lob, low = grounder, charged = smash (x1.5). Every strike within 44 ticks of the last adds +16 v16, up to 12 px/tick (rallies escalate); a coconut faster than 8 px/tick knocks a hero down (12 stun ticks); heads bounce it; a curled teammate can be batted as a "missile". First to 5 goals or most after 3 min; sudden death "golden coconut"; the ball resets to the middle 66 ticks after a goal | yes |
 | King of the Feast | carry the giant roast to fill 20 counts of 22 ticks; the carrier cannot strike, walks at most 64 v16; a hit drops it; your count never falls back below 5 left | second wave |
 | Letter Snatch | 8-12 visible spots, five hold G-R-U-B-S (shuffled); held letters float over your head; a hit drops your newest; hold all five for 44 ticks = round won | second wave |
@@ -1137,3 +1139,39 @@ blocking), phase 1 systems, phase 2 entities / bosses / UI / art, phase 3 conten
 | Zones | `zones/current`; versus `zones/goal team=1\|2` |
 | Projectiles | `projectiles/hero_spear` |
 | Specs | PHYSICS.md appendix "Party and Book II rules" (belt and swap, spear, climb, tar, geyser, raft, rising scroll, mount, hop / ride / curl / bat / brace, egg, versus hurt table); GAMEPLAY.md 13 "Expansion 2.0". Sections 1-12 do not change |
+| Added by P0.2 | `Defs.Weapon.SPEAR = 4` (name `spear`); meta `wind_loop` (and negative `wind` values); `objects/geyser deadly`; `objects/bark_board face`; `objects/raft rails`; `objects/mount wild`; `objects/plate w`; `objects/pulley range`; `objects/column trigger=drums:<bond>` and static `rise=0` columns; `objects/gate needs=<bond>`; `objects/x2_tablet far=c,r` and `secret`; `objects/spawn_point index`; enemy params `keeper=<name>`, `perch=c,r` (grab), `snatcher kind=dangler\|stinger`; `items/weapon temp=true` (versus); zones `zones/lightning`, `zones/food_rain`; tile flag TAR (`:`); `PlayerBase.launch()`, the hero timer `shield`; the route header `# route:` (LEVEL_DESIGN.md 15.9); reference data `docs/spec/PARTY_REFERENCE.json` |
+
+---
+
+## Appendix: P0.2 spec resolutions
+
+Ambiguities and inconsistencies of this document found while writing the specs (PLAN P0.2), with the resolution
+the specs implement. The text above carries the marker where it changed.
+
+| # | Topic | Problem | Resolution (spec) |
+|---|---|---|---|
+| R1 | Spear recovery | "6-tick recovery" can mean L = 6 or 6 ignored ticks; `Defs.Weapon` has no spear | L = 6 as the axe (5 ignored-input ticks, FIRE held throws every 12); `Defs.Weapon.SPEAR = 4`, name `spear` (PHYSICS C.3) |
+| R2 | Tar hop | 3 impulse ticks give a 47-48 px hop, not "about 30 px"; with full air control a tar hop covers 64 px, faster than wading | 2 impulse ticks (33 px) and the airborne `ACCEL` limit 32 after a take-off from tar *(tune)*; `Tuning.TAR_JUMP_IMPULSE_TICKS` must be 2 and `TAR_AIR_CAP = 32` added (PHYSICS C.5) |
+| R3 | Vents | 6-2b and 4-1 co-op plug a "vent" with a heave boulder; no vent object exists | `objects/geyser deadly`: a deadly spout; a boulder resting on any geyser plugs it (PHYSICS C.6) |
+| R4 | Alternating gusts | the 1.0 wind only pushes left and its script cannot repeat (9-2, Floe Rink, Cloud Top, the Roc's gale) | negative `wind` pushes right (the WIND primitive unchanged); meta `wind_loop` repeats the script (PHYSICS C.6) |
+| R5 | Missing ids | lightning (9-1b, Roc phase 3, Cloud Top) and the fruit / food rain (Feast Land E, the Long Raft Home) have no entity | `zones/lightning` (mark 22 ticks, bolt 4) and `zones/food_rain` (the ember-rain zone with food) |
+| R6 | Totem Ride reach | from a still carrier the rider's jump reaches 98 px (6 tiles), below a 7-tile boost ledge; TECH_AUDIT 4.4 put stacking in `PLATFORMS` from previous-tick positions | the rider's jump starts from the carrier's rising speed (the 11.4 platform rule): timed 1-5 ticks after the carrier's halved jump it reaches 139-152 px, so "Shoulder Hop or Totem Ride" holds for 7-8 tiles; the plain Totem ledge is 5 tiles. The ride is resolved by the `PartyDriver` after both heroes moved (PLAN P1.6), not in `PLATFORMS` (PHYSICS C.10) |
+| R7 | Hot Rock | "walks at most 96 v16" is no limit (the walk cap is 80) | the holder's cap is raised to 96: the ember carrier is the faster one (RESEARCH_VERSUS 3.4) |
+| R8 | Co-op boss hit points | 190 exceeds x1.25 of 150 (187.5) | 187 (still 8 club hits: a boss dies at 0 hp); Expert 280 stays; Roc phases 1-2 250; Idols 8 per idol; Old Mangrove's co-op stages (not given) 5 + 3 twin hits Beginner, 7 + 6 Expert *(tune)* |
+| R9 | `lone` | "the hero farther from his partner" is the same distance for both heroes | keeps away while the heroes are within 64 px of each other; else targets the hero farther from the view centre (ties: the higher slot); the Chieftains' P1 uses the same rule |
+| R10 | Keepers and drums | "every enemy named `<name>`" clashes with the unique `name=`; drums "open a column or gate" without a link | enemies take a group tag `keeper=<name>`; a drum bond opens `objects/column trigger=drums:<bond>` or unlocks `objects/gate needs=<bond>` |
+| R11 | GAMEPLAY.md 13 | GAMEPLAY.md already had a section 13 ("Items still [INFERRED]") | "Expansion 2.0" is section 13; the old list is section 14 (nothing referenced its number) |
+| R12 | Raptor daze | 14 / 12 ticks against the rule "below the measured solo minimum minus 4" with the estimate "about 15 ticks" (cap 11) | 14 / 12 are upper bounds; each record uses `min(14 B / 12 E, solo_min - 4)`, measured by `test_coop_gates`, tuned at G1 |
+| R13 | See-saw | "a hard landing (4+ tiles fall) launches ... +64 on a hard landing" is circular | every landing on the high end launches `-(yvel + 32)`, 64 more on a hard landing (PHYSICS 6.5), cap -288; a result weaker than -64 only lifts (GAMEPLAY 13.9.7) |
+| R14 | Swap and Jump | every 1.0 input is level-triggered; Jump and Up are one flag (`IN_UP`), so "Up climbs" and "Jump lets go" collide on vines | Swap is the only edge-triggered input (a held Swap does not repeat); on a vine Up climbs, a direction + Up leaps off, Down + Up drops (PHYSICS C.1, C.4) |
+| R15 | Hatch blinking | "44 ticks of blinking" with `hit_timer = 44` would also stun for 22 | a new hero timer `shield` (44, blinking, full control) and a -64 pop (PHYSICS C.12) |
+| R16 | Versus hurt | "12 stunned + 30 immune" on the 1.0 `hit_timer` | `hit_timer = 43`, stunned while >= 31 (PHYSICS C.14) |
+| R17 | Batter Up | an uncharged line drive covers 153 px: a 9-tile gap leaves 9 px; a charged lob (-360) breaks the 18 px/tick doze rule | gaps 8 tiles Beginner / 9 Expert (curl spot at the edge or a charged drive); every launch component clamped to +/-288 v16 |
+| R18 | Ledge height per difficulty | one co-op file serves both difficulties but boost ledges differ (7 / 8 tiles) | build at 7 rows plus an `expert`-flagged static `objects/column rise=0` of one row (LEVEL_DESIGN 15.7.3) |
+| R19 | Shoulder Hop | "as on an enemy" lets a hero hop off an airborne partner | kept; chained duo moves reach 12-13 tiles, so co-op paths are contained by 13+ rows (LEVEL_DESIGN 15.7.2) |
+| R20 | TECH_AUDIT bubble | TECH_AUDIT 4.5 / 4.7 describe a bubble (touch revive, 1 heart, 48-tick leash) | superseded by this document's egg (hit / throw / bounce, 2 / 1 hearts, 121 / 73-tick leash) |
+| R21 | Far marker | D.8 needs "the gate's far marker", which no id carries | `objects/x2_tablet far=c,r` (and `secret` for x2 secrets) |
+| R22 | Grub Stack pieces | "1 + stack/5 pieces" with food worth 1 / 2 / 5 / 10 | the stack is an integer count of units; spills count units and fly out split into 10s, 5s and 1s |
+| R23 | Rising tide start | where the band starts and how the camera behaves are not given | 6 rows under the start point (as after a checkpoint); the view never scrolls down and keeps the band's top row on screen (PHYSICS C.8) |
+| R24 | Brace daze | D.4 dazes a heavy 44 ticks, B.1 the co-op Tusker 66 | both: 44 for `heavy` enemies, 66 for the co-op Tusker (boss rule) |
+| R25 | Unstated geometry | mount box and saddle, egg drift, curl box, spear box, raft height, validator "within reach" | starting values marked *(tune)* in PHYSICS C (mount box 58 x 35 from the manifest, saddle 26 px; egg 2 / 6 px per tick; reach = 10 cells across, 11 rows down) |

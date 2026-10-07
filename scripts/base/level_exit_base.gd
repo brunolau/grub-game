@@ -45,10 +45,15 @@ func _notification(what: int) -> void:
 func _sim_tick(phase: int) -> void:
 	if phase != Defs.Phase.CONTACT_ITEMS or used or not is_open():
 		return
+	# The first living hero in contact order who touches it ends the level (2.0, TECH_AUDIT.md 3.12; 1.0: the one
+	# hero). The co-op team rule (every living hero at the exit) is a party rule of PLAN.md phase 1.
 	var level: LevelBase = Game.level
-	if level != null and level.player != null and not level.player.dead \
-			and Overlap.body(self, level.player, level.player):
-		use(level.player)
+	if level == null:
+		return
+	for hero: PlayerBase in level.contact_order():
+		if not hero.dead and Overlap.body(self, hero, hero):
+			use(hero)
+			return
 
 
 ## True when touching it ends the level.

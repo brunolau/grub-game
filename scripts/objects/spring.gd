@@ -51,9 +51,15 @@ func _sim_tick(_phase: int) -> void:
 		if _sprite != null:
 			_sprite.frame = BOUNCE_FRAMES[frame]
 	var level: LevelBase = Game.level
-	if level == null or level.player == null:
+	if level == null:
 		return
-	var hero: PlayerBase = level.player
+	# Every hero in contact order (2.0, TECH_AUDIT.md 3.12; 1.0: the one hero) who lands on it is launched.
+	for hero: PlayerBase in level.contact_order():
+		_launch_test(level, hero)
+
+
+## One hero: landing on it (falling, not gliding) launches him with `power`.
+func _launch_test(level: LevelBase, hero: PlayerBase) -> void:
 	if hero.dead or hero.yvel < 0 or hero.is_gliding():
 		return
 	if Overlap.body(self, hero, hero) and Overlap.stomp:

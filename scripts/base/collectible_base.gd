@@ -122,10 +122,14 @@ func _sim_tick(phase: int) -> void:
 		if not dropped:
 			age += 1
 			_move_tick()
+		# Every hero in contact order (2.0, TECH_AUDIT.md 3.11; 1.0: the one hero): the first one it is collected by
+		# wins. collect() refuses a dead hero and an item that stays (a heart at full energy), so the next may try.
 		var level: LevelBase = Game.level
-		if level != null and level.player != null and can_be_collected() \
-				and Overlap.body(self, level.player, level.player):
-			collect(level.player)
+		if level == null:
+			return
+		for hero: PlayerBase in level.contact_order():
+			if can_be_collected() and Overlap.body(self, hero, hero) and collect(hero):
+				return
 
 
 ## Dozing (SimEntity, ARCHITECTURE.md 11): a placed item far from the hero and the view only counts its age (it
@@ -170,6 +174,8 @@ func collect(hero: PlayerBase) -> bool:
 	if not _apply(hero):
 		return false
 	collected = true
+	# Per-player statistics (2.0): the collector's run counts the pick-up; team totals are paid as in 1.0.
+	hero.run.picked += 1
 	var top: Vector2i = Vector2i(sim_pos.x, sim_pos.y - box_h)
 	if points > 0:
 		Game.add_score(points)

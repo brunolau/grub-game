@@ -31,10 +31,15 @@ func _sim_tick(phase: int) -> void:
 	if phase == Defs.Phase.ITEMS:
 		_move_tick()
 	elif phase == Defs.Phase.CONTACT_ITEMS and armed:
+		# Every living hero in contact order (2.0, TECH_AUDIT.md 3.12; 1.0: the one hero), while it stays armed.
 		var level: LevelBase = Game.level
-		if level != null and level.player != null and not level.player.dead \
-				and Overlap.body(self, level.player, level.player):
-			touch(level.player)
+		if level == null:
+			return
+		for hero: PlayerBase in level.contact_order():
+			if not armed:
+				return
+			if not hero.dead and Overlap.body(self, hero, hero):
+				touch(hero)
 
 
 ## Movement / animation logic for one tick. Override.

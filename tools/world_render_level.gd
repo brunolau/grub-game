@@ -27,6 +27,8 @@ const FONT_PATH: String = "res://assets/fonts/font_hud.png"
 const FONT_CELL: int = 20
 const FONT_COLUMNS: int = 15
 const MARKER_SIZE: int = 28
+## Start marker of players 2..4 (Level.HERO_START_ID; this script must not name Level, see above).
+const HERO_START_ID: StringName = &"objects/hero_start"
 
 ## Collision overlay colours.
 const C_SOLID: Color = Color(0.9, 0.15, 0.15, 0.35)
@@ -164,6 +166,14 @@ func _render(data: LevelData, difficulty: int, collision: bool) -> Image:
 		var feet: Vector2i = LevelText.cell_to_feet(float(start.x), float(start.y))
 		if not _draw_entity_sprite(picture, &"player/player", feet, {}, boxes):
 			_draw_marker(picture, feet, "@", C_HERO)
+	# The starts of players 2..4 (`objects/hero_start slot=n`, a loader marker; 2.0): labelled like the '@'.
+	for record: Dictionary in records:
+		if record["id"] != HERO_START_ID:
+			continue
+		var params: Dictionary = record["params"]
+		var feet: Vector2i = LevelText.cell_to_feet(float(record["col"]), float(record["row"]), params)
+		_draw_marker(picture, feet, "P%s" % str(params.get("slot", "?")), C_HERO)
+		starts.append(Vector2i(int(record["col"]), int(record["row"])))
 	_draw_props(picture, records, "front")
 	_draw_layer(picture, looks, sets, LevelLooks.Layer.FRONT)
 	if collision:
@@ -237,7 +247,7 @@ func _draw_entities(picture: Image, records: Array[Dictionary], z: int, boxes: A
 	for record: Dictionary in records:
 		var id: StringName = record["id"]
 		var category: String = Spawner.category(id)
-		if Spawner.is_prop(id) or category == "zones" or _z_of(category) != z:
+		if Spawner.is_prop(id) or category == "zones" or id == HERO_START_ID or _z_of(category) != z:
 			continue
 		var params: Dictionary = record["params"]
 		var feet: Vector2i = LevelText.cell_to_feet(float(record["col"]), float(record["row"]), params)

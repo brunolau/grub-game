@@ -115,8 +115,7 @@ func _ai_tick() -> void:
 	var hero: PlayerBase = _target_hero()
 	if not fighting:
 		_play(&"idle")
-		if hero != null and absi(hero.sim_pos.x - box_left()) < EnemyTuning.COLOSSUS_WAKE_RANGE \
-				and absi(hero.sim_pos.y - sim_pos.y) < Tuning.VIEW_H:
+		if _wakes_for_any(hero):
 			start_fight()
 		if not fighting:
 			return
@@ -140,8 +139,7 @@ func _ai_tick() -> void:
 			_begin_hurt()
 		else:
 			_hurt_due = true
-	if hero != null and not hero.is_immune() and not hero.is_feasting() and Overlap.body(hero, self, hero):
-		touch_hero(hero)
+	_touch_every(hero)
 	_timer += 1
 	if _state == State.IDLE or _state == State.HURT:
 		_clock += 1
@@ -184,6 +182,26 @@ func _ai_tick() -> void:
 # =================================================================================================================
 # Internals
 # =================================================================================================================
+
+## Wake rule (BossBase._wakes_for_any): the hero is within COLOSSUS_WAKE_RANGE px of the statue's left edge and
+## less than a screen height away.
+func _wakes_for(hero: PlayerBase) -> bool:
+	return absi(hero.sim_pos.x - box_left()) < EnemyTuning.COLOSSUS_WAKE_RANGE \
+			and absi(hero.sim_pos.y - sim_pos.y) < Tuning.VIEW_H
+
+
+## The statue's body against the heroes: the target hero (1.0); a party: every living hero in contact order.
+func _touch_every(target: PlayerBase) -> void:
+	var level: LevelBase = Game.level
+	if level == null or level.hero_count() <= 1:
+		if target != null and not target.is_immune() and not target.is_feasting() \
+				and Overlap.body(target, self, target):
+			touch_hero(target)
+		return
+	for hero: PlayerBase in level.contact_order():
+		if not hero.dead and not hero.is_immune() and not hero.is_feasting() and Overlap.body(hero, self, hero):
+			touch_hero(hero)
+
 
 ## A fresh breath: the idle clock starts again.
 func _begin_idle() -> void:

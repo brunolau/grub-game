@@ -16,8 +16,14 @@ extends SceneTree
 ##                           between two ticks, as the windowed game runs them)
 ##   --no-doze               every entity ticks all the time (LevelBase.doze_enabled = false)
 ##   --repeat=<n>            play every route n times (timing only; digests are written by the first pass)
+##   --alone                 also play the chained entries marked `alone` from a fresh run, as the route test does
+##                           (e.g. the fixture of "w2_l2b.inputs" in tests/fixtures/sp_digest/)
+##   --dump=<level>:<tick>   print the doze state around that tick (the digest hash then also covers node names,
+##                           so write such a run to its own --out)
 ## Route arguments: file names of the route table ("w1_l1.inputs") or prefixes ("w2_"); default: every route that
 ## is not only played chained behind another one. Prints one line per played stage and a summary; exit code 0.
+## Single-player identity (docs/expansion/TECH_AUDIT.md 4.12): tools/sp_identity.sh runs the digests against the
+## frozen baseline in build/mp_baseline and diffs them with build/mp_digest_before*.
 ## It is compiled before the autoloads exist, so the work happens in sim_bench_runner.gd.
 
 const RUNNER: String = "res://scripts/core/dev/sim_bench_runner.gd"

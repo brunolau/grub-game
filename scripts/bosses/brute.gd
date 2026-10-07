@@ -129,8 +129,7 @@ func _ai_tick() -> void:
 	_physics_step()
 	if not fighting:
 		_play(&"idle")
-		if hero != null and absi(hero.sim_pos.x - sim_pos.x) < EnemyTuning.BRUTE_WAKE_RANGE \
-				and absi(hero.sim_pos.y - sim_pos.y) <= EnemyTuning.BRUTE_ACTIVE_DY:
+		if _wakes_for_any(hero):
 			start_fight()
 		if not fighting:
 			return
@@ -144,7 +143,7 @@ func _ai_tick() -> void:
 	if hero == null:
 		_play(&"idle")
 		return
-	_contact(hero)
+	_contact_every(hero)
 	var dist: int = absi(hero.sim_pos.x - sim_pos.x)
 	if dist > EnemyTuning.BRUTE_ACTIVE_DX or absi(hero.sim_pos.y - sim_pos.y) > EnemyTuning.BRUTE_ACTIVE_DY:
 		_play(&"idle")
@@ -179,7 +178,7 @@ func _watch_tick(hero: PlayerBase) -> void:
 	if hp < EnemyTuning.BRUTE_SKIP_WATCH_HP:
 		_set_state(State.JUMP)
 		return
-	if hero.is_striking() and (_counter & EnemyTuning.BRUTE_ANGER_PERIOD_MASK) == 0:
+	if _striking_near(hero) and (_counter & EnemyTuning.BRUTE_ANGER_PERIOD_MASK) == 0:
 		_raise_anger()
 	if _counter >= EnemyTuning.BRUTE_WATCH_TICKS:
 		_raise_anger()
@@ -346,7 +345,7 @@ func _on_head_hit(power: int, hero: PlayerBase) -> void:
 	if dead or _state == State.DYING:
 		return
 	_raise_anger()
-	if hero != null and Game.has_glider:
+	if hero != null and hero.run.has_glider:
 		hero.set_glider(false)
 	if hp < EnemyTuning.BRUTE_SKIP_WATCH_HP and skin == SKIN_CALM:
 		_apply_skin(SKIN_ENRAGED)
@@ -359,6 +358,38 @@ func _on_head_hit(power: int, hero: PlayerBase) -> void:
 		_play(&"hurt", true)
 
 
+## Wake rule (BossBase._wakes_for_any): the hero is within BRUTE_WAKE_RANGE px horizontally, at about its height.
+func _wakes_for(hero: PlayerBase) -> bool:
+	return absi(hero.sim_pos.x - sim_pos.x) < EnemyTuning.BRUTE_WAKE_RANGE \
+			and absi(hero.sim_pos.y - sim_pos.y) <= EnemyTuning.BRUTE_ACTIVE_DY
+
+
+## True when a strike raises the anger: the target hero strikes (1.0; he is within the active range here); a party:
+## any targetable hero within the active range strikes.
+func _striking_near(target: PlayerBase) -> bool:
+	var level: LevelBase = Game.level
+	if level == null or level.hero_count() <= 1:
+		return target.is_striking()
+	for hero: PlayerBase in level.contact_order():
+		if hero.is_party_targetable() and hero.is_striking() \
+				and absi(hero.sim_pos.x - sim_pos.x) <= EnemyTuning.BRUTE_ACTIVE_DX \
+				and absi(hero.sim_pos.y - sim_pos.y) <= EnemyTuning.BRUTE_ACTIVE_DY:
+			return true
+	return false
+
+
+## Body, head and fists against every hero in contact order (1.0: the target hero, the only one; the AI itself
+## still follows the target). Dead heroes are skipped, as 1.0 never tested a dead target.
+func _contact_every(target: PlayerBase) -> void:
+	var level: LevelBase = Game.level
+	if level == null or level.hero_count() <= 1:
+		_contact(target)
+		return
+	for hero: PlayerBase in level.contact_order():
+		if not hero.dead:
+			_contact(hero)
+
+
 ## Body, head and fist against the hero: a landing on the head bounces him, everything else costs a bone.
 func _contact(hero: PlayerBase) -> void:
 	if _state == State.STAGGER:
@@ -368,6 +399,7 @@ func _contact(hero: PlayerBase) -> void:
 			var held: bool = (hero.input_flags & Defs.IN_UP) != 0
 			hero.bounce(Tuning.BOSS_BOUNCE_YVEL_UP if held else Tuning.BOSS_BOUNCE_YVEL, Overlap.depth)
 			Events.player_bounced.emit(self, 0)
+			Events.hero_bounced.emit(hero, self, 0)
 			return
 		if _hurt_hero(hero):
 			return

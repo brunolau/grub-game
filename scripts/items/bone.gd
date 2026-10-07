@@ -12,8 +12,9 @@ func _init() -> void:
 	set_box(Vector3i(12, 12, 6))
 
 
-func _apply(_hero: PlayerBase) -> bool:
-	if Game.add_bones(1) > 0:
+func _apply(hero: PlayerBase) -> bool:
+	# The collector's own energy (2.0: his PlayerRun; P1's run is Game's, so Game.add_bones() in 1.0).
+	if hero.run.add_bones(1) > 0:
 		Audio.play_sfx(Sfx.HEART)
 		Events.popup_requested.emit(&"heart", 1, Vector2i(sim_pos.x, sim_pos.y - box_h))
 	return true

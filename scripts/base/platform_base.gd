@@ -13,8 +13,8 @@ var dy: int = 0
 ## True when the hero rode this platform on the previous tick (movers flagged "ride" start, droppers count down).
 var ridden: bool = false
 
-## Tick on which some platform already carried the hero (only one per tick).
-static var _carried_on_tick: int = -1
+# The "one platform per hero per tick" guard is the hero's own PlayerBase.carried_on_tick (2.0: it was one static
+# value here for the one hero; per hero it is the same for a party of one, TECH_AUDIT.md 3.12).
 
 
 func get_kind() -> int:
@@ -48,13 +48,23 @@ func _move_tick() -> void:
 	pass
 
 
-## The ride test of PHYSICS.md 11.4. Returns true when the hero is now riding this platform.
+## The ride test of PHYSICS.md 11.4. Returns true when the hero is now riding this platform. A party (2.0,
+## TECH_AUDIT.md 3.12): every hero in LevelBase.contact_order() (slot order) is tested, each carried by at most one
+## platform per tick (PlayerBase.carried_on_tick); true when any hero rides it.
 func _ride_test() -> bool:
 	var level: LevelBase = Game.level
-	if level == null or level.player == null or not on_screen:
+	if level == null or not on_screen:
 		return false
-	var hero: PlayerBase = level.player
-	if hero.dead or hero.yvel <= Tuning.PLATFORM_RIDE_MIN_YVEL_EXCL or _carried_on_tick == Sim.total_ticks:
+	var riding: bool = false
+	for hero: PlayerBase in level.contact_order():
+		if _ride_test_hero(hero):
+			riding = true
+	return riding
+
+
+## The ride test of PHYSICS.md 11.4 for one hero: true when `hero` is now riding this platform.
+func _ride_test_hero(hero: PlayerBase) -> bool:
+	if hero.dead or hero.yvel <= Tuning.PLATFORM_RIDE_MIN_YVEL_EXCL or hero.carried_on_tick == Sim.total_ticks:
 		return false
 	# The hero's feet must be inside the platform's contact band below its surface. The band is the platform's own
 	# height (8 px), but a hero falling at PLATFORM_CATCH_YVEL or faster can step across 8 px in one tick: for him
@@ -74,6 +84,6 @@ func _ride_test() -> bool:
 		false, hero.yvel, 1
 	):
 		return false
-	_carried_on_tick = Sim.total_ticks
+	hero.carried_on_tick = Sim.total_ticks
 	hero.ride_platform(self, dx, dy)
 	return true

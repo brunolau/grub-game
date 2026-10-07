@@ -30,9 +30,12 @@ Both files are generated from the engine's own data (`Engine.get_license_text()`
 | File | Pack | Author | Licence |
 |---|---|---|---|
 | `superpowers_prehistoric_platformer.txt` | Superpowers Asset Packs - Prehistoric Platformer | Pixel-boy (Sparklin Labs) | CC0 1.0 |
+| `superpowers_rpg_battle_system.txt` | Superpowers Asset Packs - RPG Battle System (2.0) | Pixel-boy (Sparklin Labs) | CC0 1.0 |
+| `superpowers_western_fps_2d.txt` | Superpowers Asset Packs - Western FPS 2D (2.0) | Pixel-boy (Sparklin Labs) | CC0 1.0 |
 | `superpowers_asset_packs_audio.txt` | Superpowers Asset Packs - prehistoric-platformer sound effects | Pixel-boy (Sparklin Labs) | CC0 1.0 |
 | `ansimuz_explosion_animations_pack.txt` | Explosion Animations Pack | ansimuz (Luis Zuno) | CC0 1.0 |
 | `ansimuz_sunny_land.txt` | SunnyLand | ansimuz (Luis Zuno) | CC0 1.0 |
+| `ansimuz_sunny_land_series.txt` | Sunny Land 2D Pixel Art Pack, OpenGameArt release (2.0: desert eagle) | ansimuz (Luis Zuno) | CC0 1.0 |
 | `ghostpixxells_free_pixel_foods.txt` | Free Pixel foods | ghostpixxells | CC0 1.0 |
 | `oga_aroach_16x16_food.txt` | 16x16 Food | ARoachIFoundOnMyPillow | CC0 1.0 |
 | `oga_aroach_16x16_rpg_items_db32.txt` | 16x16 RPG Items (DB32) | ARoachIFoundOnMyPillow | CC0 1.0 |
@@ -57,6 +60,9 @@ share-alike or attribution-required art / audio licence) asset is used.
 
 `misc_cc0_level_themes.txt` also quotes the evidence of two other tracks from the same staging folder (iamoneabe,
 enprogames); neither ships in the game.
+
+The files marked 2.0 are written by `docs/art/expansion/pipeline/build_expansion.py` in the same format, with the
+licence wording captured on 2026-10-06 (expansion staging).
 
 Keep this folder in every export. The pipeline scripts `docs/art/pipeline/build_licenses.py` and `build_manifest.py`
 rewrite the pack files, this README and `CREDITS.md` from the staging area: carry the engine files and the edits of

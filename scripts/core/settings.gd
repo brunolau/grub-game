@@ -15,6 +15,14 @@ extends Node
 ##   4. offer `reset_binding(action)` / `reset_bindings()`; call `save()` when the screen closes.
 ## Changed actions are stored in the `[bindings]` section as text tokens ("key:90", "joy_button:0",
 ## "joy_axis:1:-1"); actions that were never changed follow the project defaults, also in later versions.
+##
+## Party bindings (2.0, docs/expansion/PLAN.md P0.5, DESIGN.md D.11): every player slot has its own binding profile
+## for its generated actions `p1_*`..`p4_*` (GameInput.slot_action). The profile of slot n defaults to a keyboard
+## half of the layout "controls/party_keyboard" (InputSlot: P1 the left cluster, P2 the right one) plus the solo
+## pad layout; changed actions are stored in `[bindings_p1]`..`[bindings_p4]` with the same tokens. The
+## single-player profile (`[bindings]`, the unprefixed actions) is untouched by them. The `*_slot_*` methods work
+## like their single-player twins; `changed` reports a slot's binding as BINDINGS_KEY with the generated action
+## name ("p2_jump") as value.
 
 ## A value changed (also emitted for every key after [method load_settings] and [method reset]). Bindings
 ## report the pseudo key BINDINGS_KEY with the action name as value ("" = all actions).
@@ -27,6 +35,10 @@ const VERSION: int = 1
 const BINDINGS_KEY: String = "controls/bindings"
 ## Section of the settings file that holds the changed bindings.
 const BINDINGS_SECTION: String = "bindings"
+## Sections of the party binding profiles: SLOT_BINDINGS_SECTION + "1".."4" (see [method slot_bindings_section]).
+const SLOT_BINDINGS_SECTION: String = "bindings_p"
+## Key of the shared-keyboard layout of a party (InputSlot.KEYBOARD_LAYOUT_NAMES).
+const PARTY_KEYBOARD_KEY: String = "controls/party_keyboard"
 ## A stick or trigger must be pushed at least this far to be captured as a binding.
 const AXIS_CAPTURE_THRESHOLD: float = 0.5
 
@@ -68,6 +80,7 @@ const DEFAULTS: Dictionary = {
 	"camera/smooth_follow": false,  # non-original comfort camera (PHYSICS.md 12.6)
 	"game/locale": "",              # "" = system locale
 	"game/last_difficulty": 0,      # Defs.Difficulty
+	"controls/party_keyboard": "classic", # 2.0: "classic" | "two_hands" | "one_hand" (DESIGN.md D.11, InputSlot)
 }
 
 ## Directory of the settings file. Tests point it at `res://build/...` so they never touch real user data.
@@ -75,6 +88,7 @@ var storage_dir: String = "user://"
 
 var _values: Dictionary = {}
 var _bindings: Dictionary = {}  # action (String) -> Array of InputEvent
+var _slot_bindings: Array[Dictionary] = _empty_slot_profiles()  # per slot: action (String) -> Array of InputEvent
 
 
 func _ready() -> void:
@@ -256,6 +270,115 @@ func has_custom_bindings() -> bool:
 	return not _bindings.is_empty()
 
 
+# --- 2.0: party binding profiles (one per player slot) -----------------------------------------------------------
+
+## Section of the settings file with the changed bindings of player slot `slot` (0..3): "bindings_p1".."bindings_p4".
+static func slot_bindings_section(slot: int) -> String:
+	return "%s%d" % [SLOT_BINDINGS_SECTION, slot + 1]
+
+
+## The shared-keyboard layout of a party (InputSlot.KeyboardLayout), from "controls/party_keyboard".
+func party_keyboard_layout() -> int:
+	return InputSlot.layout_from_name(str(get_value(PARTY_KEYBOARD_KEY, InputSlot.KEYBOARD_LAYOUT_NAMES[0])))
+
+
+## Events of a game action (Defs.GAME_ACTIONS) in the binding profile of player slot `slot`, in slot order, for one
+## device family (Defs.Device.KEYBOARD / GAMEPAD; -1 = keys, then pad): the changed events of the profile, or its
+## defaults - the keys of keyboard half `half` (Defs.InputSlotKind.KEYBOARD_LEFT / KEYBOARD_RIGHT; -1 = the slot's
+## default half, InputSlot.default_half) in the layout of [method party_keyboard_layout], then the solo pad layout.
+## Every event has device -1 (GameInput binds the pad events to the slot's pad).
+func get_slot_bindings(slot: int, action: StringName, device: int = -1, half: int = -1) -> Array[InputEvent]:
+	var result: Array[InputEvent] = []
+	if not _is_slot_action(slot, action, "get_slot_bindings"):
+		return result
+	for event: InputEvent in _slot_events(slot, action, half):
+		if device < 0 or event_device(event) == device:
+			result.append(event)
+	return result
+
+
+## Replace the events of a game action in the profile of player slot `slot` (normal form, each event once; events
+## that cannot be bound are reported and left out). An empty list restores the action's defaults.
+func rebind_slot(slot: int, action: StringName, events: Array[InputEvent]) -> void:
+	if not _is_slot_action(slot, action, "rebind_slot"):
+		return
+	var accepted: Array[InputEvent] = []
+	for event: InputEvent in events:
+		var normal: InputEvent = normalize_event(event)
+		if normal == null:
+			push_error("Settings.rebind_slot: %s cannot be bound to '%s'" % [str(event), action])
+		elif _find_token(accepted, encode_event(normal)) < 0:
+			accepted.append(normal)
+	if accepted.is_empty():
+		_slot_bindings[slot].erase(String(action))
+	else:
+		_slot_bindings[slot][String(action)] = accepted
+	changed.emit(BINDINGS_KEY, String(InputSlot.action_name(slot, action)))
+
+
+## Bind one captured event to a game action of player slot `slot`'s profile, as [method set_binding] does for the
+## single-player profile: it replaces position `index` among the action's events of the same device family (or is
+## added); no event is on two actions of one profile - the action that held it receives the replaced event in
+## exchange (or loses it). Returns that other action, or &"". `half` as in [method get_slot_bindings]. Two profiles
+## may hold the same event (each slot reads only its own device); the join screen's key test reports a key that
+## two keyboard halves share.
+func set_slot_binding(slot: int, action: StringName, event: InputEvent, index: int = 0,
+		half: int = -1) -> StringName:
+	if not _is_slot_action(slot, action, "set_slot_binding"):
+		return &""
+	var normal: InputEvent = normalize_event(event)
+	if normal == null:
+		push_error("Settings.set_slot_binding: %s cannot be bound to '%s'" % [str(event), action])
+		return &""
+	var device: int = event_device(normal)
+	var token: String = encode_event(normal)
+	var mine: Array[InputEvent] = get_slot_bindings(slot, action, device, half)
+	var at: int = clampi(index, 0, mine.size())
+	var held_at: int = _find_token(mine, token)
+	var other: StringName = &""
+	if held_at >= 0:
+		at = mini(at, mine.size() - 1)
+		var swapped: InputEvent = mine[at]
+		mine[at] = mine[held_at]
+		mine[held_at] = swapped
+	else:
+		var replaced: InputEvent = null
+		if at < mine.size():
+			replaced = mine[at]
+			mine[at] = normal
+		else:
+			mine.append(normal)
+		other = _take_from_other_slot_actions(slot, action, device, token, replaced, half)
+	_slot_bindings[slot][String(action)] = _slot_with_device_events(slot, action, device, mine, half)
+	changed.emit(BINDINGS_KEY, String(InputSlot.action_name(slot, action)))
+	return other
+
+
+## Restore the defaults of one game action in player slot `slot`'s profile. Defaults that another action of the
+## profile holds meanwhile are taken away from that action (as [method reset_binding]). `half` as in
+## [method get_slot_bindings].
+func reset_slot_binding(slot: int, action: StringName, half: int = -1) -> void:
+	if not _is_slot_action(slot, action, "reset_slot_binding"):
+		return
+	_slot_bindings[slot].erase(String(action))
+	for event: InputEvent in get_slot_bindings(slot, action, -1, half):
+		_take_from_other_slot_actions(slot, action, event_device(event), encode_event(event), null, half)
+	changed.emit(BINDINGS_KEY, String(InputSlot.action_name(slot, action)))
+
+
+## Restore the defaults of every action of player slot `slot`'s profile (-1: of every slot).
+func reset_slot_bindings(slot: int = -1) -> void:
+	for each: int in Defs.MAX_PLAYERS:
+		if slot < 0 or slot == each:
+			_slot_bindings[each] = {}
+	changed.emit(BINDINGS_KEY, "")
+
+
+## True when player slot `slot`'s profile differs from its defaults.
+func has_custom_slot_bindings(slot: int) -> bool:
+	return slot >= 0 and slot < Defs.MAX_PLAYERS and not _slot_bindings[slot].is_empty()
+
+
 ## True when a captured input event can become a binding: a key press (no echo), a gamepad button press, or a
 ## stick / trigger pushed at least AXIS_CAPTURE_THRESHOLD. Releases, mouse and touch events cannot.
 func is_bindable(event: InputEvent) -> bool:
@@ -385,9 +508,10 @@ func event_label(event: InputEvent) -> String:
 	return ""
 
 
-## Restore every value to its default (does not touch save data).
+## Restore every value to its default (does not touch save data). The party binding profiles too.
 func reset() -> void:
 	_values.clear()
+	_slot_bindings = _empty_slot_profiles()
 	reset_bindings()
 	for key: String in DEFAULTS:
 		_apply(key)
@@ -398,19 +522,25 @@ func reset() -> void:
 func load_settings() -> void:
 	_values.clear()
 	_bindings.clear()
+	_slot_bindings = _empty_slot_profiles()
 	InputMap.load_from_project_settings()
 	var file: ConfigFile = ConfigFile.new()
 	var err: Error = file.load(storage_dir + FILE_NAME)
 	if err == OK:
 		var version: int = int(file.get_value("meta", "version", 0))
 		for section: String in file.get_sections():
-			if section == "meta" or section == BINDINGS_SECTION:
+			if section == "meta" or section == BINDINGS_SECTION or _slot_of_section(section) >= 0:
 				continue
 			for key_name: String in file.get_section_keys(section):
 				_values["%s/%s" % [section, key_name]] = file.get_value(section, key_name)
 		if file.has_section(BINDINGS_SECTION):
 			for action: String in file.get_section_keys(BINDINGS_SECTION):
 				_load_binding(action, file.get_value(BINDINGS_SECTION, action))
+		for slot: int in Defs.MAX_PLAYERS:
+			var slot_section: String = slot_bindings_section(slot)
+			if file.has_section(slot_section):
+				for action: String in file.get_section_keys(slot_section):
+					_load_slot_binding(slot, action, file.get_value(slot_section, action))
 		if version != VERSION:
 			_migrate(version)
 	elif err != ERR_FILE_NOT_FOUND:
@@ -434,6 +564,12 @@ func save() -> Error:
 		for event: InputEvent in _bindings[action]:
 			tokens.append(encode_event(event))
 		file.set_value(BINDINGS_SECTION, action, tokens)
+	for slot: int in Defs.MAX_PLAYERS:
+		for action: String in _slot_bindings[slot]:
+			var slot_tokens: PackedStringArray = PackedStringArray()
+			for event: InputEvent in _slot_bindings[slot][action]:
+				slot_tokens.append(encode_event(event))
+			file.set_value(slot_bindings_section(slot), action, slot_tokens)
 	var err: Error = file.save(storage_dir + FILE_NAME)
 	if err != OK:
 		push_error("Settings: could not write %s (error %d)" % [storage_dir + FILE_NAME, err])
@@ -497,6 +633,88 @@ func _take_from_others(action: StringName, device: int, token: String, replaceme
 		changed.emit(BINDINGS_KEY, String(other))
 		changed_action = other
 	return changed_action
+
+
+## One entry of a `[bindings_pN]` section, read like [method _load_binding].
+func _load_slot_binding(slot: int, action: String, stored: Variant) -> void:
+	if not Defs.GAME_ACTIONS.has(StringName(action)):
+		return
+	if not (stored is PackedStringArray or stored is Array):
+		return
+	var events: Array[InputEvent] = []
+	for item: Variant in stored:
+		if item is String:
+			var event: InputEvent = decode_event(item)
+			if event != null and _find_token(events, encode_event(event)) < 0:
+				events.append(event)
+	if not events.is_empty():
+		_slot_bindings[slot][action] = events
+
+
+## The events of a slot profile's action: the changed ones, or the defaults of the keyboard half.
+func _slot_events(slot: int, action: StringName, half: int) -> Array[InputEvent]:
+	var stored: Variant = _slot_bindings[slot].get(String(action))
+	if stored is Array:
+		var copy: Array[InputEvent] = []
+		copy.assign(stored)
+		return copy
+	var used_half: int = half if half >= 0 else InputSlot.default_half(slot)
+	return InputSlot.default_events(party_keyboard_layout(), used_half, action)
+
+
+## A slot profile's events of `action` with those of one device family replaced (keys first, then pad).
+func _slot_with_device_events(slot: int, action: StringName, device: int, device_events: Array[InputEvent],
+		half: int) -> Array[InputEvent]:
+	var result: Array[InputEvent] = []
+	for family: int in [Defs.Device.KEYBOARD, Defs.Device.GAMEPAD]:
+		result.append_array(device_events if family == device else get_slot_bindings(slot, action, family, half))
+	return result
+
+
+## [method _take_from_others] inside one slot profile.
+func _take_from_other_slot_actions(slot: int, action: StringName, device: int, token: String,
+		replacement: InputEvent, half: int) -> StringName:
+	var changed_action: StringName = &""
+	for other: StringName in Defs.GAME_ACTIONS:
+		if other == action:
+			continue
+		var theirs: Array[InputEvent] = get_slot_bindings(slot, other, device, half)
+		var at: int = _find_token(theirs, token)
+		if at < 0:
+			continue
+		if replacement != null and _find_token(theirs, encode_event(replacement)) < 0:
+			theirs[at] = replacement
+		else:
+			theirs.remove_at(at)
+		_slot_bindings[slot][String(other)] = _slot_with_device_events(slot, other, device, theirs, half)
+		changed.emit(BINDINGS_KEY, String(InputSlot.action_name(slot, other)))
+		changed_action = other
+	return changed_action
+
+
+func _is_slot_action(slot: int, action: StringName, caller: String) -> bool:
+	if slot < 0 or slot >= Defs.MAX_PLAYERS:
+		push_error("Settings.%s: no player slot %d" % [caller, slot])
+		return false
+	if not Defs.GAME_ACTIONS.has(action):
+		push_error("Settings.%s: '%s' is not a game action" % [caller, action])
+		return false
+	return true
+
+
+## The player slot of a `[bindings_pN]` section name, or -1.
+static func _slot_of_section(section: String) -> int:
+	for slot: int in Defs.MAX_PLAYERS:
+		if section == slot_bindings_section(slot):
+			return slot
+	return -1
+
+
+static func _empty_slot_profiles() -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	for slot: int in Defs.MAX_PLAYERS:
+		result.append({})
+	return result
 
 
 ## Index of the event with this token in `events`, or -1.

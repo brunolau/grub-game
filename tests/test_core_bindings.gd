@@ -219,3 +219,156 @@ func test_game_input_follows_a_new_binding() -> void:
 	Input.flush_buffered_events()
 	Sim.step(1)
 	assert_eq(GameInput.flags, 0)
+
+
+
+# --- 2.0: party binding profiles [bindings_p1]..[bindings_p4] (docs/expansion/PLAN.md P0.5, DESIGN.md D.11) -----
+
+func _slot_tokens(slot: int, action: StringName, device: int = -1, half: int = -1) -> PackedStringArray:
+	var result: PackedStringArray = PackedStringArray()
+	for event: InputEvent in Settings.get_slot_bindings(slot, action, device, half):
+		result.append(Settings.encode_event(event))
+	return result
+
+
+func _keys(codes: Array[Key]) -> PackedStringArray:
+	var result: PackedStringArray = PackedStringArray()
+	for code: Key in codes:
+		result.append("key:%d" % code)
+	return result
+
+
+func test_the_swap_action_has_its_defaults() -> void:
+	assert_eq(_tokens(Defs.ACT_SWAP), PackedStringArray(["key:%d" % KEY_V, "key:%d" % KEY_SEMICOLON,
+		"joy_button:%d" % JOY_BUTTON_LEFT_SHOULDER]), "V, ; and pad LB (DESIGN.md C.1)")
+	assert_eq(Settings.set_binding(Defs.ACT_SWAP, _key(KEY_X), 0), Defs.ACT_ATTACK, "swap takes part in the exchange")
+	assert_eq(_tokens(Defs.ACT_ATTACK, Defs.Device.KEYBOARD), PackedStringArray(["key:32", "key:%d" % KEY_V, "key:74"]))
+
+
+func test_party_profiles_default_to_the_keyboard_layouts() -> void:
+	assert_eq(Settings.slot_bindings_section(0), "bindings_p1")
+	assert_eq(Settings.slot_bindings_section(3), "bindings_p4")
+	assert_eq(Settings.party_keyboard_layout(), InputSlot.KeyboardLayout.CLASSIC, "classic is the default")
+	var kb: int = Defs.Device.KEYBOARD
+	# Classic: P1 on W A S D + Space / Left Shift, P2 on the numpad.
+	assert_eq(_slot_tokens(0, Defs.ACT_JUMP, kb), _keys([KEY_SPACE]))
+	assert_eq(_slot_tokens(0, Defs.ACT_ATTACK, kb), _keys([KEY_SHIFT]))
+	assert_eq(_slot_tokens(0, Defs.ACT_SWAP, kb), _keys([KEY_E]))
+	assert_eq(_slot_tokens(0, Defs.ACT_LOOK, kb), _keys([KEY_Q]))
+	assert_eq(_slot_tokens(1, Defs.ACT_UP, kb), _keys([KEY_KP_8]))
+	assert_eq(_slot_tokens(1, Defs.ACT_DOWN, kb), _keys([KEY_KP_5]))
+	assert_eq(_slot_tokens(1, Defs.ACT_ATTACK, kb), _keys([KEY_KP_ENTER]))
+	assert_eq(_slot_tokens(1, Defs.ACT_SWAP, kb), _keys([KEY_KP_ADD]))
+	assert_eq(_slot_tokens(1, Defs.ACT_LOOK, kb), _keys([KEY_KP_PERIOD]))
+	assert_eq(_slot_tokens(1, Defs.ACT_PAUSE, kb), PackedStringArray(), "Escape and P keep pausing for everyone")
+	assert_eq(_slot_tokens(2, Defs.ACT_JUMP, kb), PackedStringArray(), "a keyboard serves two players at most")
+	assert_eq(_slot_tokens(2, Defs.ACT_JUMP, kb, Defs.InputSlotKind.KEYBOARD_RIGHT), _keys([KEY_KP_0]),
+		"a slot can use another half")
+	assert_eq(_slot_tokens(0, Defs.ACT_JUMP, kb, Defs.InputSlotKind.KEYBOARD_FULL), _keys([KEY_Z, KEY_K]),
+		"the whole keyboard: the single-player keys")
+	for slot: int in Defs.MAX_PLAYERS:
+		assert_eq(_slot_tokens(slot, Defs.ACT_SWAP, Defs.Device.GAMEPAD), PackedStringArray(["joy_button:9"]),
+			"every slot: the solo pad layout, LB swaps")
+		assert_eq(_slot_tokens(slot, Defs.ACT_JUMP, Defs.Device.GAMEPAD), PackedStringArray(["joy_button:0"]))
+	Settings.set_value(Settings.PARTY_KEYBOARD_KEY, "two_hands")
+	assert_eq(_slot_tokens(0, Defs.ACT_JUMP, kb), _keys([KEY_G]))
+	assert_eq(_slot_tokens(0, Defs.ACT_SWAP, kb), _keys([KEY_T]))
+	assert_eq(_slot_tokens(1, Defs.ACT_ATTACK, kb), _keys([KEY_PERIOD]))
+	assert_eq(_slot_tokens(1, Defs.ACT_JUMP, kb), _keys([KEY_SLASH]))
+	assert_eq(_slot_tokens(1, Defs.ACT_SWAP, kb), _keys([KEY_SEMICOLON]))
+	Settings.set_value(Settings.PARTY_KEYBOARD_KEY, "one_hand")
+	assert_eq(_slot_tokens(0, Defs.ACT_JUMP, kb), _keys([KEY_W]), "the Up-jumps scheme: W jumps")
+	assert_eq(_slot_tokens(0, Defs.ACT_UP, kb), PackedStringArray())
+	assert_eq(_slot_tokens(1, Defs.ACT_JUMP, kb), _keys([KEY_UP]))
+	assert_eq(_slot_tokens(1, Defs.ACT_ATTACK, kb), _keys([KEY_CTRL]))
+	assert_eq(_slot_tokens(1, Defs.ACT_LOOK, kb), _keys([KEY_KP_0]))
+	Settings.set_value(Settings.PARTY_KEYBOARD_KEY, "no_such_layout")
+	assert_eq(Settings.party_keyboard_layout(), InputSlot.KeyboardLayout.CLASSIC)
+
+
+func test_every_layout_has_two_disjoint_complete_halves() -> void:
+	for layout: int in InputSlot.KEYBOARD_LAYOUT_NAMES.size():
+		var left: Array[Key] = []
+		var right: Array[Key] = []
+		for action: StringName in Defs.GAME_ACTIONS:
+			var left_keys: Array[Key] = InputSlot.default_keys(layout, Defs.InputSlotKind.KEYBOARD_LEFT, action)
+			var right_keys: Array[Key] = InputSlot.default_keys(layout, Defs.InputSlotKind.KEYBOARD_RIGHT, action)
+			left.append_array(left_keys)
+			right.append_array(right_keys)
+			if action != Defs.ACT_PAUSE and action != Defs.ACT_UP:
+				assert_false(left_keys.is_empty(), "layout %d: P1 has a key for %s" % [layout, action])
+				assert_false(right_keys.is_empty(), "layout %d: P2 has a key for %s" % [layout, action])
+		for code: Key in left:
+			assert_false(right.has(code), "layout %d: key %d is on both halves" % [layout, code])
+			assert_eq(left.count(code), 1, "layout %d: key %d is on one action of P1" % [layout, code])
+		for code: Key in right:
+			assert_eq(right.count(code), 1, "layout %d: key %d is on one action of P2" % [layout, code])
+
+
+func test_slot_bindings_swap_inside_one_profile() -> void:
+	var reported: Array[String] = []
+	var on_changed: Callable = func(key: String, value: Variant) -> void:
+		if key == Settings.BINDINGS_KEY:
+			reported.append(str(value))
+	Settings.changed.connect(on_changed)
+	var other: StringName = Settings.set_slot_binding(1, Defs.ACT_JUMP, _key(KEY_KP_ENTER), 0)
+	Settings.changed.disconnect(on_changed)
+	assert_eq(other, Defs.ACT_ATTACK, "Num Enter was P2's strike")
+	assert_eq(_slot_tokens(1, Defs.ACT_JUMP, Defs.Device.KEYBOARD), _keys([KEY_KP_ENTER]))
+	assert_eq(_slot_tokens(1, Defs.ACT_ATTACK, Defs.Device.KEYBOARD), _keys([KEY_KP_0]), "strike got Num 0 instead")
+	assert_eq(_slot_tokens(1, Defs.ACT_JUMP, Defs.Device.GAMEPAD), PackedStringArray(["joy_button:0"]),
+		"the pad part is untouched")
+	assert_true(reported.has("p2_jump") and reported.has("p2_attack"), "reported as generated actions: %s" % [reported])
+	assert_eq(_slot_tokens(0, Defs.ACT_JUMP, Defs.Device.KEYBOARD), _keys([KEY_SPACE]), "P1's profile is untouched")
+	assert_eq(_tokens(Defs.ACT_JUMP), PackedStringArray(["key:90", "key:75", "joy_button:0"]),
+		"the single-player bindings are untouched")
+	assert_false(Settings.has_custom_bindings())
+	assert_true(Settings.has_custom_slot_bindings(1))
+	assert_false(Settings.has_custom_slot_bindings(0))
+	Settings.reset_slot_binding(1, Defs.ACT_JUMP)
+	assert_eq(_slot_tokens(1, Defs.ACT_JUMP, Defs.Device.KEYBOARD), _keys([KEY_KP_0]))
+	assert_eq(_slot_tokens(1, Defs.ACT_ATTACK, Defs.Device.KEYBOARD), PackedStringArray(),
+		"a default that strike held meanwhile is taken back")
+	Settings.reset_slot_bindings(1)
+	assert_eq(_slot_tokens(1, Defs.ACT_ATTACK, Defs.Device.KEYBOARD), _keys([KEY_KP_ENTER]))
+	assert_false(Settings.has_custom_slot_bindings(1))
+
+
+func test_slot_bindings_survive_a_restart() -> void:
+	var with_ctrl: InputEventKey = _key(KEY_Y)
+	with_ctrl.ctrl_pressed = true
+	Settings.rebind_slot(0, Defs.ACT_SWAP, [with_ctrl, _key(KEY_Y), _pad_button(JOY_BUTTON_RIGHT_SHOULDER)] \
+		as Array[InputEvent])
+	assert_eq(_slot_tokens(0, Defs.ACT_SWAP), PackedStringArray(["key:%d" % KEY_Y, "joy_button:10"]))
+	Settings.set_slot_binding(3, Defs.ACT_LOOK, _pad_button(JOY_BUTTON_X), 0)
+	assert_eq(Settings.save(), OK)
+	var file: ConfigFile = ConfigFile.new()
+	assert_eq(file.load(Settings.storage_dir + Settings.FILE_NAME), OK)
+	assert_eq(file.get_value("bindings_p1", "swap"), PackedStringArray(["key:%d" % KEY_Y, "joy_button:10"]))
+	assert_true(file.has_section_key("bindings_p4", "look"))
+	assert_false(file.has_section("bindings_p2"), "unchanged profiles are not stored")
+	file.set_value("bindings_p2", "jump", ["garbage", 5])
+	file.set_value("bindings_p2", "no_such_action", ["key:81"])
+	assert_eq(file.save(Settings.storage_dir + Settings.FILE_NAME), OK)
+	Settings.load_settings()
+	assert_eq(_slot_tokens(0, Defs.ACT_SWAP), PackedStringArray(["key:%d" % KEY_Y, "joy_button:10"]))
+	assert_eq(_slot_tokens(3, Defs.ACT_LOOK, Defs.Device.GAMEPAD)[0], "joy_button:2")
+	assert_eq(_slot_tokens(1, Defs.ACT_JUMP, Defs.Device.KEYBOARD), _keys([KEY_KP_0]), "a damaged entry: defaults")
+	assert_null(Settings.get_value("bindings_p1/swap"), "a profile is no setting value")
+	assert_eq(_tokens(Defs.ACT_SWAP, Defs.Device.KEYBOARD), PackedStringArray(["key:%d" % KEY_V, "key:59"]),
+		"the single-player swap is untouched")
+	Settings.rebind_slot(0, Defs.ACT_SWAP, [] as Array[InputEvent])
+	assert_eq(_slot_tokens(0, Defs.ACT_SWAP, Defs.Device.KEYBOARD), _keys([KEY_E]), "an empty list: the defaults")
+	Settings.reset()
+	assert_false(Settings.has_custom_slot_bindings(3), "reset() clears the profiles")
+
+
+func test_invalid_slot_requests_are_refused() -> void:
+	expect_errors(5)
+	assert_eq(Settings.get_slot_bindings(Defs.MAX_PLAYERS, Defs.ACT_JUMP), [] as Array[InputEvent])
+	assert_eq(Settings.set_slot_binding(0, &"ui_accept", _key(KEY_Q)), &"")
+	assert_eq(Settings.set_slot_binding(0, Defs.ACT_JUMP, InputEventMouseButton.new()), &"")
+	Settings.rebind_slot(-1, Defs.ACT_JUMP, [] as Array[InputEvent])
+	Settings.reset_slot_binding(0, &"no_such_action")
+	assert_false(Settings.has_custom_slot_bindings(0))
+	assert_false(Settings.has_custom_slot_bindings(9))

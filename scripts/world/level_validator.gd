@@ -9,6 +9,10 @@ extends RefCounted
 ## in solid tiles, references and contents are valid, parameters are known and in range.
 ##
 ## It uses no autoload, so the command-line tool can run it in any context.
+## Level format 2 (2.0, ARCHITECTURE.md 7.11): the format-level rules only - `format` 1 or 2, the new [meta] keys
+## and their values, the keys a co-op file / an arena needs, the tar floor ':', the catalogue rows of the new ids. The
+## content rules of the co-op and versus files (traits only in co-op files, x2 tablet pairing, plate distances, hall
+## heights, `coop_base_hash` drift, arena geometry and spawns) are world-B's (PLAN.md P1.7).
 
 const ERROR: int = 0
 const WARNING: int = 1
@@ -24,7 +28,9 @@ const MAX_PLATFORMS: int = Tuning.MAX_PLATFORMS
 
 ## Parameters every entity accepts (ARCHITECTURE.md 6.1).
 const COMMON_PARAMS: Array[String] = ["name", "facing", "expert", "beginner", "dx", "dy", "tile"]
-const ENEMY_PARAMS: Array[String] = ["skin", "hp", "score"]
+## Parameters every enemy and boss accepts. Format 2 (2.0): `coop=<trait>`, `bond=<name>`, `keeper=<name>` and
+## `perch=c,r` (the trait rules of DESIGN.md D.6; "traits only in co-op files" is a world-B rule of phase 1).
+const ENEMY_PARAMS: Array[String] = ["skin", "hp", "score", "coop", "bond", "keeper", "perch"]
 const ITEM_PARAMS: Array[String] = ["dropped", "fan", "points"]
 ## The catalogue of ARCHITECTURE.md 6.2: id -> its own parameters.
 const CATALOGUE: Dictionary = {
@@ -78,6 +84,7 @@ const CATALOGUE: Dictionary = {
 	"objects/spring": ["power"],
 	"objects/sign": ["text"],
 	"objects/npc": ["kind", "turn"],
+	"objects/hero_start": ["slot"],
 	"zones/secret": ["rect"],
 	"zones/arena": ["rect", "music"],
 	"zones/camera_lock": ["rect"],
@@ -87,7 +94,56 @@ const CATALOGUE: Dictionary = {
 	"zones/message": ["rect", "text"],
 	"zones/ember_rain": ["rect", "period", "skin"],
 	"zones/flies": ["rect", "count"],
+	# --- Level format 2 (2.0, ARCHITECTURE.md 6.2 / 7.11; DESIGN.md appendix, LEVEL_DESIGN.md 15.4) ---------------
+	"enemies/roller": ["range", "speed", "dizzy", "left", "right"],
+	"enemies/guard": ["turn", "left", "right"],
+	"enemies/mimic": ["contents", "range"],
+	"enemies/shellback": ["turn", "left", "right", "speed"],
+	"enemies/raptor": ["range", "pause", "jump_x", "jump_y"],
+	"enemies/snatcher": ["kind", "depth", "speed", "range"],
+	"enemies/leech": ["range", "pause"],
+	"enemies/bull_rex": ["speed"],
+	"enemies/tar_splitter": ["left", "right", "speed", "zone", "pause", "max"],
+	"enemies/shaman": ["left", "right", "speed"],
+	"bosses/tusker": ["arena", "drops"],
+	"bosses/mangrove": ["arena", "drops"],
+	"bosses/squid": ["arena", "drops"],
+	"bosses/idols": ["arena", "drops"],
+	"bosses/roc": ["arena", "drops"],
+	"bosses/chieftain": ["arena", "mate", "drops"],
+	"items/painting": ["index"],
+	"objects/vine": ["length", "rolled"],
+	"objects/bark_board": ["face"],
+	"objects/geyser": ["period", "delay", "power", "skin", "deadly"],
+	"objects/raft": ["width", "skin", "rails"],
+	"objects/mount": ["kind", "pen", "wild"],
+	"objects/rex_pen": [],
+	"objects/plate": ["count", "mode", "w"],
+	"objects/drum": ["bond"],
+	"objects/seesaw": ["len"],
+	"objects/boulder_heavy": [],
+	"objects/pulley": ["a", "b", "range"],
+	"objects/flower_pot": [],
+	"objects/x2_tablet": ["gate", "far", "secret"],
+	"objects/spawn_point": ["index"],
+	"objects/cookpot": [],
+	"objects/coconut": [],
+	"objects/crate_lane": ["rect"],
+	"zones/current": ["rect", "dir", "speed"],
+	"zones/lightning": ["rect", "period", "delay", "mark"],
+	"zones/food_rain": ["rect", "period", "skin"],
+	"zones/goal": ["rect", "team"],
 }
+## Format 2 parameters of 1.0 ids (merged into CATALOGUE by [method _catalogue_params]): the column's plate and
+## trigger rules, the gate's drum lock, the versus weapon pick-up.
+const CATALOGUE_2: Dictionary = {
+	"objects/column": ["rise_while", "sink_while"],
+	"objects/gate": ["needs"],
+	"items/weapon": ["temp"],
+}
+## `trigger` values of a column that name a group instead of a rectangle (format 2, LEVEL_DESIGN.md 15.4):
+## `keepers:<name>` (every enemy tagged `keeper=<name>` dead) and `drums:<bond>` (that drum bond struck in time).
+const TRIGGER_GROUPS: Array[String] = ["keepers:", "drums:"]
 ## Parameters of scenery props.
 const PROP_PARAMS: Array[String] = ["layer", "flip"]
 ## Enumerated parameter values: "id:param" -> allowed values.
@@ -103,9 +159,16 @@ const CHOICES: Dictionary = {
 	"objects/drop_platform:skin": ["wood", "ice", "stone", "small"],
 	"objects/gate:skin": ["arch", "hole", "none"],
 	"objects/npc:kind": ["elder", "kid", "warrior"],
-	"items/weapon:kind": ["club", "hammer", "axe", "boomerang"],
+	"items/weapon:kind": ["club", "hammer", "axe", "boomerang", "spear"],
 	"props:layer": ["back", "front"],
 	"zones/ember_rain:skin": ["ember", "leaf"],
+	"enemies/snatcher:kind": ["dangler", "stinger"],
+	"*:coop": ["shell", "bond", "daze", "heavy", "lone", "grab", "leech", "split"],
+	"objects/bark_board:face": ["l", "r"],
+	"objects/geyser:skin": ["mud", "blowhole", "steam", "soda"],
+	"objects/raft:skin": ["log", "wafer"],
+	"objects/mount:kind": ["rex"],
+	"zones/current:dir": ["l", "r", "u", "d"],
 }
 ## Integer parameters with their inclusive range: "id:param" -> Vector2i(min, max).
 const RANGES: Dictionary = {
@@ -128,6 +191,23 @@ const RANGES: Dictionary = {
 	"*:hp": Vector2i(0, 9999),
 	"zones/ember_rain:period": Vector2i(1, 9999),
 	"zones/flies:count": Vector2i(1, 20),
+	"objects/hero_start:slot": Vector2i(2, Defs.MAX_PLAYERS),
+	"items/painting:index": Vector2i(0, Tuning.PAINTING_COUNT - 1),
+	"objects/spawn_point:index": Vector2i(2, Defs.MAX_PLAYERS),
+	"objects/vine:length": Vector2i(1, Tuning.MAP_MAX_ROWS),
+	"objects/geyser:period": Vector2i(34, 9999),
+	"objects/geyser:delay": Vector2i(0, 9999),
+	"objects/raft:width": Vector2i(3, 4),
+	"objects/plate:count": Vector2i(1, 2),
+	"objects/plate:w": Vector2i(1, 16),
+	"objects/seesaw:len": Vector2i(2, 32),
+	"objects/pulley:range": Vector2i(1, Tuning.MAP_MAX_ROWS),
+	"zones/current:speed": Vector2i(1, 3),
+	"zones/lightning:period": Vector2i(1, 9999),
+	"zones/lightning:delay": Vector2i(0, 9999),
+	"zones/lightning:mark": Vector2i(1, 9999),
+	"zones/food_rain:period": Vector2i(1, 9999),
+	"zones/goal:team": Vector2i(1, 2),
 }
 ## Parameters that are a tile rectangle `c,r,w,h`.
 const RECT_PARAMS: Array[String] = ["rect", "zone", "trigger"]
@@ -140,13 +220,17 @@ const CONTENT_ITEMS: Dictionary = {
 	"weapon": Vector2i(-1, -1), "glider": Vector2i(-1, -1), "water_bucket": Vector2i(-1, -1),
 	"warp": Vector2i(-1, -1), "trophy": Vector2i(-1, -1), "code_stone": Vector2i(0, 3),
 	"random_bonus": Vector2i(0, 2), "random": Vector2i(0, 2),
+	"painting": Vector2i(0, Tuning.PAINTING_COUNT - 1),
 }
 ## Entities whose anchor cell is meant to be solid (they ARE the tile, or live inside a wall).
 const SOLID_ANCHOR_IDS: Array[String] = [
 	"objects/hidden_spot", "objects/breakable_block", "objects/column", "bosses/colossus",
 ]
 ## Entities that must stand on a floor.
-const GROUNDED_IDS: Array[String] = ["objects/exit", "objects/checkpoint"]
+const GROUNDED_IDS: Array[String] = ["objects/exit", "objects/checkpoint", "objects/hero_start"]
+## Markers the level loader reads itself and never spawns (no scene): the start of player 2..4 (`slot=2..4`; 2.0,
+## TECH_AUDIT.md 3.3 / 4.10; read by Level._place_party_starts, ignored in single-player).
+const LOADER_MARKER_IDS: Array[String] = ["objects/hero_start"]
 ## Default `drops` of the bosses (ARCHITECTURE.md 6.2).
 const BOSS_DROPS: Dictionary = {"bosses/brute": "fire_starter", "bosses/colossus": "trophy,trophy,trophy,trophy"}
 const PASSWORD_CHARS: String = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -263,8 +347,9 @@ func _check_meta(data: LevelData) -> void:
 	var path: String = data.path
 	if not data.meta.has("format"):
 		_add(path, _meta_line(data, ""), ERROR, "meta key 'format' is required")
-	elif data.meta["format"] != 1:
-		_add(path, _meta_line(data, "format"), ERROR, "format must be 1 (found %s)" % str(data.meta["format"]))
+	elif not data.meta["format"] is int or not LevelText.FORMATS.has(int(data.meta["format"])):
+		_add(path, _meta_line(data, "format"), ERROR, "format must be 1 or 2 (found %s)" % str(data.meta["format"]))
+	_check_format_2(data)
 	if not data.meta.has("id"):
 		_add(path, _meta_line(data, ""), ERROR, "meta key 'id' is required")
 	elif str(data.meta["id"]) != String(data.id):
@@ -336,8 +421,77 @@ func _check_meta_value(data: LevelData, key: String, value: Variant) -> void:
 				if pair.size() != 2 or not pair[0].is_valid_int() or not pair[1].is_valid_int() \
 						or pair[0].to_int() < 0:
 					_add(path, line, ERROR, "wind entry '%s' must be tick:value" % entry)
+		# --- format 2 (ARCHITECTURE.md 7.11) ---
+		"book":
+			if not value is int or not LevelText.BOOKS.has(int(value)):
+				_add(path, line, ERROR, "%s = %s must be 1 or 2" % [key, text])
+		"belt":
+			_check_choice(path, line, key, text, LevelText.BELTS)
+		"coop_of":
+			if text == "" or not _all_ids.has(text):
+				_add(path, line, ERROR, "%s '%s' is not a level" % [key, text])
+			elif text == String(data.id):
+				_add(path, line, ERROR, "%s '%s' names the file itself" % [key, text])
+		"coop_base_hash":
+			if not _is_sha256(text):
+				_add(path, line, ERROR, "%s must be the sha256 of the solo file (64 hex digits)" % key)
+		"players":
+			_check_int(path, line, key, value, 2, Defs.MAX_PLAYERS)
+		"round_time":
+			_check_int(path, line, key, value, 1, 99999)
+		"modes":
+			var modes: PackedStringArray = LevelText.to_list(value)
+			if modes.is_empty():
+				_add(path, line, ERROR, "modes lists no versus mode")
+			var known: Array = []
+			for mode_name: StringName in Defs.VERSUS_MODE_NAMES:
+				known.append(String(mode_name))
+			for mode: String in modes:
+				_check_choice(path, line, key, mode, known)
+		"wrap":
+			_check_choice(path, line, key, text, LevelData.WRAPS)
+		"sudden":
+			_check_choice(path, line, key, text, LevelData.SUDDEN_DEATHS)
+		"rise_speed":
+			_check_int(path, line, key, value, 1, PartyTuning.LAUNCH_AXIS_CAP)
+		"wind_loop":
+			_check_int(path, line, key, value, 0, 99999)
 		"id", "name", "format", "author", "notes":
 			pass
+
+
+## Format-2 rules of the header (ARCHITECTURE.md 7.11): a co-op file names its solo level and that file's hash, an
+## arena its players and modes; format-2 keys and the tar floor ':' in a format-1 file are reported (LEVEL_DESIGN.md
+## 15.1: new files are format 2).
+func _check_format_2(data: LevelData) -> void:
+	var path: String = data.path
+	var kind: String = str(data.value("kind"))
+	if kind == LevelText.KIND_COOP:
+		for key: String in ["coop_of", "coop_base_hash"]:
+			if not data.meta.has(key):
+				_add(path, _meta_line(data, ""), ERROR, "a co-op file (kind = coop) needs meta key '%s'" % key)
+	elif kind == LevelText.KIND_ARENA:
+		for key: String in ["players", "modes"]:
+			if not data.meta.has(key):
+				_add(path, _meta_line(data, ""), ERROR, "an arena (kind = arena) needs meta key '%s'" % key)
+	if int(data.meta.get("format", LevelText.FORMAT_2)) != LevelText.FORMAT_1:
+		return
+	for key: String in data.meta:
+		if LevelText.META_KEYS_2.has(key.get_slice(".", 0)):
+			_add(path, _meta_line(data, key), WARNING, "'%s' is a format 2 key: set format = 2" % key)
+	for row: int in data.row_count():
+		if data.rows[row].contains(TileGrid.CH_TAR):
+			_add(path, data.row_lines[row], WARNING, "the tar floor ':' is format 2: set format = 2")
+			return
+
+
+static func _is_sha256(text: String) -> bool:
+	if text.length() != 64:
+		return false
+	for i: int in text.length():
+		if not "0123456789abcdefABCDEF".contains(text[i]):
+			return false
+	return true
 
 
 func _check_tiles(data: LevelData, grid: TileGrid) -> void:
@@ -431,7 +585,23 @@ func _check_entities(data: LevelData, grid: TileGrid) -> void:
 						"arena '%s' has no boss (it will never lock the camera)" % entity_name)
 	for difficulty: int in [Defs.Difficulty.BEGINNER, Defs.Difficulty.EXPERT]:
 		_check_limits(data, records, difficulty)
+		_check_hero_starts(data, records, difficulty)
 	_check_exit_path(data, records)
+
+
+## At most one `objects/hero_start` per player slot in each difficulty (the loader would take the last one).
+func _check_hero_starts(data: LevelData, records: Array[Dictionary], difficulty: int) -> void:
+	var seen: Dictionary = {}
+	for record: Dictionary in records:
+		if String(record["id"]) != "objects/hero_start" or not LevelText.applies_to(record["params"], difficulty):
+			continue
+		var slot: Variant = record["params"].get("slot")
+		if not slot is int:
+			continue
+		if seen.has(slot):
+			_add(data.path, int(record["line"]), ERROR, "objects/hero_start slot=%d is placed more than once in %s" % [
+				int(slot), Defs.difficulty_name(difficulty)])
+		seen[slot] = true
 
 
 func _check_entity(data: LevelData, record: Dictionary, names: Dictionary) -> void:
@@ -456,8 +626,10 @@ func _check_entity(data: LevelData, record: Dictionary, names: Dictionary) -> vo
 			return
 	if not CATALOGUE.has(id):
 		_add(path, line, WARNING, "'%s' is not in the entity catalogue (ARCHITECTURE.md 6.2)" % id)
-	if not Spawner.exists(StringName(id)):
+	if not Spawner.exists(StringName(id)) and not LOADER_MARKER_IDS.has(id):
 		_add(path, line, WARNING, "no scene for '%s' yet (%s)" % [id, Spawner.scene_path(StringName(id))])
+	if id == "objects/hero_start" and not params.has("slot"):
+		_add(path, line, ERROR, "objects/hero_start needs slot=2..%d (its player number)" % Defs.MAX_PLAYERS)
 	_check_params(path, line, id, category, params)
 	if params.has("dest") and not names.has(str(params["dest"])):
 		_add(path, line, ERROR, "dest '%s' is not the name of a gate or marker" % str(params["dest"]))
@@ -478,7 +650,7 @@ func _check_entity(data: LevelData, record: Dictionary, names: Dictionary) -> vo
 		if params.has(key):
 			_check_contents(path, line, key, str(params[key]))
 	for key: String in RECT_PARAMS:
-		if params.has(key):
+		if params.has(key) and not (key == "trigger" and _is_trigger_group(str(params[key]))):
 			_check_rect(data, line, key, params[key])
 	if params.has("lock"):
 		var cell: PackedInt32Array = LevelText.to_int_list(params["lock"])
@@ -515,6 +687,7 @@ func _check_params(path: String, line: int, id: String, category: String, params
 	var allowed: Array = []
 	allowed.append_array(COMMON_PARAMS)
 	allowed.append_array(CATALOGUE.get(id, []))
+	allowed.append_array(CATALOGUE_2.get(id, []))
 	if category == "enemies" or category == "bosses":
 		allowed.append_array(ENEMY_PARAMS)
 	if category == "items":
@@ -552,8 +725,8 @@ func _check_contents(path: String, line: int, key: String, text: String) -> void
 		var argument: String = pieces[1]
 		if item == "weapon":
 			if not CHOICES["items/weapon:kind"].has(argument):
-				_add(path, line, ERROR, "%s token '%s': weapon kind must be club, hammer, axe or boomerang" % [
-					key, token])
+				_add(path, line, ERROR, "%s token '%s': weapon kind must be %s" % [
+					key, token, ", ".join(PackedStringArray(CHOICES["items/weapon:kind"]))])
 			continue
 		var bounds: Vector2i = CONTENT_ITEMS[item]
 		if bounds.x < 0:
@@ -659,7 +832,9 @@ func _check_exit_path(data: LevelData, records: Array[Dictionary]) -> void:
 		_add(data.path, int(exits[1]["line"]), ERROR, message)
 	elif exits.is_empty():
 		var kind: String = str(data.value("kind"))
-		if kind == "bonus":
+		if kind == LevelText.KIND_ARENA:
+			pass  # a versus arena has no way out (LEVEL_DESIGN.md 15.8)
+		elif kind == "bonus":
 			if warps == 0:
 				_add(data.path, line, missing, "a bonus stage needs an items/warp or an objects/exit to leave it")
 		elif trophies == 0:
@@ -766,6 +941,14 @@ static func _is_snake_case(text: String) -> bool:
 		if not ((c >= "a" and c <= "z") or (c >= "0" and c <= "9") or c == "_"):
 			return false
 	return true
+
+
+## True when a column `trigger` names a group (`keepers:<name>`, `drums:<bond>`) instead of a rectangle.
+static func _is_trigger_group(text: String) -> bool:
+	for prefix: String in TRIGGER_GROUPS:
+		if text.begins_with(prefix) and text.length() > prefix.length():
+			return true
+	return false
 
 
 static func _is_password(text: String) -> bool:
