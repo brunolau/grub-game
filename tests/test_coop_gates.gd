@@ -16,9 +16,10 @@ extends TestCase
 ##     "windows": Array    [{"what": String, "window": int, "solo_min": int}] for every twin window / daze record
 ##     "detail": String    how the hero got there (when reached), for the failure message
 
-## Running it: `GD_TIMEOUT=3600 bash .tools/gd.sh test coop_gates` (a slow module, PLAN.md V7; about 1.5 min per gate and
-## difficulty). The environment variable COOP_GATES_SHARD=<i>/<n> runs only every n-th gate starting at i (0-based), so
-## n processes can share the table (`COOP_GATES_SHARD=0/3 ...`, `1/3`, `2/3`); together they check what one run does.
+## Running it: `GD_TIMEOUT=3600 bash .tools/gd.sh test coop_gates` (a slow module, PLAN.md V7; about 1.5 min per gate
+## and difficulty). The environment variable COOP_GATES_SHARD=<i>/<n> runs only every n-th gate starting at i
+## (0-based), so n processes can share the table (`COOP_GATES_SHARD=0/3 ...`, `1/3`, `2/3`); together they check what
+## one run does.
 ## Each search adds a world to the tree and frees it again: the test lets a frame pass after every gate, or the freed
 ## nodes' queued canvas callbacks pile up until Godot's message queue overflows (wf8_D5_to_integration.txt #1).
 

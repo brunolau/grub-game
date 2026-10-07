@@ -48,8 +48,12 @@ func needs_thinking(_tick: int) -> bool:
 	if goal == Goal.NONE:
 		return true
 	if goal == Goal.BONES:
+		# A picked-up bone can be freed between two ticks (several ticks per frame on a slow machine): never cast a
+		# freed object (GrubStackBrain._goal_valid does the same).
+		if goal_entity == null or not is_instance_valid(goal_entity):
+			return true
 		var item: CollectibleBase = goal_entity as CollectibleBase
-		return item == null or not is_instance_valid(item) or item.collected
+		return item == null or item.collected
 	if goal == Goal.ATTACK:
 		return not bot.seen_alive(goal_slot)
 	return false
@@ -153,9 +157,10 @@ func act(hero: PlayerBase, level: LevelBase, tick: int) -> int:
 	var nav: BotNavigator = bot.nav
 	match goal:
 		Goal.BONES:
-			var item: CollectibleBase = goal_entity as CollectibleBase
-			if item != null and is_instance_valid(item):
-				goal_pos = item.sim_pos
+			if goal_entity != null and is_instance_valid(goal_entity):
+				var item: CollectibleBase = goal_entity as CollectibleBase
+				if item != null:
+					goal_pos = item.sim_pos
 			nav.set_target(goal_pos, 3)
 		Goal.ATTACK:
 			nav.set_target(attack_stand(hero, bot.predicted_pos(goal_slot)), 8)

@@ -1471,6 +1471,11 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
 - **Paddling**: when a hero standing on the raft finishes a **forward** strike (its last tick), `rx = clamp(rx -
   16 * facing, -48, 48)`: the raft is pushed backward, up to 3 px/tick of its own speed (plus the current).
 - Each rider dips the raft 2 px (drawing only; the ride top does not move).
+- **Boarding from above** (G2 integration, DESIGN.md G29): the deck is only 4 px over the liquid cell and the ride
+  test runs in `PLATFORMS`, before the hero's own move; so when a hero's tile collision finds a liquid floor cell, a
+  raft whose ride band his feet were in or over before this tick's y step and whose deck they are at or under now,
+  inside its ride width (the 11.4 overlap with the ride box), catches him first: he rides it (`ride_platform`,
+  carried this tick) instead of drowning (`Raft.catch_sinking`). Away from a raft the liquid kills as in 1.0.
 - A raft launched by a geyser flies (`y += floor16(yvel)`, `yvel += 16`, cap 192), its riders are launched the same
   tick, and it settles on the first `~` surface (floating again) or floor cell (beached: `rx = 0`, currents ignored)
   below it.

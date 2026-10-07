@@ -63,6 +63,8 @@ func test_wings_telegraph_then_a_gust_blows_away_from_it_with_feathers() -> void
 	assert_eq(_level.wind, -Roc.GUST_WIND, "facing right: the gust blows to the right, away from it")
 	Sim.step(Roc.FEATHER_PERIOD + 1)
 	assert_true(_of_scene(Defs.Kind.ENEMY_PROJECTILE, &"projectiles/enemy_ember").size() >= 1, "feathers fall")
+	for feather: SimEntity in _of_scene(Defs.Kind.ENEMY_PROJECTILE, &"projectiles/enemy_ember"):
+		assert_eq((feather as EnemyEmber).skin, EnemyEmber.SKIN_FEATHER, "drawn as roc_parts feathers (enemies-A / C)")
 	Sim.step(Roc.GUST_TICKS - Roc.FEATHER_PERIOD - 1)
 	assert_eq(_level.wind, 0, "66 ticks of wind")
 	assert_eq(roc.get_state(), Roc.State.REST, "then it rests again")

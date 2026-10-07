@@ -78,7 +78,10 @@ press ui_accept
 wait_until flow.current_screen == versus_arena 300
 wait_until flow.busy == false 600
 wait 10
-# Random has the focus on a fresh user; Right = the first arena card, the Totem Ring.
+# Random has the focus on a fresh user; the Grub Stack arenas follow in file order (Cinder Pit, Echo Hollow, the
+# Totem Ring since phase 2): Right three times = the Totem Ring.
+press ui_right
+press ui_right
 press ui_right
 wait 6
 expect game.versus_match.arena == arena_totem_ring

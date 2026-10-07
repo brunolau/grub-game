@@ -784,8 +784,9 @@ eggs a hero while his partner lives. No zoom, no split screen.
   rise) whether Up is held or not. The full Shoulder Hop needs an **active** partner: a hatched hero is active once
   his own player gave any input since he last hatched or spawned (level start, team-wipe respawn, any hatch). A hero
   holding Up passes through an idle partner's head; without Up he can still ride him (a Totem Ride from a still
-  carrier reaches 98 px, below every boost ledge, and a Totem launch needs the carrier's own jump). So one player can
-  never use his partner's egg or idle body as a step: every boost ledge needs two players.
+  carrier reaches 98 px, and a Totem launch needs the carrier's own jump). With the corner catch (feet entering a
+  ledge's top cell from the side land on top) that ride climbs a 7-row ledge, so boost ledges are 8 rows over every
+  floor within reach [G28]: one player can never use his partner's egg or idle body as a step.
 - **The egg scouts**: every unopened hidden spot whose cell lies within 32 px (2 tiles) of an egg's box glints with a
   four-point star while the egg is there, so the downed player keeps helping. An egg never touches plates, items or
   enemies, so it can never solve a gate.
@@ -796,7 +797,7 @@ eggs a hero while his partner lives. No zoom, no split screen.
 
 | Move | Rule | Easy role / hard role |
 |---|---|---|
-| **Shoulder Hop** | landing on an **active** partner's head (D.3 [G1]) with Up (jump) held bounces -224 v16, as on an enemy: rises 105 px from his head, feet reach about 140 px (8.7 tiles) over the floor. Co-op ledges for it are 7 tiles (Beginner) / 8 tiles (Expert) | stand still / one held jump |
+| **Shoulder Hop** | landing on an **active** partner's head (D.3 [G1]) with Up (jump) held bounces -224 v16, as on an enemy: rises 105 px from his head, feet reach about 140 px (8.7 tiles) over the floor. Co-op ledges for it are 8 tiles on both difficulties [G28] | stand still / one held jump |
 | **Totem Ride** | landing on the partner without Up held: stand on his head (the carrier is a moving platform, PHYSICS 11.4, resolved in the party driver after both heroes moved). The carrier's jump impulses are halved. The rider can strike (a high strike reaches about 4-5 tiles over the floor), jump off (Up: 6 tiles from a still carrier, 8.5-9.5 tiles when timed 1-5 ticks after the carrier's jump [R6]; the rider's jump is measured against the carrier's rise, so the halved hop never sheds him [G7]), or drop (Down + Jump). No ride on a curled or mounted partner (the hop still works on a curled one) | walk / strike |
 | **Batter Up** | Down + Swap (co-op and versus only) curls the hero into a ball (roll frames 24-26) for up to 66 ticks. The partner's strike in contact launches him: **forward = line drive** (xvel +/-144, yvel -128: 9 tiles to the same height), **high = lob** (xvel +/-32, yvel -240: about 7 tiles up, 4 across), **low = grounder** (rolls at 6 px/tick for 32 ticks: 12 tiles), a charged strike x1.5 (each component clamped to +/-288 v16, the doze limit [R17]). The ball breaks `$` blocks (one hit), opens spots it touches, knocks small enemies (hp < 50, power 25). It uncurls on landing (the 6-tick landing rule) or against a wall. A curled hero is hurt by enemies as usual *(tune all)* | curl / aim and strike |
 | **Brace Wall** | two heroes crouching within 16 px of each other in a heavy's path are a wall: a `heavy` enemy (or Tusker's phase 3) stops dead and is dazed 44 ticks with its head open; a lone croucher is trampled (hurt, thrown back). Reuses crouch-bracing (wind, earthquakes) | crouch / crouch and line up |
@@ -820,7 +821,7 @@ same tick. Every launch move moves at most 18 px/tick or calls `notify_hero_tele
 | `objects/seesaw len=<cells>` | a hard landing (4+ tiles fall) on the high end launches whoever stands on the low end: launch = -(landing yvel + 32), +64 on a hard landing, cap -288 (about 10 tiles). Enemies on the low end are thrown off | `PlatformBase`, the hard-landing rule |
 | `objects/boulder_heavy` | moves 1 tile per 6 ticks only while **two** heroes push the same side; fills a gap, plugs a vent, presses a plate | column-style tile mover |
 | `objects/pulley a=<platform> b=<platform>` | two linked ride platforms; the heavier side sinks 2 px/tick, the other rises | `PlatformBase` |
-| Drop gifts: rolled vine (C.3), `objects/flower_pot` | every boost ledge holds a gift only the upper hero can release: a rolled vine, or a flower pot that becomes a spring (-224) where it lands when clubbed off the edge. **The pot spring reaches 6 rows from the floor it takes root on** [G6]: under a 7- or 8-row boost ledge it lands on a raised spot of 1-2 rows | vine, `objects/spring` |
+| Drop gifts: rolled vine (C.3), `objects/flower_pot` | every boost ledge holds a gift only the upper hero can release: a rolled vine, or a flower pot that becomes a spring (-224) where it lands when clubbed off the edge. **The pot spring reaches 6 rows from the floor it takes root on** [G6]; the way back from an 8-row boost ledge is a rolled vine [G28] (a pot's raised root within reach would be a step for a lone hero riding his idle partner) | vine, `objects/spring` |
 | `objects/x2_tablet gate=<name>` | a stone tablet carved with two cavemen marks every co-op gate and every co-op secret (diegetic, not HUD). Every co-op gate has one; the validator pairs them | `objects/sign` skin |
 | `objects/hero_start slot=2` | P2 start (ignored in solo) | marker |
 | `objects/exit`, `objects/gate` | team rules in co-op (D.1) | existing |
@@ -895,7 +896,8 @@ he hops over that hero (45 px high, harmless during the hop). So one hero rarely
    its boss form); every co-op `sub` file has at least 1 gate or its boss's co-op form; bonus stages and endings need
    only the team exit (the Way Home adds its lookout gate). Every gate is marked by an
    `objects/x2_tablet gate=<name>`.
-2. **Gate kinds**: boost ledge (7 tiles Beginner / 8 Expert, Shoulder Hop or a timed Totem launch [R6]), Batter Up gap
+2. **Gate kinds**: boost ledge (8 tiles over every floor within reach on both difficulties [G28], Shoulder Hop or a
+   timed Totem launch [R6]), Batter Up gap
    (8 tiles Beginner / 9 Expert of deadly liquid [R17], or a 7-tile lob ledge), plate door, twin drums, see-saw, heave boulder, pulley, keeper door, Brace
    Wall corridor (a `heavy` in a 4-row-high hall, so nobody can bounce over it), Chomper two-seat stretch.
 3. **Solo-impossibility checks** (validator `--coop` + `tests/test_coop_gates.gd`, a slow module run by name:
@@ -904,7 +906,9 @@ he hops over that hero (45 px high, harmless during the hop). So one hero rarely
    belt and Chomper where a pen is in the stage, must **fail** to reach the gate's far marker. Static rules first: no
    bounceable enemy, spring, geyser, hidden spot column (club pogo), vine, glider, bark board or see-saw within reach of
    a boost ledge (an enemy bounce rises 105 px); plates 8+ tiles from their doors; Guard and keeper halls 4 rows high.
-   The search has no eggs: the egg rule of D.3 [G1] is what keeps an egg or an idle partner off every boost ledge.
+   The search (world-B's v2, phase 2) plays the gate's columns with the file's real entities and the partner a lone
+   player has - an egg drifting after him, or his idle hatched partner walked there and ridden - and throws every
+   special as movement [G28].
 4. **Windows**: every twin window and daze time is `min(24 B / 12 E, measured solo minimum - 4)`. The solo minimum is
    measured by the search (one hero striking one target and throwing a special at the other included: an axe crosses
    12 columns in about 15 ticks).
@@ -919,7 +923,7 @@ never drift silently. Co-op files carry no passwords. Specials are placed in pai
 
 | Stage | Main-path co-op gates | Trait enemies | x2 secret (painting) |
 |---|---|---|---|
-| 1-1 Vine Bridges | (1) the springy flower becomes a 7-tile Shoulder Hop ledge, and the upper hero clubs a flower pot down (teaches hop and gift); (2) a leapfrog plate door on the canopy road. Signs teach the egg and the x2 tablet at the first checkpoint | two Shellback turtles before the exit (taught by a sign) | High Cache 7 tiles up, Totem Ride high strike (#20) |
+| 1-1 Vine Bridges | (1) the springy flower becomes an 8-tile Shoulder Hop ledge, and the upper hero clubs a rolled vine down (teaches hop and gift) [G28]; (2) a leapfrog plate door on the canopy road. Signs teach the egg and the x2 tablet at the first checkpoint | two Shellback turtles before the exit (taught by a sign) | High Cache 7 tiles up, Totem Ride high strike (#20) |
 | 1-2 Canopy Village | (1) the first tree house only by Totem Ride + jump; (2) a pulley in the trunk room. The Feast Land A warp sits behind twin drums | bonded flying-squirrel leapers; a Snatcher bat on the bat bounce | treetop cache by Batter Up lob (#21) |
 | 2-1 Echo Caverns | (1) paired plates on two hatches (one holds, one drops); (2) a keeper door guarded by two Raptors in a 4-row hall | Leeches under the dark section; `lone` stingers | a secret-room wall of `$` opened by a Batter Up line drive (#22) |
 | 2-2 Bone Gorge | (1) a see-saw on the rising stepping stones; (2) the lift pillar driven by a plate. Two gliders over the gorge with bonded harrier pairs | a Bull Rex on the gorge floor (Brace Wall) | x2 ledge over the lift pillar (#23) |
@@ -1016,7 +1020,7 @@ and adds the co-op gates, traits and the P2 start.
   | Unhatched egg | follows forever | returns to the checkpoint after 10 s |
   | `lone` trait | off (acts as plain targeting) | on |
   | Boss grabs | off | on |
-  | Boost ledges | 7 tiles | 8 tiles |
+  | Boost ledges | 8 tiles [G28] | 8 tiles |
 
   The Beginner wall is unchanged in both books.
 
@@ -1499,3 +1503,8 @@ rules in GAMEPLAY 13 (G) and the building rules in LEVEL_DESIGN 15 (LD).
 | G25 | Versus corner panels | the Ninja portrait exists only at 2x (76 px), the panels are one row tall (art-A) | **accepted**: 28 px heads in the corners, the 2x portrait in the lobby, join panel and results (E.9) |
 | G26 | Audio batch 2 | Haunted House's tail, Typhoon's end, the nene loop regions, the sudden-death loop, the lightning and gong rows, the music budget (audio) | **accepted** (F.2); the music context of every Book II stage is binding in LD 15.2 |
 | G27 | Sign texts | boards wrap; long texts covered heroes and the HUD (objects-A, the G1 verifier) | at most 3 board lines (`SignBoard.MAX_LINES`, about 60 characters); one idea per sign (LD 15.6) |
+| G28 | Boost-ledge height (G2 integration) | world-B's search v2 rides an idle partner (98 px) and the corner catch lands feet entering a ledge's top cell from the side: a 7-row ledge is solo-solvable; w1_l1_coop 'hop' (6 rows over the step at the tablet) and w5_l1_coop 'hop' fell to it; D5 / world-B asked for the rule | **8 rows over every floor within reach, both difficulties**; the way back is a rolled vine whose coil is 11+ cells from the gate's `far` cell (the validator counts a coil as a booster); a flower pot serves only a ledge with no raised root within reach. w5_l1_coop (D5) and w1_l1_coop (rebuilt at G2: the ledge face where the old step stood, the routes re-recorded through the gate) follow it; the search refuses both on both difficulties (D.4, D.8, LD 15.5 / 15.7.6 / 15.7.8) |
+| G29 | Raft boarding (G2 integration) | a hero falling onto a raft faster than about 4 px/tick died in the liquid cell before the ride test caught him (D6) | **fixed**: `Raft.catch_sinking` - the deck catches a hero whose own move carried his feet past it; banks one row over the liquid stay a design choice, not a workaround (P-C.7) |
+| G30 | Boss drops in a wall (G2 integration) | Old Mangrove's drops came out of its face, inside the bark wall: a fire-starter without sideways speed stayed there (D6) | **fixed**: `BossBase._drop_origin()`; Old Mangrove drops on the floor in front of its trunk; `w6_l2b` uses the plain default drop (B.2) |
+| G31 | Arenas as built (G2 integration, DA) | Totem Ring's big spot gave spawn 1 58 % of Grub Stack rounds; Cinder Pit with lava ends; Echo Hollow had no sketch; Coconut Cove's rims | **accepted as built**: Totem Ring big spot in the totem's base (9, 9), modes grub_stack / last_caveman / hot_rock; Cinder Pit walls at both ends, one crate lane; Echo Hollow wrap tb, tiers at row 4 or lower; Coconut Cove Clubball only, straight rims, `zones/goal` (now a scene). Not built yet (phase 3, world-B): Echo Hollow's darkness pulse, regrowing `$` walls and dangler springboard; the Cove's goal mouths as ring-outs in other modes; Clubball sides rotating per round (E.5, LD 15.8) |
+| G32 | Rising scroll and jumps (G2 integration, D6) | in a `scroll = rising` level the camera chases a jump's apex and never sinks: a jump that does not land higher kills | **design rule** (no engine change at G2): in a rising climb every jump lands higher - one-way ledges 3 rows apart in one jump column (6-2b) (LD 15.5) |

@@ -39,4 +39,4 @@ A = items/weapon kind=spear
 
 [entities]
 zones/arena 9 8 name=court rect=0,0,20,12 music=boss_idols
-bosses/idols 18 10 arena=court
+bosses/idols 18 10 arena=court drops=trophy

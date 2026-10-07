@@ -687,7 +687,9 @@ func _body_touches(idol: int, hero: PlayerBase) -> bool:
 			-pos.x, pos.y, box.x, box.y, box.x, false, hero.yvel, 1)
 
 
-## The Moon's feet point: 32 px inside the first wall to the left of the Sun on its feet row, else mirrored in the room.
+## The Moon's feet point: 32 px inside the first wall to the left of the Sun that stands both on its feet row and at
+## its head's height (a full-height wall: the 2-row altar block of DESIGN.md B.4 in the middle of the floor, or a solid
+## ledge in front of the jaws, is not one), else mirrored in the room.
 func _place_moon() -> void:
 	if _moon_placed:
 		return
@@ -697,13 +699,14 @@ func _place_moon() -> void:
 	_moon_placed = true
 	var grid: TileGrid = level.grid
 	var row: int = Tuning.to_cell(sim_pos.y - 1)
+	var head_row: int = Tuning.to_cell(sim_pos.y + EnemyTuning.COLOSSUS_HEAD_IDLE.position.y)
 	var col: int = Tuning.to_cell(sim_pos.x - EnemyTuning.COLOSSUS_BOX.x)
 	var face: int = -1
 	for i: int in WALL_SCAN_COLS:
 		var c: int = col - i
 		if c < 0:
 			break
-		if grid.side_at(c, row) == TileGrid.SIDE_WALL:
+		if grid.side_at(c, row) == TileGrid.SIDE_WALL and grid.side_at(c, head_row) == TileGrid.SIDE_WALL:
 			face = (c + 1) * Tuning.TILE
 			break
 	if face < 0:

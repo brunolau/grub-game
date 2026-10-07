@@ -252,8 +252,13 @@ const GROUNDED_IDS: Array[String] = ["objects/exit", "objects/checkpoint", "obje
 ## Markers the level loader reads itself and never spawns (no scene): the start of player 2..4 (`slot=2..4`; 2.0,
 ## TECH_AUDIT.md 3.3 / 4.10; read by Level._place_party_starts, ignored in single-player).
 const LOADER_MARKER_IDS: Array[String] = ["objects/hero_start"]
-## Default `drops` of the bosses (ARCHITECTURE.md 6.2).
-const BOSS_DROPS: Dictionary = {"bosses/brute": "fire_starter", "bosses/colossus": "trophy,trophy,trophy,trophy"}
+## Default `drops` of the bosses (ARCHITECTURE.md 6.2): each boss script's boss_drops, used when the record names
+## none (the Rival Chieftains drop nothing unless the record says so).
+const BOSS_DROPS: Dictionary = {
+	"bosses/brute": "fire_starter", "bosses/colossus": "trophy,trophy,trophy,trophy",
+	"bosses/tusker": "fire_starter", "bosses/mangrove": "fire_starter", "bosses/squid": "fire_starter",
+	"bosses/idols": "fire_starter", "bosses/roc": "fire_starter", "bosses/chieftain": "",
+}
 const PASSWORD_CHARS: String = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 # --- Content rules of co-op files and arenas (world-B, PLAN.md P1.7) -----------------------------------------------

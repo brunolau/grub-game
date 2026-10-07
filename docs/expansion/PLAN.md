@@ -185,6 +185,21 @@ G1 and phase-2 resolutions"; the phase-3 briefs of worlds 6-9, Feast Land E and 
 test level and its co-op form is refused by the solo search; the four launch modes run with Hunter bots on three
 arenas; G1 still green.
 
+**G2 integration (2026-10-07)**: rulings in DESIGN.md G28-G32. Numbers: default suite 1 517 tests green in 274 s
+(the route replays moved to slow modules, V7); slow modules green - `campaign_routes` 18, `book2_routes` 6 (17 route
+runs), `coop_routes` 6 (12 two-stream runs), `coop_gates` (18 gate searches, all refused) and `versus_bots` (2, every
+(arena, mode) with four Hunters); `tools/sp_identity.sh` IDENTICAL; validator `--strict` clean on all 74 level files;
+smoke clean; `campaign.flow` passes headless (116 checks). Proven: every appendix id has its scene and a test (`tests/test_integration_appendix.gd` reads the appendix); Tusker,
+Old Mangrove and Inkjaw lose to recorded club routes on their test levels (Tusker and Old Mangrove also inside the
+Book II routes of 5-2b and 6-2b), and every boss's co-op form - the six new ones, the Brute and the visor Colossus -
+is refused by its single-hero search; Grub Stack, Last Caveman Standing and Hot Rock with four Hunters on the Totem
+Ring, Echo Hollow and Cinder Pit and Clubball on Coconut Cove (the only Clubball arena of E.5) pass V4.b; the G1
+slice is green again (w1_l1_coop's 'hop' rebuilt to the 8-row rule, G28); worlds 5-6 of D5 / D6 pass their solo,
+co-op and gate tests; windowed flows through the real UI: `tools/autoplay/g2_book2.flow`, `g2_coop_b2.flow`,
+`g2_versus.flow`, `g1_coop.flow`, `g1_versus.flow`. Open at G2: the Twin Idols, the Storm Roc and the Rival
+Chieftains are beaten in their tests by a closed-loop pilot or injected strikes, not yet by a recorded route on their
+test levels (enemies-C, before D8 / D9 build 8-2b, 9-1b and 9-3).
+
 ---
 
 ## 6. Phase 3 - content and proofs
@@ -292,9 +307,12 @@ or taller than 2048 px; `test_core_release` export filters green.
 **V7 - Suite budget**: the default `bash .tools/gd.sh test` stays under about 5 minutes; `campaign_routes`, `book2`,
 `coop` and `versus` slow modules run at every gate and before every merge that touches their area. A slow module is
 listed in `SLOW_FILES` of `tests/run_tests.gd`: a run without a filter skips it with a skip line; it runs by name
-(`bash .tools/gd.sh test coop_gates`) or with `GD_TIMEOUT=900 bash .tools/gd.sh test --slow`. Slow modules today:
-`test_coop_gates` (G1: 66-81 s for the slice's ten gates, the static flood prefilter and the explore cache included)
-and `test_versus_bots` (V4.b).
+(`bash .tools/gd.sh test coop_gates`) or with `GD_TIMEOUT=4000 bash .tools/gd.sh test --slow`. Slow modules today:
+`test_coop_gates` (G1: 66-81 s for the slice's ten gates; since world-B's search v2 about 1.5 minutes per gate and
+difficulty - 18 at G2 - so `COOP_GATES_SHARD=<i>/<n>` splits it over n processes), `test_versus_bots` (V4.b, about
+12 minutes at G2) and, since the G2 integration, the route replays `test_campaign_routes`, `test_book2_routes` and
+`test_coop_routes` (V7's `campaign_routes`, `book2` and `coop`; together about 3.5 minutes at G2 and growing with every
+phase-3 route). The default run keeps the Book I guards (V1.c, V1.d); `tools/sp_identity.sh` replays every Book I route.
 
 ---
 

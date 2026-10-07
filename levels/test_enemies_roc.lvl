@@ -37,4 +37,4 @@ notes = "PLAN.md P2.3: the Storm Roc on art-B's roc sheet (the pterodactyl at 2x
 
 [entities]
 zones/arena 2 9 name=nest rect=0,0,20,12 music=boss_roc
-bosses/roc 9 7 arena=nest
+bosses/roc 9 7 arena=nest drops=trophy

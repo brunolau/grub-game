@@ -1195,7 +1195,13 @@ the belt). Content tokens: `weapon:spear`, `painting:<index>`.
 
 **Zones**: `zones/current` (`rect`, `dir=l|r|u|d`, `speed` 1..3 px/tick), `zones/lightning` (`rect`, `period`,
 `delay` [0], `mark` [22]), `zones/food_rain` (`rect`, `period`, `skin`: the ember rain with food), `zones/goal` *
-(`rect`, `team=1|2`).
+(`rect`, `team=1|2`; `GoalZone`, `scenes/zones/goal.tscn` since G2: data only - `Coconut.goal_team()` reads it, the
+Clubball referee falls back on the file records with the same rectangle).
+
+2.0 hooks added at the G2 integration: `BossBase._drop_origin()` (where the level's `drops` come out; default
+`_burst_origin()`, so every 1.0 boss is unchanged; Old Mangrove drops on the floor in front of its trunk) and
+`Raft.catch_sinking(level, hero)` (called by the hero's tile collision on a liquid floor cell only: a hero whose own
+move carried his feet past a raft's deck rides it instead of drowning; a level without rafts kills as before).
 
 ---
 
@@ -1709,14 +1715,17 @@ ints_eq`, `fail`, `expect_errors(n)`, `load_reference()` (PHYSICS_REFERENCE.json
 `tests/test_core_level_base.gd` shows how to test entities in a bare `LevelBase` without the world module. Tests
 never write real user data (redirected to `build/test_user`). The runner prints the seconds of every file. **Slow
 modules** (PLAN.md 8 V7; `SLOW_FILES` in `tests/run_tests.gd`: `test_coop_gates.gd` since G1, core-B's
-`test_versus_bots.gd` since phase 2) are skipped, each with a
-`skip` line and a closing `SKIPPED:` line, unless the run has `-- --slow` (`GD_TIMEOUT=900 bash .tools/gd.sh test
---slow`) or a filter that names the module - its whole name after `test_` (`bash .tools/gd.sh test coop_gates`); a
+`test_versus_bots.gd` since phase 2, and since the G2 integration the route replays `test_campaign_routes.gd`,
+`test_book2_routes.gd` and `test_coop_routes.gd`) are skipped, each with a
+`skip` line and a closing `SKIPPED:` line, unless the run has `-- --slow` (`GD_TIMEOUT=4000 bash .tools/gd.sh test
+--slow`; or each by name in parallel - `COOP_GATES_SHARD=<i>/<n>` splits `test_coop_gates`) or a filter that names the
+module - its whole name after `test_` (`bash .tools/gd.sh test coop_gates`); a
 filter that only touches it (`coop`, `gates`) runs the other matching files and skips the slow one, so a module's quick
 check never pays for the slow search (P2.6 sign-off; `run_tests.discover_files` is the rule, `tests/
 test_core_runner.gd` keeps it). They run at every gate and before every merge that touches co-op files or the solo
-search. The default run took about 4 minutes at G1 (1 135 tests); gd.sh's default `GD_TIMEOUT` of 300 s is close: a
-full run passes `GD_TIMEOUT=600`. **Isolation between files** (P2.6): the runner puts back the global clock state a
+search. The default run took about 4 minutes at G1 (1 135 tests) and 7.5 minutes before the G2 integration moved the
+route replays out (about 4.5 minutes after it); gd.sh's default `GD_TIMEOUT` of 300 s is close: a full run passes
+`GD_TIMEOUT=600`. **Isolation between files** (P2.6): the runner puts back the global clock state a
 file left behind - `Sim.frozen` (a Flow transition that a failing test never awaited), a `Sim.time_scale` other than
 1 (a deciding-moment replay), a paused tree - before the next file, with a `note: <file> left ... - reset` line
 (`run_tests.reset_leaks`), so one file's failure no longer fails the next file's timing tests (seen in phase 2: a red
@@ -1790,7 +1799,8 @@ viewport - a 320 x 320 logical view instead of 320 x 180. A taller view wakes en
 (a bounce the windowed hero never makes), the hero never reaches the 1-2 warp and `campaign.flow` stops waiting for
 `bonus_a` (it was never a Flow bug: `Flow.complete_level` is not even called). The fix is the tool's - on every
 `Flow.screen_changed(&"level")` call `Game.level.set_view_size(Vector2i(640, 360))` (the screen change of a level comes
-before its first tick); with it `campaign.flow` passes headless (116 checks, 30 259 ticks). Tests never depend on the
+before its first tick); with it `campaign.flow` passes headless (116 checks, 30 259 ticks). `headless_flow.gd` does
+exactly that since the G2 integration. Tests never depend on the
 headless viewport: those that need a view set it themselves (`set_view_size`).
 
 A plain `--autoplay=<id>` run plays its script in that one stage and ends when another stage takes over (its

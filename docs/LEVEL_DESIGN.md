@@ -698,7 +698,7 @@ every hero glows warm and every prop whose name holds "glow" (`swamp/props/glowc
 | Tar | wade 2 px/tick; hop 33 px | 15.3 |
 | Geyser | -224: 105 px, the same as a spring or an Up bounce | a geyser lifts to a ledge up to 6 tiles above its vent, also from a tar floor (the way out of a tar pit) |
 | Raft | current 1-3 px/tick; paddle up to 3 px/tick of its own; banks stop it | keep a raft's path free of cells at its surface row except the banks you want |
-| Rising tide | 1 px/tick = one row per 16 ticks | a Beginner stopping 73 ticks (3 s) loses 4.5 rows: give every climb that much spare |
+| Rising tide | 1 px/tick = one row per 16 ticks; the view chases a jump's apex and never sinks again, so a jump that does not land higher kills (6-2b, D6) [G32] | a Beginner stopping 73 ticks (3 s) loses 4.5 rows: give every climb that much spare; every jump of a rising climb lands higher - one-way ledges 3 rows apart in one jump column |
 | Chomper | 4 px/tick; hop 55 px, 84 px far at full speed | mounted gaps <= 4 tiles, steps <= 3 rows, 4 rows of air in mounted corridors, no sprite platforms on mounted stretches |
 | Gusts | negative `wind` pushes right; crouching braces; co-op: a hero up to 64 px downwind of a crouching partner (16 px up or down) feels no wind, and a jump taken there stays sheltered until he lands (the lee) | alternate with `wind_loop`; give a crouching spot before every gap; a co-op lee gap is at most 3 tiles with a crouching spot within 64 px downwind of its far edge |
 | Lightning | the column is marked 22 ticks before the bolt; `period` [66]; it alternates between the heroes inside | never two bolts on the only safe cell in a row |
@@ -742,7 +742,7 @@ every hero glows warm and every prop whose name holds "glow" (`swamp/props/glowc
 
 | Move | Numbers (P-C.10, P-C.11) | Design with |
 |---|---|---|
-| Shoulder Hop | feet reach 140 px over the floor (8.75 tiles); at or above 8 tiles for 10 ticks; only off an **active** partner - never off an egg (a hatch bounce is 10 px) or an idle hero [G1] | boost ledges 7 tiles (Beginner) / 8 (Expert); 11 rows of air over the hop spot |
+| Shoulder Hop | feet reach 140 px over the floor (8.75 tiles); at or above 8 tiles for 10 ticks; only off an **active** partner - never off an egg (a hatch bounce is 10 px) or an idle hero [G1] | boost ledges 8 tiles over every floor within reach, both difficulties [G28]; 11 rows of air over the hop spot |
 | Totem Ride, rider's jump | from a still carrier 98 px (6 tiles); a jump 1-5 ticks after the carrier's: 139-152 px (8.5-9.5 tiles) | a 5-tile ledge is the easy Totem ledge; 7-8 tiles need the timed Totem launch or the hop |
 | Totem Ride, rider's strikes | high strike 61-77 px, forward strike 36-49 px over the floor | targets 4-5 rows up for a rider; 5 rows of air where a rider is expected |
 | Line drive | 153 px to the same height (rise 36 px), and the ball stops where it lands; charged 325 px | Batter Up gaps 8 tiles (Beginner; the curl spot within 25 px of the edge) / 9 tiles (Expert: within 9 px, or charged); 4 rows of air over the gap; a landing area 2+ cells deep |
@@ -762,7 +762,7 @@ and keepers).
 
 | Kind | Recipe |
 |---|---|
-| **Boost ledge** | a ledge 7 rows (Beginner) / 8 rows (Expert) over a floor at least 3 cells wide under its face; build it at 7 and put an `expert`-flagged `objects/column rise=0` of one row on top for Expert - or the other way round: the ledge at 8 and a `beginner`-flagged static block filling the dip's bottom row for Beginner, when an Expert row on top would put the upper hero above the view (1-1 co-op) [G22]; 11 rows of air over the hop cells; a drop gift on top. **A flower pot reaches 6 rows from the floor it takes root on**: it lands 1-2 cells beyond the face, so under a 7- or 8-row boost ledge it must land on a raised spot of 1-2 rows (1-1 co-op: a one-row root; 5-1 co-op: a two-row rock); a 7-row ledge is 3 px under its apex - neither a way back to rely on nor a barrier [G6] |
+| **Boost ledge** | a ledge **8 rows over every floor within reach on both difficulties** [G28] - a flat floor at least 3 cells wide under its face, no step, root or rock nearer the top within 10 cells (a Totem Ride on an idle partner rises 98 px and the corner catch lands feet that enter a ledge's top cell from the side: a 7-row ledge falls to one player); 11 rows of air over the hop cells; a drop gift on top: a **rolled vine** at the edge, its coil 11+ cells from the gate's `far` cell (the validator counts a coil as a booster; 1-1 and 5-1 co-op). A flower pot reaches 6 rows from the floor it takes root on [G6], so it is no way back from an 8-row ledge (a raised root within reach is a step for a lone hero riding his idle partner) |
 | **Totem ledge** | a ledge 5 rows up (Totem jump or hop, both difficulties) |
 | **Batter Up gap** | 8 (Beginner) / 9 (Expert) cells of `~` between two floors at the same height; or a 7-row lob ledge (15.7.2) |
 | **Plate door** | `objects/plate` (`count=1 mode=hold`) at least **8 tiles** from its door (`objects/column rise_while=<plate>`); the holder must reach the far side another way: a second plate beyond the door for him (**leapfrog**: A holds for B, B holds for A - with **two doors in two corridors**, because a column rises only while all its plates are pressed: plate A opens the lower corridor for B, plate B beyond opens the upper corridor for A; 1-1 and 5-1 co-op [G9]), or a `timed:` plate |
@@ -809,11 +809,17 @@ the tablet and at the last checkpoint before it, with the club and every special
 is in the stage, must **fail** to reach the tablet's `far` cell within 1 457 ticks *(tune)*. It also measures
 `solo_min` for every twin window and daze record: the window used is `min(24 B / 12 E, solo_min - 4)`.
 `test_coop_gates` is a slow module (PLAN 8 V7): a plain `bash .tools/gd.sh test` skips it; run it by name with
-`bash .tools/gd.sh test coop_gates` (or `GD_TIMEOUT=900 bash .tools/gd.sh test --slow`) after every change to a
-co-op file and before you hand one over [G13]. A gate whose far cell no chain of feet cells reaches from the starts (a
-jump rises at most 5 rows over the last ground) is refused without simulating. The search has no eggs and no
-partner: the egg rule (an egg or an idle partner is no springboard, P-C.10 / P-C.12 [G1]) is what keeps them off a
-boost ledge, so do not build a gate that only that rule holds shut.
+`GD_TIMEOUT=3600 bash .tools/gd.sh test coop_gates` (about 1.5 minutes per gate and difficulty;
+`COOP_GATES_SHARD=<i>/<n>` runs every n-th gate, so n processes share the table) after every change to a co-op file and before you hand one over
+[G13]. The search (world-B's v2, phase 2) plays every gate in a **search world**: the file's grid and the entities of
+the gate's columns - doors driven by their real plates, keepers and drums, enemies with their traits, pots, boulders,
+see-saws, springs, vines, bark boards, platforms, Chomper, weapons - with the partner a lone player has: an egg
+drifting after him (the hatch bounce is -64), or his **idle hatched partner** walked there and clubbed open, whom he
+can ride (a Totem Ride starts on an idle carrier; only the Shoulder Hop needs an active one, P-C.10 [G1]) or park on
+a plate. Its macros walk, jump, crawl, drop, wait, strike (forward, low, in the air, the pogo) and throw the axe, the
+swirling axe and the spear. So build every gate for the partner model: 8-row boost ledges [G28], two-corridor
+leapfrogs (a plate holds an idle partner's weight), no single held plate door. The flood prefilter of G1 is a
+diagnostic only.
 
 #### 15.7.7 Two heroes on one camera
 
@@ -847,13 +853,11 @@ What the phase-1 owners and the slice designers settled in code, confirmed by th
 - **Flower pot**: a strike pushes it in the strike's direction; it slides to its floor's edge or a wall, falls at
   2 px/tick and lands 1-2 cells beyond the ledge's face as a permanent spring of -224 (a 105 px rise from the
   spring's top, 10 px over the floor). **It reaches 6 rows from the floor it takes root on** (19 px to spare): place
-  the ledge it is the way back to at most 6 rows above the pot's landing floor - under a 7- or 8-row boost ledge, on
-  a raised spot of 1-2 rows (1-1 co-op: a one-row root, 5-1 co-op: a two-row rock). A 7-row ledge is 3 px under the
-  apex: neither a way back to rely on nor a barrier (orchestrator resolution after G1; "a hop of 7 / 8 rows" is
-  measured from the dip under the face).
-- **Boost ledge, Expert row**: R18 may be built the other way round - the ledge at Expert height and a
-  `beginner`-flagged `objects/column rise=0` filling the dip's bottom - when an Expert row on top would put the upper
-  hero above the tribe camera's top edge (1-1 co-op). Both variants are proven per difficulty by the search.
+  the ledge it is the way back to at most 6 rows above the pot's landing floor. Not under a boost ledge: its raised
+  root would be a step for a lone hero riding his idle partner; there the way back is a rolled vine [G28]. A 7-row
+  ledge is 3 px under the apex: neither a way back to rely on nor a barrier (orchestrator resolution after G1).
+- **Boost ledge, one height**: since G2 a boost ledge is 8 rows on both difficulties [G28], so R18's Expert row (and
+  its "other way round" variant of the G1 slice) is gone; 1-1 and 5-1 co-op were rebuilt that way.
 - **Egg**: an egg or a just-hatched idle partner is no springboard (P-C.10 / P-C.12): a hatch bounce rises 10 px, a
   Shoulder Hop needs a partner whose player gave input since he hatched.
 - **Keepers that wait**: Shellbacks / Guards meant for a pincer stand still (`speed=0`): a walker with left = right = 0

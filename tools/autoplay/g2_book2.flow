@@ -1,7 +1,8 @@
 # Gate G2 (docs/expansion/PLAN.md 5): Book II "The Far Shore", Beginner, solo, from a fresh save, through the real UI
 # over the stages that exist at G2 - world 5 (w5_l1, Rattlesnake Gulch w5_l2 with Tusker's Wallow w5_l2b) and world 6
 # (Bubbling Fen w6_l1, Spore Hollow w6_l2 with Heart of the Mangrove w6_l2b) - each played by its club route, the
-# linked stages without a tally, Tusker and Old Mangrove beaten, every tally, and the map stop of 7-1 at the end. It is
+# linked stages without a tally, Tusker and Old Mangrove beaten, every tally (the run ends after 6-2 while world 7 does
+# not exist). It is
 # tools/autoplay/campaign_b2.flow cut before world 7 (that skeleton grows with phase 3). Owner: integration.
 #   GD_TIMEOUT=1800 bash .tools/gd.sh play --flow=tools/autoplay/g2_book2.flow --fast --fresh-user --out=g2_book2
 
@@ -165,15 +166,9 @@ shot tally_w6_l2
 press ui_accept
 wait 20
 press ui_accept
-wait_until flow.current_screen == world_map 900
-wait_until flow.busy == false 600
-
-# --- The map stop of 7-1 (world 7 is phase 3): the run carries the club, no life lost --------------------------
-wait_until flow.current_screen == world_map 900
-wait_until flow.busy == false 600
-expect flow.args.level_id == w7_l1
+# World 7 does not exist at G2: Book II's Beginner list ends after 6-2, so Flow ends the run (the credits). The flow
+# stops there; tools/autoplay/campaign_b2.flow (the full skeleton) takes over once phase 3 adds worlds 7-9.
+wait 120
 expect game.book == 2
-expect game.lives == 2
-wait_until scene.countdown >= 0 600
-wait 30
-shot map_w7_l1
+expect events.player_died == 0
+shot after_w6_l2

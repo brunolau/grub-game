@@ -331,7 +331,8 @@ func _update_rails() -> void:
 ## inside the raft's ride width (the PHYSICS.md 11.4 overlap with Tuning.HERO_BOX_RIDE). True when he was caught (he
 ## rides it now: PlayerBase.ride_platform, carried this tick).
 static func catch_sinking(level: LevelBase, hero: PlayerBase) -> bool:
-	if hero.dead or hero.down or hero.yvel <= Tuning.PLATFORM_RIDE_MIN_YVEL_EXCL 			or hero.carried_on_tick == Sim.total_ticks:
+	if hero.dead or hero.down or hero.yvel <= Tuning.PLATFORM_RIDE_MIN_YVEL_EXCL \
+			or hero.carried_on_tick == Sim.total_ticks:
 		return false
 	var before: int = hero.sim_pos.y - (hero.yvel >> 4)
 	var ride: Vector3i = Tuning.HERO_BOX_RIDE

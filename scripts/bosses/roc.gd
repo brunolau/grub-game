@@ -11,9 +11,9 @@ extends BossBase
 ##
 ##  - **Phase 1 Gale** (perched on a nest rim, the rims alternating): it rests REST_TICKS, raises its wings WINGS_TICKS
 ##    (whoosh; the telegraph) and beats them: the level's wind blows GUST_WIND away from it for GUST_TICKS (crouch to
-##    brace, PHYSICS.md C.6) while feathers fall like leaves (`projectiles/enemy_ember skin=leaf rain`, a touch costs a
-##    bone). Its head (the top band of the body) is open from the nest: a high strike or a bounce and a strike. After
-##    GUSTS gusts it takes off.
+##    brace, PHYSICS.md C.6) while feathers fall like leaves (`projectiles/enemy_ember skin=feather rain`, a touch
+##    costs a bone). Its head (the top band of the body) is open from the nest: a high strike or a bounce and a
+##    strike. After GUSTS gusts it takes off.
 ##  - **Phase 2 Dive**: it circles its target (way-points around him at 3 px/tick), screeches SCREECH_TICKS and dives
 ##    at the point where he stood when the screech ended (a straight line, DIVE_SPEED px/tick on the longer axis). A
 ##    miss buries its beak in the nest or the floor for BURY_TICKS: the head (low, at the front) is open. After DIVES
@@ -379,7 +379,7 @@ func _gust_tick(hero: PlayerBase) -> void:
 	_play(&"fly")
 	if _timer % FEATHER_PERIOD == 1:
 		var slot: int = hero.slot if hero != null else 0
-		_spawn_optional(FEATHER_ID, sim_pos, {"rain": true, "skin": "leaf", "rain_slot": slot})
+		_spawn_optional(FEATHER_ID, sim_pos, {"rain": true, "skin": "feather", "rain_slot": slot})
 	if _timer < GUST_TICKS:
 		return
 	_set_wind(0)
