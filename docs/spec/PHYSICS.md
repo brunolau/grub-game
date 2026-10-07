@@ -1389,7 +1389,9 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
   tar stays a tar hop):
   - walk handler: `ACCEL(32)` instead of `ACCEL(80)` (2 px/tick; crawling is 32 anyway);
   - jump handler: impulses only while `n < 2` (-65, -51, then 0 for n = 2..8) [R2] *(tune)*: apex **33 px** with UP
-    held, landing on tick 17;
+    held, landing on tick 17 on a flat floor - **tick 16 (32 px right / 32 px left) on the tar itself**: on tick 16
+    the feet are already inside the tar cell, whose top lies 6 px over the lowered surface, and LAND (11.2) puts them
+    on it (player-B, as built and pinned by tests/test_player_climb.gd);
   - airborne step: `ACCEL(32)` instead of `ACCEL(80)` *(tune)* [R2]: the hop covers 33 px right / 34 px left, so
     hopping is no faster than wading;
   - crouch, crawl, strikes, charge: normal.
@@ -1588,6 +1590,9 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
   range, the rising band, an auto-scroll edge) plays the death toss (10.4 #1-2: 60 ticks, input ignored) and then
   becomes an **egg** at the point where the toss started, clamped into the view (16 px inset). The leash (C.13) and
   the voluntary egg make an egg at once, with no toss. A down never costs a life and never resets anything.
+  *As built at G1:* "out of range" counts rows only while no other hero of `H` is in the level; while a partner of
+  the tribe holds the view, a hero above or below the camera rows is the leash's case (C.13), and the pit rule (below
+  the map) still downs him.
 - **Egg**: box 24 x 24, `x_offset` 12 *(tune)*. No tile collision; it touches no enemy, item, plate, zone, hazard,
   gate or exit; `target_hero()` skips it; it is no hero rectangle for dozing and never moves the camera. Drift
   (`POST`, `PartyDriver`): target point `T` = partner feet + (`-24 * partner.facing`, -48); per axis it steps towards
@@ -1627,7 +1632,9 @@ hero; with `|H| = 0` it holds still. With two heroes:
   device; a refused step keeps x (and `xvel`, like the commit rule).
 - **Vertical**: 12.2 runs on one **anchor** hero: the hero in `H` with the latest tick on which he had ground, a
   platform or a carrier under his feet (ties: lower slot); a hero standing still on the ground in the look-around
-  pose (12.3) is the anchor. A jumping or falling hero never drags the view while his partner stands.
+  pose (12.3) is the anchor. A jumping or falling hero never drags the view while his partner stands. *As built at
+  G1:* an anchor farther than the 12.2 curve's 131 px (only possible with two heroes, e.g. on an 8-row boost ledge)
+  is followed at the curve's last speed (16 px/tick) instead of not at all.
 - **Look-around** (12.3) by the anchor: a panning step that would put the other hero of `H` at `sc < 1` or
   `sc > 18` is refused.
 - **Leash**: a hero of `H` whose feet point is outside the authentic view rectangle (20 x 11 cells at the camera
@@ -1725,7 +1732,7 @@ Owner of each table: `Tuning` (core: hero and world rules), `PartyTuning` (core,
 | Carrier's halved jump, UP held | heights 3, 6, 9, 12, 14, 15, 15, 14, 12, 9, 5, 0 (lands on tick 12) |
 | Rider jump from a still carrier, UP held k ticks | k = 1: 49; 2: 67; 3: 82; 4: 90; 5-9: 98; held: 94 (feet px over the floor) |
 | Totem launch (rider presses on tick t0 of the carrier's jump, k = 5 / held) | t0 = 2: 143 / 131; 3: 146 / 134; 4: 149 / 137; 5: 152 / 140; 6: 139 / 130; 7: 126 / 120; 8: 113 / 109 |
-| Tar hop, UP + direction held from 32 v16 | apex 33 px, lands on tick 17, 33 px right / 34 px left |
+| Tar hop, UP + direction held from 32 v16 | apex 33 px, lands on tick 17, 33 px right / 34 px left (reference flat floor; on the tar: tick 16, 32 / 32 px, C.5) |
 | Vine leap right, UP held / released | back at the grab height on tick 17, 47 px / 83 px out; rise 36 px |
 | See-saw launch for a walk-off landing of 1 / 2 / 3 / 4 / 5+ tiles | -128 / -160 / -192 / -272 (hard) / -288 (hard, cap): rise 36 / 55 / 78 / 153 / 171 px |
 | Mount | walk x 1, 3, 6, 10 then +4 per tick; stop: 7 px, at rest on tick 6; hop apex 55 px, lands tick 21, 84 px (74 from rest) |

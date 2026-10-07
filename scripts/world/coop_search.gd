@@ -206,7 +206,20 @@ static func search_data(data: LevelData, difficulty: int, gate: String) -> Dicti
 	var starts: Array[Vector2i] = start_points(data, difficulty, tablet, grid)
 	for start: Vector2i in starts:
 		(result["starts"] as Array).append(Vector2i(Tuning.to_cell(start.x), Tuning.to_cell(start.y - 1)))
-	var found: Dictionary = searcher.explore(starts, {far: true}, area, BOUND_TICKS, MAX_NODES)
+	var found: Dictionary = {}
+	if prefilter and not flood_reaches(grid, starts, far, search_columns(area, starts, grid)):
+		# 2a. No cell path at all: the far cell lies beyond closed doors / walls (the search could not get there).
+		found = {"reached": false, "ticks": -1, "detail": "", "nodes": 0}
+		result["prefilter"] = true
+	else:
+		# 2b. The same grid at rest, starts, area and meta give the same search (Beginner and Expert often do).
+		var key: String = _explore_key(grid, data.resolved_meta(difficulty), starts, far, area)
+		if prefilter and _explore_cache.has(key):
+			found = _explore_cache[key]
+		else:
+			found = searcher.explore(starts, {far: true}, area, BOUND_TICKS, MAX_NODES)
+			found.erase("rest")
+			_explore_cache[key] = found
 	result["reached"] = bool(found["reached"])
 	result["explored"] = int(found["nodes"])
 	if result["reached"]:
@@ -216,6 +229,135 @@ static func search_data(data: LevelData, difficulty: int, gate: String) -> Dicti
 	result["windows"] = measure_windows(data, difficulty, area, searcher)
 	searcher.close()
 	return result
+
+
+## Explore results of [method search_data] by grid at rest, meta, starts, far cell and area (see [method _explore_key]).
+static var _explore_cache: Dictionary = {}
+## False: [method search_data] always runs the full search (no static prefilter, no cached explore) - for tests that
+## prove the search itself.
+static var prefilter: bool = true
+
+
+## Rows a feet cell may rise above the cell it last stood in, for [method flood_reaches]: the hero's highest jump
+## (UP released after 5-9 ticks, PHYSICS.md 6.4) peaks 64 px over the take-off, which moves the feet cell up exactly 4
+## rows from a floor, and at most 4 from feet inside a slope or tar cell. The search level holds no spring, enemy or
+## carrier that could lift him higher.
+const FLOOD_RISE_ROWS: int = 4
+
+
+## The static prefilter of [method search_data] (a cheap, sound bound asked for by D5 and DB1): false when no chain of
+## cells a hero's feet point can occupy joins a start to the `far` cell. Feet cells are the cells of the grid at rest
+## that are not side walls (slopes, one-way floors, hatches, liquids and spikes included; a tar floor too, whose
+## surface lies inside its cell), plus one open row above the map, joined 8-connected. A chain may rise at most
+## FLOOD_RISE_ROWS rows above the last cell with ground under it and may not rise again once it went down, except
+## for one row into a cell with ground under it (an airborne hero whose feet enter a one-cell wall lands on top of
+## it: the side probe tests the row above an airborne feet cell). The search level holds no entity, so the search can
+## only move the hero along such chains: when none joins, the search cannot reach the far cell either. `columns`
+## ([first, end)) keeps the chains to the columns the search can touch ([method search_columns]).
+static func flood_reaches(grid: TileGrid, starts: Array[Vector2i], far: Vector2i,
+		columns: Vector2i = Vector2i(0, 1 << 30)) -> bool:
+	if far.x < 0 or far.x >= grid.cols or far.y < -1 or far.y >= grid.rows:
+		return false
+	var cols: int = grid.cols
+	var cells: int = cols * (grid.rows + 1)    # row -1 is index row 0
+	var passable: PackedByteArray = PackedByteArray()
+	var grounded: PackedByteArray = PackedByteArray()
+	passable.resize(cells)
+	grounded.resize(cells)
+	for row: int in range(-1, grid.rows):
+		for col: int in cols:
+			var i: int = (row + 1) * cols + col
+			if row < 0:
+				passable[i] = 1
+				continue
+			var inside: bool = grid.has_profile(col, row) or grid.is_tar(col, row)
+			passable[i] = 1 if grid.side_at(col, row) != TileGrid.SIDE_WALL or inside else 0
+			grounded[i] = 1 if inside or TileGrid.is_ground(grid.floor_at(col, row + 1)) else 0
+	if passable[(far.y + 1) * cols + far.x] == 0:
+		return false
+	# State: cell index * STATES + rise * 2 + descended.
+	var states: int = (FLOOD_RISE_ROWS + 1) * 2
+	var seen: PackedByteArray = PackedByteArray()
+	seen.resize(cells * states)
+	var stack: PackedInt32Array = PackedInt32Array()
+	for start: Vector2i in starts:
+		var cell: Vector2i = Vector2i(Tuning.to_cell(start.x), Tuning.to_cell(start.y - 1))
+		if cell.x < 0 or cell.x >= cols or cell.y < -1 or cell.y >= grid.rows:
+			continue
+		var state: int = ((cell.y + 1) * cols + cell.x) * states
+		if seen[state] == 0:
+			seen[state] = 1
+			stack.append(state)
+	var far_index: int = (far.y + 1) * cols + far.x
+	while not stack.is_empty():
+		var state: int = stack[stack.size() - 1]
+		stack.resize(stack.size() - 1)
+		var index: int = state / states
+		if index == far_index:
+			return true
+		var rise: int = (state % states) >> 1
+		var descended: int = state & 1
+		var col: int = index % cols
+		var row: int = index / cols - 1
+		for dy: int in [-1, 0, 1]:
+			var next_row: int = row + dy
+			if next_row < -1 or next_row >= grid.rows:
+				continue
+			for dx: int in [-1, 0, 1]:
+				var next_col: int = col + dx
+				if (dx == 0 and dy == 0) or next_col < maxi(columns.x, 0) or next_col >= mini(columns.y, cols):
+					continue
+				var next: int = (next_row + 1) * cols + next_col
+				if passable[next] == 0:
+					continue
+				var next_state: int = -1
+				if grounded[next] == 1:
+					# Ground under the feet (a landing, a walk, or the one-row catch onto a wall top): rise resets.
+					next_state = next * states
+				elif dy < 0:
+					if descended == 0 and rise + 1 <= FLOOD_RISE_ROWS:
+						next_state = next * states + ((rise + 1) << 1)
+				elif dy > 0:
+					next_state = next * states + (rise << 1) + 1
+				else:
+					next_state = next * states + (rise << 1) + descended
+				if next_state >= 0 and seen[next_state] == 0:
+					seen[next_state] = 1
+					stack.append(next_state)
+	return false
+
+
+## The columns the search can touch, [first, end): its area and its starts, each widened by CACHE_MARGIN_COLS (the
+## search expands only resting points inside the area or at a start, and one macro run moves the hero at most 30
+## columns). [method flood_reaches] keeps to them, so its refusal speaks for the search.
+static func search_columns(area: Rect2i, starts: Array[Vector2i], grid: TileGrid) -> Vector2i:
+	var first: int = area.position.x
+	var end: int = area.end.x
+	for start: Vector2i in starts:
+		first = mini(first, Tuning.to_cell(start.x))
+		end = maxi(end, Tuning.to_cell(start.x) + 1)
+	return Vector2i(maxi(first - CACHE_MARGIN_COLS, 0), mini(end + CACHE_MARGIN_COLS, grid.cols))
+
+
+## Columns beyond the gate's area that one macro run can still touch: a run lasts at most 48 + SETTLE_TICKS ticks at
+## no more than 5 px per tick (30 columns); 40 leaves room for a slide.
+const CACHE_MARGIN_COLS: int = 40
+
+
+## The cache key of an explore: everything the search's outcome depends on - the grid's cells in every row of the
+## columns a run from a node of `area` can reach, the meta (ice, liquids ...), the starts, the far cell and the area.
+static func _explore_key(grid: TileGrid, meta: Dictionary, starts: Array[Vector2i], far: Vector2i,
+		area: Rect2i) -> String:
+	var first: int = maxi(area.position.x - CACHE_MARGIN_COLS, 0)
+	var last: int = mini(area.end.x + CACHE_MARGIN_COLS, grid.cols)
+	var rows: PackedStringArray = PackedStringArray()
+	for row: int in grid.rows:
+		var line: String = ""
+		for col: int in range(first, last):
+			line += grid.get_char(col, row)
+		rows.append(line)
+	return "%d|%d|%d|%d|%s|%s|%s" % [first, grid.rows, "\n".join(rows).hash(), str(meta).hash(), str(starts),
+		str(far), str(area)]
 
 
 static func _fresh_result() -> Dictionary:

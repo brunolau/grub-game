@@ -41,6 +41,10 @@ class ProblemCounter:
 
 var _runner: Node = null
 var _counts: Dictionary = {}
+## True until the watched stage's first tick stores the lives baseline (_counts["_lives"]).
+var _lives_pending: bool = false
+## PLAN.md 8 V3.e on a party route: the first entity found dozing inside a view or within reach of a hero ("" = none).
+var _doze_problem: String = ""
 var _letters: Dictionary = {}
 var _paintings: Dictionary = {}
 var _jackpots: int = 0
@@ -269,6 +273,8 @@ func check_expectations(label: String, spec: Dictionary, played: int, before: in
 	if expect.has("hatches"):
 		assert_true(_count(&"hero_revived") >= int(expect["hatches"]), "%s: hatches %d" % [
 			label, _count(&"hero_revived")])
+	if party:
+		assert_eq(_doze_problem, "", "%s: no entity dozes inside a view or within reach of a hero (V3.e)" % label)
 	if expect.has("x2_gates"):
 		assert_true(_gates_reached.size() >= int(expect["x2_gates"]), "%s: x2 gates crossed %d of %d (%s)" % [
 			label, _gates_reached.size(), _tablets.size(), str(_gates_reached.keys())])
@@ -350,7 +356,10 @@ func determinism_problems(file: String, mode: String, table: Dictionary) -> Pack
 
 func _reset_watch(level_id: StringName, mode: String) -> void:
 	_counts.clear()
-	_counts[&"_lives"] = Game.lives
+	# The lives baseline is taken on the stage's first tick (_on_tick), after the replay started the run: a value
+	# an earlier test file left in Game.lives must not become the baseline (a co-op run starts with 2 tribe lives).
+	_lives_pending = true
+	_doze_problem = ""
 	_letters.clear()
 	_paintings.clear()
 	_jackpots = 0
@@ -395,6 +404,11 @@ func _x2_tablets(level_id: StringName, mode: String) -> Array[Array]:
 
 ## Per tick of the replay (sim_bench_runner on_tick): the watchers of the expect keys that are not events.
 func _on_tick(level: LevelBase, stage_tick: int) -> void:
+	if _lives_pending:
+		_lives_pending = false
+		_counts[&"_lives"] = Game.lives
+	if level.hero_count() > 1 and _doze_problem == "":
+		_check_party_doze(level, stage_tick)
 	_max_wind = maxi(_max_wind, level.wind)
 	var view_y: int = level.get_view_rect().position.y
 	if _start_view_y < 0:
@@ -420,6 +434,31 @@ func _on_tick(level: LevelBase, stage_tick: int) -> void:
 			var rel: Vector2i = entity.sim_pos - hero.sim_pos
 			if absi(rel.x) < 24 and rel.y > -56 and rel.y < 8:
 				_embers_close[id] = true
+
+
+## PLAN.md 8 V3.e: on a party route no entity dozes while its doze area overlaps a view grown by
+## Tuning.DOZE_VIEW_REACH_PX or a hatched hero's box and feet point grown by Tuning.DOZE_HERO_REACH_PX (the doze
+## manager snaps its rectangles outwards, so an overlap with these is an overlap with its own). Keeps the first problem.
+func _check_party_doze(level: LevelBase, stage_tick: int) -> void:
+	var near: Array[Rect2i] = []
+	for i: int in level.get_view_count():
+		near.append(level.get_view_rect_at(i).grow(Tuning.DOZE_VIEW_REACH_PX))
+	for hero: PlayerBase in level.heroes:
+		if hero == null or hero.dead or hero.is_down():
+			continue
+		var box: Rect2i = Rect2i(hero.sim_pos.x - hero.box_xo, hero.sim_pos.y - hero.box_h, maxi(hero.box_w, 1),
+				maxi(hero.box_h, 1)).merge(Rect2i(hero.sim_pos, Vector2i.ONE))
+		near.append(box.grow(Tuning.DOZE_HERO_REACH_PX))
+	for kind: int in Defs.Kind.values():
+		for entity: SimEntity in level.get_kind(kind):
+			if entity == null or not entity.is_dozing():
+				continue
+			var area: Rect2i = entity.call(&"_doze_area")
+			for rect: Rect2i in near:
+				if area.intersects(rect):
+					_doze_problem = "%s at %s dozes on tick %d (area %s, near %s)" % [entity.name, str(entity.sim_pos),
+						stage_tick, str(area), str(rect)]
+					return
 
 
 func _watch_events() -> void:

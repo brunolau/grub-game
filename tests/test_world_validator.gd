@@ -608,7 +608,15 @@ func test_search_refuses_a_high_ledge_and_finds_a_low_one() -> void:
 	var high: Dictionary = CoopSearch.search_data(_search_level("high_coop", 6, "objects/x2_tablet 10 13 gate=hop far=16,5"),
 			Defs.Difficulty.BEGINNER, "hop")
 	assert_false(bool(high["reached"]), "8 rows: no single hero gets up there (%s)" % high["detail"])
-	assert_true(int(high["explored"]) > 10, "the floor was searched (%d resting points)" % int(high["explored"]))
+	# The static prefilter (G1 integration) already refuses it: no chain of feet cells climbs 8 rows.
+	assert_true(bool(high.get("prefilter", false)), "the prefilter refused it without simulating")
+	# The full search agrees, from the same starts.
+	CoopSearch.prefilter = false
+	var searched: Dictionary = CoopSearch.search_data(_search_level("high_coop", 6,
+			"objects/x2_tablet 10 13 gate=hop far=16,5"), Defs.Difficulty.BEGINNER, "hop")
+	CoopSearch.prefilter = true
+	assert_false(bool(searched["reached"]), "the full search refuses it too (%s)" % searched["detail"])
+	assert_true(int(searched["explored"]) > 10, "the floor was searched (%d resting points)" % int(searched["explored"]))
 	assert_eq(high["bound"], CoopSearch.BOUND_TICKS)
 	assert_true((high["starts"] as Array).has(Vector2i(10, 13)), "it starts at the tablet")
 	assert_true((high["starts"] as Array).has(Vector2i(1, 13)), "and at the start before it (no checkpoint)")

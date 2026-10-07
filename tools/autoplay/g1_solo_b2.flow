@@ -1,0 +1,76 @@
+# G1 vertical slice (docs/expansion/PLAN.md 4.2), solo Book II through the real UI: title -> Play -> Solo -> book
+# select (Book II) -> Beginner -> the map -> 5-1 Red Mesa Trail (levels/w5_l1.lvl) played by its Beginner club route
+# (tools/autoplay/routes/w5_l1.inputs) -> tally -> the_end / credits (5-1 is Book II's only stop on the G1 tree).
+# The first stop of tools/autoplay/campaign_b2.flow (the whole Book II, phase 3), cut after the first stage so it
+# runs on the G1 tree. Owner: integration.
+#   GD_TIMEOUT=900 bash .tools/gd.sh play --flow=tools/autoplay/g1_solo_b2.flow --fast --fresh-user --out=g1_solo_b2
+
+# --- Boot, title, Play > Solo > Book II > Beginner ----------------------------------------------------------------
+wait_until flow.current_screen == title 600
+wait_until flow.busy == false 600
+wait 40
+shot title
+expect save.has_progress() == false
+# Play, then Solo (Flow.open_play(SINGLE); the keys of the title's Play / Solo / Co-op / Versus choice: ui-A, P1.11).
+press ui_accept
+wait 10
+shot play_menu
+press ui_accept
+wait_until flow.current_screen == book_select 300
+wait_until flow.busy == false 600
+press ui_right
+wait 10
+shot book_select_book2
+press ui_accept
+# Flow.choose_book(2) -> the difficulty (Beginner has the focus) -> Flow.start_selected_game -> the Far Shore map.
+wait_until flow.current_screen == mode_select 300
+wait_until flow.busy == false 600
+press ui_accept
+wait_until flow.current_screen == world_map 600
+wait_until flow.busy == false 600
+expect game.book == 2
+expect game.mode == 0
+expect game.party == 1
+expect game.difficulty == 0
+expect game.lives == 2
+expect game.score == 0
+expect game.weapon == 0
+
+# --- w5_l1 ----------------------------------------------------------------------------------------------------
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w5_l1
+wait_until scene.countdown >= 0 600
+shot map_w5_l1
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w5_l1 600
+expect hero.dead == false
+expect game.weapon == 0
+wait 2
+shot w5_l1_start
+every 480 w5_l1
+play_file tools/autoplay/routes/w5_l1.inputs
+every 0
+expect events.player_died == 0
+expect events.exit_reached == 1
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_w5_l1
+press ui_accept
+wait 20
+press ui_accept
+# On the G1 tree 5-1 is Book II's only stop, so its tally ends the book (Flow.finish_tally: no next stop -> the_end ->
+# credits); tools/autoplay/campaign_b2.flow continues on the map once 5-2 exists. The result went to the Book II solo
+# namespace, never to Book I's.
+wait_until flow.current_screen == credits 1800
+wait_until flow.busy == false 600
+expect game.book == 2
+expect save.get_level_result_in(single/book2/beginner,w5_l1).clears == 1
+expect save.is_game_completed_in(single/book2/beginner) == true
+expect save.is_game_completed_in(single/book1/beginner) == false
+expect save.get_level_result_in(single/book1/beginner,w5_l1).clears == 0
+wait 60
+shot credits_after_book2

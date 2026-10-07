@@ -80,6 +80,271 @@ msgstr "Fewer enemies. The volcano stays closed."
 msgid "UI_MODE_EXPERT_INFO"
 msgstr "More enemies and the whole adventure."
 
+# --- 2.0 front end: Play, book select, join panel, versus (ui-A) ---
+msgid "UI_TITLE_PLAY"
+msgstr "Play"
+
+msgid "UI_PLAY_SOLO"
+msgstr "Solo"
+
+msgid "UI_PLAY_COOP"
+msgstr "Co-op"
+
+msgid "UI_PLAY_VERSUS"
+msgstr "Versus"
+
+msgid "UI_PLAY_SOLO_INFO"
+msgstr "One caveman, two books of adventure."
+
+msgid "UI_PLAY_COOP_INFO"
+msgstr "Two players, one tribe: get each other through every stage."
+
+msgid "UI_PLAY_VERSUS_INFO"
+msgstr "2 to 4 players and CPUs on one screen."
+
+msgid "UI_BOOK_HEADING"
+msgstr "BOOK"
+
+msgid "UI_BOOK_1"
+msgstr "Book I"
+
+msgid "UI_BOOK_2"
+msgstr "Book II"
+
+msgid "UI_BOOK_1_NAME"
+msgstr "The First Feast"
+
+msgid "UI_BOOK_2_NAME"
+msgstr "The Far Shore"
+
+msgid "UI_BOOK_1_INFO"
+msgstr "Jungle, caves, ice and the volcano."
+
+msgid "UI_BOOK_2_INFO"
+msgstr "Canyon, tar fen, coast, ruins and sky."
+
+msgid "UI_BOOK_MISSING"
+msgstr "Not in this build yet"
+
+msgid "UI_JOIN_HEADING"
+msgstr "TRIBE GATHERING"
+
+msgid "UI_JOIN_PRESS"
+msgstr "Press Jump to join"
+
+msgid "UI_JOIN_HOLD"
+msgstr "Hold {key} when ready"
+
+msgid "UI_JOIN_READY"
+msgstr "Ready!"
+
+msgid "UI_JOIN_KEYS_LEFT"
+msgstr "Left keys"
+
+msgid "UI_JOIN_KEYS_RIGHT"
+msgstr "Right keys"
+
+msgid "UI_JOIN_NUMPAD"
+msgstr "Numpad"
+
+msgid "UI_JOIN_PAD"
+msgstr "Pad {number}"
+
+msgid "UI_JOIN_TOUCH"
+msgstr "Touch"
+
+msgid "UI_JOIN_FREE"
+msgstr "Free"
+
+msgid "UI_COLOUR_YELLOW"
+msgstr "Yellow"
+
+msgid "UI_COLOUR_BLUE"
+msgstr "Blue"
+
+msgid "UI_COLOUR_PINK"
+msgstr "Pink"
+
+msgid "UI_COLOUR_GREEN"
+msgstr "Green"
+
+msgid "UI_COLOUR_WHITE"
+msgstr "White"
+
+msgid "UI_COLOUR_GOLD"
+msgstr "Gold"
+
+msgid "UI_ACTION_MOVE"
+msgstr "Move"
+
+msgid "UI_HINT_LEAVE"
+msgstr "Leave"
+
+msgid "UI_VS_HEADING"
+msgstr "VERSUS"
+
+msgid "UI_VS_ARENA"
+msgstr "Arena"
+
+msgid "UI_VS_MODE_GRUB_STACK"
+msgstr "Grub Stack"
+
+msgid "UI_VS_MODE_LAST_CAVEMAN"
+msgstr "Last Caveman Standing"
+
+msgid "UI_VS_MODE_HOT_ROCK"
+msgstr "Hot Rock"
+
+msgid "UI_VS_MODE_CLUBBALL"
+msgstr "Clubball"
+
+msgid "UI_VS_MODE_GRUB_STACK_INFO"
+msgstr "Food stacks on your head. Biggest stack at the gong wins."
+
+msgid "UI_VS_MODE_LAST_CAVEMAN_INFO"
+msgstr "Three hearts each. The last one standing wins."
+
+msgid "UI_VS_MODE_HOT_ROCK_INFO"
+msgstr "Pass the glowing ember before it pops!"
+
+msgid "UI_VS_MODE_CLUBBALL_INFO"
+msgstr "Club the coconut into the other goal."
+
+msgid "UI_VS_ARENA_RANDOM"
+msgstr "Random"
+
+msgid "UI_VS_ARENA_PARTY_MIX"
+msgstr "Party Mix"
+
+msgid "UI_VS_CPU"
+msgstr "CPU"
+
+msgid "UI_VS_BOT_ROOKIE"
+msgstr "Rookie"
+
+msgid "UI_VS_BOT_HUNTER"
+msgstr "Hunter"
+
+msgid "UI_VS_BOT_CHIEF"
+msgstr "Chief"
+
+msgid "UI_VS_ADD_CPU"
+msgstr "Add CPU"
+
+msgid "UI_VS_START"
+msgstr "Start match"
+
+msgid "UI_VS_NEED_TWO"
+msgstr "Two players needed: add a CPU."
+
+msgid "UI_VS_NOT_READY"
+msgstr "Waiting for everyone to be ready."
+
+msgid "UI_VS_NO_ARENA"
+msgstr "No arena for this many players yet."
+
+msgid "UI_VS_FIRST_TO"
+msgstr "First to {wins}"
+
+msgid "UI_VS_ROUND"
+msgstr "ROUND {number}"
+
+msgid "UI_VS_RESULTS_HEADING"
+msgstr "RESULTS"
+
+msgid "UI_VS_MATCH_WIN"
+msgstr "{player} wins the match!"
+
+msgid "UI_VS_MATCH_SHARED"
+msgstr "{players} win the match!"
+
+msgid "UI_VS_REMATCH"
+msgstr "Rematch"
+
+msgid "UI_VS_LOBBY"
+msgstr "Lobby"
+
+msgid "UI_AWARD_LEANING_TOWER"
+msgstr "Leaning Tower"
+
+msgid "UI_AWARD_LEANING_TOWER_INFO"
+msgstr "Tallest stack"
+
+msgid "UI_AWARD_PICKPOCKET"
+msgstr "Pickpocket"
+
+msgid "UI_AWARD_PICKPOCKET_INFO"
+msgstr "Most stolen by stomps"
+
+msgid "UI_AWARD_GLUTTON"
+msgstr "Glutton"
+
+msgid "UI_AWARD_GLUTTON_INFO"
+msgstr "Most food eaten"
+
+msgid "UI_AWARD_BUTTERFINGERS"
+msgstr "Butterfingers"
+
+msgid "UI_AWARD_BUTTERFINGERS_INFO"
+msgstr "Most food dropped"
+
+msgid "UI_AWARD_CHAIN_GANG"
+msgstr "Chain Gang"
+
+msgid "UI_AWARD_CHAIN_GANG_INFO"
+msgstr "Longest stomp chain"
+
+msgid "UI_AWARD_CLANG_MASTER"
+msgstr "Clang Master"
+
+msgid "UI_AWARD_CLANG_MASTER_INFO"
+msgstr "Most clubs clashed"
+
+msgid "UI_AWARD_SLUGGER"
+msgstr "Slugger"
+
+msgid "UI_AWARD_SLUGGER_INFO"
+msgstr "Most curled rivals batted"
+
+msgid "UI_AWARD_HOME_RUN"
+msgstr "Home Run"
+
+msgid "UI_AWARD_HOME_RUN_INFO"
+msgstr "Longest Clubball shot"
+
+msgid "UI_AWARD_HOT_POTATO"
+msgstr "Hot Potato"
+
+msgid "UI_AWARD_HOT_POTATO_INFO"
+msgstr "Passed the Hot Rock most"
+
+msgid "UI_AWARD_LAVA_LOVER"
+msgstr "Lava Lover"
+
+msgid "UI_AWARD_LAVA_LOVER_INFO"
+msgstr "Most hazards met"
+
+msgid "UI_AWARD_HEAD_CASE"
+msgstr "Head Case"
+
+msgid "UI_AWARD_HEAD_CASE_INFO"
+msgstr "Bonked by giant bonuses"
+
+msgid "UI_AWARD_COMEBACK_CAVEMAN"
+msgstr "Comeback Caveman"
+
+msgid "UI_AWARD_COMEBACK_CAVEMAN_INFO"
+msgstr "Won from behind"
+
+msgid "UI_AWARD_PACIFIST"
+msgstr "Pacifist"
+
+msgid "UI_AWARD_PACIFIST_INFO"
+msgstr "Fewest hits dealt"
+
+msgid "UI_JOIN_KEY_TEST"
+msgstr "Key test"
+
 # --- Continue / level code ---
 msgid "UI_CONTINUE_HEADING"
 msgstr "CONTINUE"
@@ -468,6 +733,10 @@ msgstr "Feast Land C"
 
 msgid "Way Home"
 msgstr "Way Home"
+
+# Versus arenas (kind = arena; DESIGN.md E.5). "Colossus Hall" (arena 8) shares the msgid of stage w4_l2b.
+msgid "Totem Ring"
+msgstr "Totem Ring"
 
 # --- Level texts: signs (objects/sign) and hints (zones/message) of the level files, in level order ---
 # Shown in the HUD face on a wooden board (signs) or on the hint panel (zones), wrapped to a few lines.

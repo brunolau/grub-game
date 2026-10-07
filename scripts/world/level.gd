@@ -608,6 +608,15 @@ func _place_party_starts() -> void:
 			start_positions.append(_spread_point(start_pos, slot))
 
 
+## Entities that spawn an entity of another id in the middle of play, outside Spawner.RUNTIME_CATEGORIES: those
+## scenes are preloaded with their spawner's, so the first spring of a flower pot or the first spear step never loads
+## inside a tick (a 7 ms hitch measured at G1).
+const SPAWNED_BY: Dictionary = {
+	&"objects/flower_pot": [&"objects/spring"],
+	&"objects/bark_board": [&"objects/spear_step"],
+}
+
+
 func _spawn_entities() -> void:
 	var records: Array[Dictionary] = _data.entity_records()
 	var ids: Array[StringName] = []
@@ -617,6 +626,10 @@ func _spawn_entities() -> void:
 			continue  # a start marker of the loader (_place_party_starts), not an entity
 		if not Spawner.is_prop(id) and not ids.has(id) and LevelText.applies_to(record["params"], Game.difficulty):
 			ids.append(id)
+	for id: StringName in ids.duplicate():
+		for spawned: StringName in SPAWNED_BY.get(id, []):
+			if not ids.has(spawned):
+				ids.append(spawned)
 	# Scenes of the previous level that this one does not use are released with their textures.
 	Spawner.retain_only(ids)
 	Spawner.preload_ids(ids)

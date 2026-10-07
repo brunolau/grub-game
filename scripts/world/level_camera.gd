@@ -55,6 +55,10 @@ var _tribe: Array[PlayerBase] = []
 var _group_ticks: int = 0
 var _ground_step: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 var anchor_slot: int = -1
+## True while the tribe camera's vertical step runs (tick_group): an anchor beyond the 12.2 speed curve's range
+## (0..131 px, only reachable with two heroes, e.g. on an 8-row boost ledge) is followed at the curve's last speed
+## instead of not at all (DB1's report; one hero never gets there, so 1.0 is unchanged).
+var _clamp_curve: bool = false
 
 var _locked: bool = false
 var _lock_rect: Rect2i = Rect2i()
@@ -235,7 +239,9 @@ func tick_group(heroes: Array[PlayerBase]) -> void:
 	elif pos.y > _max.y:
 		pos.y = maxi(pos.y - step, _max.y)
 	elif _min.y < _max.y:
+		_clamp_curve = true
 		_follow_y(anchor, 0)
+		_clamp_curve = false
 
 
 ## Place the tribe camera for a party that just appeared (level start, team-wipe respawn, gate): PHYSICS.md 12.5 on
@@ -589,6 +595,8 @@ func _follow_y(hero: PlayerBase, fixed_step: int) -> void:
 
 
 func _move_y(direction: int, distance: int, fixed_step: int) -> void:
+	if _clamp_curve and fixed_step == 0:
+		distance = mini(distance, Tuning.CAM_V_MAX_DISTANCE * rows / Tuning.VIEW_ROWS)
 	var step: int = fixed_step if fixed_step > 0 else vertical_step(distance)
 	if step <= 0:
 		return

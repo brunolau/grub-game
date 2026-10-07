@@ -6,7 +6,8 @@ extends ProjectileBase
 ## calls it for the spear, like the axe: spawned at the weapon anchor plus one tick of its motion): xvel +/-192
 ## (12 px/tick) by facing, yvel 0, flat for Tuning.SPEAR_FLAT_TICKS moves, then +16 v16 per tick (cap 192). Box 24 x 6,
 ## x_offset 12. No tile collision (it passes walls like the axe), except:
-##  - **bark boards** (objects-B's `objects/bark_board`): after each move the spear asks the boards for a catch
+##  - **bark boards** (objects-B's `objects/bark_board`): at its spawn position (on the first move, before moving) and
+##    after each move the spear asks the boards for a catch
 ##    (`board.catches(spear)`: its cell overlaps the spear's box and xvel points into its face) and requests a spear
 ##    step (`board.stick(spear)`): a step means it stuck - the step (objects-B's `objects/spear_step`, a one-way sprite
 ##    platform drawn as the stuck spear) stands for this spear from then on and the flying spear is removed; null
@@ -61,6 +62,11 @@ func _ready() -> void:
 ## One tick of flight (PROJECTILES phase): integrate (no tile collision), the drop after the flat part, then the bark
 ## boards (and the tiles in versus); removed once it was on no view on the previous tick.
 func _move_tick() -> void:
+	# The spawn position itself (anchor + one tick of motion) is a position of the flight too: a hero pressed against
+	# the board's wall, or standing on a spear step under a second board of the same face, throws from inside the
+	# board's reach (D5's report, G1 integration). Tested on the first move, before it moves on.
+	if moves == 0 and Game.level != null and _try_board(Game.level):
+		return
 	sim_pos.x += Tuning.floor16(xvel)
 	sim_pos.y += Tuning.floor16(yvel)
 	moves += 1

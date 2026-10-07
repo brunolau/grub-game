@@ -725,8 +725,8 @@ and keepers).
 | **See-saw** | `objects/seesaw` with its high end 1 row over the floor, a ledge 4+ rows above the high end within 3 cells to drop from, the target up to 9 rows over the low end; no enemy may fall onto it |
 | **Heave boulder** | `objects/boulder_heavy` with 3+ cells of floor behind the pushed side and 2+ rows of air; it fills a 2-cell gap, plugs a vent (`objects/geyser deadly`) or presses a plate |
 | **Pulley** | `objects/pulley` with two `objects/platform mode=ride` 4+ cells apart; the rider's target `range` rows above his platform's start |
-| **Keeper door** | `objects/column trigger=keepers:<name>` behind a hall **exactly 3 rows high**; its keepers (`keeper=<name>`) carry `shell`, `bond` or `daze` |
-| **Brace corridor** | a `heavy` (Bull Rex) in a 3-row-high hall between walls |
+| **Keeper door** | `objects/column trigger=keepers:<name>` behind a hall **exactly 4 rows high** (the Guard and Shellback art is 54 px tall); its keepers (`keeper=<name>`) carry `shell`, `bond` or `daze` |
+| **Brace corridor** | a `heavy` (Bull Rex) in a 4-row-high hall between walls |
 | **Chomper two seats** | a mounted stretch where only the gunner can clear the way (Leeches, a Snatcher) |
 
 #### 15.7.4 x2 tablets
@@ -744,9 +744,9 @@ air cell above a floor.
 - Trait choice per archetype: GAMEPLAY 13.9.4 (the "Traits used in layouts" column). Bonds: `bond=<name>` on every
   member, members placed out of one hero's reach within the window (as twin drums). `grab` needs a `perch=c,r` next
   to a pit. `lone` is off on Beginner: do not make a gate out of it.
-- **Keeper and Guard halls are exactly 3 rows high** (3 rows of air, a ceiling above): a hero only hops about 16 px
-  there (section 4), so nobody can jump or bounce over a keeper to get past it. The search (15.7.6) still proves it,
-  because a hero can land on a short enemy's head even there.
+- **Keeper and Guard halls are exactly 4 rows high** (4 rows of air, a ceiling above; orchestrator resolution at
+  phase 1: the Guard and Shellback art is 54 logical px tall): nobody can jump or bounce over a keeper to get past
+  it. The search (15.7.6) still proves it, because a hero can land on a short enemy's head even there.
 
 #### 15.7.6 Solo impossibility (validator `--coop` and `tests/test_coop_gates.gd`)
 
@@ -754,7 +754,7 @@ Static rules first (the validator), within **10 cells horizontally and 11 rows b
 ledge, a Totem ledge, and over a Batter Up gap: no enemy record that a hero can bounce on, no `objects/spring`,
 `geyser` (other than a `deadly` vent), `seesaw` (other than the gate's own), `vine`, `bark_board`, `items/glider`,
 `objects/platform` / `drop_platform` path, column of 2+ hittables stacked vertically (a club pogo ladder), mount pen.
-No bark board within 12 cells of any gate. Plates at least 8 tiles from their doors. Keeper and Guard halls 3 rows
+No bark board within 12 cells of any gate. Plates at least 8 tiles from their doors. Keeper and Guard halls 4 rows
 high. Then **the search**: for every x2 gate a bounded single-hero search on the route tools' simulator, starting at
 the tablet and at the last checkpoint before it, with the club and every special from the belt and Chomper where a pen
 is in the stage, must **fail** to reach the tablet's `far` cell within 1 457 ticks *(tune)*. It also measures
@@ -764,9 +764,50 @@ is in the stage, must **fail** to reach the tablet's `far` cell within 1 457 tic
 
 - Keep each gate inside one view: both heroes must see each other's role (20 x 11 cells).
 - The view edges are walls and the vertical follow uses the grounded hero; a hero left off the view becomes an egg
-  after 121 / 73 ticks. Do not build a gate where the upper hero has to wait off the view.
+  after 121 / 73 ticks (also above or below it: while a partner of the tribe holds the view, a hero out of its rows is
+  leashed, not downed - PHYSICS C.12 / C.13 as of G1). Do not build a gate where the upper hero has to wait off the
+  view, and keep drops where one hero may stand above the other within the view's rows, or have both drop together.
 - Checkpoints: keep 2 free cells on each side (P2 respawns 24 px beside P1).
 - Locked rooms (arenas, gates with `lock=`, camera locks) pull the partner in.
+
+#### 15.7.8 As built at G1 *(lead designer to confirm or tune)*
+
+Conventions the phase-1 owners and the slice designers settled in code; the code comments are the reference until
+DESIGN / GAMEPLAY 13.9.7 say otherwise (requests in `build/engine_requests/wf7_*_to_lead_designer.txt`).
+
+- **Plate**: anchored at its LEFT cell, covering `w` cells to the right; a hero counts while his feet are over its
+  cells, on its floor or up to 8 px above it and not rising. Columns rise while ALL their plates are pressed, so one
+  door cannot be opened from both sides: a leapfrog uses **two corridors** (plate A opens the lower corridor for B,
+  plate B beyond opens the upper corridor for A; 1-1 and 5-1 co-op).
+- **Door rule** (`objects/column`): a driven block whose next cell in its direction of travel is solid is a door (the
+  cells it leaves become air, a portcullis into a ceiling slot); into air it keeps the 1.0 pillar rule. Build a keeper
+  door as the bottom cells of a wall that continues above the hall, `rise` = the hall height (4). A returning door
+  waits instead of moving into a hero.
+- **See-saw**: fulcrum at the anchor's feet point, plank `len * 8` px each side, `facing` names the high end; the low
+  end lies 1 px over the floor, the high end one row higher, so "a ledge 4+ rows above the high end" is a ledge 5+
+  rows over the floor (the -272 / 153 px launch of C.17). Two heroes on one see-saw play ping-pong.
+- **Flower pot**: moves in the strike's direction, slides to its floor's edge or a wall, falls at 2 px/tick and lands
+  1-2 cells beyond a 7-row ledge's face as a spring of -224 (a 105 px rise). That reaches a 7- or 8-row ledge only
+  from a raised spot (1-1: a one-row root, 5-1: a two-row rock); "a hop of 7 / 8 rows" is measured from the dip
+  under the face. Open: a stronger pot spring (-256, about 133 px) or this wording.
+- **Boost ledge, Expert row**: R18 may be built the other way round - the ledge at Expert height and a
+  `beginner`-flagged `objects/column rise=0` filling the dip's bottom - when an Expert row on top would put the upper
+  hero above the tribe camera's top edge (1-1 co-op).
+- **Keepers that wait**: Shellbacks / Guards meant for a pincer stand still (`speed=0`): a walker with left = right = 0
+  still sways about 30 px, which makes the bait and back-strike distances fickle. Bait about 30 px in front, striker
+  about 40 px behind.
+- **Twin drums**: a hit on tick t0 opens a window of W ticks (24 B / 12 E); the other drums must be hit on
+  t0 .. t0 + W - 1. The count-in plays while a hatched hero stands within 40 px of every drum.
+- **x2 tablet**: lights (frame 2) once a hatched hero stood in its `far` cell, and stays lit.
+- **Team gate**: partners arrive spread behind the hero who entered (eggs when they were more than a view away); a
+  gate with `lock=` pulls the party into the locked view. A mounted hero cannot use a gate; the exit totem dismounts.
+- **Spear and boards**: a spear is tested against bark boards at its spawn position too, so a hero pressed against the
+  board's wall, or standing on a spear step under a second board of the same face, sticks it (two steps 3 rows apart
+  on one face climb 6 tiles, 15.5).
+- **Solo search**: a gate whose far cell no chain of feet cells reaches from the starts (a jump rises at most 5 rows
+  over the last ground, 15.7.6) is refused without simulating; the search starts at the tablet and at the last
+  checkpoint **before it by column** - on a road travelled leftwards place the tablet so the near-side checkpoint
+  wins (DB1).
 
 ### 15.8 Arenas
 

@@ -1,5 +1,5 @@
 # Whole-game flow, Expert, from a fresh save (docs/ARCHITECTURE.md 9.2, scripts/core/dev/autoplay_flow.gd):
-# title -> mode select (Expert) -> every map stop in campaign order, each played by the route of the weapon the run
+# title -> Play -> Solo -> book select (Book I) -> mode select (Expert) -> every map stop in campaign order, each played by the route of the weapon the run
 # carries at that point (the input the headless campaign test tests/test_campaign_routes.gd plays; no weapon is ever
 # handed over: the axe of Canopy Village, the hammer of Echo Caverns, the swirling axe of Crystal Grotto kept to the
 # end), with the warp of Canopy Village into bonus stage A, both bosses (the Brute in Brute's Den, the Wall Colossus in Colossus Hall),
@@ -8,13 +8,21 @@
 # screenshots of every map stop, stage start and tally, plus one every 480 ticks of play.
 #   GD_TIMEOUT=1800 bash .tools/gd.sh play --flow=tools/autoplay/campaign.flow --fast --fresh-user --out=campaign
 
-# --- Boot, title, mode select --------------------------------------------------------------------------------------
+# --- Boot, title, Play > Solo > Book I > mode select ----------------------------------------------------------------
 wait_until flow.current_screen == title 600
 wait_until flow.busy == false 600
 wait 40
 shot title
 expect save.has_progress() == false
 expect save.get_high_score() == 0
+# 2.0 title path (ui-A, P1.11): Play opens Solo / Co-op / Versus inside the title (Solo focused), then the book
+# select (Book I focused), then the difficulty.
+press ui_accept
+wait 10
+press ui_accept
+wait_until flow.current_screen == book_select 300
+wait_until flow.busy == false 600
+expect flow.play_mode == 0
 press ui_accept
 wait_until flow.current_screen == mode_select 300
 wait_until flow.busy == false 600
@@ -25,6 +33,8 @@ press ui_accept
 wait_until flow.current_screen == world_map 300
 wait_until flow.busy == false 600
 expect game.difficulty == 1
+expect game.book == 1
+expect game.mode == 0
 expect game.lives == 2
 expect game.score == 0
 expect game.weapon == 0

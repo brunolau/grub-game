@@ -14,6 +14,9 @@ extends SimEntity
 ## edge when the camera pages on) - a hero walking past at full speed overlaps it for half a second. The level's
 ## intro banner gives way to a board that appears under it (Hud.dismiss_intro()), so the first sign of a stage is
 ## never hidden by the stage name.
+## One board at a time (2.0, G1 verification): the board a hero came to last is in front; any other board - held for
+## its read time or read by the partner - fades out while it shows, so two boards never cover each other (co-op signs
+## stand a few columns apart). With two or more heroes the board stays below the P2 panel of the HUD (VIEW_TOP_PARTY).
 
 ## Widest text line (art px) and the room around the text inside the board.
 const TEXT_MAX_W: float = 360.0
@@ -36,6 +39,8 @@ const HOLD_MARGIN: float = 200.0
 ## Top edge of the board while a boss bar shows under the hearts (view px): the board stays below the bar, and a
 ## held board gives way to the fight.
 const VIEW_TOP_BOSS: float = 96.0
+## Top edge of the board while the level holds two or more heroes (view px): below the HUD's P2 panel.
+const VIEW_TOP_PARTY: float = 96.0
 ## Colours of ui/panel.png's edge: outline, rim and face. The tail is drawn with them.
 const COL_EDGE: Color = Color8(46, 39, 31)
 const COL_RIM: Color = Color8(108, 61, 40)
@@ -58,6 +63,9 @@ var _shown_for: float = 0.0
 var _away_for: float = 0.0
 ## True while the HUD shows a boss bar.
 var _boss_bar: bool = false
+## Presentation: a hero was at the board on the last frame; the board in front (the one a hero came to last).
+var _was_near: bool = false
+static var _front: SignBoard = null
 
 
 func _init() -> void:
@@ -139,8 +147,14 @@ func _process(delta: float) -> void:
 	_boss_bar = hud != null and hud.has_method(&"is_boss_bar_visible") and bool(hud.call(&"is_boss_bar_visible"))
 	_shown_for += delta
 	_away_for = 0.0 if _near else _away_for + delta
+	var front_valid: bool = is_instance_valid(_front) and _front.is_inside_tree()
+	if _near and (not _was_near or not front_valid or not _front._near):
+		_front = self
+		front_valid = true
+	_was_near = _near
 	var held: bool = (_shown_for < READ_SECONDS or _away_for < LINGER_SECONDS) and _sign_in_view() and not _boss_bar
-	var wanted: bool = _near or held
+	var behind: bool = front_valid and _front != self and _front.is_board_shown()
+	var wanted: bool = (_near or held) and not behind
 	_alpha = move_toward(_alpha, 1.0 if wanted else 0.0, delta / FADE_SECONDS)
 	_label.modulate.a = _alpha
 	if _alpha <= 0.0 and not wanted:
@@ -185,7 +199,9 @@ func _place_board() -> void:
 	var board: Vector2 = _label.size * Vector2(scale_x, scale_y)
 	var left: float = origin.x - board.x * 0.5
 	left = clampf(left, VIEW_EDGE, maxf(VIEW_EDGE, view.x - VIEW_EDGE - board.x))
-	var top: float = maxf(origin.y + BOARD_BOTTOM_ART * scale_y - board.y, VIEW_TOP_BOSS if _boss_bar else VIEW_TOP)
+	var party: bool = Game.level != null and Game.level.hero_count() > 1
+	var top: float = maxf(origin.y + BOARD_BOTTOM_ART * scale_y - board.y,
+			VIEW_TOP_BOSS if _boss_bar else (VIEW_TOP_PARTY if party else VIEW_TOP))
 	var target: Vector2 = Vector2(roundf((left - origin.x) / scale_x), roundf((top - origin.y) / scale_y))
 	if target != _label.position:
 		_label.position = target

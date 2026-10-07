@@ -1441,15 +1441,22 @@ func _check_arena(data: LevelData, grid: TileGrid, records: Array[Dictionary]) -
 
 
 ## The widest run of cells without a floor between two floor cells of one row (0 when the row has fewer than two).
+## A run that ends at a wall face (a side wall with a side wall above it, e.g. the Totem Ring's totem) is no gap
+## anybody jumps across, so it does not count (DA's report, G1 integration).
 static func _widest_gap(grid: TileGrid, row: int) -> int:
 	var widest: int = 0
 	var last: int = -1
 	for col: int in grid.cols:
 		if TileGrid.is_ground(grid.floor_at(col, row)):
-			if last >= 0:
+			if last >= 0 and not _wall_face(grid, col, row) and not _wall_face(grid, last, row):
 				widest = maxi(widest, col - last - 1)
 			last = col
 	return widest
+
+
+## True when the cell is a side wall with a side wall right above it (a wall face, not a ledge to land on).
+static func _wall_face(grid: TileGrid, col: int, row: int) -> bool:
+	return row > 0 and grid.side_at(col, row) == TileGrid.SIDE_WALL and grid.side_at(col, row - 1) == TileGrid.SIDE_WALL
 
 
 func _is_mechanism(record: Dictionary) -> bool:

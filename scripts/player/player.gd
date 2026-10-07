@@ -1026,7 +1026,12 @@ func _left_the_playfield(level: LevelBase, col: int, row: int) -> bool:
 	# The original limits are one screen (20 x 11 tiles); a larger view keeps "one screen" (ARCHITECTURE 2).
 	var max_rows: int = maxi(Tuning.DEATH_ROWS_FROM_CAMERA, Tuning.to_cell(view.size.y))
 	var max_cols: int = maxi(Tuning.DEATH_COLS_FROM_CAMERA, Tuning.to_cell(view.size.x + Tuning.TILE - 1))
-	if absi(row - cell.y) > max_rows or absi(col - cell.x) > max_cols:
+	# 2.0 co-op: a hero above or below the tribe camera's frame while a partner of the tribe holds the view (a
+	# partner's jump scrolled it up, or he dropped below a partner who stands) is the leash's case (C.13: an egg after
+	# 121 / 73 ticks outside the view, the edge arrow counts down), not an instant down. The pit rule below still takes
+	# a hero who falls out of the map. (G1 integration; the D5 / DB1 / world-B reports.)
+	var out_rows: bool = absi(row - cell.y) > max_rows and not _partner_holds_view(level)
+	if out_rows or absi(col - cell.x) > max_cols:
 		kill(&"off_screen")
 		return true
 	if (level.scroll_flags & Defs.SCROLL_AUTO_DOWN) != 0 and sim_pos.y < view.position.y:
@@ -1035,6 +1040,17 @@ func _left_the_playfield(level: LevelBase, col: int, row: int) -> bool:
 	if sim_pos.y > level.grid.height_px() + Tuning.PIT_DEPTH_PX:
 		kill(&"pit")
 		return true
+	return false
+
+
+## True in a co-op party (not versus) while another hero of the tribe (alive, hatched) is in the level: the tribe
+## camera follows one anchor, so a hero may be out of its rows without having left the playfield.
+func _partner_holds_view(level: LevelBase) -> bool:
+	if Game.mode != Defs.GameMode.COOP or level.hero_count() <= 1:
+		return false
+	for other: PlayerBase in level.heroes:
+		if other != self and other != null and not other.dead and not other.is_down():
+			return true
 	return false
 
 

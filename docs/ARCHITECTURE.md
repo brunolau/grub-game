@@ -1529,7 +1529,10 @@ level intro, world map, tally (GAMEPLAY.md 3.7), game over, Beginner wall, the e
 touch controls, input-glyph switching, localisation-ready strings (`tr()`).
 
 Must provide: `scenes/ui/<screen>.tscn` for the ten screen names, `scenes/ui/hud.tscn`, `pause_menu.tscn`,
-`touch_controls.tscn`. Rules:
+`touch_controls.tscn`. 2.0 (P1.11, ui-A) adds `book_select`, `join` (the Tribe Gathering), `versus_lobby`,
+`versus_scoreboard` and `versus_results`; the title's Play > Solo / Co-op / Versus choice lives inside the title (no
+screen of its own). `versus_rules`, `versus_arena` and `unlocks` follow with P2.8 (Flow's `has_screen` checks skip
+them until then). Rules:
 
 - UI reads state from `Game`, `Levels`, `Save`, `Settings`, `Flow.args` and reacts to `Game.*` / `Events.*`
   signals. It never reaches into the level, the hero or enemies (exception: the documented give-up call).
@@ -1579,7 +1582,11 @@ ints_eq`, `fail`, `expect_errors(n)`, `load_reference()` (PHYSICS_REFERENCE.json
 `run_inputs([[ticks, "KEYS"], ...])`, and for several heroes (2.0) `run_party_inputs([[ticks, "KEYS|KEYS"], ...])
 -> Array[PackedInt32Array]` (one key set per player slot, an empty part = idle; returns the streams played).
 `tests/test_core_level_base.gd` shows how to test entities in a bare `LevelBase` without the world module. Tests
-never write real user data (redirected to `build/test_user`).
+never write real user data (redirected to `build/test_user`). The runner prints the seconds of every file. **Slow
+modules** (PLAN.md 8 V7; `SLOW_FILES` in `tests/run_tests.gd`, at G1 `test_coop_gates.gd`) are skipped by a run
+without a filter, each with a `skip` line, and run with `-- --slow` (`GD_TIMEOUT=900 bash .tools/gd.sh test --slow`)
+or a filter that names them (`bash .tools/gd.sh test coop_gates`): at every gate and before every merge that touches
+co-op files or the solo search.
 
 **Permanent guards of 2.0** (PLAN.md 8 V1, core): `tests/test_core_players.gd` - on a single-player level the
 PlayerSet is the 1.0 hero, `GameInput.get_flags(0) == GameInput.flags` and the free slots read nothing on every

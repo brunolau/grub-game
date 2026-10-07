@@ -29,9 +29,9 @@ key Kp_0
 wait 10
 shot join_two
 hold Shift Kp_Enter
-wait 40
+# Ready = Strike held for 1 s of real time; the panel opens the book select by itself (ui-A's REPLY).
+wait_until flow.current_screen == book_select 600
 release all
-wait_until flow.current_screen == book_select 300
 wait_until flow.busy == false 600
 press ui_accept
 # Flow.choose_book(1) -> the difficulty (Beginner has the focus) -> Flow.start_selected_game -> the map.

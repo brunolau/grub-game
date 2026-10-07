@@ -196,6 +196,8 @@ static func _small_font() -> Font:
 	var small: FontVariation = FontVariation.new()
 	small.base_font = font(Style.BODY)
 	small.spacing_space = SMALL_WORD_SPACING
+	# No ligatures: at the small size the body face's "fi" ligature reads as an "A" ("ButterAngers", ui-A's note).
+	small.opentype_features = {TextServerManager.get_primary_interface().name_to_tag("liga"): 0}
 	_fonts[KEY] = small
 	return small
 

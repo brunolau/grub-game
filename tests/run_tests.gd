@@ -8,6 +8,12 @@ extends SceneTree
 ##   godot --headless --path . -s res://tests/run_tests.gd -- --filter=campaign --only=world_2   (only the test
 ##       methods whose name contains "world_2"; with gd.sh: bash .tools/gd.sh test campaign --only=world_2)
 ##   godot --headless --path . -s res://tests/run_tests.gd -- --user-dir=res://build/test_user_2   (parallel runs)
+##   godot --headless --path . -s res://tests/run_tests.gd -- --slow   (also the slow modules; with gd.sh:
+##       GD_TIMEOUT=900 bash .tools/gd.sh test --slow)
+##
+## Slow modules (docs/expansion/PLAN.md 8 V7: the default run stays under about 5 minutes; a slow module runs at every
+## gate and before every merge that touches its area): SLOW_FILES are left out of a run without a filter - a line
+## names each one - and run with --slow or with a filter that names them (bash .tools/gd.sh test coop_gates).
 ##
 ## Discovers `res://tests/test_*.gd`, runs every `test_*` method of each file (see TestCase) and exits with
 ## code 0 when everything passed, 1 otherwise. Any engine error logged while a test runs fails that test.
@@ -19,6 +25,9 @@ extends SceneTree
 const TEST_DIR: String = "res://tests"
 const TEST_PREFIX: String = "test_"
 const TEST_USER_DIR: String = "res://build/test_user"
+## The slow modules (see the header): the solo-impossibility search of every co-op gate (about 70 s at G1, growing
+## with every co-op file of phase 3).
+const SLOW_FILES: PackedStringArray = ["test_coop_gates.gd"]
 
 
 ## Counts engine errors (push_error, script errors, failed engine checks) while a test runs.
@@ -62,12 +71,15 @@ func _run() -> void:
 	var only: String = str(options.get("only", ""))
 	_redirect_user_data(str(options.get("user-dir", TEST_USER_DIR)))
 	OS.add_logger(_counter)
-	var files: PackedStringArray = _discover(filter)
+	var skipped: PackedStringArray = PackedStringArray()
+	var files: PackedStringArray = _discover(filter, options.has("slow"), skipped)
 	var passed: int = 0
 	var failed: int = 0
 	var failures: PackedStringArray = PackedStringArray()
 	var started: int = Time.get_ticks_msec()
 	print("Running %d test file(s) from %s" % [files.size(), TEST_DIR])
+	for file: String in skipped:
+		print("  skip %s (slow module, PLAN.md 8 V7: run with --slow or a filter naming it)" % file)
 	for file: String in files:
 		var path: String = TEST_DIR + "/" + file
 		var script: GDScript = load(path) as GDScript
@@ -84,6 +96,7 @@ func _run() -> void:
 			continue
 		test.name = file.get_basename()
 		root.add_child(test)
+		var file_started: int = Time.get_ticks_msec()
 		var file_passed: int = 0
 		var file_failed: int = 0
 		for method: Dictionary in script.get_script_method_list():
@@ -112,7 +125,8 @@ func _run() -> void:
 		passed += file_passed
 		failed += file_failed
 		var verdict: String = "ok  " if file_failed == 0 else "FAIL"
-		print("  %s %s (%d passed, %d failed)" % [verdict, file, file_passed, file_failed])
+		print("  %s %s (%d passed, %d failed, %.1f s)" % [verdict, file, file_passed, file_failed,
+				float(Time.get_ticks_msec() - file_started) / 1000.0])
 	OS.remove_logger(_counter)
 	var seconds: float = float(Time.get_ticks_msec() - started) / 1000.0
 	if files.is_empty():
@@ -134,7 +148,7 @@ func _run() -> void:
 	quit(0 if failed == 0 else 1)
 
 
-func _discover(filter: String) -> PackedStringArray:
+func _discover(filter: String, slow: bool, skipped: PackedStringArray) -> PackedStringArray:
 	var result: PackedStringArray = PackedStringArray()
 	var dir: DirAccess = DirAccess.open(TEST_DIR)
 	if dir == null:
@@ -143,7 +157,9 @@ func _discover(filter: String) -> PackedStringArray:
 	names.sort()
 	for file: String in names:
 		if file.begins_with(TEST_PREFIX) and file.get_extension() == "gd" and file != "test_case.gd":
-			if filter.is_empty() or file.contains(filter):
+			if filter.is_empty() and not slow and SLOW_FILES.has(file):
+				skipped.append(file)
+			elif filter.is_empty() or file.contains(filter):
 				result.append(file)
 	return result
 

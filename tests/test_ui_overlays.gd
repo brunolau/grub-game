@@ -3,6 +3,8 @@ extends TestCase
 
 
 func before_each() -> void:
+	# A screen of an earlier test file (versus scoreboard / results) may have left the menu clusters on.
+	GameInput.set_menu_clusters(false)
 	Game.new_game(Defs.Difficulty.BEGINNER)
 	Game.begin_level(&"test_example")
 

@@ -1,0 +1,134 @@
+# G1 vertical slice (docs/expansion/PLAN.md 4.2), versus through the real UI: title -> Play -> Versus -> the lobby
+# (P1 presses Jump on the left keyboard half, P2 on the numpad: DESIGN.md D.11's classic layout, the versus default;
+# two CPU seats stepped to Rookie on their cards; Grub Stack on the Totem Ring, levels/arena_totem_ring.lvl; both
+# humans hold Strike 1 s to be ready; START) -> the rounds (the humans' heroes read the keyboard, the Rookies are
+# core-B's HeroBots on resources/bots/arena_totem_ring.json) -> the scoreboard between rounds -> the results -> the
+# lobby -> the title. Owner: integration.
+#   GD_TIMEOUT=1200 bash .tools/gd.sh play --flow=tools/autoplay/g1_versus.flow --fast --fresh-user --out=g1_versus
+
+# --- Boot, title, Play > Versus ----------------------------------------------------------------------------------
+wait_until flow.current_screen == title 600
+wait_until flow.busy == false 600
+wait 40
+shot title
+press ui_accept
+wait 10
+press ui_down
+press ui_down
+wait 6
+shot play_menu_versus
+press ui_accept
+wait_until flow.current_screen == versus_lobby 300
+wait_until flow.busy == false 600
+wait 10
+shot lobby_empty
+
+# --- Seats: P1 on W A S D (Space joins), P2 on the numpad (Num 0 joins), two Rookie CPUs -------------------------
+key Space
+key Kp_0
+wait 10
+expect game.versus_match.get_seat(0).kind == 1
+expect game.versus_match.get_seat(1).kind == 1
+expect game.versus_match.get_seat(0).input.kind == 2
+expect game.versus_match.get_seat(1).input.kind == 3
+# The focus starts on the mode row; Up = seat card 1, Right twice = the free card 3. Confirm on a free card adds a
+# Hunter, confirm again steps it Chief, then Rookie.
+press ui_up
+press ui_right
+press ui_right
+press ui_accept
+wait 4
+press ui_accept
+wait 4
+press ui_accept
+wait 4
+press ui_right
+press ui_accept
+wait 4
+press ui_accept
+wait 4
+press ui_accept
+wait 10
+expect game.versus_match.player_count() == 4
+expect game.versus_match.is_bot(2) == true
+expect game.versus_match.is_bot(3) == true
+expect game.versus_match.get_seat(2).bot_level == 0
+expect game.versus_match.get_seat(3).bot_level == 0
+# Back along the cards to card 1, down to the mode row (Grub Stack) and the arena row: Right = the Totem Ring.
+press ui_left
+press ui_left
+press ui_left
+press ui_down
+expect game.versus_match.mode == 0
+press ui_down
+press ui_right
+wait 6
+expect game.versus_match.arena == arena_totem_ring
+shot lobby_seated
+
+# --- Ready (Strike held 1 s by both humans), START -----------------------------------------------------------------
+hold Shift Kp_Enter
+wait_until game.versus_match.can_start() == true 600
+release all
+wait 10
+shot lobby_ready
+press ui_down
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == arena_totem_ring 600
+expect game.mode == 2
+expect level.hero_count() == 4
+# The humans' heroes read the keyboard halves, the bots their HeroBot (the flow scripts no slot from here on).
+input device
+wait 2
+shot round_1_intro
+every 480 versus
+wait 200
+shot round_1_go
+# A little play from the two keyboard halves while the Rookies work the spots.
+hold D
+wait 30
+hold Shift
+wait 8
+release Shift
+wait 20
+release D
+hold Kp_4
+wait 30
+hold Kp_Enter
+wait 8
+release Kp_Enter
+wait 20
+release Kp_4
+hold A Space
+wait 20
+release all
+hold Kp_6 Kp_0
+wait 20
+release all
+
+# --- Rounds, scoreboards, results ---------------------------------------------------------------------------------
+wait_until flow.current_screen == versus_scoreboard 6000
+wait 30
+shot scoreboard_round_1
+expect events.round_ended >= 1
+wait_until flow.current_screen == versus_results 30000
+every 0
+wait_until flow.busy == false 600
+wait 90
+shot results
+expect game.versus_match.is_over() == true
+expect events.round_ended >= 3
+# Lobby (Right, confirm), then back to the title.
+press ui_right
+press ui_accept
+wait_until flow.current_screen == versus_lobby 600
+wait_until flow.busy == false 600
+wait 20
+shot lobby_again
+press ui_cancel
+wait_until flow.current_screen == title 600
+wait_until flow.busy == false 600
+wait 20
+shot title_again

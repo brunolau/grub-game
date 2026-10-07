@@ -22,8 +22,11 @@ const NUMLOCK_OFF: Dictionary = {
 	KEY_KP_8: KEY_UP, KEY_KP_4: KEY_LEFT, KEY_KP_5: KEY_CLEAR, KEY_KP_6: KEY_RIGHT, KEY_KP_0: KEY_INSERT,
 	KEY_KP_PERIOD: KEY_DELETE,
 }
-## Arenas the match may use, the G1 slice's first (PLAN.md 4.2: Totem Ring), then world-B's developer arena.
-const ARENAS: Array[StringName] = [&"arena_totem_ring", &"test_world_arena_flat"]
+## Arenas the match may use: world-B's flat developer arena first, because the scripted P1 of these tests never jumps
+## and needs a flat floor with a reachable middle (on the Totem Ring all spot food arcs onto the bridges and the middle
+## is the totem top - DA's measurement, wf7_DA_to_integration.txt). The Totem Ring with the classic keys and two Rookie
+## bots is proven by tests/test_integration_totem_ring.gd.
+const ARENAS: Array[StringName] = [&"test_world_arena_flat", &"arena_totem_ring"]
 const REFEREE: String = "res://scripts/world/versus/referee.gd"
 
 var _held: Dictionary = {}  # physical key -> the press event
@@ -45,6 +48,8 @@ func after_each() -> void:
 		Events.round_ended.disconnect(_on_round_ended)
 	GameInput.clear_scripted()
 	GameInput.reset_slots()
+	# The scoreboard and results screens switch the menu clusters on; later test files expect them off.
+	GameInput.set_menu_clusters(false)
 	Game.versus_match = null
 	Sim.manual = false
 	Sim.stop()

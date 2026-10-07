@@ -39,3 +39,5 @@ f = items/food index=3
 objects/spawn_point 18 10 index=2
 objects/spawn_point 6 4 index=3
 objects/spawn_point 13 4 index=4
+# A way out like every developer level (the validator's no-exit rule); out of the way on the right upper tier.
+objects/exit 17 4
