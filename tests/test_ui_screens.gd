@@ -1,14 +1,34 @@
 extends TestCase
 ## ui module: every screen of Flow instantiates cleanly and can be left by input (ARCHITECTURE.md 8.7 #3).
+## 2.0 (ui-A, PLAN.md P1.11): the title's Play choice, the book select, the difficulty of the prepared run, the co-op
+## join panel (press Jump to join, colour, hold Strike = ready, the keyboard presets, picture and key test), the map of
+## a co-op party. The versus screens: tests/test_ui_versus.gd.
 
 const SCREENS: Array[StringName] = [
 	&"title", &"mode_select", &"code_entry", &"options", &"world_map", &"tally", &"game_over", &"expert_wall",
-	&"the_end", &"credits",
+	&"the_end", &"credits", &"book_select", &"join",
 ]
+
+
+func before_each() -> void:
+	Settings.reset()
+	GameInput.reset_slots()
+	GameInput.set_menu_clusters(false)
+	Flow.play_mode = Defs.GameMode.SINGLE
+	Flow.play_book = 1
 
 
 func after_each() -> void:
 	Flow.args = {}
+	Flow.play_mode = Defs.GameMode.SINGLE
+	Flow.play_book = 1
+	GameInput.set_menu_clusters(false)
+	GameInput.reset_slots()
+	Game.versus_match = null
+	for run: PlayerRun in Game.runs:
+		run.palette = &""
+		run.pattern = -1
+	Settings.reset()
 
 
 func test_every_screen_exists_and_instantiates() -> void:
@@ -27,12 +47,44 @@ func test_every_screen_exists_and_instantiates() -> void:
 		await get_tree().process_frame
 
 
-func test_title_start_opens_mode_select() -> void:
+## Title > Play turns the menu into Solo / Co-op / Versus (Solo focused); "back" returns to the main entries; Solo
+## opens the book select (DESIGN.md A.1). The 1.0 path to the difficulty is Play, Solo, Book I.
+func test_title_play_opens_the_mode_choice() -> void:
 	var node: TitleScreen = await _open(&"title") as TitleScreen
 	_press(&"ui_accept")
-	assert_eq(Flow.current_screen, Flow.SCREEN_MODE_SELECT, "the focused 'start' entry opens the mode select")
-	assert_true(node.leaving)
+	assert_true(node.is_play_menu_open(), "the focused 'Play' entry shows Solo / Co-op / Versus")
+	assert_false(node.leaving)
+	assert_eq(Flow.current_screen, Flow.SCREEN_BOOT, "nothing else happens yet")
+	_press(&"ui_cancel")
+	assert_false(node.is_play_menu_open(), "back returns to the main entries")
+	assert_false(node.leaving)
+	_press(&"ui_accept")
+	_press(&"ui_accept")
+	assert_true(node.leaving, "Solo leaves the title")
+	assert_eq(Flow.play_mode, Defs.GameMode.SINGLE)
+	assert_eq(Flow.current_screen, Flow.SCREEN_BOOK_SELECT, "Solo opens the book select")
 	await _cleanup()
+
+
+func test_title_play_choices_open_coop_and_versus() -> void:
+	var expected: Dictionary = {
+		Defs.GameMode.COOP: Flow.SCREEN_JOIN, Defs.GameMode.VERSUS: Flow.SCREEN_VERSUS_LOBBY,
+	}
+	for mode: int in expected:
+		var node: TitleScreen = await _open(&"title") as TitleScreen
+		node.open_play_menu()
+		node.choose_play(mode)
+		if Flow.busy:
+			await Flow.transition_finished
+		assert_eq(Flow.play_mode, mode)
+		assert_eq(Flow.current_screen, expected[mode], "%s opens %s" % [mode, expected[mode]])
+		assert_true(GameInput.has_menu_clusters(), "both players drive %s from their own keys" % expected[mode])
+		await _cleanup()
+		node.queue_free()
+		GameInput.set_menu_clusters(false)
+		GameInput.reset_slots()
+		Game.versus_match = null
+		await get_tree().process_frame
 
 
 func test_title_attract_loop_starts_and_any_key_stops_it() -> void:
@@ -45,12 +97,256 @@ func test_title_attract_loop_starts_and_any_key_stops_it() -> void:
 	assert_eq(Flow.current_screen, Flow.SCREEN_BOOT)
 
 
-func test_mode_select_back_returns_to_title() -> void:
+func test_mode_select_back_returns_to_the_book_select() -> void:
 	var node: UiScreen = await _open(&"mode_select")
 	_press(&"ui_cancel")
-	assert_eq(Flow.current_screen, Flow.SCREEN_TITLE)
+	assert_eq(Flow.current_screen, Flow.SCREEN_BOOK_SELECT)
 	assert_true(node.leaving)
 	await _cleanup()
+
+
+## The difficulty starts the run the front end prepared (Flow.start_selected_game): a solo Book I run is the 1.0 game,
+## a co-op run takes the joined party.
+func test_mode_select_starts_the_prepared_run() -> void:
+	var node: ModeSelectScreen = await _open(&"mode_select") as ModeSelectScreen
+	assert_true(ModeSelectScreen.subtitle_text().contains(tr("UI_BOOK_1_NAME")), "the line names the book")
+	node.choose(Defs.Difficulty.EXPERT)
+	assert_eq(Game.mode, Defs.GameMode.SINGLE)
+	assert_eq(Game.book, 1)
+	assert_eq(Game.difficulty, Defs.Difficulty.EXPERT)
+	assert_eq(Flow.current_screen, Flow.SCREEN_WORLD_MAP)
+	assert_eq(Flow.args.get("level_id"), Levels.first_level(), "the 1.0 game: Book I's first stop")
+	assert_eq(GameInput.get_slot(0).kind, Defs.InputSlotKind.ALL_DEVICES, "single-player input")
+	await _cleanup()
+	Flow.play_mode = Defs.GameMode.COOP
+	GameInput.assign_slot(0, InputSlot.keyboard(Defs.InputSlotKind.KEYBOARD_LEFT))
+	GameInput.assign_slot(1, InputSlot.keyboard(Defs.InputSlotKind.KEYBOARD_RIGHT))
+	node = await _open(&"mode_select") as ModeSelectScreen
+	assert_true(GameInput.has_menu_clusters(), "co-op: both players drive the cards from their own keys")
+	assert_true(ModeSelectScreen.subtitle_text().begins_with(tr("UI_PLAY_COOP")))
+	node.choose(Defs.Difficulty.BEGINNER)
+	assert_eq(Game.mode, Defs.GameMode.COOP)
+	assert_eq(Game.party, 2)
+	assert_eq(Flow.current_screen, Flow.SCREEN_WORLD_MAP)
+	await _cleanup()
+
+
+## The book select: two slabs (Book I focused first), confirm chooses the book (-> the difficulty), "back" returns
+## to the title in Solo and to the join panel (the party kept) in Co-op.
+func test_book_select_chooses_a_book_and_goes_back() -> void:
+	var node: BookSelectScreen = await _open(&"book_select") as BookSelectScreen
+	assert_not_null(node.get_card(1))
+	assert_not_null(node.get_card(2))
+	assert_true(node.get_card(1).has_focus(), "Book I has the focus")
+	assert_true(BookSelectScreen.is_available(1))
+	assert_eq(BookSelectScreen.party_looks().size(), 1, "Solo: one hero on the pictures")
+	_press(&"ui_right")
+	assert_true(node.get_card(2).has_focus(), "Right: Book II")
+	_press(&"ui_left")
+	_press(&"ui_accept")
+	assert_true(node.leaving)
+	assert_eq(Flow.play_book, 1)
+	assert_eq(Flow.current_screen, Flow.SCREEN_MODE_SELECT, "on to Beginner / Expert")
+	await _cleanup()
+	if BookSelectScreen.is_available(2):
+		node = await _open(&"book_select") as BookSelectScreen
+		node.choose(2)
+		assert_eq(Flow.play_book, 2, "Book II is open from the start")
+		assert_eq(Flow.current_screen, Flow.SCREEN_MODE_SELECT)
+		await _cleanup()
+	node = await _open(&"book_select") as BookSelectScreen
+	_press(&"ui_cancel")
+	assert_eq(Flow.current_screen, Flow.SCREEN_TITLE, "Solo: back to the title")
+	await _cleanup()
+	Flow.play_mode = Defs.GameMode.COOP
+	GameInput.assign_slot(0, InputSlot.keyboard(Defs.InputSlotKind.KEYBOARD_LEFT))
+	GameInput.assign_slot(1, InputSlot.pad(3))
+	Game.runs[1].palette = &"green"
+	node = await _open(&"book_select") as BookSelectScreen
+	var looks: Array[Array] = BookSelectScreen.party_looks()
+	assert_eq(looks.size(), 2, "Co-op: both heroes on the pictures")
+	assert_eq(looks[1][0], &"green", "in their colours")
+	_press(&"ui_cancel")
+	assert_eq(Flow.current_screen, Flow.SCREEN_JOIN, "Co-op: back to the join panel")
+	assert_eq(GameInput.get_slot(1).kind, Defs.InputSlotKind.PAD, "the party stays")
+	await _cleanup()
+
+
+# =================================================================================================================
+# The co-op join panel (DESIGN.md D.11)
+# =================================================================================================================
+
+## "Press Jump on any device": the Jump key of each keyboard half of the classic layout and a pad's Jump take the free
+## seats in order; an input that plays already, a third player and every other key of a free half take nothing.
+func test_join_panel_seats_players_by_their_jump() -> void:
+	var node: JoinScreen = await _open_join()
+	assert_true(GameInput.has_menu_clusters(), "the menu clusters are on")
+	assert_eq(node.get_card(0).state, JoinScreen.SeatCard.State.FREE)
+	assert_eq(node.get_card(0).join_keys, PackedStringArray(["SPACE", "NUM 0"]), "the free halves' Jump keys")
+	_key(KEY_A)
+	_key(KEY_W)
+	assert_eq(Flow.party_size(), 0, "another key of a free half does nothing")
+	assert_eq(GameInput.keyboard_layout(), InputSlot.KeyboardLayout.CLASSIC, "... and does not change the layout")
+	_key(KEY_KP_0)
+	assert_eq(GameInput.get_slot(0).kind, Defs.InputSlotKind.KEYBOARD_RIGHT, "the numpad player came first: P1")
+	assert_eq(node.get_card(0).state, JoinScreen.SeatCard.State.HUMAN)
+	assert_eq(node.get_card(0).device_text, tr("UI_JOIN_NUMPAD"))
+	assert_eq(node.get_card(0).hold_key, "NUM ENTER", "his card names his own Strike key")
+	_key(KEY_KP_0)
+	assert_eq(Flow.party_size(), 1, "one input, one seat")
+	_pad_button(4, JOY_BUTTON_A)
+	assert_eq(GameInput.get_slot(1).kind, Defs.InputSlotKind.PAD, "a pad's Jump takes the second seat")
+	assert_eq(GameInput.get_slot(1).device_id, 4)
+	assert_eq(node.get_card(1).device_text, tr("UI_JOIN_PAD").format({"number": 5}))
+	_key(KEY_SPACE)
+	assert_eq(Flow.party_size(), 2, "co-op is two players")
+	assert_ne(Game.runs[0].palette, Game.runs[1].palette, "two colours")
+	await _cleanup()
+
+
+## Each player changes his own colour (the partner's is skipped) and loincloth with his own keys; holding Strike for a
+## second makes him ready (then only his Look counts), Look takes it back, Look again leaves the seat. When both are
+## ready the panel moves on to the book select.
+func test_join_panel_colour_ready_and_leave() -> void:
+	var node: JoinScreen = await _open_join()
+	_key(KEY_SPACE)
+	_key(KEY_KP_0)
+	assert_eq(Game.runs[0].palette, &"yellow", "P1's default colour")
+	assert_eq(Game.runs[1].palette, &"blue", "P2's default colour")
+	_key(KEY_A)
+	assert_ne(Game.runs[0].palette, &"blue", "Left skips the partner's colour")
+	assert_ne(Game.runs[0].palette, &"yellow", "and changes his")
+	assert_eq(node.get_card(0).colour, Game.runs[0].palette, "his card shows it")
+	var pattern: int = Game.runs[1].pattern
+	_key(KEY_KP_5)
+	assert_ne(Game.runs[1].pattern, pattern, "Down: P2's loincloth")
+	_key(KEY_SHIFT, true)
+	node._process(JoinScreen.READY_SECONDS * 0.5)
+	assert_almost_eq(node.hold_progress(0), 0.5, 0.05, "the hold fills")
+	assert_false(node.is_ready(0))
+	node._process(JoinScreen.READY_SECONDS * 0.6)
+	assert_true(node.is_ready(0), "held for a second: ready")
+	_key(KEY_SHIFT, false)
+	var colour: StringName = Game.runs[0].palette
+	_key(KEY_D)
+	assert_eq(Game.runs[0].palette, colour, "a ready player's colour stays")
+	assert_eq(GameInput.keyboard_layout(), InputSlot.KeyboardLayout.CLASSIC, "... and his keys change no menu row")
+	_key(KEY_Q)
+	assert_false(node.is_ready(0), "Look: not ready")
+	_key(KEY_Q)
+	assert_eq(Flow.party_size(), 1, "Look again: P1 leaves")
+	assert_eq(GameInput.get_slot(0).kind, Defs.InputSlotKind.KEYBOARD_RIGHT, "P2 moved up")
+	_key(KEY_SPACE)
+	assert_eq(Flow.party_size(), 2)
+	node.set_ready(0, true)
+	node.set_ready(1, true)
+	assert_true(node.everybody_ready())
+	node._process(JoinScreen.FINISH_DELAY + 0.05)
+	assert_true(node.leaving, "both ready: on to the book select")
+	assert_eq(Flow.current_screen, Flow.SCREEN_BOOK_SELECT)
+	assert_eq(Flow.play_mode, Defs.GameMode.COOP)
+	await _cleanup()
+
+
+## The shared keyboard: the classic WASD + numpad layout first; the picture lights each player's keys in his colour and
+## the free half in grey; the key list beside it names the keys; another preset changes them at once; the seated
+## player's Swap (or Tab) opens the two-player key test and "back" closes it.
+func test_join_panel_keyboard_presets_picture_and_key_test() -> void:
+	var node: JoinScreen = await _open_join()
+	assert_eq(node.get_layout_row().index, InputSlot.KeyboardLayout.CLASSIC, "classic first")
+	_key(KEY_SPACE)
+	var picture: JoinScreen.KeyboardPicture = node.get_picture()
+	var left: Dictionary = picture.halves[Defs.InputSlotKind.KEYBOARD_LEFT]
+	var right: Dictionary = picture.halves[Defs.InputSlotKind.KEYBOARD_RIGHT]
+	assert_true(bool(left["taken"]), "P1 sits at the left half")
+	assert_false(bool(right["taken"]), "the numpad is free")
+	assert_eq(left["colour"], UiPlayers.PALETTE_COLOURS[&"yellow"][UiPlayers.FILL], "in P1's colour")
+	for code: Key in [KEY_W, KEY_A, KEY_S, KEY_D, KEY_SPACE, KEY_SHIFT, KEY_E, KEY_Q]:
+		assert_true((left["keys"] as Array).has(code), "the left half has %s" % OS.get_keycode_string(code))
+	for code: Key in [KEY_KP_8, KEY_KP_4, KEY_KP_5, KEY_KP_6, KEY_KP_0, KEY_KP_ENTER, KEY_KP_ADD, KEY_KP_PERIOD]:
+		assert_true((right["keys"] as Array).has(code), "the right half has %s" % OS.get_keycode_string(code))
+	assert_eq(picture.half_of(KEY_SHIFT, 1), Defs.InputSlotKind.KEYBOARD_LEFT, "Left Shift is P1's strike")
+	assert_eq(picture.half_of(KEY_SHIFT, 2), Defs.InputSlotKind.NONE, "Right Shift is nobody's")
+	assert_eq(node.get_legend_text(Defs.InputSlotKind.KEYBOARD_LEFT, &"move"), "W A S D")
+	assert_eq(node.get_legend_text(Defs.InputSlotKind.KEYBOARD_RIGHT, &"move"), "NUM 8 4 5 6")
+	assert_eq(node.get_legend_text(Defs.InputSlotKind.KEYBOARD_RIGHT, Defs.ACT_ATTACK), "NUM ENTER")
+	node.get_layout_row().step(1)
+	assert_eq(GameInput.keyboard_layout(), InputSlot.KeyboardLayout.TWO_HANDS, "the preset row sets the layout")
+	right = picture.halves[Defs.InputSlotKind.KEYBOARD_RIGHT]
+	assert_true((right["keys"] as Array).has(KEY_SLASH), "two hands: P2 jumps with /")
+	assert_eq(node.get_legend_text(Defs.InputSlotKind.KEYBOARD_RIGHT, &"move"), "ARROWS")
+	assert_eq(node.get_legend_text(Defs.InputSlotKind.KEYBOARD_LEFT, Defs.ACT_JUMP), "G", "P1's keys follow the preset")
+	node.get_layout_row().set_index(InputSlot.KeyboardLayout.CLASSIC, true)
+	assert_eq(GameInput.keyboard_layout(), InputSlot.KeyboardLayout.CLASSIC)
+	assert_false(node.is_key_test_open())
+	_key(KEY_E)
+	assert_true(node.is_key_test_open(), "P1's Swap opens the key test")
+	assert_not_null(node.get_key_test())
+	_press(&"ui_cancel")
+	assert_false(node.is_key_test_open(), "back closes it")
+	assert_false(node.leaving, "... and stays on the panel")
+	_press(&"ui_focus_next")
+	assert_true(node.is_key_test_open(), "Tab opens it too")
+	_press(&"ui_cancel")
+	_press(&"ui_cancel")
+	assert_true(node.leaving, "back: the title")
+	assert_eq(Flow.current_screen, Flow.SCREEN_TITLE)
+	assert_eq(GameInput.get_slot(0).kind, Defs.InputSlotKind.ALL_DEVICES, "the seats are free again")
+	assert_false(GameInput.has_menu_clusters())
+	await _cleanup()
+
+
+## A phone's player has no Jump to press on a menu: a tap on a free seat takes it with the touch overlay, ready at once
+## (DESIGN.md D.11: one touch player, P2 on a pad).
+func test_join_panel_touch_takes_a_seat() -> void:
+	var node: JoinScreen = await _open_join()
+	var finger: InputEventScreenTouch = InputEventScreenTouch.new()
+	finger.position = node.get_card(0).get_global_rect().get_center()
+	finger.pressed = true
+	get_tree().root.push_input(finger)
+	assert_eq(GameInput.get_slot(0).kind, Defs.InputSlotKind.TOUCH, "the tap took P1's seat")
+	assert_true(node.is_ready(0), "ready at once")
+	get_tree().root.push_input(finger)
+	assert_eq(Flow.party_size(), 1, "a tap on a taken seat takes nothing")
+	_pad_button(1, JOY_BUTTON_A)
+	assert_eq(GameInput.get_slot(1).kind, Defs.InputSlotKind.PAD, "the partner on a pad")
+	await _cleanup()
+
+
+## The classic one-keyboard path of the flows (tools/autoplay/campaign_coop.flow): Space and Num 0 join, Left Shift and
+## Num Enter held together make both ready, and the panel moves on by itself.
+func test_join_panel_two_players_on_the_classic_keys() -> void:
+	var node: JoinScreen = await _open_join()
+	_key(KEY_SPACE)
+	_key(KEY_KP_0)
+	_key(KEY_SHIFT, true)
+	_key(KEY_KP_ENTER, true)
+	var waited: float = 0.0
+	while not node.leaving and waited < 4.0:
+		await get_tree().create_timer(0.1).timeout
+		waited += 0.1
+	_key(KEY_SHIFT, false)
+	_key(KEY_KP_ENTER, false)
+	assert_true(node.leaving, "both held Strike: ready, and the panel moved on (%.1f s)" % waited)
+	assert_true(waited < JoinScreen.READY_SECONDS + JoinScreen.FINISH_DELAY + 1.0, "in about 1.6 s")
+	assert_eq(Flow.current_screen, Flow.SCREEN_BOOK_SELECT)
+	assert_eq(Flow.party_size(), 2)
+	await _cleanup()
+
+
+## A co-op run's map: the party walks the route in its colours (P2 behind P1), the markers come from the run's book;
+## the menu clusters are off (a stray Look must not end the run).
+func test_world_map_of_a_coop_party() -> void:
+	Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.COOP, 2, 1)
+	Game.runs[1].palette = &"pink"
+	Flow.args = {"level_id": Levels.first_level(), "book": 1, "mode": Defs.GameMode.COOP}
+	var node: WorldMapScreen = await _open(&"world_map") as WorldMapScreen
+	assert_eq(node.get_partners().size(), 1, "P2 is on the map")
+	assert_not_null(node.get_partners()[0].material, "in his colour")
+	assert_false(GameInput.has_menu_clusters())
+	assert_eq(node.get_marker_ids(), Levels.get_campaign(Defs.Difficulty.BEGINNER, 1), "Book I's stops")
+	await _cleanup()
+	Game.new_game(Defs.Difficulty.BEGINNER)
 
 
 ## A screen that appears under a resting mouse pointer keeps its keyboard focus: only a pointer that MOVES over an
@@ -369,6 +665,33 @@ func test_credits_are_generated_from_credits_md() -> void:
 		assert_eq(fonts.size(), 2, "both SIL OFL attributions")
 	if by_heading.has("UI_CREDITS_PACKS"):
 		assert_true((by_heading["UI_CREDITS_PACKS"] as Array).size() >= 20, "every source pack")
+
+
+## The join panel of a co-op front end with every seat free.
+func _open_join() -> JoinScreen:
+	Flow.play_mode = Defs.GameMode.COOP
+	Flow.begin_party_setup()
+	return await _open(&"join") as JoinScreen
+
+
+## Press (and release) a physical key as the keyboard sends it; `pressed` true / false sends only that edge.
+func _key(code: Key, pressed: Variant = null) -> void:
+	var states: Array = [true, false] if pressed == null else [bool(pressed)]
+	for state: Variant in states:
+		var event: InputEventKey = InputEventKey.new()
+		event.physical_keycode = code
+		event.keycode = code
+		event.pressed = bool(state)
+		get_tree().root.push_input(event)
+
+
+func _pad_button(device: int, button: JoyButton) -> void:
+	for state: bool in [true, false]:
+		var event: InputEventJoypadButton = InputEventJoypadButton.new()
+		event.device = device
+		event.button_index = button
+		event.pressed = state
+		get_tree().root.push_input(event)
 
 
 ## Instantiate a screen under the test node (not as the current scene) and let it build.

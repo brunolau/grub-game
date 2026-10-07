@@ -1,0 +1,28 @@
+# Club & Grub - level texts of the Book I co-op files of worlds 1-2 and Feast Lands A-B, English. Owner: level
+# designer DB1 (docs/expansion/PLAN.md 6.1). A level sub-catalogue: loaded beside locale/en.po (scripts/ui/ui_kit.gd),
+# never offered as a language. Keys: the `text=` keys of signs and hint zones of levels/w1_*_coop.lvl,
+# levels/w2_*_coop.lvl, levels/bonus_a_coop.lvl and levels/bonus_b_coop.lvl (their names are the Book I names of
+# locale/en.po).
+msgid ""
+msgstr ""
+"Project-Id-Version: Club & Grub\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+# --- w1_l1_coop Vine Bridges (co-op) ---
+msgid "SIGN_COOP_W1_EGG"
+msgstr "Fall or get beaten and you float in an egg! Your partner hatches you with a whack, a bounce or a checkpoint fire."
+
+msgid "SIGN_COOP_W1_HOP"
+msgstr "A tablet with two cavemen: a deed for two! One stands under the ledge, the other jumps on his head holding Jump."
+
+msgid "SIGN_COOP_W1_POT"
+msgstr "Up top? Club the flower pot off the edge - it grows into a springy flower for your partner."
+
+msgid "SIGN_COOP_W1_PLATES"
+msgstr "Stand on a stone plate to hold its door open. Hold one for your partner, then he holds one for you!"
+
+msgid "SIGN_COOP_W1_SHELL"
+msgstr "Shellbacks turn their shell to the nearer caveman. One of you stands in front, the other clubs the back!"

@@ -1,0 +1,29 @@
+# route: level=w5_l1_coop difficulty=expert players=2 ends=exit after=tally expect=hurts:0,eggs:0,wipes:0,x2_gates:3,min_checkpoints:4,min_kills:8
+# The Expert two-stream route of Red Mesa Trail in co-op (designer D5; duo macros written per hero and merged,
+# P1|P2). Club only, no S (belt invariance). Expert differences: the hop ledge is 8 rows (a static Expert block), so
+# P1 hops off P2's head and stays the camera's anchor up top while P2 takes the flower-pot spring (the Expert leash is
+# 73 ticks); a rattler on plateau 2; one more Roller in the climb's bond and a tortoise on the mesa top.
+# The beach, the tortoises, the rattler, checkpoint 1, the arch, the tortoise after it (side by side, P2 behind)
+77:R|R,8:F|F,2:|,6:R|R,8:RU|RU,12:R|R,6:|,10:R|R,6:|,6:R|R,8:F|F,2:|,16:R|R,8:F|F,2:|,60:R|R,12:R|R,8:F|F
+# gate 'hop' (Expert: 8 rows): both onto the rock, P1 hops off P2's head (the upper hero is the camera's anchor),
+# clubs the flower pot down onto the rock, P2 takes the spring up
+14:|R,11:R|R,9:R|RU,1:RU|RU,8:RU|R,1:RU|,30:|
+4:RU|,9:U|,16:RU|,4:|,6:R|L,2:L|,8:F|,20:|,12:|U,20:|RU,23:|
+# checkpoint 2, both over the crevasse (P2 a little later), P1 clubs the plateau tortoise
+26:R|R,10:RU|R,4:RU|RU,10:R|RU,6:F|R,2:F|,10:|
+# gate 'plates' as on Beginner (P1 holds plate A, P2 holds plate B, P1 through the upper tunnel)
+12:R|R,38:|R,2:|,12:U|,10:|,6:RU|,6:U|,30:R|
+# P1 drops off the ledge and clubs the rattler on plateau 2 (Expert)
+16:R|,8:F|
+20:R|,36:R|R,8:F|R,6:|R,8:|,6:|R,4:R|R,14:|R,26:|
+# gate 'gully' as on Beginner (P1 baits, P2 drops in behind each Shellback in turn)
+22:R|R,4:R|RU,10:|RU,20:|R,30:|
+3:R|R,2:R|,14:|,10:|D,16:|,2:|L,8:|F
+# P2 jumps back up through the hatch onto the crust, runs to the second hole and drops in behind the second
+# Shellback; P1 walks up in front of it; P2 clubs its back; the keeper door rises
+4:|,10:R|U,4:|U,6:|,4:|RU,8:|U,2:R|U,6:R|,10:R|R,26:|R,14:|,10:|D,14:|,3:|L,4:|,8:|F,17:|
+# through the keeper door, past checkpoint 4, both up the long slope beside the mesa-top ledge: two Rollers come
+# down one after the other (the Expert one first) and are jumped
+29:R|,71:R|R,1:|R,9:|,5:U|,9:U|U,5:|U,3:|,5:U|,9:U|U,5:|U
+# up onto the mesa top, both jump the third Roller, P2 clubs the last tortoise, both into the exit totem
+26:R|R,2:RU|R,12:RU|RU,2:R|RU,24:R|R,8:R|F,56:R|R,4:|R

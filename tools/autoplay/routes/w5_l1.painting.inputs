@@ -1,0 +1,12 @@
+# route: level=w5_l1 difficulty=beginner ends=none expect=hurts:0,painting:0,secrets:1,weapon_end:spear
+# Featured route of Red Mesa Trail (designer D5): the Cave Painting (index 0) on the spire top, two spear steps up.
+# The Beginner line to checkpoint 1, up onto the ledge for the spear, a high throw into the first bark board, onto
+# its step, onto the spire's base, a high throw into the second board on the tower, onto that step and the tower top.
+# The beach, the first tortoise, the rattler, the second tortoise (as the club route)
+77:R,8:F,2:,6:R,8:RU,12:R,6:,10:R,6:,6:R,8:F,2:,16:R,8:F,2:
+# checkpoint 1, up through the ledge for the spear, a step back from the spire
+20:R,14:RU,2:R,14:
+# high throw into the lower board, onto its step, onto the spire base
+6:UF,12:,2:RU,10:U,10:,5:RU,9:U,10:
+# high throw into the tower's board, onto its step, onto the tower top, the painting
+6:UF,12:,2:RU,12:U,10:,6:RU,10:U,10:,6:R,20:

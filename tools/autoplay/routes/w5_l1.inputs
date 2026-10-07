@@ -1,0 +1,17 @@
+# route: level=w5_l1 difficulty=beginner ends=exit after=tally expect=hurts:0,min_checkpoints:4,min_kills:7,min_score:12000
+# The Beginner club route of Red Mesa Trail (designer D5). It never presses S and never picks up the spear, so the
+# belt-invariance runner sees the same digests whatever special rides on the belt (DESIGN.md C.1).
+# The beach and the first tortoise (the crate opens with the same swing)
+77:R,8:F,2:
+# over the red rock, the rattler on the hill
+6:R,8:RU,12:R,6:,10:R,6:,6:R,8:F,2:
+# the second tortoise, checkpoint 1 under the spear ledge, the arch, the first Roller (jumped as it rolls)
+16:R,8:F,2:,60:R,44:,14:RU,8:R
+# up the mesa steps to checkpoint 2, over the crevasse, the plateau tortoise
+6:R,10:RU,6:R,14:RU,22:R,10:RU,28:R,14:RU,7:R,8:F
+# the lower tunnel, checkpoint 3, the plateau Roller jumped, down the long slope, the plain tortoise
+53:R,24:,14:RU,51:R,8:F
+# into the gully: two tortoises, out under the mesa wall past checkpoint 4
+47:R,8:F,31:R,8:F
+# the long climb: wait for the Roller rolling down, jump it, the second Roller, the last tortoise, the exit totem
+98:R,19:,14:U,4:,16:R,14:RU,24:R,8:F,60:R

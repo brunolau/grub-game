@@ -1,0 +1,265 @@
+# Club & Grub - World 5, stage 1 in co-op: "Red Mesa Trail" (designer D5). The co-op file of levels/w5_l1.lvl
+# (DESIGN.md D.10, LEVEL_DESIGN.md 15.7): the same map with P2's start, a pair of spears at the first checkpoint, signs
+# for the egg and the x2 tablet, and three co-op gates on the main path, each with its tablet and a checkpoint behind:
+#  - 'hop': the mesa steps of the solo file are one cliff 7 rows over the floor (8 on Expert: a static Expert block)
+#    over a two-row rock; one hero stands on the rock, the other Shoulder-Hops off his head, then clubs the flower pot
+#    off the edge - it lands on the rock as a spring, the way up for the partner;
+#  - 'plates': a leapfrog plate door - the mesa's lower tunnel opens while plate A is held, its upper tunnel while
+#    plate B beyond the mesa is held (each plate 8+ tiles from its door);
+#  - 'gully': two Shellbacks keep the gully under the plain (a hall exactly 4 rows high); one hero baits the shield
+#    while the other, dropped in through a hole behind it, clubs its back; the keeper door opens when both are dead.
+# The Rollers of the long climb are one bond; the first Roller, the plateau Roller, the Expert Roller of the plain
+# and the Expert eagle are left out (a bounce for a lone hero at the hop cliff, or a hit on a plate holder or a baiter).
+
+[meta]
+format = 2
+id = w5_l1_coop
+name = "Red Mesa Trail"
+kind = coop
+coop_of = w5_l1
+coop_base_hash = "f24837a3a62a044c40584ca871e01e71f89c0cf208c28a0ba093a634af1edc21"
+book = 2
+world = 5
+stage = 1
+biome = canyon
+terrain_a = canyon/terrain
+terrain_b = canyon/terrain_mesa
+background = canyon
+music = level_canyon
+liquid = water
+bonus_tier = 1
+author = D5
+
+[legend]
+B = objects/bark_board face=l tile=%
+a = objects/hidden_spot kind=small count=3 contents=food:6,food:15,food:9 look=inset tile=#
+b = objects/hidden_spot kind=small count=2 contents=food:30,treasure:2 tile=#
+d = objects/hidden_spot kind=big hits=3 contents=giant:1 look=block tile=%
+e = objects/hidden_spot kind=small count=3 contents=food:41,food:19,treasure:5 tile=%
+f = objects/hidden_spot kind=small count=2 contents=food:12,food:27 tile=#
+g = objects/hidden_spot kind=small count=3 contents=food:22,food:35,food:8 look=inset tile=#
+
+[tiles]
+..|.........................................................................................................%%%%%%%%.......................................................%%%%%%%%......................................%%%
+..|.........................................................................................................%%%%%%%%.......................................................%%%%%%%%......................................%%%
+..|.........................................................................................................%%%%%%%%.......................................................%%%%%%%%......................................%%%
+..|.........................................................................................................%%%%%%%%.......................................................%%%%%%%%......................................%%%
+..|.........................................................................................................%%%%%%%%.......................................................%%%%%%%%......................................%%%
+..|.........................................................................................................%%%%e%%%.......................................................%%%%%%%%......................................%%%
+..|...............................................................%%%.......................................%..............................................................%%%%%%%%......................................%%%
+..|...............................................................%%%.......................................%..............................................................%%%%%%%%......................................%%%
+..|...............................................................%%%.......................................%%%%%%%%%%%....................................................%%%%%%%%................%%%...................%%%
+..|...............................................................B%%.......................................%%%%%%%%%%%....................................................%%%%%%%%................%%%...................%%%
+..|...............................................................%%%....................................===.......%.......................................................%%%%%%%%......................................%%%
+..|.............................................................%%%%%..............................................%.......................................................%%%%%%%%......................................%%%
+..|.............................................................%%%%%.................%%%%%%d%%%%%%...%%%%%%%%%%%%%%%%%%%b%%%%%%34.........................................%%%%%%%%.....................12#######g##########
+..|.............................................................%%%%%.................%%%%%%%%%%%%%...%%%%%%%%%%%%%%%%%%%%%%%%%%##34.......................................%%%%%%%%........%%%%.......12####################
+..|.............................................................B%%%%.................%%%%%%%%%%%%%...%%%%%%%%%%%%%%%%%%%%%%%%%%####34.....................................%%%%%%%%........%%%%.....12######################
+..|.............................................................%%%%%.................%%%%%%%%%%%%%...%%%%%%%%%%%%%%%%%%%%%%%%%%######34...................................%%%%%%%%...............12########################
+..|........................................................-----%%%%%.................%%%%%%%%%%%%%...%%%%%%%%%%%%%%%%%%%%%%%%%%################f#####..#######..#######..#%%%%%%%%.............12##########################
+..|..................................%%............................................%%%%%%%%%%%%%%%%...%%%%%%%%%%%%%%%%%%%%%%%%%%######################..#######..#######..#%%%%%%%%...........12############################
+..|..................................%%......./##\.................................%%%%%%%%%%%%%%%%...%%%%%%%%%%%%%%%%%%%%%%%%%%######################.....................%................12##############################
+..|.....................12###############a#########################################%%%%%%%%%%%%%%%%...%%%%%%%%%%%%%%%%%%%%%%%%%%######################.........__.......__.%..............12################################
+..|...................12###########################################################%%%%%%%%%%%%%%%%...%%%%%%%%%%%%%%%%%%%%%%%%%%######################.....................%............12##################################
+..|......@..........12#############################################################%%%%%%%%%%%%%%%%...%%%%%%%%%%%%%%%%%%%%%%%%%%######################.....................%..........12####################################
+~~#################################################################################%%%%%%%%%%%%%%%%...%%%%%%%%%%%%%%%%%%%%%%%%%%############################################################################################
+~~#################################################################################%%%%%%%%%%%%%%%%...%%%%%%%%%%%%%%%%%%%%%%%%%%############################################################################################
+###################################################################################%%%%%%%%%%%%%%%%...%%%%%%%%%%%%%%%%%%%%%%%%%%############################################################################################
+###################################################################################%%%%%%%%%%%%%%%%...%%%%%%%%%%%%%%%%%%%%%%%%%%############################################################################################
+###################################################################################%%%%%%%%%%%%%%%%...%%%%%%%%%%%%%%%%%%%%%%%%%%############################################################################################
+###################################################################################%%%%%%%%%%%%%%%%...%%%%%%%%%%%%%%%%%%%%%%%%%%############################################################################################
+###################################################################################%%%%%%%%%%%%%%%%...%%%%%%%%%%%%%%%%%%%%%%%%%%############################################################################################
+###################################################################################%%%%%%%%%%%%%%%%...%%%%%%%%%%%%%%%%%%%%%%%%%%############################################################################################
+
+[entities]
+props/canyon/raft_beached 4 21
+props/canyon/shell_conch 7 21
+props/canyon/driftwood 13 21 layer=back
+props/canyon/shell_snail 15 21
+props/canyon/grass_dry 19 21
+props/canyon/cactus_tall 23 19 layer=back
+objects/sign 11 21 text=SIGN_W5_BELT
+objects/hidden_spot 17 21 kind=small count=2 contents=food:3,food:10 prop=canyon/driftwood_log
+items/food 14 19 index=1
+items/food 15 18 index=2
+items/food 16 19 index=4
+items/food 21 18 index=5
+items/food 23 17 index=7
+items/food 25 16 index=11
+props/canyon/cactus_small 28 18 layer=back
+props/canyon/dry_bush 33 18 layer=back
+props/canyon/rock_red_a 40 18 layer=back
+props/canyon/skull_cow 44 18
+props/canyon/burrow_b 48 17 layer=back
+props/canyon/cactus_tall 51 18 layer=back
+props/canyon/grass_dry_b 55 18
+enemies/walker 31 18 skin=turtle left=-2 right=3 hp=10
+objects/container 35 18 skin=crate contents=food:13,food:14,food:16
+items/food 37 15 index=17
+items/food 38 15 index=18
+objects/hidden_spot 43 18 kind=big hits=3 contents=giant:0 prop=canyon/rock_big
+enemies/snapper 48 17 skin=snake range=30 hp=10
+items/food 50 15 index=20
+items/food 51 15 index=21
+items/food 52 15 index=23
+enemies/walker 54 18 skin=turtle left=-3 right=1 hp=10
+objects/sign 56 18 text=SIGN_W5_SPEAR
+objects/checkpoint 58 18
+items/weapon 60 15 kind=spear
+props/canyon/palisade 60 15 layer=back
+props/canyon/palisade 63 18 layer=back
+items/painting 67 5 index=0
+zones/secret 67 4 name=spire_top rect=66,3,3,3
+props/canyon/palisade 64 10 layer=back
+props/canyon/cactus_short 73 18 layer=back
+props/canyon/tumbleweed 72 18 layer=back
+props/canyon/rocks_small 80 18 layer=back
+items/food 70 15 index=25
+items/food 71 14 index=26
+items/food 72 15 index=28
+items/food 84 16 index=29
+objects/checkpoint 95 11
+props/canyon/dead_tree 90 11 layer=back
+props/canyon/cactus_small 104 11 layer=back
+props/canyon/skull_buried 97 11
+enemies/walker 104 11 skin=turtle left=-1 right=1 hp=10
+enemies/snapper 125 11 skin=snake range=30 hp=10 expert
+items/food 99 9 index=31
+items/food 100 8 index=32
+items/food 101 9 index=33
+items/heart 106 9
+zones/secret 112 6 name=upper_tunnel rect=108,6,8,2
+items/food 110 7 index=34
+items/food 113 7 index=36
+items/treasure 117 7 index=6
+props/canyon/rock_arch_big 116 11 layer=back
+objects/checkpoint 120 11
+props/canyon/cactus_tall 119 11 layer=back
+props/canyon/signpost 125 11 layer=back
+enemies/walker 142 15 skin=turtle left=-2 right=2 hp=10
+items/food 131 10 index=37
+items/food 135 12 index=38
+props/canyon/dry_bush 140 15 layer=back
+props/canyon/boulders 147 15 layer=back
+items/food 141 13 index=39
+items/food 142 13 index=40
+enemies/shellback 155 21 keeper=gully left=-1 right=1 speed=0 hp=10
+enemies/shellback 164 21 keeper=gully left=-1 right=1 speed=0 hp=10
+items/food 153 20 index=42
+items/food 162 20 index=43
+items/food 172 20 index=44
+items/treasure 175 21 index=3
+props/canyon/jar_a 157 15 layer=back
+props/canyon/cave_mouth 175 21 layer=back
+objects/checkpoint 180 21
+objects/sign 71 18 text=SIGN_W5_ROLLER
+enemies/roller 203 11 left=-1 right=1 range=10 coop=bond bond=climb
+enemies/roller 207 11 left=-1 right=1 range=7 coop=bond bond=climb
+enemies/roller 195 14 left=-1 right=1 expert coop=bond bond=climb
+enemies/walker 205 11 skin=turtle left=-2 right=2 hp=10 expert
+zones/secret 188 11 name=mesa_top rect=187,11,4,2
+zones/secret 196 6 name=high_mesa rect=195,6,3,2
+items/treasure 188 12 index=8
+items/food 189 12 index=45
+items/feast_piece 196 7 index=0
+items/treasure 197 7 index=9
+props/canyon/cactus_tall 185 20 layer=back
+props/canyon/dry_bush 199 14 layer=back
+enemies/walker 212 11 skin=turtle left=-2 right=2 hp=10
+props/canyon/dead_tree_big 206 11 layer=back
+props/canyon/palisade 216 11 layer=back
+objects/exit 215 11
+items/food 210 9 index=46
+items/food 211 9 index=47
+props/canyon/driftwood_log 6 21 layer=back flip
+props/canyon/pebbles 10 21
+props/canyon/bone_small 18 21
+props/canyon/grass_dry_b 21 20
+props/canyon/rocks_small 27 18
+props/canyon/grass_dry 30 18
+props/canyon/cactus_short 36 18 layer=back
+props/canyon/pebble_small 39 18
+props/canyon/mound_sand 42 18
+props/canyon/grass_dry 45 18
+props/canyon/dry_bush 50 18 layer=back
+props/canyon/rock_red_b 53 18 layer=back
+props/canyon/grass_dry_b 57 18
+props/canyon/jar_b 59 18 layer=back
+props/canyon/jar_a 62 15 layer=back
+props/canyon/skull_cow 65 10
+props/canyon/bone_small 68 5
+props/canyon/grass_dry 66 5
+props/canyon/rock_red_a 75 18 layer=back
+props/canyon/grass_dry_b 78 18
+props/canyon/cactus_small 81 18 layer=back
+props/canyon/rocks_small 84 16
+props/canyon/grass_dry 89 11
+props/canyon/pebbles 93 11
+props/canyon/rock_red_b 102 11 layer=back
+props/canyon/boulders 104 11 layer=back
+props/canyon/bone_small 117 7
+props/canyon/grass_dry_b 121 11
+props/canyon/rocks_small 126 11
+props/canyon/cactus_small 131 13 layer=back
+props/canyon/grass_dry 137 15
+props/canyon/rock_red_a 143 15 layer=back
+props/canyon/tumbleweed 148 15 layer=back
+props/canyon/skull_buried 154 15
+props/canyon/grass_dry_b 163 15
+props/canyon/dry_bush 166 15 layer=back
+props/canyon/pebbles 153 21
+props/canyon/bone_small 161 21
+props/canyon/skull_cow 167 21
+props/canyon/rocks_small 170 21
+props/canyon/grass_dry 180 21
+props/canyon/rock_red_b 183 21 layer=back
+props/canyon/grass_dry_b 188 12
+props/canyon/pebble_small 196 7
+props/canyon/cactus_tall 199 13 layer=back
+props/canyon/skull_cow 203 11
+props/canyon/rocks_small 209 11
+props/canyon/cactus_short 213 11 layer=back
+props/canyon/grass_dry 211 11
+items/food 30 15 index=0
+items/food 74 16 index=9
+items/food 75 15 index=10
+items/food 76 16 index=12
+items/food 91 9 index=14
+items/food 94 8 index=15
+items/food 125 8 index=19
+items/food 127 9 index=22
+items/food 166 20 index=24
+items/food 169 20 index=27
+items/food 184 18 index=30
+items/food 191 15 index=35
+items/feast_piece 114 7 index=1
+items/feast_piece 189 12 index=2
+# --- co-op (w5_l1_coop): P2's start, signs, paired spears
+objects/hero_start 7.5 21 slot=2
+objects/sign 52 18 text=SIGN_W5_COOP_EGG
+objects/sign 60 18 text=SIGN_W5_COOP_TABLET
+items/weapon 62 15 kind=spear
+enemies/walker 75 18 skin=turtle left=-2 right=2 hp=10
+# --- gate 1 'hop': the boost ledge (7 rows over the floor, 8 on Expert) and its flower pot
+objects/x2_tablet 80 18 gate=hop far=90,11
+objects/sign 78 18 text=SIGN_W5_COOP_HOP
+objects/column 86 11 size=3,1 rise=0 expert
+objects/flower_pot 86 11 beginner
+objects/flower_pot 86 10 expert
+# --- gate 2 'plates': the leapfrog plate doors of the mesa
+objects/x2_tablet 103 11 gate=plates far=122,11
+objects/sign 102 11 text=SIGN_W5_COOP_PLATES
+objects/plate 106 11 name=plate_a
+objects/column 115 11 size=1,2 rise=2 rise_while=plate_a
+objects/plate 117 11 name=plate_b
+objects/column 108 7 size=1,2 rise=2 rise_while=plate_b
+# --- gate 3 'gully': the keeper gully of two Shellbacks and its door
+objects/x2_tablet 170 21 gate=gully far=174,21
+objects/sign 145 15 text=SIGN_W5_COOP_GULLY
+objects/column 171 21 size=1,4 rise=4 trigger=keepers:gully
+
+[backwall]
+64 17 5 2 set=b deco=10
+108 6 8 2 set=b deco=20
+108 10 8 2 set=b deco=20
+150 18 29 4 set=b deco=15

@@ -3,12 +3,17 @@ extends UiScreen
 ## BEGINNER / EXPERT choice before a new run (GAMEPLAY.md 1.3, 11.1 step 5). Always starts at the first level.
 ##
 ## Left / Right (or Up / Down) move between the two cards, the confirm button or a tap starts the run with
-## `Flow.start_new_game(difficulty)`; "back" returns to the title. The card of the mode played last is preselected.
+## `Flow.start_selected_game(difficulty)`; "back" returns to the book select (to the title without one). The card of
+## the mode played last is preselected.
+## 2.0 (PLAN.md P1.11): the run is the one the front end prepared (Flow.play_mode, Flow.play_book): a solo Book I run
+## is exactly Flow.start_new_game; a line under the heading names the choice ("Co-op - Book II: The Far Shore"). In
+## co-op both players drive the cards from their own key cluster (GameInput menu clusters).
 
 const HERO_CELL: Vector2i = Vector2i(176, 112)
 const PORTRAIT: Rect2 = Rect2(52.0, 30.0, 72.0, 68.0)   ## the hero inside his 176 x 112 cell
 
 var _cards: Array[UiCard] = []
+var _subtitle: Label = null
 
 
 func _build_screen() -> void:
@@ -24,6 +29,10 @@ func _build_screen() -> void:
 	column.add_theme_constant_override(&"separation", 6)
 	safe.add_child(column)
 	column.add_child(UiKit.label("UI_MODE_HEADING", UiKit.Style.TITLE, HORIZONTAL_ALIGNMENT_CENTER))
+	_subtitle = UiKit.label(subtitle_text(), UiKit.Style.HUD, HORIZONTAL_ALIGNMENT_CENTER)
+	_subtitle.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+	_subtitle.add_theme_color_override(&"font_color", UiKit.COL_CREAM)
+	column.add_child(_subtitle)
 
 	var middle: CenterContainer = CenterContainer.new()
 	middle.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -50,25 +59,39 @@ func _build_screen() -> void:
 
 
 func _screen_ready() -> void:
-	Audio.play_music(Sfx.MUSIC_MENU)
+	Audio.play_music(Sfx.MUSIC_COOP_MENU if Flow.play_mode == Defs.GameMode.COOP else Sfx.MUSIC_MENU)
+	GameInput.set_menu_clusters(Flow.play_mode == Defs.GameMode.COOP)
 	var last: int = clampi(Settings.get_int("game/last_difficulty"), 0, _cards.size() - 1)
 	UiKit.focus_silently(_cards[last])
 
 
+## The line under the heading: the mode and the book the run will be ("Solo - Book I: The First Feast").
+static func subtitle_text() -> String:
+	var mode_key: String = "UI_PLAY_COOP" if Flow.play_mode == Defs.GameMode.COOP else "UI_PLAY_SOLO"
+	var book: int = clampi(Flow.play_book, 1, BookSelectScreen.BOOKS.size())
+	var entry: Array = BookSelectScreen.BOOKS[book - 1]
+	return "%s - %s: %s" % [TranslationServer.translate(mode_key), TranslationServer.translate(str(entry[0])),
+			TranslationServer.translate(str(entry[1]))]
+
+
 func _on_cancel() -> void:
-	if is_accepting_input():
-		Audio.play_sfx(Sfx.MENU_BACK)
-		go_to(Flow.SCREEN_TITLE)
+	if not is_accepting_input():
+		return
+	Audio.play_sfx(Sfx.MENU_BACK)
+	if Flow.has_screen(Flow.SCREEN_BOOK_SELECT):
+		go_to(Flow.SCREEN_BOOK_SELECT)
+	elif begin_leave():
+		Flow.goto_title()
 
 
 func _on_tap() -> void:
 	pass
 
 
-## Start a new run in `difficulty` (Defs.Difficulty).
+## Start a new run in `difficulty` (Defs.Difficulty): the run the front end prepared (Flow.start_selected_game).
 func choose(difficulty: int) -> void:
 	if begin_leave():
-		Flow.start_new_game(difficulty)
+		Flow.start_selected_game(difficulty)
 
 
 func _add_card(row: HBoxContainer, sheet: String, caption: String, info: String, difficulty: int) -> void:

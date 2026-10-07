@@ -1,0 +1,355 @@
+# Club & Grub - World 1, stage 1 co-op: "Vine Bridges" for two (designer DB1; docs/expansion/DESIGN.md D.9).
+# The co-op file of levels/w1_l1.lvl (kind = coop, coop_of, coop_base_hash; never edit the solo file). The first co-op
+# stage teaches the duo verbs gently: the egg and the x2 tablet by signs at the first checkpoint; gate 1 "hop" - the
+# springy flower became a ledge 7 rows high (Expert 8) at the lake shore: a Shoulder Hop gets one hero up, and he clubs
+# the flower pot off the ledge as a spring for his partner (the gift); gate 2 "plates" - a leapfrog of two plate doors
+# through the Great Tree on the canopy road (A holds for B in the lower corridor, B holds for A in the upper one); two
+# Shellback turtles guard the tree house; the x2 secret is the High Cache over the far treetop (a Totem rider's jump
+# strike, painting 20). Bats and hoppers are loners (Expert).
+
+[meta]
+format = 2
+id = w1_l1_coop
+name = "Vine Bridges"
+kind = coop
+coop_of = w1_l1
+coop_base_hash = "fa9e4c3774a3522d64fc7a15dc69ad88753ed44f30abcd6e7f312274d50ba421"
+book = 1
+world = 1
+stage = 1
+biome = jungle
+terrain_a = jungle/terrain_grass
+terrain_b = jungle/terrain
+background = jungle
+music = level_jungle
+liquid = water
+bonus_tier = 0
+author = DB1
+notes = "Co-op 1-1: Shoulder Hop ledge + flower pot gift, leapfrog plate doors in the Great Tree, Shellbacks at the tree house, High Cache (painting 20)."
+
+[legend]
+v = items/treasure index=13
+O = enemies/hopper skin=mini_rex range=4 hp=10 beginner
+a = objects/hidden_spot kind=small count=3 contents=food:3,food:0,food:4 look=inset tile=#
+b = objects/hidden_spot kind=small count=3 contents=food:1,food:2,food:7 prop=jungle/bush_big
+c = objects/hidden_spot kind=small count=2 contents=food:12,treasure:0 tile=#
+d = objects/hidden_spot kind=small count=2 contents=food:20,food:21 tile=#
+e = objects/hidden_spot kind=big hits=3 contents=giant:3 tile=#
+n = objects/hidden_spot kind=big hits=3 contents=giant:1 tile=#
+l = objects/hidden_spot kind=small count=2 contents=code_stone:0,food:27 prop=jungle/mound_leafy
+r = objects/hidden_spot kind=small count=2 contents=food:9,treasure:1 prop=jungle/rock_grass
+s = objects/hidden_spot kind=small count=2 contents=food:24,food:26 prop=jungle/rock_grass
+t = objects/hidden_spot kind=small count=3 contents=food:10,food:11,code_stone:2 prop=jungle/tree_trunk_small
+q = objects/hidden_spot kind=small count=2 contents=code_stone:1,food:31 tile=#
+o = objects/hidden_spot kind=small count=2 contents=food:33,food:35 tile=#
+w = objects/breakable_block hits=2 contents=food:8,food:13 tile=;
+K = objects/container skin=crate contents=food:5,food:14,food:22
+L = objects/container skin=barrel contents=heart,food:30,code_stone:3
+C = objects/checkpoint
+D = objects/checkpoint
+E = objects/exit
+f = items/food index=3
+g = items/food index=0
+h = items/food index=2
+i = items/food index=47
+j = items/food index=26
+k = items/food index=28
+m = items/treasure index=4
+M = items/treasure index=9
+p = items/one_up
+H = items/heart
+G = items/letter index=0
+R = items/letter index=1
+u = items/letter index=2
+B = items/letter index=3
+S = items/letter index=4
+T = enemies/walker skin=turtle left=-1 right=2 hp=10
+U = enemies/walker skin=turtle left=-2 right=2 hp=10
+V = enemies/walker skin=turtle left=-2 right=2 hp=10
+X = enemies/walker skin=turtle left=-2 right=1 hp=10
+Y = enemies/hopper skin=mini_rex range=5 hp=10 coop=lone
+A = enemies/flyer skin=bat left=-5 right=2 hp=10 coop=lone
+F = enemies/flyer skin=bat left=-3 right=3 hp=10 coop=lone
+Z = enemies/snapper skin=plant range=30 hp=10 beginner
+Q = objects/hidden_spot kind=small count=3 contents=food:29,treasure:10,food:40 prop=jungle/foliage_clump
+
+[tiles]
+...........................................................................................................................................................................................................%%%%%%%%%%...........................
+...........................................................................................................................................................................................................%%%%%%%%%%...........................
+...........................................................................................................................................................................................................%%%%%%%%%%...........................
+...........................................................................................................................................................................................................%%%%%%%%%%...........................
+...........................................................................................................................................................................................................%%%%%%%%%%...........................
+...........................................................................................................................................................................................................%%%%%%%%%%...........................
+...........................................................................................................................................................................................................%%%%%%%%%%...........................
+...........................................................................................................................................................................................................%%%%%%%%%%...........................
+...........................................................................................................................................................................................................%%%%%%%%%%...........................
+...........................................................................................................................................................................................................%%%%%%%%%%...........................
+...........................................................................................................................................................................................................%%%%%%%%%%...........................
+...........................................................................................................................................................................................................%%%%%%%%%%...........................
+..................................................................................................................................................................................................................%.........................%%%%
+..................................................................................................................................................................................................................%.........................%%%%
+...........................................................................................................................................................................................................%%%%%%%%%%.......................%%%%
+...........................................................................................................................................................................................................%%%%%%%%%%.......................%%%%
+....................................................................................................................................................................................v.......................%........===....................%%%%
+...............................................................................................................................................................................%%%%%%%%....kk...............%.................O.............%%%%
+.............................................................................................................................................................E............jj...%%%%%%%%...------%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%...=======%%%%
+............................................................................................................................................................%%%%%%%%%%%%%%%%%...................%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%..........%%%%
+............................................................................................................................................................%%%%%%%%%%%%%%%%%..............................%%%%%%%%%%...............i.......%%%%
+...........................................................................................................................................................................................................%%%%%%%%%%..............======...%%%%
+............................................................................................................................................................................................................................................%%%%
+.........................................................................................................................................................................................................................................g..%%%%
+................................................................................................................................p.u..M.......Q.........................................................................................=====%%%%
+.......................................................................................................................m..jj...--------.....................................................................................................%%%%
+..............................................................................................................kkk....--------..............kkk......................................................................................h.......%%%%
+............................................................................................................-------......................-------.....j.............................................................................======...%%%%
+.....................................................................................................jj...........................................-------...................................................................................%%%%
+.G.l...............................................................................................-------...................................................jj..........................................................................g..%%%%
+####===....................................................................................j..........................A....................................---------...................................................................=====%%%%
+####......................................R...............................................####n###...................gg.................................................................gg..Z...............................................%%%%
+####....f.............................h.h...h.h...........................................########........###----..-------....hh...............iii..................................../###########...........................S......h.......%%%%
+####...====...............................................................................########........###...............-------.....s....-------....hh..........gg.............../############.................................======...%%%%
+####......................................................................................########........###........................######...........-------.......---............./#############...................F......................%%%%
+####.......f..............................................................................########........###........................######...................#####................/###.........##.......................................f..%%%%
+####.......===...........g.g.....................................................iii......########........###........................######...................#####....####......./####.........##.....................................=====%%%%
+####....................c####...................................................------.......w............###........................######...................#####....####....../#####.........ww..........................................%%%%
+####.@.............b....c####...T....................r.........Y...........K.................w.....C..###.###........................######...................#####....####..D../######..B...H..ww..t.....Y....Y...............T.L..........%%%%
+###############a####################..............#######e########------#######........##################.###........................######...................#####....###################qqq#####################--------############oooo######
+####################################...U...V...X..################~~~~~~#######~~~~~~~~######################~~~~~~~~~~~~~~~~~~~~~~~~######~~~~~~~~~~~~~~~~~~~#####~~~~###########################################~~~~~~~~######################
+#########################################ddd######################~~~~~~#######~~~~~~~~######################~~~~~~~~~~~~~~~~~~~~~~~~######~~~~~~~~~~~~~~~~~~~#####~~~~###########################################~~~~~~~~######################
+##################################################################~~~~~~#######~~~~~~~~######################~~~~~~~~~~~~~~~~~~~~~~~~######~~~~~~~~~~~~~~~~~~~#####~~~~###########################################~~~~~~~~######################
+################################################################################################################################################################################################################################################
+
+[entities]
+objects/sign 13 38 text=SIGN_W1_CLUB
+objects/sign 34 38 text=SIGN_W1_BOUNCE
+zones/secret 2 29 name=cliff_top rect=0,26,7,4
+zones/secret 130 24 name=high_road rect=113,18,34,9
+zones/secret 187 37 name=hollow_hill rect=183,35,9,4
+# Expert: more and tougher enemies
+enemies/walker 37 40 skin=turtle_b left=-1 right=3 hp=10 expert
+enemies/hopper 77 38 skin=mini_rex_b range=6 hp=25 expert
+enemies/flyer 126 30 skin=bat_b left=-5 right=3 hp=10 expert coop=lone
+enemies/flyer 150 31 skin=bat_b left=-6 right=2 hp=10 expert coop=lone
+enemies/flyer 132 22 skin=bat_b left=-4 right=4 hp=10 expert
+enemies/hopper 204 38 skin=mini_rex_b range=5 hp=25 expert
+enemies/walker 226 38 skin=turtle_b left=-2 right=2 hp=25 expert
+enemies/snapper 188 31 skin=plant_b hp=25 expert
+enemies/hopper 222 17 skin=mini_rex_b range=4 hp=25 expert
+props/jungle/bush_big 1.5 29
+props/jungle/vine_a 2 30
+props/jungle/vine_b 5 31
+props/jungle/vine_a 9 34
+props/jungle/vine_a 12 37
+props/jungle/grass_a 9 38
+props/jungle/flower 15 38
+props/jungle/tree_trunk 30 38
+props/jungle/tree_canopy_light 30 36.75
+props/jungle/sprouts 26 36
+props/jungle/grass_b 28 36
+props/jungle/bush_light 22.5 38
+props/jungle/grass_a 34 38 layer=front
+props/jungle/bush_dark 37 40
+props/jungle/fern 45 40
+props/jungle/sprouts 42 40
+props/jungle/foliage_clump 49 40 layer=front
+props/jungle/tree_trunk 51 38
+props/jungle/tree_canopy_dark 51 36.75
+props/jungle/flower 57 38
+props/jungle/grass_strip_light 59.5 38
+props/jungle/bush_light 60.5 38
+props/jungle/vine_a 67 40
+props/jungle/vine_b 70 40
+props/jungle/grass_a 73 38
+props/jungle/fern 77 38
+props/jungle/vine_b 82 38
+props/jungle/vine_a 84 38
+props/jungle/rock_big 88.5 38
+props/jungle/tree_trunk 95 30
+props/jungle/tree_canopy_dark 95 28.75
+props/jungle/bush_dark 97 30
+props/jungle/skull_big 91.5 30
+props/jungle/moss_fringe 96 32
+props/jungle/vine_a 91 32
+props/jungle/fern 104 38
+props/jungle/grass_b 106 38
+props/jungle/grass_a 172 38
+props/jungle/fern 179 35
+props/jungle/tree_trunk 185 31
+props/jungle/tree_canopy_light 185 29.75
+props/jungle/bush_dark 191 31
+props/jungle/sprouts 193 31
+props/jungle/moss_fringe 187 35
+props/jungle/vine_a 184 35
+props/jungle/vine_a 190 35
+props/jungle/egg_nest_broken 187 38
+props/jungle/flower 198 38
+props/jungle/grass_strip_dark 202.5 38
+props/jungle/tree_trunk 207 38
+props/jungle/tree_canopy_dark 207 36.75
+props/jungle/vine_b 211 40
+props/jungle/vine_a 216 40
+props/jungle/fern 219 38
+props/jungle/tree_trunk 221 38
+props/jungle/tree_canopy_light 221 36.75
+props/jungle/bush_light 226 38
+props/jungle/skull_big 231.5 38
+props/jungle/grass_a 233 38
+props/jungle/vine_b 104 34
+props/jungle/vine_a 109 34
+props/jungle/vine_b 117 33
+props/jungle/vine_a 120 33
+props/jungle/vine_b 126 34
+props/jungle/vine_a 129 34
+props/jungle/vine_b 142 34
+props/jungle/vine_b 146 34
+props/jungle/vine_a 152 35
+props/jungle/vine_b 155 35
+props/jungle/vine_a 165 35
+props/jungle/vine_a 101 30
+props/jungle/vine_a 111 28
+props/jungle/vine_a 121 27
+props/jungle/vine_a 131 26
+props/jungle/vine_a 140 28
+props/jungle/vine_a 149 29
+props/jungle/vine_a 159 31
+props/jungle/tree_trunk 135 33
+props/jungle/tree_canopy_light 135 31.75
+props/jungle/fern 133.5 33
+props/jungle/grass_a 138 33
+props/jungle/tree_trunk 159.5 34
+props/jungle/tree_canopy_dark 159.5 32.75
+props/jungle/vine_branch 113 26
+props/jungle/leaf 124 24
+props/jungle/vine_branch 144 26
+props/jungle/bush_big 168.5 35
+props/jungle/grass_strip_light 161 34
+props/jungle/vine_b 235 37
+props/jungle/vine_a 230 34
+props/jungle/vine_b 235 31
+props/jungle/vine_a 230 28
+props/jungle/vine_b 235 25
+props/jungle/vine_a 228 22
+props/jungle/moss_fringe 237.5 13
+props/jungle/treetop_stack 237 11
+props/jungle/foliage_clump 238.5 11 layer=front
+props/jungle/vine_b 176 19
+props/jungle/vine_a 181 19
+props/jungle/tree_trunk_small 176 16
+props/jungle/grass_a 182 16
+props/jungle/vine_b 164 21
+props/jungle/vine_a 171 21
+props/village/watchtower 159.5 18
+props/jungle/bush_big 171.5 18
+props/village/fence 168 18
+objects/sign 172 18 text=SIGN_W1_HOME
+# Checkpoint 3 sits where the branch climb arrives (the overlap columns 231-232), so it cannot be skipped.
+objects/checkpoint 231.5 17
+# ---- co-op (DB1) ------------------------------------------------------------------------------------------------
+objects/hero_start 4 38 slot=2
+objects/sign 88 38 text=SIGN_COOP_W1_EGG
+# Gate 1 "hop": the springy flower became a ledge 8 rows over the dip beside it (Beginner: 7 - the static block
+# fills the dip's bottom row, LEVEL_DESIGN 15.7.3 / R18 the other way round, so the upper hero stands at the same
+# height in both modes and stays inside the tribe camera's view). The upper hero clubs the flower pot off the ledge:
+# it lands on the root as a spring for his partner (the gift).
+objects/sign 100 38 text=SIGN_COOP_W1_HOP
+objects/x2_tablet 102 37 gate=hop far=111,31
+objects/column 105 39 size=1,1 rise=0 beginner
+objects/flower_pot 106 31
+objects/sign 110 31 text=SIGN_COOP_W1_POT
+objects/checkpoint 135.5 33
+# Gate 2 "plates" (the Great Tree on the canopy road, travelled leftwards): A holds plate pa, door D1 of the lower
+# corridor opens and B walks through; B holds plate pb on the far side, door D2 of the upper corridor opens and A
+# climbs the branch into it. The tablet stands by the top of the climb.
+objects/x2_tablet 233 17 gate=plates far=196,17
+objects/sign 219 17 text=SIGN_COOP_W1_PLATES
+objects/plate 216 17 name=pa
+objects/column 204 17 size=1,2 rise=2 rise_while=pa
+objects/plate 200 17 name=pb
+objects/column 210 13 size=1,2 rise=2 rise_while=pb
+objects/checkpoint 194.5 17
+# x2 secret: the High Cache over the far treetop - only a Totem rider's jump strike reaches it (painting 20).
+objects/x2_tablet 197 17 secret far=193,17
+objects/hidden_spot 193 9 kind=small count=1 contents=painting:20 prop=jungle/foliage_clump
+# Two Shellback turtles guard the tree house (the exit): one hero in front, the other strikes the back.
+objects/sign 178 16 text=SIGN_COOP_W1_SHELL
+enemies/walker 162 18 skin=turtle_b left=0 right=0 speed=0 hp=10 coop=shell
+enemies/walker 168 18 skin=turtle_b left=0 right=0 speed=0 hp=10 coop=shell
+props/jungle/vine_a 158 21
+# Canopy dressing of the rebuilt stretch
+props/jungle/bush_dark 224 17
+props/jungle/fern 220.5 17
+props/jungle/vine_a 216 20
+props/jungle/vine_b 223 20
+props/jungle/vine_a 194 20
+props/jungle/vine_b 199 20
+props/jungle/sprouts 199 17
+props/jungle/vine_a 188 19
+props/jungle/vine_a 191 19
+props/jungle/moss_fringe 207 22
+props/jungle/vine_b 205 22
+props/jungle/vine_a 210 22
+
+[backwall]
+90 37 8 2 set=b deco=20
+183 35 9 4 set=b deco=25
+203 12 10 2 set=b deco=20
+203 16 10 2 set=b deco=20
+
+[overrides]
+91 33 a 23
+95 34 a 23
+92 34 a 23
+96 32 a 23
+175 19 b 30
+176 19 b 31
+177 19 b 31
+178 19 b 33
+180 19 b 31
+181 19 b 31
+182 19 b 32
+237 20 b 23
+238 26 b 23
+237 31 b 23
+238 35 b 23
+237 15 b 23
+213 20 b 30
+214 20 b 31
+215 20 b 31
+216 20 b 31
+217 20 b 31
+218 20 b 33
+219 20 b 31
+220 20 b 31
+221 20 b 33
+222 20 b 31
+223 20 b 31
+224 20 b 31
+225 20 b 32
+156 21 b 30
+157 21 b 31
+158 21 b 31
+159 21 b 31
+160 21 b 33
+161 21 b 31
+162 21 b 31
+163 21 b 31
+164 21 b 31
+165 21 b 31
+166 21 b 33
+167 21 b 31
+168 21 b 31
+169 21 b 31
+170 21 b 31
+171 21 b 31
+172 21 b 32
+192 20 b 30
+193 20 b 31
+194 20 b 31
+195 20 b 33
+196 20 b 31
+197 20 b 31
+198 20 b 33
+199 20 b 31
+200 20 b 31
+201 20 b 31
+202 20 b 31

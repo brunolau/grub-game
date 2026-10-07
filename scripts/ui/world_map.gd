@@ -11,6 +11,12 @@ extends UiScreen
 ## grey rocks, the volcano on the right, which only Expert runs visit). A stage without a marker of its own stands at
 ## the marker of the map stop it belongs to: a linked sub-stage at its main level, a bonus stage at its source level,
 ## the ending at the last stop. Levels outside the campaign (test levels) show the hero in the middle of the map.
+## 2.0 (PLAN.md P1.11; the Far Shore map page of Book II is P2.8): the markers are the campaign of the running book
+## (Game.book; Book II's stops spread over the SLOTS until its map page exists), marker colours come from the save
+## namespace of the run (Flow.save_space: mode x book x difficulty), every hero of a co-op party walks the route in his
+## colour (P2 one step behind P1), and "back" ends the run through Flow.goto_title (the party's seats are freed). The
+## menu clusters are off here: a stray Look (Q / Num .) must not end a co-op run; Space and Num Enter still start the
+## stage (Godot's ui_accept), and the stage starts by itself anyway.
 
 ## Seconds the map waits on the marker before the level starts by itself.
 const AUTO_START: float = 4.0
@@ -41,6 +47,8 @@ const MARKER_RADIUS: float = 8.0
 const PLATE_GAP: float = 12.0
 const PLATE_HEIGHT: float = 12.0
 const COL_LOCKED: Color = Color("8a8f99")
+## Co-op: the partners walk this far behind P1 (map px) and stand there on the marker.
+const PARTNER_GAP: float = 30.0
 
 ## Seconds left before the level starts by itself (negative while the hero is still walking).
 var countdown: float = -1.0
@@ -51,6 +59,8 @@ var _map: Control = null
 var _map_texture: Texture2D = null
 var _fill: Control = null
 var _hero: UiActor = null
+## Co-op: the heroes of P2.. (P1 is _hero).
+var _partners: Array[UiActor] = []
 var _here: TextureRect = null
 var _markers: Array[Vector2] = []
 var _marker_ids: Array[StringName] = []
@@ -74,7 +84,14 @@ func _build_screen() -> void:
 	_map.draw.connect(_draw_map)
 	add_child(_map)
 	_place_markers()
+	for slot: int in range(1, party_size()):
+		var partner: UiActor = UiActor.new(&"hero", &"idle")
+		_dress(partner, slot)
+		_map.add_child(partner)
+		_partners.append(partner)
 	_hero = UiActor.new(&"hero", &"idle")
+	if party_size() > 1:
+		_dress(_hero, 0)
 	_map.add_child(_hero)
 	_here = UiKit.picture(UiKit.icon(UiKit.ICON_DOWN))
 	_map.add_child(_here)
@@ -116,6 +133,7 @@ func _build_screen() -> void:
 
 func _screen_ready() -> void:
 	Audio.play_music(Sfx.MUSIC_MAP)
+	GameInput.set_menu_clusters(false)
 	resized.connect(_on_resized)
 	var index: int = _marker_ids.find(map_stop(_level_id))
 	_target = _markers[index] if index >= 0 else SLOTS[SLOTS.size() / 2]
@@ -124,6 +142,7 @@ func _screen_ready() -> void:
 		start = _markers[index - 1]
 	_hero.position = start
 	_hero.face(1 if _target.x >= start.x else -1)
+	_follow()
 	_here.visible = false
 	_on_resized()
 	# The map scrolls in, then the hero walks (or jumps in at the first level).
@@ -148,6 +167,7 @@ func _process(delta: float) -> void:
 	_time += delta
 	if _here.visible:
 		_here.position = Vector2(_target.x - 16.0, _target.y - 96.0 - roundf(absf(sin(_time * 4.0)) * 4.0))
+	_follow()
 	if countdown < 0.0 or not is_accepting_input():
 		return
 	countdown -= delta
@@ -162,7 +182,8 @@ func _on_accept() -> void:
 func _on_cancel() -> void:
 	if is_accepting_input():
 		Audio.play_sfx(Sfx.MENU_BACK)
-		go_to(Flow.SCREEN_TITLE)
+		if begin_leave():
+			Flow.goto_title()
 
 
 ## Leave the map and start the level of Flow.args["level_id"].
@@ -176,7 +197,7 @@ func start_level() -> void:
 
 
 func _place_markers() -> void:
-	var campaign: Array[StringName] = Levels.get_campaign(Game.difficulty)
+	var campaign: Array[StringName] = Levels.get_campaign(Game.difficulty, maxi(Game.book, 1))
 	if Flow.args.get("campaign") is Array:
 		campaign.clear()
 		for id: Variant in Flow.args["campaign"]:
@@ -207,7 +228,7 @@ static func marker_place(level_id: StringName) -> Vector2:
 ## level of a bonus stage, the last stop of the mode for the ending; "" for anything else.
 static func map_stop(level_id: StringName) -> StringName:
 	var difficulty: int = Game.difficulty
-	var campaign: Array[StringName] = Levels.get_campaign(difficulty)
+	var campaign: Array[StringName] = Levels.get_campaign(difficulty, maxi(Game.book, 1))
 	if campaign.has(level_id):
 		return level_id
 	var kind: String = str(Levels.get_value(level_id, "kind", Levels.KIND_MAIN))
@@ -233,6 +254,8 @@ func _arrive() -> void:
 	# Where the walk ended for the current view size (the window may have been resized meanwhile).
 	_set_camera(_camera_x(_target.x))
 	_hero.play(&"idle")
+	for partner: UiActor in _partners:
+		partner.play(&"idle")
 	_here.visible = true
 	countdown = AUTO_START
 
@@ -241,6 +264,35 @@ func _arrive() -> void:
 func number_plate(center: Vector2, number: String) -> Rect2:
 	var width: float = _font.get_string_size(number, HORIZONTAL_ALIGNMENT_LEFT, -1.0, UiKit.SIZE_MONO).x
 	return Rect2(roundf(center.x - width * 0.5) - 3.0, center.y + PLATE_GAP, width + 6.0, PLATE_HEIGHT)
+
+
+## Players on the map: the party of a co-op run, else one.
+static func party_size() -> int:
+	return clampi(Game.party, 1, Defs.MAX_PLAYERS) if Game.mode == Defs.GameMode.COOP else 1
+
+
+## The heroes of P2.. on the map (tests).
+func get_partners() -> Array[UiActor]:
+	return _partners
+
+
+## The hero of player `slot` in his colour (HeroPalette; P1's yellow with spots keeps no material).
+func _dress(actor: UiActor, slot: int) -> void:
+	var look: Array = HeroPalette.resolve(slot, Game.get_run(slot))
+	actor.material = HeroPalette.material_for(look[0], int(look[1]))
+
+
+## The partners walk behind P1 on the route (and stand behind him on the marker), mirroring his animation.
+func _follow() -> void:
+	if _partners.is_empty() or _hero == null:
+		return
+	var facing: int = -1 if _hero.flip_h else 1
+	for i: int in _partners.size():
+		var partner: UiActor = _partners[i]
+		partner.position = (_hero.position - Vector2(float(facing) * PARTNER_GAP * float(i + 1), 0.0)).round()
+		partner.face(facing)
+		if partner.animation != _hero.animation:
+			partner.play(_hero.animation)
 
 
 ## Map places of the markers on this map (parallel to get_marker_ids()).
@@ -325,9 +377,10 @@ func _draw_map() -> void:
 		var level_id: StringName = _marker_ids[i]
 		var center: Vector2 = _markers[i]
 		var fill_color: Color = COL_LOCKED
-		if int(Save.get_level_result(level_id, Game.difficulty)["clears"]) > 0:
+		var space_key: String = Flow.save_space()
+		if int(Save.get_level_result_in(space_key, level_id)["clears"]) > 0:
 			fill_color = UiKit.COL_FOCUS
-		elif i == 0 or Save.is_level_unlocked(level_id, Game.difficulty) or level_id == map_stop(_level_id):
+		elif i == 0 or Save.is_level_unlocked_in(space_key, level_id) or level_id == map_stop(_level_id):
 			fill_color = UiKit.COL_CREAM
 		_map.draw_circle(center, MARKER_RADIUS + 2.0, UiKit.COL_INK)
 		_map.draw_circle(center, MARKER_RADIUS, fill_color)

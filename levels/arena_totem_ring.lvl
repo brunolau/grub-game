@@ -1,0 +1,98 @@
+# Club & Grub level file - format 2 (docs/ARCHITECTURE.md 7.11). Versus arena #1 of docs/expansion/DESIGN.md E.5:
+# Totem Ring - jungle, the edges joined left-right, a carved totem in the middle with the cookpot on its top, bridges
+# either side 3 rows over the floor, springs up to the wrap ledge that runs across the seam. Owner: DA (arenas,
+# docs/expansion/PLAN.md 6.1). Rules: docs/LEVEL_DESIGN.md 15.8. Dressing: art-B's hand-over
+# (.tools/asset_candidates/expansion/_handover/ARENA_TOTEM_RING.md).
+#
+# Layout notes (the E.5 sketch, plus what the sketch leaves open; proven by a scripted match, see the end):
+# - Tiers: floor (row 10), bridges (row 7) and totem top (row 4) are 3 rows apart; the wrap ledge (row 5) is 2 rows
+#   over a bridge end and 5 over the floor: from the floor only the springs (cols 1 and 18, -224 = 105 px) reach it.
+# - Springs one cell further out than in the sketch (cols 1 / 18, still under the wrap ledge): every strike ends with
+#   a hop (3 px forward, 6 px low, a 15 px pogo off a spot) and a hero coming down from it within about 20 px of a
+#   spring is thrown 105 px up. In the sketch the stands of both floor spots (cols 3 / 16) lay in a spring's reach;
+#   now no spot stand and no spawn does. The floor spots moved one cell inward with them (cols 4 / 15).
+# - Spots (visible, refill 15 s after they are emptied): the two floor spots, two in the totem faces (left face at
+#   body height from the left floor, right face at body height from the right bridge), and the big spot (cols 12-13,
+#   one spot of two cells) on the right floor under the right bridge: its giant falls 7 rows onto the right bridge.
+#   The sketch had it on the left; a bot values it three times a small spot and every Rookie heads for it at the
+#   round start, so it lies on the side with fewer spots, as the first spot of spawn 1 only. Food knocked out of a
+#   spot under a bridge arcs up and mostly lands on that bridge: dig on the floor, collect on the bridges.
+# - Cookpots: two (4-player arena): the signature pot on the totem top (room for one banker) and one in the middle of
+#   the left bridge (x 104), opposite the big spot: contested ground - heroes land there from the wrap ledge, the
+#   floor and over the totem, and a stomp on a banker steals double. The seam, the only other mirror-symmetric
+#   place, cannot hold a pot (half of it would be off the screen).
+# - Spawns (rotate every round; 2 players use 1 and 2): 1 and 2 on the floor under the bridges by the totem (x 200 /
+#   120): nothing lands on them from above, and each faces his first spot (1 the big spot, 2 the body-height totem
+#   spot); 1 is the right one so that P1 has the seam side free to his right and P2 to his left. 3 and 4 on the outer
+#   ends of the bridges (x 72 / 248), a drop above their own floor spots. No spawn stands over another spawn's first
+#   spot: a hero striking a spot under a bridge pogos and his head pokes through the one-way bridge, where whoever
+#   stands above stomps him. Only the floor under the bridges near the totem is out of
+#   reach of every drop, jump and spring link in the first 48 ticks (the bridges, the ledge, the totem top and the
+#   seam side of the floor are all landing zones of the graph).
+# - Validator: one warning by design - row 5 has 6 clear cells between the wrap ledge and the totem face (a wall, not
+#   a gap anybody jumps), as in the sketch.
+# - Bot graph: resources/bots/arena_totem_ring.json, baked with core-B's tool after every edit of this file:
+#   bash .tools/gd.sh script res://tools/bots/bake_nav.gd -- arena_totem_ring
+# - Proof (G1): build/da/proof_totem_ring.gd (bash .tools/gd.sh script res://build/da/run_proof.gd -- --file=totem):
+#   Grub Stack through Flow.start_versus, two humans on the classic one-keyboard layout (physical keys, NumLock on and
+#   off) and two Rookie bots: the match finishes, no bot idles or misses a link at an empty head, no hit or stomp
+#   lands on a hero whose spawn shield is up, each keyboard half drives only its hero, and the replay is identical.
+
+[meta]
+format = 2
+id = arena_totem_ring
+name = "Totem Ring"
+kind = arena
+biome = jungle
+terrain_a = jungle/terrain_grass
+terrain_b = ruins/terrain_carved
+background = jungle
+music = versus_battle_a
+players = 4
+modes = grub_stack
+round_time = 90
+wrap = lr
+sudden = stampede
+author = DA
+notes = "Versus arena 1 (DESIGN.md E.5): jungle, wrap left-right, the cookpot on the totem top, springs to the wrap ledge, the big spot's giant onto the right bridge, a second pot on the left bridge."
+
+[legend]
+? = objects/hidden_spot kind=small count=3 look=block tile=#
+* = objects/hidden_spot kind=big look=inset tile=#
+t = objects/hidden_spot kind=small count=3 look=block tile=%
+J = objects/spring
+P = objects/cookpot dx=8
+Q = objects/cookpot
+B = objects/spawn_point index=2
+C = objects/spawn_point index=3
+D = objects/spawn_point index=4
+
+[tiles]
+....................
+....................
+....................
+.........P..........
+.........%%.........
+---......%t......---
+....C.Q..%%....D....
+....-----%%-----....
+.........t%.........
+.J.....B.%%.@.....J.
+####?#######**#?####
+####################
+
+[entities]
+props/jungle/vine_a 0 0 layer=back
+props/jungle/vine_b 19 0 layer=back
+props/jungle/moss_fringe 2 6 layer=back
+props/jungle/moss_fringe 17 6 layer=back
+props/jungle/sprouts 4 6 layer=back
+props/jungle/sprouts 15 6 layer=back
+props/jungle/fern 2 9 layer=back
+props/jungle/grass_a 5 9 layer=back
+props/jungle/flower 6 9 layer=back
+props/jungle/bush_dark 7 9 layer=back
+props/jungle/bush_dark 11 9 layer=back
+props/jungle/grass_a 14 9 layer=back
+props/jungle/grass_b 16 9 layer=back
+props/jungle/fern 17 9 layer=back

@@ -1,0 +1,41 @@
+# Club & Grub - level texts of world 5, Sunbaked Canyon (Book II), English. Owner: level designer D5
+# (docs/expansion/PLAN.md 6.1). A level sub-catalogue: loaded beside locale/en.po (scripts/ui/ui_kit.gd), never
+# offered as a language. Keys: the level names and the `text=` keys of signs and hint zones of levels/w5_*.lvl and
+# their co-op files.
+msgid ""
+msgstr ""
+"Project-Id-Version: Club & Grub\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+# --- Level names ---
+msgid "Red Mesa Trail"
+msgstr "Red Mesa Trail"
+
+# --- w5_l1 Red Mesa Trail ---
+msgid "SIGN_W5_BELT"
+msgstr "Your club never leaves you. Press SWAP to trade it for the special on your belt!"
+
+msgid "SIGN_W5_SPEAR"
+msgstr "A spear! Throw it at a bark board and it sticks - a step to stand on. Press SWAP for your club."
+
+msgid "SIGN_W5_ROLLER"
+msgstr "Rollers curl up and roll at you. Hold Jump as you land on one to bounce up to the mesa tops!"
+
+# --- w5_l1_coop Red Mesa Trail (co-op) ---
+msgid "SIGN_W5_COOP_EGG"
+msgstr "Fall down and you become an egg! Your partner hatches you with a whack, a bounce or a checkpoint."
+
+msgid "SIGN_W5_COOP_TABLET"
+msgstr "A tablet with two cavemen marks a spot where one caveman alone cannot pass. Work together!"
+
+msgid "SIGN_W5_COOP_HOP"
+msgstr "One stands still on the rock, the other jumps on his head holding Jump. Up top, club the flower pot down!"
+
+msgid "SIGN_W5_COOP_PLATES"
+msgstr "Stand on a plate to hold a door open for your partner - then let him hold one for you."
+
+msgid "SIGN_W5_COOP_GULLY"
+msgstr "Shellbacks turn their shield to the nearer caveman. One of you stands in front, the other drops in behind!"

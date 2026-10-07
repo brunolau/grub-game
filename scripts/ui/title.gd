@@ -2,7 +2,10 @@ class_name TitleScreen
 extends UiScreen
 ## Title picture + main menu + attract loop (GAMEPLAY.md 11.1 steps 3-4).
 ##
-## Menu: start (mode select), continue (level select / code entry), options, credits, quit (desktop only).
+## Menu: play, continue (level select / code entry), options, credits, quit (desktop only).
+## 2.0 (DESIGN.md A.1 / 0, PLAN.md P1.11): "Play" turns the menu panel into the choice Solo / Co-op / Versus
+## (Flow.open_play: Solo -> the book select, Co-op -> the join panel, Versus -> the lobby); "back" returns to the main
+## entries. Solo has the focus first, so Play + confirm + confirm is the 1.0 path to the difficulty (via the books).
 ## After ATTRACT_DELAY seconds without input the menu steps aside and the attract loop runs: the hero races
 ## across the picture chased by a small dinosaur, then races back chased by three. Any input returns to the menu.
 
@@ -19,6 +22,13 @@ const TEX_LOGO: String = "res://assets/ui/title_logo.png"
 const EDGE_FADE: int = 48
 const BAYER_4X4: PackedInt32Array = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5]
 
+## The Play choice (DESIGN.md A.1): entry text, info text and the Defs.GameMode it opens, in menu order.
+const PLAY_ENTRIES: Array[Array] = [
+	["UI_PLAY_SOLO", "UI_PLAY_SOLO_INFO", Defs.GameMode.SINGLE],
+	["UI_PLAY_COOP", "UI_PLAY_COOP_INFO", Defs.GameMode.COOP],
+	["UI_PLAY_VERSUS", "UI_PLAY_VERSUS_INFO", Defs.GameMode.VERSUS],
+]
+
 ## True while the attract loop is on screen.
 var attract_running: bool = false
 
@@ -29,6 +39,11 @@ var _logo_height: float = 0.0
 var _menu_panel: Control = null
 var _footer: Control = null
 var _buttons: Array[UiButton] = []
+# The Play choice: its list, its entries (PLAY_ENTRIES order) and the line that describes the focused one.
+var _main_list: VBoxContainer = null
+var _play_list: VBoxContainer = null
+var _play_buttons: Array[UiButton] = []
+var _play_info: Label = null
 var _idle: float = 0.0
 var _logo_time: float = 0.0
 var _logo_ready: bool = false
@@ -72,16 +87,37 @@ func _build_screen() -> void:
 	middle.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	middle.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	column.add_child(middle)
+	var lists: VBoxContainer = VBoxContainer.new()
+	lists.add_theme_constant_override(&"separation", 0)
 	var list: VBoxContainer = VBoxContainer.new()
 	list.add_theme_constant_override(&"separation", 0)
 	list.custom_minimum_size = Vector2(230.0, 0.0)
-	_add_entry(list, "UI_TITLE_START", _on_start)
+	_add_entry(list, "UI_TITLE_PLAY", open_play_menu)
 	_add_entry(list, "UI_TITLE_CONTINUE", _on_continue)
 	_add_entry(list, "UI_TITLE_OPTIONS", _on_options)
 	_add_entry(list, "UI_TITLE_CREDITS", _on_credits)
 	if not OS.has_feature("mobile") and not OS.has_feature("web"):
 		_add_entry(list, "UI_TITLE_QUIT", _on_quit)
-	_menu_panel = UiKit.panel_box(list, 12)
+	_main_list = list
+	lists.add_child(list)
+	# The Play choice replaces the main entries in the same panel (same width, so the panel does not jump).
+	_play_list = VBoxContainer.new()
+	_play_list.add_theme_constant_override(&"separation", 0)
+	_play_list.custom_minimum_size = Vector2(230.0, 0.0)
+	_play_list.visible = false
+	for entry: Array in PLAY_ENTRIES:
+		var button: UiButton = UiButton.new(str(entry[0]))
+		button.pressed.connect(choose_play.bind(int(entry[2])))
+		button.focus_entered.connect(_show_play_info.bind(str(entry[1])))
+		_play_list.add_child(button)
+		_play_buttons.append(button)
+	_play_info = UiKit.label("", UiKit.Style.SMALL, HORIZONTAL_ALIGNMENT_CENTER)
+	_play_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_play_info.custom_minimum_size = Vector2(230.0, 30.0)
+	_play_info.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_play_list.add_child(_play_info)
+	lists.add_child(_play_list)
+	_menu_panel = UiKit.panel_box(lists, 12)
 	middle.add_child(_menu_panel)
 
 	var footer: HBoxContainer = HBoxContainer.new()
@@ -110,6 +146,8 @@ func _build_screen() -> void:
 
 func _screen_ready() -> void:
 	Audio.play_music(Sfx.MUSIC_TITLE)
+	# The title is the one-player front end: no menu clusters (a screen may come back here without Flow.goto_title).
+	GameInput.set_menu_clusters(false)
 	UiKit.focus_silently(_buttons[0])
 	_layout_stage()
 	resized.connect(_layout_stage)
@@ -266,8 +304,42 @@ func _dither_edges(picture: Texture2D) -> Texture2D:
 	return ImageTexture.create_from_image(image)
 
 
-func _on_start() -> void:
-	go_to(Flow.SCREEN_MODE_SELECT)
+## Show the Play choice (Solo / Co-op / Versus) in the menu panel, Solo focused.
+func open_play_menu() -> void:
+	if not is_accepting_input():
+		return
+	_main_list.visible = false
+	_play_list.visible = true
+	UiKit.focus_silently(_play_buttons[0])
+	_show_play_info(str(PLAY_ENTRIES[0][1]))
+
+
+## Back from the Play choice to the main entries, Play focused.
+func close_play_menu() -> void:
+	_play_list.visible = false
+	_main_list.visible = true
+	UiKit.focus_silently(_buttons[0])
+
+
+## True while the Play choice shows.
+func is_play_menu_open() -> bool:
+	return _play_list.visible
+
+
+## The Play choice picked `mode` (Defs.GameMode): Flow opens the book select, the join panel or the lobby.
+func choose_play(mode: int) -> void:
+	if begin_leave():
+		Flow.open_play(mode)
+
+
+func _on_cancel() -> void:
+	if is_play_menu_open() and is_accepting_input():
+		Audio.play_sfx(Sfx.MENU_BACK)
+		close_play_menu()
+
+
+func _show_play_info(key: String) -> void:
+	_play_info.text = key
 
 
 func _on_continue() -> void:
