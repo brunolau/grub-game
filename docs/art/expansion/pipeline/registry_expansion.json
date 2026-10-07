@@ -3884,6 +3884,237 @@
   "source": "shipped assets/tiles/cave/terrain_stone.png (superpowers-prehistoric-platformer: background-elements/tileset-1.png, tan stone set)",
   "tiles": "TERRAIN_TILES"
  },
+ "assets/tiles/common/honey.png": {
+  "anims": {
+   "surface": {
+    "fps": 8,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5
+    ],
+    "loop": true
+   }
+  },
+  "edits": "water recoloured to honey (exact colour swap: body #d18b14, mid #e9a91f, light #f8cf45, foam -> gloss #fff3b0)",
+  "frame": [
+   32,
+   32
+  ],
+  "grid": [
+   8,
+   1
+  ],
+  "kind": "liquid",
+  "license": "CC0 1.0",
+  "note": "deadly `~` of `liquid = honey` (amber honey (Feast Land D: Honey Falls)); same format as water.png (ASSET_MANIFEST 10.2): 0-5 surface loop @8 fps (top 4 art px are air), 6 body, 7 body with bubbles",
+  "palette": [
+   "#7a3f0c",
+   "#d18b14",
+   "#e9a91f",
+   "#f8cf45",
+   "#fff3b0"
+  ],
+  "section": "tiles",
+  "size": [
+   256,
+   32
+  ],
+  "source": "shipped tiles/common/water.png (superpowers-prehistoric-platformer: fx/effects/water.png + tileset-1.png water tile)",
+  "tiles_inline": {
+   "0-5": "animated surface (top of a pool; the top 4 px are air)",
+   "6": "body, plain",
+   "7": "body with bubbles"
+  }
+ },
+ "assets/tiles/common/honey_floor.png": {
+  "edits": "surface tiles moved down 6 art px (their lowest 6 rows drop out, as tiles/canyon/mud_floor.png); exact 4-colour swap of the sand bands into the honey ramp (outline #7a3f0c, body #d18b14, mid #e9a91f, light #f8cf45); glossy dashes (#fff3b0) under the surface line; bubble rings in the fill tiles; lip = rows 6-13 of the surface tiles",
+  "frame": [
+   32,
+   32
+  ],
+  "grid": [
+   8,
+   1
+  ],
+  "kind": "tiles",
+  "license": "CC0 1.0",
+  "lip_rows": 8,
+  "note": "look of the ':' tar floor when `liquid = honey` (drawn by world-A). Tiles 0-3 = the layout of tiles/canyon/mud_floor.png: 0 top_left, 1 top, 2 top_right (drawn surface line at art row 6; the collision surface is art row 12, so a standing hero is 6 art px deep), 3 fill for cells under a ':' that should look like goo too; 4-6 optional FRONT-layer lip over 0-2 (rows 6-13: the hero's feet sink behind the surface band); 7 fill with bubbles (variant of 3)",
+  "section": "tiles",
+  "size": [
+   256,
+   32
+  ],
+  "source": "shipped tiles/feast/terrain.png tiles 0, 1, 2, 9 (superpowers-prehistoric-platformer: background-elements/tileset-1.png, yellow sand set)",
+  "surface_collision_row": 12,
+  "surface_drawn_row": 6,
+  "tiles_inline": {
+   "0": "top_left",
+   "1": "top (repeatable)",
+   "2": "top_right",
+   "3": "fill (goo below the surface row)",
+   "4-6": "front lip of 0-2 (rows 6-13 only)",
+   "7": "fill with bubbles"
+  }
+ },
+ "assets/tiles/common/syrup.png": {
+  "anims": {
+   "surface": {
+    "fps": 8,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5
+    ],
+    "loop": true
+   }
+  },
+  "edits": "water recoloured to syrup (exact colour swap: body #b8406e, mid #d45f8a, light #ee93b3, foam -> gloss #ffe3ee)",
+  "frame": [
+   32,
+   32
+  ],
+  "grid": [
+   8,
+   1
+  ],
+  "kind": "liquid",
+  "license": "CC0 1.0",
+  "note": "deadly `~` of `liquid = syrup` (strawberry syrup (Feast Land E: Pudding Lagoon, the Sky Picnic syrup flood)); same format as water.png (ASSET_MANIFEST 10.2): 0-5 surface loop @8 fps (top 4 art px are air), 6 body, 7 body with bubbles",
+  "palette": [
+   "#6e1f3e",
+   "#b8406e",
+   "#d45f8a",
+   "#ee93b3",
+   "#ffe3ee"
+  ],
+  "section": "tiles",
+  "size": [
+   256,
+   32
+  ],
+  "source": "shipped tiles/common/water.png (superpowers-prehistoric-platformer: fx/effects/water.png + tileset-1.png water tile)",
+  "tiles_inline": {
+   "0-5": "animated surface (top of a pool; the top 4 px are air)",
+   "6": "body, plain",
+   "7": "body with bubbles"
+  }
+ },
+ "assets/tiles/common/syrup_floor.png": {
+  "edits": "surface tiles moved down 6 art px (their lowest 6 rows drop out, as tiles/canyon/mud_floor.png); exact 4-colour swap of the sand bands into the syrup ramp (outline #6e1f3e, body #b8406e, mid #d45f8a, light #ee93b3); glossy dashes (#ffe3ee) under the surface line; bubble rings in the fill tiles; lip = rows 6-13 of the surface tiles",
+  "frame": [
+   32,
+   32
+  ],
+  "grid": [
+   8,
+   1
+  ],
+  "kind": "tiles",
+  "license": "CC0 1.0",
+  "lip_rows": 8,
+  "note": "look of the ':' tar floor when `liquid = syrup` (drawn by world-A). Tiles 0-3 = the layout of tiles/canyon/mud_floor.png: 0 top_left, 1 top, 2 top_right (drawn surface line at art row 6; the collision surface is art row 12, so a standing hero is 6 art px deep), 3 fill for cells under a ':' that should look like goo too; 4-6 optional FRONT-layer lip over 0-2 (rows 6-13: the hero's feet sink behind the surface band); 7 fill with bubbles (variant of 3)",
+  "section": "tiles",
+  "size": [
+   256,
+   32
+  ],
+  "source": "shipped tiles/feast/terrain.png tiles 0, 1, 2, 9 (superpowers-prehistoric-platformer: background-elements/tileset-1.png, yellow sand set)",
+  "surface_collision_row": 12,
+  "surface_drawn_row": 6,
+  "tiles_inline": {
+   "0": "top_left",
+   "1": "top (repeatable)",
+   "2": "top_right",
+   "3": "fill (goo below the surface row)",
+   "4-6": "front lip of 0-2 (rows 6-13 only)",
+   "7": "fill with bubbles"
+  }
+ },
+ "assets/tiles/common/tar.png": {
+  "anims": {
+   "surface": {
+    "fps": 8,
+    "frames": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5
+    ],
+    "loop": true
+   }
+  },
+  "edits": "water recoloured to tar (exact colour swap: body #2a2033, mid #3b2e4a, light #54436a, foam -> gloss #9d8bb5)",
+  "frame": [
+   32,
+   32
+  ],
+  "grid": [
+   8,
+   1
+  ],
+  "kind": "liquid",
+  "license": "CC0 1.0",
+  "note": "deadly `~` of `liquid = tar` (black-violet tar (world 6 Tar Fen, the rising tar of 6-2b, the Tar Pulleys arena)); same format as water.png (ASSET_MANIFEST 10.2): 0-5 surface loop @8 fps (top 4 art px are air), 6 body, 7 body with bubbles",
+  "palette": [
+   "#1a1320",
+   "#2a2033",
+   "#3b2e4a",
+   "#54436a",
+   "#9d8bb5"
+  ],
+  "section": "tiles",
+  "size": [
+   256,
+   32
+  ],
+  "source": "shipped tiles/common/water.png (superpowers-prehistoric-platformer: fx/effects/water.png + tileset-1.png water tile)",
+  "tiles_inline": {
+   "0-5": "animated surface (top of a pool; the top 4 px are air)",
+   "6": "body, plain",
+   "7": "body with bubbles"
+  }
+ },
+ "assets/tiles/common/tar_floor.png": {
+  "edits": "surface tiles moved down 6 art px (their lowest 6 rows drop out, as tiles/canyon/mud_floor.png); exact 4-colour swap of the sand bands into the tar ramp (outline #1a1320, body #2a2033, mid #3b2e4a, light #54436a); glossy dashes (#9d8bb5) under the surface line; bubble rings in the fill tiles; lip = rows 6-13 of the surface tiles",
+  "frame": [
+   32,
+   32
+  ],
+  "grid": [
+   8,
+   1
+  ],
+  "kind": "tiles",
+  "license": "CC0 1.0",
+  "lip_rows": 8,
+  "note": "look of the ':' tar floor when `liquid = tar` (drawn by world-A). Tiles 0-3 = the layout of tiles/canyon/mud_floor.png: 0 top_left, 1 top, 2 top_right (drawn surface line at art row 6; the collision surface is art row 12, so a standing hero is 6 art px deep), 3 fill for cells under a ':' that should look like goo too; 4-6 optional FRONT-layer lip over 0-2 (rows 6-13: the hero's feet sink behind the surface band); 7 fill with bubbles (variant of 3)",
+  "section": "tiles",
+  "size": [
+   256,
+   32
+  ],
+  "source": "shipped tiles/feast/terrain.png tiles 0, 1, 2, 9 (superpowers-prehistoric-platformer: background-elements/tileset-1.png, yellow sand set)",
+  "surface_collision_row": 12,
+  "surface_drawn_row": 6,
+  "tiles_inline": {
+   "0": "top_left",
+   "1": "top (repeatable)",
+   "2": "top_right",
+   "3": "fill (goo below the surface row)",
+   "4-6": "front lip of 0-2 (rows 6-13 only)",
+   "7": "fill with bubbles"
+  }
+ },
  "assets/ui/countdown_stones.png": {
   "edits": "the stone's carved dashes filled, a HUD-font digit carved in (dark fill + light groove)",
   "frame": [

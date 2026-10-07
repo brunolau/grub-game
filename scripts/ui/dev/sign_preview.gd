@@ -41,11 +41,13 @@ func _ready() -> void:
 	_run.call_deferred(ids)
 
 
-## Non-test levels whose file places an `objects/sign`.
+## Book I solo stages (2.0: not Book II, co-op or arena files, which this tool starts in no run of theirs) whose file
+## places an `objects/sign`.
 static func levels_with_signs() -> Array[StringName]:
 	var result: Array[StringName] = []
 	for id: StringName in Levels.all_ids():
-		if str(Levels.get_value(id, "kind", Levels.KIND_MAIN)) == Levels.KIND_TEST:
+		if str(Levels.get_value(id, "kind", Levels.KIND_MAIN)) == Levels.KIND_TEST \
+				or Levels.get_book(id) != Levels.BOOK_1 or not Levels.is_solo_level(id):
 			continue
 		if FileAccess.get_file_as_string(Levels.get_level_path(id)).contains("objects/sign"):
 			result.append(id)

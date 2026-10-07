@@ -62,7 +62,15 @@ func test_both_levels_are_valid() -> void:
 		for problem: Dictionary in problems:
 			lines.append(LevelValidator.format_problem(problem))
 		assert_eq(problems.size(), 0, "%s: no error and no warning\n%s" % [level_id, "\n".join(lines)])
-	assert_eq(validator.error_count(), 0, "every level file of the folder is valid")
+	# 2.0: every Book I file of the folder (stages and test levels); Book II, co-op and arena files are proven by their
+	# own route tests.
+	var errors: PackedStringArray = PackedStringArray()
+	for problem: Dictionary in validator.problems:
+		var level_id: StringName = StringName(str(problem["path"]).get_file().get_basename())
+		if int(problem["severity"]) == LevelValidator.ERROR and Levels.get_book(level_id) == Levels.BOOK_1 \
+				and Levels.is_solo_level(level_id):
+			errors.append(LevelValidator.format_problem(problem))
+	assert_eq(errors, PackedStringArray(), "every Book I level file of the folder is valid")
 
 
 func test_they_are_a_linked_development_pair_outside_the_campaign() -> void:

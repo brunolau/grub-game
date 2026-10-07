@@ -27,6 +27,40 @@ signal glider_changed(carrying: bool)
 ## `belt` value: nothing rides on the belt (the club is in the hand and no special is owned).
 const BELT_EMPTY: int = -1
 
+## The co-op tally medals (DESIGN.md D.11): `id`, the statistics (`stats`, summed) that decide it. The most wins;
+## ties share it; nobody wins a medal with 0. See [method award_winners].
+const COOP_MEDALS: Array[Dictionary] = [
+	{"id": &"most_food", "stats": [&"food"]},
+	{"id": &"best_bounce_chain", "stats": [&"best_chain"]},
+	{"id": &"hatchling", "stats": [&"revives"]},
+	{"id": &"slugger", "stats": [&"bats"]},
+	{"id": &"strongman", "stats": [&"plates", &"pushes"]},
+	{"id": &"clumsiest", "stats": [&"deaths", &"hurts"]},
+]
+## The versus awards (DESIGN.md E.8), in the order the companion hands them out; `fewest` = the lowest value wins
+## (and only when somebody did more). VersusMatch.hand_out_awards gives every player 1-3 of them.
+const VERSUS_AWARDS: Array[Dictionary] = [
+	{"id": &"leaning_tower", "stats": [&"best_stack"]},
+	{"id": &"pickpocket", "stats": [&"stolen"]},
+	{"id": &"glutton", "stats": [&"food"]},
+	{"id": &"butterfingers", "stats": [&"dropped"]},
+	{"id": &"chain_gang", "stats": [&"best_chain"]},
+	{"id": &"clang_master", "stats": [&"clangs"]},
+	{"id": &"slugger", "stats": [&"bats"]},
+	{"id": &"home_run", "stats": [&"best_shot"]},
+	{"id": &"hot_potato", "stats": [&"passes"]},
+	{"id": &"lava_lover", "stats": [&"hazards"]},
+	{"id": &"head_case", "stats": [&"bonks"]},
+	{"id": &"comeback_caveman", "stats": [&"comeback"]},
+	{"id": &"pacifist", "stats": [&"hits"], "fewest": true},
+]
+## Every statistic counter (reset_stats zeroes them; [method get_stat] reads them by name).
+const STATS: Array[StringName] = [
+	&"score", &"kills", &"deaths", &"revives", &"picked", &"stocks", &"food", &"best_chain", &"hurts", &"bats",
+	&"plates", &"pushes", &"hits", &"stolen", &"dropped", &"best_stack", &"clangs", &"best_shot", &"passes",
+	&"hazards", &"bonks", &"comeback",
+]
+
 ## Player slot of this run (0 = P1).
 var slot: int = 0
 ## Hearts, 0..Tuning.ENERGY_START. A hit at 0 hearts kills (PHYSICS.md 10.2).
@@ -55,6 +89,44 @@ var revives: int = 0
 var picked: int = 0
 ## Versus stock lives left (`Stock` option and modes with respawn); 0 elsewhere.
 var stocks: int = 0
+# The medal and award counters (DESIGN.md D.11 co-op tally medals, E.8 versus awards; tables COOP_MEDALS and
+# VERSUS_AWARDS below). The module that sees the deed adds to them (`run.food += 1`, or the note_* helpers for the
+# "longest" values). Co-op counts one stage (Game.begin_level zeroes the party's statistics when a co-op stage starts
+# afresh; a linked sub-stage or bonus stage carries them on, as the tally list), versus one match (VersusMatch).
+# Nothing in the simulation reads them; single-player never resets them in begin_level.
+## Food items eaten (Most Food, Glutton). Co-op: food picked up; Grub Stack: units onto the own stack.
+var food: int = 0
+## Longest chain of head bounces (co-op Best Bounce Chain) or stomps on rivals (versus Chain Gang); see note_chain.
+var best_chain: int = 0
+## Hits taken (enemies in co-op, rivals in versus); with `deaths` it makes the Clumsiest.
+var hurts: int = 0
+## Batter Up launches struck (co-op Slugger) / curled rivals batted (versus Slugger).
+var bats: int = 0
+## Plates held down (counted per press, co-op Strongman).
+var plates: int = 0
+## Heave boulders pushed and pulleys hauled (co-op Strongman).
+var pushes: int = 0
+## Versus: hits landed on rivals (Pacifist = fewest).
+var hits: int = 0
+## Grub Stack: units stolen by stomps (Pickpocket).
+var stolen: int = 0
+## Grub Stack: units knocked off this hero's stack (Butterfingers).
+var dropped: int = 0
+## Grub Stack: the tallest stack this hero carried (Leaning Tower); see note_stack.
+var best_stack: int = 0
+## Versus: clangs this hero's strike was part of (Clang Master).
+var clangs: int = 0
+## Clubball: the longest shot, in px from strike to landing / goal (Home Run); see note_shot.
+var best_shot: int = 0
+## Hot Rock: times this hero passed the ember on (Hot Potato).
+var passes: int = 0
+## Versus: knock-outs by a hazard - lava, a pit, a sudden death (Lava Lover).
+var hazards: int = 0
+## Grub Stack: times a giant bonus bonked this hero's head (Head Case).
+var bonks: int = 0
+## Versus: the most round wins this hero trailed the leader by and came back from (Comeback Caveman); written by
+## VersusMatch when the match ends.
+var comeback: int = 0
 
 # --- Look (chosen on the join panel / in the versus lobby; nothing in the simulation reads it) -------------------
 ## Colour of this player (DESIGN.md D.11, F.1): a palette name of assets/sprites/player/palettes/hero_palettes.json

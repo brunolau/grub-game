@@ -78,7 +78,9 @@ func test_menu_entries_take_the_focus_only_from_a_moving_pointer() -> void:
 func test_code_entry_accepts_every_campaign_code() -> void:
 	var codes: Array[Array] = []
 	for level_id: StringName in Levels.all_ids():
-		if str(Levels.get_value(level_id, "kind", Levels.KIND_MAIN)) == Levels.KIND_TEST:
+		# The Book I codes (2.0: Book II codes come with their campaign plumbing, PLAN.md P2.6 / P2.8).
+		if str(Levels.get_value(level_id, "kind", Levels.KIND_MAIN)) == Levels.KIND_TEST \
+				or Levels.get_book(level_id) != Levels.BOOK_1 or not Levels.is_solo_level(level_id):
 			continue
 		for difficulty: int in [Defs.Difficulty.BEGINNER, Defs.Difficulty.EXPERT]:
 			var code: String = Levels.get_password(level_id, difficulty)

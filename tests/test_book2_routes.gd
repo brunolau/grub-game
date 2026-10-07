@@ -9,6 +9,14 @@ extends RouteTestCase
 ## digests (V2.b, the belt-invariance runner). The table is empty until phase 3 adds the first Book II stage; the
 ## tests pass on an empty table and start proving routes as soon as files land.
 
+## Content gates (PLAN.md 4.2 G1, 6.2 G3): until phase 3 is content complete only the Beginner club route of every
+## Book II stage is required (G1: "`w5_l1` with its Beginner club route"); a missing Expert route is printed, not
+## failed. Integration switches this on at G3 (every (stage, difficulty) cell, V2.a).
+const REQUIRE_EXPERT_ROUTES: bool = false
+## The Book II stages of the G1 vertical slice (PLAN.md 4.2): when one exists, its Beginner club route must too.
+const SLICE_STAGES: Array[StringName] = [&"w5_l1"]
+
+
 ## The Book II header routes: solo levels of book 2, one hero.
 func _table() -> Dictionary:
 	return header_table(ROUTE_DIR, func(_file: String, spec: Dictionary) -> bool:
@@ -39,21 +47,76 @@ func test_every_book2_stage_has_its_club_routes() -> void:
 		for stage: StringName in stages:
 			if file.begins_with(String(stage) + ".") and not table.has(file):
 				problems.append("%s: a route of Book II stage %s without a valid header" % [file, stage])
+	var pending: PackedStringArray = PackedStringArray()
 	for stage: StringName in stages:
 		for mode: String in [BEGINNER, EXPERT]:
 			var difficulty: int = Defs.Difficulty.EXPERT if mode == EXPERT else Defs.Difficulty.BEGINNER
 			if not Levels.is_available(stage, difficulty):
 				continue
-			var club: PackedStringArray = PackedStringArray()
-			for file: String in table:
-				var spec: Dictionary = table[file]
-				if str(spec["level"]) == String(stage) and (spec["modes"] as Array).has(mode) \
-						and str(spec.get("leaves", "")) != "" and int(spec.get("belt", -1)) < 0 \
-						and (file == "%s.inputs" % stage or file == "%s.expert.inputs" % stage):
-					club.append(file)
-			if club.size() != 1:
-				problems.append("%s (%s): %d club route(s) %s" % [stage, mode, club.size(), str(club)])
+			var club: PackedStringArray = club_routes(table, stage, mode)
+			var line: String = "%s (%s): %d club route(s) %s" % [stage, mode, club.size(), str(club)]
+			if club.size() > 1:
+				problems.append(line)
+			elif club.is_empty():
+				# An Expert-only stage's only route is its Beginner-named file, so it is required like a Beginner one.
+				var required: bool = REQUIRE_EXPERT_ROUTES or mode == BEGINNER \
+						or not Levels.is_available(stage, Defs.Difficulty.BEGINNER)
+				if required:
+					problems.append(line)
+				else:
+					pending.append(line)
+	for line: String in pending:
+		print("    pending until G3: %s" % line)
 	assert_eq(problems, PackedStringArray(), "%d Book II stage(s), %d route(s)" % [stages.size(), table.size()])
+
+
+## The club routes of a Book II stage on a mode (V2.a): `<id>.inputs` / `<id>.expert.inputs` with a header of that
+## mode that ends the stage, no special on the belt.
+static func club_routes(table: Dictionary, stage: StringName, mode: String) -> PackedStringArray:
+	var club: PackedStringArray = PackedStringArray()
+	for file: String in table:
+		var spec: Dictionary = table[file]
+		if str(spec["level"]) == String(stage) and (spec["modes"] as Array).has(mode) \
+				and str(spec.get("leaves", "")) != "" and int(spec.get("belt", -1)) < 0 \
+				and (file == "%s.inputs" % stage or file == "%s.expert.inputs" % stage):
+			club.append(file)
+	return club
+
+
+## The G1 slice (PLAN.md 4.2): a slice stage that exists has its Beginner club route, played through Flow by
+## test_book2_routes and proven belt-invariant by test_book2_belt_invariance.
+func test_the_slice_stages_have_their_beginner_route() -> void:
+	var table: Dictionary = _table()
+	var landed: int = 0
+	for stage: StringName in SLICE_STAGES:
+		if not Levels.has_level(stage):
+			print("    slice: %s has not landed yet" % stage)
+			continue
+		landed += 1
+		assert_eq(Levels.get_book(stage), Levels.BOOK_2, "%s is a Book II file" % stage)
+		assert_true(Levels.is_solo_level(stage), "%s is a solo file" % stage)
+		assert_eq(club_routes(table, stage, BEGINNER).size(), 1, "%s: its Beginner club route %s.inputs" % [stage, stage])
+	assert_true(landed <= SLICE_STAGES.size())
+
+
+## Every Book II file is valid (the validator, LEVEL_DESIGN.md 15.10): no error in any of them (test levels
+## included), and no warning in a stage (`--strict`).
+func test_every_book2_file_is_valid() -> void:
+	var validator: LevelValidator = LevelValidator.new()
+	validator.add_folder(Levels.LEVEL_DIR)
+	validator.run()
+	var problems: PackedStringArray = PackedStringArray()
+	var files: int = 0
+	for level_id: StringName in Levels.all_ids():
+		if Levels.get_book(level_id) != Levels.BOOK_2 or not Levels.is_solo_level(level_id):
+			continue
+		files += 1
+		var strict: bool = Levels.get_level_kind(level_id) != Levels.KIND_TEST
+		for problem: Dictionary in validator.problems_of(Levels.get_level_path(level_id)):
+			if strict or int(problem["severity"]) == LevelValidator.ERROR:
+				problems.append(LevelValidator.format_problem(problem))
+	print("    Book II files: %d" % files)
+	assert_eq(problems, PackedStringArray(), "Book II files: no error, and no warning in a stage")
 
 
 ## Every Cave Painting placed in a Book II stage is collected by some route (`expect=painting:<index>`, V2.c).

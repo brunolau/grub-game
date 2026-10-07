@@ -405,14 +405,20 @@ func after_each() -> void:
 # The campaign's shape
 # =================================================================================================================
 
+## 2.0: the Book I files (the 15 stages and the Book I test levels). Book II, co-op and arena files are proven by
+## tests/test_book2_routes.gd, tests/test_coop_routes.gd and tests/test_integration_versus.gd.
 func test_every_level_file_is_valid() -> void:
 	var validator: LevelValidator = LevelValidator.new()
 	assert_true(validator.add_folder(Levels.LEVEL_DIR) > 0)
 	validator.run()
-	assert_eq(validator.error_count(), 0, "no level file of the folder has an error")
-	for level_id: StringName in Levels.all_ids():
-		if str(Levels.get_value(level_id, "kind", Levels.KIND_MAIN)) == Levels.KIND_TEST:
-			continue
+	var errors: PackedStringArray = PackedStringArray()
+	for problem: Dictionary in validator.problems:
+		var level_id: StringName = StringName(str(problem["path"]).get_file().get_basename())
+		if int(problem["severity"]) == LevelValidator.ERROR and Levels.get_book(level_id) == Levels.BOOK_1 \
+				and Levels.is_solo_level(level_id):
+			errors.append(LevelValidator.format_problem(problem))
+	assert_eq(errors, PackedStringArray(), "no Book I level file has an error")
+	for level_id: StringName in book1_stages():
 		var problems: Array[Dictionary] = validator.problems_of(Levels.get_level_path(level_id))
 		var lines: PackedStringArray = PackedStringArray()
 		for problem: Dictionary in problems:
@@ -450,7 +456,7 @@ func test_the_campaign_order_and_links() -> void:
 				assert_eq(Levels.parent_level(pair[1], _difficulty(mode)), pair[0], "%s belongs to %s" % [pair[1], pair[0]])
 	# Bonus stages: each one has exactly one source level, whose warp leads in.
 	var sources: Dictionary = {&"bonus_a": &"w1_l2", &"bonus_b": &"w2_l1", &"bonus_c": &"w3_l2"}
-	for level_id: StringName in Levels.all_ids():
+	for level_id: StringName in book1_stages():
 		for mode: String in [BEGINNER, EXPERT]:
 			var bonus: StringName = StringName(str(Levels.get_value(level_id, "bonus", "", _difficulty(mode))))
 			if bonus != &"":
@@ -469,10 +475,8 @@ func test_the_campaign_order_and_links() -> void:
 ## no bonus stage has one, all codes are unique, and every code leads to its level and mode.
 func test_every_stage_has_a_unique_code_per_mode() -> void:
 	var seen: Dictionary = {}
-	for level_id: StringName in Levels.all_ids():
+	for level_id: StringName in book1_stages():
 		var kind: String = str(Levels.get_value(level_id, "kind", Levels.KIND_MAIN))
-		if kind == Levels.KIND_TEST:
-			continue
 		for difficulty: int in [Defs.Difficulty.BEGINNER, Defs.Difficulty.EXPERT]:
 			var code: String = Levels.get_password(level_id, difficulty)
 			var playable: bool = kind != Levels.KIND_BONUS and Levels.is_available(level_id, difficulty)
@@ -486,6 +490,21 @@ func test_every_stage_has_a_unique_code_per_mode() -> void:
 					"code %s starts %s" % [code, level_id])
 			assert_eq(Levels.find_by_password(code.to_lower()), {"level_id": level_id, "difficulty": difficulty})
 	assert_eq(seen.size(), 2 * 8 + 3 + 1, "codes: 8 stages in both modes, 3 Expert-only stages, the ending")
+	# 2.0: the codes of the other books are unique across both books (GAMEPLAY.md 13.1), read as the code screen reads
+	# them; co-op files and arenas have none.
+	var book1: Dictionary = {}
+	for code: String in seen:
+		book1[Levels.normalize_code(code)] = seen[code]
+	for level_id: StringName in Levels.all_ids():
+		if Levels.get_book(level_id) == Levels.BOOK_1 and Levels.is_solo_level(level_id):
+			continue
+		for difficulty: int in [Defs.Difficulty.BEGINNER, Defs.Difficulty.EXPERT]:
+			var other: String = Levels.normalize_code(Levels.get_password(level_id, difficulty))
+			if not Levels.is_solo_level(level_id):
+				assert_eq(other, "", "%s (co-op or arena) has no code" % level_id)
+			elif other != "":
+				assert_false(book1.has(other), "%s's code %s is not a Book I code (%s)" % [level_id, other,
+						book1.get(other, "")])
 
 
 ## Every map stop has a marker of its own on an island of the world map (never on the sea), in the order of the
@@ -527,9 +546,7 @@ func test_every_level_text_is_translated() -> void:
 	var catalogue: String = FileAccess.get_file_as_string("res://locale/en.po")
 	var missing: PackedStringArray = PackedStringArray()
 	var regex: RegEx = RegEx.create_from_string("text=([A-Z0-9_]+)")
-	for level_id: StringName in Levels.all_ids():
-		if str(Levels.get_value(level_id, "kind", Levels.KIND_MAIN)) == Levels.KIND_TEST:
-			continue
+	for level_id: StringName in book1_stages():
 		for found: RegExMatch in regex.search_all(FileAccess.get_file_as_string(Levels.get_level_path(level_id))):
 			var key: String = found.get_string(1)
 			if not catalogue.contains("msgid \"%s\"" % key):
@@ -595,9 +612,9 @@ func test_every_weapon_a_run_can_bring_has_a_route() -> void:
 		if PICKUPS.has(level_id):
 			expected.append(int(PICKUPS[level_id]))
 		assert_eq(found, expected, "%s: the weapons lying in it" % level_id)
-	for level_id: StringName in Levels.all_ids():
-		if str(Levels.get_value(level_id, "kind", Levels.KIND_MAIN)) != Levels.KIND_TEST:
-			assert_true(STAGE_ORDER.has(String(level_id)), "%s is in STAGE_ORDER" % level_id)
+	for level_id: StringName in book1_stages():
+		assert_true(STAGE_ORDER.has(String(level_id)), "%s is in STAGE_ORDER" % level_id)
+	assert_eq(book1_stages().size(), STAGE_ORDER.size(), "STAGE_ORDER is every Book I stage")
 	var cells: int = 0
 	for level_id: String in STAGE_ORDER:
 		for mode: String in [BEGINNER, EXPERT]:
@@ -1474,6 +1491,18 @@ func _main_routes(level_id: String, mode: String, weapon: int) -> Array[String]:
 # =================================================================================================================
 # Helpers
 # =================================================================================================================
+
+## The stages of Book I's solo game (2.0): every level of book 1 that is not a co-op file, an arena or a test level -
+## the 15 files of 1.0, whatever Book II, co-op and arena files lie beside them in the folder. Every check of this
+## file that walks the folder walks these (Book II: tests/test_book2_routes.gd; co-op: tests/test_coop_routes.gd).
+static func book1_stages() -> Array[StringName]:
+	var stages: Array[StringName] = []
+	for level_id: StringName in Levels.all_ids():
+		if Levels.get_book(level_id) == Levels.BOOK_1 and Levels.is_solo_level(level_id) \
+				and Levels.get_level_kind(level_id) != Levels.KIND_TEST:
+			stages.append(level_id)
+	return stages
+
 
 ## The input text of a route: its file, after the prefix of a side path.
 func _route_text(spec: Dictionary, file: String, mode: String) -> String:

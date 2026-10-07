@@ -1,0 +1,5 @@
+# route: level=test_integration_book2 difficulty=both ends=exit after=tally expect=hurts:0,min_kills:2,checkpoints:1,min_score:1200,ticks:190..230
+# The Book II club route of the route-harness test bed (tests/test_integration_belt.gd): club the first turtle from
+# a standstill, jump onto the ledge for the three foods, club the second turtle, past the checkpoint into the exit.
+# It never presses S, so the belt-invariance runner must see the same digests with every special on the belt.
+20:R,40:,8:F,6:,8:R,14:RU,31:R,26:,8:F,6:,50:R

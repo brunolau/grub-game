@@ -686,6 +686,12 @@ func _redirect_user_data() -> void:
 # Digest: everything the simulation decides, after every tick
 # =================================================================================================================
 
+## The digest line of the running level's state now (what a --digest run writes after a tick); tests compare it with
+## the belt changed (PHYSICS.md C.2 rule 5: the belt is not part of it) and with anything else changed.
+func digest_line(level: LevelBase) -> String:
+	return _digest_line(level)
+
+
 ## One line per tick: tick, RNG state, score, the hero's feet point and a hash over the run state, the camera and
 ## every entity of the level that is not a cosmetic effect (feet point, velocities, facing, box, on_screen; enemies
 ## also awake / dead / hit points / tangible / flash; items whether collected).

@@ -1,0 +1,71 @@
+[gd_scene load_steps=2 format=3]
+
+[sub_resource type="GDScript" id="GDScript_key_probe"]
+script/source = "extends Node
+## Development probe (docs/expansion/DESIGN.md D.11, PLAN.md P1.12 / P4.3; excluded from exports by */dev/*): logs
+## every key event the engine reports - keycode, physical keycode, label, location - and the classic-layout party
+## actions (p1_* / p2_*) it reaches, so the NumLock and ghosting behaviour of a shared keyboard can be checked on a
+## real desktop. Run windowed:
+##   bash .tools/gd.sh play --autoplay-scene=res://scenes/core/dev/key_probe.tscn --hold=2400 --shots=99999
+## The log (res://build/key_probe.log, or the path in the environment variable KEY_PROBE_LOG) starts with
+## 'READY hwnd=<native window handle>'; F12 or 100 s end the run.
+
+const QUIT_SECONDS: float = 100.0
+
+var _log: FileAccess = null
+
+
+func _ready() -> void:
+	var path: String = OS.get_environment('KEY_PROBE_LOG')
+	if path.is_empty():
+		path = ProjectSettings.globalize_path('res://build/key_probe.log')
+	_log = FileAccess.open(path, FileAccess.WRITE)
+	Settings.set_value(Settings.PARTY_KEYBOARD_KEY, InputSlot.KEYBOARD_LAYOUT_NAMES[InputSlot.KeyboardLayout.CLASSIC])
+	GameInput.assign_slot(0, InputSlot.keyboard(Defs.InputSlotKind.KEYBOARD_LEFT))
+	GameInput.assign_slot(1, InputSlot.keyboard(Defs.InputSlotKind.KEYBOARD_RIGHT))
+	DisplayServer.window_set_title('KEY PROBE')
+	var label: Label = Label.new()
+	label.text = 'KEY PROBE - press keys, F12 ends'
+	add_child(label)
+	var hwnd: int = DisplayServer.window_get_native_handle(DisplayServer.WINDOW_HANDLE)
+	_write('READY hwnd=%d pid=%d' % [hwnd, OS.get_process_id()])
+	get_tree().create_timer(QUIT_SECONDS, true, false, true).timeout.connect(_quit)
+
+
+func _input(event: InputEvent) -> void:
+	var key: InputEventKey = event as InputEventKey
+	if key == null:
+		return
+	var actions: PackedStringArray = PackedStringArray()
+	for slot: int in 2:
+		for action: StringName in Defs.GAME_ACTIONS:
+			var generated: StringName = GameInput.slot_action(slot, action)
+			if InputMap.has_action(generated) and key.is_action(generated, true):
+				actions.append(String(generated))
+	_write('KEY pressed=%s echo=%s keycode=%d(%s) physical=%d(%s) label=%d(%s) location=%d shift_held=%s p1_attack=%s actions=%s' % [
+		key.pressed, key.echo, key.keycode, OS.get_keycode_string(key.keycode), key.physical_keycode,
+		OS.get_keycode_string(key.physical_keycode), key.key_label, OS.get_keycode_string(key.key_label),
+		key.location, Input.is_physical_key_pressed(KEY_SHIFT), Input.is_action_pressed(&'p1_attack'),
+		','.join(actions),
+	])
+	if key.pressed and key.physical_keycode == KEY_F12:
+		_quit()
+
+
+func _write(line: String) -> void:
+	print('KeyProbe: ', line)
+	if _log != null:
+		_log.store_line(line)
+		_log.flush()
+
+
+func _quit() -> void:
+	_write('END')
+	if _log != null:
+		_log.close()
+		_log = null
+	Flow.shutdown_and_quit(0)
+"
+
+[node name="KeyProbe" type="Node"]
+script = SubResource("GDScript_key_probe")

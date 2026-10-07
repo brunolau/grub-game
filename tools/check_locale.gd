@@ -25,6 +25,11 @@ const CATALOGUE: String = "res://locale/en.po"
 const LOCALE_DIR: String = "res://locale"
 const SOURCE_DIRS: PackedStringArray = ["res://scripts", "res://scenes"]
 const LEVEL_DIR: String = "res://levels"
+## 2.0 level sub-catalogues (locale/levels/<lang>/*.po, loaded beside the language file, PLAN.md P1.12): the texts of
+## Book II, co-op and arena files may live in the English ones instead of en.po (LEVEL_DESIGN.md 15.1). They are no
+## language of their own: the "another catalogue lacks a key" warnings skip them.
+const LEVEL_LOCALE_DIR: String = "res://locale/levels"
+const LEVEL_LOCALE_EN: String = "res://locale/levels/en"
 const CREDITS: String = "res://CREDITS.md"
 ## A string literal that is a translation key.
 const KEY_PATTERN: String = "\"((?:UI|SIGN|ZONE|MSG|HINT)_[A-Z0-9_]*[A-Z0-9])\""
@@ -54,11 +59,20 @@ static func scan() -> Dictionary:
 		for path: String in list_files(dir_path, ["gd", "tscn"]):
 			_collect_source(path, used)
 	_collect_credits(used)
-	_collect_levels(used)
+	var level_used: Dictionary = {}
+	_collect_levels(used, level_used)
+	var level_entries: Dictionary = {}
+	for path: String in list_files(LEVEL_LOCALE_EN, ["po"]):
+		level_entries.merge(read_catalogue(path, errors))
 	var missing: Array[String] = []
 	for key: String in used:
 		if not entries.has(key):
 			missing.append("%s (%s)" % [key, used[key]])
+	for key: String in level_used:
+		if entries.has(key):
+			_use(used, key, str(level_used[key]))
+		elif not level_entries.has(key):
+			missing.append("%s (%s; not in en.po nor %s/*.po)" % [key, level_used[key], LEVEL_LOCALE_EN])
 	missing.sort()
 	var unused: Array[String] = []
 	for key: String in entries:
@@ -66,7 +80,7 @@ static func scan() -> Dictionary:
 			unused.append(key)
 	unused.sort()
 	for path: String in list_files(LOCALE_DIR, ["po"]):
-		if path == CATALOGUE:
+		if path == CATALOGUE or path.begins_with(LEVEL_LOCALE_DIR + "/"):
 			continue
 		var other: Dictionary = read_catalogue(path, warnings)
 		for key: String in entries:
@@ -175,19 +189,26 @@ static func _collect_credits(used: Dictionary) -> void:
 		_use(used, "UI_CREDITS_" + found.get_string(1).to_upper(), "CREDITS.md (credits roll)")
 
 
-static func _collect_levels(used: Dictionary) -> void:
+## 2.0 (PLAN.md P1.3): only the Book I solo files ask locale/en.po; the keys of Book II, co-op and arena files go to
+## `level_used` and may also come from the English level sub-catalogues (LEVEL_LOCALE_EN, LEVEL_DESIGN.md 15.1).
+static func _collect_levels(used: Dictionary, level_used: Dictionary = {}) -> void:
 	var keys: RegEx = RegEx.create_from_string("(?:^|\\s)text=([^\\s]+)")
 	var names: RegEx = RegEx.create_from_string("(?m)^\\s*name\\s*=\\s*\"((?:[^\"\\\\]|\\\\.)*)\"")
 	for path: String in list_files(LEVEL_DIR, ["lvl"]):
 		var text: String = FileAccess.get_file_as_string(path)
 		var place: String = path.trim_prefix("res://")
+		var meta: Dictionary = LevelText.parse_meta(text)
+		var kind: String = str(meta.get("kind", "main"))
+		var book1_solo: bool = LevelText.meta_book(meta) == LevelText.BOOK_1 and kind != LevelText.KIND_COOP \
+				and kind != LevelText.KIND_ARENA
+		var target: Dictionary = used if book1_solo else level_used
 		for found: RegExMatch in keys.search_all(text):
-			_use(used, found.get_string(1), "%s:%d" % [place, _line_of(text, found.get_start(1))])
+			_use(target, found.get_string(1), "%s:%d" % [place, _line_of(text, found.get_start(1))])
 		if path.get_file().begins_with("test_"):
 			continue
 		var name: RegExMatch = names.search(text)
 		if name != null:
-			_use(used, name.get_string(1).c_unescape(), "%s (level name)" % place)
+			_use(target, name.get_string(1).c_unescape(), "%s (level name)" % place)
 
 
 static func _use(used: Dictionary, key: String, place: String) -> void:

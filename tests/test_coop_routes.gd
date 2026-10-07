@@ -11,6 +11,13 @@ extends RouteTestCase
 ## on the belt (the belt invariance of DESIGN.md C.1). The table is empty until the first co-op file and its routes
 ## land (phase 1 slice, phase 3 content); the tests pass on an empty table.
 
+## Content gates (PLAN.md 4.2 G1, 6.2 G3): until phase 3 is content complete only the Beginner route of every co-op
+## file is required; a missing Expert route is printed, not failed. Integration switches this on at G3 (V3.a).
+const REQUIRE_EXPERT_ROUTES: bool = false
+## The co-op files of the G1 vertical slice (PLAN.md 4.2): when one exists, its Beginner two-stream route must too.
+const SLICE_FILES: Array[StringName] = [&"w5_l1_coop", &"w1_l1_coop"]
+
+
 ## The co-op header routes: co-op files, a party of two or more.
 func _table() -> Dictionary:
 	return header_table(ROUTE_DIR, func(_file: String, spec: Dictionary) -> bool:
@@ -37,21 +44,75 @@ func test_every_coop_file_has_its_routes() -> void:
 		for level_id: StringName in files:
 			if file.begins_with(String(level_id) + ".") and not table.has(file):
 				problems.append("%s: a route of co-op file %s without a valid players=2 header" % [file, level_id])
+	var pending: PackedStringArray = PackedStringArray()
 	for level_id: StringName in files:
 		for mode: String in [BEGINNER, EXPERT]:
 			var difficulty: int = Defs.Difficulty.EXPERT if mode == EXPERT else Defs.Difficulty.BEGINNER
 			if not Levels.is_available(level_id, difficulty):
 				continue
-			var routes: PackedStringArray = PackedStringArray()
-			for file: String in table:
-				var spec: Dictionary = table[file]
-				if str(spec["level"]) == String(level_id) and (spec["modes"] as Array).has(mode) \
-						and str(spec.get("leaves", "")) != "" \
-						and (file == "%s.inputs" % level_id or file == "%s.expert.inputs" % level_id):
-					routes.append(file)
-			if routes.size() != 1:
-				problems.append("%s (%s): %d route(s) %s" % [level_id, mode, routes.size(), str(routes)])
+			var routes: PackedStringArray = stage_routes(table, level_id, mode)
+			var line: String = "%s (%s): %d route(s) %s" % [level_id, mode, routes.size(), str(routes)]
+			if routes.size() > 1:
+				problems.append(line)
+			elif routes.is_empty():
+				if REQUIRE_EXPERT_ROUTES or mode == BEGINNER or not Levels.is_available(level_id, Defs.Difficulty.BEGINNER):
+					problems.append(line)
+				else:
+					pending.append(line)
+	for line: String in pending:
+		print("    pending until G3: %s" % line)
 	assert_eq(problems, PackedStringArray(), "%d co-op file(s), %d route(s)" % [files.size(), table.size()])
+
+
+## The routes that end co-op file `level_id` on a mode: `<id>.inputs` / `<id>.expert.inputs` (the id ends in
+## `_coop`) with a two-stream header of that mode.
+static func stage_routes(table: Dictionary, level_id: StringName, mode: String) -> PackedStringArray:
+	var routes: PackedStringArray = PackedStringArray()
+	for file: String in table:
+		var spec: Dictionary = table[file]
+		if str(spec["level"]) == String(level_id) and (spec["modes"] as Array).has(mode) \
+				and str(spec.get("leaves", "")) != "" \
+				and (file == "%s.inputs" % level_id or file == "%s.expert.inputs" % level_id):
+			routes.append(file)
+	return routes
+
+
+## The G1 slice (PLAN.md 4.2): a slice co-op file that exists belongs to its solo level, plays in the co-op campaign
+## of its book and has its Beginner two-stream route.
+func test_the_slice_files_have_their_beginner_route() -> void:
+	var table: Dictionary = _table()
+	assert_eq(SLICE_FILES.size(), 2, "w5_l1_coop and w1_l1_coop")
+	for level_id: StringName in SLICE_FILES:
+		if not Levels.has_level(level_id):
+			print("    slice: %s has not landed yet" % level_id)
+			continue
+		var base: StringName = Levels.get_coop_base(level_id)
+		assert_eq(String(base), String(level_id).trim_suffix("_coop"), "%s is the co-op file of its solo level" % level_id)
+		assert_eq(Levels.get_coop_level(base), level_id)
+		assert_eq(Levels.level_for_mode(base, Defs.GameMode.COOP), level_id, "Flow plays it for %s in co-op" % base)
+		assert_eq(Levels.level_for_mode(level_id, Defs.GameMode.SINGLE), base, "and the solo file in single-player")
+		assert_eq(Levels.get_book(level_id), Levels.get_book(base), "%s keeps the book of %s" % [level_id, base])
+		assert_eq(Levels.get_password(level_id, Defs.Difficulty.BEGINNER), "", "co-op files have no codes")
+		assert_eq(stage_routes(table, level_id, BEGINNER).size(), 1, "%s: its Beginner route %s.inputs" % [
+			level_id, level_id])
+
+
+## Every co-op file is valid: no validator error (the validator's `--coop` rules are world-B's, PLAN.md P1.7; a
+## warning such as the `coop_base_hash` drift is printed).
+func test_every_coop_file_is_valid() -> void:
+	var validator: LevelValidator = LevelValidator.new()
+	validator.add_folder(Levels.LEVEL_DIR)
+	validator.run()
+	var problems: PackedStringArray = PackedStringArray()
+	var files: Array[StringName] = _coop_files()
+	for level_id: StringName in files:
+		for problem: Dictionary in validator.problems_of(Levels.get_level_path(level_id)):
+			if int(problem["severity"]) == LevelValidator.ERROR:
+				problems.append(LevelValidator.format_problem(problem))
+			else:
+				print("    warning: %s" % LevelValidator.format_problem(problem))
+	print("    co-op files: %d" % files.size())
+	assert_eq(problems, PackedStringArray(), "co-op files: no error")
 
 
 ## V3.a: every co-op route through Flow, as its header says.

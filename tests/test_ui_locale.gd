@@ -28,7 +28,9 @@ func test_level_names_and_sign_texts_are_catalogue_entries() -> void:
 	if catalogue == null:
 		return
 	for level_id: StringName in Levels.all_ids():
-		if str(Levels.get_value(level_id, "kind", Levels.KIND_MAIN)) == Levels.KIND_TEST:
+		# The 1.0 stages: Book I solo files (2.0 Book II / co-op names live in locale/levels/<lang>/*.po, P1.12).
+		if str(Levels.get_value(level_id, "kind", Levels.KIND_MAIN)) == Levels.KIND_TEST \
+				or Levels.get_book(level_id) != Levels.BOOK_1 or not Levels.is_solo_level(level_id):
 			continue
 		var raw: String = str(Levels.get_value(level_id, "name", ""))
 		assert_ne(raw, "", "%s has a name" % level_id)

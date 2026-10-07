@@ -1,0 +1,47 @@
+# Club & Grub level file - format 2 (docs/ARCHITECTURE.md 7.11). The Book II test bed of the route harness (owner:
+# integration; docs/expansion/PLAN.md P1.3): a Book II file (`book = 2`, so the fresh-club belt rule of PHYSICS.md C.2
+# applies) with what a club route meets - two turtles to club, food on a one-way ledge, a checkpoint and the exit -
+# and a P2 start for two-stream routes. The belt-invariance runner replays its header routes
+# (tests/fixtures/routes/test_integration_book2*.inputs) with every special on the belt (tests/test_integration_belt.gd);
+# no tar, vine or other Book II mechanic, so the routes stay valid while those systems land. Not part of any campaign
+# (kind = test).
+
+[meta]
+format = 2
+id = test_integration_book2
+name = "Far Shore Test Bed"
+kind = test
+book = 2
+biome = jungle
+terrain_a = jungle/terrain_grass
+terrain_b = jungle/terrain
+background = jungle
+music = level_jungle
+author = integration
+notes = "Route-harness test bed of 2.0 (P1.3): Book II club routes, the belt-invariance runner, two-stream routes."
+
+[legend]
+E = objects/exit locked=false
+C = objects/checkpoint
+T = enemies/walker skin=turtle left=-2 right=2 hp=10
+f = items/food index=3
+g = items/food index=17
+h = items/food index=26
+
+[tiles]
+|......................................|
+|......................................|
+|......................................|
+|......................................|
+|......................................|
+|......................................|
+|......................................|
+|..............f.g.h...................|
+|.............-------..................|
+|......................................|
+|..@........T..............T.....C....E|
+########################################
+########################################
+
+[entities]
+objects/hero_start 1 10 slot=2
