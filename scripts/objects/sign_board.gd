@@ -16,7 +16,9 @@ extends SimEntity
 ## never hidden by the stage name.
 ## One board at a time (2.0, G1 verification): the board a hero came to last is in front; any other board - held for
 ## its read time or read by the partner - fades out while it shows, so two boards never cover each other (co-op signs
-## stand a few columns apart). With two or more heroes the board stays below the P2 panel of the HUD (VIEW_TOP_PARTY).
+## stand a few columns apart). A board over the HUD's co-op P2 panel stays below it.
+## A board that would have to come down over the heads of the heroes at the sign (a sign near the top of the view)
+## hangs under the sign instead, its tail pointing up.
 
 ## Widest text line (art px) and the room around the text inside the board.
 const TEXT_MAX_W: float = 360.0
@@ -39,8 +41,12 @@ const HOLD_MARGIN: float = 200.0
 ## Top edge of the board while a boss bar shows under the hearts (view px): the board stays below the bar, and a
 ## held board gives way to the fight.
 const VIEW_TOP_BOSS: float = 96.0
-## Top edge of the board while the level holds two or more heroes (view px): below the HUD's P2 panel.
-const VIEW_TOP_PARTY: float = 96.0
+## Gap kept under the HUD's co-op P2 panel by a board that lies under it (view px).
+const P2_PANEL_GAP: float = 4.0
+## A board whose bottom edge would come lower than this above the feet point (art px) covers the reader's head: it
+## hangs this far under the feet point instead (art px), when it fits into the view there.
+const HEAD_ART: float = 80.0
+const BOARD_BELOW_ART: float = 14.0
 ## Colours of ui/panel.png's edge: outline, rim and face. The tail is drawn with them.
 const COL_EDGE: Color = Color8(46, 39, 31)
 const COL_RIM: Color = Color8(108, 61, 40)
@@ -66,6 +72,9 @@ var _boss_bar: bool = false
 ## Presentation: a hero was at the board on the last frame; the board in front (the one a hero came to last).
 var _was_near: bool = false
 static var _front: SignBoard = null
+## Presentation: the board hangs under the sign (no room above it); the HUD's co-op P2 panel (empty = none).
+var _flipped: bool = false
+var _p2_rect: Rect2 = Rect2()
 
 
 func _init() -> void:
@@ -145,6 +154,10 @@ func _process(delta: float) -> void:
 	if _shown_for == 0.0 and hud != null and hud.has_method(&"dismiss_intro"):
 		hud.call(&"dismiss_intro")
 	_boss_bar = hud != null and hud.has_method(&"is_boss_bar_visible") and bool(hud.call(&"is_boss_bar_visible"))
+	_p2_rect = Rect2()
+	var panel: Control = hud.get(&"_p2_panel") as Control if hud != null else null
+	if panel != null and panel.is_visible_in_tree():
+		_p2_rect = panel.get_global_rect()
 	_shown_for += delta
 	_away_for = 0.0 if _near else _away_for + delta
 	var front_valid: bool = is_instance_valid(_front) and _front.is_inside_tree()
@@ -199,12 +212,20 @@ func _place_board() -> void:
 	var board: Vector2 = _label.size * Vector2(scale_x, scale_y)
 	var left: float = origin.x - board.x * 0.5
 	left = clampf(left, VIEW_EDGE, maxf(VIEW_EDGE, view.x - VIEW_EDGE - board.x))
-	var party: bool = Game.level != null and Game.level.hero_count() > 1
-	var top: float = maxf(origin.y + BOARD_BOTTOM_ART * scale_y - board.y,
-			VIEW_TOP_BOSS if _boss_bar else (VIEW_TOP_PARTY if party else VIEW_TOP))
+	var limit: float = VIEW_TOP_BOSS if _boss_bar else VIEW_TOP
+	if _p2_rect.size.x > 0.0 and left < _p2_rect.end.x and left + board.x > _p2_rect.position.x:
+		limit = maxf(limit, _p2_rect.end.y + P2_PANEL_GAP)
+	var top: float = maxf(origin.y + BOARD_BOTTOM_ART * scale_y - board.y, limit)
+	var flip: bool = false
+	if top + board.y > origin.y - HEAD_ART * scale_y:
+		var below: float = origin.y + BOARD_BELOW_ART * scale_y
+		if below + board.y <= view.y - VIEW_EDGE:
+			top = below
+			flip = true
 	var target: Vector2 = Vector2(roundf((left - origin.x) / scale_x), roundf((top - origin.y) / scale_y))
-	if target != _label.position:
+	if target != _label.position or flip != _flipped:
 		_label.position = target
+		_flipped = flip
 		_tail.queue_redraw()
 
 
@@ -218,11 +239,29 @@ func get_board_rect() -> Rect2:
 func _draw_tail() -> void:
 	var size: Vector2 = _label.size
 	var center: float = clampf(roundf(-_label.position.x), TAIL_INSET, size.x - TAIL_INSET)
+	if _flipped:
+		_draw_tail_up(center)
+		return
 	var bottom: float = size.y
 	# Open the board's bottom edge (its shade and rim rows) above the tail.
 	_tail.draw_rect(Rect2(center - float(TAIL_HALF - 3), bottom - 5.0, float(2 * TAIL_HALF - 6), 3.0), COL_FACE)
 	for k: int in TAIL_HALF + 1:
 		var y: float = bottom - 2.0 + float(k)
+		var outline: int = TAIL_HALF - k
+		if outline <= 0:
+			break
+		_tail.draw_rect(Rect2(center - float(outline), y, float(2 * outline), 1.0), COL_EDGE)
+		if outline > 2:
+			_tail.draw_rect(Rect2(center - float(outline - 2), y, float(2 * (outline - 2)), 1.0), COL_RIM)
+		if outline > 4:
+			_tail.draw_rect(Rect2(center - float(outline - 4), y, float(2 * (outline - 4)), 1.0), COL_FACE)
+
+
+## The tail of a board hanging under its sign: the same wedge mirrored, opening the board's top edge.
+func _draw_tail_up(center: float) -> void:
+	_tail.draw_rect(Rect2(center - float(TAIL_HALF - 3), 2.0, float(2 * TAIL_HALF - 6), 3.0), COL_FACE)
+	for k: int in TAIL_HALF + 1:
+		var y: float = 1.0 - float(k)
 		var outline: int = TAIL_HALF - k
 		if outline <= 0:
 			break
