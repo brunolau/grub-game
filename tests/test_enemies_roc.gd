@@ -12,15 +12,26 @@ const PLAYER_SCENE: String = "res://scenes/player/player.tscn"
 const NEST_X0: int = 96
 const NEST_X1: int = 224
 const NEST_TOP: int = 128
+## The developer level (the same cells: nest cols 6-13 of row 8, the floor at row 10, drop clouds at row 5), played in
+## the real level scene by the Lab of tests/test_enemies_tusker.gd.
+const LEVEL_PATH: String = "res://levels/test_enemies_roc.lvl"
+const Lab = preload("res://tests/test_enemies_tusker.gd").Lab
 
 var _p2: PlayerBase = null
+## Where the single-hero search keeps its idle partner (x < 0: none kept).
+var _p2_spot: Vector2i = Vector2i(-1, -1)
 var _defeated: Array[BossBase] = []
+var _lab: Lab = null
+var _was_manual: bool = false
 
 
 func before_each() -> void:
 	super.before_each()
 	_defeated.clear()
 	_p2 = null
+	_p2_spot = Vector2i(-1, -1)
+	_lab = null
+	_was_manual = Sim.manual
 	Events.boss_defeated.connect(_on_defeated)
 
 
@@ -30,8 +41,64 @@ func after_each() -> void:
 	Game.helper_mode = false
 	if _level != null and is_instance_valid(_level):
 		_level.set_wind(0)
+	if _lab != null:
+		if _lab.level != null and is_instance_valid(_lab.level):
+			_lab.level.set_wind(0)
+		Sim.stop()
+		Sim.manual = _was_manual
+		Audio.stop_music(0.0)
+		Lab.cleanup_flow(get_tree())
+		_lab = null
 	Game.new_game(Defs.Difficulty.BEGINNER)
 	Game.begin_level(&"")
+
+
+# =================================================================================================================
+# The test level: the weak points clear of the HUD
+# =================================================================================================================
+
+## G35 (lead designer, wf9 #2 as corrected): on the test level's locked view every strikable pose keeps its weak point
+## wholly in the view and clear of the fight HUD (ui's Hud.weak_point_problem) - the perched head band on both rims,
+## the buried / stunned head, the tumbling tail.
+func test_the_weak_points_stay_clear_of_the_hud_on_the_test_level() -> void:
+	var roc: Roc = _open_lab(Defs.Difficulty.EXPERT)
+	_lab.step(PackedInt32Array([0]))
+	var view: Rect2i = _lab.level.get_view_rect()
+	var poses: Array[Array] = []
+	for rim: int in [0, 1]:
+		roc._perch(rim)
+		poses.append(["perched on rim %d" % rim, roc.get_head_rect()])
+		roc._set_state(Roc.State.BURIED)
+		poses.append(["beak buried on rim %d" % rim, roc.get_head_rect()])
+	roc._tumble()
+	roc._dive_pending = true
+	poses.append(["tumbling", roc.get_head_rect()])
+	roc._dive_pending = false
+	for pose: Array in poses:
+		var rect: Rect2i = pose[1]
+		assert_true(rect.has_area(), "%s: a weak point" % pose[0])
+		assert_true(view.encloses(rect), "%s: wholly in the view" % pose[0])
+		var art: Rect2 = Rect2(Vector2(rect.position - view.position) * 2, Vector2(rect.size) * 2)
+		assert_eq(Hud.weak_point_problem(art, Vector2(view.size) * 2), "", "%s: the HUD rule" % pose[0])
+
+
+## The test level in the real level scene (the fixture's own room freed first), one real hero, club in hand.
+func _open_lab(difficulty: int, party: int = 1) -> Roc:
+	if _level != null and is_instance_valid(_level):
+		_level.free()
+	_level = null
+	_hero = null
+	_lab = Lab.new()
+	assert_true(_lab.open(self, LEVEL_PATH, "bosses/roc", difficulty, party), "the nest came up")
+	return _lab.boss as Roc
+
+
+func _close_lab() -> void:
+	if _lab != null and _lab.level != null and is_instance_valid(_lab.level):
+		_lab.level.set_wind(0)
+		_lab.level.free()
+	GameInput.clear_scripted()
+	_lab = null
 
 
 # =================================================================================================================
@@ -68,11 +135,41 @@ func test_wings_telegraph_then_a_gust_blows_away_from_it_with_feathers() -> void
 	Sim.step(Roc.GUST_TICKS - Roc.FEATHER_PERIOD - 1)
 	assert_eq(_level.wind, 0, "66 ticks of wind")
 	assert_eq(roc.get_state(), Roc.State.REST, "then it rests again")
+	roc._refresh_visual()
+	assert_null(roc.get_gust_sprite(), "the swirl only while the gust blows")
 	for gust: int in Roc.GUSTS - 1:
 		Sim.step(Roc.REST_TICKS + Roc.WINGS_TICKS + Roc.GUST_TICKS)
 		_hero.hit_timer = 0
 		Game.hearts = Tuning.ENERGY_START
 	assert_eq(roc.get_state(), Roc.State.TAKEOFF, "after 3 gusts it takes off")
+
+
+## The gale's direction swirl (art-B's roc_parts `gust`, 3 frames): drawn while a gust blows, in front of the Roc on
+## the downwind side and pointing downwind; mirrored when it blows the other way.
+func test_a_gust_shows_the_swirl_pointing_downwind() -> void:
+	var roc: Roc = _fight()
+	if EnemySkin.find(Roc.PARTS_SKIN) == null:
+		assert_true(true, "no roc_parts sheet: nothing to draw")
+		return
+	for rim: int in [0, 1]:
+		# The hero across the nest: it faces him, the gust blows his way.
+		_hero.teleport(Vector2i(290 if rim == 0 else 30, 160))
+		roc._perch(rim)
+		_step_until(func() -> bool: return roc.get_state() == Roc.State.GUST, 120)
+		roc._refresh_visual()
+		var swirl: Sprite2D = roc.get_gust_sprite()
+		assert_not_null(swirl, "rim %d: the swirl shows during the gust" % rim)
+		if swirl == null:
+			continue
+		var downwind: int = 1 if rim == 0 else -1
+		assert_eq(roc.facing, downwind, "rim %d: it faces the hero across the nest" % rim)
+		assert_eq(signi(_level.wind), -downwind, "rim %d: the wind blows away from it (wind > 0 blows left)" % rim)
+		assert_true(swirl.frame >= 5 and swirl.frame <= 7, "a gust frame (%d)" % swirl.frame)
+		assert_eq(swirl.flip_h, downwind < 0, "pointing downwind")
+		assert_eq(signi(int(swirl.position.x)), downwind, "in front of it, downwind")
+		Sim.step(3)
+		roc._refresh_visual()
+		assert_ne(swirl.frame, -1)
 
 
 func test_the_perched_head_takes_a_high_strike_from_the_nest() -> void:
@@ -350,6 +447,79 @@ func test_coop_a_helper_is_never_snatched() -> void:
 	Game.helper_mode = false
 
 
+## G33: the wing shield faces the nearer ACTIVE hero. P2 dozes right beside the perched Roc, P1 strikes from the other
+## side: the shield stays on P1 (his hit glances); once P2 plays again the shield turns to him and P1's hit counts.
+func test_coop_the_wing_shield_ignores_a_dozing_partner() -> void:
+	var roc: Roc = _coop_fight(Vector2i(roc_right(), NEST_TOP), Vector2i(20, 160))
+	_p2.teleport(Vector2i(roc.sim_pos.x - 62, NEST_TOP))
+	_hero.teleport(Vector2i(roc.sim_pos.x + 80, NEST_TOP))
+	_p2.idle = true
+	Sim.step(1)
+	assert_eq(roc.facing, 1, "P2 is nearer but dozes: the shield faces P1")
+	_hero.club_box_active = true
+	_hero.club_box = roc.get_head_rect()
+	_hero.club_power = 25
+	Sim.step(1)
+	_hero.club_box_active = false
+	assert_eq(roc.hp, roc.max_hp, "P1's hit glances off the shield")
+	Sim.step(Tuning.BOSS_HIT_COOLDOWN)
+	_p2.idle = false
+	Sim.step(1)
+	assert_eq(roc.facing, -1, "P2 plays again: the shield turns to him")
+	_hero.club_box_active = true
+	_hero.club_box = roc.get_head_rect()
+	Sim.step(1)
+	_hero.club_box_active = false
+	assert_eq(roc.hp, roc.max_hp - 25, "the pincer: P1's hit counts")
+
+
+## G33: a dozing target is never snatched (the Snatch and its rescue are co-op rules): the dive only knocks him, as
+## solo, and pulls up.
+func test_coop_a_dozing_target_is_not_snatched() -> void:
+	Game.difficulty = Defs.Difficulty.EXPERT
+	var roc: Roc = _coop_fight(Vector2i(60, 160), Vector2i(260, 160))
+	_hero.down = true
+	_p2.idle = true
+	roc._take_off()
+	var dived: bool = false
+	var hurt: bool = false
+	for tick: int in 500:
+		Sim.step(1)
+		dived = dived or roc.get_state() == Roc.State.DIVE
+		hurt = hurt or _p2.hit_timer > 0
+		assert_null(roc.get_held(), "never holds the dozing hero")
+		_p2.run.hearts = Tuning.ENERGY_START
+		_p2.hit_timer = mini(_p2.hit_timer, 1)
+		if hurt:
+			break
+	assert_true(dived, "it dived at him")
+	assert_true(hurt, "the dive's touch knocks him")
+	assert_false(_p2.is_down(), "no egg")
+
+
+## G35: a snatching Roc climbs at 2 px per tick, but its head band (the rescue's weak point) never comes closer than
+## 72 px to the view's top (the boss bar's columns' bound, wherever it flies) - it hovers there until the rescue or the
+## egg; ui's Hud.weak_point_problem agrees all the way.
+func test_coop_the_snatch_climbs_no_higher_than_the_hud_allows() -> void:
+	Game.difficulty = Defs.Difficulty.EXPERT
+	var roc: Roc = _coop_fight(Vector2i(60, 160), Vector2i(260, 160))
+	roc._take_off()
+	_step_until(func() -> bool: return roc.get_state() == Roc.State.SNATCH, 400)
+	assert_eq(roc.get_state(), Roc.State.SNATCH)
+	var view: Rect2i = _level.get_view_rect()
+	var highest: int = 1000
+	for tick: int in Roc.SNATCH_TICKS - 1:
+		Sim.step(1)
+		if roc.get_state() != Roc.State.SNATCH:
+			break
+		var head: Rect2i = roc.get_head_rect()
+		highest = mini(highest, head.position.y - view.position.y)
+		assert_true(view.encloses(head), "the head band stays in the view")
+		var art: Rect2 = Rect2(Vector2(head.position - view.position) * 2, Vector2(head.size) * 2)
+		assert_eq(Hud.weak_point_problem(art, Vector2(view.size) * 2), "", "tick %d: the HUD rule" % tick)
+	assert_eq(highest, Roc.HUD_CLEAR_PX, "it climbs to 72 px under the view top and no higher")
+
+
 func test_coop_beginner_has_no_snatch() -> void:
 	var roc: Roc = _coop_fight(Vector2i(60, 160), Vector2i(260, 160))
 	roc._take_off()
@@ -395,23 +565,38 @@ func test_coop_pilot_and_spotter() -> void:
 	assert_eq(roc.dive_count, 1, "a dive nobody spotted within 24 ticks is lost")
 
 
-## V3.d: one hero cannot beat the co-op Roc. The real hero, his partner an egg, with every weapon from every spot of the
-## nest and the floor plus seeded random inputs, never hurts the perched Roc (the wing shield always faces him); and in
-## the storm his own dives never count without a spotter (Pilot and Spotter).
+## V3.d: one hero cannot beat the co-op Roc. The real hero - his partner an egg, or hatched and IDLE anywhere he could
+## be hatched (on the nest by either rim, on the floor on both sides; G33 / G34) - with every weapon from every spot of
+## the nest and the floor plus seeded random inputs, never hurts the perched Roc (the wing shield always faces him);
+## and in the storm his own dives never count without a spotter (Pilot and Spotter), the dozing partner on the nest.
 func test_the_single_hero_search_cannot_beat_the_coop_roc() -> void:
 	var roc: Roc = _coop_room()
 	var hero: PlayerBase = _real_hero(Vector2i(200, NEST_TOP))
 	_p2 = _add_hero2(Vector2i(30, 160))
-	_p2.down = true
 	roc.start_fight()
 	assert_true(roc.is_coop_form())
 	var rng: SimRng = SimRng.new(77)
-	for weapon: int in [Defs.Weapon.CLUB, Defs.Weapon.HAMMER, Defs.Weapon.AXE, Defs.Weapon.BOOMERANG, Defs.Weapon.SPEAR]:
-		for x: int in [100, 150, 170, 200, 215, 40, 280]:
-			roc._perch(0 if x >= 150 else 1)
-			var y: int = NEST_TOP if x >= NEST_X0 and x < NEST_X1 else 160
-			_episode(hero, weapon, Vector2i(x, y), _random_flags(rng, 120))
-			assert_eq(roc.hp, roc.max_hp, "perched: weapon %d from x %d never counts" % [weapon, x])
+	var partners: Array[Vector2i] = [Vector2i(-1, -1), Vector2i(NEST_X0 + 8, NEST_TOP), Vector2i(NEST_X1 - 8, NEST_TOP),
+			Vector2i(150, NEST_TOP), Vector2i(30, 160), Vector2i(290, 160)]
+	for partner: Vector2i in partners:
+		_p2_spot = partner if partner.x >= 0 else Vector2i(30, 160)
+		_p2.respawn_at(_p2_spot)
+		_p2.idle = true
+		_p2.down = partner.x < 0
+		var weapons: Array[int] = [Defs.Weapon.CLUB, Defs.Weapon.HAMMER, Defs.Weapon.AXE, Defs.Weapon.BOOMERANG,
+				Defs.Weapon.SPEAR]
+		if partner.x >= 0:
+			weapons = [Defs.Weapon.CLUB, Defs.Weapon.AXE, Defs.Weapon.SPEAR]
+		for weapon: int in weapons:
+			for x: int in [100, 150, 170, 200, 215, 40, 280]:
+				roc._perch(0 if x >= 150 else 1)
+				var y: int = NEST_TOP if x >= NEST_X0 and x < NEST_X1 else 160
+				_episode(hero, weapon, Vector2i(x, y), _random_flags(rng, 120))
+				assert_eq(roc.hp, roc.max_hp, "partner %s, perched: weapon %d from x %d never counts" % [partner,
+						weapon, x])
+	_p2_spot = Vector2i(150, NEST_TOP)
+	_p2.respawn_at(_p2_spot)
+	_p2.idle = true
 	roc.hp = roc.get_storm_hp()
 	roc._begin_storm()
 	hero.set_glider(true)
@@ -421,7 +606,7 @@ func test_the_single_hero_search_cannot_beat_the_coop_roc() -> void:
 		var strikes: PackedInt32Array = _random_flags(rng, Roc.TUMBLE_TICKS + 4)
 		strikes[1] = Defs.IN_FIRE
 		_episode(hero, Defs.Weapon.CLUB, hero.sim_pos, strikes, false)
-	assert_eq(roc.hp, roc.get_storm_hp(), "his own dives never count alone")
+	assert_eq(roc.hp, roc.get_storm_hp(), "his own dives never count alone (the dozing partner on the nest)")
 	assert_false(roc.dead)
 
 
@@ -588,6 +773,13 @@ func _episode(hero: PlayerBase, weapon: int, pos: Vector2i, flags: PackedInt32Ar
 		hero.hit_timer = mini(hero.hit_timer, 1)
 		if hero.dead or hero.is_down():
 			hero.respawn_at(pos)
+		if _p2 != null and is_instance_valid(_p2) and not _p2.is_down() and _p2_spot.x >= 0:
+			# The search's idle partner stays where he was put, hatched and idle.
+			_p2.run.hearts = Tuning.ENERGY_START
+			_p2.hit_timer = mini(_p2.hit_timer, 1)
+			if _p2.dead or _p2.sim_pos != _p2_spot:
+				_p2.respawn_at(_p2_spot)
+			_p2.idle = true
 	GameInput.clear_scripted()
 
 

@@ -36,6 +36,8 @@ const BACKGROUND_DIR: String = "res://assets/backgrounds/"
 
 ## Drift of a plane with scroll factor 1 in art px per second (0 = static picture).
 var speed: float = 24.0
+## The set shown ([method set_backdrop]; "" while none).
+var backdrop_id: String = ""
 
 var _top: Color = UiKit.COL_INK
 var _tile_up: bool = false
@@ -82,19 +84,51 @@ func _draw() -> void:
 				x += width
 
 
-## Switch to another background set (a key of SETS).
+## Switch to another background set: a key of SETS (the menu sets of 1.0), or any parallax set of the levels
+## (ParallaxSets.SETS: 2.0's canyon, swamp, mushroom, mangrove, coast, sea_cave, ruins, temple, sky, storm, pyre),
+## so a screen can show the backdrop of any stage (the tally).
 func set_backdrop(set_id: String) -> void:
 	_textures.clear()
 	_factors = PackedFloat32Array()
-	var entry: Dictionary = SETS.get(set_id, {})
+	var entry: Dictionary = entry_of(set_id)
+	backdrop_id = set_id if not entry.is_empty() else ""
 	if entry.is_empty():
 		push_error("UiBackdrop: unknown background set '%s'" % set_id)
 		return
 	_top = entry["top"]
 	_tile_up = bool(entry["tile_up"])
 	for layer: Array in entry["layers"]:
-		var texture: Texture2D = UiKit.tex(BACKGROUND_DIR + set_id + "/" + str(layer[0]) + ".png")
+		var texture: Texture2D = UiKit.tex(str(layer[0]))
 		if texture != null:
 			_textures.append(texture)
 			_factors.append(float(layer[1]))
 	queue_redraw()
+
+
+## True when `set_id` names a backdrop ([method set_backdrop]).
+static func has_set(set_id: String) -> bool:
+	return SETS.has(set_id) or ParallaxSets.has_set(set_id)
+
+
+## The backdrop `set_id` as {"top", "tile_up", "layers": [[texture path, scroll factor], ...]} back to front ({} when
+## unknown). A level's parallax set: its fill colour on top; its wall pattern (a TILE first layer) repeats upwards.
+static func entry_of(set_id: String) -> Dictionary:
+	if SETS.has(set_id):
+		var own: Dictionary = SETS[set_id]
+		var paths: Array = []
+		for layer: Array in own["layers"]:
+			paths.append([BACKGROUND_DIR + set_id + "/" + str(layer[0]) + ".png", float(layer[1])])
+		return {"top": own["top"], "tile_up": own["tile_up"], "layers": paths}
+	if not ParallaxSets.has_set(set_id):
+		return {}
+	var layers: Array = ParallaxSets.layers(set_id)
+	var result: Array = []
+	for layer: Dictionary in layers:
+		result.append([ParallaxSets.texture_path(layer), float(layer["scroll"])])
+	var tile_up: bool = not layers.is_empty() and int((layers[0] as Dictionary)["anchor"]) == ParallaxSets.Anchor.TILE
+	return {"top": ParallaxSets.fill_color(set_id), "tile_up": tile_up, "layers": result}
+
+
+## Number of layers drawn (tests).
+func get_layer_count() -> int:
+	return _textures.size()

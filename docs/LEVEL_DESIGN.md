@@ -593,7 +593,10 @@ files and their 72 route files are frozen: never edit them** (a guard test check
 | `scroll` | + `rising` | | the rising tide (P-C.8) |
 | `rise_speed` | v16 per tick | `16` | 16 = 1 px/tick; `.expert` variant allowed |
 | `wind` | `tick:value,...` | | values may be negative (wind to the right) |
-| `wind_loop` | ticks | `0` | the wind script restarts every that many ticks (alternating gusts) |
+| `wind_loop` | ticks | `0` | the wind script restarts every that many ticks (alternating gusts); in an arena the referee drives it, synced to the round |
+| `dark_pulse` | `<period>[:<night>]` | none | arenas: from round tick `period` on, the first `night` [73] ticks of every period are night (heroes glow; 22-tick fade as the telegraph) - Echo Hollow `486` [G43] |
+| `regrow` | ticks | `0` | arenas: a broken `$` block grows back that long after it broke (a ghost block first, solid only when no hero overlaps the cell) - Echo Hollow `364` [G43] |
+| `ember_lane` | `<col>,<width>[,<period>]` | none | arenas: an ember drifts down a random column of the lane every `period` [66] round ticks after a glow at its start; its touch is an arena hit - Cinder Pit [G43] |
 | `biome` | + `canyon` `swamp` `coast` `ruins` `sky` | | default terrain, backdrop and music of the new worlds |
 
 New terrain atlases (same 40-tile layout and collision as every set): `canyon/terrain`, `canyon/terrain_mesa`,
@@ -698,9 +701,9 @@ every hero glows warm and every prop whose name holds "glow" (`swamp/props/glowc
 | Tar | wade 2 px/tick; hop 33 px | 15.3 |
 | Geyser | -224: 105 px, the same as a spring or an Up bounce | a geyser lifts to a ledge up to 6 tiles above its vent, also from a tar floor (the way out of a tar pit) |
 | Raft | current 1-3 px/tick; paddle up to 3 px/tick of its own; banks stop it | keep a raft's path free of cells at its surface row except the banks you want |
-| Rising tide | 1 px/tick = one row per 16 ticks; the view chases a jump's apex and never sinks again, so a jump that does not land higher kills (6-2b, D6) [G32] | a Beginner stopping 73 ticks (3 s) loses 4.5 rows: give every climb that much spare; every jump of a rising climb lands higher - one-way ledges 3 rows apart in one jump column |
+| Rising tide | 1 px/tick = one row per 16 ticks; the view chases a jump's apex and never sinks again, so a jump that does not land higher kills (6-2b, D6) [G32]; world-A is asked to make the view follow the hero's footing instead (P-C.8 "footing follow" [G42]) | a Beginner stopping 73 ticks (3 s) loses 4.5 rows: give every climb that much spare; until the footing follow is built every jump of a rising climb lands higher - one-way ledges 3 rows apart in one jump column, and no target (a bat, a spot) that invites a jump in place on a climb ledge |
 | Chomper | 4 px/tick; hop 55 px, 84 px far at full speed | mounted gaps <= 4 tiles, steps <= 3 rows, 4 rows of air in mounted corridors, no sprite platforms on mounted stretches |
-| Gusts | negative `wind` pushes right; crouching braces; co-op: a hero up to 64 px downwind of a crouching partner (16 px up or down) feels no wind, and a jump taken there stays sheltered until he lands (the lee) | alternate with `wind_loop`; give a crouching spot before every gap; a co-op lee gap is at most 3 tiles with a crouching spot within 64 px downwind of its far edge |
+| Gusts | negative `wind` pushes right; crouching braces; co-op: a hero up to 64 px downwind of a crouching (so active) partner (16 px up or down) feels no wind, and a jump taken there stays sheltered until he lands (the lee) [G41] | alternate with `wind_loop`; give a crouching spot before every gap; a co-op lee gap is at most 3 tiles with a crouching spot within 64 px downwind of its far edge |
 | Lightning | the column is marked 22 ticks before the bolt; `period` [66]; it alternates between the heroes inside | never two bolts on the only safe cell in a row |
 
 ### 15.6 Book II rules
@@ -720,7 +723,13 @@ every hero glows warm and every prop whose name holds "glow" (`swamp/props/glowc
   row, the boss bar, P2's panel and the versus corners) and show one at a time: two signs a few columns apart are
   fine, but give each idea one short sign. `tests/test_ui_signs.gd` guards `locale/en.po`; check your own `.po` the
   same way.
-- **Boss arenas** as section 10, one walled screen each; the geometry of every arena is in GAMEPLAY 13.6.
+- **Boss arenas** as section 10, one walled screen each; the geometry of every arena is in GAMEPLAY 13.6. **Weak points
+  clear of the HUD** [G35]: lock the camera on 11 rows whose last row is the arena floor, and keep every rectangle a
+  counted hit must touch at least 55 px under the view's top - 72 px in the boss bar's columns (53 px left to 38 px
+  right of the view's centre): at most 105 / 88 px over the floor's top. The fight HUD is the top row (31 px on
+  touch devices) plus the boss bar under the hearts; `Hud.weak_point_problem` checks a rectangle. Old Mangrove's upper
+  ledge is row 5 (ending at col 5), the Chieftains' altar is 3 rows up; the boss test pins it, the preview at the base
+  view shows it.
 
 ### 15.7 Co-op files
 
@@ -736,14 +745,14 @@ every hero glows warm and every prop whose name holds "glow" (`swamp/props/glowc
    height gate or hit a role holder (a plate holder, a baiter), and bond what the stage wants bonded (5-1 co-op:
    four records out, the long-climb Rollers one bond) [G22]; the trait share counts the records that remain.
 5. Validator `--coop` clean; `tests/test_coop_gates.gd` green (every gate refused by the solo search); record the
-   two-stream routes (15.9).
+   two-stream routes (15.9) - with no role standing 243+ ticks without input (15.7.9).
 
 #### 15.7.2 Duo metrics in tiles
 
 | Move | Numbers (P-C.10, P-C.11) | Design with |
 |---|---|---|
-| Shoulder Hop | feet reach 140 px over the floor (8.75 tiles); at or above 8 tiles for 10 ticks; only off an **active** partner - never off an egg (a hatch bounce is 10 px) or an idle hero [G1] | boost ledges 8 tiles over every floor within reach, both difficulties [G28]; 11 rows of air over the hop spot |
-| Totem Ride, rider's jump | from a still carrier 98 px (6 tiles); a jump 1-5 ticks after the carrier's: 139-152 px (8.5-9.5 tiles) | a 5-tile ledge is the easy Totem ledge; 7-8 tiles need the timed Totem launch or the hop |
+| Shoulder Hop | feet reach 140 px over the floor (8.75 tiles); at or above 8 tiles for 10 ticks; only off an **active** partner - never off an egg (a hatch bounce is 10 px) or an idle hero [G1] [G33] | boost ledges 8 tiles over every floor within reach, both difficulties [G28]; 11 rows of air over the hop spot |
+| Totem Ride, rider's jump | from a still carrier 98 px (6 tiles); a jump 1-5 ticks after the carrier's: 139-152 px (8.5-9.5 tiles); only on an **active** carrier - an idle partner's head is passed through [G33] | a 5-tile ledge is the easy Totem ledge (a gate: one player cannot ride his parked partner); 7-8 tiles need the timed Totem launch or the hop |
 | Totem Ride, rider's strikes | high strike 61-77 px, forward strike 36-49 px over the floor | targets 4-5 rows up for a rider; 5 rows of air where a rider is expected |
 | Line drive | 153 px to the same height (rise 36 px), and the ball stops where it lands; charged 325 px | Batter Up gaps 8 tiles (Beginner; the curl spot within 25 px of the edge) / 9 tiles (Expert: within 9 px, or charged); 4 rows of air over the gap; a landing area 2+ cells deep |
 | Lob | rise 120 px; at or above 7 tiles on ticks 12-19, 24-38 px out | lob ledges 7 rows up with their face 2-3 cells from the curl spot; 9 rows of air over the curl spot |
@@ -762,10 +771,10 @@ and keepers).
 
 | Kind | Recipe |
 |---|---|
-| **Boost ledge** | a ledge **8 rows over every floor within reach on both difficulties** [G28] - a flat floor at least 3 cells wide under its face, no step, root or rock nearer the top within 10 cells (a Totem Ride on an idle partner rises 98 px and the corner catch lands feet that enter a ledge's top cell from the side: a 7-row ledge falls to one player); 11 rows of air over the hop cells; a drop gift on top: a **rolled vine** at the edge, its coil 11+ cells from the gate's `far` cell (the validator counts a coil as a booster; 1-1 and 5-1 co-op). A flower pot reaches 6 rows from the floor it takes root on [G6], so it is no way back from an 8-row ledge (a raised root within reach is a step for a lone hero riding his idle partner) |
-| **Totem ledge** | a ledge 5 rows up (Totem jump or hop, both difficulties) |
+| **Boost ledge** | a ledge **8 rows over every floor within reach on both difficulties** [G28] - a flat floor at least 3 cells wide under its face, no step, root or rock nearer the top within 10 cells (the corner catch lands feet that enter a ledge's top cell from the side, so a 98-105 px rise climbs a 7-row ledge; G28 measured it with an idle carrier, which no longer carries since G33 - the 8 rows stay [G39]); 11 rows of air over the hop cells; a drop gift on top: a **rolled vine** at the edge, its coil 11+ cells from the gate's `far` cell (the validator counts a coil as a booster; 1-1 and 5-1 co-op). A flower pot reaches 6 rows from the floor it takes root on [G6], so it is no way back from an 8-row ledge (a raised root within reach is a step for a lone hero: a 98-105 px rise plus the corner catch) |
+| **Totem ledge** | a ledge 5 rows up (Totem jump or hop, both difficulties); a gate only because a Totem Ride needs an active carrier [G33]: keep every other booster out of its static reach |
 | **Batter Up gap** | 8 (Beginner) / 9 (Expert) cells of `~` between two floors at the same height; or a 7-row lob ledge (15.7.2) |
-| **Plate door** | `objects/plate` (`count=1 mode=hold`) at least **8 tiles** from its door (`objects/column rise_while=<plate>`); the holder must reach the far side another way: a second plate beyond the door for him (**leapfrog**: A holds for B, B holds for A - with **two doors in two corridors**, because a column rises only while all its plates are pressed: plate A opens the lower corridor for B, plate B beyond opens the upper corridor for A; 1-1 and 5-1 co-op [G9]), or a `timed:` plate |
+| **Plate door** | `objects/plate` (`count=1 mode=hold`) at least **8 tiles** from its door (`objects/column rise_while=<plate>`); a plate weighs only active heroes (a parked idle partner or a riderless mount holds nothing [G33]); the holder must reach the far side another way: a second plate beyond the door for him (**leapfrog**: A holds for B, B holds for A - with **two doors in two corridors**, because a column rises only while all its plates are pressed: plate A opens the lower corridor for B, plate B beyond opens the upper corridor for A; 1-1 and 5-1 co-op [G9]), or a `timed:` plate |
 | **Twin drums** | two or more `objects/drum bond=<name>` with a column `trigger=drums:<name>` (or a gate `needs=<name>`); place them so one hero needs at least 28 ticks (Beginner) / 16 (Expert) to strike both - in practice 10+ tiles apart and 4+ rows apart, out of one axe's flight line; the search decides |
 | **See-saw** | `objects/seesaw` with its high end 1 row over the floor, a ledge 4+ rows above the high end within 3 cells to drop from, the target up to 9 rows over the low end; no enemy may fall onto it |
 | **Heave boulder** | `objects/boulder_heavy` with 3+ cells of floor behind the pushed side and 2+ rows of air; it fills a 2-cell gap, plugs a vent (`objects/geyser deadly`) or presses a plate |
@@ -773,13 +782,13 @@ and keepers).
 | **Keeper door** | `objects/column trigger=keepers:<name>` behind a hall **exactly 4 rows high** (the Guard and Shellback art is 54 px tall); its keepers (`keeper=<name>`) carry `shell`, `bond` or `daze`. Keepers meant for a pincer stand still (`speed=0`: a walker with left = right = 0 still sways about 30 px); bait about 30 px in front, the striker's way in about 40 px behind [G5] |
 | **Brace corridor** | a `heavy` (Bull Rex) in a 4-row-high hall between walls |
 | **Chomper two seats** | a mounted stretch where only the gunner can clear the way (Leeches, a Snatcher) over ground a hero on foot cannot cross (spikes with no run-up) |
-| **Lee gap** | gust gaps of up to 3 tiles whose gusts never pause, strong enough that a lone hero falls short; a crouching spot within 64 px downwind of each far edge (P-C.6 lee) [G23]; the search decides |
+| **Lee gap** | gust gaps of up to 3 tiles whose gusts never pause, strong enough that a lone hero falls short; a crouching spot within 64 px downwind of each far edge (P-C.6 lee) [G23]; the search decides - and only if its search world runs the level's wind; else build the fallback, a Brace corridor [G41] |
 
 #### 15.7.4 x2 tablets
 
 `objects/x2_tablet gate=<name> far=c,r` stands on the near side of every co-op gate (a gate is any of the kinds of
 15.7.3); `secret` marks an x2 secret instead. `far` is a cell beyond the gate that the hero reaches only through it
-(the solo search's goal). The validator pairs them: one tablet per gate name, every co-op mechanism (plate-driven or
+(the solo search's goal); the tablet lights once an active hero stood there. The validator pairs them: one tablet per gate name, every co-op mechanism (plate-driven or
 drum or keeper column, boulder, pulley, see-saw, boost ledge, gap) inside some tablet's gate, names unique, `far` an
 air cell above a floor.
 
@@ -788,11 +797,14 @@ air cell above a floor.
 - At least **one third of the enemy records** of every co-op file carry a trait, and **every enemy guarding a
   main-path chokepoint** does. Traits only in `kind = coop` files.
 - Trait choice per archetype: GAMEPLAY 13.9.4 (the "Traits used in layouts" column). Bonds: `bond=<name>` on every
-  member, members placed out of one hero's reach within the window (as twin drums), and members of one bond within
-  one view of each other (the search measures `solo_min` per bond; a bond spread over 60-80 columns makes it run for
+  member, members placed out of one hero's reach within the window (as twin drums), **never where one thrown special
+  hits two members in one throw** from any strike spot of either (axes and spears pass walls and fly about 520 px:
+  separate the members by height, or use `lone` / `daze` instead - the search's `pair_solo_min` 0 is a build error
+  [G36]), and members of one bond within one view of each other (the search measures `solo_min` per bond; a bond spread over 60-80 columns makes it run for
   minutes and proves nothing). Cap a record's window with `window=<ticks>` once its `solo_min` is known (15.4) [G2].
   `grab` needs a `perch=c,r` next to a pit. `lone` is off on Beginner: do not make a gate out of it. Snappers have no
-  co-op rule of their own (bait-and-bite was dropped [G10]): pair them with `bond`.
+  co-op rule of their own (bait-and-bite was dropped [G10] [G40]): pair them with `bond`. Every trait rule that asks
+  for "the nearer hero" (a shield, a keeper's bait, `lone`'s pair) counts only active heroes [G33].
 - **Keeper and Guard halls are exactly 4 rows high** (4 rows of air, a ceiling above; orchestrator resolution at
   phase 1: the Guard and Shellback art is 54 logical px tall): nobody can jump or bounce over a keeper to get past
   it. The search (15.7.6) still proves it, because a hero can land on a short enemy's head even there.
@@ -814,12 +826,13 @@ is in the stage, must **fail** to reach the tablet's `far` cell within 1 457 tic
 [G13]. The search (world-B's v2, phase 2) plays every gate in a **search world**: the file's grid and the entities of
 the gate's columns - doors driven by their real plates, keepers and drums, enemies with their traits, pots, boulders,
 see-saws, springs, vines, bark boards, platforms, Chomper, weapons - with the partner a lone player has: an egg
-drifting after him (the hatch bounce is -64), or his **idle hatched partner** walked there and clubbed open, whom he
-can ride (a Totem Ride starts on an idle carrier; only the Shoulder Hop needs an active one, P-C.10 [G1]) or park on
-a plate. Its macros walk, jump, crawl, drop, wait, strike (forward, low, in the air, the pogo) and throw the axe, the
-swirling axe and the spear. So build every gate for the partner model: 8-row boost ledges [G28], two-corridor
-leapfrogs (a plate holds an idle partner's weight), no single held plate door. The flood prefilter of G1 is a
-diagnostic only.
+drifting after him (the hatch bounce is -64), or his **idle hatched partner**, placed anywhere he could be hatched
+(the egg drifts after the lone hero and is clubbed open wherever he stands). The idle partner counts for no co-op rule
+[G33]: no weight on a plate or a lift, no bait, no brace, no lee, no carrier (a Totem Ride needs an active carrier) -
+he is only a body enemies may chase. Its macros walk, jump, crawl, drop, wait, strike (forward, low, in the air, the
+pogo) and throw the axe, the swirling axe and the spear. So build every gate for the partner model: 8-row boost ledges
+[G28], two-corridor leapfrogs, no booster in reach. The flood prefilter of G1 is a diagnostic only. Each boss test
+runs the same partner model against the co-op form (one hero plus an idle partner placed anywhere) [G34].
 
 #### 15.7.7 Two heroes on one camera
 
@@ -839,8 +852,8 @@ diagnostic only.
 What the phase-1 owners and the slice designers settled in code, confirmed by the lead designer after gate G1
 (DESIGN.md "Appendix: G1 and phase-2 resolutions" G5-G9, G22; GAMEPLAY 13.9.7 carries the object rules).
 
-- **Plate**: anchored at its LEFT cell, covering `w` cells to the right; a hero counts while his feet are over its
-  cells, on its floor or up to 8 px above it and not rising. Columns rise while ALL their plates are pressed, so one
+- **Plate**: anchored at its LEFT cell, covering `w` cells to the right; an active hero counts while his feet are over
+  its cells, on its floor or up to 8 px above it and not rising (an idle hero weighs nothing [G33]). Columns rise while ALL their plates are pressed, so one
   door cannot be opened from both sides: a leapfrog uses **two corridors** (plate A opens the lower corridor for B,
   plate B beyond opens the upper corridor for A; 1-1 and 5-1 co-op).
 - **Door rule** (`objects/column`): a driven block whose next cell in its direction of travel is solid is a door (the
@@ -854,19 +867,19 @@ What the phase-1 owners and the slice designers settled in code, confirmed by th
   2 px/tick and lands 1-2 cells beyond the ledge's face as a permanent spring of -224 (a 105 px rise from the
   spring's top, 10 px over the floor). **It reaches 6 rows from the floor it takes root on** (19 px to spare): place
   the ledge it is the way back to at most 6 rows above the pot's landing floor. Not under a boost ledge: its raised
-  root would be a step for a lone hero riding his idle partner; there the way back is a rolled vine [G28]. A 7-row
+  root would be a step for a lone hero (a 98-105 px rise plus the corner catch); there the way back is a rolled vine [G28]. A 7-row
   ledge is 3 px under the apex: neither a way back to rely on nor a barrier (orchestrator resolution after G1).
 - **Boost ledge, one height**: since G2 a boost ledge is 8 rows on both difficulties [G28], so R18's Expert row (and
   its "other way round" variant of the G1 slice) is gone; 1-1 and 5-1 co-op were rebuilt that way.
-- **Egg**: an egg or a just-hatched idle partner is no springboard (P-C.10 / P-C.12): a hatch bounce rises 10 px, a
-  Shoulder Hop needs a partner whose player gave input since he hatched.
+- **Egg**: an egg or an idle partner is no springboard (P-C.10 / P-C.12): a hatch bounce rises 10 px, a Shoulder Hop
+  and a Totem Ride need an active partner (input within 243 ticks and since he hatched) [G33].
 - **Keepers that wait**: Shellbacks / Guards meant for a pincer stand still (`speed=0`): a walker with left = right = 0
   still sways about 30 px, which makes the bait and back-strike distances fickle. Bait about 30 px in front, striker
   about 40 px behind.
 - **Twin drums**: a hit on tick t0 opens a window of W ticks (24 B / 12 E, capped by `solo_min - 4`); the other drums
-  must be hit on t0 .. t0 + W - 1. The count-in plays while a hatched hero stands within 40 px of every drum. The
+  must be hit on t0 .. t0 + W - 1. The count-in plays while an active hero stands within 40 px of every drum. The
   window values stay as they are for phase 3 (the pair playtests of P4.5 may only shorten them).
-- **x2 tablet**: lights (frame 2) once a hatched hero stood in its `far` cell, and stays lit.
+- **x2 tablet**: lights (frame 2) once an active hero stood in its `far` cell, and stays lit.
 - **Team gate**: partners arrive spread behind the hero who entered (eggs when they were more than a view away); a
   gate with `lock=` pulls the party into the locked view. A mounted hero cannot use a gate; the exit totem dismounts.
 - **Spear and boards**: a spear is tested against bark boards at its spawn position too, so a hero pressed against the
@@ -876,6 +889,21 @@ What the phase-1 owners and the slice designers settled in code, confirmed by th
   over the last ground, 15.7.6) is refused without simulating; the search starts at the tablet and at the last
   checkpoint **before it by column** - on a road travelled leftwards place the tablet so the near-side checkpoint
   wins (DB1).
+
+#### 15.7.9 The idle partner (phase 3) [G33]
+
+A co-op hero whose player gave no input for **243 ticks** (10 s) - or none since he entered the level - is **idle**:
+he dozes ("Zzz" after 243 quiet ticks) and counts for no co-op rule (plates, lifts, see-saw launches, tablets,
+count-ins, bait, braces, the lee, duo moves, boss rules). Only his own input wakes him; a hatch, a carry, a bump or a
+team wipe does not. What it means for a level:
+- **No role waits 243+ ticks without input.** Time each gate so the waiting role waits well under 10 s once
+  understood (D.8: a gate takes under about 30 s in all), or let him wait doing something: a plate holder may crouch
+  (Down held is input) or walk on the plate; prefer `timed:` / `latch` plates where a hold would be long.
+- **Two-stream routes**: a stream that stands still for 243+ ticks on a plate, under a rider or at a see-saw breaks
+  the replay. Hold Down (crouch) on such stretches when recording; `test_coop_routes` tells.
+- **Teach it once**: the egg and tablet signs at the first checkpoint of 1-1 and 5-1 co-op may add "Asleep? Press
+  any key!" (one idea per sign [G27]).
+- **The team exit** counts an idle hero on the view as present (an absent partner never blocks the end of a stage).
 
 ### 15.8 Arenas
 
@@ -897,14 +925,29 @@ What the phase-1 owners and the slice designers settled in code, confirmed by th
 - **What the Totem Ring taught** (DA at G1, DESIGN.md E.5 [G14]): every strike ends in a hop or a pogo, so keep spot
   stands and spawns out of a spring's reach (about 20 px); food knocked out of a spot under a bridge arcs onto that
   bridge; a hero pogoing off a spot under a one-way tier 3 rows up pokes his head 2 px through it. A stomp is a
-  landing (P-C.14 [G15]), so a hero standing on the tier does not stomp him - until world-B's referee has that rule,
-  keep spawns off the tiers above another spawn's first spot. Spawns go where no drop, jump or spring link of the
-  bot graph lands in the first 48 ticks (the floor under the tiers near the middle). Every Rookie heads for the big
-  spot at a round start (it values it as three small spots): put it on the side with fewer spots. The view-centre
+  landing (P-C.14 [G15]; built and tested by world-B [G40]), so a hero standing on the tier does not stomp him. Spawns
+  go where no drop, jump or spring link of the bot graph lands in the first 48 ticks (the floor under the tiers near
+  the middle). Every Rookie heads for the big spot at a round start (it values it as three small spots): an
+  off-centre big spot favours the nearer spawn - put it in the middle (Totem Ring as built [G31]). The view-centre
   drop point of the Feast Rush giant and the Golden Drumstick (x 160, row 2) must be a place heroes can reach.
 - **Names**: an arena's `name` is a msgid; ui-B adds it to `locale/en.po` under "Versus arenas" (one shared msgid
   serves "Colossus Hall", arena and stage).
-- Layouts and sketches: DESIGN.md E.5 (Totem Ring as built, Tar Pulleys, Coconut Cove, Cinder Pit drawn there).
+- **What the phase-2 arenas taught** (DA at G2 [G31] [G43]): keep lava and springs apart (a spring next to a deadly
+  cell throws knocked-back heroes into it; Cinder Pit's lava ends went); a single-cell big spot in a two-cell-wide
+  pillar is struck from both sides (Totem Ring's big spot in the totem's base); in a `wrap = tb` arena keep standable
+  tiers at row 4 or lower, so a plain jump never reaches the top seam (Echo Hollow); V4.b's +/-15 points over 48
+  rounds is about 2.4 standard deviations of a fair spawn, so a layout at 12-15 points is only just fair - aim lower;
+  the big spot's column can decide Grub Stack by itself (make it symmetric); a whole-arena crate lane can unbalance Hot
+  Rock (measure each mode).
+- **Signatures** (world-B's referee, phase 3 [G43]): `dark_pulse`, `regrow`, `ember_lane` and an arena `wind`
+  (15.2); every enemy record of an arena is a **neutral springboard** (never hurts, never dies, bounces heroes - Echo
+  Hollow's dangler); in every mode but Clubball each `zones/goal` mouth is **surf**, a ring-out (Coconut Cove); one
+  `bosses/colossus` record is the neutral statue of Colossus Hall (the validator accepts exactly one).
+- **Order** [G37]: Floe Rink, Tar Pulleys, Sky Picnic and Colossus Hall first; Mesa Rodeo and Cloud Top only once those
+  four are done and their bot tests green. Colossus Hall plays Grub Stack and Last Caveman Standing only (the neutral
+  statue spits at the crowned leader / the hero with the most hearts).
+- Layouts and sketches: DESIGN.md E.5 (Totem Ring, Cinder Pit, Echo Hollow and Coconut Cove as built at G2; the Tar
+  Pulleys sketch).
 
 ### 15.9 Route files and headers
 
@@ -945,5 +988,7 @@ New routes describe themselves in a header instead of a `ROUTES` entry. The head
       tablet and a drop gift; a third of the enemies with traits, every chokepoint guard with one; keeper halls 4 rows
       high; flower pots landing at most 6 rows under the ledge they serve; `window=` set on capped records; validator
       `--coop` clean; `bash .tools/gd.sh test coop_gates` refuses every gate solo; co-op routes for both difficulties.
+- [ ] Co-op (phase 3): no bond that one thrown special hits twice in one throw [G36]; no role in a two-stream route
+      standing 243+ ticks without input [G33]; a boss arena's weak points 55 px under the view's top (72 px in the boss bar's columns) [G35].
 - [ ] Signs: every text at most 3 board lines (about 60 characters); the music context of the 15.2 table.
 - [ ] Arena: 20 x 12, row 0 empty, spawns for `players`, cookpots, bot graph baked and its bot test green per mode.

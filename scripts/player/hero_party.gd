@@ -84,6 +84,8 @@ var _shell_ticks: int = 0
 var _shell_pos: Vector2i = Vector2i.ZERO
 var _egg_sprite: Sprite2D = null
 var _bubble: EmoteBubble = null
+## The dozing look of an IDLE co-op hero (PlayerBase.is_idle; made on first need).
+var _idle_mark: IdleMark = null
 
 
 func _init(p_hero: Player) -> void:
@@ -519,6 +521,8 @@ func post_step(_level: LevelBase) -> void:
 		egg_ticks += 1
 	if emote_ticks > 0 or _egg_sprite != null:
 		_refresh_party_visual()  # nothing to draw before the first emote or egg
+	if coop and (_idle_mark != null or hero.input_idle_ticks >= PlayerBase.IDLE_TICKS):
+		_refresh_idle_mark()
 
 
 ## A strike starts (Player._handle_strike, the first tick of a swing or a throw): in versus the hurt immunity and the
@@ -713,6 +717,78 @@ func _refresh_party_visual() -> void:
 		_egg_sprite.position = Vector2(_shell_pos - hero.sim_pos) * float(Tuning.ART_SCALE)
 	elif _egg_sprite.visible:
 		_egg_sprite.visible = false
+
+
+## The dozing look (2.0 IDLE rule, PlayerBase.is_idle): a hatched, living co-op hero whose own slot has held no input
+## for PlayerBase.IDLE_TICKS (10 s) shows a "Zzz" over his head until his next input. Cosmetic: the simulation never
+## reads it.
+func is_dozing_shown() -> bool:
+	return _idle_mark != null and _idle_mark.visible
+
+
+func _refresh_idle_mark() -> void:
+	var dozing: bool = hero.input_idle_ticks >= PlayerBase.IDLE_TICKS and not hero.down and not hero.dead
+	if dozing and _idle_mark == null and is_instance_valid(hero):
+		_idle_mark = IdleMark.new()
+		_idle_mark.name = "IdleMark"
+		_idle_mark.position = Vector2(IdleMark.OFFSET_X, IdleMark.OFFSET_Y)
+		_idle_mark.z_index = 1
+		_idle_mark.visible = false
+		hero.add_child(_idle_mark)
+	if _idle_mark == null:
+		return
+	if dozing != _idle_mark.visible:
+		_idle_mark.visible = dozing
+		_idle_mark.step = 0
+		_idle_mark.queue_redraw()
+	if dozing:
+		_idle_mark.advance()
+
+
+## The "Zzz" of a dozing hero, drawn with primitives (no sheet): three Z letters of 6, 8 and 10 art px rising to the
+## upper right of his head one after the other, white with a dark outline, the cycle repeating every CYCLE_TICKS.
+## Art px, origin at the first letter's bottom-left corner.
+class IdleMark:
+	extends Node2D
+
+	## Where the letters start (art px from the feet point): beside the head (the hero is about 70 art px tall).
+	const OFFSET_X: float = 10.0
+	const OFFSET_Y: float = -66.0
+	const CYCLE_TICKS: int = 36
+	const LETTER_TICKS: int = 12
+	const SIZES: Array[int] = [6, 8, 10]
+	const OUTLINE: Color = Color("#272018")
+	const PAPER: Color = Color("#fff8e8")
+
+	## Ticks into the cycle.
+	var step: int = 0
+
+	## One tick of the cycle (redrawn only when a letter appears or the cycle restarts).
+	func advance() -> void:
+		step = (step + 1) % CYCLE_TICKS
+		if step % LETTER_TICKS == 0:
+			queue_redraw()
+
+	func _draw() -> void:
+		var shown: int = step / LETTER_TICKS + 1
+		var x: float = 0.0
+		var y: float = 0.0
+		for i: int in mini(shown, SIZES.size()):
+			var size: float = float(SIZES[i])
+			_draw_z(Vector2(x, y - size), size, OUTLINE, 1.0)
+			_draw_z(Vector2(x, y - size), size, PAPER, 0.0)
+			x += size * 0.7
+			y -= size + 3.0
+
+	## A "Z" of `size` art px with its top-left corner at `at`; `grow` px of outline around the strokes.
+	func _draw_z(at: Vector2, size: float, colour: Color, grow: float) -> void:
+		var stroke: float = 2.0
+		draw_rect(Rect2(at.x - grow, at.y - grow, size + grow * 2.0, stroke + grow * 2.0), colour)
+		draw_rect(Rect2(at.x - grow, at.y + size - stroke - grow, size + grow * 2.0, stroke + grow * 2.0), colour)
+		var steps: int = int(size) - int(stroke) * 2
+		for k: int in steps:
+			var px: float = at.x + size - stroke - float(k) * (size - stroke) / float(maxi(steps, 1))
+			draw_rect(Rect2(px - grow, at.y + stroke + float(k) - grow, stroke + grow * 2.0, 1.0 + grow * 2.0), colour)
 
 
 ## The speech bubble of an emote (DESIGN.md D.11): art-A's `ui/emotes.png` (ASSET_MANIFEST.md: 4 cells of 32 x 32 -

@@ -107,7 +107,8 @@ class EggIsNoSpringboard(unittest.TestCase):
         self.assertIn("**whether UP is held\n  or not**", c12)
         self.assertNotIn("-224 with UP, else -64) and hatches", c12)
         c10 = _section(APPENDIX_C, "### C.10")
-        self.assertIn("if A holds UP and B is **active**", c10)
+        self.assertIn("if A and B are both **active**: **Shoulder Hop** if A holds UP, else **Totem Ride**", c10)
+        self.assertIn("otherwise there is no head contact at all: A passes through, as heroes do, UP held or not", c10)
         self.assertIn("- **Active**:", c10)
         self.assertIn("**An egg is no springboard** [G1]", _section(DESIGN, "### D.3"))
         self.assertIn("**An egg is no springboard** [G1]", _section(GAMEPLAY_13, "#### 13.9.2"))
@@ -175,8 +176,6 @@ class ConstantsMatchCode(unittest.TestCase):
          {"DAZE_TICKS_BEGINNER": 14, "DAZE_TICKS_EXPERT": 12, "DAZE_ALERT_PX": 48}),
         ("a head bounce dazes it 22 ticks", "scripts/enemies/enemy_tuning.gd", {"MIMIC_DAZE_TICKS": 22}),
         ("sticky for `TARGET_HOLD_TICKS` = 22", "scripts/core/party_tuning.gd", {"TARGET_HOLD_TICKS": 22}),
-        ("| Boost ledges | 7 tiles | 8 tiles |", "scripts/core/party_tuning.gd",
-         {"BOOST_LEDGE_TILES_BEGINNER": 7, "BOOST_LEDGE_TILES_EXPERT": 8}),
     ]
 
     def _check(self, doc, rows):
@@ -317,6 +316,269 @@ class ResolutionMarkers(unittest.TestCase):
         self.assertEqual(rows - used, set(), "rows no document refers to")
 
 
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Phase-3 rulings (DESIGN.md G33-G43, 2026-10-08)
+# ---------------------------------------------------------------------------------------------------------------------
+
+def _pending(case, done, what):
+    """A ruling whose code change belongs to another owner: skipped (with the request named) until the code has it,
+    asserted from then on. `done` is the condition the owner's change makes true."""
+    if not done:
+        case.skipTest("pending owner change: " + what)
+
+
+class IdlePartner(unittest.TestCase):
+    """[G33] the orchestrator's idle-partner rule: 243 ticks, counted by no co-op rule, no duo move on an idle hero."""
+
+    def test_every_document_states_the_rule(self):
+        d3 = _section(DESIGN, "### D.3")
+        self.assertIn("**The idle partner** [G33]", d3)
+        self.assertIn("**243 ticks** (10 s)", d3)
+        self.assertIn("counts for **no co-op rule**", d3)
+        self.assertIn("no Shoulder Hop, no Totem Ride", d3)
+        c10 = _section(APPENDIX_C, "### C.10")
+        self.assertIn("- **Idle** [G33]", c10)
+        self.assertIn("capped at 243 (`IDLE_TICKS`, 10 s)", c10)
+        self.assertIn("or K or R is no longer active", c10)
+        self.assertIn("**The idle partner** [G33]", _section(GAMEPLAY_13, "#### 13.9.2"))
+        self.assertIn("#### 15.7.9 The idle partner (phase 3) [G33]", LEVEL_DESIGN_15)
+        self.assertIn("| Idle | 243 ticks without input of his own", _section(APPENDIX_C, "### C.16"))
+
+    def test_no_document_keeps_the_idle_totem_ride(self):
+        stale = ("a Totem Ride starts on an idle carrier", "Totem Ride on an idle partner still starts",
+                 "carries a Totem Ride\n  without", "whom he\ncan ride", "riding his idle partner")
+        for name, text in (("DESIGN", DESIGN[:DESIGN.index("## Appendix: G1 and phase-2 resolutions")]),
+                           ("PHYSICS C", APPENDIX_C), ("GAMEPLAY 13", GAMEPLAY_13), ("LEVEL_DESIGN 15", LEVEL_DESIGN_15)):
+            for bad in stale:
+                self.assertNotIn(bad, text, "%s still says %r" % (name, bad))
+
+    def test_the_code_has_the_shared_query_at_243(self):
+        src = _read("scripts/base/player_base.gd")
+        self.assertRegex(src, r"func is_idle\(")
+        self.assertRegex(src, r"func counts_for_coop\(")
+        self.assertEqual(_gd_consts("scripts/base/player_base.gd").get("IDLE_TICKS"), 243)
+        party = _gd_consts("scripts/core/party_tuning.gd")
+        if "IDLE_TICKS" in party:
+            self.assertEqual(party["IDLE_TICKS"], 243)
+
+    def test_the_totem_ride_needs_an_active_carrier_in_code(self):
+        src = _read("scripts/world/party_driver.gd")
+        head = src[src.index("func _head_contacts"):] if "func _head_contacts" in src else ""
+        old_rule = re.search(r"elif a\.holds_up\(\) and not is_active\(b\)", head) is not None
+        _pending(self, head and not old_rule,
+                 "party / world-A: no Totem Ride on an idle carrier (wf9_lead_design_to_party.txt #1)")
+        self.assertNotRegex(head, r"elif a\.holds_up\(\) and not is_active\(b\)")
+
+
+class BoostLedgeOneHeight(unittest.TestCase):
+    """[G28] [G39] boost ledges are 8 rows on both difficulties, in every document and in PartyTuning."""
+
+    def test_the_documents(self):
+        self.assertIn("| Boost ledges | 8 tiles [G39] | 8 tiles |", _section(GAMEPLAY_13, "#### 13.9.10"))
+        self.assertIn("| Boost ledges | 8 tiles [G28] [G39] | 8 tiles |", _section(DESIGN, "### D.11"))
+        self.assertIn("an 8-tile Shoulder Hop ledge with a rolled-vine gift [G28]", _section(DESIGN, "### D.10"))
+        for name, text in (("DESIGN", DESIGN), ("GAMEPLAY 13", GAMEPLAY_13)):
+            self.assertNotIn("| Boost ledges | 7 tiles", text, name)
+            self.assertNotIn("a 7-tile Shoulder Hop ledge", text, name)
+
+    def test_the_constant(self):
+        consts = _gd_consts("scripts/core/party_tuning.gd")
+        self.assertEqual(consts["BOOST_LEDGE_TILES_EXPERT"], 8)
+        _pending(self, consts["BOOST_LEDGE_TILES_BEGINNER"] != 7,
+                 "core-A: PartyTuning.BOOST_LEDGE_TILES_BEGINNER = 8 (wf9_lead_design_to_core_a.txt #1)")
+        self.assertEqual(consts["BOOST_LEDGE_TILES_BEGINNER"], 8)
+
+
+class BossCoopForms(unittest.TestCase):
+    """[G34] co-op forms by actions; slot-bound twin rules are not capped by the solo minimum."""
+
+    def test_the_rule_and_every_boss(self):
+        b0 = _section(DESIGN, "### B.0")
+        self.assertIn("**one rule that one player cannot satisfy** [G34]", b0)
+        self.assertIn("counts only **active** heroes", b0)
+        self.assertIn("an idle hatched partner\n  placed anywhere he could be hatched", b0)
+        self.assertIn("by **two different heroes**", _section(DESIGN, "### B.2"))
+        self.assertIn("by **two different heroes**", _section(DESIGN, "### B.3"))
+        self.assertIn("**by the other hero**", _section(DESIGN, "### B.4"))
+        self.assertIn("a hero **other than the pilot**", _section(DESIGN, "### B.5"))
+        self.assertIn("an **active** hero\n  other than the smasher", _section(DESIGN, "### B.6"))
+        g136 = _section(GAMEPLAY_13, "### 13.6", r"\n### ")
+        for text in ("one rule one\n  player cannot satisfy [G34]", "not capped\n  by the measured solo minimum of 10 [G34]",
+                     "not capped by the measured solo minimum of 20 [G34]", "**by the other hero**",
+                     "a hero other than the pilot strikes its tail", "the nearer active hero"):
+            self.assertIn(text, g136)
+        self.assertIn("is exempt\n  from the `solo_min - 4` cap", _section(GAMEPLAY_13, "#### 13.9.3"))
+        self.assertIn("plus an idle hatched partner placed anywhere he could be hatched (G33)", PLAN)
+
+    def test_the_boss_code_is_slot_bound_where_built(self):
+        # Built at G2: Old Mangrove's twin (_twin_half by slot), Inkjaw's flinch slots, the Roc's pilot.
+        self.assertIn("_flinch_slot[0] != _flinch_slot[1]", _read("scripts/bosses/squid.gd"))
+        self.assertRegex(_read("scripts/bosses/mangrove.gd"), r"func _twin_half\(")
+        self.assertRegex(_read("scripts/bosses/roc.gd"), r"slot == _pilot\.slot")
+
+
+class WeakPointsClearOfTheHud(unittest.TestCase):
+    """[G35] the HUD band (ui's fight HUD), the 24 logical px clearance and the arena changes it made."""
+
+    def test_the_rule(self):
+        b0 = _section(DESIGN, "### B.0").replace("\n  ", " ")
+        self.assertIn("(`Hud.band_rects`)", b0)
+        self.assertIn("**55 px** under the view's top, **72 px** in the boss bar's columns", b0)
+        self.assertIn("at most 105 px (88 px in the bar's columns) over the floor's top", b0)
+        g136 = _section(GAMEPLAY_13, "### 13.6", r"\n### ").replace("\n  ", " ")
+        self.assertIn("its top at least 24 px below the band over its columns: 55 px under the view's top, 72 px in "
+                      "the bar's columns", g136)
+        self.assertIn("**Weak points\n  clear of the HUD** [G35]", _section(LEVEL_DESIGN_15, "### 15.6"))
+
+    def test_the_hud_has_the_band_and_the_clearance(self):
+        hud = _read("scripts/ui/hud.gd")
+        self.assertRegex(hud, r"static func weak_point_problem\(")
+        self.assertRegex(hud, r"func band_rects\(")
+        m = re.search(r"^const WEAK_POINT_CLEARANCE: float = ([\d.]+)", hud, re.M)
+        self.assertIsNotNone(m)
+        _pending(self, float(m.group(1)) != 24.0,
+                 "ui: WEAK_POINT_CLEARANCE 48 art px = 24 logical px (reply in wf9_ui_to_lead-designer.txt)")
+        self.assertEqual(float(m.group(1)), 48.0)
+
+    def test_the_arenas_that_changed(self):
+        for name, text in (("DESIGN", DESIGN[:DESIGN.index("## Appendix: G1 and phase-2 resolutions")]),
+                           ("GAMEPLAY 13", GAMEPLAY_13)):
+            self.assertNotIn("altar 6 tiles up", text, name)
+            self.assertNotRegex(text, r"ledges(?: on the left)? at\s+rows 7 and 4", name)
+            self.assertNotRegex(text, r"rows 8 and 6", name)
+        self.assertIn("ledges on the left at rows 7 and 5, the upper one ending at col 5 [G35]",
+                      _section(GAMEPLAY_13, "### 13.6", r"\n### ").replace("\n", " "))
+        self.assertIn("root ledges at rows 7 and 5 (the upper one ending at col 5)",
+                      _section(DESIGN, "### A.6").replace("\n  ", " "))
+        self.assertIn("ledges on the left at rows 7 and 5, the upper one ending at col 5",
+                      _section(DESIGN, "### B.2").replace("\n  ", " "))
+        self.assertIn("altar 3 tiles up", _section(DESIGN, "### B.6"))
+
+    def test_the_geometry_of_the_built_bosses(self):
+        # Weak rectangles relative to the feet point (y up is negative): their top must be at most 105 px over the
+        # floor of an 11-row lock (55 px under the view's top), 88 px in the boss bar's columns (72 px), where the
+        # centred Roc on its nest is. Tusker / Inkjaw are measured from their feet on the floor or the water surface;
+        # the Roc's head band from its feet on the nest (row 8: 32 px over the floor); the Twin Idols' open jaws (the
+        # Colossus head, in the walls) from their feet on the floor.
+        tusker = re.search(r"TUSKER_HEAD: Rect2i = Rect2i\((-?\d+), (-?\d+),", _read("scripts/bosses/tusker.gd"))
+        self.assertLessEqual(-int(tusker.group(2)), 105)
+        squid = re.search(r"SQUID_HEAD: Rect2i = Rect2i\((-?\d+), (-?\d+),", _read("scripts/bosses/squid.gd"))
+        self.assertLessEqual(-int(squid.group(2)) + 16, 105)
+        roc = re.search(r"HEAD_BAND: Rect2i = Rect2i\((-?\d+), (-?\d+),", _read("scripts/bosses/roc.gd"))
+        self.assertLessEqual(-int(roc.group(2)) + 32, 88)
+        spit = re.search(r"COLOSSUS_HEAD_SPIT: Rect2i = Rect2i\((-?\d+), (-?\d+),",
+                         _read("scripts/enemies/enemy_tuning.gd"))
+        self.assertLessEqual(-int(spit.group(2)), 105)
+        mangrove = _gd_consts("scripts/bosses/mangrove.gd")
+        face = re.search(r"MANGROVE_FACE: Rect2i = Rect2i\((-?\d+), (-?\d+),", _read("scripts/bosses/mangrove.gd"))
+        top = mangrove["MANGROVE_FACE_RISE"] - int(face.group(2))
+        _pending(self, top <= 105, "enemies-B: Old Mangrove's face at most 105 px over the floor (face rise <= 70; "
+                 "wf9_lead_design_to_enemies_b.txt #2) - now %d px" % top)
+        self.assertLessEqual(top, 105)
+
+
+class BondsAndCuts(unittest.TestCase):
+    """[G36] bonded-pair placement; [G37] cut 2 applied, cut 3 conditional."""
+
+    def test_bonded_pairs(self):
+        self.assertIn("**never where one thrown special\n  hits two members in one throw**", LEVEL_DESIGN_15)
+        self.assertIn("- **Bonds** (every \"bonded ... pairs\" below) [G36]", _section(DESIGN, "### A.6"))
+        self.assertIn("is a\n   build error, not a short window [G36]", _section(DESIGN, "### D.8"))
+
+    def test_cut_list(self):
+        self.assertIn("**APPLIED at the start of phase 3**", PLAN)
+        self.assertIn("built only once the four remaining launch arenas are done", PLAN)
+        self.assertNotIn("tablet table mode on a 9-10 inch tablet", PLAN)
+        self.assertIn("hidden from the release menus [G37]", _section(DESIGN, "### D.11"))
+        for name, text in (("DESIGN", DESIGN), ("GAMEPLAY 13", GAMEPLAY_13)):
+            self.assertNotIn("get **table mode**", text, name)
+            self.assertNotIn("two on a tablet in table mode", text, name)
+            self.assertNotIn("get the experimental **table mode**", text, name)
+
+
+class RisingCameraAndLee(unittest.TestCase):
+    """[G41] the lee gap; [G42] the footing follow of the rising scroll."""
+
+    def test_the_specs(self):
+        c8 = _section(APPENDIX_C, "### C.8")
+        self.assertIn("- **Footing follow** [G42]", c8)
+        self.assertIn("[G42]", _section(LEVEL_DESIGN_15, "### 15.5"))
+        self.assertIn("a croucher\n  is never idle [G41]", _section(APPENDIX_C, "### C.6"))
+        self.assertIn("else build the fallback, a Brace corridor [G41]", LEVEL_DESIGN_15)
+
+
+def _arena_geometry_from_file(level_id):
+    """Rows of an arena file's tiles reduced to collision: solid '#', one-way '-', liquid '~', else '.'."""
+    text = _read("levels/%s.lvl" % level_id)
+    legend = {}
+    in_legend = False
+    for line in text.splitlines():
+        if line.startswith("["):
+            in_legend = line.strip() == "[legend]"
+            continue
+        m = re.match(r"^(\S)\s*=\s*.*?\btile=(\S)", line) if in_legend else None
+        if m:
+            legend[m.group(1)] = m.group(2)
+    tiles = text[text.index("[tiles]") + len("[tiles]"):]
+    tiles = tiles[:tiles.index("\n[")]
+    rows = [r for r in tiles.splitlines()[1:] if r.strip()]
+    return [_reduce("".join(legend.get(c, c) for c in r)) for r in rows]
+
+
+def _reduce(row):
+    out = []
+    for c in row:
+        if c in "#%?*":
+            out.append("#")
+        elif c in "-=":
+            out.append("-")
+        elif c == "~":
+            out.append("~")
+        else:
+            out.append(".")
+    return "".join(out)
+
+
+def _arena_sketch(name):
+    """E.5's sketch of an arena (the code block after its bold name) reduced like the file."""
+    e5 = _section(DESIGN, "### E.5", r"\n### ")
+    i = e5.index("\n**%s** (" % name)
+    block = e5[e5.index("```", i) + 3:]
+    block = block[:block.index("```")]
+    rows = []
+    for line in block.splitlines():
+        m = re.match(r"^row\s+\d+\s+(\S{20})", line)
+        if m:
+            rows.append(_reduce(m.group(1).replace("G", ".")))
+    return rows
+
+
+class ArenasAsBuilt(unittest.TestCase):
+    """[G31] [G43] E.5 draws the arenas DA built at G2: the sketch's collision equals the level file's."""
+
+    ARENAS = {"Totem Ring": "arena_totem_ring", "Cinder Pit": "arena_cinder_pit", "Echo Hollow": "arena_echo_hollow",
+              "Coconut Cove": "arena_coconut_cove"}
+
+    def test_sketches_equal_the_files(self):
+        for name, level_id in self.ARENAS.items():
+            sketch = _arena_sketch(name)
+            built = _arena_geometry_from_file(level_id)
+            self.assertEqual(len(sketch), 12, name)
+            self.assertEqual(sketch, built, "%s: E.5 and levels/%s.lvl differ (update the sketch) [G43]"
+                             % (name, level_id))
+
+    def test_colossus_hall_modes(self):
+        row = [r for r in _table_rows(_section(DESIGN, "### E.5", r"\n### "), "| # | Arena |") if "Colossus Hall" in r[1]][0]
+        self.assertIn("no Hot Rock, no Clubball", row[6])
+        path = os.path.join(ROOT, "levels", "arena_colossus_hall.lvl")
+        if os.path.exists(path):
+            m = re.search(r"^modes\s*=\s*(\S+)", _read("levels/arena_colossus_hall.lvl"), re.M)
+            if m:
+                self.assertEqual(set(m.group(1).split(",")) - {"grub_stack", "last_caveman"}, set(),
+                                 "Colossus Hall offers a mode G43 excludes")
+
+
 class Hygiene(unittest.TestCase):
     def test_the_documents_are_plain_ascii(self):
         for rel in ("docs/expansion/DESIGN.md", "docs/expansion/PLAN.md", "docs/spec/PHYSICS.md",
@@ -333,11 +595,11 @@ REQUESTS = os.path.join(ROOT, "build", "engine_requests")
 class RequestsAnswered(unittest.TestCase):
     """Every request file addressed to the lead designer ends with a lead-designer reply after its last request."""
 
-    HEADER = re.compile(r"^\[?(?:wf\d+ )?[\w-]+ -> lead[ _-]designer\b", re.M | re.I)
+    HEADER = re.compile(r"^\[?(?:wf\d+ )?[\w-]+(?: \([^)]*\))? -> lead[ _-]design(?:er)?\b", re.M | re.I)
 
     def test_every_request_has_a_reply(self):
         files = [f for f in glob.glob(os.path.join(REQUESTS, "*.txt"))
-                 if re.search(r"_to_lead[-_]designer", os.path.basename(f))]
+                 if re.search(r"_to_lead[-_]design(?:er)?\.txt$", os.path.basename(f))]
         self.assertTrue(files)
         for path in files:
             with open(path, encoding="utf-8") as f:

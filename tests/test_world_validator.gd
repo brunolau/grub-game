@@ -717,7 +717,7 @@ func test_search_measures_the_windows_near_the_gate() -> void:
 	var drums: Dictionary = {}
 	var daze: Dictionary = {}
 	for window: Dictionary in result["windows"]:
-		if str(window["what"]) == "drums twin":
+		if str(window["what"]).begins_with("drums twin"):
 			drums = window
 		elif str(window["what"]).begins_with("daze enemies/raptor"):
 			daze = window
@@ -821,3 +821,204 @@ enemies/walker 9 13 coop=bond bond=b window=12",
 	assert_true(validator.has_problem("enemies/walker window"), "an integer: %s" % _messages(validator))
 
 
+# =================================================================================================================
+# Phase 3 (world-B): the IDLE partner of the search (G33), bonded pairs (G36), lee gaps (G41), arena signatures (G43)
+# =================================================================================================================
+
+## A 30 x 16 search map like [method _search_level] with extra meta lines (`meta`).
+func _search_level_meta(id: String, ledge_row: int, entities: String, meta: String) -> LevelData:
+	var rows: PackedStringArray = PackedStringArray()
+	for row: int in 16:
+		rows.append((TileGrid.CH_SOLID_A if row >= 14 else TileGrid.CH_AIR).repeat(30))
+	rows[13] = ".@" + ".".repeat(26) + "E."
+	_paint(rows, ledge_row, 14, 20)
+	var text: String = "[meta]\nformat = 2\nid = %s\nkind = coop\nbook = 2\nterrain_a = jungle/terrain_grass\n" % id \
+			+ "music = level_jungle\ncoop_of = solo_bonus\ncoop_base_hash = %s\n%s\n" % ["ab".repeat(32), meta] \
+			+ "[legend]\nE = objects/exit\n[tiles]\n%s\n[entities]\n%s\n" % ["\n".join(rows), entities]
+	return LevelData.parse(StringName(id), text, "%s.lvl" % id)
+
+
+## A search world of `data` (Beginner, every column) for direct runs; close it after use.
+func _search_world(data: LevelData) -> CoopSearch.Searcher:
+	var searcher: CoopSearch.Searcher = CoopSearch.Searcher.new()
+	assert_true(searcher.build_world(data, Defs.Difficulty.BEGINNER, CoopSearch.grid_at_rest(data,
+			Defs.Difficulty.BEGINNER), Vector2i(0, data.cols)), "the search world builds")
+	return searcher
+
+
+func _config(start: Vector2i, partner_mode: int = CoopSearch.PARTNER_EGG, partner_at: Vector2i = CoopSearch.NOWHERE,
+		hand: int = -1) -> Dictionary:
+	return {"start": start, "facing": 1, "hand": hand, "partner": partner_mode, "partner_at": partner_at}
+
+
+func test_search_partner_is_idle_and_parked_anywhere_counts_for_nothing() -> void:
+	# G33: the lone player's partner never pressed anything - IDLE from his first tick, whether an egg or hatched
+	# and parked; the lone hero is not. Parked on the plate of a held door, he does not press it.
+	var data: LevelData = _door_level("door_probe_coop", "hold")
+	var searcher: CoopSearch.Searcher = _search_world(data)
+	var plate: SimEntity = null
+	for entity: SimEntity in searcher._entities:
+		if entity is Plate:
+			plate = entity
+	var on_plate: Vector2i = Vector2i(10 * Tuning.TILE + 12, 14 * Tuning.TILE)
+	var outcome: Dictionary = searcher.run(_config(Vector2i(40, 224), CoopSearch.PARTNER_EGG, on_plate),
+			PackedInt32Array([0, 0, 0, 0, 0, 0]), {})
+	var partner_idle: bool = searcher.partner.is_idle()
+	var partner_counts: bool = searcher.partner.counts_for_coop()
+	var hero_idle: bool = searcher.hero.is_idle()
+	var partner_at: Vector2i = searcher.partner.sim_pos
+	var pressed: bool = bool(plate.get(&"pressed")) if plate != null else true
+	searcher.close()
+	assert_false(outcome.is_empty(), "the hero stood still")
+	assert_true(partner_idle, "the search world's partner is IDLE (PlayerBase.is_idle)")
+	assert_false(partner_counts, "he counts for no co-op rule")
+	assert_false(hero_idle, "the lone hero is active")
+	assert_eq(partner_at, on_plate, "parked where the lone player hatched him")
+	assert_not_null(plate)
+	assert_false(pressed, "an idle partner weighs nothing on a plate (G33)")
+	# The whole search: the held plate door 12 tiles from its plate stays shut for one player even with his partner
+	# parked anywhere near it (the search parks him and finds nothing).
+	var held: Dictionary = CoopSearch.search_data(_door_level("door_idle_coop", "hold"), Defs.Difficulty.BEGINNER,
+			"door")
+	assert_false(bool(held["reached"]), "one player and his idle partner: %s" % held["detail"])
+	assert_true(int(held.get("placements", 0)) > 0, "the partner was parked near the plate (%d nodes)"
+			% int(held.get("placements", 0)))
+
+
+func test_search_rides_on_an_idle_partner_only_as_the_engine_allows() -> void:
+	# The `partner` ride macros stay as a regression check (G33): the search reaches the 6-row ledge through them
+	# exactly when the engine still lets a hero ride an idle head (a Totem Ride starts and he rests on it).
+	var probe: CoopSearch.Searcher = _search_world(_search_level("ride_probe_coop", 6, ""))
+	var rest: Dictionary = probe.run(_config(Vector2i(40, 224), CoopSearch.PARTNER_IDLE),
+			CoopSearch._repeat(Defs.IN_UP, 9) + CoopSearch._repeat(0, 16), {})
+	probe.close()
+	var rides: bool = not rest.is_empty() and Vector2i(rest["pos"]).y < 224
+	var totem: Dictionary = CoopSearch.search_data(_search_level("totem_coop", 8,
+			"objects/x2_tablet 10 13 gate=totem far=16,7"), Defs.Difficulty.BEGINNER, "totem")
+	if rides:
+		assert_true(bool(totem["reached"]), "6 rows: a ride on the idle partner")
+		assert_true(str(totem["detail"]).contains("partner-"), str(totem["detail"]))
+	else:
+		assert_false(bool(totem["reached"]), "G33: an idle head carries no Totem Ride - %s" % totem["detail"])
+	CoopSearch.idle_partner = false
+	var alone: Dictionary = CoopSearch.search_data(_search_level("totem_coop", 8,
+			"objects/x2_tablet 10 13 gate=totem far=16,7"), Defs.Difficulty.BEGINNER, "totem")
+	CoopSearch.idle_partner = true
+	assert_false(bool(alone["reached"]), "6 rows alone, the partner an egg (-64): %s" % alone["detail"])
+
+
+func test_search_hand_is_no_world_change_and_the_wind_blows() -> void:
+	# The special in his hand is a free choice per move (every belt special of the reference hero): a throw that
+	# hits nothing leaves the world signature as it was, so it costs no replay.
+	var searcher: CoopSearch.Searcher = _search_world(_search_level("throw_probe_coop", 6, ""))
+	var thrown: Dictionary = searcher.run(_config(Vector2i(40, 224), CoopSearch.PARTNER_EGG, CoopSearch.NOWHERE,
+			Defs.Weapon.AXE), CoopSearch._repeat(Defs.IN_RIGHT, 1) + CoopSearch._repeat(Defs.IN_FIRE, 6)
+			+ CoopSearch._repeat(0, 24), {})
+	var baseline: String = searcher._baseline
+	searcher.close()
+	assert_false(thrown.is_empty())
+	assert_eq(str(thrown.get("sig", "")), baseline, "an axe thrown at nothing changes nothing")
+	assert_false(baseline.contains("hand:"), "the hand is not part of the world")
+	# The level's wind runs in the search world (Level's script: an entry t:v is the wind from tick t on).
+	var windy: CoopSearch.Searcher = _search_world(_search_level_meta("windy_coop", 6, "", "wind = 0:0,20:24"))
+	windy.run(_config(Vector2i(40, 224)), CoopSearch._repeat(0, 30), {})
+	var late: int = windy.level.wind
+	windy.close()
+	assert_eq(late, 24, "the gust of tick 20 blows in the search world")
+
+
+func test_search_result_file_cache_round_trip() -> void:
+	var data: LevelData = _search_level("cache_probe_coop", 6, "objects/x2_tablet 10 13 gate=hop far=16,5")
+	var path: String = "res://levels/w5_l1_coop.lvl"
+	var key_b: String = CoopSearch.file_cache_key(path, data, Defs.Difficulty.BEGINNER, "hop")
+	var key_e: String = CoopSearch.file_cache_key(path, data, Defs.Difficulty.EXPERT, "hop")
+	var key_g: String = CoopSearch.file_cache_key(path, data, Defs.Difficulty.BEGINNER, "x")
+	assert_ne(key_b, key_e, "the difficulty is part of the key")
+	assert_ne(key_b, key_g, "and the gate")
+	assert_eq(key_b, CoopSearch.file_cache_key(path, data, Defs.Difficulty.BEGINNER, "hop"))
+	assert_eq(CoopSearch.code_fingerprint().length(), 32, "an md5 of the simulation's files")
+	var result: Dictionary = {"reached": false, "bound": CoopSearch.BOUND_TICKS, "detail": "", "explored": 220,
+		"runs": 5000, "starts": [Vector2i(10, 13)], "windows": [{"what": "bond b", "window": 24, "solo_min": 40}]}
+	var key: String = "test_" + key_b
+	CoopSearch._file_cache_write(key, result)
+	var back: Dictionary = CoopSearch._file_cache_read(key)
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(CoopSearch.FILE_CACHE_DIR.path_join(key + ".json")))
+	assert_true(bool(back.get("cached", false)))
+	assert_false(bool(back["reached"]))
+	assert_eq(back["starts"], [Vector2i(10, 13)])
+	assert_eq(int(back["explored"]), 220)
+	assert_eq(back["windows"], [{"what": "bond b", "window": 24, "solo_min": 40}])
+	assert_true(CoopSearch._file_cache_read("no_such_key").is_empty())
+
+
+func test_search_gate_table_and_shards_partition_it() -> void:
+	var table: Array[Dictionary] = CoopSearch.gate_table()
+	var seen: Dictionary = {}
+	for shard: int in 3:
+		for entry: Dictionary in CoopSearch.shard_gates(table, shard, 3):
+			var label: String = "%s:%d:%s" % [entry["level"], int(entry["difficulty"]), entry["gate"]]
+			assert_false(seen.has(label), "%s in one shard only" % label)
+			seen[label] = true
+	assert_eq(seen.size(), table.size(), "the shards together hold every gate")
+	for entry: Dictionary in table:
+		assert_true(String(entry["level"]).ends_with("_coop"), str(entry))
+		assert_ne(entry["far"], Vector2i(-1, -1), "%s names its far cell" % str(entry))
+
+
+func test_bonded_pairs_one_throw_hits_are_errors() -> void:
+	var entities: String = "\n".join(PackedStringArray([
+		"objects/x2_tablet 4 13 gate=drums far=36,13",
+		"objects/drum 8 12 bond=near",
+		"objects/drum 11 12 bond=near",
+		"objects/column 36 13 trigger=drums:near",
+		"enemies/walker 6 13 coop=bond bond=row",
+		"enemies/walker 30 13 coop=bond bond=row",
+		"enemies/walker 14 13 coop=bond bond=apart",
+		"enemies/walker 20 2 coop=bond bond=apart",
+	]))
+	var validator: LevelValidator = _validator({"solo_main": _solo("solo_main"),
+		"bonded_coop": _coop_text("bonded_coop", entities)})
+	assert_true(validator.has_problem("drum bond 'near' (Beginner): one thrown special"), _messages(validator))
+	assert_true(validator.has_problem("bond 'row' (Beginner): one thrown special"), "a spear flies 24 cells along one row")
+	assert_false(validator.has_problem("bond 'apart'"), "no throw line from the floor reaches 11 rows up")
+
+
+func test_lee_gap_without_a_crouching_spot_warns() -> void:
+	var rows: PackedStringArray = _coop_rows()
+	_paint(rows, 14, 10, 11, ".")      # a 2-cell gap with floor on both sides
+	_paint(rows, 15, 10, 11, ".")
+	_paint(rows, 14, 20, 21, ".")      # a 2-cell gap whose right (upwind) side is a wall
+	_paint(rows, 15, 20, 21, ".")
+	for row: int in range(6, 14):
+		_paint(rows, row, 22, 22)
+	var windy: String = _coop_text("lee_coop", "", rows).replace("music = level_jungle",
+			"music = level_jungle\nwind = 0:24")
+	var validator: LevelValidator = _validator({"solo_main": _solo("solo_main"), "lee_coop": windy})
+	assert_true(validator.has_problem("gust gap at columns 20-21 over row 14", LevelValidator.WARNING),
+			_messages(validator))
+	assert_false(validator.has_problem("gust gap at columns 10-11", LevelValidator.WARNING), "a crouching spot there")
+	var calm: LevelValidator = _validator({"solo_main": _solo("solo_main"), "calm_coop": _coop_text("calm_coop", "",
+			rows)})
+	assert_false(calm.has_problem("gust gap", LevelValidator.WARNING), "no wind, no gust gap")
+
+
+func test_arena_signature_keys_colossus_and_kid_safe_syrup() -> void:
+	var good: LevelValidator = _validator({"arena_sig": _arena_text("arena_sig",
+			"modes = grub_stack\ndark_pulse = 486\nregrow = 364\nember_lane = 8,4,66", ARENA_ROWS, ARENA_LEGEND,
+			"bosses/colossus 19 9\nenemies/dangler 10 2")})
+	assert_eq(good.error_count(), 0, _messages(good))
+	assert_false(good.has_problem("unknown meta key", LevelValidator.WARNING), _messages(good))
+	var bad: LevelValidator = _validator({"arena_bad": _arena_text("arena_bad",
+			"modes = grub_stack\ndark_pulse = 40:50\nregrow = 0\nember_lane = 18,4", ARENA_ROWS, ARENA_LEGEND,
+			"bosses/colossus 19 9\nbosses/colossus 0 9\nbosses/brute 10 9")})
+	for fragment: String in ["dark_pulse = 40:50 must be", "regrow = 0 must be", "ember_lane = 18,4 must be",
+			"an arena holds one neutral bosses/colossus", "'bosses/brute' has no place in an arena"]:
+		assert_true(bad.has_problem(fragment), "%s\n%s" % [fragment, _messages(bad)])
+	var outside: LevelValidator = _validator({"pulse_level": _level("pulse_level", "dark_pulse = 486")})
+	assert_true(outside.has_problem("only an arena (kind = arena) runs it", LevelValidator.WARNING), _messages(outside))
+	var rows: PackedStringArray = ARENA_ROWS.duplicate()
+	rows[10] = "###?###~####?###?###"
+	var syrup: LevelValidator = _validator({"arena_syrup": _arena_text("arena_syrup",
+			"modes = hot_rock\nsudden = syrup_flood", rows)})
+	assert_true(syrup.has_problem("sudden = syrup_flood (kid-safe, no deaths): '~'", LevelValidator.WARNING),
+			_messages(syrup))

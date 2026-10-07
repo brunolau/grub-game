@@ -2,8 +2,10 @@ extends "res://tests/test_enemies_case.gd"
 ## The Twin Idols (scripts/bosses/idols.gd; DESIGN.md B.4, GAMEPLAY.md 13.6; PLAN.md P2.3, owner enemies-C): the two
 ## idols in the walls, the shared brain (one awake idol spits, the asleep one drops masonry), 1 per hit of any weapon
 ## (the club works), the rage every 4th hit and the role swap, the telegraphs of B.0, defeat; the co-op Twin Hit (both
-## awake, each only while a hero stands on its half, a crack only within the twin window, the crossed targets after a
-## rage) and the single-hero search against it with the real hero.
+## awake, each only while a hero who counts - hatched, not idle - stands on its half, a crack only within the twin
+## window and by the OTHER hero, the crossed targets after a rage), the single-hero search against it with the real hero
+## (his partner an egg, or hatched and idle anywhere: G33 / G34), the weak points clear of the HUD (G35) and the
+## recorded club routes on the test level.
 ##
 ## The court: 20 x 11 cells, walls in columns 0 and 19, floor at row 10 (feet y 160). The Sun Idol stands in the
 ## right wall (feet x 336), the Moon Idol in the left (feet x -16): bodies -16..88 and 232..336, the halves meet at 160.
@@ -12,21 +14,39 @@ const PLAYER_SCENE: String = "res://scenes/player/player.tscn"
 const SUN_X: int = 336
 const MOON_X: int = -16
 const MID: int = 160
+const FEET_Y: int = 160
+## The developer level (DESIGN.md B.4's court: the 2-row altar at cols 8-11, a ledge in front of each idol's jaws),
+## played in the real level scene by the Lab of tests/test_enemies_tusker.gd. Its floor is row 11 (feet y 176).
+const LEVEL_PATH: String = "res://levels/test_enemies_idols.lvl"
+const LEVEL_FLOOR_Y: int = 176
+const Lab = preload("res://tests/test_enemies_tusker.gd").Lab
 
 var _p2: PlayerBase = null
+## Where the single-hero search keeps its idle partner.
+var _p2_spot: Vector2i = Vector2i.ZERO
 var _defeated: Array[BossBase] = []
+var _lab: Lab = null
+var _was_manual: bool = false
 
 
 func before_each() -> void:
 	super.before_each()
 	_defeated.clear()
 	_p2 = null
+	_lab = null
+	_was_manual = Sim.manual
 	Events.boss_defeated.connect(_on_defeated)
 
 
 func after_each() -> void:
 	Events.boss_defeated.disconnect(_on_defeated)
 	GameInput.clear_scripted()
+	if _lab != null:
+		Sim.stop()
+		Sim.manual = _was_manual
+		Audio.stop_music(0.0)
+		Lab.cleanup_flow(get_tree())
+		_lab = null
 	Game.new_game(Defs.Difficulty.BEGINNER)
 	Game.begin_level(&"")
 
@@ -38,14 +58,15 @@ func after_each() -> void:
 func test_the_idols_sit_in_both_walls_mirrored() -> void:
 	var idols: Idols = _court()
 	Sim.step(1)
-	assert_eq(idols.get_idol_pos(Idols.SUN), Vector2i(SUN_X, 160), "the Sun: 32 px inside the right wall")
-	assert_eq(idols.get_idol_pos(Idols.MOON), Vector2i(MOON_X, 160), "the Moon: 32 px inside the left wall")
-	assert_eq(idols.get_body_rect(Idols.SUN), Rect2i(SUN_X - 104, 65, 104, 95))
-	assert_eq(idols.get_body_rect(Idols.MOON), Rect2i(MOON_X, 65, 104, 95))
+	assert_eq(idols.get_idol_pos(Idols.SUN), Vector2i(SUN_X, FEET_Y), "the Sun: 32 px inside the right wall")
+	assert_eq(idols.get_idol_pos(Idols.MOON), Vector2i(MOON_X, FEET_Y), "the Moon: 32 px inside the left wall")
+	assert_eq(idols.get_floor_y(), 160, "the floor's top")
+	assert_eq(idols.get_body_rect(Idols.SUN), Rect2i(SUN_X - 104, FEET_Y - 95, 104, 95))
+	assert_eq(idols.get_body_rect(Idols.MOON), Rect2i(MOON_X, FEET_Y - 95, 104, 95))
 	assert_eq(idols.get_mid_x(), MID)
 	var sun_head: Rect2i = idols.get_head_rect(Idols.SUN)
 	var moon_head: Rect2i = idols.get_head_rect(Idols.MOON)
-	assert_eq(sun_head, Rect2i(SUN_X - 106, 90, 46, 31), "the Colossus idle head")
+	assert_eq(sun_head, Rect2i(SUN_X - 106, FEET_Y - 70, 46, 31), "the Colossus idle head")
 	assert_eq(moon_head.position.x - MOON_X, SUN_X - sun_head.end.x, "the Moon's head is the mirror image")
 	assert_eq(moon_head.position.y, sun_head.position.y)
 	assert_eq(idols.get_mouth(Idols.MOON).x - MOON_X, SUN_X - idols.get_mouth(Idols.SUN).x)
@@ -267,6 +288,118 @@ func test_the_real_hero_beats_the_solo_idols_with_the_club() -> void:
 
 
 # =================================================================================================================
+# The test level: the Moon's wall and the recorded club routes
+# =================================================================================================================
+
+## G2 verifier fix (wf8_g2_verify_to_enemies-C #1): on DESIGN.md B.4's court the 2-row altar block stands on the
+## Sun's feet row in the middle of the room; the Moon's wall is the first column that is a wall on the feet row AND at
+## head height, so the Moon sits in the left wall (feet x -16), not on the altar (it once stood at x 160, both idols
+## overlapping in the middle). Pinned on the real level file, so the court of w8_l2b (D8) cannot regress.
+func test_the_moon_sits_in_the_left_wall_of_the_test_court() -> void:
+	var idols: Idols = _open_lab(Defs.Difficulty.EXPERT)
+	_lab.step(PackedInt32Array([0]))
+	var feet_y: int = LEVEL_FLOOR_Y
+	assert_eq(idols.get_idol_pos(Idols.SUN), Vector2i(SUN_X, feet_y), "the Sun: 32 px inside the right wall")
+	assert_eq(idols.get_idol_pos(Idols.MOON), Vector2i(MOON_X, feet_y), "the Moon: 32 px inside the LEFT wall")
+	assert_eq(idols.get_body_rect(Idols.MOON), Rect2i(MOON_X, feet_y - 95, 104, 95), "body -16..88")
+	assert_eq(idols.get_mid_x(), MID, "the halves meet over the altar")
+	var altar: Rect2i = Rect2i(8 * Tuning.TILE, 9 * Tuning.TILE, 4 * Tuning.TILE, 2 * Tuning.TILE)
+	assert_false(idols.get_body_rect(Idols.MOON).intersects(altar), "no idol on the altar")
+	assert_false(idols.get_body_rect(Idols.MOON).intersects(idols.get_body_rect(Idols.SUN)), "the bodies apart")
+	var moon_sprite: Node2D = idols.get_node_or_null("MoonSprite") as Node2D
+	if moon_sprite != null:
+		assert_eq(Vector2i(moon_sprite.position), (Vector2i(MOON_X, feet_y) - idols.sim_pos) * Tuning.ART_SCALE,
+				"the Moon is drawn where it stands")
+
+
+## G35 (lead designer, wf9 #2 as corrected): every pose in which a head can be struck lies wholly in the locked view of
+## the test court, clear of the fight HUD (Hud.weak_point_problem: 24 px under the band - 55 px under the view's top,
+## 72 px in the boss bar's columns), on the real level's view; and in a view whose last row is the court's floor (the
+## framing D8 copies for w8_l2b).
+func test_the_strikable_heads_stay_clear_of_the_hud() -> void:
+	var idols: Idols = _open_lab(Defs.Difficulty.EXPERT)
+	_lab.step(PackedInt32Array([0]))
+	var views: Array[Rect2i] = [_lab.level.get_view_rect(),
+			Rect2i(0, LEVEL_FLOOR_Y + Tuning.TILE - Tuning.VIEW_H, Tuning.VIEW_W, Tuning.VIEW_H)]
+	for view: Rect2i in views:
+		for idol: int in [Idols.MOON, Idols.SUN]:
+			for pose: StringName in [&"idle", &"spit", &"slam", &"hurt", &"rage"]:
+				idols._pose[idol] = pose
+				var head: Rect2i = idols.get_head_rect(idol)
+				assert_true(view.encloses(head), "view %s, idol %d %s: wholly in the view" % [view, idol, pose])
+				var art: Rect2 = Rect2(Vector2(head.position - view.position) * 2, Vector2(head.size) * 2)
+				assert_eq(Hud.weak_point_problem(art, Vector2(view.size) * 2), "", "view %s, idol %d %s: the HUD rule" % [
+						view, idol, pose])
+	idols._pose[0] = &"idle"
+	idols._pose[1] = &"idle"
+
+
+## G2 criterion (PLAN.md 5, enemies-C): the solo Idols fall to the club on their test level, played by the real hero
+## from the level start with no refill - replayed tick for tick from the routes [IdolsClubPilot] recorded (run
+## test_the_club_pilot_still_wins_on_the_test_court with IDOLS_ROUTE=1 to print fresh ones). The club stays in his
+## hand all the way (no special lies in the court).
+func test_the_club_routes_beat_the_solo_idols_on_the_test_court() -> void:
+	for case: Array in [[Defs.Difficulty.BEGINNER, ROUTE_BEGINNER], [Defs.Difficulty.EXPERT, ROUTE_EXPERT]]:
+		var idols: Idols = _open_lab(int(case[0]))
+		var hero: PlayerBase = _lab.hero()
+		var lives: int = Game.lives
+		var route: PackedInt32Array = Lab.parse_route(str(case[1]))
+		var specials: Array[int] = [0]
+		var played: int = _lab.play([route] as Array[PackedInt32Array], func() -> bool:
+			if hero.run.weapon != Defs.Weapon.CLUB:
+				specials[0] += 1
+			return idols.dead or hero.dead)
+		print("    idols route difficulty %d: beaten on tick %d of %d, hearts %d bones %d" % [case[0], played,
+				route.size(), hero.run.hearts, hero.run.bones])
+		assert_true(idols.dead, "difficulty %d: the club route beats the Twin Idols (hp left %d)" % [case[0], idols.hp])
+		assert_false(hero.dead, "difficulty %d: without a death" % case[0])
+		assert_eq(Game.lives, lives, "no life lost")
+		assert_eq(specials[0], 0, "the club in his hand all the way")
+		assert_false(idols.is_coop_form(), "the solo form")
+		_close_lab()
+
+
+## The pilot that recorded those routes still wins from the level start (a guard against tuning drift; with
+## IDOLS_ROUTE=1 it prints the fresh routes).
+func test_the_club_pilot_still_wins_on_the_test_court() -> void:
+	for difficulty: int in [Defs.Difficulty.BEGINNER, Defs.Difficulty.EXPERT]:
+		var idols: Idols = _open_lab(difficulty)
+		var hero: PlayerBase = _lab.hero()
+		var pilot: IdolsClubPilot = IdolsClubPilot.new()
+		var debug: bool = OS.get_environment("IDOLS_DEBUG") != ""
+		var on_hurt: Callable = func(_h: PlayerBase, kind: int, source: SimEntity) -> void:
+			if debug:
+				print("  hurt kind %d by %s at %s, idols state %d" % [kind,
+						source.scene_file_path.get_file() if source != null else "-",
+						source.sim_pos if source != null else Vector2i.ZERO, idols.get_state()])
+		Events.hero_hurt.connect(on_hurt)
+		for tick: int in 6000:
+			var f: int = pilot.flags(hero, idols, _lab.level)
+			if debug and tick % 6 == 0 and tick >= OS.get_environment("IDOLS_DEBUG").to_int() \
+					and tick < OS.get_environment("IDOLS_DEBUG").to_int() + 600:
+				var blocks: Array = []
+				for e: SimEntity in _lab.level.get_kind(Defs.Kind.ENEMY_PROJECTILE):
+					if not (e as ProjectileBase).spent:
+						blocks.append("%s%s" % [e.scene_file_path.get_file().get_basename().substr(5, 4), e.sim_pos])
+				print("t%d %s %s g%s f%d st%d roles %d/%d hp%d rel%d keys %s %s" % [tick, hero.sim_pos, hero.xvel,
+						hero.is_grounded(), hero.facing, idols.get_state(), idols.get_role(0), idols.get_role(1),
+						idols.hp, IdolsClubPilot.release_in(idols), Lab.keys(f), blocks])
+			_lab.step(PackedInt32Array([f]))
+			if debug and hero.hit_timer == Tuning.HIT_TIMER - 1:
+				print("HURT t%d at %s" % [tick, hero.sim_pos])
+			if idols.dead or hero.dead:
+				break
+		Events.hero_hurt.disconnect(on_hurt)
+		if OS.get_environment("IDOLS_ROUTE") != "":
+			print("ROUTE %d %s" % [difficulty, Lab.route_text(_lab.streams[0])])
+		print("    idols pilot difficulty %d: dead %s after %d ticks, hp %d, hearts %d bones %d, hero dead %s" % [
+				difficulty, idols.dead, _lab.ticks(), idols.hp, hero.run.hearts, hero.run.bones, hero.dead])
+		assert_true(idols.dead, "difficulty %d: the club pilot beats the Twin Idols (hp left %d)" % [difficulty, idols.hp])
+		assert_false(hero.dead)
+		_close_lab()
+
+
+# =================================================================================================================
 # The co-op form: Twin Hit
 # =================================================================================================================
 
@@ -354,27 +487,82 @@ func test_coop_rocks_are_aimed_at_the_hero_on_each_side() -> void:
 		assert_eq(absi(rock.xvel), Idols._aimed_speed(dx), "aimed at its own hero")
 
 
-## V3.d: one hero cannot beat the Twin Hit. The real hero (club, then the axe, the swirling axe and the spear) with his
-## partner an egg, from many places in the court, throws at the far idol and strikes the near one on every timing
-## offset within the window, and plays seeded random inputs: no idol ever cracks.
+## G33: only a hero who COUNTS (hatched, not idle) on a half wakes its idol: a dozing partner on the Sun's half leaves
+## it asleep and armoured (and its target is nobody), an egg too; once he presses something again it wakes.
+func test_coop_an_idle_partner_on_a_half_wakes_nothing() -> void:
+	var idols: Idols = _coop_fight(Vector2i(100, 160), Vector2i(220, 160))
+	assert_true(idols.is_open(Idols.SUN), "an active P2 on the Sun's half: open")
+	_p2.idle = true
+	Sim.step(1)
+	assert_true(idols.is_open(Idols.MOON), "P1 plays on the Moon's half")
+	assert_false(idols.is_open(Idols.SUN), "P2 dozes on the Sun's half: asleep, armoured")
+	assert_null(idols._target_of(Idols.SUN), "and it aims at nobody")
+	assert_false(idols._takes_step(Idols.SUN, true), "nor spits")
+	_club_by(_p2, idols.get_head_rect(Idols.SUN))
+	Sim.step(1)
+	_p2.club_box_active = false
+	assert_eq(idols._pending[Idols.SUN], -1, "a hit on its closed jaws glances")
+	_p2.idle = false
+	Sim.step(1)
+	assert_true(idols.is_open(Idols.SUN), "awake again once he plays")
+
+
+## G34: the twin must be struck by the OTHER hero. P1's strike on the Moon and his own hit on the Sun (both jaws open:
+## an active P2 stands on the Sun's half) within the window crack nothing; P2's strike on the Sun does.
+func test_coop_the_twin_must_come_from_the_other_hero() -> void:
+	var idols: Idols = _coop_fight(Vector2i(100, 160), Vector2i(220, 160))
+	_club_by(_hero, idols.get_head_rect(Idols.MOON))
+	Sim.step(1)
+	_hero.club_box_active = false
+	Sim.step(4)
+	_club_by(_hero, idols.get_head_rect(Idols.SUN))
+	Sim.step(1)
+	_hero.club_box_active = false
+	assert_eq(idols.hp, idols.max_hp, "one hero's two hits never twin")
+	assert_eq(idols._pending_slot[Idols.SUN], 0, "his Sun hit only waits for a twin of P2's")
+	Sim.step(Idols.PENDING_RENEW_TICKS)
+	_club_by(_p2, idols.get_head_rect(Idols.MOON))
+	Sim.step(1)
+	_p2.club_box_active = false
+	assert_eq(idols.hp, idols.max_hp - 2, "P2's hit on the Moon twins P1's waiting Sun hit")
+	assert_eq(idols.get_hits_left(Idols.MOON), idols.get_hits_left(Idols.SUN))
+
+
+## V3.d: one hero cannot beat the Twin Hit. The real hero (club, then the axe, the swirling axe and the spear), with
+## his partner an egg, or hatched and IDLE anywhere in the court (G33 / G34: on either half, by either idol, never
+## moving), from many places throws at the far idol and strikes the near one on every timing offset within the window,
+## and plays seeded random inputs: no idol ever cracks.
 func test_the_single_hero_search_cannot_crack_the_twin_idols() -> void:
 	var idols: Idols = _coop_court()
 	var hero: PlayerBase = _real_hero(Vector2i(MID, 160), 0)
 	_p2 = _add_hero2(Vector2i(MID + 40, 160))
-	_p2.down = true
 	idols.start_fight()
 	assert_true(idols.is_coop_form(), "two heroes in a co-op file: the Twin Hit")
 	var rng: SimRng = SimRng.new(4242)
 	var episodes: int = 0
-	for weapon: int in [Defs.Weapon.CLUB, Defs.Weapon.AXE, Defs.Weapon.BOOMERANG, Defs.Weapon.SPEAR]:
-		for start_x: int in [96, 120, 150, 175, 200, 225]:
-			for offset: int in [0, 4, 8, 12]:
-				_episode(hero, weapon, Vector2i(start_x, 160), _throw_then_strike(start_x, offset))
+	# The partner: an egg, then hatched and idle at spots over the whole court (both halves, under each idol's jaws).
+	var partners: Array[int] = [-1, 40, 100, 150, 175, 220, 280]
+	for partner_x: int in partners:
+		_p2_spot = Vector2i(partner_x if partner_x >= 0 else 200, 160)
+		_p2.respawn_at(_p2_spot)
+		_p2.idle = true
+		_p2.down = partner_x < 0
+		var offsets: Array[int] = [0, 7]
+		var starts: Array[int] = [96, 150, 200, 225]
+		if partner_x < 0:
+			offsets = [0, 4, 8, 12]
+			starts = [96, 120, 150, 175, 200, 225]
+		for weapon: int in [Defs.Weapon.CLUB, Defs.Weapon.AXE, Defs.Weapon.BOOMERANG, Defs.Weapon.SPEAR]:
+			for start_x: int in starts:
+				for offset: int in offsets:
+					_episode(hero, weapon, Vector2i(start_x, 160), _throw_then_strike(start_x, offset))
+					episodes += 1
+					assert_eq(idols.hp, idols.max_hp, "partner %d, weapon %d from x %d, offset %d: no crack" % [
+							partner_x, weapon, start_x, offset])
+			for run: int in (3 if partner_x < 0 else 1):
+				_episode(hero, weapon, Vector2i(rng.range_int(96, 225), 160), _random_flags(rng, 240))
 				episodes += 1
-				assert_eq(idols.hp, idols.max_hp, "weapon %d from x %d, offset %d: no crack" % [weapon, start_x, offset])
-		for run: int in 3:
-			_episode(hero, weapon, Vector2i(rng.range_int(96, 225), 160), _random_flags(rng, 240))
-			episodes += 1
+		assert_eq(idols.hp, idols.max_hp, "partner at %d: no crack" % partner_x)
 	assert_eq(idols.hp, idols.max_hp, "%d single-hero episodes, no crack" % episodes)
 	assert_false(idols.dead)
 
@@ -580,8 +768,201 @@ func _episode(hero: PlayerBase, weapon: int, pos: Vector2i, flags: PackedInt32Ar
 		hero.hit_timer = mini(hero.hit_timer, 1)
 		if hero.dead or hero.is_down():
 			hero.respawn_at(pos)
+		if _p2 != null and is_instance_valid(_p2) and not _p2.is_down():
+			# The idle partner stays where he was put, hatched and idle (a hurt would knock him about).
+			_p2.run.hearts = Tuning.ENERGY_START
+			if _p2.dead or _p2.sim_pos != _p2_spot:
+				_p2.respawn_at(_p2_spot)
+			_p2.idle = true
 	GameInput.clear_scripted()
 
 
 func _on_defeated(boss: BossBase) -> void:
 	_defeated.append(boss)
+
+
+## The test level in the real level scene (the fixture's own room freed first), one real hero, club in hand.
+func _open_lab(difficulty: int, party: int = 1) -> Idols:
+	if _level != null and is_instance_valid(_level):
+		_level.free()
+	_level = null
+	_hero = null
+	_lab = Lab.new()
+	assert_true(_lab.open(self, LEVEL_PATH, "bosses/idols", difficulty, party), "the court came up")
+	return _lab.boss as Idols
+
+
+func _close_lab() -> void:
+	if _lab != null and _lab.level != null and is_instance_valid(_lab.level):
+		_lab.level.free()
+	GameInput.clear_scripted()
+	_lab = null
+
+
+## The club pilot of the solo Idols on the test court (it recorded ROUTE_BEGINNER / ROUTE_EXPERT). Its strike spot is
+## under the awake idol's jaws, SPOT_DX px from its feet point - outside the body test (the coarse reject of 64 px),
+## where a spat rock leaves over his head and the masonry (clamped COLOSSUS_DROP_MARGIN px off the bodies) cannot
+## reach - and from there it high-strikes the head whenever it may count. Its home is the altar's top on that idol's
+## side: a rock (a heart a touch) never climbs the 2-row altar, so it waits there while a rock rolls about the court,
+## while the next spit is due within SPIT_MARGIN ticks (the shared loop's clock) and through a rage; it crosses the
+## court on the altar. A masonry block rattling over him sends him aside first (toward the altar's middle up there).
+class IdolsClubPilot:
+	extends RefCounted
+
+	const SPOT_DX: int = 74
+	const HOME_DX: int = 0           ## home: this far from the altar's middle (cols 8-11) toward the target idol
+	const ALTAR_MID: int = 160
+	const FLOOR_Y: int = 176
+	const SPIT_MARGIN: int = 34
+	const HIGH_TICKS: int = 9
+	const JUMP_TICKS: int = 8
+
+	var plan: Array[int] = []
+	var _last_x: int = -100000
+	var _stuck: int = 0
+
+	func flags(hero: PlayerBase, idols: Idols, level: LevelBase) -> int:
+		if not plan.is_empty():
+			return plan.pop_front()
+		var idol: int = target(idols)
+		var dir: int = 1 if idol == Idols.SUN else -1
+		var toward: int = Defs.IN_RIGHT if dir > 0 else Defs.IN_LEFT
+		var x: int = hero.sim_pos.x
+		var jump: int = rock_jump(hero, level)
+		if jump >= 0:
+			return jump
+		for entity: SimEntity in level.get_kind(Defs.Kind.ENEMY_PROJECTILE):
+			# (A spent projectile stays listed until the frame ends - the Lab steps without frames.)
+			var block: BossStalactite = entity as BossStalactite
+			if block != null and not block.spent and absi(block.sim_pos.x - x) < 26 and block.sim_pos.y < hero.sim_pos.y:
+				var away: int = -1 if block.sim_pos.x >= x else 1
+				if hero.sim_pos.y < FLOOR_Y:
+					# On the altar: aside, but never off it (rocks roll about the floor).
+					var dest: int = block.sim_pos.x + away * 26
+					if dest < ALTAR_MID - 26 or dest > ALTAR_MID + 26:
+						away = -away
+				return Defs.IN_LEFT if away < 0 else Defs.IN_RIGHT
+		var danger: bool = rock_alive(level) or release_in(idols) <= SPIT_MARGIN or idols._rage_due \
+				or idols.get_state() == Idols.State.RAGE
+		var goal: int = ALTAR_MID + dir * HOME_DX if danger else idols.get_idol_pos(idol).x - dir * SPOT_DX
+		var move: int = go_to(hero, goal)
+		if move >= 0:
+			return move
+		if danger or not hero.is_grounded() or hero.attack_gate:
+			return 0
+		if hero.facing != dir:
+			return toward
+		if idols.is_open(idol) and idols._cooldown[idol] == 0 \
+				and Overlap.rects(high_box(hero.sim_pos, dir), idols.get_head_rect(idol)):
+			for i: int in HIGH_TICKS - 1:
+				plan.append(Defs.IN_UP | Defs.IN_FIRE)
+			plan.append(0)
+			return Defs.IN_UP | Defs.IN_FIRE
+		return 0
+
+	## True while a spat rock is still about (flying, hopping or rolling out).
+	static func rock_alive(level: LevelBase) -> bool:
+		for entity: SimEntity in level.get_kind(Defs.Kind.ENEMY_PROJECTILE):
+			var rock: BossRock = entity as BossRock
+			if rock != null and not rock.spent:
+				return true
+		return false
+
+	## Ticks until the next rock leaves the jaws (the shared loop of idols.gd: idle pauses, then LOOP's steps).
+	static func release_in(idols: Idols) -> int:
+		var step: int = idols._step
+		var t: int = 0
+		match idols.get_state():
+			Idols.State.SPIT:
+				if idols._timer < EnemyTuning.COLOSSUS_SPIT_RELEASE_TICK:
+					return EnemyTuning.COLOSSUS_SPIT_RELEASE_TICK - idols._timer
+				t = EnemyTuning.COLOSSUS_SPIT_TICKS - idols._timer
+				step = (step + 1) % Idols.LOOP.size()
+			Idols.State.SLAM:
+				t = EnemyTuning.COLOSSUS_SLAM_TICKS - idols._timer
+				step = (step + 1) % Idols.LOOP.size()
+			Idols.State.IDLE:
+				t = idols._idle_length() - idols._clock
+				if Idols.LOOP[step] == Idols.Attack.SPIT:
+					return t + EnemyTuning.COLOSSUS_SPIT_RELEASE_TICK
+				t += EnemyTuning.COLOSSUS_SLAM_TICKS
+				step = (step + 1) % Idols.LOOP.size()
+			_:
+				return 0
+		for i: int in Idols.LOOP.size():
+			t += EnemyTuning.COLOSSUS_IDLE_TICKS[step] * 50 / 100
+			if Idols.LOOP[step] == Idols.Attack.SPIT:
+				return t + EnemyTuning.COLOSSUS_SPIT_RELEASE_TICK
+			t += EnemyTuning.COLOSSUS_SLAM_TICKS
+			step = (step + 1) % Idols.LOOP.size()
+		return t
+
+	## A rock rolling or hopping at him low (one that came back off the altar's face, or a fresh one across the court):
+	## jump it in time (JUMP_TICKS of Up with his current direction); -1 when none is coming.
+	func rock_jump(hero: PlayerBase, level: LevelBase) -> int:
+		if not hero.is_grounded() or hero.attack_gate:
+			return -1
+		var x: int = hero.sim_pos.x
+		for entity: SimEntity in level.get_kind(Defs.Kind.ENEMY_PROJECTILE):
+			var rock: BossRock = entity as BossRock
+			if rock == null or rock.spent or rock.sim_pos.y < hero.sim_pos.y - 30:
+				continue
+			var gap: int = rock.sim_pos.x - x
+			var closing: int = -signi(gap) * (rock.xvel - hero.xvel)
+			if closing <= 0 or absi(gap) > 28 + closing * 6 / 16 or absi(gap) < 4:
+				continue
+			var key: int = hero.input_flags & (Defs.IN_LEFT | Defs.IN_RIGHT)
+			for i: int in JUMP_TICKS - 1:
+				plan.append(Defs.IN_UP | key)
+			return Defs.IN_UP | key
+		return -1
+
+	## The flags that bring the hero to `spot` (braking in time: no friction in the air, so he steers back there), -1
+	## when he stands there. A wall face in the way (the altar) is jumped: JUMP_TICKS of Up with the direction.
+	func go_to(hero: PlayerBase, spot: int) -> int:
+		var x: int = hero.sim_pos.x
+		var dx: int = spot - x
+		var v: int = hero.xvel
+		if absi(dx) <= 2 and absi(v) < 16:
+			_last_x = x
+			_stuck = 0
+			return -1
+		var key: int = Defs.IN_RIGHT if dx > 0 else Defs.IN_LEFT
+		var back: int = Defs.IN_LEFT if dx > 0 else Defs.IN_RIGHT
+		var brake: int = v * v / 384 + absi(v) / 32
+		if signi(v) == signi(dx) and absi(dx) <= brake + 1:
+			return back if not hero.is_grounded() else 0
+		if absi(dx) <= 2:
+			return back if not hero.is_grounded() else 0
+		if hero.is_grounded() and x == _last_x:
+			_stuck += 1
+		else:
+			_stuck = 0
+		_last_x = x
+		if _stuck >= 2:
+			_stuck = 0
+			for i: int in JUMP_TICKS - 1:
+				plan.append(Defs.IN_UP | key)
+			return Defs.IN_UP | key
+		return key
+
+	## The idol to strike: the awake one (solo), the survivor when one broke.
+	static func target(idols: Idols) -> int:
+		if idols.get_role(Idols.SUN) == Idols.Role.BROKEN:
+			return Idols.MOON
+		if idols.get_role(Idols.MOON) == Idols.Role.BROKEN:
+			return Idols.SUN
+		return Idols.SUN if idols.get_role(Idols.SUN) == Idols.Role.AWAKE else Idols.MOON
+
+	## The high-front club box of a hero standing at `feet` facing `facing` (PHYSICS.md 8.2).
+	static func high_box(feet: Vector2i, facing: int) -> Rect2i:
+		var rect: Rect2i = Tuning.CLUB_BOX[Tuning.ClubFrame.HIGH_FRONT]
+		var origin: Vector2i = Tuning.CLUB_ORIGIN[Tuning.ClubFrame.HIGH_FRONT]
+		var xo: int = origin.x - rect.position.x
+		var ox: int = feet.x + facing * origin.x
+		return Rect2i(ox - xo, feet.y + rect.position.y, rect.size.x, rect.size.y)
+
+
+## Recorded by test_the_club_pilot_still_wins_on_the_test_court with IDOLS_ROUTE=1 (Beginner, Expert).
+const ROUTE_BEGINNER: String = ""
+const ROUTE_EXPERT: String = ""

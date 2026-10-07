@@ -27,9 +27,13 @@ extends BossBase
 ## Co-op form (`kind = coop` files or `form=coop`), the Tentacle Lock: while UP (phases 1 and 2) it crosses two
 ## tentacles over its armoured head. A strike on a tentacle from ITS side (the left one by a hero - or the thrower of
 ## a weapon - at least SQUID_FLANK_PX left of the squid, the right one from the right) makes it flinch for the flinch
-## window, min(24 Beginner / 16 Expert, SQUID_SOLO_MIN_TICKS - 4): the head opens SQUID_OPEN_TICKS when both flinch,
-## struck by the two heroes (one hero's two strikes never open it). Phase 3 keeps the solo rule: one paddles, the
-## other strikes. A count-in plays while a hero stands at each side.
+## window, 24 Beginner / 16 Expert: the head opens SQUID_OPEN_TICKS when both flinch, struck by the two heroes (one
+## hero's two strikes never open it). The flinch is a slot-bound twin rule, so it is exempt from the solo_min cap
+## (DESIGN.md G34; SQUID_SOLO_MIN_TICKS stays a measured fact). Phase 3 keeps the solo rule: one paddles, the other
+## strikes. A count-in plays while a hero stands at each side.
+## IDLE rule (DESIGN.md G33 / G34): a flinch is a hero's own strike and counts only while he counts
+## (PlayerBase.counts_for_coop: alive, hatched, not idle); the count-in reads only heroes who count. A dozing partner on
+## the other island opens nothing.
 ##
 ## Fairness (B.0): every attack shows itself 10+ ticks ahead (bubbles 22, tentacle 12, jaws 10, rumble 22); hits never
 ## stop or lengthen a state (no stun-lock); BossBase.hit_cooldown is shared. Parameters: `arena`, `hp`, `drops`
@@ -94,7 +98,8 @@ const SQUID_FLINCH_BEGINNER: int = 24        ## co-op flinch, capped like a wind
 const SQUID_FLINCH_EXPERT: int = 16
 const SQUID_OPEN_TICKS: int = 33             ## co-op: the head opens this long when both tentacles flinch
 ## Co-op: the least ticks one hero needs from flinching one tentacle (from its side) to flinching the other (from the
-## other side) on the test level, measured by tests/test_enemies_squid.gd (which pins this as a lower bound).
+## other side) on the test level, measured by tests/test_enemies_squid.gd (which pins this as a lower bound). A measured
+## fact only since DESIGN.md G34: the lock is slot-bound, so the flinch window is not capped by it.
 const SQUID_SOLO_MIN_TICKS: int = 20
 const SQUID_COUNT_IN_TICKS: int = 8
 const SQUID_COUNT_IN_PX: int = 72            ## a hero within this far on a side counts as standing there
@@ -248,10 +253,9 @@ func get_open_ticks() -> int:
 	return _open
 
 
-## The co-op flinch window of this game.
+## The co-op flinch window of this game: 24 Beginner / 16 Expert, uncapped (G34: a slot-bound twin rule).
 func flinch_window() -> int:
-	var base: int = SQUID_FLINCH_EXPERT if Game.difficulty == Defs.Difficulty.EXPERT else SQUID_FLINCH_BEGINNER
-	return maxi(mini(base, SQUID_SOLO_MIN_TICKS - PartyTuning.WINDOW_SOLO_MARGIN_TICKS), 0)
+	return SQUID_FLINCH_EXPERT if Game.difficulty == Defs.Difficulty.EXPERT else SQUID_FLINCH_BEGINNER
 
 
 ## An ink blob of this squid hit a hero: the night palette for SQUID_DIM_TICKS.
@@ -777,10 +781,12 @@ func _tentacle_hit(box: Rect2i) -> int:
 	return 0
 
 
-## A strike on the tentacle of `side` by `hero` (slot `slot`): it flinches when he stands (or threw) on its side.
+## A strike on the tentacle of `side` by `hero` (slot `slot`): it flinches when he stands (or threw) on its side and
+## counts (G33: PlayerBase.counts_for_coop).
 func _strike_tentacle(side: int, hero: PlayerBase, slot: int, at: Vector2i) -> void:
 	var index: int = 0 if side < 0 else 1
-	var dx: int = (hero.sim_pos.x - sim_pos.x) if hero != null and is_instance_valid(hero) else 0
+	var counts: bool = hero != null and is_instance_valid(hero) and hero.counts_for_coop()
+	var dx: int = (hero.sim_pos.x - sim_pos.x) if counts else 0
 	if signi(dx) != side or absi(dx) < SQUID_FLANK_PX:
 		_clank(Game.level, at)
 		return
@@ -799,7 +805,8 @@ func _strike_tentacle(side: int, hero: PlayerBase, slot: int, at: Vector2i) -> v
 		Audio.play_sfx(Sfx.BOSS_ROAR)
 
 
-## The lock's clocks: flinches and the open head run down; the count-in while a hero stands at each side.
+## The lock's clocks: flinches and the open head run down; the count-in while a hero who counts (G33) stands at each
+## side.
 func _tick_lock() -> void:
 	for i: int in 2:
 		if _flinch[i] > 0:
@@ -809,7 +816,7 @@ func _tick_lock() -> void:
 		return
 	var sides: int = 0
 	for hero: PlayerBase in Game.level.contact_order():
-		if hero.dead or hero.is_down():
+		if not hero.counts_for_coop():
 			continue
 		var dx: int = hero.sim_pos.x - sim_pos.x
 		if absi(dx) >= SQUID_FLANK_PX and absi(dx) <= SQUID_COUNT_IN_PX:

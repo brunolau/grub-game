@@ -8,6 +8,11 @@ extends SimEntity
 ## it is. A party of one never has a driver (TECH_AUDIT.md 2: N = 1 is the identity); single-player never reaches a
 ## line of this file. Everything is integer and deterministic: no signal, no listener, no randomness.
 ##
+## The IDLE rule (orchestrator decision of phase 3): a hero whose own slot gave no input for PlayerBase.IDLE_TICKS
+## (10 s; each hero counts it himself, PlayerBase.note_own_input) is counted by no co-op rule of this driver - no
+## Shoulder Hop off his head ([method is_active]), no lee behind him, no Relay Bounce by him - while the physical steps
+## (edge walls, Totem carry, leash, eggs) treat him as any hatched hero. PlayerBase.counts_for_coop is the query.
+##
 ## Per tick (each step runs after every hero's own step of the phase):
 ##  - WEAPONS: who is ACTIVE ([method is_active]); who stands in a crouching partner's lee on this tick
 ##    ([method _update_lee], LevelBase.lee_mask / wind_for); the co-op edge walls (C.13) - every hatched hero is
@@ -119,12 +124,20 @@ func rider_of(carrier: PlayerBase) -> PlayerBase:
 	return carrier.totem_rider if carrier != null else null
 
 
-## True when `hero` is ACTIVE: hatched (in H) and his own slot held some input flag (GameInput.get_flags) on a tick
-## since he last became hatched - the level start, a team-wipe respawn or a hatch. Only an active partner's head gives
+## True when `hero` is ACTIVE: hatched (in H), his own slot held some input flag (GameInput.get_flags) on a tick
+## since he last became hatched - the level start, a team-wipe respawn or a hatch - and he is not IDLE (the phase-3
+## IDLE rule, PlayerBase.is_idle: no input of his own for PlayerBase.IDLE_TICKS). Only an active partner's head gives
 ## the full Shoulder Hop (G1 resolution: the egg and the idle body that pops out of it are no springboard); an idle
 ## partner still carries a Totem Ride (a still carrier's 98 px are below every boost ledge).
 func is_active(hero: PlayerBase) -> bool:
-	return is_in_tribe(hero) and (active_mask & (1 << clampi(hero.slot, 0, Defs.MAX_PLAYERS - 1))) != 0
+	return is_in_tribe(hero) and not hero.idle \
+			and (active_mask & (1 << clampi(hero.slot, 0, Defs.MAX_PLAYERS - 1))) != 0
+
+
+## The IDLE rule (PlayerBase.is_idle; the query the boss forms asked for here, wf9_enemies_c_to_world_a.txt): true when
+## `hero` is IDLE - no input of his own for PlayerBase.IDLE_TICKS, or none since he entered the level.
+func is_idle(hero: PlayerBase) -> bool:
+	return hero != null and hero.is_idle()
 
 
 ## WEAPONS: a hero down or in his toss is inactive; a hatched hero becomes active on the first tick his slot holds any
@@ -203,10 +216,10 @@ func _update_lee(level: LevelBase) -> void:
 
 
 ## True when `hero` stands in the lee of a crouching partner of `order` for a wind of sign `wind_sign` (see
-## [method _update_lee]).
+## [method _update_lee]). An IDLE partner (PlayerBase.counts_for_coop) is no windbreak.
 func in_lee(order: Array[PlayerBase], hero: PlayerBase, wind_sign: int) -> bool:
 	for windbreak: PlayerBase in order:
-		if windbreak == hero or not is_in_tribe(windbreak) or windbreak.state != Defs.HeroState.CROUCH \
+		if windbreak == hero or not windbreak.counts_for_coop() or windbreak.state != Defs.HeroState.CROUCH \
 				or not windbreak.is_grounded():
 			continue
 		var downwind: int = (windbreak.sim_pos.x - hero.sim_pos.x) * wind_sign
@@ -619,15 +632,16 @@ func bones_to_partner(hero: PlayerBase, count: int) -> int:
 
 ## Relay Bounce (GAMEPLAY.md 13.9.8; EnemyBase.on_bounced asks it in a party): the bounce count of `enemy` after a
 ## bounce by `hero`, given the count `count` before it. Below Tuning.BOUNCE_COUNT_MAX it rises as in 1.0; past it, in
-## a co-op Feast Land only, it rises (up to RELAY_COUNT_MAX) only when `hero` is not the hero of the previous bounce.
+## a co-op Feast Land only, it rises (up to RELAY_COUNT_MAX) only when `hero` is not the hero of the previous bounce
+## and is not IDLE (PlayerBase.is_idle: a dozing body dropped on the enemy relays nothing).
 func relay_bounce_count(enemy: SimEntity, hero: PlayerBase, count: int) -> int:
 	var id: int = enemy.get_instance_id() if enemy != null else 0
 	var last: int = int(_relay_last.get(id, -1))
-	if hero != null:
+	if hero != null and not hero.idle:
 		_relay_last[id] = hero.slot
 	if count < Tuning.BOUNCE_COUNT_MAX or not relay_active():
 		return mini(count + 1, Tuning.BOUNCE_COUNT_MAX)
-	if hero == null or last < 0 or last == hero.slot:
+	if hero == null or last < 0 or last == hero.slot or hero.idle:
 		return mini(count, RELAY_COUNT_MAX)
 	return mini(count + 1, RELAY_COUNT_MAX)
 

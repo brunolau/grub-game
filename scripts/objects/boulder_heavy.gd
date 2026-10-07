@@ -127,7 +127,8 @@ func _count_pushers(level: LevelBase) -> void:
 	var top: int = block.position.y * Tuning.TILE
 	var bottom: int = block.end.y * Tuning.TILE
 	for hero: PlayerBase in level.contact_order():
-		if not hero.is_party_targetable() or hero.is_mounted() or not hero.is_grounded():
+		# 2.0 IDLE rule: a dozing hero (PlayerBase.counts_for_coop) pushes nothing.
+		if not hero.counts_for_coop() or hero.is_mounted() or not hero.is_grounded():
 			continue
 		var y: int = hero.sim_pos.y
 		if y <= top or y > bottom:

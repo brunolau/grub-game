@@ -6,7 +6,8 @@ extends SimEntity
 ## gate. `far` is the air cell beyond the gate that a hero reaches only through it: the goal of the solo-impossibility
 ## search (world-B's scripts/world/coop_search.gd, tests/test_coop_gates.gd read the level file, not this entity).
 ##
-## In the game it only reacts once: when a hatched hero first stands in its `far` cell, the gate counts as solved and
+## In the game it only reacts once: when a hatched hero who is not IDLE (PlayerBase.counts_for_coop, the phase-3 IDLE
+## rule) first stands in its `far` cell, the gate counts as solved and
 ## the carved marks light up (frame 2) for the rest of the stage (a team wipe does not darken them). The marks are a
 ## picture; nothing in the simulation reads [member solved].
 
@@ -60,7 +61,7 @@ func _sim_tick(_phase: int) -> void:
 	if level == null:
 		return
 	for hero: PlayerBase in level.contact_order():
-		if hero.is_party_targetable() and stands_in_far_cell(hero):
+		if hero.counts_for_coop() and stands_in_far_cell(hero):
 			solved = true
 			_show()
 			level.spawn_fx(ID_STAR_PUFF, Vector2i(sim_pos.x, sim_pos.y - (box_h >> 1)))

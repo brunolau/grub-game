@@ -1,0 +1,80 @@
+# Club & Grub level file - format 2 (docs/ARCHITECTURE.md 7.11). Versus arena #7 of docs/expansion/DESIGN.md E.5:
+# Sky Picnic - Feast Land, a cake island in the sky that wraps top-bottom; KID-SAFE: no cell can kill (no liquid, no
+# spikes, no pit - the floor's hole drops you onto the cake island from the top); sudden death: the Syrup flood, which
+# only slows. Owner: DA (arenas, docs/expansion/PLAN.md 6.1). Rules: docs/LEVEL_DESIGN.md 15.8. Dressing: art-B's
+# hand-over (.tools/asset_candidates/expansion/_handover/ARENA_DRESSING.md, "Sky Picnic"; E.5 has no sketch, the
+# geometry is DA's).
+#
+# Layout notes:
+# - The sky: the floor (row 10) has a 4-cell hole (cols 8-11) over nothing - the bottom row is the seam (wrap = tb), so
+#   a hero who walks or is knocked into it comes in at the top and lands on the cake island (rows 7-8, cols 8-11) right
+#   above it. Rising past the top comes in at the bottom, where every floor lets feet through from below.
+# - Tiers 3 rows apart: the floor (row 10), the cake island (row 7), the icing clouds (row 4, cols 3-7 / 12-16, one-way
+#   `=` of feast/terrain_icing). Springs (cols 2 / 17, -224 = 105 px) lift a hero from the floor to the clouds' outer
+#   ends. Nothing stands higher than row 4, so a plain jump never reaches the top seam.
+# - Spots (visible, refill 15 s after they are emptied): one in the floor beside each spring's far side (cols 5 / 14),
+#   one flush in each cloud's outer end (cols 3 / 16), and the big spot in the cake island's top (col 9; col 10 beside
+#   it is plain cake, so the spot is struck alike from either half of the island - the hit test reaches one column).
+#   Its giant falls 7 rows onto the island over the hole.
+# - Cookpots: two (4-player arena), on the clouds' inner halves (cols 6 / 13).
+# - Spawns (rotate every round; 2 players use 1 and 2): 1 and 2 on the floor between the springs and the hole (cols
+#   13 / 6), 3 and 4 on the clouds (cols 4 / 15).
+# - Modes: Hot Rock (default), Grub Stack (E.5: "Hot Rock / Grub Stack"; no Last Caveman Standing on the kid-safe
+#   arena); each needs a green bot set in core-B's tests/test_versus_bots.gd.
+# - Bot graph: resources/bots/arena_sky_picnic.json, baked with core-B's tool after every edit of this file:
+#   bash .tools/gd.sh script res://tools/bots/bake_nav.gd -- arena_sky_picnic
+
+[meta]
+format = 2
+id = arena_sky_picnic
+name = "Sky Picnic"
+kind = arena
+biome = feast
+terrain_a = feast/terrain
+terrain_b = feast/terrain_icing
+background = feast
+liquid = syrup
+music = versus_battle_a
+players = 4
+modes = hot_rock,grub_stack
+round_time = 90
+wrap = tb
+sudden = syrup_flood
+author = DA
+notes = "Versus arena 7 (DESIGN.md E.5): Feast Land, wrap top-bottom, kid-safe (no deadly cell); the floor's hole drops onto the cake island with the big spot, springs to the icing clouds; the syrup flood only slows."
+
+[legend]
+? = objects/hidden_spot kind=small count=3 look=block tile=#
+s = objects/hidden_spot kind=small count=3 look=block tile=%
+* = objects/hidden_spot kind=big look=inset tile=#
+J = objects/spring
+P = objects/cookpot
+Q = objects/cookpot
+B = objects/spawn_point index=2
+C = objects/spawn_point index=3
+D = objects/spawn_point index=4
+
+[tiles]
+....................
+....................
+....................
+....C.P......Q.D....
+...s====....====s...
+....................
+....................
+........#*##........
+........####........
+..J...B......@...J..
+#####?##....##?#####
+########....########
+
+[entities]
+props/sky/cloud_puff 4 1 layer=back
+props/sky/cloud_puff 15 1 layer=back
+props/feast/wafer_sticks 10 6 layer=back
+props/feast/pudding 1 9 layer=back
+props/feast/jelly_pink 18 9 layer=back
+props/feast/cherries 4 9 layer=back
+props/feast/cream_swirl 15 9 layer=back
+props/feast/jelly_green 3 3 layer=back
+props/feast/honey_pot 16 3 layer=back

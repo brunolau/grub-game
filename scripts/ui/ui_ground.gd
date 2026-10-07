@@ -26,6 +26,11 @@ func _init(terrain: String = "jungle/terrain_grass", rows: int = 2) -> void:
 	offset_bottom = 0.0
 
 
+## True when the terrain atlas was found (else the strip is drawn in ink).
+func has_atlas() -> bool:
+	return _atlas != null
+
+
 ## Y of the walkable surface in the parent's coordinates (a few px into the grass, like the level art).
 func get_surface_y() -> float:
 	return position.y + 10.0

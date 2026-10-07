@@ -330,12 +330,17 @@ static func next_text() -> String:
 
 
 ## Where painting `index` hides: "5-1 Red Mesa Trail" for a Book II level, "Co-op: 1-1 Fresh Meadow" for a Book I
-## co-op secret (the name alone for a stage without a number; the id while the level is not in this build).
+## co-op secret (the name alone for a stage without a number; "9-2" from the id while the level is not in this
+## build).
 static func painting_where(index: int) -> String:
 	var level_id: StringName = UnlockTable.painting_level(index)
 	if level_id == &"":
 		return ""
 	var name: String = String(level_id)
+	var parts: RegexMatch = RegEx.create_from_string("^w(\\d+)_l(\\d+)(b?)").search(name)
+	if parts != null:
+		# A stage still being built: its number ("9-2b") rather than the file id.
+		name = "%s-%s%s" % [parts.get_string(1), parts.get_string(2), parts.get_string(3)]
 	if Levels.has_level(level_id):
 		var number: String = UiKit.level_number(level_id)
 		name = UiKit.level_name(level_id) if number == "" else "%s %s" % [number, UiKit.level_name(level_id)]

@@ -16,6 +16,10 @@ extends RouteTestCase
 const REQUIRE_EXPERT_ROUTES: bool = false
 ## The co-op files of the G1 vertical slice (PLAN.md 4.2): when one exists, its Beginner two-stream route must too.
 const SLICE_FILES: Array[StringName] = [&"w5_l1_coop", &"w1_l1_coop"]
+## G3: the co-op campaign runs must play the whole book; until then they stop, PENDING, where the content ends.
+const REQUIRE_COMPLETE_CAMPAIGN: bool = false
+## Side routes of the co-op campaign runs, per book and mode (a warp into a Feast Land instead of a stage's route).
+const CAMPAIGN_SIDES: Dictionary = {}
 
 
 ## The co-op header routes: co-op files, a party of two or more.
@@ -132,6 +136,31 @@ func test_coop_routes() -> void:
 				assert_eq(int(result["input_mismatches"]), 0, "%s (%s): every slot read its stream" % [file, mode])
 	assert_eq(played, expected, "every co-op route run started")
 	print("    co-op: %d route run(s)" % played)
+
+
+## The co-op campaign in ONE run per book and difficulty, a party of two through Flow (the co-op files of the map
+## stops, Flow passing over a stop without one yet), every stage by its two-stream route, with what the run carries -
+## the headless twin of tools/autoplay/campaign_coop.flow (PLAN.md 6.2). Until G3 (REQUIRE_COMPLETE_CAMPAIGN) a run
+## stops, PENDING, at the first stage without its route.
+func test_the_coop_book1_beginner_campaign_in_one_run() -> void:
+	await _coop_campaign(Levels.BOOK_1, BEGINNER)
+
+
+func test_the_coop_book1_expert_campaign_in_one_run() -> void:
+	await _coop_campaign(Levels.BOOK_1, EXPERT)
+
+
+func test_the_coop_book2_beginner_campaign_in_one_run() -> void:
+	await _coop_campaign(Levels.BOOK_2, BEGINNER)
+
+
+func test_the_coop_book2_expert_campaign_in_one_run() -> void:
+	await _coop_campaign(Levels.BOOK_2, EXPERT)
+
+
+func _coop_campaign(book: int, mode: String) -> void:
+	var sides: Dictionary = (CAMPAIGN_SIDES.get(book, {}) as Dictionary).get(mode, {})
+	await play_campaign(book, mode, PartyTuning.COOP_PLAYERS, sides, REQUIRE_COMPLETE_CAMPAIGN)
 
 
 ## V3.b: twice, without dozing, on other devices - the same digests.

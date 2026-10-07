@@ -26,3 +26,20 @@ msgstr "Stand on a plate to hold its door open - then swap!"
 
 msgid "SIGN_COOP_W1_SHELL"
 msgstr "Shellbacks face the nearer caveman. Club the back!"
+
+# --- w1_l2_coop Canopy Village (co-op) ---
+msgid "SIGN_COOP_W1_TOTEM"
+msgstr "Ride your partner's head. Jump just after he jumps!"
+
+msgid "SIGN_COOP_W1_PULLEY"
+msgstr "Stand on one pan. Your partner hops on the other to rise!"
+
+msgid "SIGN_COOP_W1_DRUMS"
+msgstr "Two drums, one beat: strike both at the same moment!"
+
+# --- w2_l1_coop Echo Caverns (co-op) ---
+msgid "SIGN_COOP_W2_HATCH"
+msgstr "One stands on the plate, the other drops through the floor!"
+
+msgid "SIGN_COOP_W2_RAPTOR"
+msgstr "Raptors dodge clubs: bounce on one, your partner strikes!"

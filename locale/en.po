@@ -15,9 +15,6 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 
 # --- Title screen ---
-msgid "UI_TITLE_START"
-msgstr "Start Game"
-
 msgid "UI_TITLE_CONTINUE"
 msgstr "Continue"
 
@@ -135,6 +132,9 @@ msgstr "Press Jump to join"
 msgid "UI_JOIN_HOLD"
 msgstr "Hold {key} when ready"
 
+msgid "UI_JOIN_HOLD_SHORT"
+msgstr "Hold {key}: ready"
+
 msgid "UI_JOIN_READY"
 msgstr "Ready!"
 
@@ -182,9 +182,6 @@ msgstr "Leave"
 
 msgid "UI_VS_HEADING"
 msgstr "VERSUS"
-
-msgid "UI_VS_ARENA"
-msgstr "Arena"
 
 msgid "UI_VS_MODE_GRUB_STACK"
 msgstr "Grub Stack"
@@ -248,9 +245,6 @@ msgstr "First to {wins}"
 
 msgid "UI_VS_ROUND"
 msgstr "ROUND {number}"
-
-msgid "UI_VS_RESULTS_HEADING"
-msgstr "RESULTS"
 
 msgid "UI_VS_MATCH_WIN"
 msgstr "{player} wins the match!"
@@ -361,9 +355,6 @@ msgstr "{count} more: {reward}"
 msgid "UI_PAINTINGS_ALL"
 msgstr "Every painting found!"
 
-msgid "UI_PAINTINGS_INFO"
-msgstr "One painting hides in every Book II stage, ten more behind co-op secrets in Book I."
-
 msgid "UI_PAINTINGS_COOP"
 msgstr "Co-op: {level}"
 
@@ -454,9 +445,6 @@ msgstr "Moon"
 msgid "UI_VS_TEAMS_UNEVEN"
 msgstr "2 v 2 needs two players on each team."
 
-msgid "UI_VS_HANDICAP"
-msgstr "Handicap"
-
 msgid "UI_VS_HANDICAP_OFF"
 msgstr "None"
 
@@ -468,9 +456,6 @@ msgstr "Guard x{factor}"
 
 msgid "UI_VS_HANDICAP_AUTO"
 msgstr "Auto"
-
-msgid "UI_VS_RULES"
-msgstr "Rules"
 
 msgid "UI_VS_RULES_HEADING"
 msgstr "RULES"
@@ -1099,6 +1084,15 @@ msgstr "Cinder Pit"
 
 msgid "Coconut Cove"
 msgstr "Coconut Cove"
+
+msgid "Floe Rink"
+msgstr "Floe Rink"
+
+msgid "Tar Pulleys"
+msgstr "Tar Pulleys"
+
+msgid "Sky Picnic"
+msgstr "Sky Picnic"
 
 # --- Level texts: signs (objects/sign) and hints (zones/message) of the level files, in level order ---
 # Shown in the HUD face on a wooden board (signs) or on the hint panel (zones), wrapped to a few lines.

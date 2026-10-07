@@ -15,6 +15,16 @@ extends RouteTestCase
 const REQUIRE_EXPERT_ROUTES: bool = false
 ## The Book II stages of the G1 vertical slice (PLAN.md 4.2): when one exists, its Beginner club route must too.
 const SLICE_STAGES: Array[StringName] = [&"w5_l1"]
+## G3: the campaign runs must play the whole book (no stage without its route); until then they stop, PENDING, where
+## the content ends.
+const REQUIRE_COMPLETE_CAMPAIGN: bool = false
+## The side routes the campaign runs take instead of a stage's club route (V2.c). None yet: the warp of Rattlesnake
+## Gulch into Feast Land D needs the spear on the belt, and no route that ends 5-1 picks it up (requested from D5,
+## wf9_integration_to_D5.txt #1); until then both runs fight Tusker and Feast Land D is proven by its own route.
+const CAMPAIGN_SIDES: Dictionary = {
+	BEGINNER: {},
+	EXPERT: {},
+}
 
 
 ## The Book II header routes: solo levels of book 2, one hero.
@@ -151,6 +161,18 @@ func test_book2_routes() -> void:
 				played += 1
 	assert_eq(played, expected, "every Book II route run started")
 	print("    Book II: %d route run(s)" % played)
+
+
+## V2.c: Book II in ONE run per difficulty, with what the run carries (score, lives, letters, hand and belt), every
+## stage by its club route except the side routes CAMPAIGN_SIDES names - the headless twin of
+## tools/autoplay/campaign_b2.flow. Until G3 (REQUIRE_COMPLETE_CAMPAIGN) the run plays the stops that have landed and
+## stops, PENDING, at the first stage without its route.
+func test_the_book2_beginner_campaign_in_one_run() -> void:
+	await play_campaign(Levels.BOOK_2, BEGINNER, 1, CAMPAIGN_SIDES[BEGINNER], REQUIRE_COMPLETE_CAMPAIGN)
+
+
+func test_the_book2_expert_campaign_in_one_run() -> void:
+	await play_campaign(Levels.BOOK_2, EXPERT, 1, CAMPAIGN_SIDES[EXPERT], REQUIRE_COMPLETE_CAMPAIGN)
 
 
 ## V2.b: every Book II club route gives the same per-tick digests whatever special rides on the belt.

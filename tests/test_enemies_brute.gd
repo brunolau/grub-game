@@ -10,6 +10,13 @@ extends "res://tests/test_enemies_case.gd"
 const PLAYER_SCENE: String = "res://scenes/player/player.tscn"
 
 var _p2: PlayerBase = null
+## Where the single-hero search keeps its idle partner (x < 0: none kept).
+var _p2_spot: Vector2i = Vector2i(-1, -1)
+
+
+func before_each() -> void:
+	super.before_each()
+	_p2_spot = Vector2i(-1, -1)
 
 
 func after_each() -> void:
@@ -95,6 +102,72 @@ func test_coop_a_totem_ride_rider_strikes_over_the_guard() -> void:
 	Sim.step(1)
 	_hero.club_box_active = false
 	assert_eq(brute.hp, 55, "the target on his partner's head is above the guard")
+
+
+## G33: the first target is the nearest ACTIVE hero. P2 dozes right beside the Brute, P1 stands farther off: the guard
+## faces P1 (his hits glance); P2's own hit (G34: an action) would count - but a dozing hero gives none.
+func test_coop_a_dozing_partner_never_draws_the_guard() -> void:
+	var brute: Brute = _coop_fight(Defs.Difficulty.BEGINNER, Vector2i(500, 160), Vector2i(370, 160))
+	_p2.idle = true
+	Sim.step(1)
+	assert_eq(brute._target_hero(), _hero, "the dozing P2 is nearer, but P1 is the nearest ACTIVE hero")
+	_club_by(_hero, brute.get_head_rect())
+	Sim.step(1)
+	_hero.club_box_active = false
+	assert_eq(brute.hp, 80, "P1's hit glances off the guard that faces him")
+	_shot(brute.get_head_rect(), 0)
+	Sim.step(1)
+	assert_eq(brute.hp, 80, "and so does his throw")
+	_p2.idle = false
+	Sim.step(1)
+	assert_eq(brute._target_hero(), _p2, "P2 plays again: the nearest active hero is the target")
+
+
+## G35 (lead designer, wf9 #2 as corrected): the co-op Brute's head on the floor - standing, beating its chest, holding
+## a hero - stays clear of the fight HUD (ui's Hud.weak_point_problem) in a view whose last row is the floor.
+func test_coop_the_head_stays_clear_of_the_hud() -> void:
+	var brute: Brute = _grabbed(Defs.Difficulty.EXPERT)
+	var view: Rect2i = Rect2i(brute.sim_pos.x - Tuning.VIEW_W / 2, 160 + Tuning.TILE - Tuning.VIEW_H, Tuning.VIEW_W,
+			Tuning.VIEW_H)
+	for state: int in [Brute.State.HOLD, Brute.State.GRAB_BEAT, Brute.State.WATCH]:
+		if state != Brute.State.HOLD:
+			brute._release(false)
+			brute._set_state(state)
+			brute.set_box(EnemyTuning.BRUTE_BOX_STAND)
+		var head: Rect2i = brute.get_head_rect()
+		assert_true(view.encloses(head), "state %d: wholly in the view" % state)
+		var art: Rect2 = Rect2(Vector2(head.position - view.position) * 2, Vector2(head.size) * 2)
+		assert_eq(Hud.weak_point_problem(art, Vector2(view.size) * 2), "", "state %d: the HUD rule" % state)
+
+
+## G33: no Totem Ride exemption on an idle carrier (party allows no ride on one; the guard checks it too).
+func test_coop_a_rider_on_a_dozing_carrier_stays_under_the_guard() -> void:
+	var brute: Brute = _coop_fight(Defs.Difficulty.BEGINNER, Vector2i(330, 160), Vector2i(330, 160))
+	_hero.totem_carrier = _p2
+	_p2.totem_rider = _hero
+	_p2.idle = true
+	_club_by(_hero, brute.get_head_rect())
+	Sim.step(1)
+	_hero.club_box_active = false
+	assert_eq(brute.hp, 80, "the rider of a dozing carrier is still its guarded target")
+	_hero.totem_carrier = null
+	_p2.totem_rider = null
+
+
+## G33: the Grab seizes only an active hero: a dozing target in reach of the open hands is not held (he is no bait for
+## a lone player's rescue hit).
+func test_coop_a_dozing_hero_is_never_grabbed() -> void:
+	var brute: Brute = _coop_fight(Defs.Difficulty.EXPERT, Vector2i(380, 160), Vector2i(560, 160))
+	brute.hp = 39
+	brute.last_hitter = _hero
+	_hero.idle = true
+	brute._set_state(Brute.State.WATCH)
+	for tick: int in 120:
+		_hero.teleport(Vector2i(brute.sim_pos.x + brute.facing * 20, 160))
+		Sim.step(1)
+		_hero.run.hearts = Tuning.ENERGY_START
+		_hero.hit_timer = 0
+		assert_null(brute.get_held(), "tick %d: the dozing hero is not seized" % tick)
 
 
 func test_coop_the_grab_beats_its_chest_opens_and_squeezes() -> void:
@@ -230,7 +303,8 @@ func test_coop_the_grab_is_fair_to_either_hero() -> void:
 
 
 ## V3.d: one hero cannot beat the co-op Brute. The real hero (every weapon, many starts, seeded random inputs) fights
-## it while his partner is an egg: whatever he does, it is always its target and its arm guard turns every hit away.
+## it while his partner is an egg, or hatched and IDLE anywhere on its floor (G33: right beside it on either side, or
+## far off): whatever he does, he is always its target and its arm guard turns every hit away.
 func test_the_single_hero_search_cannot_hurt_the_coop_brute() -> void:
 	Game.start_run(Defs.Difficulty.EXPERT, Defs.GameMode.COOP, 2)
 	Game.begin_level(&"test")
@@ -253,6 +327,17 @@ func test_the_single_hero_search_cannot_hurt_the_coop_brute() -> void:
 		for start: int in [300, 340, 460, 500]:
 			_episode(hero, weapon, Vector2i(start, 160), _random_flags(rng, 160))
 			assert_eq(brute.hp, 80, "weapon %d from x %d: nothing counts" % [weapon, start])
+	# The idle partner, hatched, kept where he was put (beside it on both sides, far off on both sides).
+	for spot: int in [370, 430, 260, 560]:
+		_p2_spot = Vector2i(spot, 160)
+		_p2.down = false
+		_p2.respawn_at(_p2_spot)
+		_p2.idle = true
+		brute.last_hitter = null
+		for weapon: int in [Defs.Weapon.CLUB, Defs.Weapon.AXE, Defs.Weapon.SPEAR]:
+			for start: int in [300, 460]:
+				_episode(hero, weapon, Vector2i(start, 160), _random_flags(rng, 160))
+				assert_eq(brute.hp, 80, "partner at %d, weapon %d from x %d: nothing counts" % [spot, weapon, start])
 	assert_false(brute.dead)
 
 
@@ -374,4 +459,12 @@ func _episode(hero: PlayerBase, weapon: int, pos: Vector2i, flags: PackedInt32Ar
 		hero.hit_timer = mini(hero.hit_timer, 1)
 		if hero.dead or hero.is_down():
 			hero.respawn_at(pos)
+		if _p2 != null and is_instance_valid(_p2) and _p2_spot.x >= 0:
+			# The search's idle partner stays where he was put, hatched and idle (a hurt or a grab would move him).
+			_p2.run.hearts = Tuning.ENERGY_START
+			_p2.hit_timer = mini(_p2.hit_timer, 1)
+			if _p2.dead or _p2.is_down() or _p2.sim_pos != _p2_spot:
+				_p2.down = false
+				_p2.respawn_at(_p2_spot)
+			_p2.idle = true
 	GameInput.clear_scripted()

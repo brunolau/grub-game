@@ -6,7 +6,9 @@ extends BossBase
 ## Place the record like the Colossus: in the floor-level air cell just left of the arena's RIGHT wall - that is the
 ## Sun Idol (sandstone gold; feet point = the bottom-right corner of its picture, 32 px inside the wall). The Moon Idol
 ## (jade) is its mirror image in the LEFT wall: its feet point (the bottom-LEFT corner) is found on the first tick, 32 px
-## inside the first wall to the left on the Sun's feet row (else mirrored in the arena rectangle).
+## inside the first wall to the left that stands both on the floor-level row and at head height (else mirrored in the
+## arena rectangle). Its open jaws (95 px over the feet) stay clear of the fight HUD with the floor on the view's last
+## row (DESIGN.md G35 as corrected: 55 px under the view top outside the boss bar's columns; the test pins it).
 ##
 ## Solo (and a party of one): one idol is **Awake** (glowing eyes; the Colossus attack loop of spits - jaws open
 ## EnemyTuning.COLOSSUS_SPIT_RELEASE_TICK ticks ahead, rocks of 32-96 v16 that bounce twice); the other is **Asleep**
@@ -20,11 +22,13 @@ extends BossBase
 ## also takes the slam steps. Both broken: defeat (the fire-starter and the bonus burst).
 ##
 ## Co-op form ("Twin Hit"; a co-op game of two heroes in a `kind = coop` file): both idols wake together, each facing
-## the hero on its own half of the room. An idol's jaws are open only while a hatched hero stands on its half (no hero
-## on its side: asleep and armoured), so one hero can never have both idols open at once. A hit on open jaws cracks
-## the idol only if its twin is hit within the twin window (PartyTuning.window_ticks: 24 Beginner / 12 Expert): both
-## crack together (one hit each), else the lone hit fades. Every RAGE_EVERY-th twin crack both rage, then their targets
-## swap (each spits at the hero on the far half and drops masonry over him). Hits per idol: 8 (7 solo).
+## the hero on its own half of the room. An idol is awake - its jaws open, its spits and slams - only while a hero who
+## COUNTS (PlayerBase.counts_for_coop: hatched and not idle, DESIGN.md G33) stands on its half; with nobody of the kind
+## on its side it sleeps, armoured (an egg or a dozing partner wakes nothing). A hit on open jaws cracks the idol only if
+## its twin is struck within the twin window (PartyTuning.window_ticks: 24 Beginner / 12 Expert) by a hero of ANOTHER
+## slot (G34: one hero's throw plus his own strike never twin): both crack together (one hit each), else the lone hit
+## fades. Every RAGE_EVERY-th twin crack both rage, then their targets swap (each spits at the hero on the far half and
+## drops masonry over him). Hits per idol: 8 (7 solo).
 ##
 ## Rules of B.0 kept: every attack shows its pose 10+ ticks ahead (the open jaws before a rock, the slam and the
 ## 14-tick rattle before a block), the attack clock runs on through hurt poses (no stun-lock), a head bounce bounces
@@ -85,6 +89,8 @@ var _hurt: Array[int] = [0, 0]
 var _cooldown: Array[int] = [0, 0]
 var _pending: Array[int] = [-1, -1]
 var _pending_age: Array[int] = [0, 0]
+## Co-op: the slot of the hero whose hit waits for its twin (G34: the twin must come from another slot).
+var _pending_slot: Array[int] = [-1, -1]
 var _pose: Array[StringName] = [&"idle", &"idle"]
 var _pose_age: Array[int] = [0, 0]
 var _flash_idol: Array[int] = [0, 0]
@@ -185,13 +191,19 @@ func get_head_rect(idol: int) -> Rect2i:
 	return Rect2i(pos + head.position, head.size)
 
 
-## True when a hit on this idol's head can count now (the solo awake idol; co-op: a hero on its half), outside a rage.
+## True when a hit on this idol's head can count now (the solo awake idol; co-op: a hero who counts - hatched, not
+## idle - on its half), outside a rage.
 func is_open(idol: int) -> bool:
 	if _role[idol] == Role.BROKEN or _state == State.RAGE or _state == State.DORMANT or not fighting:
 		return false
 	if _coop:
 		return _side_hero(idol, false) != null
 	return _role[idol] == Role.AWAKE
+
+
+## The y of the floor's top under the idols (their feet point stands on it).
+func get_floor_y() -> int:
+	return sim_pos.y
 
 
 ## Where a spat rock of this idol leaves its jaws.
@@ -228,6 +240,7 @@ func _on_reset() -> void:
 		_cooldown[idol] = 0
 		_pending[idol] = -1
 		_pending_age[idol] = 0
+		_pending_slot[idol] = -1
 		_flash_idol[idol] = 0
 		_attackers[idol] = false
 		_set_pose(idol, &"idle")
@@ -235,7 +248,7 @@ func _on_reset() -> void:
 
 
 func _burst_origin() -> Vector2i:
-	return Vector2i(get_mid_x(), sim_pos.y + EnemyTuning.BOSS_DROP_DY * 4)
+	return Vector2i(get_mid_x(), get_floor_y() + EnemyTuning.BOSS_DROP_DY * 4)
 
 
 func _on_defeated() -> void:
@@ -366,7 +379,7 @@ func _poll_hits() -> void:
 		if hit_hero != null:
 			level.spawn_fx(&"fx/hit_stars", hit_hero.club_box.intersection(head).get_center())
 		if _coop:
-			_coop_hit(idol)
+			_coop_hit(idol, hit_slot)
 		else:
 			_count_hit(idol)
 		if dead:
@@ -386,9 +399,10 @@ func _count_hit(idol: int) -> void:
 		_wake_survivor()
 
 
-## Co-op: a hit on open jaws waits for its twin; a hit on the twin within the window, while both jaws are open (a hero
-## on each half), cracks both.
-func _coop_hit(idol: int) -> void:
+## Co-op: a hit on open jaws waits for its twin; a hit on the twin within the window, by a hero of another slot (G34),
+## while both jaws are open (a hero who counts on each half), cracks both. The same hero's hit on the twin (his throw
+## and his own strike) only renews his own wait.
+func _coop_hit(idol: int, slot: int) -> void:
 	var twin: int = 1 - idol
 	_cooldown[idol] = PENDING_RENEW_TICKS
 	var now: int = Sim.total_ticks
@@ -397,9 +411,11 @@ func _coop_hit(idol: int) -> void:
 		_cooldown[idol] = HURT_TICKS
 		_crack(idol)
 		return
-	if _pending[twin] >= 0 and now - _pending[twin] < _window() and is_open(twin):
+	if _pending[twin] >= 0 and now - _pending[twin] < _window() and is_open(twin) and _pending_slot[twin] != slot:
 		_pending[idol] = -1
 		_pending[twin] = -1
+		_pending_slot[idol] = -1
+		_pending_slot[twin] = -1
 		_cooldown[idol] = HURT_TICKS
 		_cooldown[twin] = HURT_TICKS
 		_crack(idol)
@@ -414,6 +430,7 @@ func _coop_hit(idol: int) -> void:
 		return
 	_pending[idol] = now
 	_pending_age[idol] = 0
+	_pending_slot[idol] = slot
 	_flash_idol[idol] = EnemyTuning.FLASH_TICKS
 	Audio.play_sfx(Sfx.COUNT_IN)
 
@@ -444,6 +461,7 @@ func _expire_pending() -> void:
 		_pending_age[idol] += 1
 		if Sim.total_ticks - _pending[idol] >= _window() or not is_open(idol):
 			_pending[idol] = -1
+			_pending_slot[idol] = -1
 
 
 func _window() -> int:
@@ -595,7 +613,9 @@ func _drop_masonry(idol: int) -> void:
 		return
 	var target: PlayerBase = _target_of(idol)
 	var x: int = Sim.rng.range_int(low, high) if target == null else clampi(target.sim_pos.x, low, high)
-	var top: int = _ceiling_y(x, room.position.y)
+	# The ceiling over the target's feet (on the altar too: the altar is no ceiling of a hero standing on it).
+	var from_y: int = get_floor_y() if target == null else mini(target.sim_pos.y, get_floor_y())
+	var top: int = _ceiling_y(x, room.position.y, from_y)
 	_spawn_optional(MASONRY_ID, Vector2i(x, top + EnemyTuning.STALACTITE_BOX.y), {"skin": MASONRY_SKIN})
 	Audio.play_sfx(Sfx.QUAKE)
 
@@ -607,7 +627,9 @@ func _target_of(idol: int) -> PlayerBase:
 	return _side_hero(idol, _crossed)
 
 
-## Co-op: the hatched hero whose feet are on this idol's half (`far`: on the other half); the nearer to the idol first.
+## Co-op: the hero who COUNTS (PlayerBase.counts_for_coop: hatched and not idle, G33) whose feet are on this idol's
+## half (`far`: on the other half); the nearer to the idol first. It wakes the idol (is_open, _takes_step) and is its
+## target (_target_of): an egg or a dozing partner on a half wakes nothing and is spat at by nobody.
 func _side_hero(idol: int, far: bool) -> PlayerBase:
 	var level: LevelBase = Game.level
 	if level == null:
@@ -618,7 +640,7 @@ func _side_hero(idol: int, far: bool) -> PlayerBase:
 	var best_dx: int = 0
 	var face: int = get_body_rect(side).end.x if side == MOON else get_body_rect(side).position.x
 	for hero: PlayerBase in level.contact_order():
-		if not hero.is_party_targetable():
+		if not hero.counts_for_coop():
 			continue
 		var on_moon_half: bool = hero.sim_pos.x < mid
 		if on_moon_half != (side == MOON):
@@ -687,9 +709,9 @@ func _body_touches(idol: int, hero: PlayerBase) -> bool:
 			-pos.x, pos.y, box.x, box.y, box.x, false, hero.yvel, 1)
 
 
-## The Moon's feet point: 32 px inside the first wall to the left of the Sun that stands both on its feet row and at
-## its head's height (a full-height wall: the 2-row altar block of DESIGN.md B.4 in the middle of the floor, or a solid
-## ledge in front of the jaws, is not one), else mirrored in the room.
+## The Moon's feet point: 32 px inside the first wall to the left of the Sun that stands both on the floor-level row
+## and at its head's height (a full-height wall: the 2-row altar block of DESIGN.md B.4 in the middle of the floor, or a
+## solid ledge in front of the jaws, is not one), at the Sun's feet height, else mirrored in the room.
 func _place_moon() -> void:
 	if _moon_placed:
 		return
@@ -698,7 +720,7 @@ func _place_moon() -> void:
 		return
 	_moon_placed = true
 	var grid: TileGrid = level.grid
-	var row: int = Tuning.to_cell(sim_pos.y - 1)
+	var row: int = Tuning.to_cell(get_floor_y() - 1)
 	var head_row: int = Tuning.to_cell(sim_pos.y + EnemyTuning.COLOSSUS_HEAD_IDLE.position.y)
 	var col: int = Tuning.to_cell(sim_pos.x - EnemyTuning.COLOSSUS_BOX.x)
 	var face: int = -1
@@ -754,11 +776,12 @@ func _room() -> Rect2i:
 	return Rect2i(sim_pos.x - Tuning.VIEW_W, sim_pos.y - Tuning.VIEW_H, Tuning.VIEW_W, Tuning.VIEW_H)
 
 
-## Bottom of the first ceiling above the floor at x, not higher than `limit` (the Colossus rule).
-func _ceiling_y(x: int, limit: int) -> int:
+## Bottom of the first ceiling above `from_y` (feet y) at x, not higher than `limit` (the Colossus rule; scanned from
+## the target's feet, so the 2-row altar of B.4 is the floor of a hero on it, never the ceiling of the drop).
+func _ceiling_y(x: int, limit: int, from_y: int) -> int:
 	var grid: TileGrid = Game.level.grid
 	var col: int = Tuning.to_cell(x)
-	var row: int = Tuning.to_cell(sim_pos.y - 1)
+	var row: int = Tuning.to_cell(from_y - 1)
 	var top_row: int = Tuning.to_cell(limit)
 	while row > top_row:
 		row -= 1

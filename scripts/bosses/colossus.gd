@@ -24,12 +24,13 @@ extends BossBase
 ## 2.0 co-op form, the **visor** (DESIGN.md B.7, GAMEPLAY.md 13.6; enemies-C, PLAN.md P2.3) - only in a co-op game of two
 ## heroes on a co-op file (`kind = coop`: w4_l2b_coop); everywhere else, a party of one included, the statue above
 ## runs unchanged. Hit points x5/4 (24 -> 30). A stone visor covers its face; the two `objects/plate` of the hall (the
-## left-most and the right-most plate inside its room) hold its chains, and the visor is up only while a hatched hero
-## stands on the plate whose chain glows (Plate.holder_mask, its last weight test). Thrown weapons only, as in 1.0, and
-## a throw counts only while the visor is up and its thrower is not the one holding the plate: the holder dodges, the
-## other hero throws. Rocks are spat at the plate holder (the 1.0 speeds, aimed), the ceiling drops rattle over the
-## thrower. Each rage (the 1st hit and every 4th) moves the live chain to the other plate: the roles swap. A hall
-## without two plates is a content error (warned once): its visor then stays up and only the holder rule is lost.
+## left-most and the right-most plate inside its room) hold its chains, and the visor is up only while an ACTIVE hero
+## (PlayerBase.counts_for_coop: hatched, not idle - DESIGN.md G33) stands on the plate whose chain glows
+## (Plate.holder_mask, its last weight test, which weighs no dozing hero; checked here too). Thrown weapons only, as
+## in 1.0, and a throw counts only while the visor is up and its thrower is not the one holding the plate: the holder
+## dodges, the other hero throws. Rocks are spat at the plate holder (the 1.0 speeds, aimed), the ceiling drops rattle
+## over the thrower. Each rage (the 1st hit and every 4th) moves the live chain to the other plate: the roles swap. A
+## hall without two plates is a content error (warned once): its visor then stays up and only the holder rule is lost.
 
 enum State { DORMANT, IDLE, SPIT, SLAM, HURT, RAGE, BROKEN }
 enum Attack { SPIT, SLAM }
@@ -113,12 +114,12 @@ func is_coop_form() -> bool:
 	return _coop
 
 
-## 2.0 co-op: true while the visor is up (a hatched hero on the live plate; always false in the solo form).
+## 2.0 co-op: true while the visor is up (an active hero on the live plate; always false in the solo form).
 func is_visor_up() -> bool:
 	if not _coop:
 		return false
 	var plate: Plate = get_live_plate()
-	return plate == null or plate.holder_mask != 0
+	return plate == null or _holder() != null
 
 
 ## 2.0 co-op: the plate whose chain glows (null without plates).
@@ -448,14 +449,14 @@ func _visor_glance(level: LevelBase, point: Vector2i) -> void:
 	level.spawn_fx(&"fx/hit_stars", point)
 
 
-## The hero standing on the live plate (the rocks' target), or null.
+## The ACTIVE hero standing on the live plate (G33: a dozing hero holds nothing up; the rocks' target), or null.
 func _holder() -> PlayerBase:
 	var plate: Plate = get_live_plate()
 	var level: LevelBase = Game.level
 	if plate == null or level == null:
 		return null
 	for hero: PlayerBase in level.contact_order():
-		if hero.is_party_targetable() and (plate.holder_mask & (1 << hero.slot)) != 0:
+		if hero.counts_for_coop() and (plate.holder_mask & (1 << hero.slot)) != 0:
 			return hero
 	return null
 

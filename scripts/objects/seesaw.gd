@@ -8,7 +8,8 @@ extends SimEntity
 ## floor is a walk-off fall of N - 1 rows onto the high end. `facing=r` (the default) puts the high end on the right,
 ## `facing=l` on the left. While a flip lifts an end, its riders rise with it.
 ##
-## A hatched hero landing on the high end (caught by its ride test with a landing speed of at least
+## A hatched hero who is not IDLE (PlayerBase.counts_for_coop) landing on the high end (caught by its ride test with a
+## landing speed of at least
 ## ObjTuning.SEESAW_LANDING_MIN_YVEL) flips the plank within ObjTuning.SEESAW_FLIP_TICKS ticks and, on that tick,
 ## launches every hero riding the low end with PartyTuning.seesaw_launch(landing yvel, hard landing) =
 ## max(-(yvel + 32) - (64 if hard), -288): 1 tile -128, 4 tiles -272, 5+ tiles -288 (171 px) for walk-off falls. A
@@ -189,7 +190,8 @@ func _sim_tick(_phase: int) -> void:
 
 ## An end's ride test caught `hero`, who was not on it before, with `landing_yvel` / `fall_ticks` as they were.
 func _on_landed(end: End, hero: PlayerBase, landing_yvel: int, fall_ticks: int) -> void:
-	if end != high_end() or flip_ticks > 0 or not hero.is_party_targetable():
+	# 2.0 IDLE rule (PlayerBase.counts_for_coop): a dozing hero dropped on the high end (hatched over it) flips nothing.
+	if end != high_end() or flip_ticks > 0 or not hero.counts_for_coop():
 		return
 	var contact: int = contact_yvel(landing_yvel, fall_ticks)
 	if contact < ObjTuning.SEESAW_LANDING_MIN_YVEL:

@@ -11,6 +11,9 @@ extends SimEntity
 ## sudden deaths; the spawn shield does not help, PHYSICS.md C.14) or a 12-tick daze (a Grudge rock; shield and
 ## immunity do help). [member armed_tick] / [member warn_tick] tell tests when it turned deadly; [method danger_rect]
 ## is what the bots may avoid (only what a player sees).
+## Phase 3 (the arena signatures of [VersusSignatures], DESIGN.md E.5): an EMBER of Cinder Pit's ember lane and the
+## neutral Colossus's SPIT rock - an arena hit in the mode's currency (EFFECT_HIT: [method VersusReferee.arena_hit];
+## the spawn shield and the hurt immunity help).
 
 ## Kinds (the look and the motion).
 const CHARGER: StringName = &"charger"       ## Stampede: runs along the floor at CHARGER_XVEL (kill)
@@ -19,10 +22,13 @@ const STALACTITE: StringName = &"stalactite" ## Stalactite storm: hangs (rattle)
 const BOULDER: StringName = &"boulder"       ## Rockslide: falls from a rim and rolls (kill)
 const BOLT: StringName = &"bolt"             ## Lightning: a column from the view top to the first ground (kill)
 const ROCK: StringName = &"rock"             ## a Grudge Pterodactyl's rock: falls, shatters (daze)
+const EMBER: StringName = &"ember"           ## Cinder Pit's ember lane: drifts down the lane, fizzles on ground (hit)
+const SPIT: StringName = &"spit"             ## Colossus Hall: a rock spat at the crowned leader, straight (hit)
 ## Effects of a touch (the referee applies them).
 const EFFECT_NONE: int = 0
 const EFFECT_KILL: int = 1
 const EFFECT_DAZE: int = 2
+const EFFECT_HIT: int = 3
 
 const GRAVITY: int = 16
 const FALL_MAX: int = 192
@@ -30,6 +36,8 @@ const CHARGER_XVEL: int = 96          ## a stampeding charger runs 6 px/tick (tu
 const BOULDER_XVEL: int = 48          ## a rockslide rock rolls 3 px/tick (tune)
 const BOLT_TICKS: int = 4             ## a lightning bolt burns this long (PHYSICS.md C.16: bolt 4 ticks)
 const SHATTER_TICKS: int = 0          ## a stalactite / rock is gone on the tick it lands
+const EMBER_YVEL: int = 40            ## an ember drifts down 2.5 px/tick (tune)
+const SPIT_SPEED: int = 80            ## the Colossus's rock flies 5 px/tick toward where its target stood (tune)
 
 ## What it is (the constants above).
 var kind: StringName = ROCK
@@ -50,6 +58,8 @@ var armed_tick: int = -1
 var armed_for: int = 0
 ## Where the telegraph is drawn (logical px; a shadow on the floor, dust at a rim, a mark at a cell).
 var mark: Rect2i = Rect2i()
+## SPIT: the slot it is aimed at when it is armed (where he stands then; -1 = straight ahead).
+var target_slot: int = -1
 ## Heroes this hazard touched already (instance id -> true): one touch each.
 var _touched: Dictionary = {}
 var _gone: bool = false
@@ -88,6 +98,12 @@ func setup(p_kind: StringName, p_warn: int, p_referee: Object, p_mark: Rect2i = 
 		ROCK:
 			set_box(Vector3i(12, 12, 6))
 			effect = EFFECT_DAZE
+		EMBER:
+			set_box(Vector3i(8, 8, 4))
+			effect = EFFECT_HIT
+		SPIT:
+			set_box(Vector3i(12, 12, 6))
+			effect = EFFECT_HIT
 	return self
 
 
@@ -106,6 +122,8 @@ func is_warning() -> bool:
 
 func _arm() -> void:
 	armed_tick = Sim.tick
+	if kind == SPIT:
+		_aim()
 	match kind:
 		CHARGER:
 			_sfx(Sfx.QUAKE)
@@ -144,6 +162,28 @@ func _move() -> void:
 				_remove()
 		BOLT:
 			if armed_for > BOLT_TICKS:
+				_remove()
+		EMBER:
+			# Straight down the lane, swaying a pixel; it fizzles on the first ground (or below the view).
+			sim_pos.x += 1 if (armed_for / 6) % 2 == 0 else -1
+			sim_pos.y += Tuning.floor16(EMBER_YVEL)
+			var cell: Vector2i = Vector2i(sim_pos.x >> 4, (sim_pos.y - 1) >> 4)
+			var wall: bool = level.grid.in_bounds(cell.x, cell.y) \
+					and level.grid.side_at(cell.x, cell.y) == TileGrid.SIDE_WALL
+			var floor_reached: bool = TileGrid.is_ground(level.grid.floor_at(cell.x, cell.y)) and (sim_pos.y & 15) >= 8
+			if wall or floor_reached or sim_pos.y > VersusArena.view_rect().end.y + Tuning.TILE:
+				_fx(&"fx/poof")
+				_remove()
+		SPIT:
+			# Straight at where its target stood when it was spat; gone on the first wall or floor.
+			sim_pos += Vector2i(Tuning.floor16(xvel), Tuning.floor16(yvel))
+			var cell: Vector2i = Vector2i(sim_pos.x >> 4, (sim_pos.y - (box_h >> 1)) >> 4)
+			var view: Rect2i = VersusArena.view_rect().grow(Tuning.TILE)
+			var wall: bool = level.grid.in_bounds(cell.x, cell.y) \
+					and level.grid.side_at(cell.x, cell.y) == TileGrid.SIDE_WALL
+			if not view.has_point(sim_pos) or wall:
+				_fx(&"fx/poof")
+				_sfx(Sfx.BLOCK_BREAK)
 				_remove()
 		BOULDER:
 			sim_pos.x += Tuning.floor16(xvel)
@@ -207,7 +247,7 @@ func _contacts() -> void:
 			continue
 		_touched[id] = true
 		referee.call(&"hazard_contact", hero, self)
-		if kind == ROCK or kind == STALACTITE:
+		if kind == ROCK or kind == STALACTITE or kind == EMBER or kind == SPIT:
 			_fx(&"fx/poof")
 			_remove()
 			return
@@ -235,6 +275,21 @@ func danger_rect() -> Rect2i:
 		BLOCK, STALACTITE:
 			return Rect2i(sim_pos.x - box_xo, sim_pos.y - box_h, box_w, maxi(mark.end.y - sim_pos.y + box_h, box_h))
 	return get_box().merge(mark) if mark.size != Vector2i.ZERO else get_box()
+
+
+## SPIT: the velocity toward the centre of its target's body as it is armed (SPIT_SPEED along the line).
+func _aim() -> void:
+	var level: LevelBase = Game.level
+	var hero: PlayerBase = level.get_hero(target_slot) if level != null and target_slot >= 0 else null
+	var to: Vector2i = sim_pos + Vector2i(-Tuning.TILE, 0)
+	if hero != null and not hero.dead:
+		to = Vector2i(hero.sim_pos.x, hero.sim_pos.y - (hero.box_h >> 1) + (box_h >> 1))
+	var d: Vector2 = Vector2(to - sim_pos)
+	if d.length() < 1.0:
+		d = Vector2(-1.0, 0.0)
+	d = d.normalized() * float(SPIT_SPEED)
+	xvel = roundi(d.x)
+	yvel = roundi(d.y)
 
 
 func _bolt_column() -> Rect2i:
@@ -269,6 +324,8 @@ const ROCK_COLOR: Color = Color(0.45, 0.4, 0.36)
 const CHARGER_COLOR: Color = Color(0.35, 0.24, 0.16)
 const ICE_COLOR: Color = Color(0.75, 0.9, 1.0)
 const BOLT_COLOR: Color = Color(1.0, 1.0, 0.7)
+const EMBER_COLOR: Color = Color(1.0, 0.55, 0.15)
+const EMBER_DIM: Color = Color(0.7, 0.25, 0.08, 0.7)
 
 
 func _draw() -> void:
@@ -286,6 +343,9 @@ func _draw() -> void:
 			draw_rect(rect, color)
 		if kind == STALACTITE:
 			_draw_box(ICE_COLOR, Vector2(float((Sim.tick % 2) * 2 - 1), 0.0))
+		elif kind == EMBER or kind == SPIT:
+			# The glow where it comes from (the lane's top, the jaws), pulsing.
+			_draw_box(EMBER_COLOR if (Sim.tick / 2) % 2 == 0 else EMBER_DIM)
 		return
 	match kind:
 		BOLT:
@@ -296,6 +356,8 @@ func _draw() -> void:
 			_draw_box(CHARGER_COLOR)
 		STALACTITE:
 			_draw_box(ICE_COLOR)
+		EMBER:
+			_draw_box(EMBER_COLOR)
 		_:
 			_draw_box(ROCK_COLOR)
 

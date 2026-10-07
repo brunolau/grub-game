@@ -1,0 +1,30 @@
+# Club & Grub - level texts of the Book I co-op files of Crystal Grotto, Feast Land C, world 4 and the Way Home,
+# English. Owner: level designer DB3 (docs/expansion/PLAN.md 6.1, workflow 9). A level sub-catalogue: loaded beside
+# locale/en.po (scripts/ui/ui_kit.gd), never offered as a language. Keys: the `text=` keys of signs and hint zones of
+# levels/w3_l2_coop.lvl, levels/bonus_c_coop.lvl, levels/w4_l1_coop.lvl, levels/w4_l2_coop.lvl,
+# levels/w4_l2b_coop.lvl and levels/ending_coop.lvl (their names are the Book I names of locale/en.po). Every text
+# fits three sign lines (LEVEL_DESIGN.md 15.6).
+msgid ""
+msgstr ""
+"Project-Id-Version: Club & Grub\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+# --- w3_l2_coop Crystal Grotto (co-op) ---
+msgid "SIGN_COOP_W3_SHELL"
+msgstr "Shellbacks turn to the nearer caveman. Club the back!"
+
+msgid "SIGN_COOP_W3_DRIVE"
+msgstr "Curl up (Down + Swap) at the edge: your partner bats you over!"
+
+msgid "SIGN_COOP_W3_DRUMS"
+msgstr "Strike both drums at once: the floes freeze into a bridge."
+
+msgid "SIGN_COOP_W3_CACHE"
+msgstr "A crystal cache up the wall! Hop off your partner's head."
+
+# --- ending_coop Way Home (co-op) ---
+msgid "SIGN_COOP_END_GATE"
+msgstr "The gate is barred! Hop onto the lookout off your partner."

@@ -197,6 +197,19 @@ var death_origin: Vector2i = Vector2i.ZERO
 ## Cause of the last death (as for [method kill]); Events.hero_down carries it when the toss ends in an egg.
 var death_cause: StringName = &""
 
+# --- 2.0 IDLE rule (orchestrator decision of phase 3; counted only in a co-op party, [method note_own_input]) ---------
+## Ticks without input of his own after which a co-op hero is IDLE (10 s at Tuning.TICK_HZ). Private constant until
+## core-A adds PartyTuning.IDLE_TICKS (build/engine_requests/wf9_party_to_core-A.txt).
+const IDLE_TICKS: int = 243
+## Ticks since his own player slot last held an input flag (0 on a tick on which it held one), counted from his entry
+## into the level and capped at IDLE_TICKS. Kept through hatches, respawns and team wipes. Always 0 in single-player.
+var input_idle_ticks: int = 0
+## True once his own slot held some input flag since he entered the level.
+var gave_input: bool = false
+## The IDLE rule's verdict for this tick ([method is_idle]): set by [method note_own_input]; false in single-player and
+## versus. Read it through [method is_idle] / [method counts_for_coop].
+var idle: bool = false
+
 
 func get_kind() -> int:
 	return Defs.Kind.PLAYER
@@ -302,17 +315,52 @@ func helper_ignores(kind: int) -> bool:
 
 
 ## True when enemies of a party may pick this hero as their target (LevelBase.target_hero): alive and not down. A
-## party of one never asks (1.0 targets the hero unless he is dead).
+## party of one never asks (1.0 targets the hero unless he is dead). An IDLE hero ([method is_idle]) stays a target:
+## enemies attack a dozing caveman as any other.
 func is_party_targetable() -> bool:
 	return not dead and not is_down()
+
+
+## 2.0 IDLE rule (orchestrator decision of phase 3, DESIGN.md D.3): true when the co-op rules COUNT this hero - alive,
+## hatched (no egg) and not IDLE ([method is_idle]). Every rule that needs "a hero" or "the partner" to be there asks
+## this: plates and pulleys (weight), see-saws (the lander), heave boulders (pushers), drums (the count-in), the x2
+## tablet, the Brace Wall, the Shoulder Hop, the lee; enemies-A's keeper / Shellback bait and twin windows and the
+## bosses' position rules ("on its half", "the nearer hatched hero", "a hero other than the striker") are asked to
+## use it too (build/engine_requests/wf9_party_to_*.txt). Physical contacts are not rules: an idle hero still stands,
+## blocks a tile mover, is carried, ridden (Totem Ride), launched and hurt. Exactly is_party_targetable() in
+## single-player and versus, where nobody is ever idle.
+func counts_for_coop() -> bool:
+	return not dead and not down and not idle
+
+
+## 2.0 IDLE rule: true while this co-op hero is IDLE - his own player slot has held no input flag for
+## [constant IDLE_TICKS] (10 s), or not once since he entered the level (a level start, a join, a restart at the
+## checkpoint: an untouched partner never counts). Reset only by his own slot's input (GameInput.get_flags(slot) != 0,
+## an egg's nudge too), never by a hatch, a carry, a bump, a respawn or a team wipe. Counted on every co-op tick by
+## [method note_own_input] (the hero, first thing in his WEAPONS phase); never true in single-player or versus. An
+## idle hatched hero is drawn dozing (Zzz, the party component) once [member input_idle_ticks] reaches IDLE_TICKS.
+func is_idle() -> bool:
+	return idle
+
+
+## 2.0 IDLE rule, once per co-op tick for this hero (Player, before his WEAPONS pass; never in single-player or
+## versus): `flags` = his own slot's input flags of this tick (GameInput.get_flags(slot)).
+func note_own_input(flags: int) -> void:
+	if flags != 0:
+		input_idle_ticks = 0
+		gave_input = true
+	elif input_idle_ticks < IDLE_TICKS:
+		input_idle_ticks += 1
+	idle = not gave_input or input_idle_ticks >= IDLE_TICKS
 
 
 ## Brace Wall (PHYSICS.md C.10): true when this hero and `partner` (another hero) are both alive and hatched, both in
 ## the crouch state (5, not crawl), both on the ground, and stand within PartyTuning.BRACE_GAP_PX of each other. A
 ## `heavy` enemy (enemies) or a boss whose rule says so tests it before its contact with either hero; a lone croucher
-## is trampled as usual. A pure query: never true without a partner, so never in single-player.
+## is trampled as usual. A pure query: never true without a partner, so never in single-player. 2.0 IDLE rule: never
+## with an idle hero ([method counts_for_coop]).
 func braces_with(partner: PlayerBase) -> bool:
-	if partner == null or partner == self or dead or partner.dead or down or partner.down:
+	if partner == null or partner == self or dead or partner.dead or down or partner.down or idle or partner.idle:
 		return false
 	return is_crouching() and partner.is_crouching() and is_grounded() and partner.is_grounded() \
 			and absi(sim_pos.x - partner.sim_pos.x) <= PartyTuning.BRACE_GAP_PX

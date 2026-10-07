@@ -22,9 +22,10 @@ extends BossBase
 ##    co-op, EGG_TICKS_SOLO (132) solo. Hatched he has 1 pip. Knocked to 0 with no mate left to hatch him he is out at
 ##    once. The fight is won when both are out; then the trophy (`drops`, default on the lead) and the bonus burst.
 ##  - **Co-op: "one hero smashes the egg while the other keeps the surviving chieftain away"** - an egg cracks only while
-##    a hero other than the one striking it stands within HOLD_OFF_PX of the mate (or of the mate's own egg: both may be
-##    eggs at once, and then neither is out until both are smashed). One hero alone can never smash an egg of the co-op
-##    pair: the single-hero search of tests/test_enemies_chieftain.gd pins it.
+##    an ACTIVE hero (hatched, not idle: G33) other than the one striking it stands within HOLD_OFF_PX of the mate (or of
+##    the mate's own egg: both may be eggs at once, and then neither is out until both are smashed). One hero alone -
+##    his partner an egg, or hatched and dozing anywhere - can never smash an egg of the co-op pair: the single-hero
+##    searches of tests/test_enemies_chieftain.gd pin it.
 ##  - **Solo** (a party of one, or any game on a solo file): they tag in one at a time - the lead fights, the mate waits
 ##    on the pyre (his record's place; out of reach); when the fighter falls the waiting one tags in with half energy
 ##    (at most 2 pips); a hatched egg waits on the pyre with 1 pip. **Co-op** (a co-op game of two on a co-op file):
@@ -1040,6 +1041,12 @@ func _bot_execute() -> void:
 	body.on_platform = _rides(body, mate_body)
 	body._sim_tick(Defs.Phase.PLAYER)
 	body._sim_tick(Defs.Phase.POST)
+	if body.dead and body.death_cause == &"off_screen":
+		# The hero's camera rule (Player._left_the_playfield) is no rule of a boss body (D9b, wf9 #1): it never leaves
+		# the playfield - it stands up again where the shell last stood.
+		body.respawn_at(sim_pos)
+		body.facing = facing
+		body.set_control_enabled(_act != Act.DAZED and _act != Act.BALL)
 	if body.dead:
 		# Hero physics can kill a body (a pit, a hazard): the chieftain is knocked out where he fell.
 		_mirror(body)
@@ -1278,14 +1285,15 @@ func _egg_smashed() -> bool:
 	return true
 
 
-## Co-op: true when a hatched hero other than the one in `smasher_slot` stands within HOLD_OFF_PX of the mate (or of
-## the mate's egg) on both axes - or there is no mate left.
+## Co-op: true when an ACTIVE hero (PlayerBase.counts_for_coop: hatched and not idle, DESIGN.md G33) other than the
+## one in `smasher_slot` stands within HOLD_OFF_PX of the mate (or of the mate's egg) on both axes - or there is no
+## mate left. A dozing partner next to the mate holds nobody off.
 func _held_off(smasher_slot: int) -> bool:
 	if mate == null or mate.life == Life.OUT:
 		return true
 	var level: LevelBase = Game.level
 	for hero: PlayerBase in level.contact_order():
-		if hero.slot == smasher_slot or not hero.is_party_targetable():
+		if hero.slot == smasher_slot or not hero.counts_for_coop():
 			continue
 		if absi(hero.sim_pos.x - mate.sim_pos.x) <= HOLD_OFF_PX and absi(hero.sim_pos.y - mate.sim_pos.y) <= HOLD_OFF_PX:
 			return true
@@ -1426,8 +1434,12 @@ func _floor_under(x: int, from_y: int) -> int:
 	return _post.y
 
 
-## Wake rule: a hero within a screen's width and at about its height (the arena zone starts it as a rule).
+## Wake rule: a record with an `arena` is woken only by its arena zone (the hall's camera lock then keeps both bodies
+## in the playfield; D9b wf9 #1: a distance wake from a terrace below woke them with the camera far away); one without
+## wakes for a hero within a screen's width and at about its height.
 func _wakes_for(hero: PlayerBase) -> bool:
+	if arena != &"":
+		return false
 	return absi(hero.sim_pos.x - sim_pos.x) < Tuning.VIEW_W and absi(hero.sim_pos.y - sim_pos.y) < Tuning.VIEW_H
 
 

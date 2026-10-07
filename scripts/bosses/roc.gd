@@ -26,11 +26,16 @@ extends BossBase
 ##    third dive brings it down. Weapon hits do nothing in this phase.
 ##  - **Defeat**: it tumbles down into the clouds and the fire-starter comes out over the nest.
 ##
-## Co-op form (a co-op game of two heroes in a `kind = coop` file; hp 250 for phases 1-2):
-##  - Phase 1: a **wing shield** faces the nearer hatched hero; head hits from that side glance (a pincer on the nest).
-##  - Phase 2 **Snatch** (Expert, PartyTuning.boss_grabs_on): a dive that touches its target grabs him (no control, he
-##    hangs under it) and climbs at SNATCH_RISE px/tick; his partner frees him by hitting its head within SNATCH_TICKS
-##    (the hit counts; the Roc drops, stunned STUN_TICKS, head open), else the grabbed hero becomes an egg (no life).
+## Co-op form (a co-op game of two heroes in a `kind = coop` file; hp 250 for phases 1-2). Its rules count only an
+## ACTIVE hero (PlayerBase.counts_for_coop: hatched, not idle - DESIGN.md G33); its satisfactions are the partner's own
+## hits (G34):
+##  - Phase 1: a **wing shield** faces the nearer ACTIVE hero (LevelBase.nearest_coop_hero; a dozing partner nearer to
+##    it turns nothing); head hits from that side glance (a pincer on the nest); with nobody active every hit glances.
+##  - Phase 2 **Snatch** (Expert, PartyTuning.boss_grabs_on): a dive that touches its target grabs him if he is active
+##    (a dozing target is only knocked, as solo) - no control, he hangs under it - and climbs at SNATCH_RISE px/tick,
+##    never so high that its head band comes closer than HUD_CLEAR_PX to the view's top (G35); his partner frees him by
+##    hitting its head within SNATCH_TICKS (the hit counts; the Roc drops, stunned STUN_TICKS, head open), else the
+##    grabbed hero becomes an egg (no life).
 ##  - Phase 3 **Pilot and Spotter**: a glider per hero lies on the nest; after a dive the Roc tumbles low over the nest
 ##    TUMBLE_TICKS, and the dive counts only if a hero other than the pilot strikes its tail feathers meanwhile.
 ##
@@ -75,6 +80,9 @@ const SNATCH_TICKS: int = 73
 const SNATCH_HANG_DY: int = 34            ## the held hero's feet below the Roc's feet point ... (he hangs from its talons)
 const STUN_TICKS: int = 66
 const FREE_SHIELD_TICKS: int = 44
+## G35: the snatching Roc's head band keeps its top at least this far under the view's top - the fight HUD's bound in
+## the boss bar's columns (55 px elsewhere; Hud.weak_point_problem), kept wherever it flies.
+const HUD_CLEAR_PX: int = 72
 ## Phase 3.
 const STORM_HEIGHT: int = 64              ## above the room's top while the lightning strikes
 const BOLTS: int = 3
@@ -98,6 +106,10 @@ const SKIN_FALLBACK: String = "pterodactyl"
 ## The body of art-B's roc sheet is drawn this many logical px above its pivot (WORLD9_HANDOVER: body y -58..-14).
 const ROC_ART_BODY_LIFT: int = 14
 const FALLBACK_SCALE: float = 2.0
+## The gale's direction swirl (art-B's roc_parts `gust` role, cosmetic): drawn while a gust blows, this far in front
+## of the feet point (logical px, facing right; mirrored with the wind), pointing downwind.
+const PARTS_SKIN: String = "roc_parts"
+const GUST_OFFSET: Vector2i = Vector2i(84, -26)
 
 var _state: int = State.DORMANT
 var _timer: int = 0
@@ -125,6 +137,7 @@ var nest_x0: int = 0
 var nest_x1: int = 0
 var nest_top: int = 0
 var _nest_found: bool = false
+var _gust_sprite: Sprite2D = null
 
 
 func _default_skin() -> String:
@@ -154,6 +167,37 @@ func _sim_phases() -> PackedInt32Array:
 	return PackedInt32Array([Defs.Phase.ENEMIES, Defs.Phase.CONTACT_ENEMIES])
 
 
+## The picture, plus the gale's direction swirl while a gust blows (art-B's roc_parts `gust`, 3 frames; cosmetic).
+func _refresh_visual() -> void:
+	super._refresh_visual()
+	var on: bool = _state == State.GUST and visible and not dead
+	if not on:
+		if _gust_sprite != null:
+			_gust_sprite.visible = false
+		return
+	var sheet: EnemySkin = EnemySkin.find(PARTS_SKIN)
+	if sheet == null or not sheet.has_anim(&"gust"):
+		return
+	if _gust_sprite == null:
+		_gust_sprite = Sprite2D.new()
+		_gust_sprite.name = "GustSprite"
+		_gust_sprite.texture = load(sheet.texture_path) as Texture2D
+		_gust_sprite.centered = false
+		_gust_sprite.hframes = sheet.columns
+		_gust_sprite.vframes = sheet.rows
+		add_child(_gust_sprite)
+	var swirl: Vector4i = sheet.anim(&"gust")
+	var frame: int = swirl.x + (_timer / maxi(swirl.z, 1)) % maxi(swirl.y, 1)
+	if _gust_sprite.frame != frame:
+		_gust_sprite.frame = frame
+	var downwind: int = facing if facing != 0 else 1
+	_gust_sprite.flip_h = downwind < 0
+	var pivot: Vector2 = Vector2(sheet.pivot)
+	_gust_sprite.offset = Vector2(-(float(sheet.cell.x) - pivot.x) if downwind < 0 else -pivot.x, -pivot.y)
+	_gust_sprite.position = Vector2(GUST_OFFSET.x * downwind, GUST_OFFSET.y) * float(Tuning.ART_SCALE)
+	_gust_sprite.visible = true
+
+
 func _sim_tick(phase: int) -> void:
 	if phase == Defs.Phase.CONTACT_ENEMIES:
 		if _held != null:
@@ -173,6 +217,11 @@ func get_state() -> int:
 ## True in the last phase (the glider dives).
 func is_storm_phase() -> bool:
 	return _phase3
+
+
+## The gale's swirl sprite while it shows (cosmetic; tests), else null.
+func get_gust_sprite() -> Sprite2D:
+	return _gust_sprite if _gust_sprite != null and _gust_sprite.visible else null
 
 
 ## True in the co-op form.
@@ -399,7 +448,8 @@ func _take_off() -> void:
 	_set_state(State.TAKEOFF)
 
 
-## Perched: face the heroes (solo: the hero; co-op: the nearer hatched hero - the wing shield's side).
+## Perched: face the heroes (solo: the hero; co-op: the nearer ACTIVE hero - the wing shield's side; nobody active:
+## it keeps its facing).
 func _face_heroes() -> void:
 	var near: PlayerBase = _nearest_hero()
 	if near != null:
@@ -485,7 +535,7 @@ func _dive_contact() -> bool:
 		if not Overlap.body(hero, self, hero):
 			continue
 		if _state == State.DIVE and _coop and PartyTuning.boss_grabs_on(Game.difficulty) \
-				and hero == _target_hero() and not hero.is_helper():
+				and hero == _target_hero() and not hero.is_helper() and hero.counts_for_coop():
 			_snatch(hero)
 			return true
 		touch_hero(hero)
@@ -530,7 +580,8 @@ func _snatch(hero: PlayerBase) -> void:
 func _snatch_tick() -> void:
 	_play(&"fly")
 	_snatch_ticks += 1
-	sim_pos.y -= SNATCH_RISE
+	# It climbs toward its ceiling (and sinks to it at the same pace if the dive met him higher up).
+	sim_pos.y += clampi(snatch_ceiling() - sim_pos.y, -SNATCH_RISE, SNATCH_RISE)
 	if _held == null or not is_instance_valid(_held) or _held.dead or _held.is_down():
 		_release_held(false)
 		_after_dive()
@@ -540,6 +591,15 @@ func _snatch_tick() -> void:
 		_release_held(false)
 		hero.go_down(&"enemy")
 		_after_dive()
+
+
+## The highest feet y of a snatching Roc: its head band (HEAD_BAND, the rescue's weak point) stays HUD_CLEAR_PX under
+## the view's top (G35).
+func snatch_ceiling() -> int:
+	var top: int = _room().position.y
+	if Game.level != null:
+		top = maxi(top, Game.level.get_view_rect().position.y)
+	return top + HUD_CLEAR_PX - HEAD_BAND.position.y
 
 
 func _place_held() -> void:
@@ -786,14 +846,15 @@ func _poll_hits() -> void:
 		_rescued()
 
 
-## Co-op phase 1: the wing shield faces the nearer hatched hero; a hit from that side glances (a thrown weapon by its
-## flight, a striker by his x), and so does every hit of that hero himself.
+## Co-op phase 1: the wing shield faces the nearer ACTIVE hero (G33); a hit from that side glances (a thrown weapon by
+## its flight, a striker by his x), and so does every hit of that hero himself. With nobody active (eggs, dozing) every
+## hit glances: a lone thrower's axe still in flight after he went down counts for nothing.
 func _is_shielded(source: SimEntity) -> bool:
 	if _state != State.REST and _state != State.WINGS and _state != State.GUST:
 		return false
 	var near: PlayerBase = _nearest_hero()
 	if near == null:
-		return false
+		return true
 	if Defs.hitter_slot(source) == near.slot:
 		# The shield faces him: none of his own hits gets round it (a boomerang on its way back included).
 		return true
@@ -922,23 +983,13 @@ func _face(hero: PlayerBase) -> void:
 		facing = 1 if hero.sim_pos.x > sim_pos.x else -1
 
 
-## The nearest hatched hero (the target hero in a party of one).
+## The nearest hero a co-op rule counts (LevelBase.nearest_coop_hero: hatched and not idle, G33; the target hero in a
+## party of one): the side of the wing shield.
 func _nearest_hero() -> PlayerBase:
 	var level: LevelBase = Game.level
 	if level == null:
 		return null
-	if level.hero_count() <= 1:
-		return _target_hero()
-	var best: PlayerBase = null
-	var best_d: int = 0
-	for hero: PlayerBase in level.contact_order():
-		if not hero.is_party_targetable():
-			continue
-		var d: int = absi(hero.sim_pos.x - sim_pos.x) + absi(hero.sim_pos.y - sim_pos.y)
-		if best == null or d < best_d:
-			best = hero
-			best_d = d
-	return best
+	return level.nearest_coop_hero(self)
 
 
 ## A rectangle given relative to the feet point facing right, for the current facing.

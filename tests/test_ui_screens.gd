@@ -1051,6 +1051,224 @@ func test_unlocks_screen_shows_paintings_and_rewards() -> void:
 	Save.reset()
 
 
+# =================================================================================================================
+# Phase 3 (PLAN.md 6; wf9): the co-op tally of every Book II stage, Munch, THE END and the expert wall per book and mode
+# =================================================================================================================
+
+## Every backdrop a level file may name (LevelData.BACKGROUNDS, also the Book II stages still to come) has a tally
+## backdrop with all its layers, and every terrain atlas a Book II biome falls back to exists.
+func test_every_level_backdrop_has_a_tally_picture() -> void:
+	for background: String in LevelData.BACKGROUNDS:
+		if background == "none":
+			continue
+		assert_true(UiBackdrop.has_set(background), "the tally can show '%s'" % background)
+		var entry: Dictionary = UiBackdrop.entry_of(background)
+		assert_true((entry.get("layers", []) as Array).size() >= 3, "%s has its layers" % background)
+		for layer: Array in entry.get("layers", []):
+			assert_true(ResourceLoader.exists(str(layer[0])), "%s: %s exists" % [background, layer[0]])
+	for biome: Variant in LevelData.BIOME_TERRAIN:
+		assert_true(ResourceLoader.exists(UiGround.TERRAIN_DIR + str(LevelData.BIOME_TERRAIN[biome]) + ".png"),
+				"the %s ground exists" % biome)
+	for biome: Variant in LevelData.BIOME_BACKGROUND:
+		assert_true(UiBackdrop.has_set(str(LevelData.BIOME_BACKGROUND[biome])), "%s falls back to a backdrop" % biome)
+
+
+## The co-op tally of every Book II stage that exists (solo files in a co-op run's tally fall back to them; every
+## co-op file of Book II; new files are picked up as the designers add them): the stage's own night backdrop and
+## ground, both heroes in their colours on that ground, the medals handed out, and the board, the heroes and the
+## companion inside the view at 640 x 360 and 800 x 360 with the board clear of the heroes.
+func test_tally_coop_of_every_book_two_stage() -> void:
+	var ids: Array[StringName] = []
+	for level_id: StringName in Levels.all_ids():
+		var kind: String = Levels.get_level_kind(level_id)
+		if Levels.get_book(level_id) == Levels.BOOK_2 and kind in ["main", "sub", "bonus", "ending", "coop"]:
+			ids.append(level_id)
+	ids.sort()
+	assert_true(ids.size() >= 10, "the Book II files of worlds 5-6 at least (%d)" % ids.size())
+	var shown: PackedStringArray = PackedStringArray()
+	for level_id: StringName in ids:
+		Game.start_run(Defs.Difficulty.EXPERT, Defs.GameMode.COOP, 2, Levels.BOOK_2)
+		Game.runs[1].palette = &"blue"
+		Game.begin_level(level_id)
+		Game.runs[0].food = 5
+		Game.runs[1].revives = 1
+		Game.runs[1].best_chain = 4
+		Game.runs[0].hurts = 1
+		Game.add_tally_item(&"items/food", 2, 100)
+		Game.add_tally_item(&"items/painting", 3, 0)
+		Flow.args = {"level_id": level_id, "percent": 90}
+		var node: TallyScreen = await _open(&"tally") as TallyScreen
+		var expected: String = TallyScreen.backdrop_for(level_id)
+		var own: String = str(Levels.get_value(level_id, "background", ""))
+		if UiBackdrop.has_set(own):
+			assert_eq(expected, own, "%s: its own backdrop" % level_id)
+		assert_eq(node.get_backdrop().backdrop_id, expected, "%s: the backdrop shows" % level_id)
+		assert_true(node.get_backdrop().get_layer_count() >= 3, "%s: with its layers" % level_id)
+		assert_eq(TallyScreen.ground_for(level_id), str(Levels.get_value(level_id, "terrain_a", "")),
+				"%s: the stage's own ground" % level_id)
+		assert_true((node.get("_ground") as UiGround).has_atlas(), "%s: its ground atlas" % level_id)
+		assert_null(node.get_munch(), "%s: no Munch in co-op (P2 is Munch)" % level_id)
+		shown.append("%s=%s" % [level_id, expected])
+		_press(&"ui_accept")
+		assert_eq(node.medals_shown, node.get_medals().size(), "%s: every medal handed out" % level_id)
+		assert_true(node.get_medals().size() >= 3, "%s: the medals of the stage" % level_id)
+		for width: float in [640.0, 800.0]:
+			node.size = Vector2(width, 360.0)
+			await get_tree().process_frame
+			await get_tree().process_frame
+			var view: Rect2 = Rect2(Vector2.ZERO, node.size)
+			var feet: PackedVector2Array = node.get_actor_feet()
+			assert_eq(feet.size(), 3, "%s: P1, the companion, P2" % level_id)
+			for foot: Vector2 in feet:
+				assert_eq(foot.y, node.get_ground_y(), "%s: on the ground at %d px" % [level_id, width])
+				assert_true(foot.x > 0.0 and foot.x < width, "%s: inside the view at %d px" % [level_id, width])
+			var board: Rect2 = node.get_board_rect()
+			assert_true(view.grow(0.5).encloses(board), "%s: the board inside the view at %d px (%s)" % [level_id, width,
+					board])
+			for i: int in [0, 2]:
+				var hero: Rect2 = Rect2(feet[i] - Vector2(24.0, 120.0), Vector2(48.0, 120.0))
+				assert_false(board.intersects(hero), "%s: the board clear of a hero at %d px" % [level_id, width])
+		node.queue_free()
+		await get_tree().process_frame
+		await _cleanup()
+	print("    tally backdrops: %s" % ", ".join(shown))
+	Game.new_game(Defs.Difficulty.BEGINNER)
+
+
+## Book II solo: Munch waves from the companion's side (DESIGN.md A.1) - he walks in with him, waves while they stand
+## and stays inside the view; Book I solo has no Munch.
+func test_tally_book_two_solo_munch_waves() -> void:
+	Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.SINGLE, 1, Levels.BOOK_2)
+	Game.begin_level(&"w5_l1")
+	Game.add_tally_item(&"items/food", 3, 100)
+	Flow.args = {"level_id": &"w5_l1", "percent": 75}
+	var node: TallyScreen = await _open(&"tally") as TallyScreen
+	var munch: UiActor = node.get_munch()
+	assert_not_null(munch, "Munch is there")
+	assert_eq(node.get_backdrop().backdrop_id, "canyon", "the stage's own backdrop")
+	_press(&"ui_accept")
+	await get_tree().process_frame
+	var feet: PackedVector2Array = node.get_actor_feet()
+	assert_eq(munch.position, feet[1] + Vector2(TallyScreen.MUNCH_GAP, 0.0), "beside the companion")
+	assert_eq(munch.animation, &"victory", "waving")
+	assert_not_null(munch.material, "in his blue")
+	for width: float in [640.0, 800.0]:
+		node.size = Vector2(width, 360.0)
+		await get_tree().process_frame
+		node._process(0.0)
+		assert_true(munch.position.x + 30.0 < width, "inside the view at %d px" % width)
+	await _cleanup()
+	Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.SINGLE, 1, 1)
+	Game.begin_level(&"w1_l1")
+	Flow.args = {"level_id": &"w1_l1", "percent": 75}
+	var book_one: TallyScreen = await _open(&"tally") as TallyScreen
+	assert_null(book_one.get_munch(), "Book I: no Munch")
+	assert_eq(book_one.get_backdrop().backdrop_id, "jungle")
+	await _cleanup()
+	Game.new_game(Defs.Difficulty.BEGINNER)
+
+
+## THE END per book and mode: Book I solo keeps the 1.0 village and cast; Book I co-op puts the party in the hero's
+## place in their colours; Book II shows the home beach (raft, the Great Roast, palms, the home hut) with Grub and Munch
+## in solo and the party in co-op. Every actor stands on the ground inside the view at 640 and 800 px, apart from the
+## others; the mural still replaces the picture when every painting is found.
+func test_the_end_pictures_per_book_and_mode() -> void:
+	var cases: Array[Array] = [
+		[1, Defs.GameMode.SINGLE, 1, TheEndScreen.Picture.VILLAGE, PackedInt32Array([0])],
+		[1, Defs.GameMode.COOP, 2, TheEndScreen.Picture.VILLAGE, PackedInt32Array([0, 1])],
+		[2, Defs.GameMode.SINGLE, 1, TheEndScreen.Picture.BEACH, PackedInt32Array([0, -1])],
+		[2, Defs.GameMode.COOP, 2, TheEndScreen.Picture.BEACH, PackedInt32Array([0, 1])],
+	]
+	for case: Array in cases:
+		var label: String = "Book %d %s" % [case[0], "co-op" if case[1] == Defs.GameMode.COOP else "solo"]
+		Game.start_run(Defs.Difficulty.EXPERT, int(case[1]), int(case[2]), int(case[0]))
+		if int(case[2]) > 1:
+			Game.runs[1].palette = &"pink"
+		Flow.args = {"book": case[0], "mode": case[1], "mural": false}
+		var node: TheEndScreen = await _open(&"the_end") as TheEndScreen
+		assert_eq(node.get_picture(), int(case[3]), "%s: its picture" % label)
+		var heroes: Array[UiActor] = node.get_heroes()
+		var slots: PackedInt32Array = PackedInt32Array()
+		for hero: UiActor in heroes:
+			slots.append(int(hero.get_meta(&"slot")))
+			assert_eq(hero.animation, &"victory", "%s: the heroes cheer" % label)
+		assert_eq(slots, case[4] as PackedInt32Array, "%s: who cheers" % label)
+		if case[0] == 1 and case[1] == Defs.GameMode.SINGLE:
+			var offsets: Array = []
+			for entry: Array in node.get_cast():
+				offsets.append(entry[2])
+			assert_eq(offsets, [-150.0, -86.0, 0.0, 70.0, 140.0], "Book I solo: the 1.0 cast")
+			assert_null(heroes[0].material, "Book I solo: the 1.0 hero")
+		if heroes.size() > 1:
+			assert_not_null(heroes[1].material, "%s: the second hero in his own colours" % label)
+		if case[1] == Defs.GameMode.COOP:
+			var look: Array = HeroPalette.resolve(0, Game.get_run(0))
+			assert_eq(heroes[0].material == null, HeroPalette.is_identity(look[0], int(look[1])),
+					"%s: P1 in his colours (none needed for the 1.0 yellow)" % label)
+		for width: float in [640.0, 800.0]:
+			node.size = Vector2(width, 360.0)
+			await get_tree().process_frame
+			await get_tree().process_frame
+			var xs: Array[float] = []
+			for actor: Node in node.get_children():
+				if actor is UiActor:
+					var feet: Vector2 = (actor as UiActor).position
+					assert_true(feet.x - 20.0 > 0.0 and feet.x + 20.0 < width, "%s: inside the view at %d px" % [label, width])
+					assert_true(feet.y > 300.0 and feet.y < 360.0, "%s: on the ground" % label)
+					xs.append(feet.x)
+			xs.sort()
+			for i: int in xs.size() - 1:
+				assert_true(xs[i + 1] - xs[i] >= 50.0, "%s: the cast stands apart at %d px (%s)" % [label, width, xs])
+		_press(&"ui_accept")
+		assert_eq(Flow.current_screen, Flow.SCREEN_CREDITS, "%s: on to the credits" % label)
+		await _cleanup()
+	Flow.args = {"book": 2, "mode": Defs.GameMode.COOP, "mural": true}
+	var mural: TheEndScreen = await _open(&"the_end") as TheEndScreen
+	assert_true(mural.is_mural(), "all 30 paintings: the mural, in co-op too")
+	await _cleanup()
+	Game.new_game(Defs.Difficulty.BEGINNER)
+
+
+## The expert wall of a co-op run (both books): the party stands before the warrior in their own colours, facing him,
+## on the ground and inside the view at 640 and 800 px, clear of the text panel; the warrior turns to them. Solo keeps
+## the picture without heroes.
+func test_expert_wall_of_a_coop_party() -> void:
+	for book: int in [1, 2]:
+		Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.COOP, 2, book)
+		Game.runs[1].palette = &"blue"
+		Flow.args = {"book": book, "mode": Defs.GameMode.COOP}
+		var node: ExpertWallScreen = await _open(&"expert_wall") as ExpertWallScreen
+		var party: Array[UiActor] = node.get_party()
+		assert_eq(party.size(), 2, "Book %d co-op: both heroes" % book)
+		for width: float in [640.0, 800.0]:
+			node.size = Vector2(width, 360.0)
+			await get_tree().process_frame
+			await get_tree().process_frame
+			var guard: UiActor = node.get_guard()
+			var panel: Rect2 = Rect2()
+			for label: Node in node.find_children("*", "Label", true, false):
+				if (label as Label).text == ExpertWallScreen.wall_text_key(book):
+					var up: Node = label.get_parent()
+					while up != null and not up is PanelContainer:
+						up = up.get_parent()
+					panel = (up as Control).get_global_rect()
+			assert_not_null(party[1].material, "Book %d: P2 in his colours" % book)
+			for hero: UiActor in party:
+				assert_true(hero.position.x < guard.position.x, "Book %d: before the warrior" % book)
+				assert_eq(hero.position.y, guard.position.y, "Book %d: on the ground" % book)
+				assert_true(hero.position.x - 24.0 > 0.0, "Book %d: inside the view at %d px" % [book, width])
+				var body: Rect2 = Rect2(hero.position - Vector2(24.0, 70.0), Vector2(48.0, 70.0))
+				assert_false(panel.intersects(body), "Book %d: clear of the text panel at %d px" % [book, width])
+			assert_true(guard.position.x - party[0].position.x >= 50.0, "Book %d: P1 a step from the warrior" % book)
+		await _cleanup()
+	Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.SINGLE, 1, 2)
+	Flow.args = {"book": 2, "mode": Defs.GameMode.SINGLE}
+	var solo: ExpertWallScreen = await _open(&"expert_wall") as ExpertWallScreen
+	assert_eq(solo.get_party().size(), 0, "solo: the picture without heroes")
+	await _cleanup()
+	Game.new_game(Defs.Difficulty.BEGINNER)
+
+
 ## The classic layout's Strike key of P1 (Left Ctrl since the orchestrator's G1 resolution; the tests follow the
 ## layout table, InputSlot, instead of naming the key).
 func _p1_strike() -> Key:

@@ -1,42 +1,58 @@
-# Co-op, Book I, Beginner, two players from a fresh save, through the 2.0 title path (docs/expansion/PLAN.md P1.3 /
-# 6.2, DESIGN.md D.9 / D.11): title -> Play -> Co-op -> the join panel (P1 presses Jump on the left keyboard half,
-# P2 on the numpad: the classic layout, offered first in co-op) -> book select (Book I) -> Beginner -> the map ->
-# every Beginner stop of Book I as its co-op file (`<id>_coop`, Levels.level_for_mode), each played by its two-stream
-# route (`<id>_coop.inputs`), the linked stages without a tally, the co-op Brute, one tribe tally per stop, and the
-# expert wall after Crystal Grotto. The headless twin is the co-op campaign test of tests/test_coop_routes.gd
-# (phase 3). Checks: no team wipe, both heroes at every stage start, co-op mode with a party of two.
-# skeleton: the stops are filled in as the co-op files and their routes land (G1: w1_l1_coop; phase 3: the rest);
-# the lint of tests/test_integration_flows.gd lists what is not there yet. The screens are core-A's Flow (title > Play >
-# Co-op: join > book_select > mode_select > world_map); the title's Play choice and the join keys are ui-A's (P1.11).
-#   GD_TIMEOUT=1800 bash .tools/gd.sh play --flow=tools/autoplay/campaign_coop.flow --fast --fresh-user --out=campaign_coop
+# Co-op, Books I AND II, BOTH difficulties, two players on one keyboard from a fresh save, through the 2.0 title path
+# (docs/expansion/PLAN.md 6.2, DESIGN.md D.9 - D.11): title -> Play -> Co-op -> the join panel (P1 presses Jump on the
+# left keyboard half, P2 on the numpad: the classic layout; both hold Strike) -> book select -> difficulty -> the map
+# -> every stop of the book as its co-op file (`<id>_coop`, Levels.level_for_mode), each stage played by its two-stream
+# route (`<id>_coop.inputs` Beginner, `<id>_coop.expert.inputs` Expert), the linked stages without a tally, the co-op
+# bosses, one tribe tally per stop, the expert wall after the last Beginner stop and The End after the Expert ending.
+# Four parts (`section`), each from the title: Book I Beginner, Book I Expert, Book II Beginner, Book II Expert.
+# Checks: no team wipe, both heroes and the club in hand at every stage start, co-op mode with a party of two, every
+# map stop recorded in the run's co-op save space.
+# The headless twin is tests/test_coop_routes.gd test_the_coop_book{1,2}_{beginner,expert}_campaign_in_one_run.
+# skeleton: every stop begins with `need` - its co-op files and routes. Until phase 3 is content complete a stop whose
+# content has not landed ends its section (PENDING in the summary; Flow itself would pass over a stop without a
+# co-op file) and the run goes on with the next section; the lint of tests/test_integration_flows.gd lists what is
+# missing. At G3 the skeleton line goes and a missing `need` fails the run.
+#   GD_TIMEOUT=5400 bash .tools/gd.sh play --flow=tools/autoplay/campaign_coop.flow --fast --fresh-user --out=campaign_coop
+# Headless (no screenshots; tools/g3.sh runs it so):
+#   GD_TIMEOUT=5400 bash .tools/gd.sh script res://scripts/core/dev/headless_flow.gd -- \
+#       --flow=tools/autoplay/campaign_coop.flow --fast --fresh-user --user-dir=res://build/flow_user_campaign_coop
 
-# --- Boot, title, Play > Co-op > join two players > Book I > Beginner -----------------------------------------------
-wait_until flow.current_screen == title 600
+########################################################################################################################
+# Co-op, Book I, Beginner
+########################################################################################################################
+section coop_book1_beginner
+
+# --- Title, Play > Co-op > Book I > Beginner --------------------------------------------------------------------------
+wait_until flow.current_screen == title 900
 wait_until flow.busy == false 600
 wait 40
-shot title
+shot title_coop_book1_beginner
 expect save.has_progress() == false
-# Play, then Co-op (Flow.open_play(COOP); the keys of the title's Play / Solo / Co-op / Versus choice: ui-A, P1.11).
+# Play, then Co-op (Flow.open_play; Solo has the focus, Co-op is one down).
 press ui_accept
 wait 10
 press ui_down
 press ui_accept
 wait_until flow.current_screen == join 300
 wait_until flow.busy == false 600
-# P1 joins with Space (left half), P2 with Num 0 (right half); both hold Strike to be ready (Flow.finish_join).
+# P1 joins with Space (left half), P2 with Num 0 (right half); both hold Strike to be ready (P1's classic
+# Strike is Left Ctrl). Ready = Strike held for 1 s of real time; the panel opens the book select itself.
 key Space
 key Kp_0
 wait 10
-shot join_two
+shot join_coop_book1_beginner
 hold Ctrl Kp_Enter
-# Ready = Strike held for 1 s of real time; the panel opens the book select by itself (ui-A's REPLY).
 wait_until flow.current_screen == book_select 600
 release all
 wait_until flow.busy == false 600
 press ui_accept
-# Flow.choose_book(1) -> the difficulty (Beginner has the focus) -> Flow.start_selected_game -> the map.
 wait_until flow.current_screen == mode_select 300
 wait_until flow.busy == false 600
+expect flow.play_book == 1
+# Left = Beginner, Right = Expert, whichever card the last run left focused.
+press ui_left
+wait 10
+shot mode_select_coop_book1_beginner
 press ui_accept
 wait_until flow.current_screen == world_map 600
 wait_until flow.busy == false 600
@@ -46,13 +62,15 @@ expect game.party == 2
 expect game.difficulty == 0
 expect game.lives == 2
 expect game.score == 0
+expect game.weapon == 0
 
-# --- w1_l1_coop -----------------------------------------------------------------------------------------------
+# --- w1_l1 in co-op ---------------------------------------------------------------------------------------------------
+need w1_l1_coop tools/autoplay/routes/w1_l1_coop.inputs
 wait_until flow.current_screen == world_map 900
 wait_until flow.busy == false 600
 expect flow.args.level_id == w1_l1
 wait_until scene.countdown >= 0 600
-shot map_w1_l1
+shot map_w1_l1_coop_book1_beginner
 press ui_accept
 wait_until flow.current_screen == level 900
 wait_until flow.busy == false 600
@@ -60,6 +78,7 @@ wait_until level.level_id == w1_l1_coop 600
 expect hero.dead == false
 expect level.hero_count() == 2
 expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
 expect game.weapon == 0
 wait 2
 shot w1_l1_coop_start
@@ -70,19 +89,21 @@ expect events.party_wiped == 0
 wait_until flow.current_screen == tally 900
 wait_until flow.busy == false 600
 wait 30
-shot tally_w1_l1_coop
+shot tally_w1_l1_coop_book1_beginner
 press ui_accept
 wait 20
 press ui_accept
-wait_until flow.current_screen == world_map 900
-wait_until flow.busy == false 600
+# On to the map (checked by the next stop, after its `need`).
 
-# --- w1_l2_coop -----------------------------------------------------------------------------------------------
+# --- w1_l2 in co-op ---------------------------------------------------------------------------------------------------
+need w1_l2_coop tools/autoplay/routes/w1_l2_coop.inputs
 wait_until flow.current_screen == world_map 900
 wait_until flow.busy == false 600
 expect flow.args.level_id == w1_l2
+expect save.get_level_result_in(coop/book1/beginner,w1_l1).clears == 1
+expect save.is_level_unlocked_in(coop/book1/beginner,w1_l2) == true
 wait_until scene.countdown >= 0 600
-shot map_w1_l2
+shot map_w1_l2_coop_book1_beginner
 press ui_accept
 wait_until flow.current_screen == level 900
 wait_until flow.busy == false 600
@@ -90,6 +111,7 @@ wait_until level.level_id == w1_l2_coop 600
 expect hero.dead == false
 expect level.hero_count() == 2
 expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
 expect game.weapon == 0
 wait 2
 shot w1_l2_coop_start
@@ -100,19 +122,21 @@ expect events.party_wiped == 0
 wait_until flow.current_screen == tally 900
 wait_until flow.busy == false 600
 wait 30
-shot tally_w1_l2_coop
+shot tally_w1_l2_coop_book1_beginner
 press ui_accept
 wait 20
 press ui_accept
-wait_until flow.current_screen == world_map 900
-wait_until flow.busy == false 600
+# On to the map (checked by the next stop, after its `need`).
 
-# --- w2_l1_coop -----------------------------------------------------------------------------------------------
+# --- w2_l1 in co-op ---------------------------------------------------------------------------------------------------
+need w2_l1_coop tools/autoplay/routes/w2_l1_coop.inputs
 wait_until flow.current_screen == world_map 900
 wait_until flow.busy == false 600
 expect flow.args.level_id == w2_l1
+expect save.get_level_result_in(coop/book1/beginner,w1_l2).clears == 1
+expect save.is_level_unlocked_in(coop/book1/beginner,w2_l1) == true
 wait_until scene.countdown >= 0 600
-shot map_w2_l1
+shot map_w2_l1_coop_book1_beginner
 press ui_accept
 wait_until flow.current_screen == level 900
 wait_until flow.busy == false 600
@@ -120,6 +144,7 @@ wait_until level.level_id == w2_l1_coop 600
 expect hero.dead == false
 expect level.hero_count() == 2
 expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
 expect game.weapon == 0
 wait 2
 shot w2_l1_coop_start
@@ -130,19 +155,21 @@ expect events.party_wiped == 0
 wait_until flow.current_screen == tally 900
 wait_until flow.busy == false 600
 wait 30
-shot tally_w2_l1_coop
+shot tally_w2_l1_coop_book1_beginner
 press ui_accept
 wait 20
 press ui_accept
-wait_until flow.current_screen == world_map 900
-wait_until flow.busy == false 600
+# On to the map (checked by the next stop, after its `need`).
 
-# --- w2_l2_coop -----------------------------------------------------------------------------------------------
+# --- w2_l2 + w2_l2b in co-op ------------------------------------------------------------------------------------------
+need w2_l2_coop w2_l2b_coop tools/autoplay/routes/w2_l2_coop.inputs tools/autoplay/routes/w2_l2b_coop.inputs
 wait_until flow.current_screen == world_map 900
 wait_until flow.busy == false 600
 expect flow.args.level_id == w2_l2
+expect save.get_level_result_in(coop/book1/beginner,w2_l1).clears == 1
+expect save.is_level_unlocked_in(coop/book1/beginner,w2_l2) == true
 wait_until scene.countdown >= 0 600
-shot map_w2_l2
+shot map_w2_l2_coop_book1_beginner
 press ui_accept
 wait_until flow.current_screen == level 900
 wait_until flow.busy == false 600
@@ -150,6 +177,7 @@ wait_until level.level_id == w2_l2_coop 600
 expect hero.dead == false
 expect level.hero_count() == 2
 expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
 expect game.weapon == 0
 wait 2
 shot w2_l2_coop_start
@@ -161,6 +189,11 @@ expect events.party_wiped == 0
 wait_until flow.current_screen == level 900
 wait_until flow.busy == false 600
 wait_until level.level_id == w2_l2b_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
+expect game.weapon == 0
 wait 2
 shot w2_l2b_coop_start
 every 480 w2_l2b_coop
@@ -170,19 +203,21 @@ expect events.party_wiped == 0
 wait_until flow.current_screen == tally 900
 wait_until flow.busy == false 600
 wait 30
-shot tally_w2_l2_coop
+shot tally_w2_l2_coop_book1_beginner
 press ui_accept
 wait 20
 press ui_accept
-wait_until flow.current_screen == world_map 900
-wait_until flow.busy == false 600
+# On to the map (checked by the next stop, after its `need`).
 
-# --- w3_l1_coop -----------------------------------------------------------------------------------------------
+# --- w3_l1 + w3_l1b in co-op ------------------------------------------------------------------------------------------
+need w3_l1_coop w3_l1b_coop tools/autoplay/routes/w3_l1_coop.inputs tools/autoplay/routes/w3_l1b_coop.inputs
 wait_until flow.current_screen == world_map 900
 wait_until flow.busy == false 600
 expect flow.args.level_id == w3_l1
+expect save.get_level_result_in(coop/book1/beginner,w2_l2).clears == 1
+expect save.is_level_unlocked_in(coop/book1/beginner,w3_l1) == true
 wait_until scene.countdown >= 0 600
-shot map_w3_l1
+shot map_w3_l1_coop_book1_beginner
 press ui_accept
 wait_until flow.current_screen == level 900
 wait_until flow.busy == false 600
@@ -190,6 +225,7 @@ wait_until level.level_id == w3_l1_coop 600
 expect hero.dead == false
 expect level.hero_count() == 2
 expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
 expect game.weapon == 0
 wait 2
 shot w3_l1_coop_start
@@ -201,6 +237,11 @@ expect events.party_wiped == 0
 wait_until flow.current_screen == level 900
 wait_until flow.busy == false 600
 wait_until level.level_id == w3_l1b_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
+expect game.weapon == 0
 wait 2
 shot w3_l1b_coop_start
 every 480 w3_l1b_coop
@@ -210,19 +251,21 @@ expect events.party_wiped == 0
 wait_until flow.current_screen == tally 900
 wait_until flow.busy == false 600
 wait 30
-shot tally_w3_l1_coop
+shot tally_w3_l1_coop_book1_beginner
 press ui_accept
 wait 20
 press ui_accept
-wait_until flow.current_screen == world_map 900
-wait_until flow.busy == false 600
+# On to the map (checked by the next stop, after its `need`).
 
-# --- w3_l2_coop -----------------------------------------------------------------------------------------------
+# --- w3_l2 in co-op ---------------------------------------------------------------------------------------------------
+need w3_l2_coop tools/autoplay/routes/w3_l2_coop.inputs
 wait_until flow.current_screen == world_map 900
 wait_until flow.busy == false 600
 expect flow.args.level_id == w3_l2
+expect save.get_level_result_in(coop/book1/beginner,w3_l1).clears == 1
+expect save.is_level_unlocked_in(coop/book1/beginner,w3_l2) == true
 wait_until scene.countdown >= 0 600
-shot map_w3_l2
+shot map_w3_l2_coop_book1_beginner
 press ui_accept
 wait_until flow.current_screen == level 900
 wait_until flow.busy == false 600
@@ -230,6 +273,7 @@ wait_until level.level_id == w3_l2_coop 600
 expect hero.dead == false
 expect level.hero_count() == 2
 expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
 expect game.weapon == 0
 wait 2
 shot w3_l2_coop_start
@@ -240,19 +284,1225 @@ expect events.party_wiped == 0
 wait_until flow.current_screen == tally 900
 wait_until flow.busy == false 600
 wait 30
-shot tally_w3_l2_coop
+shot tally_w3_l2_coop_book1_beginner
 press ui_accept
 wait 20
 press ui_accept
 
-# Crystal Grotto is the last Beginner stop: the expert wall, then the title.
+# --- The expert wall after the last Beginner stop ---------------------------------------------------------------------
 wait_until flow.current_screen == expert_wall 900
 wait_until flow.busy == false 600
-expect game.mode == 1
+expect save.get_level_result_in(coop/book1/beginner,w3_l2).clears == 1
+expect save.is_game_completed_in(coop/book1/beginner) == false
+expect game.book == 1
 wait 90
-shot expert_wall_coop
+shot expert_wall_coop_book1_beginner
 press ui_accept
 wait_until flow.current_screen == title 900
 wait_until flow.busy == false 600
+
+########################################################################################################################
+# Co-op, Book I, Expert
+########################################################################################################################
+section coop_book1_expert
+
+# --- Title, Play > Co-op > Book I > Expert ----------------------------------------------------------------------------
+wait_until flow.current_screen == title 900
+wait_until flow.busy == false 600
+wait 40
+shot title_coop_book1_expert
+# Play, then Co-op (Flow.open_play; Solo has the focus, Co-op is one down).
+press ui_accept
+wait 10
+press ui_down
+press ui_accept
+wait_until flow.current_screen == join 300
+wait_until flow.busy == false 600
+# P1 joins with Space (left half), P2 with Num 0 (right half); both hold Strike to be ready (P1's classic
+# Strike is Left Ctrl). Ready = Strike held for 1 s of real time; the panel opens the book select itself.
+key Space
+key Kp_0
+wait 10
+shot join_coop_book1_expert
+hold Ctrl Kp_Enter
+wait_until flow.current_screen == book_select 600
+release all
+wait_until flow.busy == false 600
+press ui_accept
+wait_until flow.current_screen == mode_select 300
+wait_until flow.busy == false 600
+expect flow.play_book == 1
+# Left = Beginner, Right = Expert, whichever card the last run left focused.
+press ui_right
+wait 10
+shot mode_select_coop_book1_expert
+press ui_accept
+wait_until flow.current_screen == world_map 600
+wait_until flow.busy == false 600
+expect game.book == 1
+expect game.mode == 1
+expect game.party == 2
+expect game.difficulty == 1
+expect game.lives == 2
+expect game.score == 0
+expect game.weapon == 0
+
+# --- w1_l1 in co-op ---------------------------------------------------------------------------------------------------
+need w1_l1_coop tools/autoplay/routes/w1_l1_coop.expert.inputs
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w1_l1
+wait_until scene.countdown >= 0 600
+shot map_w1_l1_coop_book1_expert
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w1_l1_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
+expect game.weapon == 0
+wait 2
+shot w1_l1_coop_start
+every 480 w1_l1_coop
+play_file tools/autoplay/routes/w1_l1_coop.expert.inputs
+every 0
+expect events.party_wiped == 0
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
 wait 30
-shot title_again
+shot tally_w1_l1_coop_book1_expert
+press ui_accept
+wait 20
+press ui_accept
+# On to the map (checked by the next stop, after its `need`).
+
+# --- w1_l2 in co-op ---------------------------------------------------------------------------------------------------
+need w1_l2_coop tools/autoplay/routes/w1_l2_coop.expert.inputs
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w1_l2
+expect save.get_level_result_in(coop/book1/expert,w1_l1).clears == 1
+expect save.is_level_unlocked_in(coop/book1/expert,w1_l2) == true
+wait_until scene.countdown >= 0 600
+shot map_w1_l2_coop_book1_expert
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w1_l2_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
+expect game.weapon == 0
+wait 2
+shot w1_l2_coop_start
+every 480 w1_l2_coop
+play_file tools/autoplay/routes/w1_l2_coop.expert.inputs
+every 0
+expect events.party_wiped == 0
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_w1_l2_coop_book1_expert
+press ui_accept
+wait 20
+press ui_accept
+# On to the map (checked by the next stop, after its `need`).
+
+# --- w2_l1 in co-op ---------------------------------------------------------------------------------------------------
+need w2_l1_coop tools/autoplay/routes/w2_l1_coop.expert.inputs
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w2_l1
+expect save.get_level_result_in(coop/book1/expert,w1_l2).clears == 1
+expect save.is_level_unlocked_in(coop/book1/expert,w2_l1) == true
+wait_until scene.countdown >= 0 600
+shot map_w2_l1_coop_book1_expert
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w2_l1_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
+expect game.weapon == 0
+wait 2
+shot w2_l1_coop_start
+every 480 w2_l1_coop
+play_file tools/autoplay/routes/w2_l1_coop.expert.inputs
+every 0
+expect events.party_wiped == 0
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_w2_l1_coop_book1_expert
+press ui_accept
+wait 20
+press ui_accept
+# On to the map (checked by the next stop, after its `need`).
+
+# --- w2_l2 + w2_l2b in co-op ------------------------------------------------------------------------------------------
+need w2_l2_coop w2_l2b_coop tools/autoplay/routes/w2_l2_coop.expert.inputs tools/autoplay/routes/w2_l2b_coop.expert.inputs
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w2_l2
+expect save.get_level_result_in(coop/book1/expert,w2_l1).clears == 1
+expect save.is_level_unlocked_in(coop/book1/expert,w2_l2) == true
+wait_until scene.countdown >= 0 600
+shot map_w2_l2_coop_book1_expert
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w2_l2_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
+expect game.weapon == 0
+wait 2
+shot w2_l2_coop_start
+every 480 w2_l2_coop
+play_file tools/autoplay/routes/w2_l2_coop.expert.inputs
+every 0
+expect events.party_wiped == 0
+# The linked stage follows without a tally.
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w2_l2b_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
+expect game.weapon == 0
+wait 2
+shot w2_l2b_coop_start
+every 480 w2_l2b_coop
+play_file tools/autoplay/routes/w2_l2b_coop.expert.inputs
+every 0
+expect events.party_wiped == 0
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_w2_l2_coop_book1_expert
+press ui_accept
+wait 20
+press ui_accept
+# On to the map (checked by the next stop, after its `need`).
+
+# --- w3_l1 + w3_l1b in co-op ------------------------------------------------------------------------------------------
+need w3_l1_coop w3_l1b_coop tools/autoplay/routes/w3_l1_coop.expert.inputs tools/autoplay/routes/w3_l1b_coop.expert.inputs
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w3_l1
+expect save.get_level_result_in(coop/book1/expert,w2_l2).clears == 1
+expect save.is_level_unlocked_in(coop/book1/expert,w3_l1) == true
+wait_until scene.countdown >= 0 600
+shot map_w3_l1_coop_book1_expert
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w3_l1_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
+expect game.weapon == 0
+wait 2
+shot w3_l1_coop_start
+every 480 w3_l1_coop
+play_file tools/autoplay/routes/w3_l1_coop.expert.inputs
+every 0
+expect events.party_wiped == 0
+# The linked stage follows without a tally.
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w3_l1b_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
+expect game.weapon == 0
+wait 2
+shot w3_l1b_coop_start
+every 480 w3_l1b_coop
+play_file tools/autoplay/routes/w3_l1b_coop.expert.inputs
+every 0
+expect events.party_wiped == 0
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_w3_l1_coop_book1_expert
+press ui_accept
+wait 20
+press ui_accept
+# On to the map (checked by the next stop, after its `need`).
+
+# --- w3_l2 in co-op ---------------------------------------------------------------------------------------------------
+need w3_l2_coop tools/autoplay/routes/w3_l2_coop.expert.inputs
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w3_l2
+expect save.get_level_result_in(coop/book1/expert,w3_l1).clears == 1
+expect save.is_level_unlocked_in(coop/book1/expert,w3_l2) == true
+wait_until scene.countdown >= 0 600
+shot map_w3_l2_coop_book1_expert
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w3_l2_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
+expect game.weapon == 0
+wait 2
+shot w3_l2_coop_start
+every 480 w3_l2_coop
+play_file tools/autoplay/routes/w3_l2_coop.expert.inputs
+every 0
+expect events.party_wiped == 0
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_w3_l2_coop_book1_expert
+press ui_accept
+wait 20
+press ui_accept
+# On to the map (checked by the next stop, after its `need`).
+
+# --- w4_l1 in co-op ---------------------------------------------------------------------------------------------------
+need w4_l1_coop tools/autoplay/routes/w4_l1_coop.inputs
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w4_l1
+expect save.get_level_result_in(coop/book1/expert,w3_l2).clears == 1
+expect save.is_level_unlocked_in(coop/book1/expert,w4_l1) == true
+wait_until scene.countdown >= 0 600
+shot map_w4_l1_coop_book1_expert
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w4_l1_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
+expect game.weapon == 0
+wait 2
+shot w4_l1_coop_start
+every 480 w4_l1_coop
+play_file tools/autoplay/routes/w4_l1_coop.inputs
+every 0
+expect events.party_wiped == 0
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_w4_l1_coop_book1_expert
+press ui_accept
+wait 20
+press ui_accept
+# On to the map (checked by the next stop, after its `need`).
+
+# --- w4_l2 + w4_l2b (trophy) -> ending in co-op -----------------------------------------------------------------------
+need w4_l2_coop w4_l2b_coop ending_coop tools/autoplay/routes/w4_l2_coop.inputs tools/autoplay/routes/w4_l2b_coop.inputs tools/autoplay/routes/ending_coop.inputs
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w4_l2
+expect save.get_level_result_in(coop/book1/expert,w4_l1).clears == 1
+expect save.is_level_unlocked_in(coop/book1/expert,w4_l2) == true
+wait_until scene.countdown >= 0 600
+shot map_w4_l2_coop_book1_expert
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w4_l2_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
+expect game.weapon == 0
+wait 2
+shot w4_l2_coop_start
+every 480 w4_l2_coop
+play_file tools/autoplay/routes/w4_l2_coop.inputs
+every 0
+expect events.party_wiped == 0
+# The linked stage follows without a tally.
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w4_l2b_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
+expect game.weapon == 0
+wait 2
+shot w4_l2b_coop_start
+every 480 w4_l2b_coop
+play_file tools/autoplay/routes/w4_l2b_coop.inputs
+every 0
+expect events.party_wiped == 0
+# The trophy ends the stop (its result is recorded at once) and starts the epilogue stage without
+# a tally.
+expect events.boss_defeated >= 1
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == ending_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
+expect game.weapon == 0
+wait 2
+shot ending_coop_start
+every 480 ending_coop
+play_file tools/autoplay/routes/ending_coop.inputs
+every 0
+expect events.party_wiped == 0
+expect save.get_level_result_in(coop/book1/expert,w4_l2).clears == 1
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_ending_coop_book1_expert
+press ui_accept
+wait 20
+press ui_accept
+
+# --- The End ----------------------------------------------------------------------------------------------------------
+wait_until flow.current_screen == the_end 900
+wait_until flow.busy == false 600
+expect save.is_game_completed_in(coop/book1/expert) == true
+expect game.lives >= 2
+wait 90
+shot the_end_coop_book1_expert
+
+########################################################################################################################
+# Co-op, Book II, Beginner
+########################################################################################################################
+section coop_book2_beginner
+
+# --- Title, Play > Co-op > Book II > Beginner -------------------------------------------------------------------------
+wait_until flow.current_screen == title 900
+wait_until flow.busy == false 600
+wait 40
+shot title_coop_book2_beginner
+# Play, then Co-op (Flow.open_play; Solo has the focus, Co-op is one down).
+press ui_accept
+wait 10
+press ui_down
+press ui_accept
+wait_until flow.current_screen == join 300
+wait_until flow.busy == false 600
+# P1 joins with Space (left half), P2 with Num 0 (right half); both hold Strike to be ready (P1's classic
+# Strike is Left Ctrl). Ready = Strike held for 1 s of real time; the panel opens the book select itself.
+key Space
+key Kp_0
+wait 10
+shot join_coop_book2_beginner
+hold Ctrl Kp_Enter
+wait_until flow.current_screen == book_select 600
+release all
+wait_until flow.busy == false 600
+# The book select has Book I focused (Flow.play_book); Right = Book II.
+press ui_right
+wait 10
+shot book_select_coop_book2_beginner
+press ui_accept
+wait_until flow.current_screen == mode_select 300
+wait_until flow.busy == false 600
+expect flow.play_book == 2
+# Left = Beginner, Right = Expert, whichever card the last run left focused.
+press ui_left
+wait 10
+shot mode_select_coop_book2_beginner
+press ui_accept
+wait_until flow.current_screen == world_map 600
+wait_until flow.busy == false 600
+expect game.book == 2
+expect game.mode == 1
+expect game.party == 2
+expect game.difficulty == 0
+expect game.lives == 2
+expect game.score == 0
+expect game.weapon == 0
+
+# --- w5_l1 in co-op ---------------------------------------------------------------------------------------------------
+need w5_l1_coop tools/autoplay/routes/w5_l1_coop.inputs
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w5_l1
+wait_until scene.countdown >= 0 600
+shot map_w5_l1_coop_book2_beginner
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w5_l1_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
+expect game.weapon == 0
+wait 2
+shot w5_l1_coop_start
+every 480 w5_l1_coop
+play_file tools/autoplay/routes/w5_l1_coop.inputs
+every 0
+expect events.party_wiped == 0
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_w5_l1_coop_book2_beginner
+press ui_accept
+wait 20
+press ui_accept
+# On to the map (checked by the next stop, after its `need`).
+
+# --- w5_l2 + w5_l2b in co-op ------------------------------------------------------------------------------------------
+need w5_l2_coop w5_l2b_coop tools/autoplay/routes/w5_l2_coop.inputs tools/autoplay/routes/w5_l2b_coop.inputs
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w5_l2
+expect save.get_level_result_in(coop/book2/beginner,w5_l1).clears == 1
+expect save.is_level_unlocked_in(coop/book2/beginner,w5_l2) == true
+wait_until scene.countdown >= 0 600
+shot map_w5_l2_coop_book2_beginner
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w5_l2_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
+expect game.weapon == 0
+wait 2
+shot w5_l2_coop_start
+every 480 w5_l2_coop
+play_file tools/autoplay/routes/w5_l2_coop.inputs
+every 0
+expect events.party_wiped == 0
+# The linked stage follows without a tally.
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w5_l2b_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
+expect game.weapon == 0
+wait 2
+shot w5_l2b_coop_start
+every 480 w5_l2b_coop
+play_file tools/autoplay/routes/w5_l2b_coop.inputs
+every 0
+expect events.party_wiped == 0
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_w5_l2_coop_book2_beginner
+press ui_accept
+wait 20
+press ui_accept
+# On to the map (checked by the next stop, after its `need`).
+
+# --- w6_l1 in co-op ---------------------------------------------------------------------------------------------------
+need w6_l1_coop tools/autoplay/routes/w6_l1_coop.inputs
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w6_l1
+expect save.get_level_result_in(coop/book2/beginner,w5_l2).clears == 1
+expect save.is_level_unlocked_in(coop/book2/beginner,w6_l1) == true
+wait_until scene.countdown >= 0 600
+shot map_w6_l1_coop_book2_beginner
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w6_l1_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
+expect game.weapon == 0
+wait 2
+shot w6_l1_coop_start
+every 480 w6_l1_coop
+play_file tools/autoplay/routes/w6_l1_coop.inputs
+every 0
+expect events.party_wiped == 0
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_w6_l1_coop_book2_beginner
+press ui_accept
+wait 20
+press ui_accept
+# On to the map (checked by the next stop, after its `need`).
+
+# --- w6_l2 + w6_l2b in co-op ------------------------------------------------------------------------------------------
+need w6_l2_coop w6_l2b_coop tools/autoplay/routes/w6_l2_coop.inputs tools/autoplay/routes/w6_l2b_coop.inputs
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w6_l2
+expect save.get_level_result_in(coop/book2/beginner,w6_l1).clears == 1
+expect save.is_level_unlocked_in(coop/book2/beginner,w6_l2) == true
+wait_until scene.countdown >= 0 600
+shot map_w6_l2_coop_book2_beginner
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w6_l2_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
+expect game.weapon == 0
+wait 2
+shot w6_l2_coop_start
+every 480 w6_l2_coop
+play_file tools/autoplay/routes/w6_l2_coop.inputs
+every 0
+expect events.party_wiped == 0
+# The linked stage follows without a tally.
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w6_l2b_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
+expect game.weapon == 0
+wait 2
+shot w6_l2b_coop_start
+every 480 w6_l2b_coop
+play_file tools/autoplay/routes/w6_l2b_coop.inputs
+every 0
+expect events.party_wiped == 0
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_w6_l2_coop_book2_beginner
+press ui_accept
+wait 20
+press ui_accept
+# On to the map (checked by the next stop, after its `need`).
+
+# --- w7_l1 in co-op ---------------------------------------------------------------------------------------------------
+need w7_l1_coop tools/autoplay/routes/w7_l1_coop.inputs
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w7_l1
+expect save.get_level_result_in(coop/book2/beginner,w6_l2).clears == 1
+expect save.is_level_unlocked_in(coop/book2/beginner,w7_l1) == true
+wait_until scene.countdown >= 0 600
+shot map_w7_l1_coop_book2_beginner
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w7_l1_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
+expect game.weapon == 0
+wait 2
+shot w7_l1_coop_start
+every 480 w7_l1_coop
+play_file tools/autoplay/routes/w7_l1_coop.inputs
+every 0
+expect events.party_wiped == 0
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_w7_l1_coop_book2_beginner
+press ui_accept
+wait 20
+press ui_accept
+# On to the map (checked by the next stop, after its `need`).
+
+# --- w7_l2 + w7_l2b in co-op ------------------------------------------------------------------------------------------
+need w7_l2_coop w7_l2b_coop tools/autoplay/routes/w7_l2_coop.inputs tools/autoplay/routes/w7_l2b_coop.inputs
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w7_l2
+expect save.get_level_result_in(coop/book2/beginner,w7_l1).clears == 1
+expect save.is_level_unlocked_in(coop/book2/beginner,w7_l2) == true
+wait_until scene.countdown >= 0 600
+shot map_w7_l2_coop_book2_beginner
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w7_l2_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
+expect game.weapon == 0
+wait 2
+shot w7_l2_coop_start
+every 480 w7_l2_coop
+play_file tools/autoplay/routes/w7_l2_coop.inputs
+every 0
+expect events.party_wiped == 0
+# The linked stage follows without a tally.
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w7_l2b_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
+expect game.weapon == 0
+wait 2
+shot w7_l2b_coop_start
+every 480 w7_l2b_coop
+play_file tools/autoplay/routes/w7_l2b_coop.inputs
+every 0
+expect events.party_wiped == 0
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_w7_l2_coop_book2_beginner
+press ui_accept
+wait 20
+press ui_accept
+
+# --- The expert wall after the last Beginner stop ---------------------------------------------------------------------
+wait_until flow.current_screen == expert_wall 900
+wait_until flow.busy == false 600
+expect save.get_level_result_in(coop/book2/beginner,w7_l2).clears == 1
+expect save.is_game_completed_in(coop/book2/beginner) == false
+expect game.book == 2
+wait 90
+shot expert_wall_coop_book2_beginner
+press ui_accept
+wait_until flow.current_screen == title 900
+wait_until flow.busy == false 600
+
+########################################################################################################################
+# Co-op, Book II, Expert
+########################################################################################################################
+section coop_book2_expert
+
+# --- Title, Play > Co-op > Book II > Expert ---------------------------------------------------------------------------
+wait_until flow.current_screen == title 900
+wait_until flow.busy == false 600
+wait 40
+shot title_coop_book2_expert
+# Play, then Co-op (Flow.open_play; Solo has the focus, Co-op is one down).
+press ui_accept
+wait 10
+press ui_down
+press ui_accept
+wait_until flow.current_screen == join 300
+wait_until flow.busy == false 600
+# P1 joins with Space (left half), P2 with Num 0 (right half); both hold Strike to be ready (P1's classic
+# Strike is Left Ctrl). Ready = Strike held for 1 s of real time; the panel opens the book select itself.
+key Space
+key Kp_0
+wait 10
+shot join_coop_book2_expert
+hold Ctrl Kp_Enter
+wait_until flow.current_screen == book_select 600
+release all
+wait_until flow.busy == false 600
+# The book select has Book I focused (Flow.play_book); Right = Book II.
+press ui_right
+wait 10
+shot book_select_coop_book2_expert
+press ui_accept
+wait_until flow.current_screen == mode_select 300
+wait_until flow.busy == false 600
+expect flow.play_book == 2
+# Left = Beginner, Right = Expert, whichever card the last run left focused.
+press ui_right
+wait 10
+shot mode_select_coop_book2_expert
+press ui_accept
+wait_until flow.current_screen == world_map 600
+wait_until flow.busy == false 600
+expect game.book == 2
+expect game.mode == 1
+expect game.party == 2
+expect game.difficulty == 1
+expect game.lives == 2
+expect game.score == 0
+expect game.weapon == 0
+
+# --- w5_l1 in co-op ---------------------------------------------------------------------------------------------------
+need w5_l1_coop tools/autoplay/routes/w5_l1_coop.expert.inputs
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w5_l1
+wait_until scene.countdown >= 0 600
+shot map_w5_l1_coop_book2_expert
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w5_l1_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
+expect game.weapon == 0
+wait 2
+shot w5_l1_coop_start
+every 480 w5_l1_coop
+play_file tools/autoplay/routes/w5_l1_coop.expert.inputs
+every 0
+expect events.party_wiped == 0
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_w5_l1_coop_book2_expert
+press ui_accept
+wait 20
+press ui_accept
+# On to the map (checked by the next stop, after its `need`).
+
+# --- w5_l2 + w5_l2b in co-op ------------------------------------------------------------------------------------------
+need w5_l2_coop w5_l2b_coop tools/autoplay/routes/w5_l2_coop.expert.inputs tools/autoplay/routes/w5_l2b_coop.expert.inputs
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w5_l2
+expect save.get_level_result_in(coop/book2/expert,w5_l1).clears == 1
+expect save.is_level_unlocked_in(coop/book2/expert,w5_l2) == true
+wait_until scene.countdown >= 0 600
+shot map_w5_l2_coop_book2_expert
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w5_l2_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
+expect game.weapon == 0
+wait 2
+shot w5_l2_coop_start
+every 480 w5_l2_coop
+play_file tools/autoplay/routes/w5_l2_coop.expert.inputs
+every 0
+expect events.party_wiped == 0
+# The linked stage follows without a tally.
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w5_l2b_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
+expect game.weapon == 0
+wait 2
+shot w5_l2b_coop_start
+every 480 w5_l2b_coop
+play_file tools/autoplay/routes/w5_l2b_coop.expert.inputs
+every 0
+expect events.party_wiped == 0
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_w5_l2_coop_book2_expert
+press ui_accept
+wait 20
+press ui_accept
+# On to the map (checked by the next stop, after its `need`).
+
+# --- w6_l1 in co-op ---------------------------------------------------------------------------------------------------
+need w6_l1_coop tools/autoplay/routes/w6_l1_coop.expert.inputs
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w6_l1
+expect save.get_level_result_in(coop/book2/expert,w5_l2).clears == 1
+expect save.is_level_unlocked_in(coop/book2/expert,w6_l1) == true
+wait_until scene.countdown >= 0 600
+shot map_w6_l1_coop_book2_expert
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w6_l1_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
+expect game.weapon == 0
+wait 2
+shot w6_l1_coop_start
+every 480 w6_l1_coop
+play_file tools/autoplay/routes/w6_l1_coop.expert.inputs
+every 0
+expect events.party_wiped == 0
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_w6_l1_coop_book2_expert
+press ui_accept
+wait 20
+press ui_accept
+# On to the map (checked by the next stop, after its `need`).
+
+# --- w6_l2 + w6_l2b in co-op ------------------------------------------------------------------------------------------
+need w6_l2_coop w6_l2b_coop tools/autoplay/routes/w6_l2_coop.expert.inputs tools/autoplay/routes/w6_l2b_coop.expert.inputs
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w6_l2
+expect save.get_level_result_in(coop/book2/expert,w6_l1).clears == 1
+expect save.is_level_unlocked_in(coop/book2/expert,w6_l2) == true
+wait_until scene.countdown >= 0 600
+shot map_w6_l2_coop_book2_expert
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w6_l2_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
+expect game.weapon == 0
+wait 2
+shot w6_l2_coop_start
+every 480 w6_l2_coop
+play_file tools/autoplay/routes/w6_l2_coop.expert.inputs
+every 0
+expect events.party_wiped == 0
+# The linked stage follows without a tally.
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w6_l2b_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
+expect game.weapon == 0
+wait 2
+shot w6_l2b_coop_start
+every 480 w6_l2b_coop
+play_file tools/autoplay/routes/w6_l2b_coop.expert.inputs
+every 0
+expect events.party_wiped == 0
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_w6_l2_coop_book2_expert
+press ui_accept
+wait 20
+press ui_accept
+# On to the map (checked by the next stop, after its `need`).
+
+# --- w7_l1 in co-op ---------------------------------------------------------------------------------------------------
+need w7_l1_coop tools/autoplay/routes/w7_l1_coop.expert.inputs
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w7_l1
+expect save.get_level_result_in(coop/book2/expert,w6_l2).clears == 1
+expect save.is_level_unlocked_in(coop/book2/expert,w7_l1) == true
+wait_until scene.countdown >= 0 600
+shot map_w7_l1_coop_book2_expert
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w7_l1_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
+expect game.weapon == 0
+wait 2
+shot w7_l1_coop_start
+every 480 w7_l1_coop
+play_file tools/autoplay/routes/w7_l1_coop.expert.inputs
+every 0
+expect events.party_wiped == 0
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_w7_l1_coop_book2_expert
+press ui_accept
+wait 20
+press ui_accept
+# On to the map (checked by the next stop, after its `need`).
+
+# --- w7_l2 + w7_l2b in co-op ------------------------------------------------------------------------------------------
+need w7_l2_coop w7_l2b_coop tools/autoplay/routes/w7_l2_coop.expert.inputs tools/autoplay/routes/w7_l2b_coop.expert.inputs
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w7_l2
+expect save.get_level_result_in(coop/book2/expert,w7_l1).clears == 1
+expect save.is_level_unlocked_in(coop/book2/expert,w7_l2) == true
+wait_until scene.countdown >= 0 600
+shot map_w7_l2_coop_book2_expert
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w7_l2_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
+expect game.weapon == 0
+wait 2
+shot w7_l2_coop_start
+every 480 w7_l2_coop
+play_file tools/autoplay/routes/w7_l2_coop.expert.inputs
+every 0
+expect events.party_wiped == 0
+# The linked stage follows without a tally.
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w7_l2b_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
+expect game.weapon == 0
+wait 2
+shot w7_l2b_coop_start
+every 480 w7_l2b_coop
+play_file tools/autoplay/routes/w7_l2b_coop.expert.inputs
+every 0
+expect events.party_wiped == 0
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_w7_l2_coop_book2_expert
+press ui_accept
+wait 20
+press ui_accept
+# On to the map (checked by the next stop, after its `need`).
+
+# --- w8_l1 in co-op ---------------------------------------------------------------------------------------------------
+need w8_l1_coop tools/autoplay/routes/w8_l1_coop.inputs
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w8_l1
+expect save.get_level_result_in(coop/book2/expert,w7_l2).clears == 1
+expect save.is_level_unlocked_in(coop/book2/expert,w8_l1) == true
+wait_until scene.countdown >= 0 600
+shot map_w8_l1_coop_book2_expert
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w8_l1_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
+expect game.weapon == 0
+wait 2
+shot w8_l1_coop_start
+every 480 w8_l1_coop
+play_file tools/autoplay/routes/w8_l1_coop.inputs
+every 0
+expect events.party_wiped == 0
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_w8_l1_coop_book2_expert
+press ui_accept
+wait 20
+press ui_accept
+# On to the map (checked by the next stop, after its `need`).
+
+# --- w8_l2 + w8_l2b in co-op ------------------------------------------------------------------------------------------
+need w8_l2_coop w8_l2b_coop tools/autoplay/routes/w8_l2_coop.inputs tools/autoplay/routes/w8_l2b_coop.inputs
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w8_l2
+expect save.get_level_result_in(coop/book2/expert,w8_l1).clears == 1
+expect save.is_level_unlocked_in(coop/book2/expert,w8_l2) == true
+wait_until scene.countdown >= 0 600
+shot map_w8_l2_coop_book2_expert
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w8_l2_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
+expect game.weapon == 0
+wait 2
+shot w8_l2_coop_start
+every 480 w8_l2_coop
+play_file tools/autoplay/routes/w8_l2_coop.inputs
+every 0
+expect events.party_wiped == 0
+# The linked stage follows without a tally.
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w8_l2b_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
+expect game.weapon == 0
+wait 2
+shot w8_l2b_coop_start
+every 480 w8_l2b_coop
+play_file tools/autoplay/routes/w8_l2b_coop.inputs
+every 0
+expect events.party_wiped == 0
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_w8_l2_coop_book2_expert
+press ui_accept
+wait 20
+press ui_accept
+# On to the map (checked by the next stop, after its `need`).
+
+# --- w9_l1 + w9_l1b in co-op ------------------------------------------------------------------------------------------
+need w9_l1_coop w9_l1b_coop tools/autoplay/routes/w9_l1_coop.inputs tools/autoplay/routes/w9_l1b_coop.inputs
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w9_l1
+expect save.get_level_result_in(coop/book2/expert,w8_l2).clears == 1
+expect save.is_level_unlocked_in(coop/book2/expert,w9_l1) == true
+wait_until scene.countdown >= 0 600
+shot map_w9_l1_coop_book2_expert
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w9_l1_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
+expect game.weapon == 0
+wait 2
+shot w9_l1_coop_start
+every 480 w9_l1_coop
+play_file tools/autoplay/routes/w9_l1_coop.inputs
+every 0
+expect events.party_wiped == 0
+# The linked stage follows without a tally.
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w9_l1b_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
+expect game.weapon == 0
+wait 2
+shot w9_l1b_coop_start
+every 480 w9_l1b_coop
+play_file tools/autoplay/routes/w9_l1b_coop.inputs
+every 0
+expect events.party_wiped == 0
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_w9_l1_coop_book2_expert
+press ui_accept
+wait 20
+press ui_accept
+# On to the map (checked by the next stop, after its `need`).
+
+# --- w9_l2 + w9_l2b in co-op ------------------------------------------------------------------------------------------
+need w9_l2_coop w9_l2b_coop tools/autoplay/routes/w9_l2_coop.inputs tools/autoplay/routes/w9_l2b_coop.inputs
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w9_l2
+expect save.get_level_result_in(coop/book2/expert,w9_l1).clears == 1
+expect save.is_level_unlocked_in(coop/book2/expert,w9_l2) == true
+wait_until scene.countdown >= 0 600
+shot map_w9_l2_coop_book2_expert
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w9_l2_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
+expect game.weapon == 0
+wait 2
+shot w9_l2_coop_start
+every 480 w9_l2_coop
+play_file tools/autoplay/routes/w9_l2_coop.inputs
+every 0
+expect events.party_wiped == 0
+# The linked stage follows without a tally.
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w9_l2b_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
+expect game.weapon == 0
+wait 2
+shot w9_l2b_coop_start
+every 480 w9_l2b_coop
+play_file tools/autoplay/routes/w9_l2b_coop.inputs
+every 0
+expect events.party_wiped == 0
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_w9_l2_coop_book2_expert
+press ui_accept
+wait 20
+press ui_accept
+# On to the map (checked by the next stop, after its `need`).
+
+# --- w9_l3 (trophy) -> ending_b in co-op ------------------------------------------------------------------------------
+need w9_l3_coop ending_b_coop tools/autoplay/routes/w9_l3_coop.inputs tools/autoplay/routes/ending_b_coop.inputs
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect flow.args.level_id == w9_l3
+expect save.get_level_result_in(coop/book2/expert,w9_l2).clears == 1
+expect save.is_level_unlocked_in(coop/book2/expert,w9_l3) == true
+wait_until scene.countdown >= 0 600
+shot map_w9_l3_coop_book2_expert
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w9_l3_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
+expect game.weapon == 0
+wait 2
+shot w9_l3_coop_start
+every 480 w9_l3_coop
+play_file tools/autoplay/routes/w9_l3_coop.inputs
+every 0
+expect events.party_wiped == 0
+# The trophy ends the stop (its result is recorded at once) and starts the epilogue stage without
+# a tally.
+expect events.boss_defeated >= 1
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == ending_b_coop 600
+expect hero.dead == false
+expect level.hero_count() == 2
+expect hero2.dead == false
+# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
+expect game.weapon == 0
+wait 2
+shot ending_b_coop_start
+every 480 ending_b_coop
+play_file tools/autoplay/routes/ending_b_coop.inputs
+every 0
+expect events.party_wiped == 0
+expect save.get_level_result_in(coop/book2/expert,w9_l3).clears == 1
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+shot tally_ending_b_coop_book2_expert
+press ui_accept
+wait 20
+press ui_accept
+
+# --- The End ----------------------------------------------------------------------------------------------------------
+wait_until flow.current_screen == the_end 900
+wait_until flow.busy == false 600
+expect save.is_game_completed_in(coop/book2/expert) == true
+expect game.lives >= 2
+wait 90
+shot the_end_coop_book2_expert

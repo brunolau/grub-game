@@ -17,12 +17,17 @@ var _lab: Lab = null
 var _was_manual: bool = false
 
 
+var _t0_tmp: int = 0
+
+
 func before_each() -> void:
+	_t0_tmp = Time.get_ticks_msec()
 	_was_manual = Sim.manual
 	_lab = Lab.new()
 
 
 func after_each() -> void:
+	print("    TIMING %d ms" % (Time.get_ticks_msec() - _t0_tmp))
 	GameInput.clear_scripted()
 	Sim.stop()
 	Sim.manual = _was_manual
@@ -57,8 +62,9 @@ func test_mangrove_reads_its_chamber_and_counts_hits_by_stage() -> void:
 	assert_eq(tree.floor_y, 160)
 	assert_eq(tree.sim_pos, Vector2i(240, 160), "the record moved to the wall's foot")
 	assert_eq(tree.fist_rest_x, 200)
-	assert_eq(tree.hand_rest, Vector2i(76, 64 + Mangrove.MANGROVE_HAND_SINK), "the upper ledge (row 4) ends at x 96")
-	assert_eq(tree.get_face_rect(), Rect2i(230, 19, 20, 29))
+	assert_eq(tree.hand_rest, Vector2i(76, 80 + Mangrove.MANGROVE_HAND_SINK), "the upper ledge (row 5) ends at x 96")
+	assert_eq(tree.hand_home, Vector2i(240, 80), "it comes out of the wall at the ledge top")
+	assert_eq(tree.get_face_rect(), Rect2i(230, 55, 20, 29), "76-105 px over the floor (G35)")
 	_lab.step(PackedInt32Array([0]))
 	assert_true(tree.fighting)
 	assert_eq(tree.get_stage(), 1)
@@ -104,17 +110,22 @@ func test_the_drops_land_on_the_floor_in_front_of_the_trunk() -> void:
 			"at rest on ground a hero reaches (the floor or the root ledge in front of the wall) at %s" % starter.sim_pos)
 
 
-## The resting fist launches a hero who lands on it (-160; -224 with Up held), and from the -160 launch a high strike
-## started a tick or two after the launch reaches the face at the apex; no jump from the floor (standing or running,
-## next to the wall) reaches the face with any strike: the springboard is the way up.
+## The resting fist launches a hero who lands on it (-160; -224 with Up held) and the launch carries him past the face
+## (since G35 76-105 px over the floor, the launch rises through it): a strike timed around the launch - forward or
+## high, started a few ticks before he lands on the fist or after - reaches the face. A jump from the floor beside the
+## trunk is counted too (printed: with the face this low some floor jumps reach it - the springboard is no longer the
+## only way up, DESIGN.md G35 accepted that height).
 func test_the_resting_fist_is_the_springboard_to_the_face() -> void:
 	var tree: Mangrove = _open()
 	var hero: PlayerBase = _lab.hero()
 	_lab.step(PackedInt32Array([0]))
 	tree._fist_len = 100000
-	var reached: Array[int] = []
+	var reached: Array[String] = []
 	var launches: int = tree.launches
-	for start: int in range(0, 6):
+	var land: int = -1
+	for trial: int in 23:
+		var strike: int = Defs.IN_FIRE if trial % 2 == 1 else (Defs.IN_UP | Defs.IN_FIRE)
+		var start: int = trial / 2 - 4
 		tree.hp = tree.max_hp
 		tree.hit_cooldown = 0
 		tree._part_tick.clear()
@@ -125,27 +136,27 @@ func test_the_resting_fist_is_the_springboard_to_the_face() -> void:
 		hero.respawn_at(Vector2i(206, 160))
 		hero.facing = 1
 		var launched: int = -1
-		var top: int = 1000
 		var t: int = 0
 		while t < 60 and tree.hp == tree.max_hp:
-			var flags: int = 0
-			if launched < 0:
-				flags = Defs.IN_UP if t < 9 else 0
-			elif t - launched == 1:
-				flags = Defs.IN_RIGHT
-			elif t - launched >= 2 + start and t - launched < 2 + start + 9:
-				flags = Defs.IN_UP | Defs.IN_FIRE
+			# Trial 0 finds the tick he lands on the fist (a plain jump, no strike); the others strike around it.
+			var flags: int = Defs.IN_UP if t < 9 else 0
+			if trial > 0 and t >= land + start and t < land + start + 9:
+				flags = strike
+			if launched >= 0 and t - launched <= 1:
+				flags |= Defs.IN_RIGHT
 			_lab.step(PackedInt32Array([flags]))
-			t += 1
-			top = mini(top, hero.sim_pos.y)
 			if launched < 0 and hero.yvel <= -120:
 				launched = t
-		if tree.hp < tree.max_hp:
-			reached.append(start)
-	print("    springboard: a high strike started 2+%s ticks after the launch hits the face" % str(reached))
-	assert_true(tree.launches - launches >= 6, "every landing on the resting fist launched the hero")
-	assert_false(reached.is_empty(), "the face is reachable by a high strike at the -160 launch's apex")
-	# From the floor: every jump and strike next to the wall misses the face.
+				if trial == 0:
+					land = t
+			t += 1
+		if trial > 0 and tree.hp < tree.max_hp:
+			reached.append("%s %+d" % ["forward" if strike == Defs.IN_FIRE else "high", start])
+	print("    springboard (lands on the fist on tick %d): strikes that hit the face - %s" % [land, reached])
+	assert_true(land > 0, "a jump from beside the fist lands on it and is launched")
+	assert_true(tree.launches - launches >= 20, "every landing on the resting fist launched the hero")
+	assert_true(reached.size() >= 2, "the face is reachable from the springboard")
+	# From the floor beside the trunk: counted, not forbidden any more.
 	var hits: int = 0
 	for x: int in [196, 206, 214, 220]:
 		for hold: int in [5, 9]:
@@ -167,7 +178,46 @@ func test_the_resting_fist_is_the_springboard_to_the_face() -> void:
 						tree._fist_timer = 0
 						_lab.step(PackedInt32Array([flags]))
 					hits += 1 if tree.hp < tree.max_hp else 0
-	assert_eq(hits, 0, "no jump from the floor reaches the face")
+	print("    from the floor beside the trunk: %d of 96 jump-strikes reach the face" % hits)
+
+
+## G35 (as corrected): every weak point the club can strike - the face (Hud.weak_point_rects), the resting upper hand
+## and the stuck fist of stage 3, wherever the club routes see them - lies wholly inside every view the chamber's camera
+## lock allows and 24 px clear of the fight HUD's band (Hud.weak_point_problem).
+func test_every_weak_point_is_clear_of_the_hud() -> void:
+	var worst: Array[int] = [1 << 20]
+	var checked: Array[int] = [0]
+	var kinds: Dictionary = {}
+	for case: Array in [[Defs.Difficulty.BEGINNER, ROUTE_BEGINNER], [Defs.Difficulty.EXPERT, ROUTE_EXPERT]]:
+		var tree: Mangrove = _open(int(case[0]))
+		var route: PackedInt32Array = Lab.parse_route(str(case[1]))
+		var problems: Array[String] = []
+		_lab.play([route] as Array[PackedInt32Array], func() -> bool:
+			if tree.fighting and not tree.dead and tree._dying < 0:
+				var rects: Dictionary = {}
+				if tree.get_stage() == 1:
+					rects["face"] = tree.get_face_rect()
+				if tree.get_hand_state() == Mangrove.Hand.REST:
+					rects["hand"] = tree.get_hand_rect()
+				if tree.get_fist_state() == Mangrove.Fist.STUCK:
+					rects["fist"] = tree.get_fist_rect()
+				for rect: Rect2i in Hud.weak_point_rects(tree):
+					rects["hud %s" % rect] = rect
+				for key: String in rects:
+					var rect: Rect2i = rects[key]
+					var why: String = _lab.hud_clear(rect)
+					if why != "" and problems.size() < 3:
+						problems.append("%s: %s" % [key, why])
+					worst[0] = mini(worst[0], _lab.top_clearance(rect))
+					checked[0] += 1
+					kinds[key.get_slice(" ", 0)] = true
+			return tree.dead)
+		assert_true(problems.is_empty(), "difficulty %d: %s" % [case[0], problems])
+		_fresh()
+	print("    G35: %d weak rects checked (%s), the highest top %d px under the view's top" % [checked[0], kinds.keys(),
+		worst[0]])
+	for kind: String in ["face", "hand", "fist"]:
+		assert_true(kinds.has(kind), "the routes saw the %s strikable" % kind)
 
 
 ## Each punch: a 10-tick draw-back with a creak, 3 ticks out (3 bones and the knock-back), shake 4, a leaf over the
@@ -367,9 +417,13 @@ func test_the_club_bot_still_wins() -> void:
 ## twin hit; one hero's two hits never twin; hits too far apart never twin.
 func test_coop_twin_hits_need_both_heroes_within_the_window() -> void:
 	var tree: Mangrove = _open(Defs.Difficulty.BEGINNER, 2, true)
+	_wake_both()
 	_lab.step(PackedInt32Array([0, 0]))
-	assert_eq(tree.twin_window(), mini(PartyTuning.WINDOW_TICKS_BEGINNER,
-			Mangrove.MANGROVE_SOLO_MIN_TICKS - PartyTuning.WINDOW_SOLO_MARGIN_TICKS))
+	assert_eq(tree.twin_window(), PartyTuning.WINDOW_TICKS_BEGINNER,
+			"G34: a slot-bound twin is exempt from the solo_min cap - the difficulty's window, 24 on Beginner")
+	Game.difficulty = Defs.Difficulty.EXPERT
+	assert_eq(tree.twin_window(), PartyTuning.WINDOW_TICKS_EXPERT, "12 on Expert")
+	Game.difficulty = Defs.Difficulty.BEGINNER
 	_rest_hand(tree)
 	# P1 the face, P2 the hand, on the same tick: a twin hit.
 	_shot_at(tree.get_face_rect(), 0)
@@ -410,6 +464,7 @@ func test_coop_twin_hits_need_both_heroes_within_the_window() -> void:
 func test_coop_pin_and_fling() -> void:
 	var tree: Mangrove = _open(Defs.Difficulty.BEGINNER, 2, true)
 	var p1: PlayerBase = _lab.hero(0)
+	_wake_both()
 	_lab.step(PackedInt32Array([0, 0]))
 	tree._fist_len = tree._fist_timer + 30
 	p1.respawn_at(Vector2i(204, 120))
@@ -451,6 +506,7 @@ func test_coop_stage_3_only_the_far_hero_strikes_the_wrist() -> void:
 	var p1: PlayerBase = _lab.hero(0)
 	var p2: PlayerBase = _lab.hero(1)
 	tree.hp = 3
+	_wake_both()
 	_lab.step(PackedInt32Array([0, 0]))
 	assert_eq(tree.get_stage(), 3)
 	tree._set_fist(Mangrove.Fist.STUCK)
@@ -467,36 +523,203 @@ func test_coop_stage_3_only_the_far_hero_strikes_the_wrist() -> void:
 	assert_eq(tree.hp, 2, "P2's on the wrist counts")
 
 
-## The twin window is shorter than the measured solo minimum: one hero launched from the springboard (Up held: the co-op
-## fist launches at once) who throws a spear, an axe or a swirling axe at the face and then back at the resting hand
-## (every start of both throws, forward or high) needs at least the measured number of ticks between the two hits;
-## MANGROVE_SOLO_MIN_TICKS is no more than that, so the window (min(24 B / 12 E, solo minimum - 4), GAMEPLAY.md
-## 13.9.3) stays 4+ ticks below it.
-func test_coop_twin_window_is_shorter_than_the_measured_solo_minimum() -> void:
+## G33: a dozing partner counts for none of Old Mangrove's co-op rules. A twin half "struck" by a hero who no longer
+## counts lights nothing. Standing on the resting fist he is carried but pins nothing: the fist punches when its rest is
+## over and no count-in plays. In stage 3 the knuckles turn to the hero who plays even while the dozing one is nearer,
+## so the player's strike glances - until the partner's player presses something: then the knuckles turn to him and the
+## player, on the wrist side now, strikes home.
+func test_coop_an_idle_partner_counts_for_nothing() -> void:
+	var tree: Mangrove = _open(Defs.Difficulty.BEGINNER, 2, true)
+	var p1: PlayerBase = _lab.hero(0)
+	var p2: PlayerBase = _lab.hero(1)
+	_lab.step(PackedInt32Array([0, 0]))
+	assert_true(p2.is_idle(), "a partner who never pressed anything is idle (G33)")
+	_lab.wake(0)
+	# A twin half from the dozing hero lights nothing; the player's half does.
+	_rest_hand(tree)
+	_shot_at(tree.get_face_rect(), 0)
+	_shot_at(tree.get_hand_rect(), 1)
+	_lab.step(PackedInt32Array([0, 0]))
+	assert_true(tree._face_tick >= 0, "P1's face half is lit")
+	assert_eq(tree._hand_tick, -1, "the dozing P2's 'hit' on the hand lights nothing")
+	assert_eq(tree.hp, tree.max_hp, "no twin")
+	# The dozing hero on the resting fist pins nothing.
+	tree._hand = Mangrove.Hand.AWAY
+	tree._hand_timer = 0
+	_rest_hand(tree)
+	tree._set_fist(Mangrove.Fist.REST)
+	tree._fist_x = tree.fist_rest_x
+	tree._fist_len = 30
+	p1.respawn_at(Vector2i(40, 160))
+	p2.respawn_at(Vector2i(204, 120))
+	var stood: int = 0
+	var punched: int = -1
+	var counted: bool = false
+	var trace: Array[int] = []
+	for t: int in 60:
+		_lab.step(PackedInt32Array([0, 0]))
+		var top_y: int = tree.floor_y - Mangrove.MANGROVE_FIST_BOX.y
+		if t < 12:
+			trace.append(p2.sim_pos.y)
+		if punched < 0 and absi(p2.sim_pos.y - top_y) <= 2 and absi(p2.sim_pos.x - tree.fist_rest_x) <= 24 \
+				and p2.yvel >= 0:
+			stood += 1
+		assert_eq(tree._standing_mask() & 2, 0, "tick %d: the dozing hero never pins" % t)
+		counted = counted or tree._count_in >= 0
+		if punched < 0 and tree.get_fist_state() == Mangrove.Fist.OUT:
+			punched = t
+	assert_true(stood >= 10, "he stood on the fist (%d ticks; feet y %s): carried like on any platform" % [stood, trace])
+	assert_true(punched >= 0 and punched <= 30 + Mangrove.MANGROVE_DRAW_TICKS,
+			"the fist punched when its rest was over (tick %d)" % punched)
+	assert_false(counted, "no count-in for a dozing hero on the fist")
+	# Stage 3: the knuckles turn to the player, not to his nearer dozing partner.
+	tree.hp = tree.stage_hits[tree.stage_hits.size() - 1]
+	tree.hit_cooldown = 0
+	_lab.step(PackedInt32Array([0, 0]))
+	assert_eq(tree.get_stage(), 3)
+	tree._set_fist(Mangrove.Fist.STUCK)
+	tree._fist_x = tree.fist_out_x
+	_lab.wake(0)
+	p1.respawn_at(Vector2i(tree.fist_out_x + 60, 160))
+	p2.hit_timer = 0
+	p2.respawn_at(Vector2i(tree.fist_out_x - 20, 160))
+	_lab.step(PackedInt32Array([0, 0]))
+	tree._fist_timer = 0
+	assert_true(p2.is_idle() and p1.counts_for_coop())
+	assert_eq(tree.get_fist_facing(), 1, "the knuckles face P1, the player, though dozing P2 is nearer")
+	var hp: int = tree.hp
+	_shot_at(tree.get_fist_rect(), 0)
+	_lab.step(PackedInt32Array([0, 0]))
+	tree._fist_timer = 0
+	assert_eq(tree.hp, hp, "P1's strike meets the knuckles")
+	_lab.step(PackedInt32Array([0, Defs.IN_DOWN]))
+	tree._fist_timer = 0
+	assert_true(p2.counts_for_coop())
+	assert_eq(tree.get_fist_facing(), -1, "P2's player pressed something: the knuckles turn to him, the nearer")
+	_shot_at(tree.get_fist_rect(), 0)
+	_lab.step(PackedInt32Array([0, 0]))
+	assert_eq(tree.hp, hp - 1, "P1, on the wrist side now, strikes home")
+
+
+## V3.d fairness per hero: whichever hero the boss targets, the punch comes after its 10-tick draw-back and its leaf
+## falls over HIM from high above; the twin counts whichever hero strikes the face and whichever the hand; either hero
+## pins the resting fist; in stage 3 either hero strikes the wrist while the other draws the knuckles.
+func test_coop_form_is_fair_to_either_hero() -> void:
+	for slot: int in 2:
+		var tree: Mangrove = _open(Defs.Difficulty.EXPERT, 2, true)
+		var me: PlayerBase = _lab.hero(slot)
+		var mate: PlayerBase = _lab.hero(1 - slot)
+		_wake_both()
+		_lab.step(PackedInt32Array([0, 0]))
+		# The target (the nearer hero, on the lower ledge over the punches) and his leaf.
+		me.respawn_at(Vector2i(130, 112))
+		mate.respawn_at(Vector2i(30, 160))
+		tree._held_target = null
+		tree._set_fist(Mangrove.Fist.REST)
+		tree._fist_len = tree._fist_timer + 2
+		var drew: int = 0
+		var leaf: SimEntity = null
+		for t: int in 20:
+			_lab.step(PackedInt32Array([0, 0]))
+			drew += 1 if tree.get_fist_state() == Mangrove.Fist.DRAW else 0
+			for entity: SimEntity in _lab.level.get_kind(Defs.Kind.ENEMY_PROJECTILE):
+				if entity is EnemyEmber and leaf == null:
+					leaf = entity
+			if leaf != null:
+				break
+		assert_eq(drew, Mangrove.MANGROVE_DRAW_TICKS, "slot %d targeted: a 10-tick draw-back" % slot)
+		assert_not_null(leaf, "slot %d: a leaf" % slot)
+		if leaf != null:
+			assert_eq(int(leaf.spawn_params.get("rain_slot", -1)), me.slot, "slot %d: the leaf falls on him" % slot)
+			assert_true(absi(leaf.sim_pos.x - me.sim_pos.x) <= EnemyTuning.EMBER_DROP_SPREAD,
+					"slot %d: over him (x %d, him %d)" % [slot, leaf.sim_pos.x, me.sim_pos.x])
+			assert_true(me.sim_pos.y - leaf.sim_pos.y >= 100, "slot %d: from high above (%d px)" % [slot,
+				me.sim_pos.y - leaf.sim_pos.y])
+		# The twin, both ways round.
+		_wait(Tuning.BOSS_HIT_COOLDOWN + 2)
+		var hp: int = tree.hp
+		_rest_hand(tree)
+		_shot_at(tree.get_face_rect(), me.slot)
+		_shot_at(tree.get_hand_rect(), mate.slot)
+		_lab.step(PackedInt32Array([0, 0]))
+		assert_eq(tree.hp, hp - 1, "slot %d on the face, his partner on the hand: a twin" % slot)
+		_wait(Tuning.BOSS_HIT_COOLDOWN + 2)
+		_rest_hand(tree)
+		_shot_at(tree.get_face_rect(), mate.slot)
+		_shot_at(tree.get_hand_rect(), me.slot)
+		_lab.step(PackedInt32Array([0, 0]))
+		assert_eq(tree.hp, hp - 2, "slot %d on the hand, his partner on the face: a twin" % slot)
+		# He pins the resting fist.
+		tree._set_fist(Mangrove.Fist.REST)
+		tree._fist_x = tree.fist_rest_x
+		tree._fist_len = tree._fist_timer + 20
+		me.respawn_at(Vector2i(204, 120))
+		var pinned: int = 0
+		var punched: bool = false
+		for t: int in 40:
+			_lab.step(PackedInt32Array([0, 0]))
+			pinned += 1 if (tree._standing_mask() & (1 << me.slot)) != 0 else 0
+			punched = punched or tree.get_fist_state() == Mangrove.Fist.OUT
+		assert_true(pinned >= 20, "slot %d pins the fist (%d ticks)" % [slot, pinned])
+		assert_false(punched, "slot %d: no punch while he pins it" % slot)
+		# Stage 3: he draws the knuckles, his partner strikes the wrist.
+		_lab.wake(0)
+		_lab.wake(1)
+		tree.hp = tree.stage_hits[tree.stage_hits.size() - 1]
+		tree.hit_cooldown = 0
+		_lab.step(PackedInt32Array([0, 0]))
+		tree._set_fist(Mangrove.Fist.STUCK)
+		tree._fist_x = tree.fist_out_x
+		me.respawn_at(Vector2i(tree.fist_out_x - 30, 160))
+		mate.respawn_at(Vector2i(tree.fist_out_x + 60, 160))
+		_lab.step(PackedInt32Array([0, 0]))
+		tree._fist_timer = 0
+		hp = tree.hp
+		_shot_at(tree.get_fist_rect(), me.slot)
+		_lab.step(PackedInt32Array([0, 0]))
+		tree._fist_timer = 0
+		assert_eq(tree.hp, hp, "slot %d, the nearer: on the knuckles" % slot)
+		_shot_at(tree.get_fist_rect(), mate.slot)
+		_lab.step(PackedInt32Array([0, 0]))
+		assert_eq(tree.hp, hp - 1, "slot %d's partner strikes the wrist" % slot)
+		_fresh()
+
+
+## G34: the twin is slot-bound (two heroes' own hits), so its window is the difficulty's - 24 Beginner / 12 Expert -,
+## not capped by one player's solo minimum, which stays a measured fact. The measurement (V3.d's one player with his
+## toolkit): P1 launched from the springboard (Up held: the co-op fist launches at once) throws a spear, an axe or a
+## swirling axe at the face and then back at the resting hand, every start of both throws, forward or high, while his
+## IDLE partner stands where his player could have hatched him (by the resting hand on the upper ledge, on the lower
+## ledge, on the floor) or lies on the floor as an egg. No trial ever twins - though one player's two hits come well
+## inside the 24-tick window, they never pair - and none is faster than MANGROVE_SOLO_MIN_TICKS. Lighter than at G2:
+## spent throws are freed between trials (Lab.flush) and a trial ends once its hits can no longer fall within a window.
+func test_coop_one_player_never_twins_and_the_solo_minimum_holds() -> void:
 	var measured: Dictionary = _measure_solo_twin()
-	print("    one hero from the face to the hand: %d ticks at best (%s); %d trials, %d twins" % [measured["best"],
-		measured["how"], measured["trials"], measured["twins"]])
-	assert_true(int(measured["trials"]) >= 100)
+	print("    one player from the face to the hand: %d ticks at best (%s); %d trials, %d twins, partner counted on %d ticks" % [
+		measured["best"], measured["how"], measured["trials"], measured["twins"], measured["partner_counted"]])
+	assert_true(int(measured["trials"]) >= 500)
 	assert_true(int(measured["best"]) < 100000, "the search reached both parts (it is not blind)")
 	assert_true(int(measured["best"]) >= Mangrove.MANGROVE_SOLO_MIN_TICKS,
 			"MANGROVE_SOLO_MIN_TICKS (%d) is a lower bound of the measured %d" % [Mangrove.MANGROVE_SOLO_MIN_TICKS,
 			measured["best"]])
-	for difficulty: int in [Defs.Difficulty.BEGINNER, Defs.Difficulty.EXPERT]:
-		Game.difficulty = difficulty
-		var tree: Mangrove = _lab.boss as Mangrove
-		assert_true(tree.twin_window() <= int(measured["best"]) - PartyTuning.WINDOW_SOLO_MARGIN_TICKS)
-	assert_eq(int(measured["twins"]), 0, "and one hero's hits never counted as a twin")
+	assert_true(int(measured["best"]) < PartyTuning.WINDOW_TICKS_BEGINNER,
+			"his two hits came inside the Beginner window (%d < 24): the slot rule, not the window, refuses him" % measured["best"])
+	assert_eq(int(measured["twins"]), 0, "one player's hits never counted as a twin")
+	assert_eq(int(measured["partner_counted"]), 0, "his partner never counted for a co-op rule")
 
 
-## The single-hero search cannot hurt the co-op form: the throws of the measurement never twin (above), one hero never
-## strikes the wrist of the stuck fist from either side with any weapon, and the solo club route played against the
-## co-op form never hurts it - while the same stage-3 trials do hurt the solo form.
+## V3.d, the single-hero search cannot hurt the co-op form: one player never twins (above), never strikes the wrist of
+## the stuck fist from either side with any weapon while his IDLE partner stands on the floor on the far side (nearer
+## than he: the bait a dozing body would be), further out, on the lower ledge, or lies there as an egg; and the solo
+## club route played against the co-op form never hurts it - while the same stage-3 trials alone do hurt the solo form.
 func test_the_single_hero_search_cannot_hurt_the_coop_form() -> void:
-	var coop: Dictionary = _search_fist(true)
-	var solo: Dictionary = _search_fist(false)
-	print("    single-hero search on the stuck fist: %d trials, co-op form hit %d times; solo form hit %d times" % [
-		coop["trials"], coop["hits"], solo["hits"]])
-	assert_eq(int(coop["hits"]), 0, "one hero never strikes the wrist: %s" % coop["first"])
+	var coop: Dictionary = _search_fist(true, true)
+	var solo: Dictionary = _search_fist(false, false)
+	print("    single-hero search on the stuck fist: %d trials (partner idle %d / egg %d), co-op form hit %d times; solo form hit %d times" % [
+		coop["trials"], coop["idle_trials"], coop["egg_trials"], coop["hits"], solo["hits"]])
+	assert_true(int(coop["idle_trials"]) >= 100 and int(coop["egg_trials"]) >= 20, "both partner kinds were tried")
+	assert_eq(int(coop["partner_counted"]), 0, "the partner never counted")
+	assert_eq(int(coop["hits"]), 0, "one player never strikes the wrist: %s" % coop["first"])
 	assert_true(int(solo["hits"]) >= 10, "the same trials hurt the solo form")
 	var tree: Mangrove = _open(Defs.Difficulty.BEGINNER, 1, true)
 	var route: PackedInt32Array = Lab.parse_route(ROUTE_BEGINNER)
@@ -524,6 +747,21 @@ func _wait(ticks: int) -> void:
 		_lab.step(frame)
 
 
+## True while some hero projectile is still in flight (not spent, not on its way out of the tree).
+func _flying() -> bool:
+	for entity: SimEntity in _lab.level.get_kind(Defs.Kind.HERO_PROJECTILE):
+		var shot: ProjectileBase = entity as ProjectileBase
+		if shot != null and not shot.spent and not shot.is_queued_for_deletion():
+			return true
+	return false
+
+
+## Both heroes of a co-op test are players who have just pressed something (G33: they count for the co-op rules).
+func _wake_both() -> void:
+	_lab.wake(0)
+	_lab.wake(1)
+
+
 ## Put the upper hand at rest on the ledge for a long while.
 func _rest_hand(tree: Mangrove) -> void:
 	tree._hand = Mangrove.Hand.REST
@@ -531,81 +769,128 @@ func _rest_hand(tree: Mangrove) -> void:
 	tree._hand_pos = tree.hand_rest
 
 
-## One hero, launched from the springboard with a throwing weapon in hand: the first throw at the face, the second
-## turned towards the resting hand, over every start of both; the least ticks between a face hit and a hand hit.
+## One player (P1) with a throwing weapon - the spear, the axe, the swirling axe - throws at the face and then turns and
+## throws at the resting hand; the least ticks between a face hit and a hand hit. Two families of tries, over the starts
+## of both throws (forward or high): launched from the springboard (Up held through the landing: the co-op fist launches
+## at once, -224, past the face), and a jump from the lower ledge (since G35 the face, 76-105 px over the floor, and the
+## hand on its row-5 ledge share a height band). His partner P2 never presses anything (IDLE, G33) and stands, per trial,
+## by the resting hand on the upper ledge, on the lower ledge, on the floor, or lies on the floor as an egg. A trial ends
+## when both parts were hit, when the first hit lies a whole twin window back with no second one, or when both throws
+## are over and nothing flies any more.
 func _measure_solo_twin() -> Dictionary:
-	var tree: Mangrove = _open(Defs.Difficulty.BEGINNER, 1, true)
+	var tree: Mangrove = _open(Defs.Difficulty.BEGINNER, 2, true)
 	var hero: PlayerBase = _lab.hero()
-	_lab.step(PackedInt32Array([0]))
-	var result: Dictionary = {"best": 100000, "how": "", "trials": 0, "twins": 0}
-	var faces: Array[int] = []
-	var hands: Array[int] = []
+	var p2: PlayerBase = _lab.hero(1)
+	_lab.step(PackedInt32Array([0, 0]))
+	var result: Dictionary = {"best": 100000, "how": "", "trials": 0, "twins": 0, "partner_counted": 0}
+	var window: int = tree.twin_window()
+	var spots: Array[Vector2i] = [Vector2i(tree.hand_rest.x - 36, 80), Vector2i(60, 112), Vector2i(60, 160),
+		Vector2i(150, 160)]
+	var frame: PackedInt32Array = PackedInt32Array([0, 0])
+	var tries: Array[Dictionary] = []
 	for weapon: int in [Defs.Weapon.SPEAR, Defs.Weapon.AXE, Defs.Weapon.BOOMERANG]:
-		hero.run.set_weapon(weapon)
-		for first: int in range(1, 5):
-			for gap: int in range(6, 18):
+		for first: int in [1, 2, 3]:
+			for gap: int in [8, 12, 16, 20, 24]:
 				for variant: int in 4:
-					var high_first: bool = (variant & 1) != 0
-					var high: bool = (variant & 2) != 0
-					result["trials"] = int(result["trials"]) + 1
-					for entity: SimEntity in _lab.level.get_kind(Defs.Kind.HERO_PROJECTILE):
-						(entity as ProjectileBase).consume()
-					tree.hp = tree.max_hp
-					tree._fist = Mangrove.Fist.REST
-					tree._fist_x = tree.fist_rest_x
-					tree._fist_len = 100000
-					_rest_hand(tree)
-					tree._face_tick = -1
-					tree._hand_tick = -1
-					tree._part_tick.clear()
-					hero.respawn_at(Vector2i(206, 160))
-					hero.facing = 1
-					Lab.top_up(hero)
-					var launched: int = -1
-					var face_at: int = -1
-					var hand_at: int = -1
-					for t: int in 70:
-						var flags: int = 0
-						if launched < 0:
-							# Up held through the landing: the co-op fist launches him at once instead of the pin.
-							flags = Defs.IN_UP
-						else:
-							var k: int = t - launched
-							if k == 1:
-								flags = Defs.IN_RIGHT
-							elif k >= first + 1 and k < first + 1 + 7:
-								flags = Defs.IN_FIRE | (Defs.IN_UP if high_first else 0)
-							elif k == first + gap:
-								flags = Defs.IN_LEFT
-							elif k > first + gap and k < first + gap + 8:
-								flags = Defs.IN_FIRE | (Defs.IN_UP if high else 0)
-						_lab.step(PackedInt32Array([flags]))
-						if launched < 0 and hero.yvel <= -120:
-							launched = t
-						if face_at < 0 and tree._face_tick >= 0:
-							face_at = t
-						if hand_at < 0 and tree._hand_tick >= 0:
-							hand_at = t
-						if face_at >= 0 and hand_at >= 0:
-							break
-						if launched >= 0 and t - launched > first + gap + 8 and hero.is_grounded() \
-								and _lab.level.get_kind(Defs.Kind.HERO_PROJECTILE).is_empty():
-							break
-					if tree.hp < tree.max_hp:
-						result["twins"] = int(result["twins"]) + 1
-					if face_at >= 0 and hand_at >= 0 and absi(hand_at - face_at) < int(result["best"]):
-						result["best"] = absi(hand_at - face_at)
-						result["how"] = "weapon %d, throws %d and %d ticks after the launch%s%s" % [weapon, first + 1,
-							first + gap + 1, ", the first high" if high_first else "", ", the second high" if high else ""]
+					tries.append({"weapon": weapon, "ledge": false, "x": 206, "hold": 0, "first": first, "gap": gap,
+						"high_first": (variant & 1) != 0, "high": (variant & 2) != 0})
+		for x: int in [120, 140]:
+			for hold: int in [4, 9]:
+				for first: int in [1, 3, 5]:
+					for gap: int in [6, 8, 10, 12, 14]:
+						for high: bool in [false, true]:
+							tries.append({"weapon": weapon, "ledge": true, "x": x, "hold": hold, "first": first,
+								"gap": gap, "high_first": false, "high": high})
+	for one: Dictionary in tries:
+		var ledge: bool = bool(one["ledge"])
+		var first: int = int(one["first"])
+		var gap: int = int(one["gap"])
+		var hold: int = int(one["hold"])
+		var high_first: bool = bool(one["high_first"])
+		var high: bool = bool(one["high"])
+		var trial: int = int(result["trials"])
+		result["trials"] = trial + 1
+		if hero.run.weapon != int(one["weapon"]):
+			hero.run.set_weapon(int(one["weapon"]))
+		for entity: SimEntity in _lab.level.get_kind(Defs.Kind.HERO_PROJECTILE):
+			(entity as ProjectileBase).consume()
+		_lab.flush()
+		tree.hp = tree.max_hp
+		tree.hit_cooldown = 0
+		tree._fist = Mangrove.Fist.REST
+		tree._fist_x = tree.fist_rest_x
+		tree._fist_len = 100000
+		_rest_hand(tree)
+		tree._face_tick = -1
+		tree._hand_tick = -1
+		tree._part_tick.clear()
+		hero.respawn_at(Vector2i(int(one["x"]), 112 if ledge else 160))
+		hero.facing = 1
+		Lab.top_up(hero)
+		_lab.wake(0)
+		var pick: int = trial % spots.size()
+		p2.respawn_at(spots[pick])
+		if pick == spots.size() - 1:
+			p2.go_down(&"voluntary")
+		# The ledge jump starts at once; the springboard's script starts when the launch is seen.
+		var launched: int = 0 if ledge else -1
+		var face_at: int = -1
+		var hand_at: int = -1
+		for t: int in 70:
+			var flags: int = 0
+			if launched < 0:
+				# Up held through the landing: the co-op fist launches him at once instead of the pin.
+				flags = Defs.IN_UP
+			else:
+				var k: int = t - launched
+				if ledge and k < hold:
+					flags = Defs.IN_UP
+				if not ledge and k == 1:
+					flags = Defs.IN_RIGHT
+				elif k >= first + 1 and k < first + 1 + 7:
+					flags |= Defs.IN_FIRE | (Defs.IN_UP if high_first else 0)
+				elif k == first + gap:
+					flags = Defs.IN_LEFT
+				elif k > first + gap and k < first + gap + 8:
+					flags = Defs.IN_FIRE | (Defs.IN_UP if high else 0)
+			frame[0] = flags
+			_lab.step(frame)
+			if p2.counts_for_coop():
+				result["partner_counted"] = int(result["partner_counted"]) + 1
+			if launched < 0 and hero.yvel <= -120:
+				launched = t
+			if face_at < 0 and tree._face_tick >= 0:
+				face_at = t
+			if hand_at < 0 and tree._hand_tick >= 0:
+				hand_at = t
+			if face_at >= 0 and hand_at >= 0:
+				break
+			var lone: int = face_at if hand_at < 0 else hand_at
+			if lone >= 0 and t - lone > window:
+				break
+			if launched >= 0 and t - launched > first + gap + 8 and not _flying():
+				break
+		if tree.hp < tree.max_hp:
+			result["twins"] = int(result["twins"]) + 1
+		if face_at >= 0 and hand_at >= 0 and absi(hand_at - face_at) < int(result["best"]):
+			result["best"] = absi(hand_at - face_at)
+			result["how"] = "weapon %d, %s, throws %d and %d ticks after it%s%s" % [int(one["weapon"]),
+				"a jump from the lower ledge at x %d (Up %d)" % [int(one["x"]), hold] if ledge else "the springboard",
+				first + 1, first + gap + 1, ", the first high" if high_first else "", ", the second high" if high else ""]
 	return result
 
 
-## One hero against the stuck fist of stage 3 from both sides, every weapon, forward / high / low strikes standing and
-## out of jumps.
-func _search_fist(coop_form: bool) -> Dictionary:
-	var tree: Mangrove = _open(Defs.Difficulty.BEGINNER, 1, coop_form)
+## One player (P1) against the stuck fist of stage 3 from both sides, every weapon, forward / high / low strikes standing
+## and out of jumps. `partner`: P2 never presses anything (IDLE, G33) and stands, per trial, on the floor on the far
+## side of the fist (nearer to it than P1: the bait a dozing body would be), further out on the far side, on the lower
+## ledge, or lies on the far side as an egg.
+func _search_fist(coop_form: bool, partner: bool) -> Dictionary:
+	var tree: Mangrove = _open(Defs.Difficulty.BEGINNER, 2 if partner else 1, coop_form)
 	var hero: PlayerBase = _lab.hero()
-	var result: Dictionary = {"trials": 0, "hits": 0, "first": ""}
+	var p2: PlayerBase = _lab.hero(1) if partner else null
+	var frame: PackedInt32Array = PackedInt32Array([0, 0]) if partner else PackedInt32Array([0])
+	var result: Dictionary = {"trials": 0, "hits": 0, "first": "", "idle_trials": 0, "egg_trials": 0,
+		"partner_counted": 0}
 	var start_hp: int = tree.stage_hits[tree.stage_hits.size() - 1]
 	for weapon: int in [Defs.Weapon.CLUB, Defs.Weapon.HAMMER, Defs.Weapon.AXE, Defs.Weapon.BOOMERANG,
 			Defs.Weapon.SPEAR]:
@@ -613,15 +898,29 @@ func _search_fist(coop_form: bool) -> Dictionary:
 		for dx: int in [-56, -44, -32, -20, 20, 32, 44, 56]:
 			for macro: Array in [[12, Defs.IN_FIRE], [12, Defs.IN_UP | Defs.IN_FIRE], [12, Defs.IN_DOWN | Defs.IN_FIRE],
 					[-1, Defs.IN_FIRE]]:
-				result["trials"] = int(result["trials"]) + 1
+				var trial: int = int(result["trials"])
+				result["trials"] = trial + 1
 				for entity: SimEntity in _lab.level.get_kind(Defs.Kind.HERO_PROJECTILE):
 					(entity as ProjectileBase).consume()
+				_lab.flush()
 				tree.hp = start_hp
 				tree.hit_cooldown = 0
 				tree._part_tick.clear()
 				hero.respawn_at(Vector2i(tree.fist_out_x + dx, 160))
 				hero.facing = -signi(dx)
 				Lab.top_up(hero)
+				if partner:
+					_lab.wake(0)
+					var spots: Array[Vector2i] = [Vector2i(tree.fist_out_x - signi(dx) * 14, 160),
+						Vector2i(tree.fist_out_x - signi(dx) * 40, 160), Vector2i(100, 112),
+						Vector2i(tree.fist_out_x - signi(dx) * 24, 160)]
+					var pick: int = trial % spots.size()
+					p2.respawn_at(spots[pick])
+					if pick == spots.size() - 1:
+						p2.go_down(&"voluntary")
+						result["egg_trials"] = int(result["egg_trials"]) + 1
+					else:
+						result["idle_trials"] = int(result["idle_trials"]) + 1
 				for t: int in 34:
 					tree._stage = 3
 					tree._fist = Mangrove.Fist.STUCK
@@ -633,11 +932,15 @@ func _search_fist(coop_form: bool) -> Dictionary:
 								(Defs.IN_FIRE if t < 18 else 0)
 					elif t >= int(macro[0]):
 						flags = 0
-					_lab.step(PackedInt32Array([flags]))
+					frame[0] = flags
+					_lab.step(frame)
+					if partner and p2.counts_for_coop():
+						result["partner_counted"] = int(result["partner_counted"]) + 1
 				if tree.hp < start_hp:
 					result["hits"] = int(result["hits"]) + 1
 					if str(result["first"]) == "":
-						result["first"] = "weapon %d from dx %d" % [weapon, dx]
+						result["first"] = "weapon %d from dx %d%s" % [weapon, dx, " partner at %s" % p2.sim_pos \
+								if partner else ""]
 	_fresh()
 	return result
 
@@ -655,7 +958,7 @@ class MangroveBot:
 	extends RefCounted
 
 	const LEDGE_Y: int = 112
-	const UPPER_Y: int = 64
+	const UPPER_Y: int = 80
 	const UPPER_SAFE: int = 26
 	const LEDGE_END: int = 143
 	const LEDGE_SPOT: int = 112
@@ -776,7 +1079,8 @@ class MangroveBot:
 			return Defs.IN_RIGHT if LEDGE_SPOT > x else Defs.IN_LEFT
 		return 0
 
-	## After the springboard: drift to the wall, high strike at the apex, then away to the left and back to the ledge.
+	## After the springboard: a forward strike at once while drifting to the wall (since G35 the launch rises through the
+	## face, 76-105 px over the floor), then away to the left and back to the ledge.
 	func _launch_tick(hero: PlayerBase) -> int:
 		_launched += 1
 		if hero.is_grounded() and _launched > 4:
@@ -786,9 +1090,9 @@ class MangroveBot:
 				return Defs.IN_LEFT | Defs.IN_UP
 			return 0
 		if _launched == 2:
-			return Defs.IN_RIGHT
-		if _launched >= 3 and _launched < 12:
-			return Defs.IN_UP | Defs.IN_FIRE
+			return Defs.IN_RIGHT | Defs.IN_FIRE
+		if _launched >= 3 and _launched < 11:
+			return Defs.IN_FIRE
 		return Defs.IN_LEFT
 
 	func _start_jump(direction: int, hold: int) -> void:

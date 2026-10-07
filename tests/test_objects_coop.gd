@@ -1051,6 +1051,11 @@ func load_coop_level() -> Level:
 	made.setup_from_text(COOP_LEVEL, FileAccess.get_file_as_string(Levels.get_level_path(COOP_LEVEL)))
 	add_node(made)
 	made.set_view_size(Vector2i(Tuning.VIEW_W, Tuning.VIEW_H) * Tuning.ART_SCALE)
+	# Both players are at their pads (the phase-3 IDLE rule, PlayerBase.is_idle: a hero whose player never pressed
+	# anything counts for no co-op rule): as if each had just pressed a key. The tests below stay under 10 s of
+	# stillness (tests/test_objects_idle.gd covers the rule itself).
+	for who: PlayerBase in made.contact_order():
+		who.gave_input = true
 	real = made
 	return made
 

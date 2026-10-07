@@ -18,6 +18,10 @@ extends RefCounted
 ## keeper / drum / bond pairing, the trait share, keeper and Guard halls exactly 4 rows high, the gate count per
 ## stage kind, the static solo-impossibility rules around boost ledges, and the arena checks (size, the HUD row,
 ## spawns, cookpots, Clubball goals, forbidden objects, wrap seams, spots, gaps).
+## Phase 3: bonded pairs one thrown special hits together are errors (G36: a bond or drum pair whose solo minimum would
+## be 0); a lee gap without a crouching spot on its far side is a warning (G41, optional); the arena signature keys
+## `dark_pulse`, `regrow`, `ember_lane` (VersusSignatures), one neutral `bosses/colossus` per arena (G43), and the
+## kid-safe rule of a Syrup flood arena (no deadly cell).
 
 const ERROR: int = 0
 const WARNING: int = 1
@@ -299,6 +303,18 @@ const REACH_COLS: int = 10
 const REACH_ROWS: int = 11
 ## No bark board within this many cells of any gate (a spear step would climb it).
 const BARK_GATE_CELLS: int = 12
+## Arena meta keys of the signatures the referee runs (VersusSignatures; not in LevelData.META_KEYS yet).
+const ARENA_SIGNATURE_KEYS: Array[String] = ["dark_pulse", "regrow", "ember_lane"]
+## The one boss an arena may hold: the neutral Colossus of Colossus Hall (G43).
+const ARENA_BOSS_ID: String = "bosses/colossus"
+## Cells that kill (a Syrup flood arena is kid-safe: none of them, LEVEL_DESIGN.md 15.8 / DESIGN.md E.5 Sky Picnic).
+const DEADLY_CHARS: String = "~^!+"
+## Thrown specials fly this many ticks in the bonded-pair rule (about 520 px at 13 px per tick: G36).
+const THROW_TICKS: int = 40
+## The lee (PHYSICS.md C.6 "Lee", P-C.6; PartyDriver.LEE_REACH_PX): gust gaps up to this many cells (LEVEL_DESIGN.md
+## 15.7.3), sheltered within LEE_REACH_PX downwind of a croucher.
+const LEE_GAP_MAX_CELLS: int = 3
+const LEE_REACH_PX: int = 64
 ## Things a single hero could climb on near a ledge gate (enemies are checked by category).
 const BOOSTERS: Array[String] = [
 	"objects/spring", "objects/geyser", "objects/vine", "objects/bark_board", "items/glider", "objects/platform",
@@ -463,6 +479,9 @@ func _check_meta_value(data: LevelData, key: String, value: Variant) -> void:
 	if parts.size() > 2 or (parts.size() == 2 and not LevelData.DIFFICULTIES.has(parts[1])):
 		_add(path, line, ERROR, "'%s': a variant suffix must be .beginner or .expert" % key)
 		return
+	if ARENA_SIGNATURE_KEYS.has(base):
+		_check_signature_key(data, path, line, key, base, str(value))
+		return
 	if not LevelData.META_KEYS.has(base):
 		_add(path, line, WARNING, "unknown meta key '%s'" % key)
 		return
@@ -551,6 +570,31 @@ func _check_meta_value(data: LevelData, key: String, value: Variant) -> void:
 			_check_int(path, line, key, value, 0, 99999)
 		"id", "name", "format", "author", "notes":
 			pass
+
+
+## An arena signature key (VersusSignatures): `dark_pulse = <period>[:<night>]`, `regrow = <ticks>`,
+## `ember_lane = <col>,<width>[,<period>]`; only arenas run them.
+func _check_signature_key(data: LevelData, path: String, line: int, key: String, base: String, text: String) -> void:
+	if str(data.value("kind")) != LevelText.KIND_ARENA:
+		_add(path, line, WARNING, "'%s' is an arena signature: only an arena (kind = arena) runs it" % key)
+	match base:
+		"dark_pulse":
+			var parts: PackedStringArray = text.split(":")
+			var ok: bool = parts.size() >= 1 and parts.size() <= 2 and parts[0].is_valid_int() and parts[0].to_int() > 1
+			if ok and parts.size() == 2:
+				ok = parts[1].is_valid_int() and parts[1].to_int() >= 1 and parts[1].to_int() < parts[0].to_int()
+			if not ok:
+				_add(path, line, ERROR, "%s = %s must be <period>[:<night ticks>] with the night shorter than the period" % [
+					key, text])
+		"regrow":
+			if not text.is_valid_int() or text.to_int() <= 0:
+				_add(path, line, ERROR, "%s = %s must be the ticks after which a broken '$' grows back (> 0)" % [key, text])
+		"ember_lane":
+			var values: PackedInt32Array = LevelText.to_int_list(text)
+			if values.size() < 2 or values.size() > 3 or values[0] < 0 or values[1] < 1 \
+					or values[0] + values[1] > maxi(data.cols, 1) or (values.size() == 3 and values[2] <= 12):
+				_add(path, line, ERROR, "%s = %s must be <col>,<width>[,<period>] inside the arena (period > 12)" % [
+					key, text])
 
 
 ## Format-2 rules of the header (ARCHITECTURE.md 7.11): a co-op file names its solo level and that file's hash, an
@@ -1021,7 +1065,9 @@ func _check_content(data: LevelData, grid: TileGrid) -> void:
 			if campaign:
 				_check_trait_share(data, records, difficulty)
 			_check_ledge_reach(data, records, tablets, difficulty)
+			_check_bonded_pairs(data, records, difficulty)
 		_check_halls(data, grid, records)
+		_check_lee_gaps(data, grid)
 	elif kind == LevelText.KIND_ARENA:
 		_check_arena(data, grid, records)
 
@@ -1197,6 +1243,123 @@ func _check_pairings(data: LevelData, records: Array[Dictionary]) -> void:
 		if (bonds[bond] as Array).size() < 2:
 			_add(data.path, int((bonds[bond] as Array)[0]["line"]), ERROR,
 					"bond '%s' has one member: a bond links two or more enemies" % bond)
+
+
+## G36 (orchestrator): no bond where one thrown special can hit two members in one throw - a member pair of an enemy
+## `bond=` or a drum `bond=` whose solo minimum would be 0 (CoopSearch.pair_solo_min). The axe, the swirling axe and the
+## spear pass walls, so the test is the flight lines from every strike spot of one member ([method strike_spots], the
+## grid at rest of `difficulty`) through the other member's cell ([method throw_crosses]).
+func _check_bonded_pairs(data: LevelData, records: Array[Dictionary], difficulty: int) -> void:
+	var groups: Dictionary = {}   # "enemy bond" / "drum bond" name -> [records]
+	for record: Dictionary in records:
+		var params: Dictionary = record["params"]
+		if not params.has("bond") or not LevelText.applies_to(params, difficulty):
+			continue
+		var id: String = String(record["id"])
+		if id == "objects/drum":
+			_append_to(groups, "drum bond '%s'" % str(params["bond"]), record)
+		elif Spawner.category(StringName(id)) == "enemies":
+			_append_to(groups, "bond '%s'" % str(params["bond"]), record)
+	if groups.is_empty():
+		return
+	var grid: TileGrid = data.build_grid(difficulty)
+	for group: String in groups:
+		var members: Array = groups[group]
+		for i: int in members.size():
+			for j: int in range(i + 1, members.size()):
+				var a: Vector2i = Vector2i(int(members[i]["col"]), int(members[i]["row"]))
+				var b: Vector2i = Vector2i(int(members[j]["col"]), int(members[j]["row"]))
+				if throw_crosses(strike_spots(grid, a), b) or throw_crosses(strike_spots(grid, b), a):
+					_add(data.path, int(members[j]["line"]), ERROR,
+							"%s (%s): one thrown special from beside the member at %d,%d also hits the member at %d,%d - one hero strikes both at once (G36: put them on rows no single throw line crosses, or use another trait)" % [
+							group, Defs.difficulty_name(difficulty), a.x, a.y, b.x, b.y])
+
+
+## Feet points from which a strike reaches the cell `target`: standing cells one or two columns beside it, with the
+## target up to two rows above the feet row (forward, high and low boxes, PHYSICS.md 8.2). Shared with the solo
+## search (CoopSearch.strike_spots).
+static func strike_spots(grid: TileGrid, target: Vector2i) -> Array[Vector2i]:
+	var spots: Array[Vector2i] = []
+	for dc: int in [-2, -1, 1, 2]:
+		for dr: int in [0, 1, 2]:
+			var cell: Vector2i = Vector2i(target.x + dc, target.y + dr)
+			if not grid.in_bounds(cell.x, cell.y + 1) or grid.side_at(cell.x, cell.y) == TileGrid.SIDE_WALL:
+				continue
+			if TileGrid.is_ground(grid.floor_at(cell.x, cell.y + 1)):
+				spots.append(LevelText.cell_to_feet(float(cell.x), float(cell.y)))
+	return spots
+
+
+## True when an axe, a swirling axe or a spear thrown either way from one of `spots` (no tile collision: they pass
+## walls, PHYSICS.md 8.4 / C.3) crosses the cell `target` within THROW_TICKS ticks. Shared with the solo search
+## (CoopSearch.throw_crosses).
+static func throw_crosses(spots: Array[Vector2i], target: Vector2i) -> bool:
+	var box: Rect2i = Rect2i(target.x * Tuning.TILE, target.y * Tuning.TILE, Tuning.TILE, Tuning.TILE)
+	for spot: Vector2i in spots:
+		for facing: int in [1, -1]:
+			for kind: int in [Defs.Weapon.AXE, Defs.Weapon.BOOMERANG, Defs.Weapon.SPEAR]:
+				var pos: Vector2i = spot + Vector2i(facing * 20, -16)
+				var xvel: int = (Tuning.SPEAR_XVEL if kind == Defs.Weapon.SPEAR else Tuning.THROW_XVEL) * facing
+				var yvel: int = Tuning.AXE_YVEL if kind == Defs.Weapon.AXE else (Tuning.BOOMERANG_YVEL
+						if kind == Defs.Weapon.BOOMERANG else 0)
+				for t: int in THROW_TICKS:
+					pos += Vector2i(Tuning.floor16(xvel), Tuning.floor16(yvel))
+					match kind:
+						Defs.Weapon.AXE:
+							yvel += Tuning.AXE_YACC
+						Defs.Weapon.BOOMERANG:
+							yvel += Tuning.BOOMERANG_YACC
+						_:
+							if t >= Tuning.SPEAR_FLAT_TICKS:
+								yvel = mini(yvel + 16, Tuning.SPEAR_FALL_MAX)
+					if Overlap.rects(Rect2i(pos.x - 8, pos.y - 16, 16, 16), box):
+						return true
+	return false
+
+
+## G41 (optional, a warning): a gust gap of a co-op file - a run of 1..LEE_GAP_MAX_CELLS cells without a floor
+## between two floors of one row, in a file with wind - whose far side (upwind: the wind blows from it into the gap)
+## offers no crouching spot at its edge: the croucher of a lee leapfrog stands there, LEE_REACH_PX upwind of his
+## partner at the near edge (P-C.6 "Lee": only an ACTIVE croucher shelters, so no idle body does it for one player).
+## Both directions are checked when the wind script blows both ways.
+func _check_lee_gaps(data: LevelData, grid: TileGrid) -> void:
+	var signs: Dictionary = {}
+	for difficulty: int in [Defs.Difficulty.BEGINNER, Defs.Difficulty.EXPERT]:
+		for entry: Vector2i in data.wind_script(difficulty):
+			if entry.y != 0:
+				signs[signi(entry.y)] = true
+	if signs.is_empty():
+		return
+	var reported: Dictionary = {}
+	for row: int in range(1, grid.rows):
+		var col: int = 0
+		while col < grid.cols:
+			if _ground(grid, col, row):
+				col += 1
+				continue
+			var first: int = col
+			while col < grid.cols and not _ground(grid, col, row):
+				col += 1
+			var width: int = col - first
+			if first == 0 or col >= grid.cols or width > LEE_GAP_MAX_CELLS:
+				continue
+			# A gap [first, col - 1] between the floors at first - 1 and col (row `row` is the floor row).
+			for wind_sign: int in signs:
+				# A positive wind blows leftwards (PHYSICS.md 13.1): the far (upwind) side is the right one.
+				var far_col: int = col if wind_sign > 0 else first - 1
+				var spot: Vector2i = Vector2i(far_col, row - 1)
+				var crouch: bool = grid.side_at(spot.x, spot.y) != TileGrid.SIDE_WALL \
+						and grid.floor_at(spot.x, spot.y) != TileGrid.FLOOR_DEADLY
+				if not crouch and not reported.has(Vector3i(first, row, wind_sign)):
+					reported[Vector3i(first, row, wind_sign)] = true
+					_add(data.path, data.row_lines[row] if row < data.row_lines.size() else 0, WARNING,
+							"gust gap at columns %d-%d over row %d: no crouching spot on its far (%s) edge within %d px of the near edge - no lee leapfrog there (G41)" % [
+							first, col - 1, row, "right" if wind_sign > 0 else "left", LEE_REACH_PX])
+
+
+## True when (col, row) is ground a hero may land on (not a deadly floor).
+static func _ground(grid: TileGrid, col: int, row: int) -> bool:
+	return TileGrid.is_ground(grid.floor_at(col, row)) and grid.floor_at(col, row) != TileGrid.FLOOR_DEADLY
 
 
 ## The x2 tablets of one difficulty (LEVEL_DESIGN.md 15.7.4): each names its gate (`gate=`) or marks a secret, has
@@ -1430,12 +1593,20 @@ func _check_arena(data: LevelData, grid: TileGrid, records: Array[Dictionary]) -
 	var coconuts: int = 0
 	var goals: Dictionary = {}
 	var spots: int = 0
+	var bosses: int = 0
 	for record: Dictionary in records:
 		var id: String = String(record["id"])
 		var params: Dictionary = record["params"]
 		var line: int = int(record["line"])
 		if ARENA_FORBIDDEN.has(id):
 			_add(path, line, ERROR, "'%s' has no place in an arena (no exit, checkpoint or co-op object)" % id)
+		if Spawner.category(StringName(id)) == "bosses":
+			bosses += 1
+			if id != ARENA_BOSS_ID:
+				_add(path, line, ERROR, "'%s' has no place in an arena: its one boss is the neutral %s (G43)" % [id,
+						ARENA_BOSS_ID])
+			elif bosses > 1:
+				_add(path, line, ERROR, "an arena holds one neutral %s (G43)" % ARENA_BOSS_ID)
 		match id:
 			"objects/spawn_point":
 				var index: int = int(params.get("index", 0))
@@ -1474,6 +1645,8 @@ func _check_arena(data: LevelData, grid: TileGrid, records: Array[Dictionary]) -
 		for team: int in [1, 2]:
 			if not goals.has(team):
 				_add(path, tiles_line, ERROR, "Clubball needs a zones/goal team=%d" % team)
+	if str(data.value("sudden")) == "syrup_flood":
+		_check_kid_safe(data, records)
 	if spots < VersusTuning.ARENA_SPOTS_MIN or spots > VersusTuning.ARENA_SPOTS_MAX:
 		_add(path, tiles_line, WARNING, "%d hidden spots: an arena has %d-%d visible ones" % [
 			spots, VersusTuning.ARENA_SPOTS_MIN, VersusTuning.ARENA_SPOTS_MAX])
@@ -1499,6 +1672,21 @@ func _check_arena(data: LevelData, grid: TileGrid, records: Array[Dictionary]) -
 		if gap > VersusTuning.ARENA_GAP_MAX_CELLS:
 			_add(path, data.row_lines[row] if row < data.row_lines.size() else tiles_line, WARNING,
 					"a clear gap of %d cells in row %d (at most %d in an arena)" % [gap, row, VersusTuning.ARENA_GAP_MAX_CELLS])
+
+
+## A Syrup flood arena is kid-safe (DESIGN.md E.5 Sky Picnic: no deaths): no liquid, spike or kill cell, no
+## zones/kill (warnings, DA's wf9 #4).
+func _check_kid_safe(data: LevelData, records: Array[Dictionary]) -> void:
+	for row: int in data.rows.size():
+		var text: String = data.rows[row]
+		for i: int in text.length():
+			if DEADLY_CHARS.contains(text[i]):
+				_add(data.path, data.row_lines[row] if row < data.row_lines.size() else 0, WARNING,
+						"sudden = syrup_flood (kid-safe, no deaths): '%s' at column %d of row %d kills" % [text[i], i, row])
+				break
+	for record: Dictionary in records:
+		if String(record["id"]) == "zones/kill":
+			_add(data.path, int(record["line"]), WARNING, "sudden = syrup_flood (kid-safe, no deaths): zones/kill kills")
 
 
 ## The widest run of cells without a floor between two floor cells of one row (0 when the row has fewer than two).

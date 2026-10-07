@@ -4,7 +4,8 @@ extends SimEntity
 ## 13.9.7): a pressure plate of `w` [2] floor cells. Its anchor is the LEFT cell (the air cell above the floor, as for
 ## every multi-cell object anchored at its bottom-left cell); it reaches `w` cells to the right.
 ##
-## Weight (CONTACT_ITEMS phase, after every hero moved): each hatched hero (alive, not an egg) whose feet point lies
+## Weight (CONTACT_ITEMS phase, after every hero moved): each counted hero (PlayerBase.counts_for_coop: alive, not an
+## egg, not IDLE - the phase-3 IDLE rule: a hero with no input of his own for 10 s weighs nothing) whose feet point lies
 ## over its cells, on its floor or at most ObjTuning.PLATE_FEET_SLACK_PX above it and not rising, weighs
 ## PartyTuning.PLATE_WEIGHT_HERO; a mount (Chomper, through its driver's seat) PLATE_WEIGHT_CHOMPER; an
 ## objects/boulder_heavy resting on it PLATE_WEIGHT_BOULDER. Enemies and eggs weigh nothing, so an egg can never solve
@@ -154,13 +155,18 @@ func measure_weight(level: LevelBase) -> int:
 	var total: int = 0
 	holder_mask = 0
 	for hero: PlayerBase in level.contact_order():
-		if not hero.is_party_targetable():
+		# 2.0 IDLE rule: a dozing hero (PlayerBase.counts_for_coop) weighs nothing - nor does the mount he drives.
+		if not hero.counts_for_coop():
 			continue
 		if hero.is_mounted():
-			# The mount weighs for its riders (counted once, through the driver).
+			# The mount weighs for its riders (counted once, through the driver - or through the gunner while the
+			# driver does not count: idle).
 			var mount: SimEntity = hero.mount
-			if hero.mount_seat == PlayerBase.SEAT_DRIVER and is_instance_valid(mount) \
-					and feet_on(mount.sim_pos.x, mount.sim_pos.y):
+			var counts: bool = hero.mount_seat == PlayerBase.SEAT_DRIVER
+			if not counts and is_instance_valid(mount):
+				var driver: Variant = mount.get(&"driver")
+				counts = driver is PlayerBase and (driver as PlayerBase).is_idle()
+			if counts and is_instance_valid(mount) and feet_on(mount.sim_pos.x, mount.sim_pos.y):
 				total += PartyTuning.PLATE_WEIGHT_CHOMPER
 				holder_mask |= 1 << hero.slot
 			continue

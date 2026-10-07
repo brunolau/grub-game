@@ -12,9 +12,10 @@ extends HittableBase
 ## ticks, so the other drums must be hit on ticks t0 .. t0 + W - 1.
 ##
 ## The bond's state lives on its first drum in registration order, the leader ([method bond_drums]). The count-in:
-## while a hatched hero stands within ObjTuning.COUNT_IN_REACH_PX of every drum of the bond (not all of them the same
-## hero) the leader plays three blips ObjTuning.COUNT_IN_SPACING_TICKS apart, then "go" (presentation only; nothing
-## needs two inputs on the same tick).
+## while a hatched hero who is not IDLE (PlayerBase.counts_for_coop) stands within ObjTuning.COUNT_IN_REACH_PX of every
+## drum of the bond (not all of them the same hero) the leader plays three blips ObjTuning.COUNT_IN_SPACING_TICKS
+## apart, then "go" (presentation only; nothing needs two inputs on the same tick). 2.0 IDLE rule: a hit made by an
+## idle hero (his box, throw or ball; [method _idle_source]) lights nothing.
 ##
 ## Enemies may share the `bond=` registry (LevelBase.get_tagged): only Drum members count here.
 ##
@@ -105,10 +106,21 @@ func take_hit(_power: int, source: SimEntity) -> bool:
 	var level: LevelBase = Game.level
 	if level != null:
 		level.spawn_fx(&"fx/star_puff", get_hit_point())
-		if not succeeded:
+		if not succeeded and not _idle_source(level, source):
 			_light(level)
 	_show()
 	return true
+
+
+## 2.0 IDLE rule: true when the hit was made by an IDLE hero (PlayerBase.is_idle) - his own box or ball (`source` is
+## the hero) or a projectile of his slot.
+static func _idle_source(level: LevelBase, source: SimEntity) -> bool:
+	if source is PlayerBase:
+		return (source as PlayerBase).is_idle()
+	if source is ProjectileBase and source.get_kind() == Defs.Kind.HERO_PROJECTILE:
+		var owner: PlayerBase = level.get_hero((source as ProjectileBase).owner_slot)
+		return owner != null and owner.is_idle()
+	return false
 
 
 func get_hit_point() -> Vector2i:
@@ -234,7 +246,7 @@ func _heroes_ready(level: LevelBase, drums: Array[Drum]) -> bool:
 	for drum: Drum in drums:
 		var near: int = 0
 		for hero: PlayerBase in level.contact_order():
-			if hero.is_party_targetable() \
+			if hero.counts_for_coop() \
 					and absi(hero.sim_pos.x - drum.sim_pos.x) <= ObjTuning.COUNT_IN_REACH_PX \
 					and absi(hero.sim_pos.y - drum.sim_pos.y) <= ObjTuning.COUNT_IN_REACH_PX:
 				near |= 1 << hero.slot

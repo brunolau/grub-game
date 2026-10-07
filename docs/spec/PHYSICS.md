@@ -1435,7 +1435,8 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
   ticks [R4] (entry ticks count from the start of each round). Bosses (the Storm Roc) set `level.wind` themselves.
   Outside the ice biome the wind shows as gust streaks instead of snow.
 - **Lee** (co-op only) [G23]: in `WEAPONS`, before any hero moves, a hero of `H` (C.13) is **sheltered** on this tick
-  when his feet are 0..64 px downwind of the feet of a partner of `H` who is in the crouch state (5, not crawl) with
+  when his feet are 0..64 px downwind of the feet of an active partner of `H` (C.10; a crouch is input, so a croucher
+  is never idle [G41]) who is in the crouch state (5, not crawl) with
   ground or a platform under him (downwind = to the croucher's left while `wind > 0`, to his right while `wind < 0`),
   at most 16 px above or below them; a hero sheltered on the previous tick stays sheltered while airborne until he has
   ground, a platform or a carrier under his feet again, or the wind changes sign (a jump taken in the lee crosses the
@@ -1471,7 +1472,7 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
 - **Paddling**: when a hero standing on the raft finishes a **forward** strike (its last tick), `rx = clamp(rx -
   16 * facing, -48, 48)`: the raft is pushed backward, up to 3 px/tick of its own speed (plus the current).
 - Each rider dips the raft 2 px (drawing only; the ride top does not move).
-- **Boarding from above** (G2 integration, DESIGN.md G29): the deck is only 4 px over the liquid cell and the ride
+- **Boarding from above** (G2 integration) [G29]: the deck is only 4 px over the liquid cell and the ride
   test runs in `PLATFORMS`, before the hero's own move; so when a hero's tile collision finds a liquid floor cell, a
   raft whose ride band his feet were in or over before this tick's y step and whose deck they are at or under now,
   inside its ride width (the 11.4 overlap with the ride box), catches him first: he rides it (`ride_platform`,
@@ -1497,6 +1498,11 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
   row; the camera's top y (px) is then `min(candidate, band_top + 16 - 176, previous)`: the view never moves down,
   rises at least with the band (whose top row is then the view's bottom row), and rises faster when a hero climbs
   ahead (the band may then be below the view). Horizontal follow is unchanged.
+- **Footing follow** [G42] (asked of world-A at the start of phase 3): while the band rises, the candidate row of the
+  vertical follow is computed from the hero's **footing** - his feet y on the last tick he had ground, a platform, a
+  carrier or a vine (CLIMB) under his feet - not from his current y (co-op: the anchor's footing, C.13), so a jump's
+  apex never raises the view and a jump in place lands in view. Until it is built the view follows the current y and
+  every jump of a rising climb must land higher (DESIGN.md G32; LEVEL_DESIGN 15.5).
 - `zones/autoscroll_stop`: the first hero to enter it stops the rise for the rest of the stage (the band stays and
   stays deadly) and the camera returns to the normal follow.
 - 16 v16 is 1 px/tick; a hero climbs a vine at 2 px/tick and walks at 5.
@@ -1561,15 +1567,25 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
   with `yvel >= 0`, not gliding, climbing, curled, a ball, an egg, mounted, already riding, nor in a drop lock, and
   each other hatched hero B in slot order: if `Overlap.body(A, B, A)` and `Overlap.stomp` (2.2: B is the lower
   object, so the stomp flag means A's feet are in the top half of B's box, or A falls at 8 px/tick or more), then
-  **Shoulder Hop** if A holds UP and B is **active**, else **Totem Ride**; if A holds UP and B is not active there is
-  no head contact at all (A passes through, as heroes do) [G1]. No Totem Ride on a curled or a mounted B (the hop
-  still works on a curled one) [G7]. At most one head contact per hero per tick.
-- **Active**: a hatched hero is active once his own slot held any input flag on a tick since he last became hatched
-  (the level start, a team-wipe respawn, a hatch by a box, a stomp or a checkpoint); going down (an egg, a death toss)
-  clears it (`PartyDriver.is_active`). An idle partner is thus passed through with UP held and carries a Totem Ride
-  without: from a still carrier that reaches 98 px, below every boost ledge, and a Totem launch needs the carrier's own
-  jump, which makes him active. Together with the hatch bounce of C.12 (b) this is the rule **an egg is no
-  springboard**: one player can never use his partner's egg or idle body as a step.
+  - if A and B are both **active**: **Shoulder Hop** if A holds UP, else **Totem Ride**;
+  - otherwise there is no head contact at all: A passes through, as heroes do, UP held or not [G1] [G33].
+  No Totem Ride on a curled or a mounted B (the hop still works on a curled one) [G7]. At most one head contact per
+  hero per tick.
+- **Idle** [G33] (orchestrator decision of phase 3; `PlayerBase.input_idle_ticks`, `is_idle()`, `counts_for_coop()`):
+  per co-op hero, `input_idle_ticks` counts the ticks since his own slot held any input flag (`GameInput.get_flags(slot)
+  != 0`; the egg's nudge counts), capped at 243 (`IDLE_TICKS`, 10 s); a hatch, a carry, a bump, a launch, a
+  respawn, a checkpoint and a team wipe never reset it. A hero is **idle** while `input_idle_ticks >= 243` or while
+  his slot has held no flag since he entered the level (a level start, a join, a restart at the checkpoint): an
+  untouched partner never counts, not even in the first 243 ticks. He is drawn dozing ("Zzz", drawing only) once
+  `input_idle_ticks` reaches 243 on a hatched living hero, until his next input. Never in single-player or versus.
+- **Active**: hatched (in `H`) and not idle (`PlayerBase.counts_for_coop()`); for the head contacts above also: his
+  own slot held some input flag since he last became hatched (the level start, a team-wipe respawn, a hatch by a box,
+  a stomp or a checkpoint; `PartyDriver.is_active`, the G1 rule). Every co-op rule counts only active heroes: head contacts (above), the Totem carry (a ride ends on the tick K or R stops being
+  active), the Brace Wall, the lee (C.6), plate and pulley weight, see-saw launches, x2 tablet lights, count-ins, the
+  trait rules that ask for "the nearer hero" and every boss position rule (GAMEPLAY 13.6, 13.9). An idle hero is still
+  a body: he stands, is launched (geysers, see-saw ends), rides platforms, is hurt, goes down and is leashed. Together
+  with the hatch bounce of C.12 (b) this is the rule **an egg is no springboard**: one player can never use his
+  partner's egg or idle body as a step, a weight or a bait.
 - **Shoulder Hop**: `A.bounce(-224, depth)` - exactly the enemy bounce of section 9 (`yvel = -224`,
   `fall_ticks = 0`, `y -= depth`; A's `no_jump` stays armed); B is unaffected; any state of an active B counts,
   airborne too ("as on an enemy"). From a standing partner A rises 105 px from the head and his feet reach **140 px**
@@ -1581,7 +1597,8 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
   - **Carry** (`PartyDriver` step a, before new contacts, every tick): `dx, dy` = K's motion this tick (`sim_pos -
     sim_prev`). The ride ends if R jumped (`R.yvel - totem_carry_yvel < -16`, his speed measured against the
     `dy * 16` the last carry gave him, so a carrier rising 2-3 px/tick in his halved hop keeps his rider and the
-    Totem launch of [R6] happens) [G7], dropped, was hurt, or `|R.x + dx - K.x| > 16`. Otherwise
+    Totem launch of [R6] happens) [G7], dropped, was hurt, `|R.x + dx - K.x| > 16`, or K or R is no longer active
+    (R falls through K, `yvel` unchanged, no drop lock) [G33]. Otherwise
     `R.x += dx` (x bounds and edge walls only), `R.y = K.y - 34`, `R.yvel = dy * 16` (= `totem_carry_yvel`),
     `on_platform = true`, grounded bookkeeping. **Scrape**: if after the carry R's wall-probe cell (`R.x +/- 9`, `row - 1`) is SIDE 1 or his head
     probe (`col, row - 2`) is a ceiling, `R.x -= dx` and the ride ends (he falls off).
@@ -1596,8 +1613,8 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
     with UP held to the apex), so a Totem launch reaches an 8-tile ledge [R6]. R's high strike covers 61-77 px over
     the floor (3.8-4.8 tiles), the forward strike 36-49 px.
 - **Brace Wall** (`CONTACT_ENEMIES`, before the heavy's contact with either hero): when a `heavy` enemy (or a boss
-  whose rule says so) overlaps a hero H in the crouch state (5, not crawl) whose partner is also in the crouch state,
-  both grounded, `|H.x - partner.x| <= 16`: the heavy stops dead (`xvel = 0`) and is **dazed 44 ticks** with its head
+  whose rule says so) overlaps an active hero H in the crouch state (5, not crawl) whose partner is also active and in
+  the crouch state, both grounded, `|H.x - partner.x| <= 16`: the heavy stops dead (`xvel = 0`) and is **dazed 44 ticks** with its head
   open (Tusker's co-op form: 66, GAMEPLAY 13.6); neither hero is touched. A lone croucher is trampled (the normal hurt,
   10.1).
 
@@ -1655,7 +1672,8 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
   in place.
 - **Hatched**: feet at the egg's bottom centre, `launch(0, -64)`; hearts **2** (Beginner) / **1** (Expert), bones 0;
   `shield = 44` (a new hero timer: blinking, enemy contact skipped while it is above 0, full control; it counts down
-  in `POST`; `hit_timer` stays 0). His own "since last death" tally list is cleared (GAMEPLAY 3.4).
+  in `POST`; `hit_timer` stays 0). His own "since last death" tally list is cleared (GAMEPLAY 3.4). The hatch leaves
+  his idle count as it is (C.10 [G33]): a partner nobody plays pops out idle.
 - **Voluntary egg**: DOWN + LOOK held together for 24 consecutive ticks while grounded and the partner is hatched:
   an egg at once.
 - **Helper mode** (Options, P2 only; slot 1 of a co-op run with `Game.helper_mode`, copied from Options > Co-op at the
@@ -1762,6 +1780,7 @@ Owner of each table: `Tuning` (core: hero and world rules), `PartyTuning` (core,
 | Mount | C.9 table | | C.9 | MountTuning |
 | Totem | head 35 / rest 34 px; foot reach 16 px; jump-off 16 over the carry; impulses `>> 1`; drop lock 12 *(tune)* | | C.10 | PartyTuning |
 | Shoulder Hop | -224 (= `Tuning.BOUNCE_YVEL_UP`), active partner only | v16 | C.10 | PartyTuning |
+| Idle | 243 ticks without input of his own (or none since entering the level); Zzz from 243 | ticks | C.10 | PartyTuning (`PlayerBase.IDLE_TICKS` until core-A adds it) |
 | Lee | 64 px downwind, 16 px vertical *(tune)* | px | C.6 | PartyDriver (PartyTuning asked) |
 | Brace | 16 px apart, heavy dazed 44 | | C.10 | PartyTuning |
 | Curl | 66 ticks, box 24 x 20 *(tune)* | | C.11 | PartyTuning |

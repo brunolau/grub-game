@@ -667,6 +667,136 @@ func test_results_companion_keeps_clear_of_the_players() -> void:
 
 
 # =================================================================================================================
+# Phase 3 (PLAN.md 6; wf9 G2 fixes): awards per mode, medals clear of the award texts
+# =================================================================================================================
+
+## The awards follow the modes the match played: after a Last Caveman Standing match in which everybody is level on
+## every count, VersusMatch's "closest award" fallback hands somebody Leaning Tower ("Tallest stack"); the results show
+## no Grub Stack, Clubball or Hot Rock award and still give everybody 1-3 awards of the mode played. A Party Mix match
+## that also played Grub Stack keeps an earned Leaning Tower.
+func test_results_awards_follow_the_modes_played() -> void:
+	var versus_match: VersusMatch = _four_players(Defs.VersusMode.LAST_CAVEMAN)
+	for winner: int in [0, 0]:
+		versus_match.begin_round(ARENA)
+		versus_match.record_round(PackedInt32Array([winner]))
+	Game.runs[0].hits = 4
+	Game.runs[1].hits = 4
+	versus_match.finish(Game.runs)
+	var given: Dictionary = versus_match.hand_out_awards(Game.runs)
+	var misfit: bool = false
+	for slot: Variant in given:
+		for award: StringName in given[slot]:
+			misfit = misfit or not VersusResultsScreen.award_fits(award, PackedInt32Array([Defs.VersusMode.LAST_CAVEMAN]))
+	if not misfit:
+		print("    note: VersusMatch.hand_out_awards gave no Grub Stack award in Last Caveman Standing (core fixed)")
+	Flow.args = {"winners": versus_match.leaders(), "awards": given}
+	var node: VersusResultsScreen = await _open(&"versus_results") as VersusResultsScreen
+	assert_eq(VersusResultsScreen.modes_played(versus_match), PackedInt32Array([Defs.VersusMode.LAST_CAVEMAN]))
+	var shown: Dictionary = node.get_awards()
+	for slot: int in 4:
+		var list: Array = shown.get(slot, [])
+		assert_true(list.size() >= VersusTuning.AWARDS_MIN and list.size() <= VersusTuning.AWARDS_MAX,
+				"P%d gets 1-3 awards (%s)" % [slot + 1, list])
+		for award: Variant in list:
+			assert_false(VersusResultsScreen.AWARD_MODES.has(StringName(str(award))),
+					"P%d: %s cannot be earned in Last Caveman Standing" % [slot + 1, award])
+	for row: Control in node.get_award_rows():
+		assert_ne(row.get_meta(&"award"), &"leaning_tower", "no 'Tallest stack' outside Grub Stack")
+	assert_eq(VersusResultsScreen.closest_award([Game.runs[0], Game.runs[2]] as Array[PlayerRun], Game.runs[2],
+			PackedInt32Array([Defs.VersusMode.LAST_CAVEMAN])), &"pacifist", "who landed no hit is the Pacifist")
+	node.queue_free()
+	await get_tree().process_frame
+	# Party Mix: Grub Stack was played too, so an earned Leaning Tower stays; Home Run (Clubball) never was.
+	versus_match.history.append({"arena": ARENA, "mode": Defs.VersusMode.GRUB_STACK, "winners": PackedInt32Array([1])})
+	Game.runs[1].best_stack = 9
+	var mixed: Dictionary = VersusResultsScreen.awards_for_modes({1: [&"leaning_tower", &"home_run"], 0: [&"home_run"]},
+			VersusResultsScreen.modes_played(versus_match), Game.runs)
+	assert_eq(mixed[1], [&"leaning_tower"] as Array[StringName], "Grub Stack was played: Leaning Tower stays")
+	assert_eq((mixed[0] as Array).size(), 1, "a lost Home Run is replaced")
+	assert_true(VersusResultsScreen.award_fits(StringName(str(mixed[0][0])), VersusResultsScreen.modes_played(versus_match)))
+	for mode: int in [Defs.VersusMode.GRUB_STACK, Defs.VersusMode.LAST_CAVEMAN, Defs.VersusMode.HOT_ROCK,
+			Defs.VersusMode.CLUBBALL]:
+		var count: int = 0
+		for award: Dictionary in PlayerRun.VERSUS_AWARDS:
+			count += 1 if VersusResultsScreen.award_fits(award["id"], PackedInt32Array([mode])) else 0
+		assert_true(count >= 7, "mode %d has its awards" % mode)
+	await _cleanup()
+
+
+## No award text overlaps its medal: on every row the medal and the text (outline included) keep apart, and a medal
+## flying from the companion's hand to its row never crosses any award's text on the way (four players, three awards
+## each, at the base view and a wide one).
+func test_results_medals_keep_clear_of_the_award_texts() -> void:
+	var versus_match: VersusMatch = _four_players(Defs.VersusMode.GRUB_STACK)
+	for winner: int in [3, 3]:
+		versus_match.begin_round(ARENA)
+		versus_match.record_round(PackedInt32Array([winner]))
+	var awards: Dictionary = {0: [&"leaning_tower", &"glutton", &"chain_gang"], 1: [&"pickpocket", &"butterfingers",
+			&"comeback_caveman"], 2: [&"pacifist", &"clang_master", &"head_case"], 3: [&"lava_lover", &"slugger"]}
+	for width: float in [640.0, 800.0]:
+		Flow.args = {"winners": PackedInt32Array([3]), "awards": awards}
+		var node: VersusResultsScreen = await _open(&"versus_results") as VersusResultsScreen
+		node.size = Vector2(width, 360.0)
+		await get_tree().process_frame
+		node._process(0.01)
+		await get_tree().process_frame
+		var rows: Array[Control] = node.get_award_rows()
+		assert_eq(rows.size(), 11)
+		var texts: Array[Rect2] = []
+		for row: Control in rows:
+			var rects: Array[Rect2] = node.award_rects(row)
+			assert_true(rects.size() >= 2, "a medal and a text")
+			for i: int in range(1, rects.size()):
+				assert_false(rects[0].intersects(rects[i]), "%s: the text keeps clear of its medal at %d px (%s / %s)"
+						% [row.get_meta(&"award"), width, rects[0], rects[i]])
+				texts.append(rects[i])
+		var crossings: int = 0
+		for row: Control in rows:
+			var start: Vector2 = node.companion_hand()
+			var target: Vector2 = node.medal_place(row)
+			for step: int in 51:
+				var at: Vector2 = VersusResultsScreen.flight_point(start, target, float(step) / 50.0).round()
+				var medal: Rect2 = Rect2(at, Vector2(VersusResultsScreen.AWARD_MEDAL_SIZE,
+						VersusResultsScreen.AWARD_MEDAL_SIZE + 5.0))
+				for text: Rect2 in texts:
+					if medal.intersects(text):
+						if crossings < 3:
+							print("    crossing: %s -> %s at step %d: medal %s over text %s" % [start, target, step, medal,
+									text])
+						crossings += 1
+		assert_eq(crossings, 0, "no medal in flight crosses an award text at %d px" % width)
+		# Handed out for real: the row's medal and text show only once its medal landed.
+		node.hand_out(0, true)
+		var first: Control = rows[0]
+		assert_eq((first.get_meta(&"text") as Control).modulate.a, 0.0, "the text waits for its medal")
+		node._process(VersusResultsScreen.AWARD_FLIGHT_SECONDS + 0.01)
+		assert_eq((first.get_meta(&"icon") as Control).modulate.a, 1.0, "the medal landed on its place")
+		node.show_all_awards()
+		for row: Control in rows:
+			assert_eq((row.get_meta(&"text") as Control).modulate.a, 1.0)
+		node.queue_free()
+		await get_tree().process_frame
+	await _cleanup()
+
+
+## A four-player match (two keyboard humans, two Hunters) of `mode` on the test arena, its runs started.
+func _four_players(mode: int) -> VersusMatch:
+	var versus_match: VersusMatch = VersusMatch.new()
+	versus_match.arena = ARENA
+	versus_match.mode = mode
+	versus_match.rounds_to_win = 2
+	versus_match.seat_human(InputSlot.keyboard(Defs.InputSlotKind.KEYBOARD_LEFT))
+	versus_match.seat_human(InputSlot.keyboard(Defs.InputSlotKind.KEYBOARD_RIGHT))
+	versus_match.seat_bot(Defs.BotLevel.HUNTER)
+	versus_match.seat_bot(Defs.BotLevel.HUNTER)
+	versus_match.ready_all()
+	versus_match.begin_match(7)
+	Game.versus_match = versus_match
+	Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.VERSUS, 4, 1)
+	return versus_match
+
+
+# =================================================================================================================
 # Helpers
 # =================================================================================================================
 

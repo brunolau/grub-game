@@ -1520,3 +1520,215 @@ func test_mayhem_rolls_only_variants_the_profile_has_opened() -> void:
 	Save.set_unlock_everything(false)
 	for variant: StringName in closed:
 		assert_true(opened.has(variant), "Unlock everything opens %s" % variant)
+
+
+# =================================================================================================================
+# Phase 3: the arena signatures (VersusSignatures; DESIGN.md E.5, DA's wf8 / wf9 requests, G31 / G43) and the
+# Clubball sides rotating per round
+# =================================================================================================================
+
+## An arena (as _arena) whose level gets the extra `meta` (and the file `level_id` the referee reads its markers from,
+## "" = none), then round 0 in `mode` begins again (the signatures read the arena afresh).
+func _signature_arena(count: int, xs: Array, meta: Dictionary, mode: int = Defs.VersusMode.GRUB_STACK,
+		level_id: StringName = &"") -> void:
+	_arena(count, xs)
+	for key: String in meta:
+		level.meta[key] = meta[key]
+	if level_id != &"":
+		level.level_id = level_id
+	_mode(mode)
+
+
+func test_clubball_sides_rotate_every_round() -> void:
+	var coconut: Coconut = _clubball()
+	if coconut == null:
+		return
+	assert_false(referee.clubball.swapped, "round 0: the file's sides")
+	assert_eq(referee.goal_rect(1), Rect2i(0, 112, 16, 48), "team 1 defends the left mouth")
+	referee.begin_round(1)
+	referee.start_round_now()
+	_unshield()
+	assert_true(referee.clubball.swapped, "round 1: the sides changed ends")
+	assert_eq(referee.goal_rect(1), Rect2i(304, 112, 16, 48), "team 1 defends the right mouth now")
+	assert_eq(referee.goal_rect(2), Rect2i(0, 112, 16, 48))
+	assert_eq(heroes[0].sim_pos.x, 256, "team 1 kicks off on the right half (the spawn nearest its own goal)")
+	assert_eq(heroes[1].sim_pos.x, 64)
+	var goals: Array[Array] = []
+	referee.goal_scored.connect(func(team: int, a: int, b: int) -> void: goals.append([team, a, b]))
+	coconut.teleport(Vector2i(8, FLOOR_Y - 8))
+	coconut.xvel = 0
+	coconut.yvel = 0
+	Sim.step(1)
+	assert_eq(goals, [[1, 1, 0]] as Array[Array], "the left mouth is team 2's this round: team 1 scores there")
+	referee.begin_round(2)
+	assert_false(referee.clubball.swapped, "round 2: back to the file's sides")
+	assert_eq(referee.goal_rect(1), Rect2i(0, 112, 16, 48))
+
+
+func test_goal_mouths_are_ring_outs_in_the_other_modes() -> void:
+	_signature_arena(2, [64, 256], {}, Defs.VersusMode.GRUB_STACK, &"arena_coconut_cove")
+	assert_eq(referee.signatures.ring_rects, [Rect2i(0, 112, 16, 48), Rect2i(304, 112, 16, 48)] as Array[Rect2i],
+			"Coconut Cove's two zones/goal mouths")
+	assert_true(referee.danger_rects(0).has(Rect2i(0, 112, 16, 48)), "the bots keep out of them")
+	_give(heroes[0], 10)
+	heroes[0].teleport(Vector2i(24, FLOOR_Y))
+	Sim.step(1)
+	assert_false(heroes[0].dead, "the beach before the mouth is safe")
+	heroes[0].teleport(Vector2i(10, FLOOR_Y))
+	Sim.step(1)
+	assert_true(heroes[0].dead, "feet in the mouth: into the surf")
+	assert_eq(referee.stack_of(0), 0, "knocked out as by a hazard: everything spilled")
+	assert_eq(kos.size(), 1)
+	assert_eq(kos[0][2], VersusSignatures.CAUSE_SURF)
+	# Last Caveman Standing: the surf puts him out.
+	_signature_arena(2, [64, 256], {}, Defs.VersusMode.LAST_CAVEMAN, &"arena_coconut_cove")
+	heroes[1].teleport(Vector2i(310, FLOOR_Y))
+	Sim.step(1)
+	assert_true(referee.is_out(1), "LCS: a ring-out is out")
+	# Clubball: the mouths are goals, never ring-outs.
+	_signature_arena(2, [64, 256], {}, Defs.VersusMode.CLUBBALL, &"arena_coconut_cove")
+	assert_true(referee.signatures.ring_rects.is_empty(), "Clubball keeps its goals")
+
+
+func test_echo_hollow_darkness_pulse() -> void:
+	_signature_arena(2, [64, 256], {"dark_pulse": "40:10"})
+	assert_eq(referee.signatures.dark_period, 40)
+	assert_eq(referee.signatures.dark_ticks, 10)
+	var nights: Array[int] = []
+	for t: int in 100:
+		Sim.step(1)
+		if level.dark:
+			nights.append(referee.round_ticks)
+	assert_eq(nights.size(), 20, "two nights of 10 ticks in 100: %s" % str(nights))
+	assert_eq(nights[0], 40, "the first night from round tick 40 (one period in)")
+	assert_eq(nights[10], 80)
+	assert_eq(VersusSignatures.parse_pulse("486"), PackedInt32Array([486, VersusTuning.ECHO_DARK_TICKS]),
+			"Echo Hollow: every 20 s, 3 s of night")
+	assert_eq(VersusSignatures.parse_pulse(""), PackedInt32Array([0, 0]))
+	# Lights Out keeps the night between the pulses.
+	var rules: VersusRules = VersusRules.new()
+	rules.variants[VersusRules.LIGHTS_OUT] = true
+	_signature_arena(2, [64, 256], {"dark_pulse": "40:10"})
+	referee.rules = rules
+	_mode(Defs.VersusMode.GRUB_STACK)
+	Sim.step(55)
+	assert_true(level.dark, "Lights Out: still night after the pulse")
+
+
+func test_echo_hollow_walls_grow_back() -> void:
+	_signature_arena(2, [24, 280], {"regrow": "60"})
+	level.set_cell(10, 9, TileGrid.CH_SOLID_INVISIBLE)
+	var block: BreakableBlock = spawn(&"objects/breakable_block", Vector2i(10 * 16 + 8, 160), {"hits": 1}) \
+			as BreakableBlock
+	assert_not_null(block)
+	if block == null:
+		return
+	_mode(Defs.VersusMode.GRUB_STACK)
+	block.take_hit(25, heroes[0])
+	assert_true(block.opened, "one hit breaks it")
+	assert_eq(level.get_cell(10, 9), TileGrid.CH_AIR)
+	Sim.step(60 - VersusSignatures.REGROW_WARN_TICKS)
+	assert_eq(level.get_cell(10, 9), TileGrid.CH_AIR, "the ghost first: nothing blocks yet")
+	# A hero stands in the cell when its time comes: the block waits for him.
+	heroes[1].teleport(Vector2i(10 * 16 + 8, FLOOR_Y))
+	Sim.step(VersusSignatures.REGROW_WARN_TICKS + 4)
+	assert_eq(level.get_cell(10, 9), TileGrid.CH_AIR, "never closes on a hero")
+	heroes[1].teleport(Vector2i(280, FLOOR_Y))
+	Sim.step(2)
+	assert_eq(level.get_cell(10, 9), TileGrid.CH_SOLID_INVISIBLE, "solid again once the cell is clear")
+	assert_false(block.opened, "the block is back to its level-file state")
+	assert_eq(block.hits_left, block.hits_total)
+	assert_true(block.take_hit(25, heroes[0]), "and breaks again")
+
+
+func test_neutral_enemies_are_springboards() -> void:
+	_arena(2, [64, 256])
+	var dangler: EnemyBase = spawn(&"enemies/dangler", Vector2i(160, 100), {"depth": 0}) as EnemyBase
+	assert_not_null(dangler)
+	if dangler == null:
+		return
+	_mode(Defs.VersusMode.LAST_CAVEMAN)
+	assert_true(referee.signatures.neutrals.has(dangler), "every enemy of an arena is neutral")
+	assert_false(dangler.contact_hurts, "it hurts nobody")
+	dangler.take_hit(250, heroes[0])
+	Sim.step(1)
+	assert_false(dangler.dead, "hits glance off it")
+	assert_eq(dangler.hp, VersusSignatures.NEUTRAL_HP)
+
+
+func test_cinder_pit_ember_lane() -> void:
+	_signature_arena(2, [88, 256], {"ember_lane": "5,1,30"})
+	assert_eq(VersusSignatures.parse_lane("8,4"), PackedInt32Array([8, 4, VersusSignatures.EMBER_PERIOD]))
+	_give(heroes[0], 10)
+	var warned: Array[int] = []
+	var armed: Array[int] = []
+	for t: int in 90:
+		Sim.step(1)
+		for node: Node in get_tree().get_nodes_in_group(VersusReferee.ROUND_GROUP):
+			var hazard: VersusHazard = node as VersusHazard
+			if hazard == null or hazard.kind != VersusHazard.EMBER:
+				continue
+			if hazard.warn_tick == Sim.tick:
+				warned.append(referee.round_ticks)
+				assert_true(referee.danger_rects(0).size() >= 1, "its glow is in the danger rects")
+			if hazard.armed_tick == Sim.tick:
+				armed.append(hazard.armed_tick - hazard.warn_tick)
+		if referee.stack_of(0) < 10:
+			break
+	assert_eq(warned[0], 30 - VersusSignatures.EMBER_WARN_TICKS, "the glow 12 ticks before the period")
+	assert_eq(armed[0], VersusSignatures.EMBER_WARN_TICKS, "telegraphed 12 ticks")
+	assert_eq(referee.stack_of(0), 7, "an ember on the head: the spill of a hit (1 + 10 / 5)")
+	assert_eq(referee.stack_of(1), 0)
+
+
+func test_colossus_hall_spits_at_the_crowned_leader() -> void:
+	_signature_arena(2, [64, 256], {})
+	var statue: SimEntity = SimEntity.new()
+	place(level, statue, Vector2i(312, 160))
+	referee.signatures.colossus = statue
+	assert_eq(referee.signatures.spit_target(), -1, "nobody crowned: no spit")
+	_give(heroes[1], 10)
+	assert_eq(referee.signatures.spit_target(), 1, "Grub Stack: the tallest stack")
+	var period: int = VersusTuning.COLOSSUS_SPIT_PERIOD_TICKS
+	var spat: Array[int] = []
+	for t: int in period + 40:
+		Sim.step(1)
+		for node: Node in get_tree().get_nodes_in_group(VersusReferee.ROUND_GROUP):
+			var hazard: VersusHazard = node as VersusHazard
+			if hazard != null and hazard.kind == VersusHazard.SPIT and hazard.warn_tick == Sim.tick:
+				spat.append(referee.round_ticks)
+				assert_eq(hazard.target_slot, 1)
+		if referee.stack_of(1) < 10:
+			break
+	assert_eq(spat, [period - VersusTuning.COLOSSUS_JAWS_TICKS] as Array[int], "the jaws 10 ticks before the period")
+	assert_eq(referee.stack_of(1), 7, "the rock hit the leader: the spill of a hit")
+	# Last Caveman Standing: the most hearts; a tie is no target.
+	_signature_arena(2, [64, 256], {}, Defs.VersusMode.LAST_CAVEMAN)
+	referee.signatures.colossus = statue
+	assert_eq(referee.signatures.spit_target(), -1, "equal hearts: no spit")
+	Game.runs[0].hearts = 1
+	assert_eq(referee.signatures.spit_target(), 1)
+	_mode(Defs.VersusMode.HOT_ROCK)
+	assert_eq(referee.signatures.spit_target(), -1, "no crown in Hot Rock (G43: Grub Stack and LCS only)")
+
+
+func test_arena_wind_is_round_synced_and_gives_way() -> void:
+	_signature_arena(2, [64, 256], {"wind": "0:16,20:-16", "wind_loop": 40})
+	var winds: Dictionary = {}
+	for t: int in 45:
+		Sim.step(1)
+		winds[referee.round_ticks] = level.wind
+	assert_eq(winds[1], 16)
+	assert_eq(winds[19], 16)
+	assert_eq(winds[20], -16, "the entry of round tick 20")
+	assert_eq(winds[40], 16, "the loop restarts at 40")
+	assert_eq(VersusSignatures.wind_at([Vector2i(5, 8)] as Array[Vector2i], 0, 3), 0, "calm before the first entry")
+	assert_eq(VersusSignatures.wind_at([Vector2i(5, 8)] as Array[Vector2i], 20, 23), 8, "a later round keeps the last")
+	# The Gusty variant replaces the arena's gusts.
+	var rules: VersusRules = VersusRules.new()
+	rules.variants[VersusRules.GUSTY] = true
+	_signature_arena(2, [64, 256], {"wind": "0:16"})
+	referee.rules = rules
+	_mode(Defs.VersusMode.GRUB_STACK)
+	Sim.step(3)
+	assert_eq(level.wind, VersusRules.GUSTY_WIND, "Gusty's wind, not the arena's 16")

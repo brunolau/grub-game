@@ -25,12 +25,15 @@ extends BossBase
 ## 2.0 co-op form (DESIGN.md B.7, GAMEPLAY.md 13.6; enemies-C, PLAN.md P2.3) - only in a co-op game of two heroes on a
 ## co-op file (`kind = coop`: w2_l2b_coop); everywhere else, a party of one included, the Brute above runs unchanged:
 ##  - hit points x5/4 (64 -> 80; PartyTuning.BOSS_HP_MAX_NUM / DEN);
-##  - it targets whoever hit it last (the nearest hatched hero before the first hit, or when he is down);
+##  - it targets whoever hit it last (before the first hit, or when he is down: the nearest ACTIVE hero -
+##    LevelBase.nearest_coop_hero, hatched and not idle, DESIGN.md G33 - so a dozing partner never draws the guard);
 ##  - its **arm guard** faces its target: every head hit of the target hero glances off (a clank and a spark), a club
-##    or a throw alike - only the partner reaches the head, from any side; a target riding his partner's head (Totem
-##    Ride) is above the guard and his strikes count;
+##    or a throw alike - only the partner reaches the head, from any side (G34: his own hits); a target riding his
+##    ACTIVE partner's head (Totem Ride; there is no ride on an idle carrier, G33) is above the guard and his strikes
+##    count;
 ##  - below half its hit points (Expert; PartyTuning.boss_grabs_on) the **Grab**: a GRAB_BEAT_TICKS chest beat, then
-##    its hands open GRAB_OPEN_TICKS; a target whose feet are within GRAB_REACH_PX in front is squeezed: he cannot move
+##    its hands open GRAB_OPEN_TICKS; an active target whose feet are within GRAB_REACH_PX in front is squeezed (a dozing
+##    hero is no bait for the partner's rescue, G33): he cannot move
 ##    or strike and loses a bone every GRAB_SQUEEZE_TICKS; wriggling (Left and Right pressed in turn) shortens the hold
 ##    by GRAB_WRIGGLE_TICKS per press; his partner's head hit frees him (and counts) and staggers the Brute
 ##    BRUTE_STAGGER_TICKS. A hold ends after GRAB_HOLD_TICKS at most; the next grab waits GRAB_COOLDOWN_TICKS.
@@ -436,11 +439,16 @@ func start_fight() -> void:
 	super.start_fight()
 
 
-## Co-op: it targets whoever hit it last (BossBase.last_hitter) while he may be targeted; else the party's rule
-## (EnemyBase._choose_target). A party of one: the 1.0 target.
+## Co-op: it targets whoever hit it last (BossBase.last_hitter) while he may be targeted; else the nearest ACTIVE hero
+## (LevelBase.nearest_coop_hero, G33: the guard never faces a dozing partner, so a lone player is always its target),
+## else the party's rule (EnemyBase._choose_target). A party of one: the 1.0 target.
 func _choose_target() -> PlayerBase:
 	if _coop and last_hitter != null and is_instance_valid(last_hitter) and last_hitter.is_party_targetable():
 		return last_hitter
+	if _coop and Game.level != null:
+		var active: PlayerBase = Game.level.nearest_coop_hero(self)
+		if active != null:
+			return active
 	return super._choose_target()
 
 
@@ -510,14 +518,15 @@ func _coop_poll(target: PlayerBase) -> int:
 	return 0
 
 
-## True when the arm guard stops a hit of `hitter`: he is the target (the guard faces him) and does not ride a Totem.
-## During a Grab the guard is down: only the held hero cannot hit (his partner always can).
+## True when the arm guard stops a hit of `hitter`: he is the target (the guard faces him) and does not ride a Totem
+## on an ACTIVE carrier (G33). During a Grab the guard is down: only the held hero cannot hit (his partner always can).
 func _guarded(hitter: PlayerBase, target: PlayerBase) -> bool:
 	if hitter == null:
 		return false
 	if _held != null:
 		return hitter == _held
-	return hitter == target and not hitter.is_riding_totem()
+	var over_guard: bool = hitter.is_riding_totem() and hitter.totem_carrier.counts_for_coop()
+	return hitter == target and not over_guard
 
 
 func _guard_glance(level: LevelBase, point: Vector2i) -> void:
@@ -582,7 +591,7 @@ func _grab_wanted(target: PlayerBase) -> bool:
 ## after a hurt is seized all the same (whoever stands that close has touched the body); a Helper-mode P2
 ## (PlayerBase.is_helper, PHYSICS.md C.12) never is.
 func _in_grab_reach(hero: PlayerBase) -> bool:
-	if hero.dead or hero.is_down() or not hero.is_party_targetable() or hero.is_helper():
+	if hero.dead or hero.is_down() or not hero.counts_for_coop() or hero.is_helper():
 		return false
 	var ahead: int = (hero.sim_pos.x - sim_pos.x) * facing
 	return ahead >= 0 and ahead <= GRAB_REACH_PX and absi(hero.sim_pos.y - sim_pos.y) <= Tuning.TILE

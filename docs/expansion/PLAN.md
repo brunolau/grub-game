@@ -204,6 +204,10 @@ test levels (enemies-C, before D8 / D9 build 8-2b, 9-1b and 9-3).
 
 ## 6. Phase 3 - content and proofs
 
+**Phase 3 start (2026-10-08)**: the orchestrator's decisions (the idle partner, boss co-op forms by actions, boss weak
+points clear of the HUD, bonded-pair placement, cut 2 applied, cut 3 conditional) and the lead designer's decisions
+on the G2 reports are DESIGN.md G33-G43; the rulings went to every owner as `build/engine_requests/wf9_lead_design_to_*.txt`.
+
 ### 6.1 Level-designer write areas
 
 | Designer | Exclusive globs |
@@ -250,7 +254,7 @@ co-op routes, belt invariance on all, every x2 gate refused by the search, every
 |---|---|---|
 | P4.1 | integration | full headless runs: Book I solo (both difficulties, unchanged), Book II solo, co-op Book I and II, both difficulties; versus soak (bots, 1 000 seeded rounds per mode, headless) |
 | P4.2 | core-A / player-A | performance: `--perf` with a two-hero route per world, 4-player arenas; on the Cortex-A53 device: 2-player co-op must meet the 1.0 budget class; 4 heroes on mobile only where the check passes (else capped at 2 there) |
-| P4.3 | ui-B / core-A | devices: shared keyboards (ghosting key test), pads on Windows / Android (reconnect dialog), tablet table mode on a 9-10 inch tablet; touch targets >= 56 art px |
+| P4.3 | ui-B / core-A | devices: shared keyboards (ghosting key test), pads on Windows / Android (reconnect dialog); touch targets >= 56 art px (the tablet table mode is cut 2, applied: a hidden prototype, not tested) |
 | P4.4 | audio / art-A | one human listen-through of every music pick; loop seams; licence audit of every new file (manifest, CREDITS, THIRD_PARTY); style review against `_style_tests/biome_all.png` |
 | P4.5 | lead designer | mixed-skill pair playtests of every co-op stage, including the gate types G1 could not playtest (window and daze values, Batter Up, the lee); an expert told to cheat; final *(tune)* values written into DESIGN.md and the specs |
 | P4.6 | core-A | version 2.0.0, Save v2 migration test on real 1.0 saves, exports (Windows, Android, macOS, iOS presets), `test_core_release` filters, smoke run of the exported build, README / BUILD notes |
@@ -284,9 +288,13 @@ b. Determinism: each co-op route replayed twice -> identical digests; with and w
    different device assignment -> identical.
 c. Requiredness: `tests/test_coop_gates.gd` runs the solo-impossibility search on every `objects/x2_tablet gate=`:
    a single reference hero with every weapon, every belt special and Chomper where present must **fail** to reach the
-   gate's far marker; window and daze values must be below the measured solo minimum minus 4 ticks.
-d. Bosses: each `test_enemies_<boss>.gd` asserts the co-op form is not beatable by the single-hero search and runs the
-   fairness checks per hero.
+   gate's far marker; window and daze values must be below the measured solo minimum minus 4 ticks. The partner a lone
+   player has is modelled: an egg drifting after him, or his idle hatched partner placed anywhere he could be hatched,
+   who counts for no co-op rule (DESIGN.md D.3 [G33]); a bond one thrown special hits twice in one throw is a build
+   error (G36).
+d. Bosses: each `test_enemies_<boss>.gd` asserts the co-op form is not beatable by the single-hero search - one hero
+   plus an idle hatched partner placed anywhere he could be hatched (G33) - runs the fairness checks per hero, and pins
+   every weak point at least 72 px under the locked view's top (DESIGN.md B.0 [G35]).
 e. `test_core_doze.gd` extended: a two-hero route with and without dozing; no dozing entity within reach of any hero
    or inside any view.
 
@@ -321,8 +329,8 @@ phase-3 route). The default run keeps the Book I guards (V1.c, V1.d); `tools/sp_
 | # | Cut | Replacement | Saves |
 |---|---|---|---|
 | 1 | Second-wave versus modes (King of the Feast, Letter Snatch, Egg Heist) | already outside launch | - |
-| 2 | Tablet table mode (two touch players) | one touch player + pads | ~1 ew |
-| 3 | Unlockable arenas Mesa Rodeo and Cloud Top | 8 arenas; those painting unlocks become variants and colours | ~1 ew |
+| 2 | Tablet table mode (two touch players) - **APPLIED at the start of phase 3** (orchestrator): an experimental, hidden prototype | one touch player + pads | ~1 ew |
+| 3 | Unlockable arenas Mesa Rodeo and Cloud Top - built only once the four remaining launch arenas are done and their bot tests green (orchestrator, phase 3) | 8 arenas; those painting unlocks become variants and colours | ~1 ew |
 | 4 | Bots on an arena whose graph fails | that arena ships human-only | per arena |
 | 5 | Chief bot level, deciding-moment replay | Rookie + Hunter; a still frame of the deciding hit | ~1.5 ew |
 | 6 | Shaman (co-op enemy) | Shellbacks in those halls | ~0.5 ew |

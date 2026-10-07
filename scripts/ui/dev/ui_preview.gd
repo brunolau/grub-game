@@ -11,7 +11,8 @@ extends Control
 ##   --ui-args=k=v,k=v    Flow.args of the screen (integers are converted, "a|b|c" becomes a list)
 ##   --ui-state=<name>    prepared game state: progress | tally | hud | boss | paused | intro (_prepare_state); boss
 ##                        starts a fight of a boss with --ui-boss-hp=<n> hit points (default 150). 2.0 (ui-B):
-##                        coop (P2's panel, belt icons, edge arrows with the stone countdown), versus (Grub Stack
+##                        coop (P2's panel, belt icons, edge arrows with the stone countdown), coop_boss (the same in a
+##                        boss fight: the fight band, P2's panel in the letters' row), versus (Grub Stack
 ##                        corner panels, sundial, a banner), pause_p2 (the pause menu of P2 in co-op), table (two
 ##                        touch players, table mode), keytest (options: the two-player keyboard test)
 ##   --ui-keys=a,b,...    input script, one step every --ui-step seconds after --ui-delay seconds:
@@ -117,6 +118,10 @@ func _after_overlay(state: String) -> void:
 	match state:
 		"coop":
 			_build_edge_level()
+		"coop_boss":
+			_build_edge_level()
+			Events.boss_started.emit(null)
+			Events.boss_energy_changed.emit(null, _boss_hp, _boss_hp)
 		"versus":
 			var hud: Hud = get_tree().get_first_node_in_group(Defs.GROUP_HUD) as Hud
 			if hud != null and hud.get_versus() != null:
@@ -169,7 +174,7 @@ func _prepare_state(state: String) -> void:
 	if level_id != &"":
 		Game.begin_level(level_id)
 	match state:
-		"coop", "pause_p2":
+		"coop", "pause_p2", "coop_boss":
 			Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.COOP, 2)
 			Game.begin_level(level_id)
 			Game.add_score(12340)

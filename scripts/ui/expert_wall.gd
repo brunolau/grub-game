@@ -10,6 +10,8 @@ extends UiScreen
 ## Roc (the pterodactyl in storm slate) circles under the cloud beside the lightning, and a warrior keeps the path at
 ## its foot. The spire stands in the right part of the view and the same text panel on the left, so the picture shows
 ## beside the words; the same way back to the title.
+## Phase 3: a co-op run (args {"mode": COOP} or Game.mode, a party of two or more) meets the wall as a party: every hero
+## stands before the warrior in his own colours (PARTY_GAP apart), the warrior turned to face them - in both books.
 
 const PROP_DIR: String = "res://assets/tiles/village/props/"
 ## Book II: the Roc's flight, a slow ellipse under the storm cloud around the spire (art px; the centre's y is the
@@ -20,6 +22,9 @@ const ROC_SECONDS: float = 9.0
 const SPIRE_AT: float = 0.7
 ## Book II: the text panel's width on the left (the Book I panel is centred and wider).
 const PANEL_WIDTH_B2: float = 236.0
+## Co-op: the party's heroes stand this far apart, the nearest this far from the warrior (art px).
+const PARTY_GAP: float = 58.0
+const PARTY_FRONT: float = 66.0
 ## The storm tint of the Book II sky.
 const STORM_TINT: Color = Color(0.55, 0.6, 0.78)
 ## The spire's storm slate, dark to light (the Far Shore map's spire).
@@ -37,6 +42,8 @@ var _wall: Texture2D = null
 var _book: int = 1
 var _roc: UiActor = null
 var _time: float = 0.0
+## Co-op: the party's heroes (P1 nearest the warrior).
+var _party: Array[UiActor] = []
 
 
 func _build_screen() -> void:
@@ -69,6 +76,13 @@ func _build_screen() -> void:
 		add_child(_castle)
 	_guard = UiActor.new(&"warrior", &"idle")
 	add_child(_guard)
+	if party_size() > 1:
+		for slot: int in party_size():
+			var hero: UiActor = UiActor.new(&"hero", &"idle")
+			TallyScreen.dress_hero(hero, slot)
+			hero.set_meta(&"slot", slot)
+			add_child(hero)
+			_party.append(hero)
 
 	var column: VBoxContainer = VBoxContainer.new()
 	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -145,12 +159,33 @@ func _reveal(box: Control) -> void:
 func _layout() -> void:
 	if _book == Levels.BOOK_2:
 		_guard.position = Vector2(roundf(_spire_x() - 128.0), _ground.position.y + 10.0)
-		_guard.face(1)
+		_guard.face(-1 if not _party.is_empty() else 1)
 		_place_roc()
 	else:
 		_guard.position = Vector2(roundf(size.x * 0.5 + 40.0), _ground.position.y + 10.0)
 		_guard.face(-1)
+	for i: int in _party.size():
+		_party[i].position = Vector2(_guard.position.x - PARTY_FRONT - PARTY_GAP * float(i), _guard.position.y)
+		_party[i].face(1)
 	_castle.queue_redraw()
+
+
+## The heroes before the wall: the party of a co-op run (args "mode" or Game.mode), else none (the 1.0 picture).
+static func party_size() -> int:
+	var mode: int = int(Flow.args.get("mode", Game.mode))
+	if mode != Defs.GameMode.COOP:
+		return 0
+	return clampi(Game.party, 0, Defs.MAX_PLAYERS)
+
+
+## The party's heroes in front of the wall (tests).
+func get_party() -> Array[UiActor]:
+	return _party
+
+
+## The warrior who keeps the way (tests).
+func get_guard() -> UiActor:
+	return _guard
 
 
 ## The Roc circles the spire top: wide and slow, nearer (lower) on the way to the left.

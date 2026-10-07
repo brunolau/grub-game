@@ -181,6 +181,9 @@ func _sim_phases() -> PackedInt32Array:
 func _sim_tick(phase: int) -> void:
 	match phase:
 		Defs.Phase.WEAPONS:
+			if hero_party.coop:
+				# 2.0 IDLE rule (PlayerBase.note_own_input): his own slot's input of this tick, before anything reads it.
+				note_own_input(GameInput.get_flags(slot))
 			_weapon_pass()
 		Defs.Phase.PLAYER:
 			_hero_update()

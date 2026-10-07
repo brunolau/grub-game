@@ -3,17 +3,22 @@ extends "res://tests/test_enemies_case.gd"
 ## the pair and its lead, the solo tag team, the "HUP!" telegraph, one pip per hit, P1 raids, the P2 bat (solo: the
 ## waiting chief comes down to bat the fighter; co-op: the stack, then the bat), the P3 roast run, the eggs (solo 132,
 ## co-op 66, the mate's hatch), the win; the co-op hold-off rule and the single-hero search; and the hero-physics
-## executor driven by core-B's HeroBot (behind Chieftain.hero_bot_enabled).
+## executor driven by core-B's HeroBot (behind Chieftain.hero_bot_enabled); the idle-partner rule (G33: an idle hatched
+## partner holds nobody off, and the single-hero searches place one anywhere); the bodies clear of the HUD on the test
+## level (G35) and the recorded club routes there.
 ##
-## The pyre: 20 x 12 cells, walls at columns 0 and 19, the floor at row 11 (feet y 176), the altar (one-way) at columns
-## 9-10 of row 5 (top y 80), ledges at row 8. Gorm's record stands on the floor at column 6 (x 104), Gulla's on the
-## altar (x 152, y 80).
+## The pyre (as levels/test_enemies_chieftain.lvl): 20 x 12 cells, walls at columns 0 and 19, a rock crown in rows 0-4
+## (ceiling underside y 80), the floor at row 11 (feet y 176), the altar (one-way) at columns 9-10 of row 8 (top y 128:
+## 3 rows up, level with the side ledges - the lead designer's G35 ruling), ledges at row 8. Gorm's record stands on the
+## floor at column 6 (x 104), Gulla's on the altar (x 152, y 128).
 
 const PLAYER_SCENE: String = "res://scenes/player/player.tscn"
 const FLOOR_Y: int = 176
-const ALTAR_Y: int = 80
+const ALTAR_Y: int = 128
 
 var _p2: PlayerBase = null
+## The idle-partner searches: P2 (hatched, idle) is kept at the side of the chieftain nobody smashes (_keep_alive).
+var _shadow: bool = false
 var _gorm: Chieftain = null
 var _gulla: Chieftain = null
 var _defeated: Array[BossBase] = []
@@ -25,6 +30,7 @@ func before_each() -> void:
 	super.before_each()
 	_defeated.clear()
 	_p2 = null
+	_shadow = false
 	Events.boss_defeated.connect(_on_defeated)
 	NavGraph.clear_cache()
 
@@ -256,6 +262,14 @@ func test_coop_an_egg_cracks_only_while_the_partner_holds_the_mate_off() -> void
 	assert_eq(_gorm._egg_hits, 0, "P2 is far from Gulla: P1's blow glances off the egg")
 	Sim.step(Chieftain.EGG_HIT_GAP_TICKS)
 	_p2.teleport(Vector2i(_gulla.sim_pos.x - 30, FLOOR_Y))
+	_p2.idle = true
+	_club(_gorm.get_weak_rect())
+	Sim.step(1)
+	_hero.club_box_active = false
+	assert_eq(_gorm._egg_hits, 0, "G33: P2 dozes next to Gulla - an idle partner holds nobody off")
+	Sim.step(Chieftain.EGG_HIT_GAP_TICKS)
+	_p2.idle = false
+	_p2.teleport(Vector2i(_gulla.sim_pos.x - 30, FLOOR_Y))
 	_club(_gorm.get_weak_rect())
 	Sim.step(1)
 	_hero.club_box_active = false
@@ -308,6 +322,47 @@ func test_the_single_hero_search_cannot_beat_the_coop_chieftains() -> void:
 	assert_ne(_gorm.life, Chieftain.Life.OUT, "nobody out")
 	assert_ne(_gulla.life, Chieftain.Life.OUT)
 	assert_true(_defeated.is_empty())
+
+
+## V3.d with the idle partner (G33 / G34): P2 hatched and IDLE, kept at whichever chieftain is not being smashed (more
+## than any real placement: a dozing hero never follows anyone). P1 (bare) strikes an egg on every tick it could count,
+## then the real P1 plays seeded random inputs with every weapon on both executors: no egg ever cracks, nobody is out.
+func test_the_single_hero_search_with_an_idle_partner_cannot_beat_the_coop_chieftains() -> void:
+	for bot: bool in [false, true]:
+		if bot:
+			_bot_pyre(true)
+		else:
+			_pyre(true)
+		_start()
+		_p2.idle = true
+		_shadow = true
+		assert_true(_gorm.is_coop_form())
+		assert_eq(_gorm.get_body() != null, bot, "executor: hero physics %s" % bot)
+		_gorm.hp = 1
+		_club(_gorm.get_weak_rect())
+		Sim.step(1)
+		_hero.club_box_active = false
+		for tick: int in Chieftain.EGG_TICKS_COOP - 2:
+			if _gorm.life == Chieftain.Life.EGG:
+				_hero.teleport(Vector2i(_gorm.sim_pos.x - 20, FLOOR_Y))
+				_club(_gorm.get_weak_rect())
+			Sim.step(1)
+			_hero.club_box_active = false
+			_keep_alive()
+		assert_eq(_gorm._egg_hits, 0, "bot %s: the dozing partner at Gulla's side holds nobody off" % bot)
+		var real: PlayerBase = _real_p1(Vector2i(60, FLOOR_Y))
+		var rng: SimRng = SimRng.new(55)
+		for weapon: int in [Defs.Weapon.CLUB, Defs.Weapon.AXE, Defs.Weapon.SPEAR]:
+			for chief: Chieftain in [_gorm, _gulla]:
+				if chief.life == Chieftain.Life.FIGHT:
+					chief.hp = 1
+			_episode(real, weapon, Vector2i(rng.range_int(40, 280), FLOOR_Y), _random_flags(rng, 260))
+		assert_ne(_gorm.life, Chieftain.Life.OUT, "bot %s: nobody out" % bot)
+		assert_ne(_gulla.life, Chieftain.Life.OUT)
+		assert_true(_defeated.is_empty())
+		_shadow = false
+		GameInput.clear_scripted()
+		GameInput.reset_slots()
 
 
 # =================================================================================================================
@@ -537,10 +592,10 @@ static func _pyre_rows() -> PackedStringArray:
 	rows.append("#".repeat(20))
 	for row: int in range(1, 11):
 		var line: String = "#" + ".".repeat(18) + "#"
-		if row == 5:
-			line = "#........--........#"
+		if row <= 4:
+			line = "#".repeat(20)
 		elif row == 8:
-			line = "#.---.........---..#"
+			line = "#.---....--...---..#"
 		rows.append(line)
 	rows.append("#".repeat(20))
 	return rows
@@ -582,6 +637,14 @@ func _keep_alive() -> void:
 		if hero != null and is_instance_valid(hero) and not hero.is_down():
 			hero.run.hearts = Tuning.ENERGY_START
 			hero.hit_timer = mini(hero.hit_timer, 1)
+	if _shadow and _p2 != null and is_instance_valid(_p2):
+		# The search's idle partner: hatched, idle, at the side of the chieftain nobody is smashing (the mate of an egg).
+		var keep: Chieftain = _gulla if _gorm.life == Chieftain.Life.EGG else _gorm
+		if _p2.dead or _p2.is_down():
+			_p2.down = false
+			_p2.respawn_at(keep.sim_pos)
+		_p2.teleport(Vector2i(keep.sim_pos.x + 12, keep.sim_pos.y))
+		_p2.idle = true
 
 
 func _step_until(done: Callable, max_ticks: int) -> int:
@@ -633,6 +696,8 @@ func _episode(hero: PlayerBase, weapon: int, pos: Vector2i, flags: PackedInt32Ar
 		hero.hit_timer = mini(hero.hit_timer, 1)
 		if hero.dead or hero.is_down():
 			hero.respawn_at(pos)
+		if _shadow:
+			_keep_alive()
 	GameInput.clear_scripted()
 
 

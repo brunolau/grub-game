@@ -13,7 +13,8 @@ extends Control
 ## co-op stage, versus; never in Book I solo, whose overlay stays the 1.0 one). Every player slot whose input is
 ## TOUCH (GameInput.slots, InputSlot.touch(region)) gets its own cluster inside its screen region, feeding its own
 ## slot; without a touch slot (single-player) the one overlay feeds slot 0 as in 1.0. **Table mode** (experimental,
-## the tablet prototype of D.11): two touch slots on one tablet lying between two players - P1's cluster along the
+## hidden: cut list 2 / G37 - offered only behind the developer switch of [method table_mode_switched_on]; the tablet
+## prototype of D.11): two touch slots on one tablet lying between two players - P1's cluster along the
 ## bottom edge, P2's turned half a circle along the top edge (so it is upright for the player across the table), each
 ## tinted in its player's colour; one pause stone at the left edge. [method table_regions] gives the join panel the
 ## two regions to assign.
@@ -65,6 +66,8 @@ const PAUSE_CLUSTER: int = 99
 const TABLE_TINT: float = 0.45
 ## Smallest screen (inches across) that offers table mode (DESIGN.md D.11: tablets of 9 inches or more).
 const TABLE_MIN_INCHES: float = 9.0
+## Developer switch of the table-mode prototype (debug builds only; see [method table_mode_switched_on]).
+static var experimental_table_mode: bool = false
 
 ## True while the overlay shows two (or more) touch players: table mode.
 var table_mode: bool = false
@@ -213,8 +216,12 @@ static func table_regions() -> Array[Rect2]:
 	return [Rect2(0.0, 0.5, 1.0, 0.5), Rect2(0.0, 0.0, 1.0, 0.5)]
 
 
-## True on a screen large enough for table mode (DESIGN.md D.11: 9 inches or more across; marked experimental).
+## True when the join panel and the versus lobby offer table mode: only behind the developer switch (cut list 2 APPLIED,
+## DESIGN.md G37: the tablet table mode stays an experimental, hidden prototype - touch play is one touch player plus
+## pads) and then on a screen large enough for it (DESIGN.md D.11: 9 inches or more across).
 static func table_mode_available() -> bool:
+	if not table_mode_switched_on():
+		return false
 	if not DisplayServer.is_touchscreen_available():
 		return false
 	var dpi: int = DisplayServer.screen_get_dpi()
@@ -222,6 +229,14 @@ static func table_mode_available() -> bool:
 		return false
 	var pixels: Vector2 = Vector2(DisplayServer.screen_get_size())
 	return pixels.length() / float(dpi) >= TABLE_MIN_INCHES
+
+
+## The developer switch of the table-mode prototype: [member experimental_table_mode] (tests, previews), or the user
+## argument `--table-mode` of a debug build. Never on in a release build.
+static func table_mode_switched_on() -> bool:
+	if not OS.is_debug_build():
+		return false
+	return experimental_table_mode or OS.get_cmdline_user_args().has("--table-mode")
 
 
 ## Screen rectangle of the button of `action` of player slot `slot` (empty when there is none or it is hidden). The

@@ -48,6 +48,18 @@ extends Node
 ##                                    the 800 x 360 view of a wide phone, 1364 1024 the 682 x 512 view of a tablet
 ##   focus out|in                     the application loses / regains the focus, as when the player switches to
 ##                                    another window (also switches Flow.pause_on_focus_loss back on, as in a game)
+##   wait_ms <milliseconds>           let at least this much real time pass (frames keep running)
+##   expect_errors <count>            the next <count> engine errors are part of the flow (an error path it tests);
+##                                    any other engine error fails the run (see below)
+##   section <name>                   an independent part of the flow that starts at the title: when the game is
+##                                    elsewhere (the end of the part before, or a part cut short by `need`), Flow
+##                                    goes back to the title first (Flow.goto_title); held keys are let go and every
+##                                    hero is scripted again. Before the title was ever shown (the boot) it does
+##                                    nothing: the part's own lines wait for the title
+##   need <what> [<what> ...]         content the lines after it need: a level id (Levels.has_level) or a file path
+##                                    (a route). In a skeleton flow (a `# skeleton:` line, filled in as the content
+##                                    lands) a missing one ends the part: the run goes on at the next `section` and
+##                                    reports the part as PENDING; in any other flow it is a failure
 ##   quit                             end the run here
 ##
 ## Expressions are `<path> <op> <value>` (op: == != < <= > >=) or a single path that must be true. A path starts
@@ -61,20 +73,33 @@ extends Node
 ## Values: integers, decimals, true, false, null or text.
 ##
 ## The simulation runs one tick per rendered frame with `--fast` (never while paused or covered), otherwise in real
-## time. With `--fast` a stage that has just started waits for its first `play`: its clock starts with the first
-## scripted tick, so a route file plays exactly as in the headless route tests (tests/test_campaign_routes.gd), no
-## matter how many frames the commands before it took. trace.json gets one row per tick: [frame, level, tick, x, y,
+## time. Either way a stage that has just started waits for its first `play` (or for `input device`): its clock starts
+## with the first scripted tick, so a route file plays exactly as in the headless route tests
+## (tests/test_campaign_routes.gd), no matter how many frames or how much real time the commands before it took - a
+## real-time run (`--perf`, a showcase) replays a route tick for tick like a `--fast` one (wf8_g2_verify #3). In real
+## time the runner holds the new stage's clock (Sim.manual) from Flow.screen_changed(level), before its first tick,
+## until the `play` starts. trace.json gets one row per tick: [frame, level, tick, x, y,
 ## xvel, yvel, state, dead]; with a party also one "party" row per tick and further hero: [frame, level, tick, player,
 ## x, y, xvel, yvel, state, dead].
-## Exit code: 0 = the script ran to the end and every check passed, 4 = a check failed or a wait timed out,
-## 2 = the script could not be read.
+## Engine errors (push_error, SCRIPT ERROR, failed engine checks) logged while the flow runs are failures, as in the
+## test runner: a flow that passes every check with a crash path in its log FAILS (wf8_g2_verify #1). Warnings are
+## counted and printed, not failed. `expect_errors` announces errors a flow provokes on purpose.
+## Exit code: 0 = the script ran to the end, every check passed and no unexpected engine error was logged (a skeleton
+## flow may have PENDING parts), 4 = a check failed, a wait timed out or the engine logged an error, 2 = the script
+## could not be read.
 
 const DEFAULT_TIMEOUT: int = 2400
 const DEFAULT_PRESS_FRAMES: int = 2
 ## Frames a `window` command waits for the window manager and the layouts to follow.
 const RESIZE_FRAMES: int = 6
-## A `play` that sees no tick for this many frames fails (the game is paused or no level runs).
+## A `play` that sees no tick for this many frames fails (the game is paused or no level runs); in real time also only
+## after STALL_MSEC (a headless real-time run renders hundreds of frames between two ticks).
 const STALL_FRAMES: int = 600
+const STALL_MSEC: int = 10000
+## The mark of a skeleton flow (tests/test_integration_flows.gd): its `need` lines may name content that is not there.
+const SKELETON_MARK: String = "# skeleton:"
+## Engine errors listed one by one in the summary (the rest are counted).
+const ERRORS_LISTED: int = 12
 const ROOTS: PackedStringArray = [
 	"game", "flow", "sim", "save", "input", "audio", "level", "hero", "boss", "enemy", "hud", "scene", "tree",
 	"settings", "events", "hero2", "hero3", "hero4",
@@ -97,6 +122,44 @@ class EventCounts:
 	func _get(property: StringName) -> Variant:
 		return int(counts.get(property, 0))
 
+
+## What the engine logs while the flow runs: errors (every type but warnings) with their text, warnings counted. The
+## engine may log from other threads (background loading), hence the mutex.
+class EngineLog:
+	extends Logger
+
+	var errors: PackedStringArray = PackedStringArray()
+	var warnings: PackedStringArray = PackedStringArray()
+	var _mutex: Mutex = Mutex.new()
+
+	func _log_error(
+			function: String, file: String, line: int, code: String, rationale: String, _editor_notify: bool,
+			error_type: int, _script_backtraces: Array[ScriptBacktrace]
+	) -> void:
+		var text: String = "%s (%s:%d in %s)" % [rationale if not rationale.is_empty() else code, file, line, function]
+		_mutex.lock()
+		if error_type == Logger.ERROR_TYPE_WARNING:
+			warnings.append(text)
+		else:
+			errors.append(text)
+		_mutex.unlock()
+
+	func _log_message(_message: String, _error: bool) -> void:
+		pass
+
+	## [errors, warnings] logged so far (copies).
+	func snapshot() -> Array[PackedStringArray]:
+		_mutex.lock()
+		var result: Array[PackedStringArray] = [errors.duplicate(), warnings.duplicate()]
+		_mutex.unlock()
+		return result
+
+
+## Emitted when the run is over (also in-process, see [member quit_when_done]).
+signal done(exit_code: int)
+
+## False: the run does not end the application (tests run a flow in-process and read [method result]).
+var quit_when_done: bool = true
 
 var _commands: Array[PackedStringArray] = []
 var _out_dir: String = ""
@@ -136,6 +199,24 @@ var _stepping_level: int = 0
 var _device_input: bool = false
 ## Keys a `hold` pressed and no `release` let go yet.
 var _held_keys: Array[Key] = []
+## Real time: true while the runner holds a new stage's clock (Sim.manual) until its first `play` (see the header).
+var _clock_held: bool = false
+## The stage the running `play` plays in (instance id; 0 = it has not seen its stage yet).
+var _play_stage: int = 0
+## The engine's log while the flow runs, and how many errors the flow announced (`expect_errors`).
+var _engine_log: EngineLog = null
+var _expected_errors: int = 0
+## A skeleton flow (SKELETON_MARK): a missing `need` ends its part instead of failing the run.
+var _skeleton: bool = false
+## What `need` found missing, one line per part cut short.
+var _pending: PackedStringArray = PackedStringArray()
+## True once the title was shown (a `section` at the boot waits for it instead of going back to it).
+var _title_seen: bool = false
+## Sim.manual when the run began (put back by an in-process run).
+var _manual_before: bool = false
+## Signal connections the run made: [Signal, Callable] (an in-process run takes them back).
+var _connections: Array[Array] = []
+var _exit_code: int = -1
 
 
 func _init() -> void:
@@ -148,7 +229,7 @@ const COMMAND_ARGS: Dictionary = {
 	"pad": [1, 2], "play": [1, -1],
 	"play_file": [1, 1], "input": [1, 2], "weapon": [1, 2], "shot": [1, -1], "every": [1, 2], "expect": [1, -1],
 	"log": [1, -1], "reset_events": [0, 0], "start_level": [1, 3], "window": [2, 2], "focus": [1, 1],
-	"quit": [0, 0],
+	"wait_ms": [1, 1], "expect_errors": [1, 1], "section": [1, -1], "need": [1, -1], "quit": [0, 0],
 }
 ## Pad control names of `pad` (besides button numbers).
 const PAD_NAMES: PackedStringArray = [
@@ -183,10 +264,14 @@ static func lint(script_text: String) -> Dictionary:
 					"any" if int(bounds[1]) < 0 else str(bounds[1]), count])
 			continue
 		match op:
-			"wait", "every", "window":
+			"wait", "every", "window", "wait_ms", "expect_errors":
 				for argument: String in command.slice(1, 3 if op == "window" else 2):
 					if not argument.is_valid_int():
 						errors.append(at + "'%s' needs a number, not '%s'" % [op, argument])
+			"need":
+				for what: String in command.slice(1):
+					if not content_exists(what):
+						missing.append(at + ("route %s" % what if _is_path(what) else "level %s" % what))
 			"press":
 				if not InputMap.has_action(StringName(command[1])):
 					errors.append(at + "unknown action '%s'" % command[1])
@@ -255,6 +340,18 @@ static func _is_player(text: String) -> bool:
 	return text.is_valid_int() and text.to_int() >= 1 and text.to_int() <= Defs.MAX_PLAYERS
 
 
+## True when the content `what` of a `need` line is there: a file path (it has a `/`; relative to the project, or
+## res:// / absolute) exists, or a level id is in the registry.
+static func content_exists(what: String) -> bool:
+	if _is_path(what):
+		return FileAccess.file_exists(what if what.begins_with("res://") or what.is_absolute_path() else "res://" + what)
+	return Levels.has_level(StringName(what))
+
+
+static func _is_path(what: String) -> bool:
+	return what.contains("/")
+
+
 # Input entries of a `play` / `play_file`: every entry `ticks:KEYS[|KEYS...]` with known key letters.
 static func _lint_inputs(text: String, at: String, errors: PackedStringArray) -> void:
 	for line: String in text.split("\n"):
@@ -280,8 +377,13 @@ func begin(script_text: String, out_dir: String, fast: bool, can_capture: bool) 
 	_out_dir = out_dir
 	_fast = fast
 	_can_capture = can_capture
+	_manual_before = Sim.manual
+	_engine_log = EngineLog.new()
+	OS.add_logger(_engine_log)
 	for raw: String in script_text.split("\n"):
 		var line: String = raw.strip_edges()
+		if line.begins_with(SKELETON_MARK):
+			_skeleton = true
 		if line.is_empty() or line.begins_with("#"):
 			continue
 		_commands.append(line.split(" ", false))
@@ -290,15 +392,54 @@ func begin(script_text: String, out_dir: String, fast: bool, can_capture: bool) 
 		_finish.call_deferred(EXIT_BAD_SCRIPT)
 		return
 	_script_slots(-1)
-	Sim.tick_finished.connect(_on_tick_finished)
+	_connect(Sim.tick_finished, _on_tick_finished)
 	for info: Dictionary in Events.get_signal_list():
 		var signal_name: StringName = StringName(str(info["name"]))
 		var arguments: int = (info["args"] as Array).size()
 		var counter: Callable = _events.count.bind(signal_name)
-		Events.connect(signal_name, counter.unbind(arguments) if arguments > 0 else counter)
-	Flow.screen_changed.connect(func(screen: StringName) -> void: _events.count(StringName("screen_" + screen)))
+		_connect(Signal(Events, signal_name), counter.unbind(arguments) if arguments > 0 else counter)
+	_connect(Flow.screen_changed, _on_screen_changed)
 	Sim.manual = _fast
 	_run.call_deferred()
+
+
+## The run's verdict so far (in-process runs read it after [signal done]): "exit_code" (-1 while running), "checks",
+## "failures", "pending", "engine_errors", "warnings", "ticks", "trace" (the P1 rows of trace.json: [frame, level,
+## tick, x, y, xvel, yvel, state, dead]).
+func result() -> Dictionary:
+	var logged: Array[PackedStringArray] = _engine_log.snapshot() if _engine_log != null \
+			else [PackedStringArray(), PackedStringArray()] as Array[PackedStringArray]
+	return {"exit_code": _exit_code, "checks": _checks, "failures": _failures.duplicate(), "pending": _pending.duplicate(),
+		"engine_errors": logged[0], "warnings": logged[1], "ticks": _ticks, "trace": _trace_rows()}
+
+
+func _connect(signal_ref: Signal, callable: Callable) -> void:
+	signal_ref.connect(callable)
+	_connections.append([signal_ref, callable])
+
+
+func _on_screen_changed(screen: StringName) -> void:
+	_events.count(StringName("screen_" + screen))
+	_title_seen = _title_seen or screen == Flow.SCREEN_TITLE
+	if _fast or _finished:
+		return
+	if screen != Flow.SCREEN_LEVEL:
+		_release_clock()
+		return
+	# Real time: a new stage (emitted before its first tick, while the cover still freezes it) waits for its first
+	# `play` like a --fast one - unless the heroes read the devices, or a `play` already waits for this very stage
+	# (one that started before the stage did and has not seen a stage yet).
+	if _device_input or (_playing and _play_stage == 0):
+		return
+	_clock_held = true
+	Sim.manual = true
+
+
+## Real time: let a held stage's clock run (its first `play` starts, or the heroes read the devices).
+func _release_clock() -> void:
+	if _clock_held:
+		_clock_held = false
+		Sim.manual = false
 
 
 func _process(_delta: float) -> void:
@@ -321,10 +462,32 @@ func _may_step() -> bool:
 
 
 func _run() -> void:
-	print("Autoplay flow: %d command(s), output %s" % [_commands.size(), _out_dir])
-	for command: PackedStringArray in _commands:
+	print("Autoplay flow: %d command(s), output %s%s" % [_commands.size(), _out_dir,
+			" (skeleton: parts without their content are skipped)" if _skeleton else ""])
+	var index: int = 0
+	while index < _commands.size():
+		var command: PackedStringArray = _commands[index]
+		index += 1
 		if _finished:
 			return
+		if command[0] == "need":
+			var missing: PackedStringArray = PackedStringArray()
+			for what: String in command.slice(1):
+				if not content_exists(what):
+					missing.append(what)
+			if missing.is_empty():
+				continue
+			if not _skeleton:
+				_failures.append("need: %s not there (only a skeleton flow may wait for content)" % ", ".join(missing))
+				break
+			# The part waits for its content: go on at the next section (or end the run).
+			var skipped: int = 0
+			while index < _commands.size() and _commands[index][0] != "section":
+				index += 1
+				skipped += 1
+			_pending.append("%s (%d line(s) skipped)" % [", ".join(missing), skipped])
+			print("Autoplay flow: PENDING %s - %d line(s) skipped to the next section" % [", ".join(missing), skipped])
+			continue
 		if not await _execute(command):
 			_failures.append("stopped at: %s" % " ".join(command))
 			break
@@ -367,6 +530,8 @@ func _execute(command: PackedStringArray) -> bool:
 					else:
 						GameInput.clear_scripted_slot(slot)
 						_device_slots |= 1 << slot
+					# The heroes read the devices: the clock runs without a `play`.
+					_release_clock()
 				"script":
 					_script_slots(slot)
 					_device_slots = 0 if slot < 0 else _device_slots & ~(1 << slot)
@@ -377,6 +542,9 @@ func _execute(command: PackedStringArray) -> bool:
 		"play":
 			return await _play(rest)
 		"play_file":
+			if not FileAccess.file_exists(_project_path(rest)):
+				push_error("Autoplay flow: route %s not found" % rest)
+				return false
 			return await _play(FileAccess.get_file_as_string(_project_path(rest)), true)
 		"weapon":
 			var weapon: int = -1
@@ -436,12 +604,41 @@ func _execute(command: PackedStringArray) -> bool:
 					else NOTIFICATION_APPLICATION_FOCUS_IN
 			get_tree().root.propagate_notification(what)
 			await get_tree().process_frame
+		"wait_ms":
+			var until: int = Time.get_ticks_msec() + maxi(_int_arg(command, 1, 0), 0)
+			while Time.get_ticks_msec() < until:
+				await get_tree().process_frame
+		"expect_errors":
+			_expected_errors += maxi(_int_arg(command, 1, 0), 0)
+		"section":
+			print("Autoplay flow: section %s" % rest)
+			return await _start_section()
+		"need":
+			pass  # _run decides (a part without its content is skipped)
 		"quit":
 			_finish(EXIT_OK if _failures.is_empty() else EXIT_FAILED)
 		_:
 			push_error("Autoplay flow: unknown command '%s'" % op)
 			return false
 	return true
+
+
+## `section`: the part starts at the title (see the header); false when the title does not come.
+func _start_section() -> bool:
+	_hold("all", false)
+	Input.flush_buffered_events()
+	_script_slots(-1)
+	_device_slots = 0
+	_device_input = false
+	var idle: PackedStringArray = PackedStringArray(["wait_until", "flow.busy", "==", "false", "900"])
+	if not await _wait_until(idle):
+		return false
+	# At the boot (the title not shown yet) the part's own lines wait for the title.
+	if Flow.current_screen == Flow.SCREEN_TITLE or not _title_seen:
+		return true
+	Flow.goto_title()
+	return await _wait_until(PackedStringArray(["wait_until", "flow.current_screen", "==", "title", "900"])) \
+			and await _wait_until(idle)
 
 
 func _wait_until(command: PackedStringArray) -> bool:
@@ -597,10 +794,14 @@ func _play(script_text: String, from_file: bool = false) -> bool:
 	_playing = true
 	var idle_frames: int = 0
 	var stalled: int = 0
+	var stalled_since: int = Time.get_ticks_msec()
 	var last_index: int = 0
 	var played: bool = true
 	# The stage is told apart by its instance id: a freed level compares equal to null.
-	var stage: int = Game.level.get_instance_id() if Game.level != null else 0
+	var stage: int = Game.level.get_instance_id() if is_instance_valid(Game.level) else 0
+	_play_stage = stage
+	# Real time: the stage's clock was held for this `play` (its first entry is the stage's first tick).
+	_release_clock()
 	while _flag_index < _length:
 		await get_tree().process_frame
 		if Flow.current_screen != Flow.SCREEN_LEVEL and not Flow.busy:
@@ -611,20 +812,26 @@ func _play(script_text: String, from_file: bool = false) -> bool:
 		var current: int = Game.level.get_instance_id() if is_instance_valid(Game.level) else 0
 		if stage == 0:
 			stage = current
+			_play_stage = stage
 		elif current != 0 and current != stage:
 			# A linked sub-stage, a bonus stage or the stage after a trophy took over: its own input comes next.
 			print("Autoplay flow: %s started after %d of %d ticks" % [Game.level.level_id, _flag_index, _length])
 			break
-		stalled = 0 if _flag_index != last_index else stalled + 1
+		if _flag_index != last_index:
+			stalled = 0
+			stalled_since = Time.get_ticks_msec()
+		else:
+			stalled += 1
 		last_index = _flag_index
-		if stalled >= STALL_FRAMES:
-			_failures.append("play: no tick ran for %d frames (paused?)" % STALL_FRAMES)
+		if stalled >= STALL_FRAMES and (_fast or Time.get_ticks_msec() - stalled_since >= STALL_MSEC):
+			_failures.append("play: no tick ran for %d frames (paused?)" % stalled)
 			played = false
 			break
 	_streams = []
 	_length = 0
 	_flag_index = 0
 	_playing = false
+	_play_stage = 0
 	return played
 
 
@@ -914,19 +1121,53 @@ func _project_path(path: String) -> String:
 	return "res://" + path
 
 
+## P1's trace rows: [frame, level, tick, x, y, xvel, yvel, state, dead].
+func _trace_rows() -> Array[Array]:
+	var rows: Array[Array] = []
+	for i: int in _trace_levels.size():
+		var k: int = i * 8
+		rows.append([_trace[k], String(_trace_levels[i]), _trace[k + 1], _trace[k + 2], _trace[k + 3],
+			_trace[k + 4], _trace[k + 5], _trace[k + 6], _trace[k + 7] != 0])
+	return rows
+
+
+## The engine errors of the run beyond the announced ones become failures (see the header); warnings are printed.
+func _account_engine_log() -> void:
+	if _engine_log == null:
+		return
+	OS.remove_logger(_engine_log)
+	var logged: Array[PackedStringArray] = _engine_log.snapshot()
+	var errors: PackedStringArray = logged[0]
+	var warnings: PackedStringArray = logged[1]
+	print("Autoplay flow: engine log: %d error(s) (%d announced), %d warning(s)" % [errors.size(), _expected_errors,
+			warnings.size()])
+	for i: int in mini(warnings.size(), ERRORS_LISTED):
+		print("Autoplay flow: warning: %s" % warnings[i])
+	var unexpected: int = errors.size() - _expected_errors
+	if unexpected <= 0:
+		return
+	for i: int in mini(errors.size(), ERRORS_LISTED):
+		_failures.append("engine error: %s" % errors[i])
+	if errors.size() > ERRORS_LISTED:
+		_failures.append("engine error: ... and %d more" % (errors.size() - ERRORS_LISTED))
+	if _expected_errors > 0:
+		_failures.append("%d engine error(s) logged, %d announced by expect_errors" % [errors.size(), _expected_errors])
+
+
 func _finish(exit_code: int) -> void:
 	if _finished:
 		return
 	_finished = true
+	_account_engine_log()
+	if exit_code == EXIT_OK and not _failures.is_empty():
+		exit_code = EXIT_FAILED
+	_exit_code = exit_code
 	_hold("all", false)
 	GameInput.clear_scripted()
+	_release_clock()
 	var file: FileAccess = FileAccess.open(_out_dir + "/trace.json", FileAccess.WRITE)
 	if file != null:
-		var rows: Array[Array] = []
-		for i: int in _trace_levels.size():
-			var k: int = i * 8
-			rows.append([_trace[k], String(_trace_levels[i]), _trace[k + 1], _trace[k + 2], _trace[k + 3],
-				_trace[k + 4], _trace[k + 5], _trace[k + 6], _trace[k + 7] != 0])
+		var rows: Array[Array] = _trace_rows()
 		var trace: Dictionary = {
 			"columns": ["frame", "level", "tick", "x", "y", "xvel", "yvel", "state", "dead"], "rows": rows,
 		}
@@ -946,6 +1187,20 @@ func _finish(exit_code: int) -> void:
 	])
 	for failure: String in _failures:
 		print("Autoplay flow: failed: %s" % failure)
-	print("Autoplay flow: RESULT %s" % ("PASS" if exit_code == EXIT_OK else "FAIL"))
+	for part: String in _pending:
+		print("Autoplay flow: pending: %s" % part)
+	print("Autoplay flow: RESULT %s%s" % ["PASS" if exit_code == EXIT_OK else "FAIL",
+			" (PENDING %d part(s))" % _pending.size() if not _pending.is_empty() else ""])
+	if not quit_when_done:
+		# In-process (tests): give the clock, the input and the signals back; the caller frees the node.
+		for connection: Array in _connections:
+			var signal_ref: Signal = connection[0]
+			if signal_ref.is_connected(connection[1]):
+				signal_ref.disconnect(connection[1])
+		_connections.clear()
+		Sim.manual = _manual_before
+		done.emit(exit_code)
+		return
+	done.emit(exit_code)
 	Autoplay.finished.emit(exit_code)
 	Flow.shutdown_and_quit(exit_code)

@@ -1,0 +1,395 @@
+# Club & Grub - World 2, stage 1 co-op: "Echo Caverns" for two (designer DB1; docs/expansion/DESIGN.md D.9).
+# The co-op file of levels/w2_l1.lvl (kind = coop, coop_of, coop_base_hash; never edit the solo file). Gate 1
+# "hatches": the first hatch of the Hatch Well became two stone trapdoors in the floor, each lifted by a plate (one
+# holds, one drops): A stands on plate pa, trapdoor 1 rises and B drops into the first chamber; there B stands on plate
+# pb and trapdoor 2 rises for A (a leapfrog of two doors, LEVEL_DESIGN 15.7.3). Gate 2 "den": the low passage from the
+# fourth chamber into the Dark Deep is a keeper hall, 4 rows high, held by two Raptors (daze: one hero bounces on a
+# head, the partner strikes the dazed Raptor); their door opens when both are dead. Leeches lurk in the dark beyond;
+# the Expert stinger of the shaft is a loner; the turtles are Shellbacks (shell) and the Echo Gallery's bats a bonded
+# pair. x2 secret: at the foot of the Echo Shaft a channel of black water runs under the rock - only a Batter Up line
+# drive crosses it, to a cracked wall and the Deep Pantry with Cave Painting 22 (a gate brings the batter back).
+
+[meta]
+format = 2
+id = w2_l1_coop
+name = "Echo Caverns"
+kind = coop
+coop_of = w2_l1
+coop_base_hash = "df1b1a97a84b424fab7ba8e61629b6e299756846e042579ba29626af1ebd1cf4"
+book = 1
+world = 2
+stage = 1
+biome = cave
+terrain_a = cave/terrain
+terrain_b = cave/terrain_stone
+liquid = water
+background = cave
+music = level_cave
+bonus = bonus_b
+bonus_tier = 1
+author = DB1
+notes = "Co-op 2-1: plate trapdoors (leapfrog) in the Hatch Well, Raptor keeper hall into the Dark Deep, leeches, the Deep Pantry by line drive (painting 22)."
+
+[legend]
+? = objects/hidden_spot kind=small count=3 contents=food:13,food:21,food:9 look=inset tile=#
+* = objects/hidden_spot kind=big hits=3 contents=giant:3 look=block tile=#
+$ = objects/breakable_block hits=2 tile=;
+k = objects/hidden_spot kind=small count=2 contents=food:24,food:12 tile=#
+K = objects/hidden_spot kind=small count=3 contents=food:27,treasure:4,food:31 tile=#
+J = objects/hidden_spot kind=big hits=4 contents=giant:1 tile=#
+n = objects/hidden_spot kind=small count=4 contents=food:22,food:30,food:23,treasure:7 tile=#
+a = items/food index=2
+b = items/food index=7
+c = items/food index=14
+d = items/food index=21
+e = items/food index=33
+f = items/food index=40
+g = items/food index=41
+h = items/food index=47
+i = items/food index=43
+t = items/treasure index=3
+p = items/food index=31
+
+[tiles]
+################################################################################################################################################################################################################
+################################################################################################################################################################################################################
+################################################################################################################################################################################################################
+################################################################################################################################################################################################################
+#################################...................############################################################################################################################################################
+#################################...................############################################################################################################################################################
+#################################.....b.b.b...d.t...############################################################################################################################################################
+#######################..........----####kk#######..############################################################################################################################################################
+#######.......#########..............#############..############################################################################################################################################################
+#######.......######..............c......##..............#####...###############################################################################################################################################
+#...............................------...##..............#####...###############################################################################################################################################
+#........................................##......................###############################################################################################################################################
+#............bb...........hhh............##......................###############################################################################################################################################
+#...........b..b.........------..................................###################################################################################################......................######################
+#..........a....a..............................e.................###################################################################################################...........................................#
+#.........a......a...........................####................###################################################################################################...........................................#
+#..................../###################\...####................k##################################################################################################...........................................#
+#..@......../##\..../#####################\..####.......d.d.d....k##################################################################################################.........................f.f.f.............#
+#######?############################################*###############################################################################################################...........................................#
+#######################################################.......######################################################################################################................------#########nn####*######
+############################################.......................#################################################################################################......................######################
+############################################.............a.a.a.....#################################################################################################......................######################
+############################################.......................#################################################################################################........------........######################
+############################################.......................k###############################################################################################k......................######################
+##..................########################..bbb..../##\..........k###############################################################################################k......................######################
+##..................#########################_____##################################################################################################################------................######################
+##.......pp.........#########################.....##################################################################################################################......................#.............########
+##..................####################.................#####...................###################################################################################......................#.............########
+##......p...p.......####################.................#####...................###################################################################################........------........#.............########
+##......-----.......####################.........................................###################################################################################......................$.............########
+##..................####################.........................................###################################################################################......................$.............########
+##..................####################.................................###########################################################################################................------######################
+###################################....#............................----.###########################################################################################......................######################
+###################################....$.................................###########################################################################################......................######################
+###################################.i..$...........h.h........h.h.g.g....###########################################################################################...........------.....######################
+##################################################################______############################################################################################......................######################
+##################################################################......############################################################################################......................######################
+##################################################.............................#####################################################################################...------.............######################
+##################################################.............................#####################################################################################......................######################
+###................###############################.............................#####################################################################################......................######################
+###................###############################.............a.a.............#####################################################################################...........------.....######################
+###................###############################.............................#####################################################################################......................######################
+###......i.........#################################______##########################################################################################################......................######################
+###.....i.i........#################################......##########################################################################################################..................##########################
+###................###########################.............................#########################################################################################..................##########################
+###................###########################.............................#########################################################################################......................######################
+##############################################.............................#########################################################################################......................######################
+##############################################..........................................#.##########################################################################......................######################
+##############################################..........................................#.......###############################################################...........................######################
+##############################################..........................................#.......###############################################################...........................######################
+##############################################..........................................#.......................##########.............##########...###########...........................######################
+################################################################KKK#################?#####\.....................##########.............##########...###########...........................######################
+###########################################################################################\.....................########...............########....###...................................######################
+################################################################################################.................########...............########....................##*#..................######################
+################################################################################################...................#####..................#####.....................####..................######################
+################################################################################################..........................................................................................######################
+####################################################################################################\.........d......................d...................................------...........######################
+#####################################################################################################\......d...d..................d...d..................................................######################
+######################################################################################################\..................................................../####$$##.................................$.......###
+#######################################################################################################\................................................../####....#.............------..............$.......###
+############################################################################################################~~~~##########~~~####J#~~~~##########~~~###########....#.................................$.......###
+############################################################################################################~~~~##########~~~######~~~~##########~~~################.................................$.......###
+##########################################################################################################################################################################################~~~~~~~~##############
+##########################################################################################################################################################################################~~~~~~~~##############
+################################################################################################################################################################################################################
+################################################################################################################################################################################################################
+################################################################################################################################################################################################################
+################################################################################################################################################################################################################
+################################################################################################################################################################################################################
+################################################################################################################################################################################################################
+
+[entities]
+enemies/walker 28 15 skin=turtle_b left=-4 right=3 coop=shell
+enemies/walker 36 15 skin=turtle_b left=-3 right=2 expert coop=shell
+enemies/dangler 39 9 skin=bat depth=80 speed=2
+objects/hidden_spot 31 15 kind=small count=3 contents=food:25,food:20,treasure:1 prop=cave/rock_big
+items/letter 44 6 index=0
+items/code_stone 49 6 index=3
+zones/secret 40 6 rect=33,4,19,3 name=upper_vein
+objects/gate 47 14 name=cache_in dest=cache_out skin=hole
+objects/sign 63 17 text=SIGN_W2_HATCH
+objects/checkpoint 53 17
+enemies/dangler 49 9 skin=bat depth=72 speed=2 expert
+enemies/lurker 50 20 skin=insect_b range=4 hp=10
+enemies/lurker 63 20 skin=insect_b range=3 hp=10 expert
+enemies/walker 57 34 skin=turtle_b left=-2 right=4 coop=shell
+enemies/lurker 71 27 skin=insect_b range=3 hp=10
+enemies/lurker 77 27 skin=insect range=2 hp=10
+enemies/hopper 62 34 skin=mini_rex_b range=5 expert
+items/weapon 77 30 kind=hammer
+items/letter 79 30 index=1
+items/treasure 37 34 index=8
+enemies/swinger 60 41 skin=bat_b radius=35
+enemies/dangler 67 37 skin=bat depth=40 speed=1 expert
+objects/hidden_spot 76 41 kind=small count=3 contents=food:35,treasure:6,food:28 prop=cave/skull_big
+objects/hidden_spot 48 50 kind=small count=3 contents=food:26,food:44,treasure:2 prop=cave/boulders
+objects/checkpoint 61 50
+enemies/walker 70 50 skin=turtle_b left=-3 right=3 coop=shell
+zones/dark 91 50 rect=90,47,2,5
+objects/sign 72 50 text=SIGN_W2_DARK
+enemies/leech 93 48 range=3
+enemies/leech 101 50 range=4
+enemies/swinger 117 59 skin=bat_b radius=35
+objects/checkpoint 127 59
+items/heart 125 59
+objects/hidden_spot 113 59 kind=small count=3 contents=food:34,food:22,treasure:5 prop=cave/crystal_violet_b
+objects/hidden_spot 150 59 kind=small count=3 contents=food:36,treasure:10,food:32 prop=cave/skull_big
+enemies/swinger 140 59 skin=bat_b radius=35
+enemies/dangler 152 52 skin=bat depth=88 speed=2
+enemies/dangler 156 52 skin=bat depth=56 speed=2 expert
+objects/gate 159 57 name=vault_in dest=vault_out skin=arch
+items/treasure 160.5 60 index=13
+zones/dark 164 61 rect=164,50,2,12 on=false
+objects/checkpoint 165 52
+objects/platform 169.5 54 dir=1 speed=2 travel=79 mode=ride skin=stone
+enemies/flyer 176 47 skin=bat left=-4 right=4
+enemies/dangler 170 26 skin=bat depth=40 speed=2
+enemies/stinger 168 30 skin=insect range=5 expert coop=lone
+enemies/dangler 181 41 skin=bat depth=24 speed=1
+items/letter 168 36 index=4
+items/warp 196 30
+items/code_stone 192 30 index=2
+zones/secret 192 30 rect=187,26,13,5 name=warp_nook
+objects/exit 204 18
+enemies/walker 193 18 skin=turtle_b left=-3 right=3 coop=shell
+enemies/hopper 199 18 skin=mini_rex_b range=6
+enemies/lurker 196 14 skin=insect_b range=3 hp=10 expert
+objects/hidden_spot 187 18 kind=small count=3 contents=food:39,treasure:14,food:38 prop=cave/rock_big
+objects/gate 4 31 name=cache_out dest=cache_in lock=1,22 skin=hole
+zones/secret 10 31 rect=2,24,18,8 name=crystal_cache
+items/letter 15 31 index=2
+items/code_stone 6 31 index=0
+items/treasure 10 28 index=11
+objects/hidden_spot 18 31 kind=small count=3 contents=treasure:9,food:38,food:39 prop=cave/crystal_cyan_b
+objects/gate 5 45 name=vault_out dest=vault_in lock=1,36 skin=arch
+zones/secret 10 45 rect=3,39,16,7 name=bone_vault
+items/letter 14 45 index=3
+items/code_stone 11 45 index=1
+objects/hidden_spot 17 45 kind=small count=3 contents=treasure:12,food:36,food:40 prop=cave/skull_big
+props/cave/cave_mouth 2.5 17
+props/cave/crystal_violet_b 9 17
+props/cave/crystal_cyan_c 10 17
+props/cave/mushrooms 37 9
+props/cave/mushrooms 30 12
+props/cave/pebble 180 18
+props/cave/mushrooms 177 21
+props/cave/crystal_violet_d 164 24
+props/cave/crystal_cyan_d 177 27
+props/cave/pebble 180 30
+props/cave/crystal_violet_d 175 33
+props/cave/crystal_cyan_d 172 36
+props/cave/pebble 175 39
+props/cave/crystal_violet_d 169 55
+props/cave/crystal_cyan_d 182 58
+props/cave/drips 47.5 4
+props/cave/drips 49.5 4
+props/cave/stalactite 24 7
+props/cave/stalactite 25 7
+props/cave/drips 31.5 7
+props/cave/drips 11.5 8
+props/cave/drip_cap 44 9
+props/cave/stalactite 46 9
+props/cave/drips 52.5 9
+props/cave/stalactite 18 10
+props/cave/stalactite 167 13
+props/cave/stalactite 168 13
+props/cave/stalactite 169 13
+props/cave/stalactite 178 13
+props/cave/stalactite 179 13
+props/cave/stalactite 185 13
+props/cave/drip_cap 193 14
+props/cave/stalactite 199 14
+props/cave/drip_cap 205 14
+props/cave/crystal_cyan_c 23 15 flip
+props/cave/bone_big 24 15
+props/cave/crystal_cyan_a 34 15
+props/cave/crystal_cyan_c 38 15
+props/cave/bone_pile 40 15
+props/cave/skull_buried 13.5 16
+props/cave/tusk_d 19 17 flip
+props/cave/crystal_cyan_c 51 17 flip
+props/cave/crystal_cyan_a 189 18
+props/cave/crystal_cyan_d 191 18
+props/cave/bone_pile 202 18
+props/cave/stalactite 48 20
+props/cave/tusk_d 55 23
+props/cave/drips 4.5 24
+props/cave/stalactite 11 24
+props/cave/stalactite 17 24
+props/cave/pebble 50 24 flip
+props/cave/skull_buried 51.5 24
+props/cave/twigs 58 24 flip
+props/cave/mushrooms 62 24 flip
+props/cave/twigs 63 24
+props/cave/stalactite 190 26
+props/cave/stalactite 191 26
+props/cave/drip_cap 193 26
+props/cave/drips 197.5 26
+props/cave/drips 55.5 27
+props/cave/drips 65.5 27
+props/cave/stalactite 68 27
+props/cave/stalactite 69 27
+props/cave/drips 59.5 29
+props/cave/crystal_violet_c 187 30 flip
+props/cave/crystal_violet_d 190 30
+props/cave/crystal_violet_a 194 30
+props/cave/mound_small 2 31 flip
+props/cave/tusk_d 11 31
+props/cave/drips 35.5 32
+props/cave/crystal_violet_c 41 34 flip
+props/cave/twigs 42 34
+props/cave/crystal_cyan_b 45 34
+props/cave/skull_buried 47.5 34
+props/cave/mushrooms 59 34
+props/cave/mushrooms 72 34
+props/cave/stalactite 50 37
+props/cave/stalactite 55 37
+props/cave/drip_cap 56 37
+props/cave/stalactite 73 37
+props/cave/stalactite 74 37
+props/cave/stalactite 5 39
+props/cave/drips 9.5 39
+props/cave/stalactite 15 39
+props/cave/drip_cap 18 39
+props/cave/crystal_violet_d 72 41 flip
+props/cave/bone_pile 74 41 flip
+props/cave/crystal_cyan_c 78 41 flip
+props/cave/crystal_cyan_b 182 42 flip
+props/cave/bone_pile 183 42
+props/cave/drip_cap 48 44
+props/cave/stalactite 50 44
+props/cave/drip_cap 58 44
+props/cave/stalactite 62 44
+props/cave/stalactite 66 44
+props/cave/drips 67.5 44
+props/cave/drip_cap 69 44
+props/cave/pebble 7 45
+props/cave/stalactite 184 45
+props/cave/drip_cap 76 47
+props/cave/drips 161.5 48
+props/cave/rock_big 53.5 50
+props/cave/mushrooms 56 50 flip
+props/cave/twigs 57 50
+props/cave/crystal_cyan_d 87 50 flip
+props/cave/stalactite 96 50
+props/cave/stalactite 110 50
+props/cave/stalactite 111 50
+props/cave/drips 123.5 50
+props/cave/stalactite 128 50
+props/cave/stalactite 129 50
+props/cave/stalactite 134 50
+props/cave/drip_cap 147 50
+props/cave/bone_pile 93 52 flip
+props/cave/crystal_violet_c 94 52
+props/cave/stalactite 148 53
+props/cave/drip_cap 150 53
+props/cave/stalactite 114 54
+props/cave/stalactite 136 54
+props/cave/stalactite 137 54
+props/cave/crystal_cyan_b 96 55 flip
+props/cave/stalactite 119 55
+props/cave/stalactite 139 55
+props/cave/drip_cap 166 55
+props/cave/rock_big 162.5 57 flip
+props/cave/crystal_cyan_b 104 59
+props/cave/crystal_cyan_a 106 59
+props/cave/pebble 107 59 flip
+props/cave/bone_big 115 59
+props/cave/skull_buried 137.5 59 flip
+props/cave/mound_small 144 59
+props/cave/crystal_cyan_c 152 59
+props/cave/crystal_cyan_c 169 61 flip
+props/cave/twigs 172 61
+props/cave/mushrooms 174 61
+props/cave/crystal_cyan_a 176 61 flip
+props/cave/skull_ribs 177.5 61
+props/cave/crystal_cyan_b 181 61
+props/cave/mound_small 184 61 flip
+# ---- co-op (DB1) ------------------------------------------------------------------------------------------------
+objects/hero_start 2 17 slot=2
+# Gate 1 "hatches" (one holds, one drops): plate pa holds trapdoor H1 up (a 2-cell slab of the floor that rises 3 rows,
+# opening the floor under it); the dropped hero holds plate pb in the first chamber, which lifts trapdoor H2 for his
+# partner. Each plate 8+ cells from its trapdoor; a checkpoint in the chamber behind the gate.
+objects/sign 51 17 text=SIGN_COOP_W2_HATCH
+objects/x2_tablet 54 17 gate=hatches far=58,24
+objects/plate 49 17 name=pa
+objects/column 58 18 size=2,1 rise=3 rise_while=pa
+objects/plate 50 24 name=pb
+objects/column 60 18 size=2,1 rise=3 rise_while=pb
+objects/checkpoint 63 24
+# Gate 2 "den": two Raptors (daze) keep the low passage, 4 rows high; their door (col 88) rises when both are dead.
+objects/sign 70 50 text=SIGN_COOP_W2_RAPTOR
+objects/x2_tablet 74 50 gate=den far=89,50
+enemies/raptor 80 50 keeper=den
+enemies/raptor 85 50 keeper=den
+objects/column 88 50 size=1,4 rise=4 trigger=keepers:den
+# x2 secret: the Deep Pantry behind the black-water channel at the foot of the Echo Shaft. A Batter Up line drive
+# from the shaft floor crosses the 8 cells of water; the batter clubs the cracked wall and takes Cave Painting 22;
+# the arch in the pantry brings him back to the shaft.
+objects/x2_tablet 183 61 secret far=195,61
+zones/secret 200 61 name=deep_pantry rect=198,58,7,4
+items/painting 201 61 index=22
+objects/gate 203 61 name=pantry_out dest=pantry_back skin=arch
+objects/marker 178 61 name=pantry_back
+
+[backwall]
+1 10 6 8 set=a deco=25
+2 24 18 8 set=a deco=30
+3 39 16 7 set=a deco=30
+187 26 13 5 set=a deco=30
+35 32 4 3 set=a deco=40
+44 19 23 6 set=a deco=15
+40 26 41 9 set=a deco=15
+50 36 29 6 set=a deco=15
+46 43 29 8 set=a deco=15
+186 14 20 5 set=a deco=20
+
+[overrides]
+55 18 b 27
+56 18 b 28
+57 18 b 28
+58 18 b 28
+59 18 b 28
+60 18 b 28
+61 18 b 29
+45 25 b 27
+46 25 b 28
+47 25 b 28
+48 25 b 28
+49 25 b 29
+66 35 b 27
+67 35 b 28
+68 35 b 28
+69 35 b 28
+70 35 b 28
+71 35 b 29
+52 42 b 27
+53 42 b 28
+54 42 b 28
+55 42 b 28
+56 42 b 28
+57 42 b 29

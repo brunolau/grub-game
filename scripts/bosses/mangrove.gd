@@ -13,9 +13,13 @@ extends BossBase
 ##    creak (the telegraph), MANGROVE_OUT_TICKS out along the floor (the moving fist: 3 bones and the boss knock-back),
 ##    one tick back; it shakes the screen (4), shoves the heroes on the floor 2 px and drops one leaf from 150 px over
 ##    its target (`projectiles/enemy_ember skin=leaf`, a bone).
-##  - the UPPER HAND: after a MANGROVE_SHAKE_TICKS ledge shake (the telegraph) it sweeps out of the wall onto the upper
-##    ledge (a bone for anyone in its way) and rests there MANGROVE_HAND_REST_TICKS, its fingers hooked over the
-##    ledge's edge (reachable by a high strike from the lower ledge, or from the upper ledge itself), then draws back.
+##  - the UPPER HAND: after a MANGROVE_SHAKE_TICKS ledge shake (the telegraph) it sweeps out of the wall along the top
+##    of the upper ledge (a bone for anyone in its way - a hero crouching on the lower ledge stays under it) and rests
+##    there MANGROVE_HAND_REST_TICKS, its fingers hooked MANGROVE_HAND_SINK px over the ledge's edge (reachable by a
+##    high strike from the lower ledge, or from the upper ledge itself), then draws back.
+## The weak points stay clear of the fight HUD (DESIGN.md G35 as corrected; Hud.weak_point_problem) in the B.2 chamber
+## framed as w6_l2b frames it (an 11-row lock, the floor on the view's last row): the face 76-105 px over the floor
+## (MANGROVE_FACE_RISE 70), the resting hand on a row-5 ledge ending at column 5.
 ##  - the TRUNK: the strip of wall under the face; walking into it pushes the hero back and costs a bone.
 ## Any weapon counts 1 per hit (archetype 6.2): Beginner 4 / 3 / 3, Expert 6 / 5 / 5 hits per stage.
 ##  1. FACE: the fist punches (bursts of 3-8, Sim.rng, the first burst 8; rests of 64-184 ticks): the face is the weak
@@ -26,11 +30,15 @@ extends BossBase
 ##     and every punch sends the bugs that are up back down.
 ## Co-op form (`kind = coop` files or `form=coop`): stages 1 and 2 merge - the face and the resting hand must both be
 ## struck within the twin window, by the two heroes (one hero's two hits never twin), a twin hit counting 1 (Beginner 5,
-## Expert 7 [R8]); the window is min(PartyTuning.window_ticks, MANGROVE_SOLO_MIN_TICKS - 4), the solo minimum measured
-## by tests/test_enemies_mangrove.gd. A hero landing on the resting fist without Up held stands on it and PINS it (no
-## punch) until it flings him off (-160) after MANGROVE_PIN_TICKS; with Up held it launches him at once (-224). Stage 3
-## (Beginner 3, Expert 6): the knuckle armour of the stuck fist turns to the nearer hero every tick - only a hit from
-## the far side (the wrist) counts.
+## Expert 7 [R8]); the window is PartyTuning.window_ticks (24 Beginner / 12 Expert): a slot-bound twin rule is exempt
+## from the solo_min cap (DESIGN.md G34 - one player never strikes with two heroes; MANGROVE_SOLO_MIN_TICKS stays a
+## measured fact). A hero landing on the resting fist without Up held stands on it and PINS it (no punch) until it
+## flings him off (-160) after MANGROVE_PIN_TICKS; with Up held it launches him at once (-224). Stage 3 (Beginner 3,
+## Expert 6): the knuckle armour of the stuck fist turns to the nearer hero every tick - only a hit from the far side
+## (the wrist) counts.
+## IDLE rule (DESIGN.md G33 / G34): the pin, the knuckles' "nearer hero" and both twin halves count only a hero for whom
+## PlayerBase.counts_for_coop() holds (alive, hatched, not idle). A dozing partner still stands on the resting fist (a
+## physical contact: carried, and launched by nothing) but pins nothing, and the knuckles never turn to him.
 ##
 ## Fairness (B.0): every attack shows itself 10+ ticks ahead (draw-back 10, ledge shake 14); hits never stop or lengthen
 ## a part's clock (no stun-lock); BossBase.hit_cooldown is shared. Parameters: `arena`, `hp` (stage 1 takes what the
@@ -57,8 +65,10 @@ const MANGROVE_HITS_BEGINNER: Array[int] = [4, 3, 3]   ## hits per stage (face, 
 const MANGROVE_HITS_EXPERT: Array[int] = [6, 5, 5]
 const MANGROVE_COOP_HITS_BEGINNER: Array[int] = [5, 3] ## co-op: twin hits, then the fist (*tune*)
 const MANGROVE_COOP_HITS_EXPERT: Array[int] = [7, 6]
-const MANGROVE_FACE_RISE: int = 106          ## the face's feet point this far over the floor: its weak rect lies 6-35 px
-                                             ## higher (above any jump from the floor, at the -160 launch's apex) [own]
+## The face's feet point this far over the floor: its weak rect lies 6-35 px higher, 76-105 px over the floor - at most
+## 105 so that it stays 24 px under the fight HUD in the B.2 chamber (DESIGN.md G35 as corrected; it was 106, the rect
+## at 112-141 px, under the HUD). The resting fist's -160 launch passes it on the way up. [own]
+const MANGROVE_FACE_RISE: int = 70
 const MANGROVE_TRUNK_PX: int = 4             ## the trunk strip in front of the wall face (a bone, pushed back)
 const MANGROVE_FIST_REST_DX: int = 40        ## the resting fist's centre this far from the wall face [own]
 const MANGROVE_FIST_DRAW_DX: int = 16        ## drawn back to this far from the wall face [own]
@@ -81,7 +91,9 @@ const MANGROVE_SHAKE_TICKS: int = 14         ## the ledge shake before the upper
 const MANGROVE_HAND_SPEED: int = 8           ## px per tick of the sweep and the retreat [own]
 const MANGROVE_HAND_REST_TICKS: int = 44     ## the hand rests on the ledge this long
 const MANGROVE_HAND_PAUSE: int = 66          ## ticks between the hand's retreat and its next ledge shake [own]
-const MANGROVE_HAND_SINK: int = 12           ## the resting hand's fingers hang this far below the ledge top [own]
+## The resting hand's fingers hang this far below the ledge top; it sweeps (and draws back) with its box's bottom on the
+## ledge top and sinks onto the edge when it comes to rest [own]
+const MANGROVE_HAND_SINK: int = 12
 const MANGROVE_HAND_FIRST_PAUSE: int = 22    ## the first shake of a stage comes this long after it began [own]
 const MANGROVE_PIN_TICKS: int = 66           ## co-op: a hero standing on the resting fist pins it this long ...
 const MANGROVE_FLING_YVEL: int = Tuning.BOSS_LAUNCH_YVEL  ## ... then it flings him off
@@ -92,9 +104,9 @@ const MANGROVE_PIN_GRACE: int = 3
 const MANGROVE_PIN_HOVER_PX: int = 6
 ## Co-op: the least ticks one hero needs between a face hit and a hand hit on the test level, measured by
 ## tests/test_enemies_mangrove.gd (launched from the fist with the spear, the axe or the swirling axe, a throw at the face
-## and one back at the resting hand; the axe does it in 10), which pins this as a lower bound: the twin window is
-## min(PartyTuning.window_ticks, this - PartyTuning.WINDOW_SOLO_MARGIN_TICKS) = 6 ticks on both difficulties
-## (GAMEPLAY.md 13.9.3). One hero's two hits never twin anyway (the slot rule of _twin_half).
+## and one back at the resting hand), which pins this as a lower bound. A measured fact only since DESIGN.md G34: the
+## twin is slot-bound (two heroes' own hits, the slot rule of _twin_half; an idle partner never strikes), so the window
+## is not capped by it.
 const MANGROVE_SOLO_MIN_TICKS: int = 10
 const MANGROVE_COUNT_IN_TICKS: int = 8       ## the twin count-in: three blips 8 ticks apart, then "go"
 const MANGROVE_PART_DEBOUNCE: int = 8        ## one strike lights a part once (its boxes live up to 3 ticks) [own]
@@ -228,7 +240,7 @@ func _apply_params(params: Dictionary) -> void:
 	fist_draw_x = wall_x - MANGROVE_FIST_DRAW_DX
 	fist_out_x = fist_rest_x - MANGROVE_PUNCH_REACH
 	hand_home = Vector2i(wall_x, floor_y - MANGROVE_FACE_RISE + 8)
-	hand_rest = hand_home + Vector2i(-160, 0)
+	hand_rest = hand_home + Vector2i(-160, MANGROVE_HAND_SINK)
 
 
 func _ready() -> void:
@@ -307,9 +319,9 @@ func fist_is_springboard() -> bool:
 	return fighting and not dead and _dying < 0 and _fist == Fist.REST and _fist_x == fist_rest_x
 
 
-## The twin window of this game (co-op).
+## The twin window of this game (co-op): the difficulty's window, uncapped (G34: a slot-bound twin rule).
 func twin_window() -> int:
-	return PartyTuning.window_ticks(Game.difficulty, MANGROVE_SOLO_MIN_TICKS)
+	return PartyTuning.window_ticks(Game.difficulty)
 
 
 # =================================================================================================================
@@ -530,13 +542,14 @@ func _punch_heroes(from: int) -> void:
 # =================================================================================================================
 
 ## A hero's feet reached the resting fist's top this tick: launch him (solo; co-op with Up held), or let him stand on
-## it and pin it (co-op).
+## it and pin it (co-op; G33: only a hero who counts pins - a dozing partner just stands on it).
 func on_fist_rider(hero: PlayerBase, top: FistTop) -> void:
 	var up: bool = (hero.input_flags & Defs.IN_UP) != 0
 	if coop_form and not up:
 		hero.carried_on_tick = Sim.total_ticks
 		hero.ride_platform(top, 0, 0)
-		top.riders |= 1 << hero.slot
+		if hero.counts_for_coop():
+			top.riders |= 1 << hero.slot
 		return
 	hero.sim_pos.y = top.sim_pos.y - top.box_h
 	hero.bounce(Tuning.BOUNCE_YVEL_UP if up else Tuning.BOSS_LAUNCH_YVEL)
@@ -544,14 +557,15 @@ func on_fist_rider(hero: PlayerBase, top: FistTop) -> void:
 	Audio.play_sfx(Sfx.BOUNCE)
 
 
-## Co-op: bit per slot - the heroes standing on the resting fist this tick: caught by its top in the last PLATFORMS
-## phase, or with their feet on or just over it and not jumping (the screen-shake nudge of PHYSICS.md 13.3 lifts a
-## standing hero up to 3 px over it for a few ticks, out of the ride band; he still stands there).
+## Co-op: bit per slot - the heroes who count (G33: PlayerBase.counts_for_coop) standing on the resting fist this tick:
+## caught by its top in the last PLATFORMS phase, or with their feet on or just over it and not jumping (the
+## screen-shake nudge of PHYSICS.md 13.3 lifts a standing hero up to 3 px over it for a few ticks, out of the ride
+## band; he still stands there).
 func _standing_mask() -> int:
 	var mask: int = _top.riders if _top != null else 0
 	var top_y: int = floor_y - MANGROVE_FIST_BOX.y
 	for hero: PlayerBase in Game.level.contact_order():
-		if hero.dead or hero.is_down() or hero.yvel <= Tuning.PLATFORM_RIDE_MIN_YVEL_EXCL:
+		if not hero.counts_for_coop() or hero.yvel <= Tuning.PLATFORM_RIDE_MIN_YVEL_EXCL:
 			continue
 		if absi(hero.sim_pos.x - _fist_x) <= (MANGROVE_FIST_BOX.x >> 1) \
 				and hero.sim_pos.y >= top_y - MANGROVE_PIN_HOVER_PX and hero.sim_pos.y <= top_y + 2:
@@ -598,10 +612,14 @@ func _hand_tick_update() -> void:
 				_hand_pos = hand_home
 				Audio.play_sfx(Sfx.CLUB_SWING)
 		Hand.SWEEP:
+			# Along the ledge top (its box's bottom on it), then it sinks onto the edge: a crouch on the lower ledge
+			# stays under the sweep (G35 moved the upper ledge down to row 5, two rows over the lower one).
 			var from: Vector2i = _hand_pos
-			_hand_pos = _step_toward(_hand_pos, hand_rest, MANGROVE_HAND_SPEED)
+			var sweep_end: Vector2i = Vector2i(hand_rest.x, hand_rest.y - MANGROVE_HAND_SINK)
+			_hand_pos = _step_toward(_hand_pos, sweep_end, MANGROVE_HAND_SPEED)
 			_sweep_heroes(from)
-			if _hand_pos == hand_rest:
+			if _hand_pos == sweep_end:
+				_hand_pos = hand_rest
 				_set_hand(Hand.REST)
 		Hand.REST:
 			if _hand_timer >= MANGROVE_HAND_REST_TICKS or not active:
@@ -629,7 +647,8 @@ func _sweep_heroes(from: Vector2i) -> void:
 
 
 ## The upper ledge: the highest row of one-way floor cells in the room left of the wall (its rightmost run); the hand
-## rests at that run's right end with its fingers hooked MANGROVE_HAND_SINK below the ledge top.
+## rests at that run's right end with its fingers hooked MANGROVE_HAND_SINK below the ledge top, and comes out of the
+## wall (hand_home) at the ledge-top height it sweeps along.
 func _find_hand_rest() -> void:
 	var grid: TileGrid = Game.level.grid
 	var room: Rect2i = _room()
@@ -643,7 +662,7 @@ func _find_hand_rest() -> void:
 			if ch == TileGrid.CH_ONEWAY_A or ch == TileGrid.CH_ONEWAY_B:
 				var right: int = (col + 1) * Tuning.TILE
 				hand_rest = Vector2i(right - (MANGROVE_HAND_BOX.x >> 1), row * Tuning.TILE + MANGROVE_HAND_SINK)
-				hand_home = Vector2i(wall_x, hand_rest.y)
+				hand_home = Vector2i(wall_x, row * Tuning.TILE)
 				return
 
 
@@ -708,6 +727,9 @@ func _strike(what: StringName, hero: PlayerBase, slot: int, at: Vector2i) -> boo
 	if not weak:
 		_clank(level, at)
 		return false
+	if coop_form and _stage == 1 and (hero == null or not is_instance_valid(hero) or not hero.counts_for_coop()):
+		# G33: a twin half is a hero's own hit - one who no longer counts (dozing, an egg, in his toss) lights nothing.
+		return false
 	if int(_part_tick.get(what, -1000)) > now - MANGROVE_PART_DEBOUNCE:
 		return false
 	_part_tick[what] = now
@@ -756,9 +778,10 @@ func _count_hit(what: StringName) -> void:
 		_fist_len = mini(_fist_len, _fist_timer + MANGROVE_FACE_HIT_REST)
 
 
-## Co-op stage 3: true when `hero` strikes the stuck fist from the wrist side (away from the knuckle armour).
+## Co-op stage 3: true when `hero` strikes the stuck fist from the wrist side (away from the knuckle armour); he must
+## count (G33).
 func _from_wrist(hero: PlayerBase) -> bool:
-	if hero == null or not is_instance_valid(hero):
+	if hero == null or not is_instance_valid(hero) or not hero.counts_for_coop():
 		return false
 	var dx: int = hero.sim_pos.x - _fist_x
 	return absi(dx) >= EnemyTuning.FRONT_DX and signi(dx) == -_fist_facing
@@ -901,12 +924,13 @@ func _room() -> Rect2i:
 	return Rect2i(wall_x - Tuning.VIEW_W, floor_y - Tuning.VIEW_H + Tuning.TILE, Tuning.VIEW_W, Tuning.VIEW_H)
 
 
-## The hatched hero nearest to `point` (|dx| + |dy|, ties to the lower slot), null when none.
+## The co-op knuckles' "nearer hero": the hero who counts (G33: PlayerBase.counts_for_coop - alive, hatched, not idle)
+## nearest to `point` (|dx| + |dy|, ties to the lower slot, as LevelBase.nearest_coop_hero), null when none does.
 func _nearest_to(point: Vector2i) -> PlayerBase:
 	var best: PlayerBase = null
 	var best_distance: int = 1 << 30
 	for hero: PlayerBase in Game.level.contact_order():
-		if hero.dead or hero.is_down():
+		if not hero.counts_for_coop():
 			continue
 		var distance: int = absi(hero.sim_pos.x - point.x) + absi(hero.sim_pos.y - point.y)
 		if distance < best_distance:

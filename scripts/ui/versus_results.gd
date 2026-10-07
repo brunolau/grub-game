@@ -40,6 +40,30 @@ const AWARD_KEYS: Dictionary = {
 	&"comeback_caveman": ["UI_AWARD_COMEBACK_CAVEMAN", "UI_AWARD_COMEBACK_CAVEMAN_INFO"],
 	&"pacifist": ["UI_AWARD_PACIFIST", "UI_AWARD_PACIFIST_INFO"],
 }
+## The versus modes an award can be earned in (DESIGN.md E.8): the stack, steal, food and drop counters exist only in
+## Grub Stack, the longest shot only in Clubball, the passes only in Hot Rock (PlayerRun.VERSUS_AWARDS' statistics).
+## An award not listed here (stomp chains, clangs, bats, hazards, bonks, comebacks, hits) belongs to every mode.
+const AWARD_MODES: Dictionary = {
+	&"leaning_tower": [Defs.VersusMode.GRUB_STACK],
+	&"pickpocket": [Defs.VersusMode.GRUB_STACK],
+	&"glutton": [Defs.VersusMode.GRUB_STACK],
+	&"butterfingers": [Defs.VersusMode.GRUB_STACK],
+	&"home_run": [Defs.VersusMode.CLUBBALL],
+	&"hot_potato": [Defs.VersusMode.HOT_ROCK],
+}
+## Clear gap between an award's medal (with its ribbon) and its text's outline (art px).
+const AWARD_TEXT_GAP: int = 2
+## How far a long reason may reach past the column into the gap beside it (art px).
+const COLUMN_SLACK: float = 4.0
+## The medal of an award: its size on the row, and the flight from the companion's hand (seconds, and how high above
+## the higher end the arc turns: it comes down straight onto its row's medal, never across a text).
+const AWARD_MEDAL_SIZE: float = 16.0
+const AWARD_FLIGHT_SECONDS: float = 0.3
+const AWARD_FLIGHT_RISE: float = 40.0
+## Share of the flight spent on the arc over the players (the rest is the drop onto the row).
+const AWARD_ARC_SHARE: float = 0.6
+## How far the small face's outline (UiKit Style.SMALL, outline size 4) reaches past a label's rectangle (art px).
+const TEXT_OUTLINE: float = 2.0
 static var _plain_small: Font = null
 
 ## Awards handed out so far (entries of [method get_award_rows] in hand-out order).
@@ -54,6 +78,10 @@ var _award_rows: Array[Control] = []
 var _award_timer: float = AWARD_DELAY
 var _companion: UiActor = null
 var _players: HBoxContainer = null
+## The awards shown, by slot (the args' awards made right for the modes played: [method awards_for_modes]).
+var _awards: Dictionary = {}
+## Medals in flight: [medal, start, target, progress 0..1, row] each.
+var _flights: Array[Array] = []
 
 
 ## One player of the match, in art-A's versus pieces (ASSET_MANIFEST.md 17.13): his portrait (`ui/portraits.png`:
@@ -247,7 +275,9 @@ func _build_screen() -> void:
 	column.add_child(players)
 	_players = players
 	var versus_match: VersusMatch = Game.versus_match
-	var awards: Dictionary = Flow.args.get("awards", {}) as Dictionary
+	var awards: Dictionary = awards_for_modes(Flow.args.get("awards", {}) as Dictionary, modes_played(versus_match),
+			Game.runs)
+	_awards = awards
 	var lists: Array[Array] = []
 	for slot: int in seated_slots():
 		var box: VBoxContainer = VBoxContainer.new()
@@ -307,6 +337,7 @@ func _screen_ready() -> void:
 func _process(delta: float) -> void:
 	_age += delta
 	_place_companion()
+	_fly_medals(delta)
 	if awards_shown >= _award_rows.size():
 		return
 	_award_timer -= delta
@@ -315,34 +346,104 @@ func _process(delta: float) -> void:
 		hand_out(awards_shown, true)
 
 
-## Show award row `index` (hand-out order): a medal flies from the companion to it (`animate`) and it fades in.
+## Show award row `index` (hand-out order). Animated, the medal flies from the companion's hand along
+## [method flight_point] - over the players, then straight down onto the row's own medal place - and the row's medal
+## and text appear when it lands; else the row shows at once.
 func hand_out(index: int, animate: bool) -> void:
 	if index < awards_shown or index >= _award_rows.size():
 		return
 	awards_shown = index + 1
 	var row: Control = _award_rows[index]
+	row.modulate.a = 1.0
 	if not animate:
-		row.modulate.a = 1.0
+		_land(row)
 		return
-	row.create_tween().tween_property(row, "modulate:a", 1.0, 0.25).set_delay(0.25)
+	var icon: Control = row.get_meta(&"icon") as Control
+	var text: Control = row.get_meta(&"text") as Control
+	icon.modulate.a = 0.0
+	text.modulate.a = 0.0
 	var medal: TallyScreen.MedalIcon = TallyScreen.MedalIcon.new(StringName(str(row.get_meta(&"award", ""))),
-			JoinScreen.text_colour(look_of(int(row.get_meta(&"slot", 0)))[0]), 16.0, true)
+			JoinScreen.text_colour(look_of(int(row.get_meta(&"slot", 0)))[0]), AWARD_MEDAL_SIZE, true)
+	medal.set_meta(&"flying", true)
 	add_child(medal)
-	medal.position = _companion.position + Vector2(-10.0, -60.0)
-	var target: Vector2 = row.global_position - global_position + Vector2(2.0, 2.0)
-	var flight: Tween = medal.create_tween()
-	flight.tween_property(medal, "position", target, 0.25).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	flight.tween_callback(medal.queue_free)
+	var start: Vector2 = companion_hand()
+	medal.position = start
+	_flights.append([medal, start, medal_place(row), 0.0, row])
 	_companion.play(&"catch", false)
 	Audio.play_sfx(Sfx.TALLY_TICK)
 
 
-## Every award at once (a tap, tests); the ones still fading in show fully.
+## Every award at once (a tap, tests); medals in flight land and every row shows fully.
 func show_all_awards() -> void:
 	for index: int in range(awards_shown, _award_rows.size()):
 		hand_out(index, false)
+	for flight: Array in _flights:
+		(flight[0] as Node).queue_free()
+	_flights.clear()
 	for row: Control in _award_rows:
 		row.modulate.a = 1.0
+		(row.get_meta(&"icon") as Control).modulate.a = 1.0
+		(row.get_meta(&"text") as Control).modulate.a = 1.0
+
+
+## Where a medal in flight is at `progress` (0..1) from `start` to `target` (screen px, the medal's top-left corner):
+## first an arc from the companion's hand to the point straight above the target, AWARD_FLIGHT_RISE over the higher
+## end (never above the view's top edge), then straight down onto the row's medal place. The arc stays as high as its
+## ends and the drop runs down the column of medals, so the medal never sweeps across an award's text.
+static func flight_point(start: Vector2, target: Vector2, progress: float) -> Vector2:
+	var t: float = clampf(progress, 0.0, 1.0)
+	var above: Vector2 = Vector2(target.x, maxf(0.0, minf(start.y, target.y) - AWARD_FLIGHT_RISE))
+	if t >= AWARD_ARC_SHARE:
+		return above.lerp(target, (t - AWARD_ARC_SHARE) / (1.0 - AWARD_ARC_SHARE))
+	var s: float = t / AWARD_ARC_SHARE
+	var bend: Vector2 = Vector2((start.x + above.x) * 0.5, maxf(0.0, minf(start.y, above.y) - AWARD_FLIGHT_RISE * 0.5))
+	var u: float = 1.0 - s
+	return start * (u * u) + bend * (2.0 * u * s) + above * (s * s)
+
+
+## The companion's hand (screen px), where a medal starts its flight.
+func companion_hand() -> Vector2:
+	return (_companion.position if _companion != null else Vector2.ZERO) + Vector2(-10.0, -60.0)
+
+
+## The top-left corner (screen px) of award row `row`'s medal.
+func medal_place(row: Control) -> Vector2:
+	var icon: Control = row.get_meta(&"icon") as Control
+	return (icon.global_position - global_position).round()
+
+
+## The screen rectangle of an award row's medal and of its text (the text's outline included), screen px (tests).
+func award_rects(row: Control) -> Array[Rect2]:
+	var result: Array[Rect2] = []
+	var icon: Control = row.get_meta(&"icon") as Control
+	result.append(Rect2(icon.global_position - global_position, icon.size))
+	for label: Node in (row.get_meta(&"text") as Control).get_children():
+		if label is Label and (label as Label).visible:
+			var rect: Rect2 = (label as Label).get_global_rect()
+			result.append(Rect2(rect.position - global_position, rect.size).grow(TEXT_OUTLINE))
+	return result
+
+
+## Medals in flight move on; one that arrives shows its row.
+func _fly_medals(delta: float) -> void:
+	for i: int in range(_flights.size() - 1, -1, -1):
+		var flight: Array = _flights[i]
+		var medal: Control = flight[0] as Control
+		flight[3] = minf(float(flight[3]) + delta / AWARD_FLIGHT_SECONDS, 1.0)
+		medal.position = flight_point(flight[1], flight[2], flight[3]).round()
+		if float(flight[3]) >= 1.0:
+			medal.queue_free()
+			_flights.remove_at(i)
+			_land(flight[4] as Control)
+
+
+## A row's medal arrived: it shows, and its text fades in beside it.
+func _land(row: Control) -> void:
+	var icon: Control = row.get_meta(&"icon") as Control
+	var text: Control = row.get_meta(&"text") as Control
+	icon.modulate.a = 1.0
+	if text.modulate.a < 1.0:
+		text.create_tween().tween_property(text, "modulate:a", 1.0, 0.2)
 
 
 ## The match winners of the args (both of a team; empty when nobody won a round).
@@ -365,6 +466,101 @@ static func headline_text(winners: PackedInt32Array) -> String:
 	for slot: int in winners:
 		tags.append(UiPlayers.tag(slot))
 	return TranslationServer.translate("UI_VS_MATCH_SHARED").format({"players": " + ".join(tags)})
+
+
+## The versus modes of the match's rounds (Defs.VersusMode values, in first-played order; a Party Mix match plays
+## several); the match's mode before a round was recorded; empty without a match (then every award fits).
+static func modes_played(versus_match: VersusMatch) -> PackedInt32Array:
+	var result: PackedInt32Array = PackedInt32Array()
+	if versus_match == null:
+		return result
+	for entry: Dictionary in versus_match.history:
+		var mode: int = int(entry.get("mode", versus_match.mode))
+		if not result.has(mode):
+			result.append(mode)
+	if result.is_empty():
+		result.append(versus_match.mode)
+	return result
+
+
+## True when `award` (a PlayerRun.VERSUS_AWARDS id) can be earned in one of `modes` (AWARD_MODES; an empty list of
+## modes: every award).
+static func award_fits(award: StringName, modes: PackedInt32Array) -> bool:
+	if modes.is_empty() or not AWARD_MODES.has(award):
+		return true
+	for mode: Variant in AWARD_MODES[award]:
+		if modes.has(int(mode)):
+			return true
+	return false
+
+
+## The awards to show, by slot: `awards` (slot -> award ids, the order kept) without the ones the played `modes` cannot
+## give - VersusMatch's "closest award" fallback hands a player who is level with everybody on every count the first
+## award of the table, Leaning Tower ("Tallest stack"), in any mode. A player who loses his only award that way gets
+## the award of the played modes he comes closest to winning instead ([method closest_award] over `runs`, index =
+## slot). Slots absent from `awards` stay absent (no awards).
+static func awards_for_modes(awards: Dictionary, modes: PackedInt32Array, runs: Array) -> Dictionary:
+	var result: Dictionary = {}
+	var seated: Array[PlayerRun] = []
+	for slot: Variant in awards:
+		if int(slot) >= 0 and int(slot) < runs.size() and runs[int(slot)] is PlayerRun:
+			seated.append(runs[int(slot)] as PlayerRun)
+	for slot: Variant in awards:
+		var list: Array[StringName] = []
+		var given: Variant = awards[slot]
+		if given is Array or given is PackedStringArray:
+			for award: Variant in given:
+				var id: StringName = StringName(str(award))
+				if award_fits(id, modes) and not list.has(id):
+					list.append(id)
+		var had_awards: bool = (given is Array and not (given as Array).is_empty()) \
+				or (given is PackedStringArray and not (given as PackedStringArray).is_empty())
+		if list.is_empty() and had_awards:
+			var run: PlayerRun = runs[int(slot)] as PlayerRun if int(slot) >= 0 and int(slot) < runs.size() else null
+			var fallback: StringName = closest_award(seated, run, modes)
+			if fallback != &"":
+				list.append(fallback)
+		result[int(slot)] = list
+	return result
+
+
+## The award of `modes` that `run` comes closest to winning among `runs` (VersusMatch's measure: 1 = he has the best
+## value, 0 = the worst or everybody level); level scores go to the award he has the most of himself (a "fewest"
+## award he is lowest or level on before any count of 0: somebody who did nothing at all is the Pacifist), then to
+## the table's order. "" without a run.
+static func closest_award(runs: Array[PlayerRun], run: PlayerRun, modes: PackedInt32Array) -> StringName:
+	if run == null:
+		return &""
+	var best_id: StringName = &""
+	var best: Vector2 = Vector2(-1.0, -1.0)
+	for award: Dictionary in PlayerRun.VERSUS_AWARDS:
+		var id: StringName = award["id"]
+		if not award_fits(id, modes):
+			continue
+		var low: int = run.award_value(award)
+		var high: int = low
+		for other: PlayerRun in runs:
+			low = mini(low, other.award_value(award))
+			high = maxi(high, other.award_value(award))
+		var fewest: bool = bool(award.get("fewest", false))
+		var closeness: float = 0.0
+		if high > low:
+			closeness = float(run.award_value(award) - low) / float(high - low)
+			if fewest:
+				closeness = 1.0 - closeness
+		var own: float = float(run.award_value(award))
+		if fewest:
+			own = 0.5 if run.award_value(award) <= low else -own
+		var score: Vector2 = Vector2(closeness, own)
+		if score.x > best.x or (score.x == best.x and score.y > best.y):
+			best = score
+			best_id = id
+	return best_id if best_id != &"" else &"pacifist"
+
+
+## The awards the screen shows, by slot (tests).
+func get_awards() -> Dictionary:
+	return _awards
 
 
 ## The slots that played the match (the match's seats, else the run's party).
@@ -464,27 +660,31 @@ func companion_place() -> Vector2:
 	return Vector2(roundf(size.x - COMPANION_HALF_WIDTH - 6.0), roundf(head.end.y - origin.y + COMPANION_HEIGHT - 8.0))
 
 
-## One award: its medal, its name in gold and what it was for (when that fits the column width).
+## One award: its medal, its name in gold and what it was for (when that fits the column width). The text keeps
+## AWARD_TEXT_GAP px clear of the medal past its outline. Metas: "award", "slot", "icon" (the medal), "text" (the box
+## of the two labels).
 func _award_label(award: StringName, slot: int) -> Control:
 	var keys: Array = AWARD_KEYS.get(award, [String(award), ""])
 	var row: HBoxContainer = HBoxContainer.new()
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.add_theme_constant_override(&"separation", 3)
+	row.add_theme_constant_override(&"separation", AWARD_TEXT_GAP + int(TEXT_OUTLINE))
 	row.set_meta(&"award", award)
 	row.set_meta(&"slot", slot)
-	var icon: TallyScreen.MedalIcon = TallyScreen.MedalIcon.new(award, JoinScreen.text_colour(look_of(slot)[0]), 16.0,
-			true)
+	var icon: TallyScreen.MedalIcon = TallyScreen.MedalIcon.new(award, JoinScreen.text_colour(look_of(slot)[0]),
+			AWARD_MEDAL_SIZE, true)
 	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(icon)
+	row.set_meta(&"icon", icon)
 	var box: VBoxContainer = VBoxContainer.new()
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_theme_constant_override(&"separation", -3)
+	row.set_meta(&"text", box)
 	var title: Label = UiKit.label(str(keys[0]), UiKit.Style.SMALL)
 	title.add_theme_color_override(&"font_color", UiKit.COL_FOCUS)
 	title.add_theme_font_override(&"font", plain_small_font())
 	box.add_child(title)
 	# What the award was for, where it fits under the player's column (four players leave no room for the long ones).
-	var room: float = COLUMN_SIZE.x - 16.0 - 3.0
+	var room: float = COLUMN_SIZE.x - AWARD_MEDAL_SIZE - float(AWARD_TEXT_GAP) - TEXT_OUTLINE + COLUMN_SLACK
 	var info_text: String = tr(str(keys[1])) if str(keys[1]) != "" else ""
 	if info_text != "" and plain_small_font().get_string_size(info_text, HORIZONTAL_ALIGNMENT_LEFT, -1.0,
 			UiKit.SIZE_SMALL).x <= room:

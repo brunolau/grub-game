@@ -103,6 +103,11 @@ var rules: VersusRules = VersusRules.new()
 var hot_rock: VersusHotRock = null
 var clubball: VersusClubball = null
 var sudden_death: VersusSuddenDeath = null
+## The arena signatures (phase 3: ring-outs, the darkness pulse, regrowing walls, neutral enemies, the ember lane, the
+## neutral Colossus, the round-synced arena wind; [VersusSignatures]).
+var signatures: VersusSignatures = null
+## The Gusty variant's wind now (the arena wind gives way to it).
+var gust_wind: int = 0
 ## Round tick at which the themed sudden death starts (-1 = never this round).
 var sudden_death_at: int = -1
 
@@ -170,6 +175,7 @@ func _init() -> void:
 	box_xo = 0
 	hot_rock = VersusHotRock.new(self)
 	clubball = VersusClubball.new(self)
+	signatures = VersusSignatures.new(self)
 
 
 func _sim_phases() -> PackedInt32Array:
@@ -267,6 +273,7 @@ func begin_round(index: int) -> void:
 	_thrown_seen.clear()
 	_bonked.clear()
 	_gust_sign = 1
+	gust_wind = 0
 	hot_rock.reset()
 	if level == null:
 		return
@@ -277,6 +284,8 @@ func begin_round(index: int) -> void:
 	level.set_wind(0)
 	level.set_darkness(rules.has(VersusRules.LIGHTS_OUT))
 	var spawns: Array[Vector2i] = VersusArena.spawn_points(level)
+	if mode == Defs.VersusMode.CLUBBALL:
+		clubball.set_round(round_index)
 	var sides: Dictionary = _clubball_spawns(spawns) if mode == Defs.VersusMode.CLUBBALL else {}
 	for hero: PlayerBase in _heroes():
 		var slot: int = hero.slot
@@ -296,6 +305,8 @@ func begin_round(index: int) -> void:
 		_emit_stack(slot)
 	if mode == Defs.VersusMode.CLUBBALL:
 		clubball.reset()
+	signatures.begin_round()
+	signatures.wind_step()
 
 
 ## Everyone starts every round with the club in the hand and an empty belt (DESIGN.md E.2); Hammer Time puts the
@@ -336,7 +347,7 @@ func _clubball_spawns(spawns: Array[Vector2i]) -> Dictionary:
 	if spawns.is_empty():
 		return result
 	if clubball.zones.is_empty():
-		clubball.zones = VersusClubball.goal_zones(level)
+		clubball.set_round(round_index)
 	var sorted: Array[Vector2i] = spawns.duplicate()
 	sorted.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return a.x < b.x or (a.x == b.x and a.y < b.y))
 	var centre: int = VersusArena.view_rect().get_center().x
@@ -656,14 +667,16 @@ func goal_rect(team: int) -> Rect2i:
 
 ## The boxes (logical px) that are deadly now or whose telegraph is showing and that turn deadly within
 ## `lookahead_ticks`: armed and telegraphing sudden-death hazards, the rising band (and its next row once the rumble
-## announced it). A Grudge rock is a daze, not listed. Only what a player can see.
+## announced it), the arena hits of the signatures (embers, the Colossus's rock) and the ring-out mouths
+## (VersusSignatures). A Grudge rock is a daze, not listed. Only what a player can see.
 func danger_rects(lookahead_ticks: int) -> Array[Rect2i]:
 	var result: Array[Rect2i] = []
 	if level == null or not level.is_inside_tree():
 		return result
 	for node: Node in level.get_tree().get_nodes_in_group(ROUND_GROUP):
 		var hazard: VersusHazard = node as VersusHazard
-		if hazard == null or hazard.is_queued_for_deletion() or hazard.effect != VersusHazard.EFFECT_KILL:
+		if hazard == null or hazard.is_queued_for_deletion() \
+				or (hazard.effect != VersusHazard.EFFECT_KILL and hazard.effect != VersusHazard.EFFECT_HIT):
 			continue
 		if not hazard.is_warning():
 			result.append(hazard.danger_rect())
@@ -675,6 +688,7 @@ func danger_rects(lookahead_ticks: int) -> Array[Rect2i]:
 		if sudden_death.band_step_tick >= 0 and sudden_death.band_step_tick - Sim.tick <= lookahead_ticks:
 			top -= Tuning.TILE
 		result.append(Rect2i(view.position.x, top, view.size.x, maxi(view.end.y + Tuning.TILE - top, 0)))
+	result.append_array(signatures.danger_rects())
 	return result
 
 
@@ -983,6 +997,42 @@ func hazard_contact(hero: PlayerBase, hazard: VersusHazard) -> void:
 			if hazard.owner_slot >= 0:
 				_last_hitter[slot] = hazard.owner_slot
 				_last_hit_tick[slot] = Sim.tick
+		VersusHazard.EFFECT_HIT:
+			arena_hit(hero, hazard)
+
+
+## An arena hit (an ember, the Colossus's rock; DESIGN.md E.5, G43): a hit by nobody in the mode's currency - Grub
+## Stack the spill of a hit (1 + stack / 5, nothing stolen), Last Caveman Standing one heart, Hot Rock the knock-back
+## only - away from `source`, unless the hero is shielded, immune (hurt, stomp, feast) or curled. True when it landed.
+func arena_hit(hero: PlayerBase, source: SimEntity) -> bool:
+	if hero == null or not _round_live() or not _in_play(hero) or _pvp_immune(hero) or hero.is_curled():
+		return false
+	if _leaf[hero.slot] != 0:
+		# The Auto handicap's leaf shield absorbs it as it absorbs a hit: a bump, nothing else.
+		_leaf[hero.slot] = 0
+		hero.xvel = VersusTuning.TEAMMATE_BUMP_XVEL * _away(null, hero, source)
+		_sfx(SFX_CLANG)
+		return true
+	_apply_hit(null, source, hero, false, Defs.Weapon.CLUB, false)
+	return true
+
+
+## Knock `hero` out now as a hazard does (`cause`: a ring-out's "surf", ...): Grub Stack spills everything and he
+## respawns, Last Caveman Standing and Hot Rock put him out (the mode's knock-out rules).
+func knock_out(hero: PlayerBase, cause: StringName) -> void:
+	if hero == null or not _in_play(hero):
+		return
+	_death_cause[hero.slot] = cause
+	_death_pos[hero.slot] = hero.sim_pos
+	hero.kill(cause)
+
+
+## Add an entity of this round (a hazard of the signatures): it is freed when the next round begins.
+func add_round_entity(node: SimEntity) -> void:
+	if level == null:
+		node.free()
+		return
+	level.get_container("fx").add_child(node)
 
 
 ## A cave-in block settled into `cell`: a hero whose body is in it is crushed.
@@ -1200,7 +1250,8 @@ func _apply_hit(attacker: PlayerBase, source: SimEntity, victim: PlayerBase, cha
 				hearts_lost = victim.run.hearts
 			_lose_hearts(victim, hearts_lost, attacker, &"hit")
 		Defs.VersusMode.HOT_ROCK:
-			hot_rock.contact(attacker, victim, round_ticks)
+			if attacker != null:
+				hot_rock.contact(attacker, victim, round_ticks)
 
 
 func _set_stop(hero: PlayerBase, ticks: int) -> void:
@@ -1459,6 +1510,7 @@ func _stomp_step() -> void:
 func _round_step() -> void:
 	match phase:
 		PHASE_INTRO:
+			signatures.wind_step()
 			var steps: int = VersusTuning.COUNTDOWN_STEPS
 			if _intro_ticks % INTRO_COUNT_TICKS == 0 and _intro_ticks < steps * INTRO_COUNT_TICKS:
 				Events.round_countdown.emit(round_index, steps - _intro_ticks / INTRO_COUNT_TICKS)
@@ -1469,6 +1521,7 @@ func _round_step() -> void:
 		PHASE_PLAY:
 			round_ticks += 1
 			_world_rules()
+			signatures.wind_step()
 			if phase != PHASE_PLAY:
 				return  # a goal ended the game
 			if mode == Defs.VersusMode.GRUB_STACK:
@@ -1484,6 +1537,7 @@ func _round_step() -> void:
 					_finish(standing)
 		PHASE_GOLDEN:
 			round_ticks += 1
+			signatures.wind_step()
 			if mode == Defs.VersusMode.CLUBBALL:
 				_world_rules()
 			elif _golden == null or not is_instance_valid(_golden):
@@ -1502,8 +1556,10 @@ func _world_rules() -> void:
 				_finish(clubball.slots_of(scorer))
 				return
 	if rules.has(VersusRules.GUSTY) and round_ticks % VersusRules.GUSTY_PERIOD_TICKS == 1:
-		level.set_wind(VersusRules.GUSTY_WIND * _gust_sign)
+		gust_wind = VersusRules.GUSTY_WIND * _gust_sign
+		level.set_wind(gust_wind)
 		_gust_sign = -_gust_sign
+	signatures.world_step()
 	if rules.has(VersusRules.GIANT_RAIN) and mode == Defs.VersusMode.GRUB_STACK \
 			and round_ticks % VersusRules.GIANT_RAIN_PERIOD_TICKS == 0 and Spawner.exists(&"items/giant_bonus"):
 		var view: Rect2i = VersusArena.view_rect()
@@ -1960,6 +2016,11 @@ func _pot_index(slot: int) -> int:
 func _away(attacker: PlayerBase, victim: PlayerBase, source: SimEntity) -> int:
 	if source is ProjectileBase:
 		return 1 if source.xvel > 0 else (-1 if source.xvel < 0 else source.facing)
+	if attacker == null and source is VersusHazard:
+		# An arena hit: away from the ember / rock (its flight decides when it hit him dead centre).
+		if victim.sim_pos.x != source.sim_pos.x:
+			return 1 if victim.sim_pos.x > source.sim_pos.x else -1
+		return 1 if source.xvel >= 0 else -1
 	if attacker == null:
 		return 1
 	if victim.sim_pos.x > attacker.sim_pos.x:

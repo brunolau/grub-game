@@ -16,6 +16,8 @@ extends UiScreen
 ## (PlayerRun.score, his share of the tribe score), and an item paid again also counts again for the hero who picked
 ## it. A skip hands out the rest at once. The companion catches each item on its picker's side
 ## (Game.tally_item_slots), so every hero gets his own pile.
+## Phase 3: the night backdrop and the ground are the stage's own (backdrop_for / ground_for: every Book II set,
+## the cave and storm variants included); in a Book II solo run Munch waves from the companion's side (DESIGN.md A.1).
 
 enum Phase { INTRO, ENTER, DROPS, MEDALS, SETTLE, EXIT, DONE }
 
@@ -36,6 +38,10 @@ const BOARD_MIN_WIDTH: float = 196.0
 ## art-A's medals (ui/medals.png): one 32 x 32 gold disc per medal / award (medal_cell).
 const TEX_MEDALS: String = "res://assets/ui/medals.png"
 const MEDAL_CELL: float = 32.0
+## Book II solo (DESIGN.md A.1 "Munch waves from the tally companion's side"): P2's cousin in his blue, this far right
+## of the companion's feet (art px), waving while they stand.
+const MUNCH_PALETTE: StringName = &"blue"
+const MUNCH_GAP: float = 54.0
 ## The medal texts by PlayerRun.COOP_MEDALS id: [name, what it was for].
 const MEDAL_KEYS: Dictionary = {
 	&"most_food": ["UI_MEDAL_MOST_FOOD", "UI_MEDAL_MOST_FOOD_INFO"],
@@ -78,6 +84,9 @@ var _head_medals: Dictionary = {}
 var _rival_labels: Dictionary = {}
 ## Co-op: the medal board (wider on wide views, so the medals' reasons fit).
 var _board: VBoxContainer = null
+## The stage's own backdrop (night-tinted) and, in a Book II solo run, Munch beside the companion.
+var _backdrop: UiBackdrop = null
+var _munch: UiActor = null
 
 
 ## A medal: art-A's gold disc with its engraved emblem (`ui/medals.png`) hanging from a ribbon in its winner's colour
@@ -111,19 +120,23 @@ func _build_screen() -> void:
 	if Game.tally_item_slots.size() == _ids.size():
 		_pickers = Game.tally_item_slots.duplicate()
 	var level_id: StringName = StringName(str(Flow.args.get("level_id", Game.level_id)))
-	var biome: String = str(Levels.get_value(level_id, "background", Levels.get_value(level_id, "biome", "jungle")))
-	if not UiBackdrop.SETS.has(biome):
-		biome = "jungle"
-	var night: UiBackdrop = UiBackdrop.new(biome, 10.0)
+	var night: UiBackdrop = UiBackdrop.new(backdrop_for(level_id), 10.0)
 	night.modulate = Color(0.32, 0.3, 0.42)
 	add_child(night)
+	_backdrop = night
 	_stage = Control.new()
 	_stage.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_stage.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_stage)
-	_ground = UiGround.new(str(Levels.get_value(level_id, "terrain_a", "jungle/terrain_grass")), 2)
+	_ground = UiGround.new(ground_for(level_id), 2)
 	_ground.modulate = Color(0.6, 0.58, 0.72)
 	_stage.add_child(_ground)
+	if munch_waves():
+		# Book II solo (DESIGN.md A.1): Munch, P2's blue cousin, waves from the companion's side.
+		_munch = UiActor.new(&"hero", &"victory")
+		_munch.material = HeroPalette.material_for(MUNCH_PALETTE, HeroPalette.slot_default_pattern(1))
+		_munch.face(-1)
+		_stage.add_child(_munch)
 	for slot: int in range(1, party_size()):
 		var partner: UiActor = UiActor.new(&"hero", &"walk")
 		_dress(partner, slot)
@@ -183,6 +196,7 @@ func _screen_ready() -> void:
 	for i: int in _partners.size():
 		_partners[i].position = Vector2(-60.0 - PARTNER_GAP * float(i + 1), _floor_y())
 	_companion.position = Vector2(size.x + 70.0, _floor_y())
+	_place_munch()
 	if _board != null:
 		resized.connect(_size_board)
 		_size_board()
@@ -254,6 +268,7 @@ func _process(delta: float) -> void:
 			_follow_head_medals()
 			if t >= 1.0:
 				finish()
+	_place_munch()
 
 
 func _on_accept() -> void:
@@ -336,6 +351,63 @@ func _row_tag(row: Node, slot: int) -> Control:
 ## Heroes at the tally: the party of a co-op run, else one.
 static func party_size() -> int:
 	return clampi(Game.party, 1, Defs.MAX_PLAYERS) if Game.mode == Defs.GameMode.COOP else 1
+
+
+## Munch keeps beside the companion: walking in and off with him, waving while they stand.
+func _place_munch() -> void:
+	if _munch == null:
+		return
+	_munch.position = _companion.position + Vector2(MUNCH_GAP, 0.0)
+	var walking: bool = phase == Phase.INTRO or phase == Phase.ENTER or phase == Phase.EXIT or phase == Phase.DONE
+	var anim: StringName = &"walk" if walking else &"victory"
+	if _munch.animation != anim:
+		_munch.play(anim)
+	_munch.face(-1)
+
+
+## True when Munch waves beside the companion: a Book II run of one hero.
+static func munch_waves() -> bool:
+	return party_size() == 1 and Game.book >= Levels.BOOK_2 and Game.mode != Defs.GameMode.VERSUS
+
+
+## The backdrop of the tally after `level_id` (UiBackdrop set): the stage's own parallax set (`background`, also the
+## cave and storm variants of Book II), else its biome's outdoor set, else the jungle.
+static func backdrop_for(level_id: StringName) -> String:
+	var background: String = str(Levels.get_value(level_id, "background", ""))
+	if UiBackdrop.has_set(background):
+		return background
+	var biome: String = str(Levels.get_value(level_id, "biome", "jungle"))
+	var outdoor: String = str(LevelData.BIOME_BACKGROUND.get(biome, biome))
+	return outdoor if UiBackdrop.has_set(outdoor) else "jungle"
+
+
+## The terrain atlas the tally's ground is drawn from (UiGround path): the stage's `terrain_a` when its atlas exists,
+## else its biome's set, else the jungle grass.
+static func ground_for(level_id: StringName) -> String:
+	var biome: String = str(Levels.get_value(level_id, "biome", "jungle"))
+	for terrain: String in [str(Levels.get_value(level_id, "terrain_a", "")),
+			str(LevelData.BIOME_TERRAIN.get(biome, "")), "jungle/terrain_grass"]:
+		if terrain != "" and ResourceLoader.exists(UiGround.TERRAIN_DIR + terrain + ".png"):
+			return terrain
+	return "jungle/terrain_grass"
+
+
+## The backdrop shown (tests).
+func get_backdrop() -> UiBackdrop:
+	return _backdrop
+
+
+## Co-op: the medal board's rectangle on the screen (screen px; an empty Rect2 without a board).
+func get_board_rect() -> Rect2:
+	if _board == null:
+		return Rect2()
+	var rect: Rect2 = _board.get_global_rect()
+	return Rect2(rect.position - global_position, rect.size)
+
+
+## Munch (Book II solo; null otherwise).
+func get_munch() -> UiActor:
+	return _munch
 
 
 ## The cell of a medal in ui/medals.png (32 x 32 cells): 0-5 the co-op medals in PlayerRun.COOP_MEDALS order, 6-18
@@ -454,6 +526,11 @@ func _popup(text: String) -> void:
 	label.add_theme_color_override(&"font_color", UiKit.COL_FOCUS)
 	_stage.add_child(label)
 	var start: Vector2 = Vector2(roundf(_companion.position.x + 18.0), _floor_y() - 110.0)
+	if _board != null:
+		# Co-op: the medal board fills the right third; the points rise on the heroes' side of the companion.
+		var width: float = UiKit.font(UiKit.Style.HUD).get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1.0,
+				UiKit.SIZE_HUD).x
+		start.x = roundf(_companion.position.x - 18.0 - width)
 	label.position = start
 	var rise: Tween = label.create_tween().set_parallel(true)
 	rise.tween_property(label, "position:y", start.y - 24.0, 0.45)
@@ -495,6 +572,12 @@ func _actor_of(slot: int) -> UiActor:
 
 ## The hero of player `slot` in his colour (HeroPalette).
 func _dress(actor: UiActor, slot: int) -> void:
+	dress_hero(actor, slot)
+
+
+## Dress `actor` (a hero) as player `slot` of the run: his colour and loincloth (HeroPalette.resolve). Shared by the
+## screens that show the party (tally, expert wall, THE END).
+static func dress_hero(actor: UiActor, slot: int) -> void:
 	var look: Array = HeroPalette.resolve(slot, Game.get_run(slot))
 	actor.material = HeroPalette.material_for(look[0], int(look[1]))
 

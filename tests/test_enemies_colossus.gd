@@ -1259,6 +1259,8 @@ const PLATE_RIGHT_X: int = 12 * 16 + 8
 var _hall: LevelBase = null
 var _p1: PlayerBase = null
 var _p2: PlayerBase = null
+## Where the single-hero search keeps its idle partner (x < 0: none kept).
+var _p2_spot: Vector2i = Vector2i(-1, -1)
 
 
 func test_coop_visor_only_in_a_coop_game_of_two_on_a_coop_file() -> void:
@@ -1304,6 +1306,74 @@ func test_coop_the_plate_holder_lifts_the_visor_and_only_the_other_hero_hurts_it
 	assert_eq(colossus.hp, 29, "P2's throw counts one")
 	assert_eq(colossus.last_hitter, _p2)
 	_coop_teardown()
+
+
+## G33: a dozing hero on the glowing plate lifts nothing (objects-A's plate weighs him 0; the statue checks it too): the
+## visor stays down and P1's throw glances; once P2 plays again the visor is up and P1's throw counts.
+func test_coop_a_dozing_hero_on_the_plate_lifts_no_visor() -> void:
+	if _aid_running():
+		assert_true(true, "skipped while a route-building aid runs")
+		return
+	var colossus: Colossus = _visor_hall(true, true)
+	_p2.teleport(Vector2i(PLATE_LEFT_X, 160))
+	_p1.teleport(Vector2i(160, 160))
+	_p2.idle = true
+	Sim.step(2)
+	assert_false(colossus.is_visor_up(), "P2 dozes on the glowing plate: the visor stays down")
+	assert_null(colossus._holder(), "nobody holds it")
+	_head_shot(colossus, 0)
+	Sim.step(1)
+	assert_eq(colossus.hp, 30, "P1's throw glances off the visor")
+	_p2.idle = false
+	Sim.step(2)
+	assert_true(colossus.is_visor_up(), "P2 plays again: up")
+	Sim.step(Tuning.BOSS_HIT_COOLDOWN)
+	_head_shot(colossus, 0)
+	Sim.step(1)
+	assert_eq(colossus.hp, 29, "P1's throw counts")
+	_coop_teardown()
+
+
+## G35 (lead designer, wf9 #2 as corrected): the visor statue's strikable head poses lie wholly in the locked view of
+## DB2's co-op hall (levels/w4_l2b_coop.lvl, built this phase), clear of the fight HUD (ui's Hud.weak_point_problem).
+## Until the file exists this test says so.
+func test_coop_the_visor_head_stays_clear_of_the_hud_in_the_coop_hall() -> void:
+	var path: String = "res://levels/w4_l2b_coop.lvl"
+	if not FileAccess.file_exists(path):
+		print("    PENDING: %s does not exist yet (DB2, phase 3) - the G35 pin waits for it" % path)
+		assert_true(true, "pending DB2's file")
+		return
+	Sim.manual = true
+	Game.start_run(Defs.Difficulty.EXPERT, Defs.GameMode.COOP, 2, 2)
+	Game.begin_level(&"w4_l2b_coop")
+	var hall: Level = (load("res://scenes/world/level.tscn") as PackedScene).instantiate() as Level
+	hall.setup_from_text(&"w4_l2b_coop", FileAccess.get_file_as_string(path))
+	add_node(hall)
+	hall.set_view_size(Vector2i(640, 360))
+	var colossus: Colossus = null
+	for entity: SimEntity in hall.get_kind(Defs.Kind.BOSS):
+		colossus = entity as Colossus
+	assert_not_null(colossus, "the hall has the Colossus")
+	if colossus == null:
+		hall.free()
+		return
+	# Both heroes at the statue's hall: the camera locks on its arena.
+	for hero: PlayerBase in hall.heroes:
+		hero.teleport(Vector2i(colossus.sim_pos.x - 120 - hero.slot * 30, colossus.sim_pos.y))
+		hall.notify_hero_teleported(hero)
+	colossus.start_fight()
+	Sim.step(30)
+	var view: Rect2i = hall.get_view_rect()
+	for role: StringName in [&"idle", &"spit", &"slam", &"hurt", &"rage"]:
+		colossus._anim_role = role
+		var head: Rect2i = colossus.get_head_rect()
+		assert_true(view.encloses(head), "%s: wholly in the view" % role)
+		var art: Rect2 = Rect2(Vector2(head.position - view.position) * 2, Vector2(head.size) * 2)
+		assert_eq(Hud.weak_point_problem(art, Vector2(view.size) * 2), "", "%s: the HUD rule" % role)
+	hall.free()
+	Sim.stop()
+	Game.new_game(Defs.Difficulty.BEGINNER)
+	Game.begin_level(&"")
 
 
 func test_coop_every_rage_moves_the_live_chain_and_the_roles_swap() -> void:
@@ -1387,21 +1457,32 @@ func test_coop_rocks_go_for_the_holder_and_drops_for_the_thrower_whoever_they_ar
 		_coop_teardown()
 
 
-## V3.d: one hero cannot beat the visor. The real hero with two axes (the co-op checkpoint's), his partner an egg:
-## throwing from the glowing plate, from the floor right after stepping off it, and seeded random play - nothing counts.
+## V3.d: one hero cannot beat the visor. The real hero with two axes (the co-op checkpoint's), his partner an egg, or
+## hatched and IDLE anywhere (G33: on the glowing plate, on the other plate, on the floor): throwing from the glowing
+## plate, from the floor right after stepping off it, and seeded random play - nothing counts.
 func test_coop_the_single_hero_search_cannot_hurt_the_visor_colossus() -> void:
 	if _aid_running():
 		assert_true(true, "skipped while a route-building aid runs")
 		return
 	var colossus: Colossus = _visor_hall(true, true, true)
-	_p2.down = true
 	var rng: SimRng = SimRng.new(5)
-	for weapon: int in [AXE, BOOMERANG, Defs.Weapon.SPEAR]:
-		for start: int in [PLATE_LEFT_X, PLATE_LEFT_X + 8, PLATE_RIGHT_X, 120, 170, 210]:
-			_coop_episode(_p1, weapon, Vector2i(start, 160), _throw_and_step(start))
-			_coop_episode(_p1, weapon, Vector2i(start, 160), _coop_random(rng, 120))
-			assert_eq(colossus.hp, 30, "weapon %d from x %d: nothing counts" % [weapon, start])
+	for partner_x: int in [-1, PLATE_LEFT_X, PLATE_RIGHT_X, 150]:
+		_p2_spot = Vector2i(partner_x if partner_x >= 0 else 130, 160)
+		_p2.down = false
+		_p2.respawn_at(_p2_spot)
+		_p2.idle = true
+		_p2.down = partner_x < 0
+		var starts: Array[int] = [PLATE_LEFT_X, PLATE_LEFT_X + 8, PLATE_RIGHT_X, 120, 170, 210]
+		if partner_x >= 0:
+			starts = [PLATE_LEFT_X, PLATE_RIGHT_X, 120, 210]
+		for weapon: int in [AXE, BOOMERANG, Defs.Weapon.SPEAR]:
+			for start: int in starts:
+				_coop_episode(_p1, weapon, Vector2i(start, 160), _throw_and_step(start))
+				_coop_episode(_p1, weapon, Vector2i(start, 160), _coop_random(rng, 120))
+				assert_eq(colossus.hp, 30, "partner %d, weapon %d from x %d: nothing counts" % [partner_x, weapon,
+						start])
 	assert_false(colossus.dead)
+	_p2_spot = Vector2i(-1, -1)
 	_coop_teardown()
 
 
@@ -1505,4 +1586,11 @@ func _coop_episode(hero: PlayerBase, weapon: int, pos: Vector2i, flags: PackedIn
 		hero.hit_timer = mini(hero.hit_timer, 1)
 		if hero.dead or hero.is_down():
 			hero.respawn_at(pos)
+		if _p2 != null and is_instance_valid(_p2) and not _p2.is_down() and _p2_spot.x >= 0:
+			# The search's idle partner stays where he was put, hatched and idle.
+			_p2.run.hearts = Tuning.ENERGY_START
+			_p2.hit_timer = mini(_p2.hit_timer, 1)
+			if _p2.dead or _p2.sim_pos != _p2_spot:
+				_p2.respawn_at(_p2_spot)
+			_p2.idle = true
 	GameInput.clear_scripted()

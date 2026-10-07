@@ -21,12 +21,17 @@ var _lab: Lab = null
 var _was_manual: bool = false
 
 
+var _t0_tmp: int = 0
+
+
 func before_each() -> void:
+	_t0_tmp = Time.get_ticks_msec()
 	_was_manual = Sim.manual
 	_lab = Lab.new()
 
 
 func after_each() -> void:
+	print("    TIMING %d ms" % (Time.get_ticks_msec() - _t0_tmp))
 	GameInput.clear_scripted()
 	Sim.stop()
 	Sim.manual = _was_manual
@@ -311,9 +316,13 @@ func test_coop_tentacle_lock() -> void:
 	var squid: Squid = _open(Defs.Difficulty.BEGINNER, 2, true)
 	var p1: PlayerBase = _lab.hero(0)
 	var p2: PlayerBase = _lab.hero(1)
+	_wake_both()
 	_lab.step(PackedInt32Array([0, 0]))
-	assert_eq(squid.flinch_window(), mini(Squid.SQUID_FLINCH_BEGINNER,
-			Squid.SQUID_SOLO_MIN_TICKS - PartyTuning.WINDOW_SOLO_MARGIN_TICKS))
+	assert_eq(squid.flinch_window(), Squid.SQUID_FLINCH_BEGINNER,
+			"G34: a slot-bound twin is exempt from the solo_min cap - 24 on Beginner")
+	Game.difficulty = Defs.Difficulty.EXPERT
+	assert_eq(squid.flinch_window(), Squid.SQUID_FLINCH_EXPERT, "16 on Expert")
+	Game.difficulty = Defs.Difficulty.BEGINNER
 	_hold_up(squid, GAP_A)
 	p1.respawn_at(Vector2i(GAP_A - 37, SURFACE))
 	p2.respawn_at(Vector2i(GAP_A + 37, SURFACE))
@@ -351,30 +360,183 @@ func test_coop_tentacle_lock() -> void:
 	assert_eq(squid.get_open_ticks(), 0, "... for the same hero: shut")
 
 
-## The flinch window is shorter than the measured solo minimum: one hero (every hand weapon) who flinches the left
-## tentacle from the left island and then crosses over the squid (bouncing off its head) to flinch the right one needs
-## at least the measured ticks; SQUID_SOLO_MIN_TICKS is no more than that, so the flinch (min(24 B / 16 E, solo
-## minimum - 4)) stays 4+ below it.
-func test_coop_flinch_window_is_shorter_than_the_measured_solo_minimum() -> void:
-	var squid: Squid = _open(Defs.Difficulty.BEGINNER, 1, true)
+## G33: a dozing partner counts for none of the lock's rules. With P2 idle on the right flank the count-in never plays;
+## a "strike" credited to the dozing hero flinches nothing; P1 flinches his own tentacle, and the head stays shut. The
+## moment P2's player presses something the count-in starts, and his strike on his tentacle opens the head.
+func test_coop_an_idle_partner_counts_for_nothing() -> void:
+	var squid: Squid = _open(Defs.Difficulty.BEGINNER, 2, true)
+	var p1: PlayerBase = _lab.hero(0)
+	var p2: PlayerBase = _lab.hero(1)
+	_lab.step(PackedInt32Array([0, 0]))
+	assert_true(p2.is_idle(), "a partner who never pressed anything is idle (G33)")
+	_lab.wake(0)
+	_hold_up(squid, GAP_A)
+	p1.respawn_at(Vector2i(GAP_A - 37, SURFACE))
+	p2.respawn_at(Vector2i(GAP_A + 37, SURFACE))
+	var counted: bool = false
+	for t: int in 40:
+		_hold_up(squid, GAP_A)
+		_step2()
+		counted = counted or squid._count_in >= 0
+	assert_false(counted, "no count-in with a dozing hero on the right flank")
+	_hold_up(squid, GAP_A)
+	_shot_at(squid.get_tentacle_rect(1), 1)
+	_step2()
+	assert_eq(squid.get_flinch(1), 0, "the dozing hero's 'strike' flinches nothing")
+	_hold_up(squid, GAP_A)
+	_shot_at(squid.get_tentacle_rect(-1), 0)
+	_step2()
+	assert_true(squid.get_flinch(-1) > 0, "P1 flinches his tentacle")
+	assert_eq(squid.get_open_ticks(), 0, "and the head stays shut")
+	# P2's player presses something: he counts, the count-in runs, his strike opens the head.
+	_hold_up(squid, GAP_A)
+	_lab.step(PackedInt32Array([0, Defs.IN_DOWN]))
+	assert_true(p2.counts_for_coop())
+	assert_true(squid._count_in >= 0, "the count-in starts")
+	_hold_up(squid, GAP_A)
+	_shot_at(squid.get_tentacle_rect(1), 1)
+	_step2()
+	assert_true(squid.get_open_ticks() > 0, "both flinch for the two players: the head opens")
+
+
+## V3.d fairness per hero: whichever hero it goes for, the tentacle's shadow marks HIS spot 12 ticks before the slam and
+## he escapes it by stepping out from under it; the ink blob (phase 2) is aimed at him after the 10-tick jaws; and the
+## lock opens whichever hero takes which flank.
+func test_coop_form_is_fair_to_either_hero() -> void:
+	for slot: int in 2:
+		var squid: Squid = _open(Defs.Difficulty.EXPERT, 2, true)
+		var me: PlayerBase = _lab.hero(slot)
+		var mate: PlayerBase = _lab.hero(1 - slot)
+		_wake_both()
+		_step2()
+		# The slam at him: the target is the nearer hero.
+		me.respawn_at(Vector2i(GAP_A - 50, SURFACE))
+		mate.respawn_at(Vector2i(GAP_B + 60, SURFACE))
+		squid._held_target = null
+		_hold_up(squid, GAP_A)
+		squid._timer = Squid.SQUID_TENTACLE_AT - 1
+		_step2()
+		assert_eq(squid.get_slam_mark(), me.sim_pos.x, "slot %d: the shadow marks his spot" % slot)
+		var marked: int = 0
+		var hurt: bool = false
+		var slammed: bool = false
+		for t: int in 30:
+			# He steps out from under it (outward, away from the squid) while it rises.
+			var flags: PackedInt32Array = PackedInt32Array([0, 0])
+			flags[slot] = Defs.IN_LEFT if t < 6 else 0
+			_lab.step(flags)
+			marked += 1 if squid.get_slam_mark() >= 0 else 0
+			slammed = slammed or squid.get_slam_rect().size.x > 0
+			hurt = hurt or me.hit_timer > 0
+		assert_eq(marked + 1, Squid.SQUID_TENTACLE_RISE_TICKS, "slot %d: 12 ticks of shadow" % slot)
+		assert_true(slammed, "slot %d: it slammed" % slot)
+		assert_false(hurt, "slot %d: he stepped out from under it" % slot)
+		# The ink (phase 2) at him.
+		squid.hp = squid.max_hp / 2
+		squid._held_target = null
+		me.respawn_at(Vector2i(GAP_A - 50, SURFACE))
+		_hold_up(squid, GAP_A)
+		squid._timer = Squid.SQUID_JAWS_AT - 1
+		var jaws: int = 0
+		var spits: int = squid.spits
+		for t: int in 20:
+			_lab.step(PackedInt32Array([0, 0]))
+			if squid.spits > spits:
+				break
+			jaws += 1 if squid.get_jaws() > 0 else 0
+		assert_true(jaws >= 10 - 1, "slot %d: the jaws open 10 ticks first (%d seen open)" % [slot, jaws])
+		assert_eq(squid.facing, signi(me.sim_pos.x - squid.sim_pos.x), "slot %d: the blob flies at him" % slot)
+		# The lock, this hero on the left flank, then on the right.
+		squid.hp = squid.max_hp
+		squid.hit_cooldown = 0
+		for side: int in [-1, 1]:
+			_hold_up(squid, GAP_A)
+			squid._flinch = [0, 0]
+			squid._open = 0
+			squid._part_tick = [-1000, -1000]
+			me.respawn_at(Vector2i(GAP_A + side * 37, SURFACE))
+			mate.respawn_at(Vector2i(GAP_A - side * 37, SURFACE))
+			_hold_up(squid, GAP_A)
+			_shot_at(squid.get_tentacle_rect(side), me.slot)
+			_shot_at(squid.get_tentacle_rect(-side), mate.slot)
+			_step2()
+			assert_true(squid.get_open_ticks() > 0, "slot %d on the %s flank: the head opens" % [slot,
+				"left" if side < 0 else "right"])
+		_fresh()
+
+
+## G35 (as corrected): every weak point the club can strike - the head while up (Hud.weak_point_rects) and the co-op
+## lock's two tentacles - wherever the club routes see it surface, lies wholly inside every view the grotto's camera
+## lock allows and 24 px clear of the fight HUD's band (Hud.weak_point_problem).
+func test_every_weak_point_is_clear_of_the_hud() -> void:
+	var worst: Array[int] = [1 << 20]
+	var checked: Array[int] = [0]
+	for case: Array in [[Defs.Difficulty.BEGINNER, ROUTE_BEGINNER], [Defs.Difficulty.EXPERT, ROUTE_EXPERT]]:
+		var squid: Squid = _open(int(case[0]))
+		var route: PackedInt32Array = Lab.parse_route(str(case[1]))
+		var problems: Array[String] = []
+		_lab.play([route] as Array[PackedInt32Array], func() -> bool:
+			if squid.is_up() and not squid.dead:
+				var rects: Array[Rect2i] = Hud.weak_point_rects(squid)
+				rects.append_array([squid.get_tentacle_rect(-1), squid.get_tentacle_rect(1)])
+				for rect: Rect2i in rects:
+					var why: String = _lab.hud_clear(rect)
+					if why != "" and problems.size() < 3:
+						problems.append(why)
+					worst[0] = mini(worst[0], _lab.top_clearance(rect))
+					checked[0] += 1
+			return squid.dead)
+		assert_true(problems.is_empty(), "difficulty %d: %s" % [case[0], problems])
+		_fresh()
+	print("    G35: %d up-pose weak rects checked, the highest top %d px under the view's top" % [checked[0], worst[0]])
+	assert_true(checked[0] > 100, "the routes saw it up (%d)" % checked[0])
+
+
+## G34: the Tentacle Lock is slot-bound (two heroes' own strikes), so the flinch is the difficulty's - 24 Beginner / 16
+## Expert -, not capped by one player's solo minimum, which stays a measured fact. The measurement (V3.d's one player
+## with his toolkit): P1 (every hand weapon) flinches the left tentacle from the left island, then crosses over the
+## squid (bouncing off its head) to flinch the right one, while his IDLE partner stands where his player could have
+## hatched him (the right island, the ledge over the gap, the far end of the left island) or lies on the right island as
+## an egg. The lock never opens for him - though his two flinches come inside the 24-tick Beginner flinch, they never
+## pair - and no trial is faster than SQUID_SOLO_MIN_TICKS. Lighter than at G2: spent throws are freed between trials
+## (Lab.flush) and a trial ends once its second flinch can no longer fall inside the first one's window.
+func test_coop_one_player_never_opens_the_lock_and_the_solo_minimum_holds() -> void:
+	var squid: Squid = _open(Defs.Difficulty.BEGINNER, 2, true)
 	var hero: PlayerBase = _lab.hero()
-	_lab.step(PackedInt32Array([0]))
+	var p2: PlayerBase = _lab.hero(1)
+	_lab.step(PackedInt32Array([0, 0]))
 	var best: int = 100000
 	var how: String = ""
 	var trials: int = 0
+	var opened: int = 0
+	var counted: int = 0
+	var window: int = squid.flinch_window()
+	var spots: Array[Vector2i] = [Vector2i(GAP_A + 52, SURFACE), Vector2i(GAP_A + 8, 96), Vector2i(GAP_A - 70, SURFACE),
+		Vector2i(GAP_A + 44, SURFACE)]
+	var frame: PackedInt32Array = PackedInt32Array([0, 0])
 	for weapon: int in [Defs.Weapon.CLUB, Defs.Weapon.HAMMER, Defs.Weapon.AXE, Defs.Weapon.BOOMERANG, Defs.Weapon.SPEAR]:
 		hero.run.set_weapon(weapon)
 		for jump_at: int in range(8, 13):
 			for hold: int in [5, 9]:
 				for strike_at: int in range(10, 26, 2):
-					trials += 1
 					for entity: SimEntity in _lab.level.get_kind(Defs.Kind.HERO_PROJECTILE):
 						(entity as ProjectileBase).consume()
+					_lab.flush()
 					squid.flinch_log.clear()
 					squid._part_tick = [-1000, -1000]
+					squid._flinch = [0, 0]
+					squid._open = 0
 					hero.respawn_at(Vector2i(GAP_A - 37, SURFACE))
 					hero.facing = 1
 					Lab.top_up(hero)
+					_lab.wake(0)
+					var pick: int = trials % spots.size()
+					p2.respawn_at(spots[pick])
+					if pick == spots.size() - 1:
+						p2.go_down(&"voluntary")
+					trials += 1
+					var left_at: int = -1
+					var right_at: int = -1
 					for t: int in 50:
 						_hold_up(squid, GAP_A)
 						var flags: int = 0
@@ -388,37 +550,46 @@ func test_coop_flinch_window_is_shorter_than_the_measured_solo_minimum() -> void
 							flags = Defs.IN_UP | Defs.IN_FIRE
 						elif t >= jump_at and t < jump_at + strike_at:
 							flags = Defs.IN_RIGHT
-						_lab.step(PackedInt32Array([flags]))
-					var left_at: int = -1
-					var right_at: int = -1
-					for entry: Vector3i in squid.flinch_log:
-						if entry.y < 0 and left_at < 0:
-							left_at = entry.x
-						elif entry.y > 0 and right_at < 0:
-							right_at = entry.x
+						frame[0] = flags
+						_lab.step(frame)
+						opened += 1 if squid.get_open_ticks() > 0 else 0
+						counted += 1 if p2.counts_for_coop() else 0
+						for entry: Vector3i in squid.flinch_log:
+							if entry.y < 0 and left_at < 0:
+								left_at = entry.x
+							elif entry.y > 0 and right_at < 0:
+								right_at = entry.x
+						if right_at >= 0 or (left_at >= 0 and Sim.total_ticks - left_at > window):
+							break
 					if left_at >= 0 and right_at >= 0 and right_at - left_at < best:
 						best = right_at - left_at
 						how = "weapon %d, jump at %d held %d, strike %d later" % [weapon, jump_at, hold, strike_at]
-	print("    one hero from the left tentacle to the right one: %d ticks at best (%s), %d trials" % [best, how, trials])
+	print("    one player from the left tentacle to the right one: %d ticks at best (%s), %d trials; open on %d ticks, partner counted on %d" % [
+		best, how, trials, opened, counted])
 	assert_true(best < 100000, "the search flinched both tentacles (it is not blind)")
 	assert_true(best >= Squid.SQUID_SOLO_MIN_TICKS, "SQUID_SOLO_MIN_TICKS (%d) is a lower bound of the measured %d" % [
 		Squid.SQUID_SOLO_MIN_TICKS, best])
-	for difficulty: int in [Defs.Difficulty.BEGINNER, Defs.Difficulty.EXPERT]:
-		Game.difficulty = difficulty
-		assert_true(squid.flinch_window() <= best - PartyTuning.WINDOW_SOLO_MARGIN_TICKS)
-	assert_eq(squid.hp, squid.max_hp, "and the head never opened for him")
+	assert_true(best < Squid.SQUID_FLINCH_BEGINNER,
+			"his two flinches came inside the Beginner flinch (%d < 24): the slot rule, not the window, refuses him" % best)
+	assert_eq(opened, 0, "the head never opened for one player")
+	assert_eq(counted, 0, "his partner never counted for a co-op rule")
+	assert_eq(squid.hp, squid.max_hp)
 
 
-## The single-hero search cannot hurt the co-op form: one hero with every weapon, from both islands and the ledge over
-## the gap, striking forward / high / low standing and out of jumps (over the squid too), never lands a hit on the
-## locked squid - while the same search hurts the solo form; the solo club route never hurts the co-op form.
+## V3.d, the single-hero search cannot hurt the co-op form: one player with every weapon, from both islands and the
+## ledge over the gap, striking forward / high / low standing and out of jumps (over the squid too), with his IDLE
+## partner standing on the other flank of the gap (where the lock wants a hero), on the ledge, further out, or lying on
+## the other flank as an egg, never lands a hit on the locked squid - while the same search alone hurts the solo form;
+## the solo club route never hurts the co-op form.
 func test_the_single_hero_search_cannot_hurt_the_coop_form() -> void:
-	var coop: Dictionary = _search(true)
-	var solo: Dictionary = _search(false)
-	print("    single-hero search: %d trials, co-op form hit %d times; solo form hit %d times" % [coop["trials"],
-		coop["hits"], solo["hits"]])
+	var coop: Dictionary = _search(true, true)
+	var solo: Dictionary = _search(false, false, 20)
+	print("    single-hero search: %d trials (partner idle %d / egg %d), co-op form hit %d times; solo form hit %d times in %d trials" % [
+		coop["trials"], coop["idle_trials"], coop["egg_trials"], coop["hits"], solo["hits"], solo["trials"]])
 	assert_true(int(coop["trials"]) >= 200)
-	assert_eq(int(coop["hits"]), 0, "one hero never hurts the locked squid: %s" % coop["first"])
+	assert_true(int(coop["idle_trials"]) >= 150 and int(coop["egg_trials"]) >= 40, "both partner kinds were tried")
+	assert_eq(int(coop["partner_counted"]), 0, "the partner never counted")
+	assert_eq(int(coop["hits"]), 0, "one player never hurts the locked squid: %s" % coop["first"])
 	assert_true(int(solo["hits"]) >= 20, "the same search hurts the solo form")
 	var squid: Squid = _open(Defs.Difficulty.BEGINNER, 1, true)
 	var route: PackedInt32Array = Lab.parse_route(ROUTE_BEGINNER)
@@ -465,12 +636,24 @@ static func _span(values: Array) -> String:
 	return "%d..%d (%d)" % [int(values.min()), int(values.max()), values.size()]
 
 
-## The single-hero search against the up squid in a gap (co-op or solo form).
-func _search(coop_form: bool) -> Dictionary:
-	var squid: Squid = _open(Defs.Difficulty.BEGINNER, 1, coop_form)
+## Both heroes of a co-op test are players who have just pressed something (G33: they count for the co-op rules).
+func _wake_both() -> void:
+	_lab.wake(0)
+	_lab.wake(1)
+
+
+## The single-hero search against the up squid in a gap (co-op or solo form). `partner`: P2 never presses anything
+## (IDLE, G33) and stands, per trial, on the other flank of the gap from P1's start (where the lock wants the second
+## hero), on the ledge over the gap, further out on the other island, or lies on the other flank as an egg.
+## `max_hits` > 0 ends the search at that many hits (the solo form's "not blind" check).
+func _search(coop_form: bool, partner: bool, max_hits: int = 0) -> Dictionary:
+	var squid: Squid = _open(Defs.Difficulty.BEGINNER, 2 if partner else 1, coop_form)
 	var hero: PlayerBase = _lab.hero()
-	_lab.step(PackedInt32Array([0]))
-	var result: Dictionary = {"trials": 0, "hits": 0, "first": ""}
+	var p2: PlayerBase = _lab.hero(1) if partner else null
+	var frame: PackedInt32Array = PackedInt32Array([0, 0]) if partner else PackedInt32Array([0])
+	_lab.step(frame)
+	var result: Dictionary = {"trials": 0, "hits": 0, "first": "", "idle_trials": 0, "egg_trials": 0,
+		"partner_counted": 0}
 	var starts: Array[Vector2i] = [Vector2i(GAP_A - 37, SURFACE), Vector2i(GAP_A - 52, SURFACE),
 		Vector2i(GAP_A + 37, SURFACE), Vector2i(GAP_A + 52, SURFACE), Vector2i(GAP_A - 8, 96), Vector2i(GAP_A + 8, 96)]
 	for weapon: int in [Defs.Weapon.CLUB, Defs.Weapon.HAMMER, Defs.Weapon.AXE, Defs.Weapon.BOOMERANG, Defs.Weapon.SPEAR]:
@@ -478,9 +661,13 @@ func _search(coop_form: bool) -> Dictionary:
 		for start: Vector2i in starts:
 			var toward: int = 1 if start.x < GAP_A else -1
 			for macro: PackedInt32Array in _macros(toward):
-				result["trials"] = int(result["trials"]) + 1
+				if max_hits > 0 and int(result["hits"]) >= max_hits:
+					break
+				var trial: int = int(result["trials"])
+				result["trials"] = trial + 1
 				for entity: SimEntity in _lab.level.get_kind(Defs.Kind.HERO_PROJECTILE):
 					(entity as ProjectileBase).consume()
+				_lab.flush()
 				squid.hp = squid.max_hp
 				squid.hit_cooldown = 0
 				squid._flinch = [0, 0]
@@ -489,17 +676,30 @@ func _search(coop_form: bool) -> Dictionary:
 				hero.respawn_at(start)
 				hero.facing = toward
 				Lab.top_up(hero)
-				var frame: PackedInt32Array = PackedInt32Array([0])
+				if partner:
+					_lab.wake(0)
+					var spots: Array[Vector2i] = [Vector2i(GAP_A + toward * 37, SURFACE), Vector2i(GAP_A + 8, 96),
+						Vector2i(GAP_A + toward * 60, SURFACE), Vector2i(GAP_A + toward * 37, SURFACE)]
+					var pick: int = trial % spots.size()
+					p2.respawn_at(spots[pick])
+					if pick == spots.size() - 1:
+						p2.go_down(&"voluntary")
+						result["egg_trials"] = int(result["egg_trials"]) + 1
+					else:
+						result["idle_trials"] = int(result["idle_trials"]) + 1
 				for flags: int in macro:
 					_hold_up(squid, GAP_A)
 					frame[0] = flags
 					_lab.step(frame)
+					if partner and p2.counts_for_coop():
+						result["partner_counted"] = int(result["partner_counted"]) + 1
 					if squid.hp < squid.max_hp or hero.dead:
 						break
 				if squid.hp < squid.max_hp:
 					result["hits"] = int(result["hits"]) + 1
 					if str(result["first"]) == "":
-						result["first"] = "weapon %d from %s (%s)" % [weapon, start, Lab.route_text(macro)]
+						result["first"] = "weapon %d from %s%s (%s)" % [weapon, start, " partner at %s" % p2.sim_pos \
+								if partner else "", Lab.route_text(macro)]
 	_fresh()
 	return result
 

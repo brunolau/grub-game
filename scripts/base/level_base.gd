@@ -336,6 +336,28 @@ func target_hero(from: SimEntity) -> PlayerBase:
 	return best
 
 
+## 2.0 IDLE rule (phase 3): the hero a co-op RULE reads as "the nearer hero" of `from` - [method target_hero]'s
+## choice (|dx| + |dy| between feet points, ties to the lower slot) among the heroes that count
+## (PlayerBase.counts_for_coop: alive, hatched, not idle); null when none does. For position rules, not for targeting:
+## a `shell` record's shield and a boss's "nearer hatched hero" / "on its half" face a hero who plays, never his dozing
+## partner (enemies keep attacking whom [method target_hero] gives). A party of one: exactly [method target_hero].
+func nearest_coop_hero(from: SimEntity) -> PlayerBase:
+	if _hero_total <= 1:
+		return target_hero(from)
+	var best: PlayerBase = null
+	var best_distance: int = 0
+	for hero: PlayerBase in _orders[0]:
+		if not hero.counts_for_coop():
+			continue
+		if from == null:
+			return hero
+		var distance: int = absi(hero.sim_pos.x - from.sim_pos.x) + absi(hero.sim_pos.y - from.sim_pos.y)
+		if best == null or distance < best_distance:
+			best = hero
+			best_distance = distance
+	return best
+
+
 ## True when some hero is dead (death toss) or down (an egg, PlayerBase.is_down()). A party of one: P1 is dead.
 func any_hero_dead_or_down() -> bool:
 	if _hero_total <= 1:
@@ -1059,8 +1081,7 @@ func _doze_update() -> void:
 		_dz_hero_right = hero_right
 		_dz_hero_bottom = hero_bottom
 		_doze_notes.clear()
-		for i: int in _doze.size():
-			_doze_check(i)
+		_doze_full_pass()
 		return
 	if _doze_notes.is_empty():
 		return
@@ -1069,6 +1090,51 @@ func _doze_update() -> void:
 	for entity: SimEntity in notes:
 		if is_instance_valid(entity) and entity._doze_slot >= 0:
 			_doze_check(entity._doze_slot)
+
+
+## Every entity against the doze rectangles, in slot order: exactly [method _doze_check] for each slot, with the
+## common cases written out (the multi-hero performance pass of phase 3): a dozing entity that stays far and an awake
+## one that stays near cost a few array reads instead of two calls. The far test is [method _doze_far] on locals
+## (`_dz_more` is only read here). Everything else - an unknown area, a never-dozing area, a wake, a doze-off - goes
+## through _doze_check / _doze_wake_entity as before, so the decisions and their order are the same.
+func _doze_full_pass() -> void:
+	var view_left: int = _dz_view_left
+	var view_top: int = _dz_view_top
+	var view_right: int = _dz_view_right
+	var view_bottom: int = _dz_view_bottom
+	var hero_left: int = _dz_hero_left
+	var hero_top: int = _dz_hero_top
+	var hero_right: int = _dz_hero_right
+	var hero_bottom: int = _dz_hero_bottom
+	var more: PackedInt32Array = _dz_more
+	var more_end: int = _dz_more_count * 4
+	for slot: int in _doze.size():
+		if _doze_known[slot] == 0:
+			_doze_check(slot)
+			continue
+		var k: int = slot * 4
+		var left: int = _doze_rects[k]
+		var right: int = _doze_rects[k + 2]
+		if right <= left:
+			_doze_check(slot)
+			continue
+		var top: int = _doze_rects[k + 1]
+		var bottom: int = _doze_rects[k + 3]
+		var far: bool = (right <= view_left or left >= view_right or bottom <= view_top or top >= view_bottom) \
+				and (right <= hero_left or left >= hero_right or bottom <= hero_top or top >= hero_bottom)
+		if far:
+			var j: int = 0
+			while j < more_end:
+				if not (right <= more[j] or left >= more[j + 2] or bottom <= more[j + 1] or top >= more[j + 3]):
+					far = false
+					break
+				j += 4
+		var entity: SimEntity = _doze[slot]
+		if entity._sim_suspended:
+			if not far:
+				_doze_wake_entity(entity)
+		elif far:
+			_doze_check(slot)
 
 
 ## The rectangles of the further views (1..) and heroes (all but `first`) into `_dz_more`, the feet points of every

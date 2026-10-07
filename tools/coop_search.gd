@@ -1,0 +1,177 @@
+extends SceneTree
+## The solo-impossibility search from the command line (scripts/world/coop_search.gd; docs/expansion/PLAN.md 8 V3.c,
+## LEVEL_DESIGN.md 15.7.6). Owner: world-B (PLAN.md 4.1).
+##
+## Usage (from the project root):
+##   bash .tools/gd.sh script res://tools/coop_search.gd -- --list               the gate table of test_coop_gates
+##   bash .tools/gd.sh script res://tools/coop_search.gd -- w5_l1_coop           every gate of these files
+##   bash .tools/gd.sh script res://tools/coop_search.gd -- w5_l1_coop:hop       one gate, both difficulties
+##   bash .tools/gd.sh script res://tools/coop_search.gd -- w5_l1_coop:hop:expert   one gate, one difficulty
+##   ... -- --shard=<i>/<n>     only the gates of shard i of n ([method CoopSearch.shard_gates], the rule of
+##                              tools/world_coop_gates.sh and of test_coop_gates' COOP_GATES_SHARD)
+##   ... -- --profile           where the time of every search went (reset, place, step, sig, build, windows ...)
+##   ... -- --sim-profile       the tick time by entity script (Sim's development profiler hook)
+##   ... -- --nodes             print every resting point the search expands (and what its world changed)
+##   ... -- --no-cache          no result cache (neither the in-process nor the file cache of CoopSearch)
+## Prints one line per gate (refused / REACHED, seconds, resting points, runs, ticks simulated) and a summary. Exit
+## code 0 = every gate refused and every window below its solo minimum - 4, 1 = not, 2 = bad arguments.
+##
+## Autoloads are reached through the tree and the search is loaded by path: this script is compiled before they exist.
+
+const SEARCH_PATH: String = "res://scripts/world/coop_search.gd"
+
+
+## --sim-profile: Sim's development profiler hook (Sim._profiler): the time of every entity call by script and of
+## the tick's own parts.
+class SimProfile:
+	extends RefCounted
+
+	var calls: Dictionary = {}
+	var parts: Dictionary = {}
+
+	func add_call(_phase: int, script: Script, usec: int) -> void:
+		var key: String = script.resource_path.get_file() if script != null else "?"
+		calls[key] = int(calls.get(key, 0)) + usec
+
+	func add_part(part: StringName, usec: int) -> void:
+		parts[part] = int(parts.get(part, 0)) + usec
+
+	func report() -> String:
+		var rows: Array = []
+		for key: String in calls:
+			rows.append([int(calls[key]), key])
+		for key: StringName in parts:
+			rows.append([int(parts[key]), String(key)])
+		rows.sort_custom(func(a: Array, b: Array) -> bool: return a[0] > b[0])
+		var lines: PackedStringArray = PackedStringArray()
+		for row: Array in rows.slice(0, 14):
+			lines.append("%s %.1f s" % [row[1], row[0] / 1000000.0])
+		return ", ".join(lines)
+
+
+func _initialize() -> void:
+	_run.call_deferred()
+
+
+func _run() -> void:
+	var selectors: PackedStringArray = PackedStringArray()
+	var listing: bool = false
+	var profiling: bool = false
+	var shard: Vector2i = Vector2i(0, 1)
+	var cache: bool = true
+	var sim_profile: SimProfile = null
+	var search_debug: bool = false
+	for argument: String in OS.get_cmdline_user_args():
+		if argument == "--list":
+			listing = true
+		elif argument == "--profile":
+			profiling = true
+		elif argument == "--sim-profile":
+			sim_profile = SimProfile.new()
+		elif argument == "--nodes":
+			search_debug = true
+		elif argument == "--no-cache":
+			cache = false
+		elif argument.begins_with("--shard="):
+			var parts: PackedStringArray = argument.get_slice("=", 1).split("/")
+			if parts.size() != 2 or not parts[0].is_valid_int() or not parts[1].is_valid_int():
+				print("coop_search: bad --shard (want <i>/<n>)")
+				_finish(2)
+				return
+			shard = Vector2i(parts[0].to_int(), maxi(parts[1].to_int(), 1))
+		elif argument.begins_with("--"):
+			print("coop_search: unknown option %s" % argument)
+			_finish(2)
+			return
+		else:
+			selectors.append(argument)
+	var search: GDScript = load(SEARCH_PATH) as GDScript
+	if search == null:
+		print("coop_search: the search %s cannot be loaded" % SEARCH_PATH)
+		_finish(2)
+		return
+	search.set(&"use_cache", cache)
+	search.set(&"debug_nodes", search_debug)
+	search.set(&"use_file_cache", cache)
+	var table: Array = search.call(&"gate_table")
+	if shard.y > 1:
+		table = search.call(&"shard_gates", table, shard.x, shard.y)
+	var chosen: Array = []
+	for entry: Dictionary in table:
+		if selectors.is_empty() or _selected(entry, selectors):
+			chosen.append(entry)
+	if listing:
+		for i: int in chosen.size():
+			var entry: Dictionary = chosen[i]
+			print("%3d  %s  %s  %s  tablet %s  far %s" % [i, entry["level"], _difficulty_name(int(entry["difficulty"])),
+				entry["gate"], str(entry["cell"]), str(entry["far"])])
+		print("coop_search: %d gate(s)" % chosen.size())
+		_finish(0)
+		return
+	if sim_profile != null:
+		root.get_node("Sim").set(&"_profiler", sim_profile)
+	var failures: int = 0
+	var started: int = Time.get_ticks_msec()
+	for entry: Dictionary in chosen:
+		search.call(&"profile_reset")
+		var clock: int = Time.get_ticks_msec()
+		var result: Dictionary = search.call(&"search_gate", entry["level"], entry["difficulty"], entry["gate"])
+		var seconds: float = (Time.get_ticks_msec() - clock) / 1000.0
+		var label: String = "%s (%s) gate %s" % [entry["level"], _difficulty_name(int(entry["difficulty"])), entry["gate"]]
+		var reached: bool = bool(result.get("reached", true))
+		var bad_windows: PackedStringArray = PackedStringArray()
+		for window: Dictionary in result.get("windows", []):
+			if int(window["window"]) > int(window["solo_min"]) - 4:
+				bad_windows.append("%s window %d solo_min %d" % [window["what"], window["window"], window["solo_min"]])
+		if reached or not bad_windows.is_empty():
+			failures += 1
+		print("%s: %s in %.1f s (%d resting points, %d runs, %d ticks, %d replayed%s)" % [label,
+			"REACHED" if reached else "refused", seconds, int(result.get("explored", 0)), int(result.get("runs", 0)),
+			int(result.get("simulated", 0)), int(result.get("replayed", 0)),
+			", cached" if bool(result.get("cached", false)) else ""])
+		if reached:
+			print("    %s" % result.get("detail", ""))
+		for line: String in bad_windows:
+			print("    window too wide: %s" % line)
+		if profiling:
+			var parts: PackedStringArray = PackedStringArray()
+			var profile: Dictionary = search.get(&"profile")
+			for part: StringName in profile:
+				parts.append("%s %.1f s" % [part, int(profile[part]) / 1000000.0])
+			print("    profile: %s" % ", ".join(parts))
+		if sim_profile != null:
+			print("    sim: %s" % sim_profile.report())
+			sim_profile.calls.clear()
+			sim_profile.parts.clear()
+		# Let the main loop turn: the freed search world's canvas callbacks are flushed (wf8_D5_to_integration #1).
+		await process_frame
+	print("coop_search: %d gate(s) in %.1f s, %d failing" % [chosen.size(), (Time.get_ticks_msec() - started) / 1000.0,
+		failures])
+	_finish(1 if failures > 0 else 0)
+
+
+## True when `entry` matches one of `selectors` (`<level>`, `<level>:<gate>`, `<level>:<gate>:<difficulty>`).
+func _selected(entry: Dictionary, selectors: PackedStringArray) -> bool:
+	for selector: String in selectors:
+		var parts: PackedStringArray = selector.split(":")
+		if parts[0] != str(entry["level"]):
+			continue
+		if parts.size() >= 2 and parts[1] != "" and parts[1] != str(entry["gate"]):
+			continue
+		if parts.size() >= 3 and parts[2].to_lower() != _difficulty_name(int(entry["difficulty"])).to_lower():
+			continue
+		return true
+	return false
+
+
+func _difficulty_name(difficulty: int) -> String:
+	return "Expert" if difficulty == 1 else "Beginner"
+
+
+func _finish(code: int) -> void:
+	# Let the audio autoload release its players before the engine shuts down (no leak reports).
+	var audio: Node = root.get_node_or_null("Audio")
+	if audio != null and audio.has_method("shutdown"):
+		audio.call("shutdown")
+	await create_timer(0.1).timeout
+	quit(code)

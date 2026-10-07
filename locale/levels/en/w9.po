@@ -1,0 +1,36 @@
+# Club & Grub - level texts of world 9, Sky Spire (Book II), English. Owner: level designer D9a
+# (docs/expansion/PLAN.md 6.1). A level sub-catalogue: loaded beside locale/en.po (scripts/ui/ui_kit.gd), never
+# offered as a language. Keys: the level names and the `text=` keys of signs and hint zones of levels/w9_l1*.lvl and
+# levels/w9_l2*.lvl and their co-op files. Every sign text fits three board lines (DESIGN.md G27).
+msgid ""
+msgstr ""
+"Project-Id-Version: Club & Grub\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+# --- Level names ---
+msgid "Cloudbreak Climb"
+msgstr "Cloudbreak Climb"
+
+msgid "Thunderhead Glide"
+msgstr "Thunderhead Glide"
+
+msgid "The Roc's Spire"
+msgstr "The Roc's Spire"
+
+msgid "Storm Nest"
+msgstr "Storm Nest"
+
+# --- w9_l1 Cloudbreak Climb ---
+msgid "SIGN_W9_CLIMB"
+msgstr "The Roc nests above the clouds. Climb!"
+
+# --- w9_l1b Thunderhead Glide ---
+msgid "SIGN_W9_LIGHTNING"
+msgstr "A dark cloud marks where lightning strikes."
+
+# --- w9_l2 The Roc's Spire ---
+msgid "SIGN_W9_GUST"
+msgstr "Crouch to stand firm in the wind."

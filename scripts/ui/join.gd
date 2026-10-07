@@ -49,6 +49,9 @@ const LEGEND_KEYS: Dictionary = {
 }
 const MOVE_ACTIONS: Array[StringName] = [Defs.ACT_UP, Defs.ACT_LEFT, Defs.ACT_DOWN, Defs.ACT_RIGHT]
 const CARD_SIZE: Vector2 = Vector2(236.0, 142.0)
+## A seat card's "Hold <key> when ready" keeps this much of the card's width free (its frame and outline); a longer
+## text takes the short form (UI_JOIN_HOLD_SHORT).
+const HOLD_TEXT_MARGIN: float = 14.0
 ## Feet of the hero on a seat card (art px from the card's top).
 const FEET_Y: float = 84.0
 ## Texts of the bot levels (Defs.BotLevel order).
@@ -245,6 +248,11 @@ class SeatCard:
 					_arrow_cap(left_text, Vector2(roundf((width - name_w) * 0.5) - 8.0, y + 1.0), true)
 					_arrow_cap(right_text, Vector2(roundf((width + name_w) * 0.5) + 8.0, y + 1.0), false)
 					var hold_text: String = tr("UI_JOIN_HOLD").format({"key": hold_key})
+					var hold_w: float = _small.get_string_size(hold_text, HORIZONTAL_ALIGNMENT_LEFT, -1.0,
+							UiKit.SIZE_SMALL).x
+					if hold_w > width - JoinScreen.HOLD_TEXT_MARGIN:
+						# A narrow card (four seats of the versus lobby) with a long key name: the short form.
+						hold_text = tr("UI_JOIN_HOLD_SHORT").format({"key": hold_key})
 					_centred(_small, UiKit.SIZE_SMALL, hold_text, y + 25.0, UiKit.COL_CREAM)
 					var bar: Rect2 = Rect2(roundf(width * 0.5 - 40.0), y + 28.0, 80.0, 3.0)
 					_overlay.draw_rect(bar.grow(1.0), UiKit.COL_INK)

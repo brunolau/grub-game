@@ -15,6 +15,8 @@ const FLOW_RUNNER: String = "res://scripts/core/dev/autoplay_flow.gd"
 const HEADLESS: String = "res://scripts/core/dev/headless_flow.gd"
 const ROUTE_PREFIX: String = "tools/autoplay/routes/"
 const SKELETON_MARK: String = "# skeleton:"
+## Where the in-process runs of the runner's own tests write their trace.
+const RUNNER_OUT: String = "res://build/test_integration_flows"
 ## The flows the 2.0 plan names (PLAN.md P1.3).
 const PLAN_FLOWS: PackedStringArray = [
 	"campaign.flow", "campaign_beginner.flow", "campaign_b2.flow", "campaign_coop.flow",
@@ -69,6 +71,110 @@ func test_the_lint_reports_broken_lines() -> void:
 		assert_true(errors[i].begins_with(expected[i]), "%s: %s" % [expected[i], errors[i]])
 	assert_eq(report["missing"], PackedStringArray([
 		"line 12: route tools/autoplay/routes/zz_none.inputs", "line 15: level zz_nowhere"]))
+
+
+## The commands of phase 3 in the lint: `need` lists what is missing (a level id or a route path), `section`,
+## `wait_ms` and `expect_errors` are known.
+func test_the_lint_knows_need_and_section() -> void:
+	var report: Dictionary = (load(FLOW_RUNNER) as GDScript).call("lint", "\n".join([
+		"need w1_l1 tools/autoplay/routes/w1_l1.inputs", "need zz_nowhere tools/autoplay/routes/zz_none.inputs",
+		"section expert", "wait_ms 250", "wait_ms soon", "expect_errors 1", "section",
+	]))
+	assert_eq(report["missing"], PackedStringArray([
+		"line 2: level zz_nowhere", "line 2: route tools/autoplay/routes/zz_none.inputs"]))
+	var errors: PackedStringArray = report["errors"]
+	assert_eq(errors.size(), 2, "\n".join(errors))
+	if errors.size() == 2:
+		assert_true(errors[0].begins_with("line 5:"), errors[0])
+		assert_true(errors[1].begins_with("line 7:"), errors[1])
+
+
+## wf8_g2_verify #3: a `play` in a real-time flow starts on the stage's first tick, however long the commands before
+## it took - the runner holds the new stage's clock until the `play` - so a route replays tick for tick as with
+## --fast. 400 ms on a fresh stage would be about ten ticks of its own clock without the hold.
+func test_a_real_time_play_starts_on_the_stages_first_tick() -> void:
+	var script: String = "\n".join([
+		"start_level test_integration", "wait_ms 400", "expect sim.tick == 0", "play 30:R,8:RU,24:R,6:,10:L", "quit",
+	])
+	var fast: Dictionary = await _run_flow(script, true)
+	var real_time: Dictionary = await _run_flow(script, false)
+	for run: Dictionary in [fast, real_time]:
+		assert_eq(int(run["exit_code"]), 0, "the flow passes: %s" % str(run["failures"]))
+		assert_eq(int(run["checks"]), 2, "the stage's clock stood still until the play")
+	var rows_fast: Array = fast["trace"]
+	var rows_real: Array = real_time["trace"]
+	# Real time may run one more (idle) tick in the frame that ends the play: the play's ticks are compared.
+	assert_eq(rows_fast.size(), 78, "--fast played every entry of the play")
+	assert_true(rows_real.size() >= rows_fast.size(), "real time played every entry (%d ticks)" % rows_real.size())
+	if rows_real.is_empty() or rows_fast.is_empty():
+		return
+	assert_eq(int(rows_real[0][2]), 1, "the play's first entry is the stage's tick 1")
+	var differences: int = 0
+	for i: int in mini(rows_fast.size(), rows_real.size()):
+		# [frame, level, tick, x, y, xvel, yvel, state, dead]: everything but the frame must agree.
+		if (rows_fast[i] as Array).slice(1) != (rows_real[i] as Array).slice(1):
+			differences += 1
+			if differences == 1:
+				fail("real time differs from --fast at row %d: %s / %s" % [i, str(rows_real[i]), str(rows_fast[i])])
+	assert_eq(differences, 0, "the real-time trace is the --fast trace")
+
+
+## wf8_g2_verify #1: an engine error logged while a flow runs fails it, as in the test runner, unless the flow
+## announced it with `expect_errors`.
+func test_an_engine_error_fails_a_flow() -> void:
+	expect_errors(2)
+	var failed: Dictionary = await _run_flow("log nobody.score\nquit", true)
+	assert_eq(int(failed["exit_code"]), 4, "a script error fails the flow")
+	assert_eq((failed["engine_errors"] as PackedStringArray).size(), 1)
+	assert_true(" ".join(failed["failures"]).contains("engine error: Autoplay flow: unknown root 'nobody'"),
+			str(failed["failures"]))
+	var announced: Dictionary = await _run_flow("expect_errors 1\nlog nobody.score\nquit", true)
+	assert_eq(int(announced["exit_code"]), 0, "an announced error does not: %s" % str(announced["failures"]))
+
+
+## `need` in a skeleton flow: a part without its content is skipped up to the next `section` and reported as
+## pending (the run passes); in any other flow a missing `need` fails the run.
+func test_need_skips_a_part_of_a_skeleton_flow() -> void:
+	var part: String = "\n".join([
+		"need zz_nowhere", "expect game.score == 123456789", "section next", "expect sim.running == false", "quit",
+	])
+	var skeleton: Dictionary = await _run_flow("# skeleton: test\n" + part, true)
+	assert_eq(int(skeleton["exit_code"]), 0, "a skeleton flow passes: %s" % str(skeleton["failures"]))
+	assert_eq((skeleton["pending"] as PackedStringArray).size(), 1, "one part pending")
+	assert_eq(int(skeleton["checks"]), 1, "only the next section's check ran")
+	var whole: Dictionary = await _run_flow(part, true)
+	assert_eq(int(whole["exit_code"]), 4, "a flow without the skeleton mark fails")
+	assert_true(" ".join(whole["failures"]).contains("need: zz_nowhere"), str(whole["failures"]))
+
+
+## Run flow `text` in-process (the runner of `gd.sh play --flow`, without ending the application) and return its
+## result(); the stage it left is freed.
+func _run_flow(text: String, fast: bool) -> Dictionary:
+	var runner: Node = (load(FLOW_RUNNER) as GDScript).new() as Node
+	runner.set("quit_when_done", false)
+	runner.name = "FlowRunner"
+	add_child(runner)
+	var out: String = ProjectSettings.globalize_path(RUNNER_OUT)
+	DirAccess.make_dir_recursive_absolute(out)
+	runner.call("begin", text, out, fast, false)
+	await runner.done
+	# The runner is still inside its emission: let its coroutines end before it is freed.
+	for i: int in 2:
+		await get_tree().process_frame
+	var result: Dictionary = runner.call("result")
+	runner.free()
+	GameInput.clear_scripted()
+	GameInput.reset_slots()
+	Sim.manual = false
+	Sim.stop()
+	if get_tree().current_scene != null:
+		get_tree().current_scene.free()
+		get_tree().current_scene = null
+	Flow.current_screen = Flow.SCREEN_BOOT
+	Flow.args = {}
+	for i: int in 2:
+		await get_tree().process_frame
+	return result
 
 
 ## campaign.flow (Expert) and campaign_beginner.flow play the frozen Book I routes: every route they play is a 1.0

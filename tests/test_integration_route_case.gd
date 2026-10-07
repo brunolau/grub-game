@@ -300,6 +300,8 @@ func clean_up_route() -> void:
 		get_tree().current_scene = null
 	Flow.current_screen = Flow.SCREEN_BOOT
 	Flow.args = {}
+	Flow.play_mode = Defs.GameMode.SINGLE
+	Flow.play_book = 1
 	if _runner != null and is_instance_valid(_runner):
 		_runner.free()
 	_runner = null
@@ -348,6 +350,190 @@ func determinism_problems(file: String, mode: String, table: Dictionary) -> Pack
 		problems.append("%s (%s) with other devices: %s" % [file, mode, device_difference])
 	clean_up_route()
 	return problems
+
+
+# =================================================================================================================
+# The campaign in one run (PLAN.md 6.2 and 8 V2.c: the headless twins of campaign_b2.flow and campaign_coop.flow)
+# =================================================================================================================
+
+## The files of the finished design per book (DESIGN.md A.2; Book I: the 15 files of 1.0). A campaign run is held to
+## its whole shape - every stop, the expert wall after a Beginner run, The End after an Expert run - once every file
+## of its book exists (solo) or every one of them has its co-op file `<id>_coop` (DESIGN.md D.9 / D.10); until then it
+## plays the stops that have landed and reports where it waits.
+const DESIGN_FILES: Dictionary = {
+	1: [&"w1_l1", &"w1_l2", &"bonus_a", &"w2_l1", &"bonus_b", &"w2_l2", &"w2_l2b", &"w3_l1", &"w3_l1b", &"bonus_c",
+		&"w3_l2", &"w4_l1", &"w4_l2", &"w4_l2b", &"ending"],
+	2: [&"w5_l1", &"w5_l2", &"w5_l2b", &"bonus_d", &"w6_l1", &"w6_l2", &"w6_l2b", &"w7_l1", &"bonus_e", &"w7_l2",
+		&"w7_l2b", &"w8_l1", &"w8_l2", &"w8_l2b", &"w9_l1", &"w9_l1b", &"w9_l2", &"w9_l2b", &"w9_l3", &"ending_b"],
+}
+## Screens a campaign run may end on.
+const CAMPAIGN_ENDS: Array[StringName] = [&"expert_wall", &"the_end"]
+
+
+## True when every file of `book`'s design exists (with `coop`: every one as its co-op file).
+static func design_complete(book: int, coop: bool) -> bool:
+	for level_id: StringName in DESIGN_FILES.get(book, []):
+		if not Levels.has_level(StringName(String(level_id) + "_coop") if coop else level_id):
+			return false
+	return true
+
+
+## The route a campaign run plays in stage `level_id` on `mode`: the side route `sides` names for it (a warp into a
+## Feast Land), else the stage's club route (`<id>.inputs` / `<id>.expert.inputs` with a header of that mode that ends
+## the stage and carries nothing on the belt); "" when it has none yet.
+static func campaign_route(table: Dictionary, level_id: StringName, mode: String, sides: Dictionary) -> String:
+	var side: String = str(sides.get(String(level_id), ""))
+	if side != "":
+		return side if table.has(side) else ""
+	for file: String in ["%s.expert.inputs" % level_id, "%s.inputs" % level_id] if mode == EXPERT \
+			else ["%s.inputs" % level_id]:
+		if not table.has(file):
+			continue
+		var spec: Dictionary = table[file]
+		if str(spec["level"]) == String(level_id) and (spec["modes"] as Array).has(mode) \
+				and str(spec.get("leaves", "")) != "" and int(spec.get("belt", -1)) < 0:
+			return file
+	return ""
+
+
+## Play book `book` on `mode` in ONE run through Flow, as the map leads (DESIGN.md A.1: score, lives, letters, hand
+## and belt carried from stage to stage; a co-op run of `party` heroes plays the co-op files, Flow passing over a stop
+## that has none yet): every stage with its campaign route (campaign_route; `sides` names side routes such as a warp),
+## linked stages and bonus stages as Flow starts them, every tally, every map stop. Each stage must end the way its
+## header says without a death (solo) or a team wipe and a death (co-op), without a lost life and without an engine
+## warning or error; each map stop is recorded once in the run's save space. The run stops - PENDING, not failed - at
+## the first stage without its route; `strict` (G3) fails that, and a run of a complete design must end at the expert
+## wall (Beginner, when the book has Expert stops) or at The End with the book completed (Expert). Returns {"files":
+## the routes played, "stops": map stops entered, "pending": "" or why it stopped, "screen": the last screen,
+## "ticks": ticks played}.
+func play_campaign(book: int, mode: String, party: int, sides: Dictionary = {}, strict: bool = false) -> Dictionary:
+	var coop: bool = party > 1
+	var difficulty: int = Defs.Difficulty.EXPERT if mode == EXPERT else Defs.Difficulty.BEGINNER
+	var game_mode: int = Defs.GameMode.COOP if coop else Defs.GameMode.SINGLE
+	var run_name: String = "campaign %s book %d %s" % ["co-op" if coop else "solo", book, mode]
+	var table: Dictionary = header_table(ROUTE_DIR, func(_file: String, spec: Dictionary) -> bool:
+		return (spec["errors"] as PackedStringArray).is_empty() and (int(spec.get("players", 1)) == party))
+	var outcome: Dictionary = {"files": [], "stops": [], "pending": "",
+		"screen": &"", "ticks": 0}
+	Save.reset()
+	_watch_events()
+	Flow.play_mode = game_mode
+	Flow.play_book = book
+	Game.start_run(difficulty, game_mode, party, book)
+	Game.helper_mode = false
+	var space_key: String = Flow.save_space()
+	var campaign: Array[StringName] = Levels.get_coop_campaign(difficulty, book) if coop \
+			else Levels.get_campaign(difficulty, book)
+	if campaign.is_empty():
+		outcome["pending"] = "book %d has no %s stop yet" % [book, "co-op" if coop else "solo"]
+	else:
+		await _enter_stop(Levels.get_coop_base(campaign[0]) if coop else campaign[0], outcome)
+	var steps: int = 0
+	while outcome["pending"] == "" and steps < 128:
+		steps += 1
+		if Flow.current_screen == Flow.SCREEN_LEVEL and Game.level != null:
+			var level_id: StringName = Game.level_id
+			var file: String = campaign_route(table, level_id, mode, sides)
+			if file == "":
+				outcome["pending"] = "%s has no %s route for this run yet" % [level_id, mode]
+				break
+			if not await _play_campaign_stage(run_name, file, mode, table, outcome):
+				return outcome
+		elif Flow.current_screen == Flow.SCREEN_TALLY:
+			Flow.finish_tally()
+			await _settle_flow()
+		elif Flow.current_screen == Flow.SCREEN_WORLD_MAP:
+			var stop: StringName = StringName(str(Flow.args.get("level_id", "")))
+			assert_true(Save.is_level_unlocked_in(space_key, stop), "%s: the map's stop %s is unlocked" % [run_name, stop])
+			await _enter_stop(stop, outcome)
+		else:
+			break
+	outcome["screen"] = Flow.current_screen
+	print("    %s: %d stage(s), %d ticks (%.1f min), score %d, lives %d, screen %s%s\n      routes: %s" % [run_name,
+		(outcome["files"] as Array).size(), outcome["ticks"], int(outcome["ticks"]) / Tuning.TICK_HZ / 60.0,
+		Game.score, Game.lives, Flow.current_screen,
+		"" if outcome["pending"] == "" else " - PENDING: %s" % outcome["pending"],
+		", ".join(PackedStringArray(outcome["files"]))])
+	for stop: StringName in outcome["stops"]:
+		var cleared: int = int(Save.get_level_result_in(space_key, stop).get("clears", 0))
+		var waiting: bool = outcome["pending"] != "" and stop == (outcome["stops"] as Array).back()
+		if not waiting:
+			assert_eq(cleared, 1, "%s: map stop %s recorded once" % [run_name, stop])
+	if outcome["pending"] != "":
+		if strict:
+			fail("%s stops at: %s" % [run_name, outcome["pending"]])
+		return outcome
+	assert_true(CAMPAIGN_ENDS.has(Flow.current_screen), "%s ends at the expert wall or The End, not %s" % [run_name,
+			Flow.current_screen])
+	if design_complete(book, coop):
+		var wall: bool = mode != EXPERT and not Levels.get_campaign(Defs.Difficulty.EXPERT, book).all(
+				func(id: StringName) -> bool: return Levels.is_available(id, Defs.Difficulty.BEGINNER))
+		assert_eq(Flow.current_screen, Flow.SCREEN_EXPERT_WALL if wall else Flow.SCREEN_THE_END, "%s: how it ends" % run_name)
+		assert_eq(Save.is_game_completed_in(space_key), not wall, "%s: the book is completed only by The End" % run_name)
+	return outcome
+
+
+## Enter map stop `stop` the way the map does (Flow.start_level; in co-op Flow plays its co-op file), with the clock
+## under the test's control; a map that started the level by itself is left as it is.
+func _enter_stop(stop: StringName, outcome: Dictionary) -> void:
+	Sim.manual = true
+	await _settle_flow()
+	if Flow.current_screen != Flow.SCREEN_LEVEL:
+		Flow.start_level(stop, Defs.Transition.NONE)
+		await _settle_flow()
+	(outcome["stops"] as Array).append(stop)
+	if Flow.current_screen != Flow.SCREEN_LEVEL or Game.level == null:
+		outcome["pending"] = "map stop %s did not start (screen %s)" % [stop, Flow.current_screen]
+		return
+	var level: Level = Game.level as Level
+	if level != null:
+		level.set_view_size(Vector2i(Tuning.VIEW_W, Tuning.VIEW_H) * Tuning.ART_SCALE)
+
+
+## One stage of a campaign run: route `file` in the stage that runs now, with what the run carries; false ends the run
+## (the stage did not play).
+func _play_campaign_stage(run_name: String, file: String, mode: String, table: Dictionary, outcome: Dictionary) -> bool:
+	var spec: Dictionary = table[file]
+	var label: String = "%s: %s" % [run_name, file]
+	var party: bool = int(spec.get("players", 1)) > 1
+	var lives: int = Game.lives
+	_reset_watch(Game.level_id, mode)
+	_start_counting_problems()
+	var result: Dictionary = await runner().replay_stage(file, mode, {"routes": table, "on_tick": _on_tick,
+			"keep": true})
+	_stop_counting_problems()
+	var played: int = stage_ticks(result.get("lines", PackedStringArray()))
+	(outcome["files"] as Array).append(file)
+	outcome["ticks"] = int(outcome["ticks"]) + maxi(played, 0)
+	print("    %s: %d ticks, score %d, lives %d, hurt %d, deaths %d, eggs %d, weapon %s / belt %s, screen %s" % [
+		label, played, Game.score, Game.lives, _count(&"hero_hurt" if party else &"player_hurt"),
+		_count(&"hero_died" if party else &"player_died"), _count(&"hero_down"), Defs.weapon_name(Game.runs[0].weapon),
+		Defs.weapon_name(Game.runs[0].belt) if Game.runs[0].belt >= 0 else "-", Flow.current_screen])
+	assert_true(played > 0, "%s played" % label)
+	if played <= 0:
+		outcome["pending"] = "%s did not play" % file
+		return false
+	var expect: Dictionary = spec.get("expect", {})
+	assert_eq(_count(&"hero_died" if party else &"player_died"), int(expect.get("deaths", 0)), "%s: deaths" % label)
+	if party:
+		assert_eq(_count(&"party_wiped"), 0, "%s: no team wipe" % label)
+		assert_eq(_doze_problem, "", "%s: no entity dozes inside a view or within reach of a hero (V3.e)" % label)
+	assert_true(Game.lives >= lives, "%s: no life lost (%d -> %d)" % [label, lives, Game.lives])
+	assert_eq(_problems.count, 0, "%s: no engine warning or error (first: %s)" % [label, _problems.first])
+	assert_eq(int(result.get("input_mismatches", 0)), 0, "%s: every slot read its stream" % label)
+	_check_after(label, spec, mode)
+	var ends: Array[StringName] = [StringName(str(spec.get("leaves", "")))]
+	if _exit_kinds != ends:
+		outcome["pending"] = "%s did not end the stage" % file
+		return false
+	return true
+
+
+func _settle_flow() -> void:
+	for i: int in 3:
+		await get_tree().process_frame
+	while Flow.busy:
+		await get_tree().process_frame
 
 
 # =================================================================================================================

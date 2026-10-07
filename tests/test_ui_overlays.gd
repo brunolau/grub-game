@@ -336,6 +336,216 @@ func test_hud_coop_shows_p2_panel_mirrored_top_right() -> void:
 	assert_false(panel.visible, "back to single-player: the 1.0 HUD")
 
 
+## A boss weak point for the fight-band tests: a boss whose head is wherever the test puts it (logical px).
+class BandBoss:
+	extends BossBase
+
+	var head: Rect2i = Rect2i()
+
+	func get_head_rect() -> Rect2i:
+		return head
+
+
+## The fight band (phase 3, Hud.BAND_HEIGHT): in a co-op boss fight the bonus letters give way and P2's panel moves
+## up into their row, so the HUD keeps to the top BAND_HEIGHT px (plus the boss bar); his Rival-score line waits; after
+## the fight everything goes back. In solo the letters stay (they lie inside the band).
+func test_hud_coop_fight_band() -> void:
+	Settings.set_value(OptionsPanel.KEY_RIVAL_SCORE, true)
+	Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.COOP, 2)
+	var hud: Hud = await _overlay(Flow.HUD_SCENE) as Hud
+	await get_tree().process_frame
+	var panel: HudPlayerPanel = hud.get_p2_panel()
+	assert_true(panel.get_global_rect().position.y >= Hud.P2_TOP, "outside a fight: under the letters")
+	assert_true(panel.score_shown, "the Rival score line under his hearts")
+	Events.boss_started.emit(null)
+	assert_true(hud.fight_layout, "a boss bar shows: the fight band")
+	hud._process(Hud.ROW_FADE_SECONDS + 0.01)
+	await get_tree().process_frame
+	var band_bottom: float = hud.get_row_bottom()
+	assert_true(panel.get_global_rect().end.y <= band_bottom + 0.5,
+			"P2's panel in the letters' row: %s, band bottom %d" % [panel.get_global_rect(), int(band_bottom)])
+	assert_almost_eq(hud.letters_alpha, 0.0, 0.001, "the letters gave way")
+	assert_true(panel.visible, "P2's hearts stay in sight")
+	assert_false(panel.score_shown, "his Rival-score line waits for the end of the fight")
+	var view: Vector2 = hud.get_viewport_rect().size
+	for rect: Rect2 in Hud.band_rects(view, true, true, true, Hud.BAND_MARGIN_DESKTOP):
+		assert_true(rect.end.y <= Hud.BAND_MARGIN_DESKTOP + Hud.BOSS_TOP + HudBossBar.FRAME_SIZE.y + 0.5,
+				"the fight band: the row and the boss bar only (%s)" % rect)
+	Events.level_respawned.emit()
+	hud._process(Hud.ROW_FADE_SECONDS + 0.01)
+	await get_tree().process_frame
+	assert_false(hud.fight_layout)
+	assert_true(panel.get_global_rect().position.y >= Hud.P2_TOP, "after the fight: back under the letters")
+	assert_almost_eq(hud.letters_alpha, 1.0, 0.001, "the letters are back")
+	assert_true(panel.score_shown, "and the Rival score line")
+	# Solo: the letters stay in a fight.
+	Game.new_game(Defs.Difficulty.BEGINNER)
+	Events.boss_started.emit(null)
+	hud._process(Hud.ROW_FADE_SECONDS + 0.01)
+	assert_true(hud.fight_layout)
+	assert_almost_eq(hud.letters_alpha, 1.0, 0.001, "solo: the letters stay")
+	Events.level_respawned.emit()
+	Settings.set_value(OptionsPanel.KEY_RIVAL_SCORE, false)
+
+
+## A fighting boss's weak point behind the HUD fades what covers it (the row, P2's co-op panel, the boss bar), like a
+## hero under the row; it comes back once the weak point moved away. Weak points come from the boss's own methods
+## (Hud.weak_point_rects: head, rump, face, weak spot; the Twin Idols' head of each idol).
+func test_hud_fades_over_a_boss_weak_point() -> void:
+	Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.COOP, 2)
+	var hud: Hud = await _overlay(Flow.HUD_SCENE) as Hud
+	await get_tree().process_frame
+	var boss: BandBoss = BandBoss.new()
+	boss.sim_pos = Vector2i(160, 150)
+	boss.sim_prev = boss.sim_pos
+	add_node(boss)
+	boss.fighting = true
+	boss.head = Rect2i(150, 140, 20, 10)
+	Events.boss_started.emit(boss)
+	await get_tree().process_frame
+	assert_eq(Hud.weak_point_rects(boss), [Rect2i(150, 140, 20, 10)] as Array[Rect2i])
+	var on_screen: Array[Rect2] = hud.boss_weak_rects_on_screen()
+	assert_eq(on_screen.size(), 1)
+	assert_eq(on_screen[0], Rect2(300.0, 280.0, 40.0, 20.0), "logical px -> screen px")
+	hud._process(Hud.ROW_FADE_SECONDS + 0.01)
+	assert_eq(hud.row_alpha, 1.0, "a weak point low in the view: nothing fades")
+	# Up under the letters' row (top-right): the row fades.
+	var view: Vector2 = hud.get_viewport_rect().size
+	boss.head = Rect2i(int(view.x * 0.5 / float(Tuning.ART_SCALE)) + 120, 4, 20, 10)
+	hud._process(Hud.ROW_FADE_SECONDS + 0.01)
+	assert_almost_eq(hud.row_alpha, Hud.ROW_UNDER_HERO_ALPHA, 0.001, "the row fades over the weak point")
+	# Behind the boss bar: the bar fades too.
+	var bar: Rect2 = hud.get_boss_bar_rect()
+	boss.head = Rect2i(int(bar.get_center().x / float(Tuning.ART_SCALE)) - 5, int(bar.get_center().y / 2.0) - 3, 10, 6)
+	hud._process(Hud.ROW_FADE_SECONDS + 0.01)
+	assert_almost_eq(hud.get_boss_bar().self_modulate.a, Hud.BOSS_UNDER_HERO_ALPHA, 0.001, "the bar fades")
+	boss.head = Rect2i(150, 140, 20, 10)
+	hud._process(Hud.ROW_FADE_SECONDS + 0.01)
+	assert_eq(hud.row_alpha, 1.0, "back when the weak point moved away")
+	assert_eq(hud.get_boss_bar().self_modulate.a, 1.0)
+	Events.boss_defeated.emit(boss)
+	assert_eq(hud.boss_weak_rects_on_screen().size(), 0, "no fight, no weak point")
+
+
+## The band rule designers check their arenas with (Hud.weak_point_problem): a weak point inside the view at least
+## WEAK_POINT_CLEARANCE px below the fight band passes; one under the row, under the boss bar or cut off by the view
+## fails. The numbers hold on every device (the touch margin).
+func test_weak_point_band_rule() -> void:
+	var view: Vector2 = Vector2(640.0, 360.0)
+	var row_bottom: float = Hud.BAND_MARGIN_TOUCH + Hud.BAND_HEIGHT
+	var clear_top: float = row_bottom + Hud.WEAK_POINT_CLEARANCE
+	assert_eq(Hud.weak_point_problem(Rect2(560.0, clear_top, 40.0, 40.0), view), "", "right wall, clear of the row")
+	assert_ne(Hud.weak_point_problem(Rect2(560.0, clear_top - 1.0, 40.0, 40.0), view), "", "1 px too high")
+	assert_ne(Hud.weak_point_problem(Rect2(560.0, 20.0, 40.0, 40.0), view), "", "under the letters")
+	var bar_bottom: float = Hud.BAND_MARGIN_TOUCH + Hud.BOSS_TOP + HudBossBar.FRAME_SIZE.y
+	assert_ne(Hud.weak_point_problem(Rect2(310.0, clear_top, 20.0, 20.0), view), "", "under the boss bar's column")
+	assert_eq(Hud.weak_point_problem(Rect2(310.0, bar_bottom + Hud.WEAK_POINT_CLEARANCE, 20.0, 20.0), view), "")
+	assert_ne(Hud.weak_point_problem(Rect2(630.0, 200.0, 20.0, 20.0), view), "", "cut off by the view's edge")
+	assert_eq(Hud.weak_point_problem(Rect2(700.0, clear_top, 40.0, 40.0), Vector2(800.0, 360.0)), "", "a wide view")
+	# In logical px (DESIGN.md G35, Tuning.ART_SCALE 2): 24 px of clearance; a weak point's top 55 px under the view
+	# top clears the row, 72 px the boss bar's columns.
+	assert_eq(Hud.WEAK_POINT_CLEARANCE, 24.0 * float(Tuning.ART_SCALE))
+	assert_eq(int(ceilf(clear_top / float(Tuning.ART_SCALE))), 55)
+	assert_eq(int(ceilf((bar_bottom + Hud.WEAK_POINT_CLEARANCE) / float(Tuning.ART_SCALE))), 72)
+
+
+## Boss stages whose weak point still breaks the band rule, with the request that fixes it (the test reports them and
+## says when they are clear, so the entry can go). Book I's solo boss stages keep their 1.0 framing (frozen files):
+## reported, never failed.
+const BAND_OPEN: Dictionary = {
+	&"w6_l2b": "D6 lowers Old Mangrove's face (G35, wf9_d6_to_enemies-B.txt: face_rise <= 70)",
+	&"w6_l2b_coop": "D6 lowers Old Mangrove's face (G35, wf9_d6_to_enemies-B.txt: face_rise <= 70)",
+}
+const BAND_FROZEN: Array[StringName] = [&"w2_l2b", &"w4_l2b"]
+
+
+## The band rule on every boss stage that exists (solo and co-op files; new ones are picked up as they land): the
+## heroes walk into the boss's arena, the camera settles on its lock, the fight starts, and every weak point of the
+## boss lies inside the view at least WEAK_POINT_CLEARANCE px below the fight band (Hud.weak_point_problem, the touch
+## margin) - at the start of the fight, where the arena puts it.
+func test_boss_stages_keep_weak_points_clear_of_the_hud() -> void:
+	var ids: Array[StringName] = []
+	for level_id: StringName in Levels.all_ids():
+		if not Levels.get_level_kind(level_id) in ["main", "sub", "coop"]:
+			continue
+		if FileAccess.get_file_as_string(Levels.get_level_path(level_id)).contains("\nbosses/"):
+			ids.append(level_id)
+	ids.sort()
+	assert_true(ids.has(&"w5_l2b") and ids.has(&"w6_l2b"), "the Book II boss stages are found (%s)" % [ids])
+	var report: PackedStringArray = PackedStringArray()
+	for level_id: StringName in ids:
+		var coop: bool = Levels.get_level_kind(level_id) == "coop"
+		Game.start_run(Defs.Difficulty.EXPERT, Defs.GameMode.COOP if coop else Defs.GameMode.SINGLE, 2 if coop else 1,
+				Levels.get_book(level_id))
+		await _start_level(level_id)
+		var bosses: Array[SimEntity] = Game.level.get_kind(Defs.Kind.BOSS) if Game.level != null else []
+		if bosses.is_empty():
+			report.append("%s: no boss" % level_id)
+			_leave_level()
+			continue
+		var boss: BossBase = bosses[0] as BossBase
+		_walk_into_arena(boss)
+		# The game's base view (the test window's own size differs), the camera placed around the party at once.
+		if Game.level.has_method(&"set_view_size"):
+			Game.level.call(&"set_view_size", Vector2i(Tuning.VIEW_W, Tuning.VIEW_H) * Tuning.ART_SCALE)
+		for tick: int in 120:
+			Sim.step(1)
+		if not boss.fighting:
+			boss.start_fight()
+		Sim.step(2)
+		var view: Rect2i = Game.level.get_view_rect()
+		var view_art: Vector2 = Vector2(view.size) * float(Tuning.ART_SCALE)
+		var problems: PackedStringArray = PackedStringArray()
+		for weak: Rect2i in Hud.weak_point_rects(boss):
+			var art: Rect2 = Rect2(Vector2(weak.position - view.position) * float(Tuning.ART_SCALE),
+					Vector2(weak.size) * float(Tuning.ART_SCALE))
+			var problem: String = Hud.weak_point_problem(art, view_art)
+			if problem != "":
+				problems.append(problem)
+		var verdict: String = "clear" if problems.is_empty() else "; ".join(problems)
+		report.append("%s (%s): %s" % [level_id, boss.get_script().resource_path.get_file(), verdict])
+		if BAND_FROZEN.has(level_id):
+			pass
+		elif BAND_OPEN.has(level_id):
+			if problems.is_empty():
+				print("    %s is clear now: remove it from BAND_OPEN" % level_id)
+		else:
+			assert_true(problems.is_empty(), "%s: the boss's weak point keeps clear of the HUD band: %s" % [level_id,
+					verdict])
+		_leave_level()
+	for line: String in report:
+		print("    band: %s" % line)
+	Game.new_game(Defs.Difficulty.BEGINNER)
+
+
+## Put the party into `boss`'s arena (zones/arena named by its `arena`, else 6 tiles before the boss), standing on the
+## first floor under the arena's middle, so the camera takes the arena's lock.
+func _walk_into_arena(boss: BossBase) -> void:
+	var level: LevelBase = Game.level
+	var target: Vector2i = boss.sim_pos - Vector2i(6 * Tuning.TILE, 2 * Tuning.TILE)
+	for node: Node in get_tree().get_nodes_in_group(Defs.GROUP_SIM):
+		var zone: SimEntity = node as SimEntity
+		if zone == null or str(zone.spawn_params.get("name", "")) != String(boss.arena) \
+				or not zone.spawn_params.has("rect"):
+			continue
+		var parts: PackedStringArray = str(zone.spawn_params["rect"]).split(",")
+		if parts.size() == 4:
+			var col: int = parts[0].to_int() + parts[2].to_int() / 2
+			if absi(col * Tuning.TILE - boss.sim_pos.x) < 3 * Tuning.TILE:
+				col = parts[0].to_int() + parts[2].to_int() / 4
+			target = Vector2i(col * Tuning.TILE + Tuning.TILE / 2, (parts[1].to_int() + 1) * Tuning.TILE)
+	var col_x: int = target.x / Tuning.TILE
+	for row: int in range(target.y / Tuning.TILE, level.grid.rows):
+		if TileGrid.is_ground(level.grid.floor_at(col_x, row)):
+			target.y = row * Tuning.TILE
+			break
+	for i: int in level.heroes.size():
+		var hero: PlayerBase = level.heroes[i]
+		hero.sim_pos = target - Vector2i(24 * i, 0)
+		hero.sim_prev = hero.sim_pos
+		level.notify_hero_teleported(hero)
+
+
 ## A hero off the view gets an arrow in his colour at the nearest edge; while the co-op leash counts, a stone counts
 ## the seconds down to the egg (5..1 Beginner, 3..1 Expert). A party of one gets none.
 func test_hud_edge_arrows_follow_heroes_off_the_view() -> void:
@@ -1243,6 +1453,21 @@ func test_touch_controls_table_mode_gives_each_player_a_cluster() -> void:
 	touch.release_all()
 	assert_true(TouchControls.table_regions()[0].intersection(TouchControls.table_regions()[1]).size.y <= 0.0,
 			"the two regions do not overlap")
+
+
+## Cut list 2 APPLIED (DESIGN.md G37): table mode is a hidden prototype - not offered unless the developer switch is
+## on: a tap on the join panel or in the lobby always seats a whole-screen touch player.
+func test_table_mode_is_hidden_behind_the_developer_switch() -> void:
+	assert_false(TouchControls.experimental_table_mode, "off by default")
+	if not OS.get_cmdline_user_args().has("--table-mode"):
+		assert_false(TouchControls.table_mode_switched_on(), "no switch, no table mode")
+	assert_false(TouchControls.table_mode_available(), "never offered without the switch")
+	var tapped: InputSlot = JoinScreen.touch_input_at(Vector2(320.0, 40.0), Vector2(640.0, 360.0))
+	assert_eq(tapped.kind, Defs.InputSlotKind.TOUCH)
+	assert_eq(tapped.region, InputSlot.touch().region, "a tap in the top half: the whole screen, not P2's half")
+	TouchControls.experimental_table_mode = true
+	assert_eq(TouchControls.table_mode_switched_on(), OS.is_debug_build(), "the switch works in debug builds only")
+	TouchControls.experimental_table_mode = false
 
 
 func _options_of(menu: PauseMenu) -> OptionsPanel:

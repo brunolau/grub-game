@@ -73,7 +73,7 @@ func test_level_sub_catalogues_load_beside_the_language_file() -> void:
 	assert_eq(String(_added[1].locale), "eo", "the folder names the locale, not the header")
 	TranslationServer.set_locale("en")
 	assert_eq(String(TranslationServer.translate("SIGN_UI_B_SUBCATALOGUE")), "Read me from a sub-catalogue")
-	assert_eq(String(TranslationServer.translate("UI_TITLE_START")), "Start Game", "the language file still answers")
+	assert_eq(String(TranslationServer.translate("UI_TITLE_PLAY")), "Play", "the language file still answers")
 	TranslationServer.set_locale("eo")
 	assert_eq(String(TranslationServer.translate("SIGN_UI_B_SUBCATALOGUE")), "Legu min")
 	TranslationServer.set_locale("en")

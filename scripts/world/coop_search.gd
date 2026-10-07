@@ -72,6 +72,8 @@ const PARTNER_IDLE: int = 1
 ## The idle partner stands this far in front of the hero when a `partner` macro starts (px; 0 = on his spot: heroes
 ## pass through each other, so a jump straight up lands on the partner's head).
 const PARTNER_FRONT_PX: int = 0
+## No spot (no partner placed, no position to check).
+const NOWHERE: Vector2i = Vector2i(-1, -1)
 ## Sim.rng at the start of every run (a run and its replay draw the same numbers).
 const SEARCH_SEED: int = 0x5EA2C4
 ## A changed node's replay is at most this long (ticks from its last unchanged ancestor); longer paths are dropped.
@@ -169,6 +171,46 @@ class SearchLevel:
 		changed.clear()
 
 
+## The wind of a search world: the level's script (meta `wind`, `wind_loop`, PHYSICS.md 13.1 / C.6) exactly as
+## Level._apply_wind_script runs it, restarted at every run (from play tick 0, like every moving thing of the search
+## world: a gust's phase at the start of a move is the level start's - the `wait-walk` moves wait 40 ticks).
+class SearchWind:
+	extends RefCounted
+
+	var _level: LevelBase = null
+	var _script: Array[Vector2i] = []
+	var _loop: int = 0
+	var _index: int = 0
+	var _base: int = 0
+	var _play: int = 0
+
+	func _init(level: LevelBase, script: Array[Vector2i], loop: int) -> void:
+		_level = level
+		_script = script
+		_loop = loop
+
+	## The level start: no wind, then the entries of tick 0 and 1 (Level._setup_world_state).
+	func restart() -> void:
+		_index = 0
+		_base = 0
+		_play = 0
+		_level.set_wind(0)
+		_apply()
+
+	## Phase WORLD (Level._world_step).
+	func step() -> void:
+		_play += 1
+		_apply()
+
+	func _apply() -> void:
+		if _loop > 0 and not _script.is_empty() and _play + 1 - _base >= _loop:
+			_base += _loop
+			_index = 0
+		while _index < _script.size() and _script[_index].x <= _play + 1 - _base:
+			_level.set_wind(_script[_index].y)
+			_index += 1
+
+
 ## One search: a level with the real hero, scripted from macros; with [method build_world] the file's entities and
 ## the partner (an egg or an idle hero) in a co-op game of two.
 class Searcher:
@@ -185,6 +227,8 @@ class Searcher:
 	var runs: int = 0
 	## Ticks replayed to bring a changed node back (part of [member simulated]).
 	var replayed: int = 0
+	## Nodes of the last [method explore] that parked the idle partner (G33's "placed anywhere").
+	var placements: int = 0
 	## True when the level holds the file's entities ([method build_world]).
 	var world: bool = false
 	var _saved_level: LevelBase = null
@@ -208,8 +252,11 @@ class Searcher:
 	var _baseline: String = ""
 	## Feet points (logical px) of what strikes and throws can act on.
 	var _targets: Array[Vector2i] = []
-	## Feet points of what an idle partner can be used on (plates to weigh, keepers and trait enemies to bait).
+	## Feet points of the co-op mechanisms and trait enemies where parking the idle partner is tried
+	## ([method placement_useful]).
 	var _partner_targets: Array[Vector2i] = []
+	## The level's wind script, when the file has one ([class SearchWind]).
+	var _wind: SearchWind = null
 
 	## Build a bare level from `grid` (no entity but the hero). False when the hero scene does not exist.
 	func build(level_id: StringName, meta: Dictionary, grid: TileGrid) -> bool:
@@ -256,6 +303,14 @@ class Searcher:
 		level.grid = grid
 		level.follow = true
 		(Engine.get_main_loop() as SceneTree).root.add_child(level)
+		# The level's wind (meta `wind`, `wind_loop`), stepped first in the WORLD phase as the level's own driver does.
+		var script: Array[Vector2i] = data.wind_script(difficulty)
+		if not script.is_empty():
+			_wind = SearchWind.new(level, script, int(level.meta.get("wind_loop", 0)))
+			var wind_driver: LevelDriver = LevelDriver.new()
+			wind_driver.setup(_wind.step, Callable(), Callable())
+			level.add_child(wind_driver)
+			_kept[wind_driver.get_instance_id()] = true
 		for record: Dictionary in CoopSearch.world_record_list(data, difficulty, columns):
 			var id: String = String(record["id"])
 			var col: int = int(record["col"])
@@ -269,8 +324,7 @@ class Searcher:
 			_kept[node.get_instance_id()] = true
 			if CoopSearch.is_target(id):
 				_targets.append(node.sim_pos)
-			if id == "objects/plate" or (record["params"] as Dictionary).has("keeper") \
-					or (record["params"] as Dictionary).has("coop"):
+			if CoopSearch.is_partner_target(record):
 				_partner_targets.append(node.sim_pos)
 		hero = level.spawn(PLAYER_ID, Vector2i(Tuning.TILE * 2, Tuning.TILE * 2), {}) as PlayerBase
 		partner = level.spawn(PLAYER_ID, Vector2i(Tuning.TILE * 3, Tuning.TILE * 2), {"slot": PARTNER_SLOT}) \
@@ -374,34 +428,70 @@ class Searcher:
 			if extra != "":
 				parts.append(extra)
 		parts.append("cells:" + level.changed_cells())
-		parts.append("hand:%d,%d" % [hero.run.weapon, hero.run.belt])
 		return "|".join(parts)
 
-	## Play `flags` from `start` (facing `facing`) on a reset world with the hand weapon `hand` (-1: the club) and the
-	## partner `partner_mode` (a search world). The first `skip` ticks are a replay (no goal test; after them the hero
-	## stands at `expect` unless it is (-1, -1)). {"goal": true,
-	## "ticks"} when the feet point entered a cell of `goals`; at rest {"pos", "ticks" (after the replay), "played"
-	## (every flag of the run up to the rest), "sig"}; {} when he died, went down or did not come to rest.
-	func run(start: Vector2i, facing: int, flags: PackedInt32Array, goals: Dictionary, hand: int = -1,
-			partner_mode: int = PARTNER_EGG, skip: int = 0, expect: Vector2i = Vector2i(-1, -1)) -> Dictionary:
+	## Play `flags` on a reset world from the run configuration `config` ([method _config]: "start", "facing", "hand"
+	## (-1: the club), "partner" (PARTNER_EGG / PARTNER_IDLE: an idle hero on the start spot), "partner_at" (an idle hero
+	## placed there; NOWHERE: none)). `events` ([tick, kind, value], sorted by tick) are applied after `tick` ticks were
+	## played: "hand" (value: the special in his hand from then on), "place" (value: the spot - the idle partner is put
+	## where the hero stands, which a replay has checked is that spot). The first `skip` ticks are a replay (no goal
+	## test; after them the hero stands at `expect` unless it is NOWHERE). {"goal": true, "ticks"} when the feet point
+	## entered a cell of `goals`; at rest {"pos", "ticks" (after the replay), "played" (every flag of the run up to the
+	## rest), "sig"}; {} when he died, went down or did not come to rest.
+	func run(config: Dictionary, flags: PackedInt32Array, goals: Dictionary, skip: int = 0,
+			expect: Vector2i = NOWHERE, events: Array = []) -> Dictionary:
 		runs += 1
+		var clock: int = Time.get_ticks_usec()
 		if world:
 			_tick_max = maxi(_tick_max, Sim.tick)
 			Sim.tick = _tick_base
 			reset_world()
+		CoopSearch.profile_add(&"reset", clock)
+		clock = Time.get_ticks_usec()
+		var start: Vector2i = config["start"]
+		var facing: int = int(config["facing"])
 		hero.run.reset_energy()
-		hero.run.set_weapon(hand if hand >= 0 else Defs.Weapon.CLUB)
-		hero.run.set_belt(Defs.Weapon.CLUB if hand > Defs.Weapon.CLUB else PlayerRun.BELT_EMPTY)
+		_set_hand(int(config["hand"]))
 		hero.respawn_at(start)
 		hero.facing = facing
+		_mark_active(hero)
 		if world:
-			_place_partner(partner_mode, start, facing)
+			var at: Vector2i = config["partner_at"]
+			if at != NOWHERE:
+				_place_idle(at, facing)
+			else:
+				_place_partner(int(config["partner"]), start, facing)
 			level.refresh_doze()
+			if _wind != null:
+				_wind.restart()
 		_flags = flags
 		_first_tick = Sim.tick + 1
+		CoopSearch.profile_add(&"place", clock)
+		clock = Time.get_ticks_usec()
+		var outcome: Dictionary = _play(flags, goals, skip, expect, events)
+		CoopSearch.profile_add(&"step", clock)
+		if outcome.has("pos") and world:
+			clock = Time.get_ticks_usec()
+			outcome["sig"] = signature()
+			CoopSearch.profile_add(&"sig", clock)
+		if outcome.has("pos") and (hero.on_platform or hero.is_riding_totem()):
+			# He rests on something that moves or is reset (a lift, a raft, a partner's head), not on the grid: a fresh
+			# run cannot put him back there (respawn_at would stand him on the air), so the node is a changed one -
+			# its replay brings back exactly that carrier and him on it.
+			var carrier: Object = hero.totem_carrier if hero.is_riding_totem() else null
+			outcome["sig"] = "%s|support:%s@%d,%d" % [str(outcome["sig"]), "partner" if carrier != null else "platform",
+				hero.sim_pos.x, hero.sim_pos.y]
+		return outcome
+
+	## The tick loop of [method run].
+	func _play(flags: PackedInt32Array, goals: Dictionary, skip: int, expect: Vector2i, events: Array) -> Dictionary:
 		var still: int = 0
 		var t: int = 0
+		var next_event: int = 0
 		while t < flags.size() + SETTLE_TICKS:
+			while next_event < events.size() and int(events[next_event][0]) <= t:
+				_apply_event(events[next_event])
+				next_event += 1
 			Sim.step(1)
 			t += 1
 			simulated += 1
@@ -410,7 +500,7 @@ class Searcher:
 			if t < skip:
 				replayed += 1
 				continue
-			if t == skip and expect != Vector2i(-1, -1) and hero.sim_pos != expect:
+			if t == skip and expect != NOWHERE and hero.sim_pos != expect:
 				return {}  # the replay did not come back to its node (a world that is not reset exactly): dropped
 			if t == skip:
 				continue
@@ -423,33 +513,60 @@ class Searcher:
 					if still >= 2:
 						var played: PackedInt32Array = flags.duplicate()
 						played.resize(t)
-						return {"pos": hero.sim_pos, "ticks": t - skip, "played": played,
-							"sig": signature() if world else ""}
+						return {"pos": hero.sim_pos, "ticks": t - skip, "played": played, "sig": ""}
 				else:
 					still = 0
 		return {}
 
+	func _apply_event(event: Array) -> void:
+		match str(event[1]):
+			"hand":
+				_set_hand(int(event[2]))
+			"place":
+				_place_idle(hero.sim_pos, hero.facing)
+
+	## The weapon in his hand (-1: the club); a special in the hand puts the club on the belt (the reference hero).
+	func _set_hand(hand: int) -> void:
+		hero.run.set_weapon(hand if hand >= 0 else Defs.Weapon.CLUB)
+		hero.run.set_belt(Defs.Weapon.CLUB if hand > Defs.Weapon.CLUB else PlayerRun.BELT_EMPTY)
+
+	## The lone player is never IDLE (G33): he pressed something long before the gate.
+	func _mark_active(who: PlayerBase) -> void:
+		who.gave_input = true
+		who.input_idle_ticks = 0
+		who.idle = false
+
 	## The partner at the start of a run: an egg at its drift point behind the hero, or an idle hatched hero
 	## PARTNER_FRONT_PX in front of him (on the same feet line; he falls when there is no floor).
 	func _place_partner(mode: int, start: Vector2i, facing: int) -> void:
-		partner.run.reset_energy()
 		if mode == PARTNER_IDLE:
-			partner.respawn_at(start + Vector2i(PARTNER_FRONT_PX * facing, 0))
-			partner.facing = -facing
-		else:
-			partner.respawn_at(start)
-			partner.go_down(&"search")
-			partner.teleport(start + Vector2i(PartyTuning.EGG_OFFSET_X * facing, PartyTuning.EGG_OFFSET_Y))
+			_place_idle(start + Vector2i(PARTNER_FRONT_PX * facing, 0), facing)
+			return
+		partner.run.reset_energy()
+		partner.respawn_at(start)
+		partner.go_down(&"search")
+		partner.teleport(start + Vector2i(PartyTuning.EGG_OFFSET_X * facing, PartyTuning.EGG_OFFSET_Y))
+		_mark_idle(partner)
 		driver.set(&"active_mask", 0)
 
-	## True when an idle partner may help at `pos`: a plate or a keeper / trait enemy within THROW_REACH_CELLS, or
-	## a floor PARTNER_LEDGE_ROWS over the hero's feet within PARTNER_LEDGE_COLS columns (higher than his own jump
-	## with its corner catch, low enough for a ride off a still carrier).
+	## The partner hatched and IDLE at `at` (G33: his player is away - he never pressed anything, so he counts for no
+	## co-op rule; PlayerBase.is_idle holds from his first tick anyway, set here explicitly).
+	func _place_idle(at: Vector2i, facing: int) -> void:
+		partner.run.reset_energy()
+		partner.respawn_at(at)
+		partner.facing = -facing
+		_mark_idle(partner)
+		driver.set(&"active_mask", 0)
+
+	func _mark_idle(who: PlayerBase) -> void:
+		who.gave_input = false
+		who.input_idle_ticks = PlayerBase.IDLE_TICKS
+		who.idle = true
+
+	## True when an idle partner may carry a ride here (the `partner` ride macros - a regression check since G33: an
+	## idle head is no carrier): a floor PARTNER_LEDGE_ROWS over the hero's feet within PARTNER_LEDGE_COLS columns
+	## (higher than his own jump with its corner catch, low enough for a ride off a still carrier).
 	func partner_useful(pos: Vector2i) -> bool:
-		for target: Vector2i in _partner_targets:
-			if absi(target.x - pos.x) <= THROW_REACH_CELLS.x * Tuning.TILE \
-					and absi(target.y - pos.y) <= THROW_REACH_CELLS.y * Tuning.TILE:
-				return true
 		var grid: TileGrid = level.grid
 		var col: int = Tuning.to_cell(pos.x)
 		var row: int = Tuning.to_cell(pos.y - 1)
@@ -461,6 +578,16 @@ class Searcher:
 					return true
 		return false
 
+	## True when parking the idle partner at `pos` is worth a node of its own: a co-op mechanism (plate, see-saw, pulley
+	## lift, heave boulder, drum) or a keeper / trait / bond enemy within THROW_REACH_CELLS. Since G33 none of them
+	## counts him, so these nodes are the search's regression check of the IDLE rule in the objects and traits.
+	func placement_useful(pos: Vector2i) -> bool:
+		for target: Vector2i in _partner_targets:
+			if absi(target.x - pos.x) <= THROW_REACH_CELLS.x * Tuning.TILE \
+					and absi(target.y - pos.y) <= THROW_REACH_CELLS.y * Tuning.TILE:
+				return true
+		return false
+
 	## True when something a strike (`reach` = STRIKE_REACH_CELLS) or a throw can act on lies near `pos`.
 	func target_near(pos: Vector2i, reach: Vector2i) -> bool:
 		for target: Vector2i in _targets:
@@ -469,16 +596,19 @@ class Searcher:
 		return false
 
 	## Breadth-first over resting points from `starts` (feet points) inside `area` (cells) until a cell of `goals` is
-	## entered. Returns {"reached", "ticks", "detail", "nodes", "runs"}.
+	## entered. A node ([method _node]) is a resting point, the world's signature and where the idle partner was left
+	## ("partner_at"; G33: he may be placed anywhere his egg reaches - the egg drifts after the lone hero and is clubbed
+	## open where he stands - so a `place partner` step parks him at the node, and every later move starts with him
+	## there). Returns {"reached", "ticks", "detail", "nodes", "runs", "simulated", "replayed"}.
 	func explore(starts: Array[Vector2i], goals: Dictionary, area: Rect2i, bound: int, max_nodes: int) -> Dictionary:
 		var queue: Array[Dictionary] = []
 		var seen: Dictionary = {}
+		placements = 0
 		for start: Vector2i in starts:
-			var key: String = CoopSearch.state_key(start, _baseline)
-			if not seen.has(key):
-				seen[key] = 0
-				queue.append({"pos": start, "ticks": 0, "path": "start %d,%d" % [start.x, start.y], "anchor": start,
-					"facing": 1, "hand": -1, "partner": PARTNER_EGG, "prefix": PackedInt32Array()})
+			var first: Dictionary = _node(start, 0, "start %d,%d" % [start.x, start.y], _baseline, NOWHERE)
+			if not seen.has(_key_of(first)):
+				seen[_key_of(first)] = 0
+				queue.append(first)
 		var head: int = 0
 		while head < queue.size() and head < max_nodes:
 			var node: Dictionary = queue[head]
@@ -486,19 +616,45 @@ class Searcher:
 			var pos: Vector2i = node["pos"]
 			var start_cell: Vector2i = Vector2i(Tuning.to_cell(pos.x), Tuning.to_cell(pos.y - 1))
 			if goals.has(start_cell):
-				return {"reached": true, "ticks": node["ticks"], "detail": node["path"], "nodes": head, "runs": runs,
-					"simulated": simulated, "replayed": replayed}
+				return _found(int(node["ticks"]), str(node["path"]), head)
 			var prefix: PackedInt32Array = node["prefix"]
 			var changed: bool = not prefix.is_empty()
+			if CoopSearch.debug_nodes:
+				print("  node %d at %s t%d prefix %d partner %s: %s%s" % [head - 1, str(pos), int(node["ticks"]),
+					prefix.size(), str(node["partner_at"]), str(node["path"]).right(90), "" if not changed else " | "
+					+ CoopSearch.sig_diff(_baseline, str(node["sig"]))])
+			# Park the idle partner here (G33): a node of its own, no move played.
+			if CoopSearch.idle_partner and placement_useful(pos) \
+					and CoopSearch.node_key(node["partner_at"]) != CoopSearch.node_key(pos):
+				var parked: Dictionary = node.duplicate()
+				parked["partner_at"] = pos
+				parked["path"] = "%s > place partner" % node["path"]
+				if changed:
+					parked["events"] = (node["events"] as Array) + [[prefix.size(), "place", pos]]
+				var parked_key: String = _key_of(parked)
+				if not seen.has(parked_key):
+					seen[parked_key] = int(node["ticks"])
+					queue.append(parked)
+					placements += 1
 			for macro: Dictionary in macros:
 				if not _macro_fits(macro, node):
 					continue
-				var hand: int = int(node["hand"]) if changed else int(macro.get("hand", -1))
-				var partner_mode: int = int(node["partner"]) if changed else int(macro.get("partner", PARTNER_EGG))
-				var facing: int = int(node["facing"]) if changed else int(macro["facing"])
-				var start: Vector2i = node["anchor"] if changed else pos
-				var outcome: Dictionary = run(start, facing, prefix + (macro["flags"] as PackedInt32Array), goals, hand,
-						partner_mode, prefix.size(), pos if changed else Vector2i(-1, -1))
+				var config: Dictionary
+				var events: Array = []
+				var macro_hand: int = int(macro.get("hand", -1))
+				var ride: bool = int(macro.get("partner", PARTNER_EGG)) == PARTNER_IDLE
+				if changed:
+					config = node["config"]
+					events = (node["events"] as Array).duplicate()
+					if macro_hand >= 0 and macro_hand != int(node["hand_now"]):
+						events.append([prefix.size(), "hand", macro_hand])
+					if ride:
+						events.append([prefix.size(), "place", pos])
+				else:
+					config = _config(pos, int(macro["facing"]), macro_hand, PARTNER_IDLE if ride else PARTNER_EGG,
+						NOWHERE if ride else node["partner_at"])
+				var outcome: Dictionary = run(config, prefix + (macro["flags"] as PackedInt32Array), goals, prefix.size(),
+						pos if changed else NOWHERE, events)
 				if outcome.is_empty():
 					continue
 				var ticks: int = int(node["ticks"]) + int(outcome["ticks"])
@@ -506,34 +662,72 @@ class Searcher:
 					continue
 				var path: String = "%s > %s" % [node["path"], macro["name"]]
 				if outcome.has("goal"):
-					return {"reached": true, "ticks": ticks, "detail": path, "nodes": head, "runs": runs,
-						"simulated": simulated, "replayed": replayed}
+					return _found(ticks, path, head)
 				var rest: Vector2i = outcome["pos"]
 				var sig: String = outcome["sig"]
-				var key: String = CoopSearch.state_key(rest, sig)
-				if seen.has(key) and int(seen[key]) <= ticks:
-					continue
-				var fresh: bool = not seen.has(key)
-				seen[key] = ticks
-				var child: Dictionary = {"pos": rest, "ticks": ticks, "path": path, "anchor": rest, "facing": 1,
-					"hand": -1, "partner": PARTNER_EGG, "prefix": PackedInt32Array()}
-				if sig != _baseline:
+				var child: Dictionary
+				if sig == _baseline:
+					# Back in the level-file world: the next moves start from a reset world (the partner stays parked).
+					child = _node(rest, ticks, path, sig, node["partner_at"])
+				else:
 					# The world changed for good: the child replays the run from its last unchanged ancestor.
 					var played: PackedInt32Array = outcome["played"]
 					if played.size() > MAX_PREFIX_TICKS:
 						continue
-					child["anchor"] = start
-					child["facing"] = facing
-					child["hand"] = hand
-					child["partner"] = partner_mode
+					child = _node(rest, ticks, path, sig, _partner_spot(config, events))
+					child["config"] = config
+					child["events"] = events
 					child["prefix"] = played
+					child["hand_now"] = _hand_after(config, events)
+				var key: String = _key_of(child)
+				if seen.has(key) and int(seen[key]) <= ticks:
+					continue
+				var fresh: bool = not seen.has(key)
+				seen[key] = ticks
 				var cell: Vector2i = Vector2i(Tuning.to_cell(rest.x), Tuning.to_cell(rest.y - 1))
 				if fresh and area.has_point(cell):
 					queue.append(child)
-		return {"reached": false, "ticks": -1, "detail": "", "nodes": head, "runs": runs, "simulated": simulated, "replayed": replayed}
+		return {"reached": false, "ticks": -1, "detail": "", "nodes": head, "runs": runs, "simulated": simulated,
+			"replayed": replayed, "placements": placements}
+
+	func _found(ticks: int, path: String, nodes: int) -> Dictionary:
+		return {"reached": true, "ticks": ticks, "detail": path, "nodes": nodes, "runs": runs, "simulated": simulated,
+			"replayed": replayed, "placements": placements}
+
+	## A node of [method explore]: an unchanged one (no prefix) unless "config" / "events" / "prefix" are filled in.
+	func _node(pos: Vector2i, ticks: int, path: String, sig: String, partner_at: Vector2i) -> Dictionary:
+		return {"pos": pos, "ticks": ticks, "path": path, "sig": sig, "partner_at": partner_at, "config": {},
+			"events": [], "prefix": PackedInt32Array(), "hand_now": -1}
+
+	func _key_of(node: Dictionary) -> String:
+		var key: String = CoopSearch.state_key(node["pos"], str(node["sig"]))
+		var at: Vector2i = node["partner_at"]
+		return key if at == NOWHERE else "%s|p%s" % [key, str(CoopSearch.node_key(at))]
+
+	## A run configuration for [method run].
+	func _config(start: Vector2i, facing: int, hand: int, partner_mode: int, partner_at: Vector2i) -> Dictionary:
+		return {"start": start, "facing": facing, "hand": hand, "partner": partner_mode, "partner_at": partner_at}
+
+	## Where the idle partner was put last in a run of `config` with `events` (NOWHERE: he is an egg).
+	func _partner_spot(config: Dictionary, events: Array) -> Vector2i:
+		for i: int in range(events.size() - 1, -1, -1):
+			if str(events[i][1]) == "place":
+				return events[i][2]
+		if config["partner_at"] != NOWHERE:
+			return config["partner_at"]
+		return config["start"] if int(config["partner"]) == PARTNER_IDLE else NOWHERE
+
+	## The hand after `config` and its `events`.
+	func _hand_after(config: Dictionary, events: Array) -> int:
+		var hand: int = int(config["hand"])
+		for event: Array in events:
+			if str(event[1]) == "hand":
+				hand = int(event[2])
+		return hand
 
 	## Whether `macro` is worth a run from `node`: strikes where something to hit is near, throws where something to
-	## throw at is in range, the partner moves only from an unchanged node (they place him).
+	## throw at is in range, the partner ride moves (a regression check since G33) only from an unchanged node under a
+	## ledge.
 	func _macro_fits(macro: Dictionary, node: Dictionary) -> bool:
 		match str(macro.get("kind", "move")):
 			"strike":
@@ -551,11 +745,123 @@ class Searcher:
 ## the gate cannot be searched), "bound": BOUND_TICKS, "windows": [{"what", "window", "solo_min"}], "detail": String,
 ## "starts": Array of start cells, "explored": resting points searched, "runs": macro runs, "flood": bool (the
 ## diagnostic of [method flood_reaches])}.
+## With [member use_file_cache] (and [member use_cache]) a result is kept in FILE_CACHE_DIR under a key of everything
+## it depends on ([method file_cache_key]: the level file and its solo base, the gate and difficulty, and the
+## fingerprint of every script, scene and resource of the simulation), so a rerun with nothing changed reads it back
+## instead of searching again ("cached": true in the result).
 static func search_gate(level_id: StringName, difficulty: int, gate: String) -> Dictionary:
-	var data: LevelData = LevelData.load_file(level_path(level_id))
+	var path: String = level_path(level_id)
+	var data: LevelData = LevelData.load_file(path)
 	if data == null:
 		return _unproven(_fresh_result(), "cannot read the level %s" % level_id)
-	return search_data(data, difficulty, gate)
+	var key: String = ""
+	if use_cache and use_file_cache:
+		key = file_cache_key(path, data, difficulty, gate)
+		var cached: Dictionary = _file_cache_read(key)
+		if not cached.is_empty():
+			return cached
+	var started: int = Time.get_ticks_msec()
+	var result: Dictionary = search_data(data, difficulty, gate)
+	if key != "" and not str(result.get("detail", "")).begins_with("unproven"):
+		result["seconds"] = (Time.get_ticks_msec() - started) / 1000.0
+		_file_cache_write(key, result)
+	return result
+
+
+## Where [method search_gate] keeps its results (one JSON file per key; build/ is not versioned).
+const FILE_CACHE_DIR: String = "res://build/coop_search_cache"
+## The search's own version in the cache key (bump it when a result's meaning changes without a code change).
+const FILE_CACHE_VERSION: String = "v3.0"
+## The folders whose files make the simulation (their contents are the code fingerprint).
+const FINGERPRINT_DIRS: Array[String] = ["res://scripts", "res://scenes", "res://resources"]
+const FINGERPRINT_EXTENSIONS: Array[String] = ["gd", "tscn", "tres", "json", "cfg"]
+
+static var _fingerprint: String = ""
+
+
+## The key of a search result: md5 over the search version, the code fingerprint ([method code_fingerprint]), the
+## level file's text, its `coop_of` base file's text (the static rules read its kind), the difficulty, the gate, and
+## the partner model.
+static func file_cache_key(path: String, data: LevelData, difficulty: int, gate: String) -> String:
+	var parts: PackedStringArray = PackedStringArray([FILE_CACHE_VERSION, code_fingerprint(),
+		FileAccess.get_file_as_string(path)])
+	var base: String = str(data.value("coop_of"))
+	if base != "":
+		var base_path: String = level_path(StringName(base))
+		parts.append(FileAccess.get_file_as_string(base_path) if FileAccess.file_exists(base_path) else "")
+	parts.append("%d|%s|%s" % [difficulty, gate, "idle" if idle_partner else "egg"])
+	return "|".join(parts).md5_text()
+
+
+## The md5 of every script, scene and resource file of the simulation (FINGERPRINT_DIRS) and project.godot, taken
+## once per run: any change anywhere makes every cached result stale.
+static func code_fingerprint() -> String:
+	if _fingerprint != "":
+		return _fingerprint
+	var files: PackedStringArray = PackedStringArray(["res://project.godot"])
+	for dir_path: String in FINGERPRINT_DIRS:
+		_collect_files(dir_path, files)
+	files.sort()
+	var parts: PackedStringArray = PackedStringArray()
+	for file: String in files:
+		parts.append("%s=%s" % [file, FileAccess.get_md5(file)])
+	_fingerprint = ";".join(parts).md5_text()
+	return _fingerprint
+
+
+static func _collect_files(dir_path: String, into: PackedStringArray) -> void:
+	var dir: DirAccess = DirAccess.open(dir_path)
+	if dir == null:
+		return
+	for file_name: String in dir.get_files():
+		if FINGERPRINT_EXTENSIONS.has(file_name.get_extension()):
+			into.append(dir_path.path_join(file_name))
+	for sub: String in dir.get_directories():
+		_collect_files(dir_path.path_join(sub), into)
+
+
+static func _file_cache_read(key: String) -> Dictionary:
+	var file_path: String = FILE_CACHE_DIR.path_join(key + ".json")
+	if not FileAccess.file_exists(file_path):
+		return {}
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(file_path))
+	if not parsed is Dictionary or not (parsed as Dictionary).has("reached"):
+		return {}
+	var result: Dictionary = parsed
+	var starts: Array = []
+	for cell: Variant in result.get("starts", []):
+		if cell is Array and (cell as Array).size() == 2:
+			starts.append(Vector2i(int(cell[0]), int(cell[1])))
+	result["starts"] = starts
+	for key_name: String in ["explored", "runs", "simulated", "replayed", "bound"]:
+		result[key_name] = int(result.get(key_name, 0))
+	var windows: Array = []
+	for window: Variant in result.get("windows", []):
+		if window is Dictionary:
+			windows.append({"what": str(window.get("what", "")), "window": int(window.get("window", 0)),
+				"solo_min": int(window.get("solo_min", 0))})
+	result["windows"] = windows
+	result["cached"] = true
+	return result
+
+
+static func _file_cache_write(key: String, result: Dictionary) -> void:
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(FILE_CACHE_DIR))
+	var copy: Dictionary = result.duplicate(true)
+	var starts: Array = []
+	for cell: Variant in result.get("starts", []):
+		if cell is Vector2i:
+			starts.append([(cell as Vector2i).x, (cell as Vector2i).y])
+	copy["starts"] = starts
+	copy.erase("cached")
+	var final_path: String = FILE_CACHE_DIR.path_join(key + ".json")
+	var temp_path: String = "%s.%d.tmp" % [final_path, OS.get_process_id()]
+	var file: FileAccess = FileAccess.open(temp_path, FileAccess.WRITE)
+	if file == null:
+		return
+	file.store_string(JSON.stringify(copy))
+	file.close()
+	DirAccess.rename_absolute(ProjectSettings.globalize_path(temp_path), ProjectSettings.globalize_path(final_path))
 
 
 ## [method search_gate] on a parsed level (tests, tools).
@@ -568,7 +874,9 @@ static func search_data(data: LevelData, difficulty: int, gate: String) -> Dicti
 	if far == Vector2i(-1, -1):
 		return _unproven(result, "the tablet of gate %s names no far cell" % gate)
 	# 1. Static rules.
+	var clock: int = Time.get_ticks_usec()
 	var broken: String = static_problem(data, gate)
+	profile_add(&"static", clock)
 	if broken != "":
 		result["reached"] = true
 		result["detail"] = "static rule: " + broken
@@ -577,11 +885,13 @@ static func search_data(data: LevelData, difficulty: int, gate: String) -> Dicti
 	var grid: TileGrid = grid_at_rest(data, difficulty)
 	var area: Rect2i = gate_area(tablet, grid)
 	# The daze measurements build a search level of their own: before this one (they never nest).
+	clock = Time.get_ticks_usec()
 	for record: Dictionary in data.entity_records():
 		var id: String = String(record["id"])
 		var daze: bool = str(record["params"].get("coop", "")) == "daze" or id == "enemies/raptor"
 		if daze and Spawner.category(StringName(id)) == "enemies" and LevelText.applies_to(record["params"], difficulty):
 			measure_daze_solo_min(id)
+	profile_add(&"daze", clock)
 	var starts: Array[Vector2i] = start_points(data, difficulty, tablet, grid)
 	for start: Vector2i in starts:
 		(result["starts"] as Array).append(Vector2i(Tuning.to_cell(start.x), Tuning.to_cell(start.y - 1)))
@@ -589,15 +899,20 @@ static func search_data(data: LevelData, difficulty: int, gate: String) -> Dicti
 	result["flood"] = flood_reaches(grid, starts, far, columns)
 	var world_columns: Vector2i = world_columns_of(area, starts, grid)
 	var key: String = _explore_key(grid, data.resolved_meta(difficulty), starts, far, area) + "|" \
-			+ str(world_records(data, difficulty, world_columns).hash()) + ("|idle" if idle_partner else "|egg")
+			+ str(world_records(data, difficulty, world_columns).hash()) + ("|idle" if idle_partner else "|egg") \
+			+ "|d%d" % difficulty
 	var found: Dictionary = {}
 	if use_cache and _explore_cache.has(key):
 		found = _explore_cache[key]
 	else:
 		var searcher: Searcher = Searcher.new()
+		clock = Time.get_ticks_usec()
 		if not searcher.build_world(data, difficulty, grid_at_rest(data, difficulty), world_columns):
 			return _unproven(result, "the hero scene %s does not exist" % PLAYER_ID)
+		profile_add(&"build", clock)
+		clock = Time.get_ticks_usec()
 		found = searcher.explore(starts, {far: true}, area, BOUND_TICKS, MAX_NODES)
+		profile_add(&"explore", clock)
 		searcher.close()
 		_explore_cache[key] = found
 	result["reached"] = bool(found["reached"])
@@ -605,14 +920,17 @@ static func search_data(data: LevelData, difficulty: int, gate: String) -> Dicti
 	result["runs"] = int(found.get("runs", 0))
 	result["simulated"] = int(found.get("simulated", 0))
 	result["replayed"] = int(found.get("replayed", 0))
+	result["placements"] = int(found.get("placements", 0))
 	if result["reached"]:
 		result["detail"] = "one hero reached %d,%d in %d ticks: %s" % [far.x, far.y, int(found["ticks"]),
 			found["detail"]]
 	# 3. Windows near the gate, on the bare grid at rest (nothing in the hero's way: the least he needs).
 	var bare: Searcher = Searcher.new()
+	clock = Time.get_ticks_usec()
 	if bare.build(data.id, data.resolved_meta(difficulty), grid):
 		result["windows"] = measure_windows(data, difficulty, area, bare)
 		bare.close()
+	profile_add(&"windows", clock)
 	return result
 
 
@@ -689,6 +1007,13 @@ static func _link_names(record: Dictionary) -> PackedStringArray:
 		result.append("bond:" + str(params["bond"]))
 	if params.has("needs"):
 		result.append("drums:" + str(params["needs"]))
+	# A pulley and its two lifts (`a=` / `b=` name `objects/platform name=`).
+	if id == "objects/pulley":
+		for key: String in ["a", "b"]:
+			if params.has(key):
+				result.append("platform:" + str(params[key]))
+	elif id == "objects/platform" and params.has("name"):
+		result.append("platform:" + str(params["name"]))
 	return result
 
 
@@ -702,6 +1027,19 @@ static func world_keeps(id: String) -> bool:
 	if category == "player" or category == "projectiles" or category == "fx":
 		return false
 	return Spawner.exists(StringName(id))
+
+
+## True when parking the idle partner near a record is worth a node of the search (G33: none of these counts him,
+## the nodes are the regression check of the IDLE rule): plates, see-saws, pulleys and their lifts, heave boulders,
+## drums, and keeper, trait or bond enemies.
+static func is_partner_target(record: Dictionary) -> bool:
+	var id: String = String(record["id"])
+	var params: Dictionary = record["params"]
+	if id in ["objects/plate", "objects/seesaw", "objects/pulley", "objects/boulder_heavy", "objects/drum"]:
+		return true
+	if id == "objects/platform" and params.has("pulley"):
+		return true
+	return params.has("keeper") or params.has("coop") or params.has("bond")
 
 
 ## True when a strike or a throw can act on a record of `id` (enemies, every hittable object, bark boards, boulders,
@@ -785,11 +1123,41 @@ static func _no_input(_tick: int) -> int:
 	return 0
 
 
+## Debugging: print every node the search expands (with what its world changed against the baseline).
+static var debug_nodes: bool = false
+
+
+## The parts of world signature `b` that differ from `a` (for [member debug_nodes]).
+static func sig_diff(a: String, b: String) -> String:
+	var left: PackedStringArray = a.split("|")
+	var parts: PackedStringArray = PackedStringArray()
+	for part: String in b.split("|"):
+		if not left.has(part):
+			parts.append(part)
+	return " ".join(parts)
+
+
+## Microseconds spent per part of the search since [method profile_reset] (tools/coop_search.gd --profile).
+static var profile: Dictionary = {}
+
+
+static func profile_add(part: StringName, since_usec: int) -> void:
+	profile[part] = int(profile.get(part, 0)) + Time.get_ticks_usec() - since_usec
+
+
+static func profile_reset() -> void:
+	profile = {}
+
+
 ## Explore results of [method search_data] (see [method _explore_key] and [method world_records]): the same grid at
-## rest, records, starts, area and meta give the same search (Beginner and Expert often do).
+## rest, records, starts, area, meta and difficulty give the same search (the difficulty is part of the key since
+## phase 3: entities read Game.difficulty - windows, the egg's return, Expert behaviours - so a Beginner explore never
+## stands in for the Expert one).
 static var _explore_cache: Dictionary = {}
 ## False: [method search_data] always runs the search (no cached explore) - for tests that prove the search itself.
 static var use_cache: bool = true
+## False: no result file cache (see [method _file_cache_path]).
+static var use_file_cache: bool = true
 ## False: the search world's partner is only ever an egg (no `partner` macros) - to tell a gate that one player opens
 ## with an idle partner from one he opens alone (tests, tools).
 static var idle_partner: bool = true
@@ -928,6 +1296,50 @@ static func _unproven(result: Dictionary, why: String) -> Dictionary:
 	return result
 
 
+## Every co-op gate the registry knows, in the order of tests/test_coop_gates.gd: per co-op level (Levels.all_ids
+## order), per difficulty it is available in (Beginner, Expert), every `objects/x2_tablet gate=` of that difficulty in
+## file order: {"level": StringName, "difficulty": int, "gate": String, "far": Vector2i ((-1, -1) when its tablet
+## names none), "cell": Vector2i (the tablet's cell)}. Empty without the Levels autoload.
+static func gate_table() -> Array[Dictionary]:
+	var table: Array[Dictionary] = []
+	var registry: Object = (Engine.get_main_loop() as SceneTree).root.get_node_or_null(^"Levels") \
+			if Engine.get_main_loop() is SceneTree else null
+	if registry == null:
+		return table
+	for level_id: StringName in registry.call(&"all_ids"):
+		if not bool(registry.call(&"is_coop_level", level_id)):
+			continue
+		var data: LevelData = LevelData.load_file(str(registry.call(&"get_level_path", level_id)))
+		if data == null:
+			continue
+		for difficulty: int in [Defs.Difficulty.BEGINNER, Defs.Difficulty.EXPERT]:
+			if not bool(registry.call(&"is_available", level_id, difficulty)):
+				continue
+			for record: Dictionary in data.entity_records():
+				var params: Dictionary = record["params"]
+				if String(record["id"]) != "objects/x2_tablet" or not params.has("gate") \
+						or not LevelText.applies_to(params, difficulty):
+					continue
+				var far: PackedStringArray = str(params.get("far", "")).replace(" ", "").split(",")
+				var far_cell: Vector2i = Vector2i(-1, -1)
+				if far.size() == 2 and far[0].is_valid_int() and far[1].is_valid_int():
+					far_cell = Vector2i(far[0].to_int(), far[1].to_int())
+				table.append({"level": level_id, "difficulty": difficulty, "gate": str(params["gate"]),
+					"far": far_cell, "cell": Vector2i(int(record["col"]), int(record["row"]))})
+	return table
+
+
+## The entries of `table` ([method gate_table]) that shard `index` of `count` runs: every count-th entry from
+## `index` on (the rule of test_coop_gates' COOP_GATES_SHARD=<index>/<count>), so `count` processes share the table.
+static func shard_gates(table: Array, index: int, count: int) -> Array:
+	var result: Array = []
+	var n: int = maxi(count, 1)
+	for i: int in table.size():
+		if i % n == clampi(index, 0, n - 1):
+			result.append(table[i])
+	return result
+
+
 ## The file of a level id (the registry's path when the Levels autoload knows it, else res://levels/<id>.lvl).
 static func level_path(level_id: StringName) -> String:
 	var registry: Object = (Engine.get_main_loop() as SceneTree).root.get_node_or_null(^"Levels") \
@@ -1058,15 +1470,15 @@ static func make_macros(world: bool = false) -> Array[Dictionary]:
 		result.append(_macro("wait-walk %s" % side, facing, _repeat(0, 40) + _repeat(dir, 40)))
 		# Strikes with the club: forward, low, in the air, the pogo (a low strike falling onto a head or a spot).
 		result.append(_macro("strike %s" % side, facing, _repeat(dir, 1) + _repeat(fire, 12) + _repeat(0, 4),
-				"strike"))
+				"strike", Defs.Weapon.CLUB))
 		result.append(_macro("low-strike %s" % side, facing, _repeat(dir, 1) + _repeat(Defs.IN_DOWN | fire, 12),
-				"strike"))
+				"strike", Defs.Weapon.CLUB))
 		result.append(_macro("jump-strike %s" % side, facing, _repeat(up | dir, 9) + _repeat(dir | fire, 12)
-				+ _repeat(dir, 8), "strike"))
+				+ _repeat(dir, 8), "strike", Defs.Weapon.CLUB))
 		result.append(_macro("pogo %s" % side, facing, _repeat(up | dir, 9) + _repeat(dir | Defs.IN_DOWN | fire, 16),
-				"strike"))
+				"strike", Defs.Weapon.CLUB))
 		result.append(_macro("strike-walk %s" % side, facing, _repeat(dir, 1) + _repeat(fire, 12) + _repeat(dir, 36),
-				"strike"))
+				"strike", Defs.Weapon.CLUB))
 		# Throws of every special (each held in the hand for the move, the club on the belt).
 		for weapon: int in THROW_WEAPONS:
 			var label: String = ["club", "hammer", "axe", "swirl", "spear"][weapon]
@@ -1074,16 +1486,14 @@ static func make_macros(world: bool = false) -> Array[Dictionary]:
 					+ _repeat(0, 24), "throw", weapon))
 		result.append(_macro("jump-throw axe %s" % side, facing, _repeat(up | dir, 9) + _repeat(dir | fire, 6)
 				+ _repeat(dir, 12), "throw", Defs.Weapon.AXE))
-		# The idle partner where the hero stands (heroes pass through each other): a jump straight up lands on his
-		# head (a Totem Ride - he never jumps, so it is the still carrier's; UP released before the landing, else he
-		# passes through an inactive partner: no Shoulder Hop), then a jump off it forward or a run and a jump.
+		# The idle partner where the hero stands (heroes pass through each other): a jump straight up onto his head,
+		# then a jump off it forward or a run and a jump. Since G33 an idle head carries no Totem Ride (the hero passes
+		# through it, UP held or not): these stay as the regression check that nothing is reached through them.
 		var onto: PackedInt32Array = _repeat(up, 9) + _repeat(0, 16)
 		result.append(_macro("partner-jump %s" % side, facing, onto + _repeat(up | dir, 9) + _repeat(dir, 16),
 				"partner", -1, PARTNER_IDLE))
 		result.append(_macro("partner-run-jump %s" % side, facing, onto + _repeat(dir, 3) + _repeat(up | dir, 9)
 				+ _repeat(dir, 16), "partner", -1, PARTNER_IDLE))
-		# Leave him standing where he is (on a plate, as bait before a keeper) and go on.
-		result.append(_macro("partner-leave-walk %s" % side, facing, _repeat(dir, 48), "partner", -1, PARTNER_IDLE))
 	result.append(_macro("jump up", 1, _repeat(up, 12)))
 	result.append(_macro("drop", 1, _repeat(Defs.IN_DOWN, 10)))
 	if world:
@@ -1151,8 +1561,12 @@ static func measure_windows(data: LevelData, difficulty: int, area: Rect2i, sear
 		for i: int in cells.size():
 			for j: int in range(i + 1, cells.size()):
 				solo_min = maxi(solo_min, pair_solo_min(cells[i], cells[j], grid, area, searcher))
-		windows.append({"what": key.replace(":", " "),
-			"window": int(caps.get(key, PartyTuning.window_ticks(difficulty))), "solo_min": solo_min})
+		var what: String = key.replace(":", " ")
+		if solo_min == 0:
+			# G36: a bonded pair one thrown special hits together is a build error (the validator names it too).
+			what += " (one thrown special hits two members: a build error, G36)"
+		windows.append({"what": what, "window": int(caps.get(key, PartyTuning.window_ticks(difficulty))),
+			"solo_min": solo_min})
 	for plate_name: String in plates:
 		var plate: Dictionary = plates[plate_name]
 		var plate_cell: Vector2i = Vector2i(int(plate["col"]), int(plate["row"]))
@@ -1205,18 +1619,10 @@ static func travel_ticks(starts: Array[Vector2i], goals: Dictionary, area: Rect2
 	return int(found["ticks"]) if found["reached"] else BOUND_TICKS
 
 
-## Feet points from which a strike reaches the cell `target`: standing cells one or two columns beside it, with the
-## target up to two rows above the feet row (forward, high and low boxes, PHYSICS.md 8.2).
+## Feet points from which a strike reaches the cell `target` (LevelValidator.strike_spots, shared with the bonded-pair
+## rule of G36).
 static func strike_spots(grid: TileGrid, target: Vector2i) -> Array[Vector2i]:
-	var spots: Array[Vector2i] = []
-	for dc: int in [-2, -1, 1, 2]:
-		for dr: int in [0, 1, 2]:
-			var cell: Vector2i = Vector2i(target.x + dc, target.y + dr)
-			if not grid.in_bounds(cell.x, cell.y + 1) or grid.side_at(cell.x, cell.y) == TileGrid.SIDE_WALL:
-				continue
-			if TileGrid.is_ground(grid.floor_at(cell.x, cell.y + 1)):
-				spots.append(LevelText.cell_to_feet(float(cell.x), float(cell.y)))
-	return spots
+	return LevelValidator.strike_spots(grid, target)
 
 
 ## Standing spots beside a door block (one or two columns either side of its anchor).
@@ -1227,30 +1633,10 @@ static func _door_spots(grid: TileGrid, door: Vector2i) -> Dictionary:
 	return goals
 
 
-## True when an axe, a swirling axe or a spear thrown either way from one of `spots` (no tile collision: they pass
-## walls, PHYSICS.md 8.4 / C.3) crosses the cell `target` within 40 ticks.
+## True when an axe, a swirling axe or a spear thrown either way from one of `spots` crosses the cell `target`
+## (LevelValidator.throw_crosses, shared with the bonded-pair rule of G36).
 static func throw_crosses(spots: Array[Vector2i], target: Vector2i) -> bool:
-	var box: Rect2i = Rect2i(target.x * Tuning.TILE, target.y * Tuning.TILE, Tuning.TILE, Tuning.TILE)
-	for spot: Vector2i in spots:
-		for facing: int in [1, -1]:
-			for kind: int in [Defs.Weapon.AXE, Defs.Weapon.BOOMERANG, Defs.Weapon.SPEAR]:
-				var pos: Vector2i = spot + Vector2i(facing * 20, -16)
-				var xvel: int = (Tuning.SPEAR_XVEL if kind == Defs.Weapon.SPEAR else Tuning.THROW_XVEL) * facing
-				var yvel: int = Tuning.AXE_YVEL if kind == Defs.Weapon.AXE else (Tuning.BOOMERANG_YVEL
-						if kind == Defs.Weapon.BOOMERANG else 0)
-				for t: int in 40:
-					pos += Vector2i(Tuning.floor16(xvel), Tuning.floor16(yvel))
-					match kind:
-						Defs.Weapon.AXE:
-							yvel += Tuning.AXE_YACC
-						Defs.Weapon.BOOMERANG:
-							yvel += Tuning.BOOMERANG_YACC
-						_:
-							if t >= Tuning.SPEAR_FLAT_TICKS:
-								yvel = mini(yvel + 16, Tuning.SPEAR_FALL_MAX)
-					if Overlap.rects(Rect2i(pos.x - 8, pos.y - 16, 16, 16), box):
-						return true
-	return false
+	return LevelValidator.throw_crosses(spots, target)
 
 
 static func _append_cell(groups: Dictionary, key: String, cell: Vector2i) -> void:

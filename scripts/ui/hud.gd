@@ -18,6 +18,9 @@ extends Control
 ## panels, the sundial and the round banners of [HudVersus]. World text that must not sit under a party panel (sign
 ## boards) asks [method clear_of_panels]. A Cave Painting that opens a reward (Save.reward_unlocked) shows a notice
 ## under the HUD row for a few seconds ("Unlocked: Mesa Rodeo arena"), below the hint panel while one shows.
+## Phase 3: in a boss fight the HUD keeps to the fight band (BAND_HEIGHT: in co-op the letters give way and P2's panel
+## moves up into their row) and fades what a fighting boss's weak point is behind; designers keep weak points
+## WEAK_POINT_CLEARANCE px below the band ([method band_rects], [method weak_point_problem]).
 ##
 ## Owner: ui-B. Instantiated by Flow into the HUD CanvasLayer. It reacts to `Game` and `Events` signals; of the level it
 ## reads only the heroes' documented HUD fields (position, leash; ARCHITECTURE.md 3.12) and the versus numbers the
@@ -70,6 +73,25 @@ const PANEL_CLEAR_GAP: float = 4.0
 ## The reward notice: how long it stays (seconds, fades included) and its icon (ui/icons.png: the fruit).
 const REWARD_SECONDS: float = 3.5
 const REWARD_ICON: int = UiKit.ICON_FRUIT
+## The HUD band of a boss fight (phase-3 rule, LEVEL_DESIGN.md co-op chapter / DESIGN.md B.0): while a boss bar shows
+## the HUD keeps to the top BAND_HEIGHT art px of the view across its whole width - in co-op the bonus letters give
+## way and P2's panel moves up into their row (P2_TOP_FIGHT; his Rival-score line waits for the end of the fight) -
+## plus the boss bar under the hearts ([method band_rects]). A boss weak point stays WEAK_POINT_CLEARANCE art px (24
+## logical px, DESIGN.md G35) below that band and inside the view (camera locks and arena geometry;
+## [method weak_point_problem] checks one); the HUD also fades every element a fighting boss's weak point is behind
+## (a safety net, not a licence).
+const BAND_HEIGHT: float = ROW_HEIGHT
+## 24 logical px (the documents' unit, DESIGN.md G35 as corrected by the lead designer) = 48 art px.
+const WEAK_POINT_CLEARANCE: float = 24.0 * Tuning.ART_SCALE
+## The HUD's top margin inside the view (the safe-area margin minus 2, [method _apply_margins]): on a computer, and on
+## phones and tablets (the larger touch margin; the band rule is checked against it, so it holds on every device).
+const BAND_MARGIN_DESKTOP: float = float(UiKit.MARGIN - 2)
+const BAND_MARGIN_TOUCH: float = float(UiKit.MARGIN_MOBILE - 2)
+const P2_TOP_FIGHT: float = 0.0
+## The boss methods that return a weak point (logical px, world coordinates): the Brute / Colossus / Tusker / Squid /
+## Roc / Idols head, the Tusker's rump (co-op), Old Mangrove's face, the Chieftains' weak spot. A method that takes an
+## argument (the Twin Idols' get_head_rect(idol)) is asked for idols 0 and 1.
+const WEAK_POINT_METHODS: Array[StringName] = [&"get_head_rect", &"get_rump_rect", &"get_face_rect", &"get_weak_rect"]
 
 ## Hearts drawn (mirrors Game.hearts).
 var shown_hearts: int = 0
@@ -131,6 +153,13 @@ var _p2_panel: HudPlayerPanel = null
 var _edge_arrows: HudEdgeArrows = null
 var _versus: HudVersus = null
 var _campaign_nodes: Array[CanvasItem] = []
+var _letter_box: Control = null
+## The boss of the fight shown (Events.boss_started; null outside fights and for the previews' boss-less signals).
+var _boss: BossBase = null
+## True while the HUD keeps to the fight band (a boss bar shows; see BAND_HEIGHT).
+var fight_layout: bool = false
+## Alpha of the bonus letters (they give way in a co-op boss fight).
+var letters_alpha: float = 1.0
 
 
 func _init() -> void:
@@ -203,7 +232,8 @@ func _process(delta: float) -> void:
 		_show_letters(Game.letters)
 
 
-## Fade the top row while the hero's head is under it (see ROW_UNDER_HERO_ALPHA; 2.0: any living hero's head).
+## Fade the top row while the hero's head is under it (see ROW_UNDER_HERO_ALPHA; 2.0: any living hero's head, and a
+## fighting boss's weak point); in a co-op boss fight the bonus letters give way to P2's panel (fight_layout).
 func _fade_row(delta: float) -> void:
 	var level: LevelBase = Game.level
 	var under: bool = false
@@ -214,11 +244,19 @@ func _fade_row(delta: float) -> void:
 				if is_under_row(feet.y - float(hero.box_h * Tuning.ART_SCALE)):
 					under = true
 					break
+	var weak: Array[Rect2] = boss_weak_rects_on_screen()
+	for rect: Rect2 in weak:
+		under = under or is_under_row(rect.position.y)
 	row_alpha = move_toward(row_alpha, ROW_UNDER_HERO_ALPHA if under else 1.0, delta / ROW_FADE_SECONDS)
+	var give_way: bool = fight_layout and hud_layout == Defs.GameMode.COOP
+	letters_alpha = move_toward(letters_alpha, 0.0 if give_way else 1.0, delta / ROW_FADE_SECONDS)
 	for node: CanvasItem in _row_nodes:
-		node.modulate.a = row_alpha
+		node.modulate.a = row_alpha * (letters_alpha if node == _letter_box else 1.0)
 	if _p2_panel != null and _p2_panel.visible:
-		var behind: bool = level != null and _any_hero_behind(level, _p2_panel.get_global_rect())
+		var panel: Rect2 = _p2_panel.get_global_rect()
+		var behind: bool = level != null and _any_hero_behind(level, panel)
+		for rect: Rect2 in weak:
+			behind = behind or rect.intersects(panel)
 		p2_alpha = move_toward(p2_alpha, ROW_UNDER_HERO_ALPHA if behind else 1.0, delta / ROW_FADE_SECONDS)
 		_p2_panel.modulate.a = p2_alpha
 
@@ -238,15 +276,17 @@ func _any_hero_behind(level: LevelBase, rect: Rect2) -> bool:
 ## Fade the boss bar while the hero overlaps it (2.0: any living hero).
 func _fade_boss_bar(delta: float) -> void:
 	if _boss_bar.visible != _boss_bar_was_visible:
-		# The bar appeared or finished fading out: move the banner and the hint panel.
+		# The bar appeared or finished fading out: the fight band (co-op), the banner and the hint panel move.
 		_boss_bar_was_visible = _boss_bar.visible
-		_place_below_boss_bar()
+		_apply_fight_layout()
 	if not _boss_bar.visible:
 		_boss_bar.self_modulate.a = 1.0
 		return
 	var behind: bool = false
+	for rect: Rect2 in boss_weak_rects_on_screen():
+		behind = behind or rect.intersects(get_boss_bar_rect())
 	var level: LevelBase = Game.level
-	if level != null:
+	if level != null and not behind:
 		for hero: PlayerBase in level.contact_order():
 			if not hero.is_inside_tree() or hero.dead:
 				continue
@@ -270,6 +310,76 @@ func get_boss_bar_rect() -> Rect2:
 ## The boss bar (tests, previews).
 func get_boss_bar() -> HudBossBar:
 	return _boss_bar
+
+
+## The boss whose fight the bar shows (null outside fights).
+func get_boss() -> BossBase:
+	return _boss if _boss != null and is_instance_valid(_boss) else null
+
+
+## The weak points of `boss` this tick (logical px, world coordinates; see WEAK_POINT_METHODS), empty rectangles left
+## out. For the HUD's fade and for the designers' checks of the fight band ([method weak_point_problem]).
+static func weak_point_rects(boss: Object) -> Array[Rect2i]:
+	var result: Array[Rect2i] = []
+	if boss == null or not is_instance_valid(boss):
+		return result
+	for method: StringName in WEAK_POINT_METHODS:
+		if not boss.has_method(method):
+			continue
+		var calls: Array[Array] = [[]]
+		if boss.get_method_argument_count(method) >= 1:
+			calls = [[0], [1]]
+		for arguments: Array in calls:
+			var value: Variant = boss.callv(method, arguments)
+			if value is Rect2i and (value as Rect2i).has_area():
+				result.append(value as Rect2i)
+	return result
+
+
+## The fighting boss's weak points on the screen (viewport px), empty outside a fight.
+func boss_weak_rects_on_screen() -> Array[Rect2]:
+	var result: Array[Rect2] = []
+	var boss: BossBase = get_boss()
+	if boss == null or not boss.fighting or not boss.is_inside_tree():
+		return result
+	var origin: Vector2 = boss.get_global_transform_with_canvas().origin
+	var scale_px: float = float(Tuning.ART_SCALE)
+	for rect: Rect2i in weak_point_rects(boss):
+		result.append(Rect2(origin + Vector2(rect.position - boss.sim_pos) * scale_px, Vector2(rect.size) * scale_px))
+	return result
+
+
+## The HUD band in a view of `view` art px (view coordinates; `margin_top` = the HUD's top margin inside the safe area:
+## BAND_MARGIN_DESKTOP on a computer, BAND_MARGIN_TOUCH on phones and tablets): the top row across the whole width
+## and, in a fight, the boss bar with its skull under the hearts; outside a fight a co-op run adds P2's panel under
+## the letters (in a fight it sits in the letters' row). See BAND_HEIGHT.
+static func band_rects(view: Vector2, fighting: bool, coop: bool, rival_score: bool = false,
+		margin_top: float = BAND_MARGIN_TOUCH) -> Array[Rect2]:
+	var result: Array[Rect2] = [Rect2(0.0, 0.0, view.x, margin_top + BAND_HEIGHT)]
+	if fighting:
+		var left: float = roundf(view.x * 0.5 - HudBossBar.FRAME_SIZE.x * 0.5) + HudBossBar.SKULL_POS.x
+		result.append(Rect2(left, margin_top + BOSS_TOP, HudBossBar.FRAME_SIZE.x - HudBossBar.SKULL_POS.x,
+				HudBossBar.FRAME_SIZE.y))
+	elif coop:
+		var height: float = HudPlayerPanel.PANEL_H + (HudPlayerPanel.SCORE_H if rival_score else 0.0)
+		result.append(Rect2(view.x - float(UiKit.MARGIN_MOBILE) - HudPlayerPanel.PANEL_W, margin_top + P2_TOP,
+				HudPlayerPanel.PANEL_W + float(UiKit.MARGIN_MOBILE), height))
+	return result
+
+
+## What is wrong with a boss weak point `weak` (art px, view coordinates) in a fight in a view of `view` art px: ""
+## when it lies inside the view and WEAK_POINT_CLEARANCE px below every part of the fight band above it (any device:
+## the touch margin), else a description. Designers check their arenas with it (logical px * Tuning.ART_SCALE).
+static func weak_point_problem(weak: Rect2, view: Vector2, margin_top: float = BAND_MARGIN_TOUCH) -> String:
+	if not Rect2(Vector2.ZERO, view).encloses(weak):
+		return "cut off by the view (%s in %s)" % [weak, view]
+	for band: Rect2 in band_rects(view, true, false, false, margin_top):
+		if weak.end.x <= band.position.x or weak.position.x >= band.end.x:
+			continue
+		if weak.position.y < band.end.y + WEAK_POINT_CLEARANCE:
+			return "top %d art px is less than %d px below the HUD band (bottom %d at x %d..%d)" % [
+				int(weak.position.y), int(WEAK_POINT_CLEARANCE), int(band.end.y), int(band.position.x), int(band.end.x)]
+	return ""
 
 
 ## True when a screen y (viewport px) lies within the HUD row.
@@ -459,6 +569,7 @@ func _build_letters(area: Control) -> void:
 	letter_box.offset_left = -LETTER_SPACING * float(Tuning.LETTER_COUNT)
 	letter_box.offset_right = 0.0
 	area.add_child(letter_box)
+	_letter_box = letter_box
 	for i: int in Tuning.LETTER_COUNT:
 		var letter: TextureRect = UiKit.picture(UiKit.cell(UiKit.TEX_LETTERS, Vector2i(40, 40), i))
 		letter.position = Vector2(float(i) * LETTER_SPACING, float(LETTER_STAGGER[i % LETTER_STAGGER.size()] - 2))
@@ -483,7 +594,7 @@ func _build_boss_bar(area: Control) -> void:
 func _boss_drop() -> float:
 	var drop: float = 0.0
 	if _p2_panel != null and _p2_panel.visible:
-		drop = maxf(0.0, P2_TOP + _p2_panel.panel_height() + PARTY_GAP - HINT_TOP)
+		drop = maxf(0.0, _p2_panel.offset_top + _p2_panel.panel_height() + PARTY_GAP - HINT_TOP)
 	if _boss_bar == null or not _boss_bar.visible:
 		return drop
 	return maxf(drop, BOSS_TOP + HudBossBar.FRAME_SIZE.y + BOSS_GAP - HINT_TOP)
@@ -543,6 +654,20 @@ func _apply_layout_mode() -> void:
 		_versus = null
 	if _time_label != null and not versus:
 		_time_label.visible = shown_time >= 0
+	_apply_fight_layout()
+
+
+## The fight band (see BAND_HEIGHT): while a boss bar shows in a co-op run P2's panel moves up into the letters' row
+## (the letters give way in _fade_row) and shows no Rival-score line; after the fight it goes back under the letters.
+## Then the banner and the hint panel move below whatever shows.
+func _apply_fight_layout() -> void:
+	fight_layout = _boss_bar != null and _boss_bar.visible and hud_layout != Defs.GameMode.VERSUS
+	if _p2_panel != null:
+		var up: bool = fight_layout and hud_layout == Defs.GameMode.COOP
+		var top: float = P2_TOP_FIGHT if up else P2_TOP
+		_p2_panel.show_score(rival_score and not up)
+		_p2_panel.offset_top = top
+		_p2_panel.offset_bottom = top + _p2_panel.panel_height()
 	_place_below_boss_bar()
 
 
@@ -887,13 +1012,14 @@ func _on_run_started(_difficulty: int) -> void:
 
 
 func _on_boss_started(boss: BossBase) -> void:
+	_boss = boss
 	var energy: Vector2i = _boss_energy(boss, Tuning.BOSS_BAR_MAX_PIPS, Tuning.BOSS_BAR_MAX_PIPS)
 	boss_pips = Tuning.BOSS_BAR_MAX_PIPS
 	boss_max_pips = Tuning.BOSS_BAR_MAX_PIPS
 	boss_hp = energy.x
 	boss_max_hp = energy.y
 	_boss_bar.start(boss_hp, boss_max_hp)
-	_place_below_boss_bar()
+	_apply_fight_layout()
 	# A short boss stage: the fight starts a few seconds in, the arena needs the whole view.
 	dismiss_intro()
 
@@ -907,13 +1033,16 @@ func _on_boss_energy_changed(boss: BossBase, pips: int, max_pips: int) -> void:
 	var energy: Vector2i = _boss_energy(boss, pips, max_pips)
 	boss_hp = energy.x
 	boss_max_hp = energy.y
+	if boss != null and is_instance_valid(boss):
+		_boss = boss
 	_boss_bar.set_energy(boss_hp, boss_max_hp)
-	_place_below_boss_bar()
+	_apply_fight_layout()
 
 
-func _on_boss_defeated(_boss: BossBase) -> void:
+func _on_boss_defeated(_defeated: BossBase) -> void:
 	boss_pips = 0
 	boss_hp = 0
+	_boss = null
 	_boss_bar.finish()
 
 
@@ -935,8 +1064,9 @@ func _set_boss(pips: int, max_pips: int) -> void:
 	boss_pips = clampi(pips, 0, boss_max_pips)
 	boss_hp = 0
 	boss_max_hp = 0
+	_boss = null
 	_boss_bar.clear()
-	_place_below_boss_bar()
+	_apply_fight_layout()
 
 
 func _draw_bones() -> void:

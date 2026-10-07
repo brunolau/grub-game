@@ -1,0 +1,81 @@
+# Club & Grub level file - format 2 (docs/ARCHITECTURE.md 7.11). Versus arena #8 of docs/expansion/DESIGN.md E.5:
+# Colossus Hall - the volcano keep, walled; the Wall Colossus watches from the right edge as a neutral that spits at the
+# crowned leader; sudden death: the Stalactite storm. Owner: DA (arenas, docs/expansion/PLAN.md 6.1). Rules:
+# docs/LEVEL_DESIGN.md 15.8. Dressing: art-B's hand-over (.tools/asset_candidates/expansion/_handover/ARENA_DRESSING.md,
+# "Colossus Hall"; E.5 has no sketch, the geometry is DA's).
+#
+# Layout notes:
+# - The hall: a carved altar in the middle (rows 7-9, cols 8-11, set B ruins/terrain_carved, standing on the floor)
+#   with the big spot in its top (col 9; col 10 beside it is plain stone, so it is struck alike from either side - the
+#   hit test reaches one column); its giant falls 7 rows onto the altar. Upper slabs (row 4, cols 3-8 / 11-16, one-way)
+#   3 rows over the altar top; the floor (row 10) 3 rows under it. Springs (cols 2 / 17, -224 = 105 px) lift a hero
+#   from the floor to the slabs' outer ends.
+# - Spots (visible, refill 15 s after they are emptied): one in the floor by each floor spawn (cols 5 / 14), one flush
+#   in each slab's outer end (cols 3 / 16), and the big spot.
+# - Cookpots: two (4-player arena), on the slabs' inner ends (cols 7 / 12).
+# - Spawns (rotate every round; 2 players use 1 and 2): 1 and 2 on the floor (cols 13 / 6), 3 and 4 on the slabs
+#   (cols 5 / 14).
+# - The Wall Colossus (DESIGN.md E.5: every 10 s it spits at the crowned leader, jaws open 10 ticks ahead) stands in the
+#   right edge at floor level (its picture covers cols 13-19, rows 4-9 and blocks nothing). Its neutral versus form is
+#   asked of enemies-C / world-B (build/engine_requests/wf9_da_to_enemies_c.txt, wf9_da_to_world_b.txt); until it
+#   exists the record stays out of this file and the hall plays without the spit.
+# - Modes: Grub Stack (default) and Last Caveman Standing (DESIGN.md G43: the spit targets the crowned leader / the hero
+#   with the most hearts); each needs a green bot set in core-B's
+#   tests/test_versus_bots.gd.
+# - Bot graph: resources/bots/arena_colossus_hall.json, baked with core-B's tool after every edit of this file:
+#   bash .tools/gd.sh script res://tools/bots/bake_nav.gd -- arena_colossus_hall
+
+[meta]
+format = 2
+id = arena_colossus_hall
+name = "Colossus Hall"
+kind = arena
+biome = volcano
+terrain_a = cave/terrain_stone
+terrain_b = ruins/terrain_carved
+background = volcano_shaft
+liquid = lava
+music = versus_battle_c
+players = 4
+modes = grub_stack,last_caveman
+round_time = 90
+wrap = none
+sudden = stalactites
+author = DA
+notes = "Versus arena 8 (DESIGN.md E.5): the volcano keep, walled; a carved altar with the big spot in the middle, upper slabs with the pots, springs from the floor; the Wall Colossus spits at the crowned leader; stalactites in sudden death."
+
+[legend]
+? = objects/hidden_spot kind=small count=3 look=block tile=#
+s = objects/hidden_spot kind=small count=3 look=block tile=%
+* = objects/hidden_spot kind=big look=inset tile=%
+J = objects/spring
+P = objects/cookpot
+Q = objects/cookpot
+B = objects/spawn_point index=2
+C = objects/spawn_point index=3
+D = objects/spawn_point index=4
+
+[tiles]
+....................
+....................
+....................
+.....C.P....Q.D.....
+...s=====..=====s...
+....................
+....................
+........%*%%........
+........%%%%........
+..J...B.%%%%.@...J..
+#####?########?#####
+####################
+
+[entities]
+props/ruins/brazier_glow 1 9 layer=back
+props/ruins/brazier_glow 18 9 layer=back
+props/ruins/skull_big 4 9 layer=back
+props/ruins/bone_pile 15 9 layer=back
+props/ruins/column_broken 9 6 layer=back
+props/cave/stalactite 5 0 layer=back
+props/cave/stalactite 14 0 layer=back
+props/ruins/moss_fringe 4 5 layer=back
+props/ruins/moss_fringe 15 5 layer=back

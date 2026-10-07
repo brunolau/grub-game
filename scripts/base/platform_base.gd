@@ -79,9 +79,21 @@ func rider_count() -> int:
 
 
 ## 2.0: weight on it since its last ride test (DESIGN.md D.5: PartyTuning.PLATE_WEIGHT_HERO per hero, plus
-## [method _extra_weight]). The heavier side of a pulley sinks.
+## [method _extra_weight]). The heavier side of a pulley sinks. 2.0 IDLE rule (phase 3): a riding hero who does not
+## count (PlayerBase.counts_for_coop: IDLE, no input of his own for 10 s) weighs nothing, as on plates.
 func rider_weight() -> int:
-	return rider_count() * PartyTuning.PLATE_WEIGHT_HERO + _extra_weight()
+	var heroes: int = 0
+	var mask: int = rider_mask
+	var level: LevelBase = Game.level
+	while mask != 0:
+		var slot: int = 0
+		while (mask & (1 << slot)) == 0:
+			slot += 1
+		mask &= ~(1 << slot)
+		var hero: PlayerBase = level.get_hero(slot) if level != null else null
+		if hero == null or hero.counts_for_coop():
+			heroes += 1
+	return heroes * PartyTuning.PLATE_WEIGHT_HERO + _extra_weight()
 
 
 ## 2.0 hook: weight on it that is no riding hero (a boulder resting on it ...). Override; 0 by default.

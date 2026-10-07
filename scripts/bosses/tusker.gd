@@ -21,13 +21,18 @@ extends BossBase
 ## charge, the ball while rolling). A lying boar (recoil, dizzy, stuck, dazed) is harmless to touch.
 ##
 ## Co-op form (`<id>_coop` files: meta `kind = coop`; tests force it with the parameter `form=coop`): it charges whoever
-## hit it last (at first the nearest hero); while it lies open (recoil, dizzy, stuck) it turns EVERY tick to face the
-## nearer hatched hero and its head glances: only a hero BEHIND it (his x on the side it turns away from; for a thrown
+## hit it last (at first the nearest hero who counts); while it lies open (recoil, dizzy, stuck) it turns EVERY tick to
+## face the nearer hero and its head glances: only a hero BEHIND it (his x on the side it turns away from; for a thrown
 ## weapon its thrower's x) can strike the leafy rump. Phase 3: its charges skid and turn 32 px before a wall (no
-## impact, no rocks, no dizziness). A Brace Wall (PHYSICS.md C.10: two crouching heroes within 16 px, both grounded)
-## in the path of a charge stops it dead: DAZED 66 ticks with head and rump open to everybody; a lone croucher is
-## trampled. One hero is always the nearer one, so he can never be behind it, and he can never brace alone: the
-## single-hero search of tests/test_enemies_tusker.gd proves it.
+## impact, no rocks, no dizziness); a charge may still stick in the wallow (DESIGN.md G38: the rump from behind, a
+## pair's opening). A Brace Wall (PHYSICS.md C.10: two crouching heroes within 16 px, both grounded) in the path of a
+## charge stops it dead: DAZED 66 ticks with head and rump open to everybody; a lone croucher is trampled.
+## IDLE rule (DESIGN.md G33 / G34): every "nearer hero" here is the nearer hero who COUNTS (PlayerBase.counts_for_coop:
+## alive, hatched, not idle - LevelBase.nearest_coop_hero), the striker behind must count too, and the Brace Wall
+## refuses an idle partner (PlayerBase.braces_with). A dozing partner parked anywhere is no bait: one player is always
+## the nearer hero who counts, so he can never be behind it, and he can never brace alone - the single-hero search of
+## tests/test_enemies_tusker.gd (with an egg and with an idle hatched partner placed around the boar) proves it.
+## Targeting and harm still take any hatched hero (LevelBase.target_hero: a dozing hero is trampled like any other).
 ##
 ## Fairness (B.0, pinned by tests/test_enemies_tusker.gd): every attack shows itself 10+ ticks ahead; a hit never
 ## stops or lengthens a state (the clocks run through the flash: no stun-lock); BossBase.hit_cooldown (22) is shared by
@@ -560,9 +565,9 @@ static func _touches_any(box: Rect2i, parts: Array[Rect2i]) -> bool:
 
 
 ## True when `hero` stands behind it: his x on the side it faces away from, at least EnemyTuning.FRONT_DX px from its
-## feet point (the shell rule of GAMEPLAY.md 13.9.5).
+## feet point (the shell rule of GAMEPLAY.md 13.9.5); he must count for the co-op rules (G33: alive, hatched, not idle).
 func _is_behind(hero: PlayerBase) -> bool:
-	if hero == null or not is_instance_valid(hero):
+	if hero == null or not is_instance_valid(hero) or not hero.counts_for_coop():
 		return false
 	var dx: int = hero.sim_pos.x - sim_pos.x
 	return absi(dx) >= EnemyTuning.FRONT_DX and signi(dx) == -facing
@@ -774,25 +779,30 @@ func _snap_to_wall(grid: TileGrid) -> void:
 	sim_pos.x = x
 
 
-## Co-op: lying open it faces the nearer hatched hero on every tick (not the sticky target).
+## Co-op: lying open it faces the nearer hero on every tick (not the sticky target) - the nearer one who COUNTS (G33:
+## LevelBase.nearest_coop_hero, never a dozing partner or an egg); with nobody counting it keeps its facing.
 func _face_nearer() -> void:
 	var level: LevelBase = Game.level
 	if level == null:
 		return
-	var hero: PlayerBase = level.target_hero(self)
+	var hero: PlayerBase = level.nearest_coop_hero(self)
 	if hero != null:
 		facing = _dir_to(hero)
 
 
 ## Who the next attack goes for: solo the target hero; co-op whoever hit it last while he can be targeted, else the
-## nearest hatched hero.
+## nearest hero who counts (G33: its first target is never a dozing partner while a player plays), else the nearest
+## hatched one.
 func _charge_target(target: PlayerBase) -> PlayerBase:
 	if not coop_form:
 		return target
 	if last_hitter != null and is_instance_valid(last_hitter) and last_hitter.is_party_targetable():
 		return last_hitter
 	var level: LevelBase = Game.level
-	return level.target_hero(self) if level != null else target
+	if level == null:
+		return target
+	var nearer: PlayerBase = level.nearest_coop_hero(self)
+	return nearer if nearer != null else level.target_hero(self)
 
 
 ## A weak point or armour rectangle relative to the feet point (facing right), mirrored by the facing.

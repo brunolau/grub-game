@@ -15,6 +15,9 @@ extends RefCounted
 ## of play for VersusTuning.BALL_RESET_TICKS (Coconut.reset_after), then it drops in at its drop point and every hero
 ## is back at his side's spawn with the spawn shield. First to VersusTuning.CLUBBALL_GOALS, or the most after
 ## VersusTuning.CLUBBALL_MATCH_TICKS; a tie plays on with the golden coconut (the next goal wins, the clock stops).
+## Sides rotate per round (DESIGN.md E.5, phase 3): on an odd round every goal mouth is defended by the other team
+## than its file names (team 1 defends the right mouth), so the spawns, the goals, the HUD and the bots
+## (goal_rect / own_goal_x) all swap ends; [member swapped] tells which.
 
 ## Goals per team (index 1 and 2; 0 unused).
 var goals: PackedInt32Array = PackedInt32Array([0, 0, 0])
@@ -26,6 +29,8 @@ var pause_left: int = 0
 var golden: bool = false
 ## The team that scored last (0 = none yet).
 var last_scorer: int = 0
+## True on an odd round: the sides changed ends ([method set_round]).
+var swapped: bool = false
 
 var _referee: VersusReferee = null
 
@@ -34,13 +39,28 @@ func _init(referee: VersusReferee) -> void:
 	_referee = referee
 
 
+## The round `index` decides the ends: on an odd round the sides swap (the zones are taken afresh).
+func set_round(index: int) -> void:
+	swapped = posmod(index, 2) == 1
+	zones = _round_zones()
+
+
+## The goal zones of the arena with this round's defenders.
+func _round_zones() -> Array[Dictionary]:
+	var result: Array[Dictionary] = goal_zones(_referee.level)
+	if swapped:
+		for zone: Dictionary in result:
+			zone["team"] = 3 - int(zone["team"])
+	return result
+
+
 ## A fresh game: no goals, the coconut dropped in at its drop point now.
 func reset() -> void:
 	goals = PackedInt32Array([0, 0, 0])
 	pause_left = 0
 	golden = false
 	last_scorer = 0
-	zones = goal_zones(_referee.level)
+	zones = _round_zones()
 	var coconut: Coconut = ball()
 	if coconut != null:
 		coconut.golden = false
@@ -77,7 +97,7 @@ static func goal_zones(level: LevelBase) -> Array[Dictionary]:
 ## The goal mouth `team` (1 / 2) defends, logical px (an empty rect when there is none).
 func goal_rect(team: int) -> Rect2i:
 	if zones.is_empty():
-		zones = goal_zones(_referee.level)
+		zones = _round_zones()
 	for zone: Dictionary in zones:
 		if int(zone["team"]) == team:
 			return zone["rect"]
@@ -97,7 +117,8 @@ func own_goal_x(team: int) -> int:
 	var rect: Rect2i = goal_rect(team)
 	if rect.size != Vector2i.ZERO:
 		return rect.get_center().x
-	return VersusArena.view_rect().position.x if team == 1 else VersusArena.view_rect().end.x
+	var left: bool = (team == 1) != swapped
+	return VersusArena.view_rect().position.x if left else VersusArena.view_rect().end.x
 
 
 ## The defending team of the goal the coconut's centre is in (0 = none): Coconut.goal_team() over the arena's zone
@@ -107,7 +128,8 @@ func goal_team_of(coconut: Coconut) -> int:
 		return 0
 	var team: int = coconut.goal_team()
 	if team == 1 or team == 2:
-		return team
+		# The zone entity names the file's defender; on a swapped round the other team defends it.
+		return 3 - team if swapped else team
 	var centre: Vector2i = coconut.center()
 	for zone: Dictionary in zones:
 		if (zone["rect"] as Rect2i).has_point(centre):
