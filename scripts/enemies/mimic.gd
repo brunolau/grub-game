@@ -68,6 +68,8 @@ func accepts_hit_from(source: SimEntity) -> bool:
 func on_bounced(hero: PlayerBase) -> int:
 	var shown: int = super.on_bounced(hero)
 	if not dead:
+		if _dazed == 0:
+			Audio.play_sfx(Sfx.DAZE)  # "an enemy is dazed" (DESIGN.md F.2), once per daze
 		_dazed = EnemyTuning.MIMIC_DAZE_TICKS
 		_shudder = 0
 		_state = State.REST

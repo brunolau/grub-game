@@ -10,10 +10,12 @@ extends UiScreen
 ## 2.0 co-op (DESIGN.md D.11, GAMEPLAY.md 13.9.9, PLAN.md P2.8): every hero of the party walks in in his colour (P2 a
 ## step behind P1); the score is the tribe's. After the items the companion hands out the medals of the stage
 ## (PlayerRun.medals(Game.party_runs()): Most Food, Best Bounce Chain, Hatchling, Slugger, Strongman, Clumsiest; ties
-## share one) - one every MEDAL_SECONDS: the medal flies from the companion to its winner's head and its name joins
-## the winner's column on the medal board; heroes who won one cheer. With the "Rival score" option every column also
-## shows that hero's own points (PlayerRun.score). A skip hands out the rest at once. Where the game knows who picked an
-## item (Game.tally_item_slots, when core provides it) the companion catches it on its picker's side.
+## share one) - one every MEDAL_SECONDS: the medal flies from the companion to its winner's head and its row on the
+## medal board lights up with his tag (one row per medal: a shared one lists both); heroes who won one cheer. With the
+## "Rival score" option (ui-B's OptionsPanel.KEY_RIVAL_SCORE) the board first shows every hero's own points
+## (PlayerRun.score, his share of the tribe score), and an item paid again also counts again for the hero who picked
+## it. A skip hands out the rest at once. The companion catches each item on its picker's side
+## (Game.tally_item_slots), so every hero gets his own pile.
 
 enum Phase { INTRO, ENTER, DROPS, MEDALS, SETTLE, EXIT, DONE }
 
@@ -28,6 +30,9 @@ const CATCH_HEIGHT: float = 52.0    ## items land this far above the companion's
 ## Co-op: the partners stop this far behind P1 (art px), and a medal is handed out every MEDAL_SECONDS.
 const PARTNER_GAP: float = 58.0
 const MEDAL_SECONDS: float = 0.55
+## The medal board's width: this share of the view, at least BOARD_MIN_WIDTH px.
+const BOARD_SHARE: float = 0.36
+const BOARD_MIN_WIDTH: float = 196.0
 ## art-A's medals (ui/medals.png): one 32 x 32 gold disc per medal / award (medal_cell).
 const TEX_MEDALS: String = "res://assets/ui/medals.png"
 const MEDAL_CELL: float = 32.0
@@ -69,6 +74,10 @@ var _catch_time: float = 0.0
 var _medals: Array[Array] = []
 var _board_columns: Dictionary = {}
 var _head_medals: Dictionary = {}
+## Rival score: the label of each hero's own points, by slot.
+var _rival_labels: Dictionary = {}
+## Co-op: the medal board (wider on wide views, so the medals' reasons fit).
+var _board: VBoxContainer = null
 
 
 ## A medal: art-A's gold disc with its engraved emblem (`ui/medals.png`) hanging from a ribbon in its winner's colour
@@ -99,9 +108,8 @@ func _build_screen() -> void:
 	_ids = Game.tally_item_ids.duplicate()
 	_indices = Game.tally_item_indices.duplicate()
 	_points = Game.tally_item_points.duplicate()
-	var pickers: Variant = Game.get(&"tally_item_slots")
-	if pickers is PackedInt32Array and (pickers as PackedInt32Array).size() == _ids.size():
-		_pickers = (pickers as PackedInt32Array).duplicate()
+	if Game.tally_item_slots.size() == _ids.size():
+		_pickers = Game.tally_item_slots.duplicate()
 	var level_id: StringName = StringName(str(Flow.args.get("level_id", Game.level_id)))
 	var biome: String = str(Levels.get_value(level_id, "background", Levels.get_value(level_id, "biome", "jungle")))
 	if not UiBackdrop.SETS.has(biome):
@@ -175,6 +183,9 @@ func _screen_ready() -> void:
 	for i: int in _partners.size():
 		_partners[i].position = Vector2(-60.0 - PARTNER_GAP * float(i + 1), _floor_y())
 	_companion.position = Vector2(size.x + 70.0, _floor_y())
+	if _board != null:
+		resized.connect(_size_board)
+		_size_board()
 	var column: Node = safe.get_child(0)
 	var reveal: Tween = create_tween()
 	for child: Node in column.get_children():
@@ -306,10 +317,20 @@ func get_board_texts(slot: int) -> PackedStringArray:
 	if box == null:
 		return result
 	for row: Node in box.get_children():
-		if row is HBoxContainer and (row as Control).modulate.a > 0.5 and row.has_meta(&"medal") \
-				and int(row.get_meta(&"slot")) == slot:
+		if not (row is HBoxContainer and row.has_meta(&"medal") and (row as Control).modulate.a > 0.5):
+			continue
+		var tag: Control = _row_tag(row, slot)
+		if tag != null and tag.visible:
 			result.append(str(row.get_meta(&"medal")))
 	return result
+
+
+## The winner tag of player `slot` on a board row (null when he did not win that medal).
+func _row_tag(row: Node, slot: int) -> Control:
+	for child: Node in row.get_children():
+		if child is Label and child.has_meta(&"slot") and int(child.get_meta(&"slot")) == slot:
+			return child as Control
+	return null
 
 
 ## Heroes at the tally: the party of a co-op run, else one.
@@ -408,6 +429,14 @@ func _pay(item: int) -> void:
 	_bonus_total += _points[item]
 	paid = item + 1
 	_bonus_label.text = tr("UI_TALLY_BONUS").format({"points": _bonus_total})
+	# Co-op: the item counts again for the hero who picked it (his share of the tribe score, the Rival score line).
+	if party_size() > 1 and item < _pickers.size() and _points[item] > 0:
+		var run: PlayerRun = Game.get_run(_pickers[item])
+		if run != null:
+			run.score += _points[item]
+			var own: Label = _rival_labels.get(_pickers[item]) as Label
+			if own != null:
+				own.text = UiKit.score_text(run.score)
 
 
 func _pay_rest() -> void:
@@ -495,7 +524,7 @@ func _build_medal_board(column: VBoxContainer) -> void:
 	var board: VBoxContainer = VBoxContainer.new()
 	board.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	board.add_theme_constant_override(&"separation", 0)
-	board.custom_minimum_size = Vector2(196.0, 0.0)
+	board.custom_minimum_size = Vector2(BOARD_MIN_WIDTH, 0.0)
 	row_holder.add_child(board)
 	if Settings.get_bool(OptionsPanel.KEY_RIVAL_SCORE):
 		var scores: HBoxContainer = HBoxContainer.new()
@@ -510,23 +539,33 @@ func _build_medal_board(column: VBoxContainer) -> void:
 			own.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 			own.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 			scores.add_child(own)
+			_rival_labels[slot] = own
 		board.add_child(scores)
+	# One row per medal: its disc in the (first) winner's ribbon, every winner's tag (a shared medal lists both; a tag
+	# shows once his medal was handed out), the medal's name and, where it fits, what it was for.
+	var winners_of: Dictionary = {}
 	for entry: Array in _medals:
-		var slot: int = int(entry[1])
+		var list: PackedInt32Array = winners_of.get(entry[0], PackedInt32Array())
+		list.append(int(entry[1]))
+		winners_of[entry[0]] = list
+	for medal: Variant in winners_of:
+		var winners: PackedInt32Array = winners_of[medal]
 		var row: HBoxContainer = HBoxContainer.new()
 		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_theme_constant_override(&"separation", 4)
-		row.set_meta(&"medal", entry[0])
-		row.set_meta(&"slot", slot)
+		row.set_meta(&"medal", medal)
 		row.modulate.a = 0.0
-		var icon: MedalIcon = MedalIcon.new(entry[0], slot_colour(slot), 16.0)
+		var icon: MedalIcon = MedalIcon.new(medal, slot_colour(winners[0]), 16.0)
 		icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(icon)
-		var tag: Label = UiKit.label(UiPlayers.tag(slot), UiKit.Style.SMALL)
-		tag.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
-		tag.add_theme_color_override(&"font_color", slot_colour(slot))
-		row.add_child(tag)
-		var keys: Array = MEDAL_KEYS.get(entry[0], [String(entry[0]), ""])
+		for slot: int in winners:
+			var tag: Label = UiKit.label(UiPlayers.tag(slot), UiKit.Style.SMALL)
+			tag.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+			tag.add_theme_color_override(&"font_color", slot_colour(slot))
+			tag.set_meta(&"slot", slot)
+			tag.visible = false
+			row.add_child(tag)
+		var keys: Array = MEDAL_KEYS.get(medal, [String(medal), ""])
 		var name: Label = UiKit.label(str(keys[0]), UiKit.Style.SMALL)
 		name.add_theme_color_override(&"font_color", UiKit.COL_FOCUS)
 		row.add_child(name)
@@ -534,13 +573,39 @@ func _build_medal_board(column: VBoxContainer) -> void:
 		info.add_theme_color_override(&"font_color", UiKit.COL_DIM)
 		info.clip_text = true
 		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		info.set_meta(&"info", true)
 		row.add_child(info)
 		board.add_child(row)
 	_board_columns[0] = board
+	_board = board
+	board.resized.connect(_fit_board_infos.bind(board))
 	column.add_child(row_holder)
 
 
-## Hand out medal `index` of the list: its row joins the winner's column, a medal flies from the companion to the
+## The board takes about a third of the view on the right (at least BOARD_MIN_WIDTH), clear of the companion.
+func _size_board() -> void:
+	_board.custom_minimum_size.x = maxf(BOARD_MIN_WIDTH, roundf(size.x * BOARD_SHARE))
+
+
+## A medal's reason ("Longest head-bounce chain") shows only where it fits whole on the board (a narrow view keeps the
+## names alone rather than cut words).
+func _fit_board_infos(board: VBoxContainer) -> void:
+	var font: Font = UiKit.font(UiKit.Style.SMALL)
+	for row: Node in board.get_children():
+		if not row is HBoxContainer:
+			continue
+		for child: Node in row.get_children():
+			if child is Label and child.has_meta(&"info"):
+				var info: Label = child as Label
+				var used: float = 0.0
+				for other: Node in row.get_children():
+					if other != info and other is Control:
+						used += (other as Control).get_combined_minimum_size().x + 4.0
+				var need: float = font.get_string_size(info.text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, UiKit.SIZE_SMALL).x
+				info.visible = used + need <= board.size.x
+
+
+## Hand out medal `index` of the list: its board row shows with the winner's tag, a medal flies from the companion to the
 ## winner's head (`animate`) or appears there at once.
 func _hand_out(index: int, animate: bool) -> void:
 	if index < medals_shown or index >= _medals.size():
@@ -551,13 +616,17 @@ func _hand_out(index: int, animate: bool) -> void:
 	var box: VBoxContainer = _board_columns.get(0) as VBoxContainer
 	if box != null:
 		for row: Node in box.get_children():
-			if row is HBoxContainer and row.has_meta(&"medal") and row.get_meta(&"medal") == entry[0] \
-					and int(row.get_meta(&"slot")) == slot and (row as Control).modulate.a < 0.5:
+			if not (row is HBoxContainer and row.has_meta(&"medal") and row.get_meta(&"medal") == entry[0]):
+				continue
+			var tag: Control = _row_tag(row, slot)
+			if tag != null:
+				tag.visible = true
+			if (row as Control).modulate.a < 0.5:
 				if animate:
 					(row as Control).create_tween().tween_property(row, "modulate:a", 1.0, 0.2)
 				else:
 					(row as Control).modulate.a = 1.0
-				break
+			break
 	var icon: MedalIcon = MedalIcon.new(entry[0], slot_colour(slot), 16.0)
 	_stage.add_child(icon)
 	var stack: Array = _head_medals.get(slot, [])
@@ -579,11 +648,13 @@ func _hand_out(index: int, animate: bool) -> void:
 		icon.position = target
 
 
-## Where the `n`-th medal of player `slot` hangs over his head.
+## Where the `n`-th medal of player `slot` hangs over his head: side by side, centred on him, overlapping a little
+## from the third one on (so a partner's medals never seem to hang over the wrong hero).
 func _head_medal_place(slot: int, n: int) -> Vector2:
 	var actor: UiActor = _actor_of(slot)
 	var count: int = (_head_medals.get(slot, []) as Array).size()
-	var x: float = actor.position.x - float(count) * 8.0 + float(n) * 16.0
+	var step: float = 16.0 if count <= 2 else 11.0
+	var x: float = actor.position.x - 8.0 - step * float(count - 1) * 0.5 + float(n) * step
 	return Vector2(roundf(x), actor.position.y - 96.0)
 
 

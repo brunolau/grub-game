@@ -18,7 +18,7 @@ terrain_b = volcano/terrain_obsidian
 background = volcano
 music = level_volcano
 author = enemies-C
-notes = "PLAN.md P2.3: the Twin Idols on the shipped colossus sheet (mirrored and tinted until art-B's idol sheets)."
+notes = "PLAN.md P2.3: the Twin Idols on art-B's idol_sun / idol_moon sheets (the asleep idol in grey stone)."
 
 [legend]
 A = items/weapon kind=spear

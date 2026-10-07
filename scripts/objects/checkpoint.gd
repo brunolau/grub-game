@@ -14,6 +14,9 @@ const ID_STAR_PUFF: StringName = &"fx/star_puff"
 var _sprite: Sprite2D = null
 var _anim: int = 0
 var _loop_on: bool = false
+## The frame last written to the sprite: the lit fire changes it at 8 fps, so most ticks write nothing (2.0, player-A's
+## two-hero performance pass, PLAN P2.12; presentation only).
+var _shown_frame: int = -1
 
 
 func _sim_phases() -> PackedInt32Array:
@@ -31,8 +34,7 @@ func _sim_tick(phase: int) -> void:
 		super._sim_tick(phase)
 	elif phase == Defs.Phase.WORLD and active:
 		_anim += 1
-		if _sprite != null:
-			_sprite.frame = FRAME_ON_FIRST + ObjTuning.anim_frame(_anim, ON_FPS) % ON_FRAMES
+		_show_frame(FRAME_ON_FIRST + ObjTuning.anim_frame(_anim, ON_FPS) % ON_FRAMES)
 		_set_loop(on_screen)
 
 
@@ -50,10 +52,15 @@ func activate(hero: PlayerBase) -> void:
 
 func _on_active_changed() -> void:
 	_anim = 0
-	if _sprite != null:
-		_sprite.frame = FRAME_ON_FIRST if active else FRAME_OFF
+	_show_frame(FRAME_ON_FIRST if active else FRAME_OFF)
 	if not active:
 		_set_loop(false)
+
+
+func _show_frame(frame: int) -> void:
+	if _sprite != null and frame != _shown_frame:
+		_shown_frame = frame
+		_sprite.frame = frame
 
 
 func _set_loop(on: bool) -> void:

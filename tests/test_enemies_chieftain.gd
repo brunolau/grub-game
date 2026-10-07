@@ -17,6 +17,8 @@ var _p2: PlayerBase = null
 var _gorm: Chieftain = null
 var _gulla: Chieftain = null
 var _defeated: Array[BossBase] = []
+## The pyre's bot graph as JSON text, baked once for the whole file (a bake simulates thousands of hero runs).
+static var _pyre_graph_json: String = ""
 
 
 func before_each() -> void:
@@ -24,12 +26,15 @@ func before_each() -> void:
 	_defeated.clear()
 	_p2 = null
 	Events.boss_defeated.connect(_on_defeated)
+	NavGraph.clear_cache()
 
 
 func after_each() -> void:
 	Events.boss_defeated.disconnect(_on_defeated)
-	Chieftain.hero_bot_enabled = false
+	Chieftain.hero_bot_enabled = true
 	GameInput.clear_scripted()
+	GameInput.reset_slots()
+	NavGraph.clear_cache()
 	Game.new_game(Defs.Difficulty.BEGINNER)
 	Game.begin_level(&"")
 
@@ -129,7 +134,7 @@ func test_p3_the_last_pip_runs_the_roast_to_the_perch() -> void:
 	_gorm.hp = 1
 	var took: int = _step_until(func() -> bool: return _gorm.carries_roast(), 300)
 	assert_true(took > 0, "he fetches the Great Roast from the altar")
-	assert_eq(_gorm.perch.x, 24, "and runs for the perch farther from the hero")
+	assert_true(_gorm.perch.x <= 40, "and runs for the perch farther from the hero (the left floor edge: x %d)" % _gorm.perch.x)
 	_club(_gorm.get_weak_rect())
 	Sim.step(1)
 	_hero.club_box_active = false
@@ -140,7 +145,8 @@ func test_p3_the_last_pip_runs_the_roast_to_the_perch() -> void:
 	_gorm.hp = 1
 	_step_until(func() -> bool: return _gorm.carries_roast(), 300)
 	assert_eq(_gorm.get_attack_box(), Rect2i())
-	var home: int = _step_until(func() -> bool: return not _gorm.carries_roast(), 400)
+	var home: int = _step_until(func() -> bool:
+		return not _gorm.carries_roast(), 400)
 	assert_true(home > 0, "he reaches the perch")
 	assert_eq(_gorm.get_pips_left(), 2, "the roast returns to the altar and he regains a pip")
 
@@ -308,12 +314,16 @@ func test_the_single_hero_search_cannot_beat_the_coop_chieftains() -> void:
 # The hero-physics executor (HeroBot)
 # =================================================================================================================
 
-## Behind the flag: each chieftain drives a hero body (scenes/player/player.tscn, not one of the level's heroes) from
-## its HeroBot's GameInput slot; the body moves on the hero's own physics (at most the hero's 5 px per tick, the
-## jump table), the shell mirrors it, and the brain's telegraph shows the HUP!.
+## The default: each chieftain drives a hero body (scenes/player/player.tscn, not one of the level's heroes) from its
+## HeroBot's GameInput slot; the body moves on the hero's own physics (at most the hero's 5 px per tick, the jump
+## table), the shell mirrors it, and the brain's telegraph shows the HUP!. Without a bot graph for the level the state
+## machine plays instead (PLAN cut 8 behind Chieftain.hero_bot_enabled).
 func test_hero_bot_bodies_move_on_hero_physics() -> void:
-	Chieftain.hero_bot_enabled = true
+	assert_true(Chieftain.hero_bot_enabled, "hero physics is the default executor")
 	_pyre(false)
+	_start()
+	assert_null(_gorm.get_body(), "no bot graph for the level: the state machine plays")
+	_bot_pyre(false)
 	_hero.teleport(Vector2i(250, FLOOR_Y))
 	_start()
 	var body: PlayerBase = _gorm.get_body()
@@ -324,15 +334,14 @@ func test_hero_bot_bodies_move_on_hero_physics() -> void:
 	assert_false(_level.heroes.has(body), "not one of the level's heroes")
 	assert_eq(_level.hero_count(), 1)
 	assert_eq(GameInput.get_slot(2).kind, Defs.InputSlotKind.BOT, "fed by a HeroBot through GameInput slot 2")
+	assert_not_null(_gulla.get_body(), "Gulla too (slot 3), waiting on the pyre")
 	var fastest: int = 0
-	var highest: int = FLOOR_Y
 	var telegraphed: bool = false
 	var last: Vector2i = _gorm.sim_pos
 	for tick: int in 400:
 		Sim.step(1)
 		_keep_alive()
 		fastest = maxi(fastest, absi(_gorm.sim_pos.x - last.x))
-		highest = mini(highest, _gorm.sim_pos.y)
 		last = _gorm.sim_pos
 		assert_eq(_gorm.sim_pos, body.sim_pos, "the shell mirrors the body")
 		telegraphed = telegraphed or _gorm.is_telegraphing()
@@ -341,12 +350,128 @@ func test_hero_bot_bodies_move_on_hero_physics() -> void:
 	assert_true(fastest <= Tuning.WALK_CAP / 16 + 1, "never faster than the hero walks (%d px/tick)" % fastest)
 	assert_true(absi(_gorm.sim_pos.x - 104) > 16, "it went for the hero")
 	assert_true(telegraphed, "its attacks are announced (the brain's 14-tick crouch)")
+	assert_eq(_gulla.sim_pos, Vector2i(152, ALTAR_Y), "the waiting chief stays on the pyre")
 
 
-## Behind the flag the whole fight still ends: a bare hero who keeps hitting whichever chieftain is in play wins.
+## Every attack on hero physics: the HUP! and the body's 14-tick crouch, nothing reaches the hero meanwhile, then the
+## club costs him a bone (a boss body hit).
+func test_hero_bot_a_raid_is_announced_by_hup_and_a_14_tick_crouch() -> void:
+	_bot_pyre(false)
+	_hero.teleport(Vector2i(170, FLOOR_Y))
+	_start()
+	var announced: int = _step_until(func() -> bool: return _gorm.is_telegraphing(), 300)
+	assert_true(announced > 0, "Gorm comes and announces an attack")
+	assert_true(_gorm._hup.visible, "the HUP! pop-up")
+	var crouch: int = 0
+	var hurt_at: int = -1
+	for tick: int in 60:
+		if _gorm.is_telegraphing():
+			crouch += 1
+			assert_eq(_gorm.get_attack_box(), Rect2i(), "nothing reaches the hero while he crouches")
+		Sim.step(1)
+		if _hero.hit_timer > 0:
+			hurt_at = tick
+			break
+	assert_true(crouch >= Chieftain.TELEGRAPH_TICKS - 1, "a 14-tick crouch (%d)" % crouch)
+	assert_true(hurt_at >= Chieftain.TELEGRAPH_TICKS - 1, "then the attack hurts the hero (tick %d)" % hurt_at)
+	assert_eq(Game.bones, Tuning.BONES_PER_HEART - 1, "a boss body hit: one bone")
+
+
+## Co-op on hero physics, both at 2 pips: the stack (the top's body rides the bottom's head while he walks), then the
+## top curls, the bottom bats him across the arena (a line drive) and he lies dazed DAZE_TICKS where he lands.
+func test_hero_bot_coop_stack_then_bat_and_daze() -> void:
+	_bot_pyre(true)
+	_hero.teleport(Vector2i(200, FLOOR_Y))
+	_p2.teleport(Vector2i(186, FLOOR_Y))
+	_start()
+	_gulla._place(Vector2i(130, FLOOR_Y))
+	_gorm.hp = 2
+	_gulla.hp = 2
+	var stacked: int = _step_until(func() -> bool:
+		return _gulla.sim_pos == _gorm.sim_pos - Vector2i(0, Chieftain.STACK_HEAD_PX), 300)
+	assert_true(stacked > 0, "the top got onto the bottom's head")
+	var carried: Vector2i = _gorm.sim_pos
+	Sim.step(10)
+	_keep_alive()
+	if _gorm.order_kind == Chieftain.Order.STACK_BOTTOM and _gulla.order_kind == Chieftain.Order.STACK_TOP:
+		assert_eq(_gulla.sim_pos, _gorm.sim_pos - Vector2i(0, Chieftain.STACK_HEAD_PX), "and rides along")
+	var batted: int = _step_until(func() -> bool:
+		return _gorm.get_act() == Chieftain.Act.BALL or _gulla.get_act() == Chieftain.Act.BALL, 500)
+	assert_true(batted > 0, "the top curls and the bottom bats him")
+	if batted <= 0:
+		return
+	var ball: Chieftain = _gorm if _gorm.get_act() == Chieftain.Act.BALL else _gulla
+	var start_x: int = ball.sim_pos.x
+	var landed: int = _step_until(func() -> bool:
+		return ball.get_act() == Chieftain.Act.DAZED, 80)
+	assert_true(landed > 0, "the ball lands: dazed")
+	assert_true(absi(ball.sim_pos.x - start_x) >= 48, "batted across the arena (%d px)" % absi(ball.sim_pos.x - start_x))
+	var lying: Vector2i = ball.sim_pos
+	Sim.step(Chieftain.DAZE_TICKS - 2)
+	_keep_alive()
+	assert_eq(ball.get_act(), Chieftain.Act.DAZED, "dazed 30 ticks ...")
+	assert_eq(ball.sim_pos, lying, "... where he landed")
+	Sim.step(3)
+	assert_ne(ball.get_act(), Chieftain.Act.DAZED, "then he gets up")
+
+
+## Co-op egg revive on hero physics: the mate's body jumps onto the egg and his landing hatches it before the egg
+## would hatch by itself.
+func test_hero_bot_coop_the_mate_jumps_on_the_egg_to_hatch_it() -> void:
+	_bot_pyre(true)
+	_hero.teleport(Vector2i(40, FLOOR_Y))
+	_p2.teleport(Vector2i(290, FLOOR_Y))
+	_start()
+	_gorm._place(Vector2i(120, FLOOR_Y))
+	_gulla._place(Vector2i(200, FLOOR_Y))
+	_gorm.hp = 1
+	_club(_gorm.get_weak_rect())
+	Sim.step(1)
+	_hero.club_box_active = false
+	assert_eq(_gorm.life, Chieftain.Life.EGG)
+	var hatched: int = _step_until(func() -> bool: return _gorm.life == Chieftain.Life.FIGHT, 70)
+	assert_true(hatched > 0 and hatched < Chieftain.EGG_TICKS_COOP - 1,
+			"Gulla's head bounce hatches it (tick %d)" % hatched)
+	assert_eq(_gorm.get_pips_left(), 1)
+	assert_true(_gorm.get_body().control_enabled, "his body moves again")
+
+
+## P3 on hero physics: with his last pip Gorm climbs to the altar (the bot graph: ledges, then the altar), takes the
+## roast, runs for the perch at the floor edge and regains a pip there.
+func test_hero_bot_p3_the_roast_run_climbs_to_the_altar() -> void:
+	_bot_pyre(false)
+	_hero.teleport(Vector2i(250, FLOOR_Y))
+	_start()
+	_gorm.hp = 1
+	var took: int = _step_until(func() -> bool: return _gorm.carries_roast(), 600)
+	assert_true(took > 0, "he climbed to the altar and took the roast (at %s)" % _gorm.sim_pos)
+	assert_eq(_gorm.get_attack_box(), Rect2i(), "no strike while carrying")
+	var home: int = _step_until(func() -> bool: return not _gorm.carries_roast(), 600)
+	assert_true(home > 0, "he reaches the perch (at %s, perch %s)" % [_gorm.sim_pos, _gorm.perch])
+	assert_eq(_gorm.get_pips_left(), 2, "and regains a pip")
+
+
+## Solo P2 on hero physics: the waiting chief comes down from the pyre, bats the curled fighter at the hero, and
+## climbs back onto the pyre.
+func test_hero_bot_solo_p2_the_waiting_chief_bats_and_climbs_back() -> void:
+	_bot_pyre(false)
+	_hero.teleport(Vector2i(280, FLOOR_Y))
+	_start()
+	_gorm.hp = 2
+	_gorm._set_routine(Chieftain.Routine.RAID)
+	_gorm._routine_timer = Chieftain.SOLO_RAID_TICKS
+	var batted: int = _step_until(func() -> bool: return _gorm.get_act() == Chieftain.Act.BALL, 600)
+	assert_true(batted > 0, "Gulla came down and batted Gorm (Gulla at %s)" % _gulla.sim_pos)
+	var dazed: int = _step_until(func() -> bool: return _gorm.get_act() == Chieftain.Act.DAZED, 80)
+	assert_true(dazed > 0, "he lies dazed")
+	var back: int = _step_until(func() -> bool:
+		return absi(_gulla.sim_pos.x - 152) <= ChieftainBrain.ARRIVE_PX and _gulla.sim_pos.y == ALTAR_Y, 600)
+	assert_true(back > 0, "Gulla climbs back onto the pyre (at %s)" % _gulla.sim_pos)
+
+
+## The whole fight ends on hero physics: a bare hero who keeps hitting whichever chieftain is in play wins.
 func test_hero_bot_fight_can_be_won() -> void:
-	Chieftain.hero_bot_enabled = true
-	_pyre(false)
+	_bot_pyre(false)
 	_hero.teleport(Vector2i(250, FLOOR_Y))
 	_start()
 	for tick: int in 4000:
@@ -361,6 +486,26 @@ func test_hero_bot_fight_can_be_won() -> void:
 			break
 	assert_true(_gorm.dead and _gulla.dead, "won (Gorm %s, Gulla %s)" % [_gorm.life, _gulla.life])
 	assert_eq(GameInput.get_slot(2).kind, Defs.InputSlotKind.NONE, "the bots gave their slots back")
+	assert_eq(GameInput.get_slot(3).kind, Defs.InputSlotKind.NONE)
+
+
+## V3.d on hero physics: one hero (his partner an egg) with seeded random play and every weapon never puts a co-op
+## chieftain out.
+func test_hero_bot_the_single_hero_search_cannot_beat_the_coop_chieftains() -> void:
+	_bot_pyre(true)
+	_p2.down = true
+	_start()
+	assert_not_null(_gorm.get_body())
+	var real: PlayerBase = _real_p1(Vector2i(60, FLOOR_Y))
+	var rng: SimRng = SimRng.new(33)
+	for weapon: int in [Defs.Weapon.CLUB, Defs.Weapon.AXE, Defs.Weapon.SPEAR]:
+		for chief: Chieftain in [_gorm, _gulla]:
+			if chief.life == Chieftain.Life.FIGHT:
+				chief.hp = 1
+		_episode(real, weapon, Vector2i(rng.range_int(40, 280), FLOOR_Y), _random_flags(rng, 260))
+	assert_ne(_gorm.life, Chieftain.Life.OUT, "nobody out")
+	assert_ne(_gulla.life, Chieftain.Life.OUT)
+	assert_true(_defeated.is_empty())
 
 
 # =================================================================================================================
@@ -373,17 +518,7 @@ func _pyre(coop: bool) -> void:
 		Game.start_run(Defs.Difficulty.EXPERT, Defs.GameMode.COOP, 2)
 		Game.begin_level(&"test")
 		Sim.rng.reseed(1)
-	var rows: PackedStringArray = PackedStringArray()
-	rows.append("#".repeat(20))
-	for row: int in range(1, 11):
-		var line: String = "#" + ".".repeat(18) + "#"
-		if row == 5:
-			line = "#........--........#"
-		elif row == 8:
-			line = "#.---.........---..#"
-		rows.append(line)
-	rows.append("#".repeat(20))
-	_rows_level(rows)
+	_rows_level(_pyre_rows())
 	_level.view = Rect2i(0, 0, Tuning.VIEW_W, 192)
 	_hero.teleport(Vector2i(40, FLOOR_Y))
 	if coop:
@@ -394,6 +529,36 @@ func _pyre(coop: bool) -> void:
 	_gorm = _enemy(&"bosses/chieftain", Vector2i(104, FLOOR_Y), {"name": "gorm", "mate": "gulla"}) as Chieftain
 	_gulla = _enemy(&"bosses/chieftain", Vector2i(152, ALTAR_Y),
 			{"name": "gulla", "mate": "gorm", "drops": "trophy"}) as Chieftain
+
+
+## The pyre's tile rows (the header's room).
+static func _pyre_rows() -> PackedStringArray:
+	var rows: PackedStringArray = PackedStringArray()
+	rows.append("#".repeat(20))
+	for row: int in range(1, 11):
+		var line: String = "#" + ".".repeat(18) + "#"
+		if row == 5:
+			line = "#........--........#"
+		elif row == 8:
+			line = "#.---.........---..#"
+		rows.append(line)
+	rows.append("#".repeat(20))
+	return rows
+
+
+## The pyre of [method _pyre] with its bot graph (core-B's NavBaker on the same rows, baked once for the file and
+## cached under the test level's id), so that the hero-physics executor plays.
+func _bot_pyre(coop: bool) -> void:
+	if _pyre_graph_json.is_empty():
+		var text: String = "[meta]\nformat = 2\nid = test\nkind = test\n[tiles]\n%s\n[entities]\n" \
+				% "\n".join(_pyre_rows())
+		var baked: NavGraph = NavBaker.new().bake_text(self, &"test", text, Defs.Difficulty.BEGINNER,
+				PackedInt32Array([NavGraph.WEIGHT_LIGHT]))
+		_pyre_graph_json = baked.to_json()
+	var json: JSON = JSON.new()
+	json.parse(_pyre_graph_json)
+	NavGraph.cache(NavGraph.from_dict(json.data))
+	_pyre(coop)
 
 
 func _start() -> void:

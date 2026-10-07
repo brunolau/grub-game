@@ -274,6 +274,27 @@ func test_registry_books_coop_files_and_arenas() -> void:
 	assert_false(Levels.has_level(&"zz2_a"))
 
 
+## Book II campaign plumbing (PLAN.md P2.6): the code entry finds the codes of both books, and every code of every map
+## stop leads back to that stop and difficulty - no Book II code shadows a Book I code (or the reverse) once read the
+## code entry's way (upper case, O = 0, I = 1).
+func test_every_code_of_both_books_leads_to_its_own_stop() -> void:
+	var codes: int = 0
+	var books: Dictionary = {}
+	for book: int in [1, Levels.BOOK_2]:
+		for difficulty: int in [Defs.Difficulty.BEGINNER, Defs.Difficulty.EXPERT]:
+			for id: StringName in Levels.get_campaign(difficulty, book):
+				var code: String = Levels.get_password(id, difficulty)
+				if code == "":
+					continue
+				codes += 1
+				books[book] = true
+				assert_eq(Levels.find_by_password(code), {"level_id": id, "difficulty": difficulty},
+						"code %s of %s (book %d)" % [code, id, book])
+				assert_eq(Levels.find_by_password(code.to_lower()), {"level_id": id, "difficulty": difficulty})
+	assert_true(books.has(1), "Book I has codes")
+	assert_true(codes >= 14, "the 14 map-stop codes of 1.0 at least (%d)" % codes)
+
+
 ## Every registry answer the 1.0 game asks about the solo levels of the folder, by difficulty.
 func _book1_answers() -> Dictionary:
 	var answers: Dictionary = {}

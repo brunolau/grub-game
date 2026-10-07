@@ -243,10 +243,11 @@ func get_camera_cell() -> Vector2i:
 ## A co-op party: the authentic 20 x 11-cell view of the tribe camera (PHYSICS.md C.13); a camera locked to a
 ## rectangle no larger than that (an arena, a one-screen room): the rectangle itself (LevelBase).
 func get_party_frame() -> Rect2i:
-	var lock: Rect2i = get_camera_lock()
-	var small_lock: bool = is_camera_locked() and lock.size.x <= Tuning.VIEW_COLS * Tuning.TILE \
-			and lock.size.y <= Tuning.VIEW_ROWS * Tuning.TILE
-	if _tribe_on() and not small_lock:
+	# Fields read directly (asked several times per hero and tick in co-op: the hero's playfield test, the edge walls,
+	# the leash, the eggs): the tribe camera's cell rectangle unless a lock no bigger than the authentic view holds.
+	if _frame_logic != null and _hero_total > 1 and not (_camera_locked \
+			and _camera_lock_rect.size.x <= Tuning.VIEW_COLS * Tuning.TILE \
+			and _camera_lock_rect.size.y <= Tuning.VIEW_ROWS * Tuning.TILE):
 		return _frame_logic.cell_rect()
 	return super.get_party_frame()
 

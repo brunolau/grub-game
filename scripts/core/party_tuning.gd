@@ -112,6 +112,9 @@ const CURL_LANDING_TICKS: int = Tuning.NO_JUMP_TICKS  ## it uncurls on landing b
 # Brace Wall: two crouching heroes stop a heavy.
 const BRACE_GAP_PX: int = 16                 ## the two crouchers stand within this many px of each other
 const BRACE_DAZE_TICKS: int = 44             ## a `heavy` enemy stopped dead is dazed this long, head open (the co-op Tusker: 66, EnemyTuning) [R24]
+# Lee (co-op only): a crouching partner shelters a hero from the wind (PHYSICS.md C.6; the PartyDriver, world-A). (tune)
+const LEE_REACH_PX: int = 4 * Tuning.TILE    ## 64: how far downwind of the croucher's feet a hero is sheltered [P C.6]
+const LEE_DY_PX: int = Tuning.TILE           ## 16: how far his feet may be above or below the croucher's [P C.6]
 # Windows: twin drums, bonds, splits, twin hits. Never longer than the measured solo minimum minus the margin. [D D.8]
 const WINDOW_TICKS_BEGINNER: int = 24
 const WINDOW_TICKS_EXPERT: int = 12

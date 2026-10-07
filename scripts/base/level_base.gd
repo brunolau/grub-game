@@ -58,6 +58,10 @@ var shake: int = 0
 var shake_offset: int = 0
 ## Current wind value of PHYSICS.md 13.1 (0 on normal levels). The hero's WIND primitive reads it.
 var wind: int = 0
+## 2.0 co-op lee ("lee leapfrog", DESIGN.md 3-1b / 9-2 co-op): bit per slot - that hero is sheltered from the wind on
+## this tick by a crouching partner. The PartyDriver writes it in WEAPONS, before any hero moves; it is always 0 in
+## single-player, in versus and for a party of one. Read it through [method wind_for].
+var lee_mask: int = 0
 ## Bit mask of Defs.SCROLL_* flags.
 var scroll_flags: int = 0
 ## True while the level is dark (GAMEPLAY.md 7.10).
@@ -636,6 +640,15 @@ func set_darkness(p_dark: bool) -> void:
 		return
 	dark = p_dark
 	Events.darkness_changed.emit(dark)
+
+
+## 2.0: the wind `hero`'s WIND primitive feels on this tick - [member wind], or 0 while he is in a crouching
+## partner's lee ([member lee_mask], co-op only). Without a party (every single-player tick) it is exactly
+## [member wind].
+func wind_for(hero: PlayerBase) -> int:
+	if lee_mask == 0 or hero == null:
+		return wind
+	return 0 if (lee_mask & (1 << clampi(hero.slot, 0, Defs.MAX_PLAYERS - 1))) != 0 else wind
 
 
 ## Set the wind value (blizzard script) and tell listeners.

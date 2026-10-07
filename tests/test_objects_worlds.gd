@@ -86,7 +86,8 @@ func test_a_chest_opens_its_lid_throws_its_contents_and_stays() -> void:
 
 
 func test_the_old_containers_are_unchanged() -> void:
-	var crate: BonusContainer = spawn(&"objects/container", Vector2i(200, 160), {"contents": "food:1"}) as BonusContainer
+	var crate: BonusContainer = spawn(&"objects/container", Vector2i(200, 160),
+			{"contents": "food:1"}) as BonusContainer
 	var sprite: Sprite2D = crate.get_node("Sprite") as Sprite2D
 	assert_eq(crate.skin, BonusContainer.DEFAULT_SKIN)
 	assert_eq([crate.box_w, crate.box_h, crate.box_xo], [16, 11, 8])
@@ -110,14 +111,14 @@ func test_cloud_and_driftwood_platforms_are_skins_with_the_wood_box() -> void:
 		assert_eq([platform.box_w, platform.box_h, platform.box_xo], [wood.box_w, wood.box_h, wood.box_xo],
 				"the wood platform's box")
 		assert_eq(platform.home, Vector2i(platform.sim_pos.x, wood.home.y))
-	assert_eq(picture(cloud), PlatformSkin.texture(PlatformSkin.SKIN_CLOUD))
-	assert_eq(picture(drift), PlatformSkin.texture(PlatformSkin.SKIN_DRIFTWOOD))
-	for skin: int in [PlatformSkin.SKIN_CLOUD, PlatformSkin.SKIN_DRIFTWOOD]:
-		var path: String = PlatformSkin.PATHS[skin - PlatformSkin.TEXTURES.size()]
-		var expected: Texture2D = PlatformSkin.TEXTURES[PlatformSkin.STAND_INS[skin - PlatformSkin.TEXTURES.size()]]
-		if ResourceLoader.exists(path):
-			expected = load(path) as Texture2D
-		assert_eq(PlatformSkin.texture(skin), expected, "%s: its file, or its stand-in until art-A delivers it" % path)
+	assert_eq(picture(cloud).resource_path, "res://assets/sprites/objects/platform_cloud.png", "art-A's cloud slab")
+	assert_eq(picture(drift).resource_path, "res://assets/sprites/objects/platform_driftwood.png", "the driftwood")
+	assert_eq(picture(wood).resource_path, "res://assets/sprites/objects/platform_wood.png")
+	for platform: DropPlatform in [cloud, drift]:
+		var size: Vector2 = picture(platform).get_size()
+		assert_eq(size, picture(wood).get_size(), "the wood platform's layout (96 x 16 art px)")
+		assert_eq((platform.get_node("Sprite") as Sprite2D).offset, (wood.get_node("Sprite") as Sprite2D).offset,
+				"the same pivot: the top edge is the standing surface")
 	var mover: MovingPlatform = spawn(&"objects/platform", Vector2i(500, 96), {"skin": "cloud"}) as MovingPlatform
 	assert_eq(picture(mover), PlatformSkin.texture(PlatformSkin.SKIN_CLOUD), "moving platforms take them too")
 
@@ -140,7 +141,8 @@ func test_cap_springs_launch_like_flowers() -> void:
 	var cap: SpringPad = spawn(&"objects/spring", Vector2i(400, 160), {"skin": "cap"}) as SpringPad
 	assert_eq([flower.skin, cap.skin], [0, 1])
 	assert_eq(picture(flower), SPRING_PICTURE)
-	assert_eq(picture(cap), ObjTuning.picture(SpringPad.CAP_TEXTURE, SPRING_PICTURE), "the cap (or the flower)")
+	assert_eq(picture(cap).resource_path, "res://assets/sprites/objects/spring_cap.png", "the glowing cap")
+	assert_eq(picture(cap).get_size(), SPRING_PICTURE.get_size(), "spring.png's layout")
 	assert_eq(cap.power, flower.power)
 	assert_eq([cap.box_w, cap.box_h], [flower.box_w, flower.box_h])
 	hero.teleport(Vector2i(400, 155))
@@ -156,9 +158,28 @@ func test_cap_drums_keep_the_drum_rules() -> void:
 	var cap: Drum = spawn(&"objects/drum", Vector2i(500, 160), {"bond": "caps", "skin": "cap"}) as Drum
 	assert_eq([plain.skin, cap.skin], [0, 1])
 	assert_eq(picture(plain), DRUM_PICTURE)
-	assert_eq(picture(cap), ObjTuning.picture(Drum.CAP_TEXTURE, DRUM_PICTURE))
+	assert_eq(picture(cap).resource_path, "res://assets/sprites/objects/drum_cap.png", "the glowing cap drum")
+	assert_eq(picture(cap).get_size(), DRUM_PICTURE.get_size(), "drum.png's layout")
+	# The lit frames read clearly brighter in the dark (art-A: the crest dim teal in 0-2, white-cyan in 3-4).
+	var image: Image = picture(cap).get_image()
+	if image.is_compressed():
+		image.decompress()
+	assert_true(cell_luma(image, Drum.FRAME_LIT) > cell_luma(image, Drum.FRAME_IDLE) * 1.1, "lit glows brighter")
 	assert_eq([cap.box_w, cap.box_h], [plain.box_w, plain.box_h])
 	assert_eq(cap.bond_drums(level).size(), 2, "one bond, whatever the skin")
+
+
+## Mean brightness of the opaque pixels of cell `index` of a drum sheet (40 x 44 art px cells).
+func cell_luma(image: Image, index: int) -> float:
+	var total: float = 0.0
+	var count: int = 0
+	for y: int in 44:
+		for x: int in range(index * 40, index * 40 + 40):
+			var c: Color = image.get_pixel(x, y)
+			if c.a > 0.5:
+				total += c.get_luminance()
+				count += 1
+	return total / float(maxi(count, 1))
 
 
 # =================================================================================================================

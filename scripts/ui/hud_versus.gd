@@ -1,15 +1,17 @@
 class_name HudVersus
 extends Control
-## The versus HUD (DESIGN.md E.3 / E.8 / E.9, GAMEPLAY.md 13.10.1, PLAN.md P2.9): one corner panel per player (P1
-## top-left, P2 top-right, P3 bottom-left, P4 bottom-right) with his tag, the win pips under it, his head in the colour
-## he wears (ui/portrait_heads.png: cheering while he leads, "ouch" while he is knocked out), the units on his head (the
-## stack) and in the cookpot (banked) - or his hearts in a mode that counts hearts - and his held special; the crown
-## beside the leader's panel; the round sundial top centre (its shadow sweeps round as the round runs out, a red rim in
-## the Feast Rush) with the seconds left; the round banners: "3, 2, 1, GRUB!", "FEAST RUSH!", "SUDDEN DEATH!" and the
-## result; and while Flow replays a round's deciding moment (DESIGN.md E.8) its banner with the skip hint, plus a
-## "Skip" button for touch players (Flow.skip_replay). Where the top row cannot hold both top panels, their crowns and
-## the sundial (three-digit counts on a 640 px view) the panels leave out the tag text: the head in the player's colour
-## still says who is who.
+## The versus HUD (DESIGN.md E.3 / E.4 / E.8 / E.9, GAMEPLAY.md 13.10.1, PLAN.md P2.9): one corner panel per player
+## (P1 top-left, P2 top-right, P3 bottom-left, P4 bottom-right) with his tag, the win pips under it, his head in the
+## colour he wears (ui/portrait_heads.png: cheering while he leads, "ouch" while he is knocked out), what the round's
+## mode counts ([enum Content]: Grub Stack the units on his head and in the cookpot, Last Caveman Standing his hearts
+## and - with the Stock option - his lives, Hot Rock the ember while he holds it (his plate glows red), Clubball his
+## side's goals) and his held special; the crown beside the leader's panel; the round sundial top centre (its shadow
+## sweeps round as the round runs out, a red rim in the Feast Rush) with the seconds left - hidden in a mode without a
+## clock; the round banners: "3, 2, 1, GRUB!", "FEAST RUSH!", "SUDDEN DEATH!" with the arena's theme ("Stampede!"),
+## the Golden Drumstick / Golden Coconut of a tie and the result; and while Flow replays a round's deciding moment
+## (DESIGN.md E.8) its banner with the skip hint, plus a "Skip" button for touch players (Flow.skip_replay). Where the
+## top row cannot hold both top panels, their crowns and the sundial (three-digit counts on a 640 px view) the panels
+## leave out the tag text: the head in the player's colour still says who is who.
 ##
 ## Never over a hero: every panel is one arena row tall (32 art px). The top panels and the sundial sit in row 0, which
 ## holds nothing to stand on (LEVEL_DESIGN.md 15.8); the bottom panels sit under the arena's floor line (the floor
@@ -28,9 +30,10 @@ extends Control
 ## round clock then counts itself from `Events.round_started` (the arena's `round_time`, else
 ## `VersusTuning.stack_round_ticks`):
 ##   stack_of(slot) -> int, banked_of(slot) -> int, round_wins_of(slot) -> int, leader_slot() -> int (the crown;
-##   -1 = a tie), round_ticks_left() -> int (-1 = no clock), round_length() -> int (0 = no clock), `mode`
-##   (Defs.VersusMode: Grub Stack shows the stack and the pot, Last Caveman Standing the hearts), hearts_of(slot) -> int
-##   (else the run's hearts).
+##   -1 = a tie), round_ticks_left() -> int (-1 = no clock running), round_length() -> int (0 = the mode has no
+##   clock), `mode` (Defs.VersusMode), hearts_of(slot) -> int (else score_of(slot) in Last Caveman Standing, else the
+##   run's hearts), stocks_of(slot) -> int and `rules.stock` (the Stock option), ember_holder() -> int (Hot Rock),
+##   score_of(slot) -> int (Clubball: his side's goals), `phase` (VersusReferee.PHASE_GOLDEN: the tie's golden item).
 ## Read once per frame outside the tick; nothing is written back.
 
 ## Panel height (one arena row, art px), its inner padding, and the gap between its parts.
@@ -70,10 +73,38 @@ const POT_PART: Rect2 = Rect2(8.0, 1.0, 16.0, 27.0)
 const CROWN_PART: Rect2 = Rect2(3.0, 2.0, 26.0, 21.0)
 const BELT_PART: Rect2 = Rect2(0.0, 1.0, 32.0, 30.0)
 const HEART_PART: Rect2 = Rect2(0.0, 2.0, 32.0, 30.0)
+## The Hot Rock emblem (HudAtlas `ember`) and the Clubball coconut (HudAtlas `coconut`): their visible discs.
+const EMBER_PART: Rect2 = Rect2(1.0, 1.0, 30.0, 30.0)
+const COCONUT_PART: Rect2 = Rect2(1.0, 1.0, 30.0, 30.0)
+## Text that reserves the room of the lives left under the Stock option ("x3").
+const STOCK_SAMPLE: String = "x8"
 ## The player's head (ui/portrait_heads.png, 28 x 28 cells).
 const HEAD_W: float = 28.0
 const COL_PLATE: Color = Color(0.153, 0.125, 0.094, 0.72)
 const COL_RUSH: Color = HudAtlas.COL_RUSH
+## The second line of the sudden-death banner: the arena's theme (VersusSuddenDeath.THEMES -> text key).
+const SUDDEN_DEATH_KEYS: Dictionary = {
+	&"stampede": "UI_VS_SD_STAMPEDE",
+	&"cave_in": "UI_VS_SD_CAVE_IN",
+	&"whiteout": "UI_VS_SD_WHITEOUT",
+	&"lava_rise": "UI_VS_SD_LAVA_RISE",
+	&"tar_rise": "UI_VS_SD_TAR_RISE",
+	&"high_tide": "UI_VS_SD_HIGH_TIDE",
+	&"syrup_flood": "UI_VS_SD_SYRUP_FLOOD",
+	&"stalactites": "UI_VS_SD_STALACTITES",
+	&"rockslide": "UI_VS_SD_ROCKSLIDE",
+	&"lightning": "UI_VS_SD_LIGHTNING",
+}
+## Seconds the banner of the tie's golden item stays.
+const GOLDEN_SECONDS: float = 3.0
+
+## What a corner panel counts, by the round's mode.
+enum Content {
+	STACK = 0,   ## Grub Stack: the stack (roast) and the banked units (pot)
+	HEARTS = 1,  ## Last Caveman Standing: the hearts, and the lives left under the Stock option
+	EMBER = 2,   ## Hot Rock: the ember while he holds it
+	GOALS = 3,   ## Clubball: his side's goals
+}
 
 
 ## One player's corner panel: what it shows and where (the HUD draws it).
@@ -92,8 +123,17 @@ class CornerPanel:
 	## Round wins that take the match (the pips).
 	var wins_needed: int = VersusTuning.STACK_ROUND_WINS
 	var belt: int = PlayerRun.BELT_EMPTY
-	## Hearts left in a mode that counts hearts; -1 = the mode shows the stack and the pot.
+	## What the panel counts (Content, by the round's mode).
+	var content: int = HudVersus.Content.STACK
+	## Hearts left in a mode that counts hearts; -1 = the mode shows something else.
 	var hearts: int = -1
+	## Lives left under Last Caveman Standing's Stock option; -1 = no Stock.
+	var stock: int = -1
+	## Hot Rock: true while he holds the ember.
+	var ember: bool = false
+	## Clubball: his side's goals, and true while the golden coconut of a tie is in play.
+	var goals: int = 0
+	var golden: bool = false
 	## True while this player leads (the referee's leader_slot()): the crown hangs beside the panel.
 	var crowned: bool = false
 	## Face of his head (UiPlayers.Face): CHEER while he leads, OUCH while his hero is knocked out.
@@ -110,6 +150,13 @@ class CornerPanel:
 
 	func get_banked_text() -> String:
 		return str(banked)
+
+	## Text of the lives left under the Stock option ("" without it).
+	func get_stock_text() -> String:
+		return "x%d" % stock if stock >= 0 else ""
+
+	func get_goals_text() -> String:
+		return str(goals)
 
 	## Screen rectangle of the plate (as a Control's global rect).
 	func get_global_rect() -> Rect2:
@@ -139,6 +186,8 @@ class Sundial:
 	var seconds: int = -1
 	## True in the Feast Rush (red rim and numbers).
 	var rush: bool = false
+	## False in a mode without a round clock (Hot Rock): nothing is drawn (the rect still ends the HUD row).
+	var visible: bool = true
 	var alpha: float = 1.0
 	## Screen rectangle of its plate (viewport px).
 	var rect: Rect2 = Rect2()
@@ -189,6 +238,11 @@ var _banner_rect: Rect2 = Rect2()
 var _digit_w: float = 16.0
 var _tag_w: float = 32.0
 var _clock_w: float = 48.0
+var _stock_w: float = 32.0
+## True from the gong until the next countdown (the dial shows a full shadow while no clock runs).
+var _round_over: bool = false
+## True once the banner of the tie's golden item showed in this round.
+var _golden_shown: bool = false
 var _drawn_key: Array = []
 var _last_batch: Object = null
 var _skip_button: UiButton = null
@@ -202,7 +256,8 @@ func _init() -> void:
 	_digit_w = _text_width("8")
 	_tag_w = _text_width("P4")
 	_clock_w = _text_width(CLOCK_SAMPLE)
-	for slot: int in clampi(Game.party, 1, Defs.MAX_PLAYERS):
+	_stock_w = _text_width(STOCK_SAMPLE)
+	for slot: int in players_wanted():
 		var panel: CornerPanel = CornerPanel.new()
 		panel.slot = slot
 		panel.mirrored = slot % 2 == 1
@@ -236,8 +291,14 @@ func refresh(delta: float = 0.0) -> void:
 	var leader: int = -1
 	if provider != null and provider.has_method(&"leader_slot"):
 		leader = int(provider.call(&"leader_slot"))
-	var hearts_mode: bool = _mode(provider) == Defs.VersusMode.LAST_CAVEMAN
+	var mode: int = _mode(provider)
+	var content: int = content_of(mode)
 	var needed: int = _wins_needed()
+	var stock_rule: bool = content == Content.HEARTS and _stock_rule(provider)
+	var holder: int = -1
+	if content == Content.EMBER and provider != null and provider.has_method(&"ember_holder"):
+		holder = int(provider.call(&"ember_holder"))
+	var golden: bool = _golden_phase(provider)
 	for panel: CornerPanel in _panels:
 		var run: PlayerRun = Game.get_run(panel.slot)
 		panel.belt = run.special() if run != null else PlayerRun.BELT_EMPTY
@@ -250,10 +311,22 @@ func refresh(delta: float = 0.0) -> void:
 		var hero: PlayerBase = _hero(panel.slot)
 		if hero != null and (hero.dead or hero.down):
 			panel.face = UiPlayers.Face.OUCH
+		panel.content = content
 		panel.hearts = -1
-		if hearts_mode:
-			panel.hearts = _ask(provider, &"hearts_of", panel.slot) if provider != null \
-					and provider.has_method(&"hearts_of") else (run.hearts if run != null else 0)
+		panel.stock = -1
+		panel.ember = false
+		panel.goals = 0
+		panel.golden = false
+		match content:
+			Content.HEARTS:
+				panel.hearts = clampi(_hearts_of(provider, panel.slot, run), 0, Tuning.ENERGY_START)
+				if stock_rule:
+					panel.stock = maxi(_ask(provider, &"stocks_of", panel.slot), 0)
+			Content.EMBER:
+				panel.ember = holder >= 0 and holder == panel.slot
+			Content.GOALS:
+				panel.goals = maxi(_ask(provider, &"score_of", panel.slot), 0)
+				panel.golden = golden
 	var length: int = _round_length
 	if provider != null and provider.has_method(&"round_length"):
 		length = int(provider.call(&"round_length"))
@@ -261,12 +334,24 @@ func refresh(delta: float = 0.0) -> void:
 		ticks_left = int(provider.call(&"round_ticks_left"))
 	elif round_running:
 		ticks_left = maxi(_round_length - (Sim.tick - _round_start_tick), 0)
+	_dial.visible = length > 0
 	_dial.elapsed = 0.0
 	_dial.seconds = -1
 	if ticks_left >= 0 and length > 0:
 		_dial.elapsed = clampf(1.0 - float(ticks_left) / float(length), 0.0, 1.0)
 		_dial.seconds = ceili(Tuning.ticks_to_seconds(ticks_left) - 0.0001)
+	elif golden or _round_over:
+		# The clock ran out (the gong, a tie's golden item): the shadow covers the whole dial.
+		_dial.elapsed = 1.0
 	_dial.rush = feast_rush
+	if golden and not _golden_shown:
+		_golden_shown = true
+		if content == Content.GOALS:
+			show_banner(tr("UI_VS_GOLDEN_COCONUT"), UiKit.COL_FOCUS, UiKit.Style.HUD, GOLDEN_SECONDS,
+					tr("UI_VS_GOLDEN_COCONUT_HINT"))
+		else:
+			show_banner(tr("UI_VS_GOLDEN_DRUMSTICK"), UiKit.COL_FOCUS, UiKit.Style.HUD, GOLDEN_SECONDS,
+					tr("UI_VS_GOLDEN_DRUMSTICK_HINT"))
 	_layout()
 	_fade(delta)
 	var key: Array = _state_key()
@@ -334,12 +419,22 @@ static func result_text(winner_slots: PackedInt32Array) -> String:
 
 ## Width of a panel for what it shows now (the counts take at least two digits, so a panel does not jump at 10).
 func panel_width(panel: CornerPanel) -> float:
-	var x: float = _content_x(panel)
-	if panel.hearts >= 0:
-		x += HEART_STEP * float(Tuning.ENERGY_START - 1) + HEART_PART.size.x
-	else:
-		x += FOOD_PART.size.x + 1.0 + _count_w(panel.stack) + GAP + POT_PART.size.x + 1.0 + _count_w(panel.banked)
+	var x: float = _content_x(panel) + _counts_width(panel)
 	return x + GAP + BELT_PART.size.x + PAD
+
+
+## Width of what the panel counts (between the head and the belt icon). Room is kept for the ember the whole round,
+## so a panel does not jump when it passes.
+func _counts_width(panel: CornerPanel) -> float:
+	match panel.content:
+		Content.HEARTS:
+			var hearts: float = HEART_STEP * float(Tuning.ENERGY_START - 1) + HEART_PART.size.x
+			return hearts + (GAP + _stock_w if panel.stock >= 0 else 0.0)
+		Content.EMBER:
+			return EMBER_PART.size.x
+		Content.GOALS:
+			return COCONUT_PART.size.x + 1.0 + _count_w(panel.goals)
+	return FOOD_PART.size.x + 1.0 + _count_w(panel.stack) + GAP + POT_PART.size.x + 1.0 + _count_w(panel.banked)
 
 
 ## Top-left corners: P1 / P2 in row 0 under the safe-area top, the sundial between them; P3 / P4 under the arena's
@@ -449,11 +544,11 @@ static func _covers(rect: Rect2, bodies: Array[Rect2]) -> bool:
 ## Everything a frame shows, to redraw only on a change.
 func _state_key() -> Array:
 	var key: Array = [banner_text, banner_hint, _banner_rect, snappedf(_banner_alpha(), 0.02), _dial.rect,
-			HudAtlas.dial_index(_dial.elapsed), _dial.seconds, _dial.rush, snappedf(_dial.alpha, 0.02)]
+			HudAtlas.dial_index(_dial.elapsed), _dial.seconds, _dial.rush, _dial.visible, snappedf(_dial.alpha, 0.02)]
 	for panel: CornerPanel in _panels:
-		key.append_array([panel.rect, panel.stack, panel.banked, panel.wins, panel.wins_needed, panel.belt,
-				panel.hearts, panel.crowned, panel.face, panel.show_tag, snappedf(panel.alpha, 0.02),
-				UiPlayers.palette_of(panel.slot)])
+		key.append_array([panel.rect, panel.content, panel.stack, panel.banked, panel.wins, panel.wins_needed,
+				panel.belt, panel.hearts, panel.stock, panel.ember, panel.goals, panel.golden, panel.crowned, panel.face,
+				panel.show_tag, snappedf(panel.alpha, 0.02), UiPlayers.palette_of(panel.slot)])
 	return key
 
 
@@ -473,7 +568,7 @@ func _draw() -> void:
 	# 2. Text in the HUD face.
 	for panel: CornerPanel in _panels:
 		_draw_panel_text(panel)
-	if _dial.seconds >= 0:
+	if _dial.visible and _dial.seconds >= 0:
 		var color: Color = COL_RUSH if _dial.is_warning() else UiKit.COL_TEXT
 		_text(_dial.get_text(), _dial.rect.position + Vector2(PAD + DIAL_PX + GAP, TEXT_BASELINE),
 				Color(color, _dial.alpha))
@@ -498,7 +593,9 @@ func _draw() -> void:
 func _draw_panel_pictures(atlas: Texture2D, panel: CornerPanel) -> void:
 	var a: float = panel.alpha
 	var r: Rect2 = panel.rect
-	_plate(atlas, r, Color(COL_PLATE, COL_PLATE.a * a), Color(UiPlayers.colour(panel.slot, UiPlayers.SHADE), a))
+	# The holder of the hot rock glows: his plate's rim turns ember red.
+	var rim: Color = COL_RUSH if panel.ember else UiPlayers.colour(panel.slot, UiPlayers.SHADE)
+	_plate(atlas, r, Color(COL_PLATE, COL_PLATE.a * a), Color(rim, a))
 	var fill: Color = Color(UiPlayers.colour(panel.slot), a)
 	var ink: Color = Color(UiKit.COL_INK, a)
 	var white: Rect2 = HudAtlas.white()
@@ -513,16 +610,22 @@ func _draw_panel_pictures(atlas: Texture2D, panel: CornerPanel) -> void:
 	_blit(atlas, HudAtlas.region(&"head", UiPlayers.head_cell(panel.slot, panel.face)),
 			Rect2(head.position + Vector2(0.0, roundf((PANEL_H - HEAD_W) * 0.5)), Vector2.ONE * HEAD_W), tint)
 	var x: float = _content_x(panel)
-	if panel.hearts >= 0:
-		for i: int in Tuning.ENERGY_START:
-			var heart: Rect2 = _place(panel, x + float(i) * HEART_STEP, HEART_PART.size.x)
-			_icon(atlas, &"heart", 0 if i < panel.hearts else 1, HEART_PART, heart, tint)
-		x += HEART_STEP * float(Tuning.ENERGY_START - 1) + HEART_PART.size.x
-	else:
-		_icon(atlas, &"food", STACK_CELL, FOOD_PART, _place(panel, x, FOOD_PART.size.x), tint)
-		x += FOOD_PART.size.x + 1.0 + _count_w(panel.stack) + GAP
-		_icon(atlas, &"food", POT_CELL, POT_PART, _place(panel, x, POT_PART.size.x), tint)
-		x += POT_PART.size.x + 1.0 + _count_w(panel.banked)
+	match panel.content:
+		Content.HEARTS:
+			for i: int in Tuning.ENERGY_START:
+				var heart: Rect2 = _place(panel, x + float(i) * HEART_STEP, HEART_PART.size.x)
+				_icon(atlas, &"heart", 0 if i < panel.hearts else 1, HEART_PART, heart, tint)
+		Content.EMBER:
+			if panel.ember:
+				_icon(atlas, &"ember", 0, EMBER_PART, _place(panel, x, EMBER_PART.size.x), tint)
+		Content.GOALS:
+			var ball: int = HudAtlas.COCONUT_GOLDEN if panel.golden else HudAtlas.COCONUT
+			_icon(atlas, &"coconut", ball, COCONUT_PART, _place(panel, x, COCONUT_PART.size.x), tint)
+		_:
+			_icon(atlas, &"food", STACK_CELL, FOOD_PART, _place(panel, x, FOOD_PART.size.x), tint)
+			var pot_x: float = x + FOOD_PART.size.x + 1.0 + _count_w(panel.stack) + GAP
+			_icon(atlas, &"food", POT_CELL, POT_PART, _place(panel, pot_x, POT_PART.size.x), tint)
+	x += _counts_width(panel)
 	if panel.belt != PlayerRun.BELT_EMPTY:
 		var cell: int = clampi(panel.belt, Defs.Weapon.CLUB, Defs.Weapon.SPEAR)
 		_icon(atlas, &"belt", cell, BELT_PART, _place(panel, x + GAP, BELT_PART.size.x), tint)
@@ -537,18 +640,31 @@ func _draw_panel_text(panel: CornerPanel) -> void:
 		var tag: Rect2 = _place(panel, PAD, _tag_w)
 		_text(UiPlayers.tag(panel.slot), Vector2(tag.position.x, panel.rect.position.y + TEXT_BASELINE - 3.0),
 				Color(UiPlayers.text_colour(panel.slot), a))
-	if panel.hearts >= 0:
-		return
-	var x: float = _content_x(panel) + FOOD_PART.size.x + 1.0
-	var stack: Rect2 = _place(panel, x, _count_w(panel.stack))
-	_text(str(panel.stack), Vector2(stack.position.x, panel.rect.position.y + TEXT_BASELINE), Color(UiKit.COL_TEXT, a))
-	x += _count_w(panel.stack) + GAP + POT_PART.size.x + 1.0
-	var banked: Rect2 = _place(panel, x, _count_w(panel.banked))
-	_text(str(panel.banked), Vector2(banked.position.x, panel.rect.position.y + TEXT_BASELINE),
-			Color(UiKit.COL_CREAM, a))
+	var baseline: float = panel.rect.position.y + TEXT_BASELINE
+	var x: float = _content_x(panel)
+	match panel.content:
+		Content.HEARTS:
+			if panel.stock >= 0:
+				x += HEART_STEP * float(Tuning.ENERGY_START - 1) + HEART_PART.size.x + GAP
+				var lives: Rect2 = _place(panel, x, _stock_w)
+				_text(panel.get_stock_text(), Vector2(lives.position.x, baseline), Color(UiKit.COL_CREAM, a))
+		Content.GOALS:
+			x += COCONUT_PART.size.x + 1.0
+			var goals: Rect2 = _place(panel, x, _count_w(panel.goals))
+			_text(panel.get_goals_text(), Vector2(goals.position.x, baseline),
+					Color(UiKit.COL_FOCUS if panel.golden else UiKit.COL_TEXT, a))
+		Content.STACK:
+			x += FOOD_PART.size.x + 1.0
+			var stack: Rect2 = _place(panel, x, _count_w(panel.stack))
+			_text(str(panel.stack), Vector2(stack.position.x, baseline), Color(UiKit.COL_TEXT, a))
+			x += _count_w(panel.stack) + GAP + POT_PART.size.x + 1.0
+			var banked: Rect2 = _place(panel, x, _count_w(panel.banked))
+			_text(str(panel.banked), Vector2(banked.position.x, baseline), Color(UiKit.COL_CREAM, a))
 
 
 func _draw_dial_pictures(atlas: Texture2D) -> void:
+	if not _dial.visible:
+		return
 	var a: float = _dial.alpha
 	_plate(atlas, _dial.rect, Color(COL_PLATE, COL_PLATE.a * a), Color(UiKit.COL_INK, 0.0))
 	var face: Rect2 = Rect2(_dial.rect.position + Vector2(PAD, roundf((PANEL_H - DIAL_PX) * 0.5)), Vector2.ONE * DIAL_PX)
@@ -698,6 +814,59 @@ static func _mode(provider: Object) -> int:
 	return Defs.VersusMode.GRUB_STACK
 
 
+## What the corner panels count in versus mode `mode` (Defs.VersusMode).
+static func content_of(mode: int) -> int:
+	match mode:
+		Defs.VersusMode.LAST_CAVEMAN:
+			return Content.HEARTS
+		Defs.VersusMode.HOT_ROCK:
+			return Content.EMBER
+		Defs.VersusMode.CLUBBALL:
+			return Content.GOALS
+	return Content.STACK
+
+
+## Panels this HUD builds: one per player of the match (Game.party, 1..MAX_PLAYERS).
+static func players_wanted() -> int:
+	return clampi(Game.party, 1, Defs.MAX_PLAYERS)
+
+
+## Panels this HUD has.
+func player_count() -> int:
+	return _panels.size()
+
+
+## True when Last Caveman Standing is played with the Stock option: the provider's `rules.stock`, else the match's.
+static func _stock_rule(provider: Object) -> bool:
+	var rules: Variant = provider.get(&"rules") if provider != null else null
+	if rules is Object and rules != null:
+		var stock: Variant = (rules as Object).get(&"stock")
+		if stock is bool:
+			return stock
+	if Game.versus_match != null:
+		var value: Variant = Game.versus_match.get(&"stock")
+		return value is bool and bool(value)
+	return false
+
+
+## Hearts left of `slot` in a hearts mode: the provider's hearts_of, else its score_of (0 once he is out), else the
+## run's hearts.
+static func _hearts_of(provider: Object, slot: int, run: PlayerRun) -> int:
+	if provider != null and provider.has_method(&"hearts_of"):
+		return int(provider.call(&"hearts_of", slot))
+	if provider != null and provider.has_method(&"score_of"):
+		return int(provider.call(&"score_of", slot))
+	return run.hearts if run != null else 0
+
+
+## True while the round's tie is decided by the golden item (the referee's PHASE_GOLDEN).
+static func _golden_phase(provider: Object) -> bool:
+	if provider == null:
+		return false
+	var phase: Variant = provider.get(&"phase")
+	return phase is int and int(phase) == VersusReferee.PHASE_GOLDEN
+
+
 ## Round wins that take the match (the pips): the match's rule, else Grub Stack's.
 static func _wins_needed() -> int:
 	if Game.versus_match != null:
@@ -720,6 +889,8 @@ func _round_ticks() -> int:
 
 func _on_round_countdown(p_round_index: int, count: int) -> void:
 	round_index = p_round_index
+	_round_over = false
+	_golden_shown = false
 	if count > 0:
 		show_banner(str(count), UiKit.COL_CREAM, UiKit.Style.TITLE, 0.0)
 	else:
@@ -730,6 +901,8 @@ func _on_round_started(p_round_index: int) -> void:
 	round_index = p_round_index
 	round_running = true
 	feast_rush = false
+	_round_over = false
+	_golden_shown = false
 	_round_start_tick = Sim.tick
 	_round_length = _round_ticks()
 	if banner_text != "" and banner_text != tr("UI_VS_GO"):
@@ -741,13 +914,16 @@ func _on_feast_rush(_round_index: int) -> void:
 	show_banner(tr("UI_VS_FEAST_RUSH"), COL_RUSH, UiKit.Style.HUD, BANNER_SECONDS)
 
 
-func _on_sudden_death(_round_index: int, _kind: StringName) -> void:
-	show_banner(tr("UI_VS_SUDDEN_DEATH"), COL_RUSH, UiKit.Style.HUD, BANNER_SECONDS)
+## "SUDDEN DEATH!" and, under it, which one the arena throws in (VersusSuddenDeath's theme: "Stampede!").
+func _on_sudden_death(_round_index: int, kind: StringName) -> void:
+	var theme: String = tr(str(SUDDEN_DEATH_KEYS[kind])) if SUDDEN_DEATH_KEYS.has(kind) else ""
+	show_banner(tr("UI_VS_SUDDEN_DEATH"), COL_RUSH, UiKit.Style.HUD, BANNER_SECONDS * 1.5, theme)
 
 
 func _on_round_ended(p_round_index: int, winner_slots: PackedInt32Array) -> void:
 	round_index = p_round_index
 	round_running = false
+	_round_over = true
 	feast_rush = false
 	var provider: Object = _provider()
 	if provider == null or not provider.has_method(&"round_ticks_left"):

@@ -1,20 +1,28 @@
 class_name HudAtlas
 extends RefCounted
 ## One texture for every picture of the party HUD (PLAN.md P2.9, G1 follow-up: the four corner panels of a 4-player
-## arena cost 31 of the 60 draw calls of ARCHITECTURE.md 11). The cells of the shipped HUD sheets - versus food and
-## crown (`ui/stack_food.png`, `ui/crown.png`), belt icons (`ui/hud_belt.png`), hearts (`ui/hud_heart.png`), the
-## P-tags with their colour arrow (`ui/player_tags.png`), the edge arrows (`ui/player_arrows.png`) and the stone
-## countdown (`ui/countdown_stones.png`) - are copied at run time into one image, together with a white block for
-## plates and pips and the frames of the round sundial (drawn here, no art file: the P2.11 sundial art does not exist
-## yet). Everything the versus HUD and the edge arrows draw, except text, then comes from this one texture, so the
-## renderer batches it into one draw call (text adds one per font).
+## arena cost 31 of the 60 draw calls of ARCHITECTURE.md 11; with this atlas the whole HUD costs 3). The cells of the
+## shipped HUD sheets - versus food and crown (`ui/stack_food.png`, `ui/crown.png`), belt icons (`ui/hud_belt.png`),
+## hearts (`ui/hud_heart.png`), the P-tags with their colour arrow (`ui/player_tags.png`), the edge arrows
+## (`ui/player_arrows.png`), the stone countdown (`ui/countdown_stones.png`), the round sundial and its Feast Rush rim
+## (`ui/sundial.png`, `ui/sundial_rush.png`), the players' heads (`ui/portrait_heads.png`), the Hot Rock emblem of the
+## awards sheet (`ui/medals.png` cell 14: the ember a Hot Rock player holds) and the Clubball coconut
+## (`sprites/objects/coconut.png`: cell 0 the coconut, cell 4 the golden one) - are copied at run time into one image,
+## together with a white block for plates and pips. Everything the versus HUD and the edge arrows draw, except text,
+## then comes from this one texture, so the renderer batches it into one draw call (text adds one per font).
 ##
 ## Owner: ui-B. No asset file of its own: the image is built from the shipped sheets the first time it is asked for
-## and kept for the session (about 0.7 MB). A missing sheet leaves its cells transparent - except the sundial's, which
+## and kept for the session (about 0.8 MB). A missing sheet leaves its cells transparent - except the sundial's, which
 ## are then drawn here (the frames and the Feast Rush rim of [method _draw_dial]).
 
-## Cell groups: key -> [sheet path, cell size, cell count] (cells row-major). `white` is a block drawn here. The tags,
-## arrows and heads have a row per hero colour (UiPlayers.PALETTE_ORDER; UiPlayers.tag_cell / arrow_cell / head_cell).
+## Cell of ui/medals.png that shows the hot rock (the Hot Potato award, PlayerRun.VERSUS_AWARDS).
+const EMBER_MEDAL: int = 14
+## Cells of the `coconut` group: the coconut and the golden coconut of a tie ("next goal wins").
+const COCONUT: int = 0
+const COCONUT_GOLDEN: int = 4
+## Cell groups: key -> [sheet path, cell size, cell count, first cell of the sheet (optional, default 0)] (cells
+## row-major). `white` is a block drawn here. The tags, arrows and heads have a row per hero colour
+## (UiPlayers.PALETTE_ORDER; UiPlayers.tag_cell / arrow_cell / head_cell).
 const GROUPS: Array[Array] = [
 	[&"white", "", Vector2i(4, 4), 1],
 	[&"food", "res://assets/ui/stack_food.png", Vector2i(32, 28), 6],
@@ -27,6 +35,8 @@ const GROUPS: Array[Array] = [
 	[&"dial", "res://assets/ui/sundial.png", Vector2i(28, 28), 32],
 	[&"dial_rush", "res://assets/ui/sundial_rush.png", Vector2i(28, 28), 1],
 	[&"head", "res://assets/ui/portrait_heads.png", Vector2i(28, 28), 18],
+	[&"ember", "res://assets/ui/medals.png", Vector2i(32, 32), 1, EMBER_MEDAL],
+	[&"coconut", "res://assets/sprites/objects/coconut.png", Vector2i(32, 32), 5],
 ]
 ## Width of the atlas image (px); groups are packed on shelves, 1 px apart.
 const WIDTH: int = 512
@@ -37,7 +47,7 @@ const COL_DIAL_SHADOW: Color = Color("8f7f63")
 const COL_RUSH: Color = Color("ff6b5a")
 
 static var _texture: ImageTexture = null
-## key -> [origin (Vector2i), cell size (Vector2i), columns (int), count (int)]
+## key -> [origin (Vector2i), cell size (Vector2i), columns (int), count (int), first cell of the sheet (int)]
 static var _groups: Dictionary = {}
 
 
@@ -97,7 +107,7 @@ static func _build() -> void:
 			x = 0
 			y += shelf + 1
 			shelf = 0
-		_groups[group[0]] = [Vector2i(x, y), cell, columns, count]
+		_groups[group[0]] = [Vector2i(x, y), cell, columns, count, int(group[4]) if group.size() > 4 else 0]
 		x += block.x + 1
 		shelf = maxi(shelf, block.y)
 	var image: Image = Image.create_empty(WIDTH, y + shelf, false, Image.FORMAT_RGBA8)
@@ -121,14 +131,16 @@ static func _build() -> void:
 	_texture = ImageTexture.create_from_image(image)
 
 
-## Copy the cells of a uniform sheet (row-major) into the group's block.
+## Copy the cells of a uniform sheet (row-major, from the group's first cell on) into the group's block.
 static func _copy_cells(image: Image, source: Image, key: StringName) -> void:
 	var group: Array = _groups[key]
 	var cell: Vector2i = group[1]
 	var columns: int = group[2]
+	var first: int = group[4]
 	var source_columns: int = maxi(1, source.get_width() / cell.x)
 	for i: int in int(group[3]):
-		var from: Vector2i = Vector2i((i % source_columns) * cell.x, (i / source_columns) * cell.y)
+		var at: int = first + i
+		var from: Vector2i = Vector2i((at % source_columns) * cell.x, (at / source_columns) * cell.y)
 		if from.x + cell.x > source.get_width() or from.y + cell.y > source.get_height():
 			continue
 		var to: Vector2i = group[0] + Vector2i((i % columns) * cell.x, (i / columns) * cell.y)

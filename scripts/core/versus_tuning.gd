@@ -141,6 +141,15 @@ const BALL_KNOCKDOWN_SPEED_EXCL: int = 128   ## a coconut faster than 8 px/tick 
 const CLUBBALL_GOALS: int = 5                ## first to 5 goals ...
 const CLUBBALL_MATCH_TICKS: int = 4370       ## ... or most after 3 min; then the golden coconut
 const BALL_RESET_TICKS: int = 66             ## the ball resets to the middle 66 ticks after a goal
+# The shots: a front box touching the coconut sets its velocity by the strike (xvel signed by the striker's facing;
+# every component capped at PartyTuning.LAUNCH_AXIS_CAP). P2.7 (objects-B's objects/coconut). [G 13.10.6]
+const BALL_DRIVE_XVEL: int = 144             ## forward front box: the drive ...
+const BALL_DRIVE_YVEL: int = -128
+const BALL_LOB_XVEL: int = 32                ## high front box: the lob ...
+const BALL_LOB_YVEL: int = -240
+const BALL_GROUNDER_XVEL: int = 96           ## low front box: the grounder (yvel 0, along the floor)
+const BALL_BOUNCE_MIN_YVEL: int = 32         ## a floor bounces it while yvel >= 32, else it rests and rolls
+const BALL_HEAD_BOUNCE_MIN_YVEL: int = -96   ## a coconut landing on a head bounces up at 3/4, at least -96
 # Second wave (not at launch).
 const KING_COUNTS: int = 20                  ## King of the Feast: fill 20 counts ...
 const KING_COUNT_TICKS: int = 22             ## ... of 22 ticks carrying the giant roast

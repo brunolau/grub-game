@@ -272,7 +272,9 @@ func run(start: Vector2i, flags: PackedInt32Array, max_ticks: int, geyser: int =
 		if hero.dead:
 			outcome.died = true
 			break
-		var standing: bool = hero.is_grounded() and hero.yvel == 0 and (airborne or hero.xvel == 0 or hero.on_platform)
+		# A rider of a platform keeps yvel 1 (the ride rule holds him 1 px into its top): he stands all the same.
+		var standing: bool = hero.is_grounded() and (hero.yvel == 0 or hero.on_platform) \
+				and (airborne or hero.xvel == 0 or hero.on_platform)
 		if not handed_back:
 			if not hero.is_grounded():
 				airborne = true

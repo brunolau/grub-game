@@ -6,8 +6,10 @@ extends TestCase
 const LEVEL_SCENE: String = "res://scenes/world/level.tscn"
 const FLAT_ARENA: String = "res://levels/test_world_arena_flat.lvl"
 const RING_ARENA: String = "res://levels/test_world_arena_ring.lvl"
-## A walled 20 x 12 arena with a one-way bridge 3 rows over the floor on the left and a solid ledge 3 rows up on the
-## right (4 cells wide, wall-backed): the bake must find jumps up and drops down in both directions.
+## A walled 20 x 12 arena with a one-way bridge 4 rows over the floor on the left and a solid ledge 3 rows up on the
+## right (4 cells wide, wall-backed): the bake must find jumps up and drops down in both directions. (A jump whose feet
+## get into a one-way floor's own row lands on its top - the 1.0 rule - so the light hero reaches the 4-row bridge
+## with his 60 px rise and a 20+ stack's 38 px rise does not.)
 const TIER_ARENA: String = """[meta]
 format = 2
 id = test_core_bots_tiers
@@ -23,8 +25,8 @@ biome = jungle
 |..................|
 |..................|
 |..................|
-|..................|
-|...-----......####|
+|...-----..........|
+|..............####|
 |..................|
 |.@................|
 ####################
@@ -58,10 +60,40 @@ G = objects/geyser period=88
 [entities]
 """
 
+## A walled arena whose two ledges (5 rows over the floor: out of every jump) only a moving platform joins: it
+## starts at the left ledge's edge and travels right (objects/platform dir=2, ping-pong) close to the right ledge. The
+## bot starts on the left ledge (spawn 2, slot 1); slot 0 waits on the floor.
+const LIFT_ARENA: String = """[meta]
+format = 2
+id = test_core_bots_lift
+kind = arena
+players = 2
+modes = last_caveman
+biome = jungle
+[legend]
+M = objects/platform dir=2 speed=4 travel=18
+B = objects/spawn_point index=2
+[tiles]
+|..................|
+|..................|
+|..................|
+|..................|
+|.B................|
+|####M.......######|
+|..................|
+|..................|
+|..................|
+|.@................|
+####################
+####################
+[entities]
+"""
+
 ## The tier arena's graph as JSON text, baked once for the whole file (a bake simulates thousands of hero runs; text,
 ## not the graph itself, so that nothing is left over at exit).
 static var _tier_json: String = ""
 static var _geyser_json: String = ""
+static var _lift_json: String = ""
 
 
 func before_each() -> void:
@@ -185,7 +217,7 @@ func test_span_nodes_follow_the_grid() -> void:
 	var data: LevelData = LevelData.parse(&"test_core_bots_tiers", TIER_ARENA)
 	var nodes: Array[NavGraph.NavNode] = NavBaker.span_nodes(data.build_grid(0))
 	assert_eq(nodes.size(), 3, "bridge, ledge, floor")
-	assert_eq(nodes[0].to_dict(), {"id": 0, "row": 7, "y": 112, "x0": 64, "x1": 143, "ice": 0}, "the bridge")
+	assert_eq(nodes[0].to_dict(), {"id": 0, "row": 6, "y": 96, "x0": 64, "x1": 143, "ice": 0}, "the bridge")
 	# The ledge runs into the invisible wall of column 19: the wall probe stops a walker 9 px before it.
 	assert_eq(nodes[1].to_dict(), {"id": 0, "row": 7, "y": 112, "x0": 240, "x1": 294, "ice": 0}, "the ledge")
 	assert_eq(nodes[2].to_dict(), {"id": 0, "row": 10, "y": 160, "x0": 25, "x1": 294, "ice": 0}, "the floor")
@@ -201,7 +233,7 @@ func test_bake_finds_jumps_and_drops_both_ways() -> void:
 	assert_not_null(graph)
 	assert_eq(graph.nodes.size(), 3)
 	var floor_node: int = graph.node_at(Vector2i(100, 160))
-	var bridge: int = graph.node_at(Vector2i(100, 112))
+	var bridge: int = graph.node_at(Vector2i(100, 96))
 	var ledge: int = graph.node_at(Vector2i(260, 112))
 	for pair: Vector2i in [Vector2i(floor_node, bridge), Vector2i(bridge, floor_node), Vector2i(floor_node, ledge),
 			Vector2i(ledge, floor_node), Vector2i(bridge, ledge), Vector2i(ledge, bridge)]:
@@ -228,7 +260,7 @@ func test_every_baked_link_lands_from_every_x_of_its_window() -> void:
 	assert_eq(problems.size(), 0, "\n".join(problems))
 	# A link that is wrong is caught: point the floor -> bridge jump at the ledge.
 	var broken: NavGraph = NavGraph.from_dict(graph.to_dict())
-	var bridge: int = graph.node_at(Vector2i(100, 112))
+	var bridge: int = graph.node_at(Vector2i(100, 96))
 	var ledge: int = graph.node_at(Vector2i(260, 112))
 	for link: NavGraph.NavLink in broken.links:
 		if link.to == bridge:
@@ -328,12 +360,13 @@ func test_weight_classes_follow_the_modes() -> void:
 	assert_false(NavGraph.class_jumps_short(NavGraph.WEIGHT_HEAVY))
 
 
-func test_heavier_class_cannot_jump_three_rows() -> void:
-	# 20+ units: impulses x3/4, apex 38 px - the 48 px bridge is out of reach; the light hero jumps it.
+func test_heavier_class_cannot_jump_four_rows() -> void:
+	# 20+ units: impulses x3/4, a 38 px rise - the 4-row bridge (feet into its row: 49+ px) is out of reach; the light
+	# hero (60 px) lands on it.
 	var graph: NavGraph = _tier()
 	assert_eq(graph.weights, PackedInt32Array([NavGraph.WEIGHT_LIGHT, NavGraph.WEIGHT_HEAVIER]))
 	var floor_node: int = graph.node_at(Vector2i(100, 160))
-	var bridge: int = graph.node_at(Vector2i(100, 112))
+	var bridge: int = graph.node_at(Vector2i(100, 96))
 	var up_light: bool = false
 	var up_heavy: bool = false
 	var down_heavy: bool = false
@@ -438,6 +471,72 @@ func test_bot_rides_the_geyser_to_the_ledge() -> void:
 			break
 	assert_true(reached, "the bot rode the geyser up (stands at %s)" % hero.sim_pos)
 	assert_true(bot.nav.links_landed >= 1)
+	assert_eq(bot.nav.links_failed, 0, "; ".join(bot.nav.failure_log))
+	bot.uninstall()
+
+
+func test_moving_platform_is_a_mover_node_with_verified_links() -> void:
+	var graph: NavGraph = _lift_graph()
+	assert_eq(graph.format, NavGraph.FORMAT)
+	assert_eq(graph.movers.size(), 1, "the platform is a mover")
+	if graph.movers.is_empty():
+		return
+	assert_eq(StringName(str(graph.movers[0]["kind"])), NavGraph.MOVER_PERIODIC, "it moves by itself")
+	var left: int = graph.node_at(Vector2i(40, 80))
+	var right: int = graph.node_at(Vector2i(260, 80))
+	var platform: int = -1
+	for node: NavGraph.NavNode in graph.nodes:
+		if node.mover >= 0:
+			platform = node.id
+	assert_true(left >= 0 and right >= 0 and platform >= 0, "both ledges and the platform are nodes")
+	var board: int = 0
+	var off: int = 0
+	for link: NavGraph.NavLink in graph.links:
+		assert_true(link.kind != NavGraph.KIND_JUMP or link.from != left or link.to != right,
+				"no jump crosses the gap (link %d)" % link.id)
+		if link.to == platform and link.from == left:
+			board += 1
+			assert_eq(link.kind, NavGraph.KIND_RIDE)
+			assert_eq(link.cond.size(), 5, "a boarding waits for the platform's state")
+		if link.from == platform and link.to == right:
+			off += 1
+	assert_true(board >= 1, "left ledge -> platform")
+	assert_true(off >= 1, "platform -> right ledge")
+	assert_true(graph.path_cost(left, 40, right, 260) < NavGraph.UNREACHABLE, "a route across by the platform")
+	var baker: NavBaker = NavBaker.new()
+	var data: LevelData = LevelData.parse(graph.level_id, LIFT_ARENA)
+	assert_true(baker.sim.setup(self, graph.level_id, data.build_grid(0), data.resolved_meta(0), data.entity_records()))
+	var problems: PackedStringArray = baker.verify_graph(graph)
+	baker.sim.teardown()
+	assert_eq(problems.size(), 0, "; ".join(problems))
+
+
+func test_bot_rides_the_moving_platform_across() -> void:
+	var graph: NavGraph = _lift_graph()
+	NavGraph.cache(graph)
+	var level: Level = _load_arena_text(2, &"test_core_bots_lift", LIFT_ARENA)
+	if level == null:
+		return
+	var bot: HeroBot = HeroBot.new(1, Defs.BotLevel.HUNTER, 5, Defs.VersusMode.LAST_CAVEMAN)
+	var steering: _Steer = _Steer.new()
+	steering.bot = bot
+	bot.brain = steering
+	bot.install()
+	GameInput.set_scripted_slot(0, func(_tick: int) -> int: return 0)
+	var hero: PlayerBase = level.get_hero(1)
+	assert_eq(graph.node_at(hero.sim_pos), graph.node_at(Vector2i(40, 80)), "the bot starts on the left ledge")
+	var rode: bool = false
+	for target: Vector2i in [Vector2i(260, 80), Vector2i(40, 80)]:
+		steering.target = target
+		var reached: bool = false
+		for t: int in 900:
+			Sim.step(1)
+			rode = rode or hero.on_platform
+			if bot.nav.arrived(hero) and not bot.nav.is_busy():
+				reached = true
+				break
+		assert_true(reached, "the bot reached %s (stands at %s)" % [target, hero.sim_pos])
+	assert_true(rode, "on the platform")
 	assert_eq(bot.nav.links_failed, 0, "; ".join(bot.nav.failure_log))
 	bot.uninstall()
 
@@ -642,6 +741,16 @@ func _geyser_graph() -> NavGraph:
 		_geyser_json = baked.to_json()
 	var json: JSON = JSON.new()
 	json.parse(_geyser_json)
+	return NavGraph.from_dict(json.data)
+
+
+## The lift arena's graph, baked once for the whole file.
+func _lift_graph() -> NavGraph:
+	if _lift_json.is_empty():
+		var baked: NavGraph = NavBaker.new().bake_text(self, &"test_core_bots_lift", LIFT_ARENA)
+		_lift_json = baked.to_json()
+	var json: JSON = JSON.new()
+	json.parse(_lift_json)
 	return NavGraph.from_dict(json.data)
 
 

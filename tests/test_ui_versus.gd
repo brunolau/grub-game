@@ -527,6 +527,145 @@ func test_results_hand_out_awards() -> void:
 	await _cleanup()
 
 
+## The full lobby fits the game's 640 x 360 view: four seat cards, Teams, START, the two small entries (Cave Paintings,
+## Key test) and the keyboard preset all lie inside it, side by side without overlapping; the Key test entry opens the
+## test.
+func test_lobby_fits_the_view() -> void:
+	var node: VersusLobbyScreen = await _open_lobby()
+	_key(KEY_SPACE)
+	_key(KEY_KP_0)
+	node.add_cpu(2, Defs.BotLevel.CHIEF)
+	node.add_cpu(3, Defs.BotLevel.ROOKIE)
+	node.set_teams(true)
+	await get_tree().process_frame
+	var parts: Array[Control] = []
+	for slot: int in Defs.MAX_PLAYERS:
+		parts.append(node.get_card(slot))
+	parts.append_array([node.get_teams_row(), node.get_start_button(), node.get_paintings_button(),
+			node.get_key_test_button()] as Array[Control])
+	_assert_fits_base_view(node)
+	var view: Rect2 = node.get_global_rect()
+	if view.size.x >= float(Tuning.VIEW_W) * Tuning.ART_SCALE and view.size.y >= float(Tuning.VIEW_H) * Tuning.ART_SCALE:
+		for part: Control in parts:
+			assert_true(view.encloses(part.get_global_rect()), "%s inside the view" % part)
+		for i: int in Defs.MAX_PLAYERS - 1:
+			assert_true(parts[i].get_global_rect().end.x <= parts[i + 1].get_global_rect().position.x,
+					"seat cards %d and %d side by side" % [i + 1, i + 2])
+		assert_false(node.get_paintings_button().get_global_rect().intersects(node.get_key_test_button().get_global_rect()))
+	node.get_key_test_button().emit_signal(&"pressed")
+	assert_true(node.is_key_test_open(), "the Key test entry opens the test")
+	node.close_key_test()
+	assert_true(node.get_key_test_button().has_focus(), "closing it gives the focus back to the entry")
+	await _cleanup()
+
+
+## The rules screen fits the view: Mode and Preset span the panel (a long mode name keeps the big face), every row, chip
+## and "Choose the arena" lie inside; a locked variant's info line names the paintings it needs.
+func test_rules_screen_fits_the_view() -> void:
+	Save.reset()
+	var versus_match: VersusMatch = _two_humans()
+	versus_match.mode = Defs.VersusMode.LAST_CAVEMAN
+	Flow.args = {"owner": 0}
+	var node: VersusRulesScreen = await _open(&"versus_rules") as VersusRulesScreen
+	await get_tree().process_frame
+	var rows: Array[VersusRulesScreen.RuleRow] = node.get_rows()
+	assert_true(rows[0].size.x >= VersusRulesScreen.ROW_SIZE.x * 2.0, "the mode row spans both columns")
+	var mode_text: String = tr(str(VersusLobbyScreen.MODE_KEYS[Defs.VersusMode.LAST_CAVEMAN][0]))
+	var room: float = rows[0].size.x - 2.0 * float(UiOptionRow.PAD + UiOptionRow.ARROW_W) - 52.0
+	assert_true(UiKit.font(UiKit.Style.HUD).get_string_size(mode_text, HORIZONTAL_ALIGNMENT_LEFT, -1.0,
+			UiKit.SIZE_HUD).x <= room, "Last Caveman Standing fits the mode row in the big face")
+	_assert_fits_base_view(node)
+	var view: Rect2 = node.get_global_rect()
+	if view.size.x >= float(Tuning.VIEW_W) * Tuning.ART_SCALE and view.size.y >= float(Tuning.VIEW_H) * Tuning.ART_SCALE:
+		var parts: Array[Control] = []
+		parts.append_array(rows)
+		parts.append_array(node.get_chips())
+		parts.append(node.get_next_button())
+		for part: Control in parts:
+			assert_true(view.encloses(part.get_global_rect()), "%s inside the view" % part)
+	_press(&"ui_down")
+	assert_true(rows[1].has_focus(), "Down from Mode: Preset")
+	_press(&"ui_down")
+	_press(&"ui_down")
+	assert_true(rows[3].has_focus(), "then the pairs left before right: Rounds, Round time")
+	var locked: VersusRulesScreen.VariantChip = node.get_chips()[2]
+	assert_true(locked.is_locked())
+	locked.grab_focus()
+	assert_true(node.get_info_text().contains(tr("UI_VS_LOCKED").format({"count": Tuning.PAINTING_UNLOCK_VARIANTS})),
+			"a locked variant's info names the paintings it needs")
+	await _cleanup()
+	Save.reset()
+
+
+## The arena select, the scoreboard and the results of a four-player 2 v 2 match fit the 640 x 360 view.
+func test_match_screens_fit_the_view() -> void:
+	var versus_match: VersusMatch = VersusMatch.new()
+	versus_match.arena = ARENA
+	versus_match.rounds_to_win = 3
+	versus_match.seat_human(InputSlot.keyboard(Defs.InputSlotKind.KEYBOARD_LEFT))
+	versus_match.seat_human(InputSlot.keyboard(Defs.InputSlotKind.KEYBOARD_RIGHT))
+	versus_match.seat_bot(Defs.BotLevel.HUNTER)
+	versus_match.seat_bot(Defs.BotLevel.CHIEF)
+	for slot: int in 4:
+		versus_match.get_seat(slot).team = 1 if slot % 2 == 0 else 2
+	versus_match.ready_all()
+	versus_match.begin_match(3)
+	Game.versus_match = versus_match
+	Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.VERSUS, 4, 1)
+	for winners: Array in [[0, 2], [1, 3], [0, 2]]:
+		versus_match.begin_round(ARENA)
+		versus_match.record_round(PackedInt32Array(winners))
+	var awards: Dictionary = {0: [&"leaning_tower", &"glutton", &"chain_gang"], 1: [&"pickpocket", &"butterfingers",
+			&"comeback_caveman"], 2: [&"pacifist"], 3: [&"head_case", &"lava_lover"]}
+	for state: Array in [[&"versus_arena", {"owner": 0}],
+			[&"versus_scoreboard", {"round_index": 2, "winners": PackedInt32Array([0, 2])}],
+			[&"versus_results", {"winners": PackedInt32Array([0, 2]), "awards": awards}]]:
+		Flow.args = state[1]
+		var node: UiScreen = await _open(state[0])
+		if node is VersusResultsScreen:
+			(node as VersusResultsScreen).show_all_awards()
+		await get_tree().process_frame
+		_assert_fits_base_view(node)
+		node.queue_free()
+		await get_tree().process_frame
+	await _cleanup()
+
+
+## The results of four players: the companion stands inside the view and clear of every player's portrait and plate
+## (with a full wall in the top-right corner beside the headline), also after the layout settled.
+func test_results_companion_keeps_clear_of_the_players() -> void:
+	var versus_match: VersusMatch = VersusMatch.new()
+	versus_match.arena = ARENA
+	versus_match.rounds_to_win = 2
+	versus_match.seat_human(InputSlot.keyboard(Defs.InputSlotKind.KEYBOARD_LEFT))
+	versus_match.seat_human(InputSlot.keyboard(Defs.InputSlotKind.KEYBOARD_RIGHT))
+	versus_match.seat_bot(Defs.BotLevel.HUNTER)
+	versus_match.seat_bot(Defs.BotLevel.CHIEF)
+	versus_match.ready_all()
+	versus_match.begin_match(5)
+	Game.versus_match = versus_match
+	Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.VERSUS, 4, 1)
+	for winner: int in [2, 2]:
+		versus_match.begin_round(ARENA)
+		versus_match.record_round(PackedInt32Array([winner]))
+	Flow.args = {"winners": versus_match.leaders(), "awards": {2: [&"glutton"]}}
+	var node: VersusResultsScreen = await _open(&"versus_results") as VersusResultsScreen
+	node._process(0.01)
+	await get_tree().process_frame
+	node._process(0.01)
+	var feet: Vector2 = node.companion_place()
+	var body: Rect2 = Rect2(feet - Vector2(VersusResultsScreen.COMPANION_HALF_WIDTH, VersusResultsScreen.COMPANION_HEIGHT),
+			Vector2(VersusResultsScreen.COMPANION_HALF_WIDTH * 2.0, VersusResultsScreen.COMPANION_HEIGHT))
+	assert_true(Rect2(Vector2.ZERO, node.size).encloses(body), "the companion stands inside the view")
+	assert_eq(node.get_columns().size(), 4)
+	for column: VersusResultsScreen.PlayerColumn in node.get_columns():
+		var origin: Vector2 = column.global_position - node.global_position
+		var portrait: Rect2 = Rect2(origin + Vector2(column.size.x * 0.5 - 40.0, column.portrait_top()),
+				Vector2(80.0, column.plate_line() + 10.0 - column.portrait_top()))
+		assert_false(body.intersects(portrait), "clear of P%d's portrait and plate" % (column.slot + 1))
+	await _cleanup()
+
+
 # =================================================================================================================
 # Helpers
 # =================================================================================================================
@@ -601,6 +740,14 @@ func _match() -> VersusMatch:
 
 func _idle(_tick: int) -> int:
 	return 0
+
+
+## The screen's content (its safe-area container with the margins) needs no more than the game's base 640 x 360 view,
+## whatever size the test's viewport has.
+func _assert_fits_base_view(node: UiScreen) -> void:
+	var need: Vector2 = node.safe.get_combined_minimum_size()
+	var base: Vector2 = Vector2(Tuning.VIEW_W, Tuning.VIEW_H) * float(Tuning.ART_SCALE)
+	assert_true(need.x <= base.x and need.y <= base.y, "%s fits the 640 x 360 view (needs %s)" % [node.name, need])
 
 
 ## Instantiate a screen under the test node (not as the current scene) and let it build.

@@ -41,6 +41,22 @@ const RESTLESS_TICKS: int = 96
 ## Look this far ahead for telegraphed dangers (ticks) and keep this far away from them (px).
 const DANGER_LOOKAHEAD_TICKS: int = 24
 const DANGER_MARGIN_PX: int = 12
+## A safe point is picked this much farther out still (the walk stops within a few px of it).
+const SAFETY_SLACK_PX: int = 8
+## Escaping a chaser ([method escape_point]): a point counts as safe when the hero gets there this many ticks before
+## him; chaser costs are capped here (an unreachable point is this far away for him).
+const ESCAPE_MARGIN_TICKS: int = 12
+const ESCAPE_CAP_TICKS: int = 240
+## Attacking: stand this far from the rival's feet point (his body is in the forward front box from 0 to 49 px away),
+## on the hero's own side of him - a strike, not a body bump.
+const STRIKE_STAND_PX: int = 28
+## Once a rival is in reach, the forward strike waits a random 0..n ticks per Defs.BotLevel (the Rookie hesitates by
+## [method decide] instead), so that two bots never swing in lockstep into clang after clang.
+const STRIKE_JITTER_TICKS: Array[int] = [0, 3, 1]
+## Ramming guard: never run at a rival closer than this (px apart, same floor) at 3+ px/tick - two heroes running into
+## each other are knocked back (PHYSICS.md C.14 body bump), which gains nothing. The Hot Rock holder may.
+const RAM_GUARD_PX: int = 38
+const RAM_MIN_XVEL: int = 48
 
 ## The bot this brain decides for (held weakly: the bot owns the brain, so a strong reference back would be a
 ## reference cycle that never frees).
@@ -69,6 +85,11 @@ var _sequence: Array[Vector2i] = []
 # Projectile instance id -> true (deflect) / false (let it be): decided once each.
 var _deflect_choice: Dictionary = {}
 var _projectile_seen: Dictionary = {}
+# The forward strike's jitter: ticks still to wait (-1 = none drawn) and the last tick a rival was in reach.
+var _strike_wait: int = -1
+var _strike_tick: int = -2
+# The dangers of the last decision (safety_target).
+var _dangers: Array[Rect2i] = []
 
 
 ## Forget the cached spot stands (tests; a re-baked graph).
@@ -85,6 +106,58 @@ func reset() -> void:
 	_sequence.clear()
 	_deflect_choice.clear()
 	_projectile_seen.clear()
+	_strike_wait = -1
+	_strike_tick = -2
+	_dangers.clear()
+
+
+## True when the brain wants body contact with rivals (the Hot Rock holder passing the ember): no ramming guard.
+func wants_contact() -> bool:
+	return false
+
+
+## Where to stand to strike the rival whose feet were seen at `pos`: STRIKE_STAND_PX from him on the hero's side.
+func attack_stand(hero: PlayerBase, pos: Vector2i) -> Vector2i:
+	var side: int = -1 if hero.sim_pos.x < pos.x else 1
+	if hero.sim_pos.x == pos.x:
+		side = -hero.facing if hero.facing != 0 else -1
+	return Vector2i(pos.x + side * STRIKE_STAND_PX, pos.y)
+
+
+## `flags` without a walk at a rival close ahead while the hero already runs at him (the ramming guard; the rival's
+## place is extrapolated from what the bot saw over its reaction ticks, as a player anticipates).
+func guard_ramming(hero: PlayerBase, flags: int) -> int:
+	if wants_contact() or not hero.is_grounded() or (flags & (Defs.IN_LEFT | Defs.IN_RIGHT)) == 0:
+		return flags
+	var dir: int = 1 if (flags & Defs.IN_RIGHT) != 0 else -1
+	if hero.xvel * dir < RAM_MIN_XVEL:
+		return flags
+	for rival: int in Defs.MAX_PLAYERS:
+		if not bot.is_rival(rival) or not bot.seen_alive(rival):
+			continue
+		var pos: Vector2i = bot.predicted_pos(rival)
+		var dx: int = (pos.x - hero.sim_pos.x) * dir
+		if dx > 0 and dx < RAM_GUARD_PX and absi(pos.y - hero.sim_pos.y) < Tuning.HERO_BOX_STAND.y:
+			return flags & ~(Defs.IN_LEFT | Defs.IN_RIGHT)
+	return flags
+
+
+## The forward strike's jitter (Hunter 0-3, Chief 0-1 random ticks once a rival is in reach; the Rookie decides by
+## [method decide]): true on the tick to strike.
+func strike_now() -> bool:
+	if rookie():
+		return decide()
+	var tick: int = Sim.tick
+	if _strike_tick != tick - 1 and _strike_tick != tick:
+		_strike_wait = -1
+	_strike_tick = tick
+	if _strike_wait < 0:
+		_strike_wait = bot.rng.range_int(0, STRIKE_JITTER_TICKS[bot.bot_level])
+	if _strike_wait == 0:
+		_strike_wait = -1
+		return true
+	_strike_wait -= 1
+	return false
 
 
 ## True when the brain wants a decision this tick outside the regular period (no goal yet).
@@ -211,6 +284,14 @@ func chief() -> bool:
 	return bot.bot_level == Defs.BotLevel.CHIEF
 
 
+## True when the hero may start a strike or a throw now: a versus bot keeps its spawn shield (PHYSICS.md C.14: 48
+## ticks after every (re)spawn, ended by the hero's own first strike or throw), so nobody lands a hit on it within
+## VersusTuning.SPAWN_SHIELD_TICKS of a spawn (PLAN.md 8 V4.b); it walks to its goal meanwhile. A boss body has no
+## shield rule.
+func may_strike(hero: PlayerBase) -> bool:
+	return bot.body != null or hero.shield <= 0
+
+
 ## The Rookie hesitates: it takes a micro-rule only half of the time (its own SimRng).
 func decide() -> bool:
 	if rookie():
@@ -224,7 +305,8 @@ func decide() -> bool:
 
 ## The grounded micro-rules on the seen rivals; -1 when none applies.
 func combat(hero: PlayerBase, level: LevelBase) -> int:
-	if not hero.is_grounded() or hero.attack_gate or hero.swing_lock > 0 or hero.is_curled() or hero.squash > 0:
+	if not hero.is_grounded() or hero.attack_gate or hero.swing_lock > 0 or hero.is_curled() or hero.squash > 0 \
+			or not may_strike(hero):
 		return -1
 	var deflect: int = _deflect(hero, level)
 	if deflect >= 0:
@@ -260,11 +342,14 @@ func combat(hero: PlayerBase, level: LevelBase) -> int:
 				strikes += 1
 				return start_action(dir_flag(facing) | STRIKE_FLAGS[STRIKE_HIGH], strike_ticks(STRIKE_HIGH))
 		var worth: bool = worth_hitting(rival, seen)
-		# Forward strike: his body will be in the front box.
-		if worth and front_box(me, facing, STRIKE_FORWARD).intersects(body_box(ahead)):
-			if decide():
+		# Forward strike: his body will be in the front box (both moving on for the lead ticks).
+		var me_ahead: Vector2i = me + Vector2i(Tuning.floor16(hero.xvel * STRIKE_LEAD_TICKS), 0)
+		if worth and (front_box(me_ahead, facing, STRIKE_FORWARD).intersects(body_box(ahead))
+				or front_box(me, facing, STRIKE_FORWARD).intersects(body_box(ahead))):
+			if strike_now():
 				strikes += 1
 				return start_action(dir_flag(facing) | STRIKE_FLAGS[STRIKE_FORWARD], strike_ticks(STRIKE_FORWARD))
+			continue
 		if rookie():
 			continue
 		var same_floor: bool = absi(pos.y - me.y) <= 8 and (bits & HeroBot.SEEN_GROUNDED) != 0
@@ -360,8 +445,10 @@ func _deflect(hero: PlayerBase, level: LevelBase) -> int:
 
 ## A feet point out of every telegraphed danger near the hero (the cheapest node point whose body box stays
 ## DANGER_MARGIN_PX away from every danger box); BotSenses.NO_POS when the hero is safe (or nowhere is).
+## The dangers it read are kept for [method is_dangerous] until the next decision.
 func safety_target(hero: PlayerBase, level: LevelBase) -> Vector2i:
 	var dangers: Array[Rect2i] = BotSenses.danger_rects(level, DANGER_LOOKAHEAD_TICKS)
+	_dangers = dangers
 	if dangers.is_empty() or not _in_danger(hero.sim_pos, dangers):
 		return BotSenses.NO_POS
 	var graph: NavGraph = bot.nav.graph
@@ -370,7 +457,7 @@ func safety_target(hero: PlayerBase, level: LevelBase) -> Vector2i:
 	if graph == null:
 		for dx: int in [-48, 48, -96, 96]:
 			var p: Vector2i = Vector2i(hero.sim_pos.x + dx, hero.sim_pos.y)
-			if not _in_danger(p, dangers) and absi(dx) < best_cost:
+			if not _in_danger(p, dangers, DANGER_MARGIN_PX + SAFETY_SLACK_PX) and absi(dx) < best_cost:
 				best_cost = absi(dx)
 				best = p
 		return best
@@ -382,7 +469,7 @@ func safety_target(hero: PlayerBase, level: LevelBase) -> Vector2i:
 		var x: int = x0
 		while x <= x1:
 			var p: Vector2i = Vector2i(x, y)
-			if not _in_danger(p, dangers):
+			if not _in_danger(p, dangers, DANGER_MARGIN_PX + SAFETY_SLACK_PX):
 				var cost: int = graph.reach_cost(reach, p)
 				if cost < best_cost:
 					best_cost = cost
@@ -391,8 +478,14 @@ func safety_target(hero: PlayerBase, level: LevelBase) -> Vector2i:
 	return best
 
 
-static func _in_danger(feet: Vector2i, dangers: Array[Rect2i]) -> bool:
-	var box: Rect2i = body_box(feet).grow(DANGER_MARGIN_PX)
+## True when a hero standing at `feet` would be inside a danger the last [method safety_target] read (goals there are
+## not worth it).
+func is_dangerous(feet: Vector2i) -> bool:
+	return not _dangers.is_empty() and _in_danger(feet, _dangers)
+
+
+static func _in_danger(feet: Vector2i, dangers: Array[Rect2i], margin: int = DANGER_MARGIN_PX) -> bool:
+	var box: Rect2i = body_box(feet).grow(margin)
 	for rect: Rect2i in dangers:
 		if rect.intersects(box):
 			return true
@@ -538,6 +631,54 @@ func wander_target(hero: PlayerBase) -> Vector2i:
 	if _wander.x < 0 or _wander_age > WANDER_TICKS or (bot.nav.arrived(hero) and bot.nav.target == _wander):
 		_pick_wander(hero)
 	return _wander
+
+
+## Where to run from the seen rivals in `chasers` (Hot Rock: the holder; LCS: a healthier rival): the node point
+## (sampled every 16 px) the hero reaches within `max_cost` ticks that the nearest chaser - planning on the graph with
+## the weight class `chaser_class` from where he was seen - reaches latest, among those the hero reaches first
+## (ESCAPE_MARGIN_TICKS ahead of every chaser); when no point is safe, the one where the hero is least late. A chaser
+## standing between the hero and a point makes it cheap for him, so the bot never runs past him. `avoid_here`: the
+## points within 32 px of the hero score less (a restless bot moves on). NO_POS when there is no point.
+func escape_point(hero: PlayerBase, chasers: Array[int], max_cost: int, chaser_class: int = NavGraph.WEIGHT_LIGHT,
+		avoid_here: bool = false) -> Vector2i:
+	var graph: NavGraph = bot.nav.graph
+	var away: Array[Vector2i] = []
+	for chaser: int in chasers:
+		away.append(bot.seen_pos(chaser))
+	if graph == null or graph.nodes.is_empty():
+		return far_point(hero, away, max_cost)
+	var mine: Dictionary = bot.nav.reach(hero)
+	var theirs: Array[Dictionary] = []
+	for pos: Vector2i in away:
+		var from: int = graph.node_for(pos)
+		theirs.append(graph.reach_from(from, pos.x, {}, graph.usable_class(chaser_class)))
+	var best: Vector2i = BotSenses.NO_POS
+	var best_score: int = -(1 << 30)
+	for node: NavGraph.NavNode in graph.nodes:
+		var x: int = graph.node_x0(node)
+		var x1: int = graph.node_x1(node)
+		var y: int = graph.node_y(node)
+		while x <= x1:
+			var p: Vector2i = Vector2i(x, y)
+			x += 16
+			var my_cost: int = graph.reach_cost(mine, p)
+			if my_cost > max_cost or is_dangerous(p):
+				continue
+			var his: int = ESCAPE_CAP_TICKS
+			for reach: Dictionary in theirs:
+				his = mini(his, graph.reach_cost(reach, p))
+			var margin: int = his - my_cost
+			var score: int = 0
+			if margin >= ESCAPE_MARGIN_TICKS:
+				score = (1 << 20) + 4 * mini(his, ESCAPE_CAP_TICKS) - my_cost
+			else:
+				score = 8 * margin - my_cost
+			if avoid_here and absi(p.x - hero.sim_pos.x) + absi(p.y - hero.sim_pos.y) < 32:
+				score -= 1 << 21
+			if score > best_score:
+				best_score = score
+				best = p
+	return best
 
 
 ## The point of `graph`'s nodes (sampled every 16 px) farthest from `away` among those the hero reaches within

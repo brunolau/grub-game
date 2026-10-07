@@ -8,9 +8,9 @@ extends UiScreen
 ## under each painting his portrait stands behind his plate of round wins as golden drumsticks ([PlayerColumn]). Then
 ## the tally companion, at the wall's right end, **hands out the awards**: one every AWARD_SECONDS, a medal (art-A's
 ## disc on a ribbon in the player's colour) flies from him to its player's column and the award's name and reason
-## appear under the plate (a tap shows the rest at once). **Rematch** is the default button
-## (Flow.rematch); Lobby (Flow.leave_versus) and Quit to title (Flow.leave_versus(true)); "back" = the lobby. Every
-## player drives the buttons from his own key cluster. Music: the match-win jingle, then the results loop; an applause
+## appear under the plate (a tap shows the rest at once). **Rematch** is the default button (Flow.rematch); Lobby
+## (Flow.leave_versus) and Title (Flow.leave_versus(true): the short word keeps the button row inside 640 px); "back" =
+## the lobby. Every player drives the buttons from his own key cluster. Music: the match-win jingle, then the results loop; an applause
 ## bed at the start.
 
 ## Seconds before a confirm counts (a Strike still held from the last round must not start the rematch).
@@ -21,6 +21,9 @@ const TEX_WALL: String = "res://assets/ui/cave_wall.png"
 ## Seconds between two awards handed out, and before the first.
 const AWARD_SECONDS: float = 0.45
 const AWARD_DELAY: float = 0.9
+## The companion's half width and height on the screen (npc/companion.png, feet at the actor's position).
+const COMPANION_HALF_WIDTH: float = 22.0
+const COMPANION_HEIGHT: float = 52.0
 ## The awards' texts: UI_AWARD_<ID> (name) and UI_AWARD_<ID>_INFO (what it was for), by PlayerRun.VERSUS_AWARDS id.
 const AWARD_KEYS: Dictionary = {
 	&"leaning_tower": ["UI_AWARD_LEANING_TOWER", "UI_AWARD_LEANING_TOWER_INFO"],
@@ -278,12 +281,12 @@ func _build_screen() -> void:
 	var row: HBoxContainer = HBoxContainer.new()
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override(&"separation", 12)
-	column.add_child(UiKit.panel_box(row, 6))
+	row.add_theme_constant_override(&"separation", 0)
+	column.add_child(UiKit.panel_box(row, 4))
 	(column.get_child(column.get_child_count() - 1) as Control).size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_add_button(row, "UI_VS_REMATCH", rematch)
 	_add_button(row, "UI_VS_LOBBY", to_lobby)
-	_add_button(row, "UI_PAUSE_QUIT", to_title)
+	_add_button(row, "UI_HINT_TITLE", to_title)
 	for i: int in _buttons.size():
 		_buttons[i].focus_neighbor_left = _buttons[i].get_path_to(_buttons[posmod(i - 1, _buttons.size())])
 		_buttons[i].focus_neighbor_right = _buttons[i].get_path_to(_buttons[(i + 1) % _buttons.size()])
@@ -303,6 +306,7 @@ func _screen_ready() -> void:
 
 func _process(delta: float) -> void:
 	_age += delta
+	_place_companion()
 	if awards_shown >= _award_rows.size():
 		return
 	_award_timer -= delta
@@ -440,17 +444,27 @@ func _add_button(row: HBoxContainer, key: String, callback: Callable) -> void:
 	_buttons.append(button)
 
 
-## The companion stands right of the players, on the line of their plates.
+## The companion stands right of the players on the line of their plates when there is room there (two or three
+## players, wide views); with a full wall he stands in the top-right corner beside the headline. Placed every frame,
+## so he follows the layout (the columns are only placed after the first frames) and a resized view.
 func _place_companion() -> void:
 	if _companion == null or _players == null or _columns.is_empty():
 		return
+	_companion.position = companion_place()
+
+
+## Where the companion's feet stand (screen px; see _place_companion).
+func companion_place() -> Vector2:
 	var last: Rect2 = _columns[-1].get_global_rect()
-	var x: float = minf(last.end.x + 40.0, size.x - 34.0)
-	var y: float = last.position.y + _columns[-1].plate_line() + 10.0
-	_companion.position = Vector2(roundf(x - global_position.x), roundf(y - global_position.y))
+	var origin: Vector2 = global_position
+	var beside: float = last.end.x - origin.x + COMPANION_HALF_WIDTH + 6.0
+	if beside + COMPANION_HALF_WIDTH <= size.x - 4.0:
+		return Vector2(roundf(beside), roundf(last.position.y - origin.y + _columns[-1].plate_line() + 10.0))
+	var head: Rect2 = _headline.get_global_rect()
+	return Vector2(roundf(size.x - COMPANION_HALF_WIDTH - 6.0), roundf(head.end.y - origin.y + COMPANION_HEIGHT - 8.0))
 
 
-## One award: its medal, its name in gold and what it was for.
+## One award: its medal, its name in gold and what it was for (when that fits the column width).
 func _award_label(award: StringName, slot: int) -> Control:
 	var keys: Array = AWARD_KEYS.get(award, [String(award), ""])
 	var row: HBoxContainer = HBoxContainer.new()
@@ -469,7 +483,11 @@ func _award_label(award: StringName, slot: int) -> Control:
 	title.add_theme_color_override(&"font_color", UiKit.COL_FOCUS)
 	title.add_theme_font_override(&"font", plain_small_font())
 	box.add_child(title)
-	if str(keys[1]) != "":
+	# What the award was for, where it fits under the player's column (four players leave no room for the long ones).
+	var room: float = COLUMN_SIZE.x - 16.0 - 3.0
+	var info_text: String = tr(str(keys[1])) if str(keys[1]) != "" else ""
+	if info_text != "" and plain_small_font().get_string_size(info_text, HORIZONTAL_ALIGNMENT_LEFT, -1.0,
+			UiKit.SIZE_SMALL).x <= room:
 		var info: Label = UiKit.label(str(keys[1]), UiKit.Style.SMALL)
 		info.add_theme_color_override(&"font_color", UiKit.COL_CREAM)
 		info.add_theme_font_override(&"font", plain_small_font())

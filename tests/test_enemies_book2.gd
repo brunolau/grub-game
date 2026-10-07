@@ -210,6 +210,35 @@ func test_a_shellback_is_a_guard_alone_and_turns_every_tick_in_a_coop_party() ->
 	assert_eq(plain.coop_traits().kind, Defs.CoopTrait.BOND, "a level's coop= replaces the preset's trait")
 
 
+func test_the_book_one_shellback_is_a_walker_with_the_shell_trait() -> void:
+	var alone: Shellback = _enemy(&"enemies/shellback", Vector2i(200, 160), {"skin": "turtle_b", "hp": 100}) as Shellback
+	assert_true(alone.walker_form, "skin=turtle_b: the Book I variant (DESIGN.md D.7)")
+	assert_eq(alone.score_index, EnemyTuning.SCORE_WALKER, "a walker's score")
+	assert_eq(alone.speed, EnemyTuning.PATROL_SPEED, "a walker's speed")
+	assert_eq(alone.coop_traits().kind, Defs.CoopTrait.SHELL)
+	_hero.teleport(Vector2i(150, 160))
+	Sim.step(2)
+	_hero.teleport(Vector2i(alone.sim_pos.x + alone.facing * 30, 160))
+	alone.take_hit(25, _hero)
+	assert_eq(alone.hp, 75, "a party of one: a plain walker, no shield in front")
+	var p2: PlayerBase = _coop_party(Vector2i(300, 160))
+	var shellback: Shellback = _enemy(&"enemies/shellback", Vector2i(200, 160),
+			{"skin": "turtle_b", "speed": 0, "left": 0, "right": 0, "hp": 100}) as Shellback
+	_hero.teleport(Vector2i(140, 160))
+	Sim.step(2)
+	assert_eq(shellback.facing, -1, "the trait turns its front to the nearer hero")
+	_hero.teleport(Vector2i(60, 160))
+	Sim.step(1)
+	assert_eq(shellback.facing, 1, "every tick")
+	shellback.take_hit(25, p2)
+	assert_eq(shellback.hp, 100, "P2 is in front: it glances")
+	shellback.take_hit(25, _hero)
+	assert_eq(shellback.hp, 75, "P1 hits its back")
+	var bone: Shellback = _enemy(&"enemies/shellback", Vector2i(400, 160)) as Shellback
+	assert_false(bone.walker_form, "the bone-armour sheet is the Guard form")
+	assert_eq(bone.score_index, EnemyTuning.SCORE_GUARD)
+
+
 func test_the_guard_swings_after_its_body_hurt_a_hero() -> void:
 	var guard: Guard = _enemy(&"enemies/guard", Vector2i(200, 160), {"speed": 0}) as Guard
 	_hero.teleport(Vector2i(150, 160))
@@ -353,6 +382,130 @@ func test_in_a_party_the_mimic_faces_the_nearer_hero_and_shows_its_back_to_the_f
 	assert_eq(mimic.hp, 75, "the far hero hits its back")
 
 
+func test_a_mimic_daze_plays_the_daze_cue_once() -> void:
+	assert_true(AudioTable.SFX.has(Sfx.DAZE), "the cue has its row")
+	var mimic: Mimic = _enemy(&"enemies/mimic", Vector2i(200, 160), {"hp": 100}) as Mimic
+	_hero.teleport(Vector2i(185, 160))
+	Sim.step(2)
+	mimic.on_bounced(_hero)
+	assert_eq(mimic.get_dazed(), EnemyTuning.MIMIC_DAZE_TICKS)
+	Sim.step(3)
+	mimic.on_bounced(_hero)
+	assert_eq(mimic.get_dazed(), EnemyTuning.MIMIC_DAZE_TICKS, "a second bounce renews the daze")
+
+
+# =================================================================================================================
+# Tar floor (PHYSICS.md C.5: "ground enemies on a ':' cell move at most 32 v16")
+# =================================================================================================================
+
+func test_ground_enemies_wade_through_tar_at_2_px_per_tick() -> void:
+	var rows: PackedStringArray = PackedStringArray()
+	for row: int in 16:
+		var line: String = ""
+		for col: int in 60:
+			if row < 10:
+				line += TileGrid.CH_AIR
+			elif row == 10 and col >= 20 and col < 30:
+				line += TileGrid.CH_TAR
+			else:
+				line += TileGrid.CH_SOLID_A
+		rows.append(line)
+	_rows_level(rows)
+	_level.view = Rect2i(0, 0, 2 * Tuning.VIEW_W, Tuning.VIEW_H)
+	_hero.teleport(Vector2i(900, 160))
+	var walker: EnemyBase = _enemy(&"enemies/walker", Vector2i(200, 160),
+			{"speed": 64, "left": 0, "right": 40, "facing": "r"})
+	var bull: EnemyBase = _enemy(&"enemies/bull_rex", Vector2i(100, 160))
+	var on_tar: Array[int] = []
+	var off_tar: Array[int] = []
+	var bull_on_tar: Array[int] = []
+	for tick: int in 160:
+		var x0: int = walker.sim_pos.x
+		var b0: int = bull.sim_pos.x
+		var tar: bool = walker._grounded and _level.grid.is_tar(Tuning.to_cell(x0), Tuning.to_cell(walker.sim_pos.y))
+		var bull_tar: bool = bull._grounded and _level.grid.is_tar(Tuning.to_cell(b0), Tuning.to_cell(bull.sim_pos.y))
+		Sim.step(1)
+		if walker.awake and walker._grounded:
+			(on_tar if tar else off_tar).append(absi(walker.sim_pos.x - x0))
+		if bull.awake and bull_tar and bull._grounded:
+			bull_on_tar.append(absi(bull.sim_pos.x - b0))
+	assert_true(on_tar.size() > 10, "the walker crossed the tar (%d ticks)" % on_tar.size())
+	assert_eq(on_tar.max(), Tuning.floor16(Tuning.TAR_WALK_CAP), "at most 2 px per tick on tar")
+	assert_eq(walker.xvel, 64, "its own speed is kept")
+	assert_eq(off_tar.max(), Tuning.floor16(64), "4 px per tick off the tar")
+	assert_true(walker.sim_pos.x > 30 * 16, "it walked out of the tar on the far side (%d)" % walker.sim_pos.x)
+	assert_true(bull_on_tar.size() > 0, "the Bull Rex ran into the tar")
+	assert_eq(bull_on_tar.max(), Tuning.floor16(Tuning.TAR_WALK_CAP), "the charger wades too")
+
+
+# =================================================================================================================
+# Co-op (GAMEPLAY.md 13.9.4: the Roller rolls at the nearest, `bond` pairs on two slopes; the Guard keeps its solo
+# turn delay of 33 ticks - only the `shell` trait turns it every tick)
+# =================================================================================================================
+
+func test_in_a_party_the_roller_rolls_at_the_nearer_hero() -> void:
+	var p2: PlayerBase = _coop_party(Vector2i(480, 160))
+	_level.view = Rect2i(0, 0, 2 * Tuning.VIEW_W, Tuning.VIEW_H)
+	_hero.teleport(Vector2i(40, 160))
+	var roller: Roller = _enemy(&"enemies/roller", Vector2i(400, 160), {"left": 0, "right": 0}) as Roller
+	assert_null(roller.coop_traits(), "no trait of its own")
+	Sim.step(2)
+	assert_eq(roller.get_state(), Roller.State.CURL, "P2 within 6 tiles: it curls")
+	Sim.step(EnemyTuning.ROLLER_CURL_TICKS)
+	assert_eq(roller.get_state(), Roller.State.ROLL)
+	assert_eq(roller.xvel, EnemyTuning.ROLLER_SPEED, "it rolls at the nearer hero, P2 on its right")
+	_hero.teleport(Vector2i(130, 160))
+	p2.teleport(Vector2i(300, 160))
+	var other: Roller = _enemy(&"enemies/roller", Vector2i(200, 160), {"left": 0, "right": 0}) as Roller
+	Sim.step(2 + EnemyTuning.ROLLER_CURL_TICKS)
+	assert_eq(other.get_state(), Roller.State.ROLL)
+	assert_eq(other.xvel, -EnemyTuning.ROLLER_SPEED, "P1 nearer on its left: it rolls left")
+
+
+func test_a_bonded_roller_regrows_walking_at_its_anchor() -> void:
+	var p2: PlayerBase = _coop_party(Vector2i(700, 160))
+	_level.view = Rect2i(0, 0, 2 * Tuning.VIEW_W, Tuning.VIEW_H)
+	var a: Roller = _enemy(&"enemies/roller", Vector2i(200, 160), {"coop": "bond", "bond": "slopes"}) as Roller
+	var b: Roller = _enemy(&"enemies/roller", Vector2i(600, 160), {"coop": "bond", "bond": "slopes"}) as Roller
+	_hero.teleport(Vector2i(260, 160))
+	Sim.step(1 + EnemyTuning.ROLLER_CURL_TICKS + 3)
+	assert_eq(a.get_state(), Roller.State.ROLL, "both roll at their heroes")
+	assert_eq(b.get_state(), Roller.State.ROLL)
+	a.kill(&"weapon", _hero)
+	_hero.teleport(Vector2i(40, 160))
+	Sim.step(PartyTuning.WINDOW_TICKS_BEGINNER)
+	assert_false(a.dead, "its mate lived through the window: it regrows")
+	assert_eq(a.sim_pos, Vector2i(200, 160), "at its anchor")
+	assert_eq(a.get_state(), Roller.State.WALK, "uncurled, walking again")
+	assert_eq(Vector2i(a.box_w, a.box_h), Vector2i(54, 24), "with its walking box")
+	a.kill(&"weapon", _hero)
+	Sim.step(3)
+	b.kill(&"weapon", p2)
+	Sim.step(PartyTuning.WINDOW_TICKS_BEGINNER + 2)
+	assert_true(a.dead and b.dead, "both down within the window: they stay dead")
+
+
+func test_in_a_party_a_plain_guard_keeps_its_33_tick_clock() -> void:
+	var p2: PlayerBase = _coop_party(Vector2i(320, 160))
+	var guard: Guard = _enemy(&"enemies/guard", Vector2i(200, 160), {"speed": 0, "hp": 100}) as Guard
+	assert_null(guard.coop_traits())
+	_hero.teleport(Vector2i(140, 160))
+	Sim.step(1)
+	assert_eq(guard.get_shield_dir(), -1, "it wakes facing the nearer hero, P1")
+	_hero.teleport(Vector2i(20, 160))
+	var turned: int = -1
+	for tick: int in 2 * EnemyTuning.GUARD_TURN_TICKS:
+		Sim.step(1)
+		if guard.get_shield_dir() == 1:
+			turned = tick + 1
+			break
+	assert_eq(turned, EnemyTuning.GUARD_TURN_TICKS, "P2 is nearer now, but it turns only on its own clock")
+	guard.take_hit(25, p2)
+	assert_eq(guard.hp, 100, "P2 is in front now")
+	guard.take_hit(25, _hero)
+	assert_eq(guard.hp, 75, "P1 behind it hits")
+
+
 # =================================================================================================================
 # The rattler
 # =================================================================================================================
@@ -420,6 +573,17 @@ func _load_canyon() -> Dictionary:
 			var params: Dictionary = (legend[key]["params"] as Dictionary).duplicate()
 			records[key] = _enemy(legend[key]["id"], LevelText.cell_to_feet(col, row, params), params)
 	return records
+
+
+## A co-op game on a fresh flat level (60 x 16, floor at row 10) with P2 at `p2_pos`; P1 is `_hero`.
+func _coop_party(p2_pos: Vector2i) -> PlayerBase:
+	Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.COOP, 2)
+	Game.begin_level(&"test")
+	_flat_level(60, 16, 10)
+	var p2: PlayerBase = PlayerBase.new()
+	place(_level, p2, p2_pos, {"slot": 1})
+	p2.respawn_at(p2_pos)
+	return p2
 
 
 func _shot(pos: Vector2i, p_xvel: int) -> ProjectileBase:

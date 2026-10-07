@@ -14,6 +14,7 @@ var _p2: PlayerBase = null
 
 func after_each() -> void:
 	GameInput.clear_scripted()
+	Game.helper_mode = false
 	Game.new_game(Defs.Difficulty.BEGINNER)
 	Game.begin_level(&"")
 
@@ -164,6 +165,24 @@ func test_coop_beginner_has_no_grab() -> void:
 		Game.runs[0].hearts = Tuning.ENERGY_START
 		assert_ne(brute.get_state(), Brute.State.GRAB_BEAT, "no grabs on Beginner (GAMEPLAY 13.9.10)")
 	assert_null(brute.get_held())
+
+
+## Helper mode (PHYSICS.md C.12, player-A's PlayerBase.is_helper): the Grab hurts outside hurt(), so a Helper-mode P2
+## is never grabbed - the Brute that targets him beats no chest and seizes nobody.
+func test_coop_a_helper_is_never_grabbed() -> void:
+	var brute: Brute = _coop_fight(Defs.Difficulty.EXPERT, Vector2i(120, 160), Vector2i(380, 160))
+	Game.helper_mode = true
+	assert_true(_p2.is_helper())
+	brute.hp = 39
+	brute.last_hitter = _p2
+	brute._set_state(Brute.State.WATCH)
+	for tick: int in 150:
+		_p2.teleport(Vector2i(brute.sim_pos.x + brute.facing * 20, 160))
+		_p2.hit_timer = 0
+		Sim.step(1)
+		assert_ne(brute.get_state(), Brute.State.GRAB_BEAT, "no grab for a helper")
+		assert_null(brute.get_held())
+	Game.helper_mode = false
 
 
 func test_coop_a_team_wipe_resets_the_form_and_lets_go() -> void:

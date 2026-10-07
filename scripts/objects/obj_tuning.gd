@@ -200,13 +200,3 @@ static func anim_frame(age: int, fps: int) -> int:
 ## Ticks a one-shot animation of `frames` frames at `fps` lasts (rounded up).
 static func anim_ticks(frames: int, fps: int) -> int:
 	return (frames * Tuning.ANIM_TICKS_PER_SECOND + fps - 1) / fps
-
-
-## 2.0 skins whose picture art-A has not delivered yet: the texture at `path` when the file exists, else `stand_in`
-## (a skin is a picture only, so a stand-in never changes a rule).
-static func picture(path: String, stand_in: Texture2D) -> Texture2D:
-	if ResourceLoader.exists(path):
-		var loaded: Texture2D = load(path) as Texture2D
-		if loaded != null:
-			return loaded
-	return stand_in

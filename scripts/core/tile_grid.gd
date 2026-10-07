@@ -271,6 +271,13 @@ func is_tar(col: int, row: int) -> bool:
 	return material_at(col, row) == MATERIAL_TAR
 
 
+## 2.0 (P2.12, player-B's A53 pass): true when any cell of the grid is a tar floor ':' (PHYSICS.md C.5) - one native
+## search instead of a scan through material_at (HeroClimb asks once per level load whether the stage has tar).
+## A set_char that changes a cell is seen at once.
+func has_tar() -> bool:
+	return _material.has(MATERIAL_TAR)
+
+
 ## True when a FLOOR value is a walkable floor for something that ignores hatches (enemies, dropped items,
 ## drop platforms: "FLOOR not 0 and not 6", PHYSICS.md 11.4).
 static func is_ground(floor_value: int) -> bool:

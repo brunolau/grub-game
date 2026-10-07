@@ -140,11 +140,44 @@ def narrow_island(im, width):
     return Image.fromarray(np.concatenate([a[:, :x0], a[:, x1:]], axis=1), "RGBA")
 
 
+def extend_down(im, n):
+    """every column that reaches the piece's bottom row continues n px further in that row's colour, so a piece cut
+    out of a layer above its base (a straight bottom edge) stands on the island drawn over it instead of floating"""
+    a = np.array(im)
+    h, w = a.shape[:2]
+    out = np.zeros((h + n, w, 4), np.uint8)
+    out[:h] = a
+    reach = a[h - 1, :, 3] > 0
+    out[h:, reach] = a[h - 1, reach]
+    return Image.fromarray(out, "RGBA")
+
+
+def slope_left(im, k, top, bottom):
+    """a piece cut out of a wider rock group gets a sloping left flank instead of the cut's vertical edge: in the k
+    leftmost columns the rows top..bottom - 1 are cleared above a line from (k, top) down to (0, bottom); the foam
+    and water rows under `bottom` stay"""
+    a = np.array(im)
+    for c in range(k):
+        lim = top + (bottom - top) * (k - c) / float(k)
+        for r in range(top, bottom):
+            if r < lim:
+                a[r, c] = 0
+    return Image.fromarray(a, "RGBA")
+
+
 def mesa_piece():
     """art-B's small canyon mesa (backgrounds/canyon/layer2_mesas.png x 400-522, rows 184-234: the mesa alone, above
-    the layer's rock band) in the island's reds"""
+    the layer's rock band) in the island's reds, its foot carried 30 px down (extend_down) so that the island drawn
+    over it hides the cut: the mesa rises out of the island"""
     m = asset("backgrounds/canyon/layer2_mesas.png").crop((400, 184, 522, 234))
-    return snap_map(m, ["#6e3428", "#94402f", "#b4513f", "#c96a4e", "#e8a386"])
+    return extend_down(snap_map(m, ["#6e3428", "#94402f", "#b4513f", "#c96a4e", "#e8a386"]), MESA_FOOT)
+
+
+MESA_FOOT = 30
+MESA_ISLE_AT, MESA_ON_ISLE = (6, 134), (74, -22)     # the mesa island on the page; the mesa relative to it
+# the coral sea stacks behind 7's isle: the mirrored rock group cut at column 90 (the ridge between its two rocks),
+# its cut flank sloped down to the foam over 16 columns (rock rows 20-44, foam from row 45)
+COAST_CUT, COAST_SLOPE, COAST_ROCK_ROWS = 90, 16, (20, 45)
 
 
 def spire_piece():
@@ -293,10 +326,10 @@ def build_map(write=True):
     # home, far away on the left horizon: the small grey rock of island-1 (the way back)
     m.alpha_composite(bg_el("island-1.png").crop((0, 63, 33, 73)), (8, 146))
     # --- 5 Sunbaked Canyon: the red mesa
-    x, y = 6, 134
+    x, y = MESA_ISLE_AT
     im = island("mesa")
     mesa = mesa_piece()
-    m.alpha_composite(mesa, (x + 74, y - 22))
+    m.alpha_composite(mesa, (x + MESA_ON_ISLE[0], y + MESA_ON_ISLE[1]))
     m.alpha_composite(im, (x, y))
     for cx, cy in ((x + 116, y + 60), (x + 236, y + 70), (x + 42, y + 84)):
         c = tiny_cactus()
@@ -316,7 +349,8 @@ def build_map(write=True):
     # --- 7 Coral Coast: sand isle with coral sea stacks behind it
     x, y = 562, 136
     m.alpha_composite(rocks("coast"), (x + 70, y + 46))
-    m.alpha_composite(rocks("coast", True).crop((90, 0, 214, 52)), (x - 26, y + 34))
+    m.alpha_composite(slope_left(rocks("coast", True).crop((COAST_CUT, 0, 214, 52)), COAST_SLOPE, *COAST_ROCK_ROWS),
+                      (x - 26, y + 34))
     im = narrow_island(island("coast"), 214)
     m.alpha_composite(im, (x, y + 8))
     MARKERS[(7, 1)] = (x + 38, y + 98)
@@ -347,12 +381,14 @@ def build_map(write=True):
     meta = {"markers": {"%d-%d" % k: list(v) for k, v in sorted(MARKERS.items())}}
     save(m, "ui/world_map_far_shore.png", kind="ui", frame=[W, H], grid=[1, 1], section="far_shore", **meta,
          source="shipped ui/world_map_background.png's own pieces (" + SRC_AP + "sky-1.png, sea-1.png, island-1.png, "
-                "cloud-1.png); art-B's backgrounds/canyon/layer2_mesas.png and layer1_far_spires.png, tiles/swamp/"
-                "props/dead_tree.png, mangrove_trunk.png, canopy_murky.png and canopy_moss.png",
+                "cloud-1.png); art-B's backgrounds/canyon/layer2_mesas.png, backgrounds/canyon/layer1_far_spires.png, "
+                "tiles/swamp/props/dead_tree.png, tiles/swamp/props/mangrove_trunk.png, "
+                "tiles/swamp/props/canopy_murky.png and tiles/swamp/props/canopy_moss.png",
          edits="the 1.0 sky and sea rebuilt exactly as the 1.0 map; four copies of island-1's big island (made "
                "narrower by a slice out of the middle at the best-matching seam, some mirrored) and its grey rocks, "
                "recoloured by exact swaps (mesa reds, fen bark and tar, coral and pale sand, jungle with sandstone, "
-               "storm slate); on them a canyon mesa and the far spire (palette-snapping gradient maps), the swamp "
+               "storm slate; the coral group's cut flank sloped down to its foam); on them a canyon mesa (its foot "
+               "carried down behind the island) and the far spire (palette-snapping gradient maps), the swamp "
                "dead tree on the mangrove trunk under murky canopies (the giant mangrove), tar pools in the tar "
                "liquid's colours; drawn by the pipeline in background-element style (flat tones, no outline): three "
                "tiny cacti, the temple gate with two jade idols, the lightning bolts, and the storm cloud's silhouette "

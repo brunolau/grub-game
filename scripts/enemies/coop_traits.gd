@@ -596,7 +596,8 @@ func _try_seize() -> void:
 	if not enemy.is_targetable():
 		return
 	for hero: PlayerBase in Game.level.contact_order():
-		if not hero.is_party_targetable() or hero.is_immune() or hero.is_feasting():
+		# Helper mode (PHYSICS.md C.12): enemy contacts never harm the helper - a seize is that contact.
+		if not hero.is_party_targetable() or hero.is_immune() or hero.is_feasting() or hero.is_helper():
 			continue
 		if not Overlap.body(hero, enemy, hero):
 			continue
@@ -661,8 +662,8 @@ func _leech_pre() -> bool:
 		if _relatch_wait > 0:
 			_relatch_wait -= 1
 		return false
-	if not _holdable(host):
-		_drop_host()
+	if not _holdable(host) or host.is_helper():
+		_drop_host()  # gone down, or Helper mode switched on for him meanwhile
 		return true
 	host_ticks += 1
 	if host_ticks % PartyTuning.LEECH_DRAIN_TICKS == 0 and host.run.lose_bone():
@@ -683,7 +684,8 @@ func _try_latch() -> void:
 	if not enemy.is_targetable():
 		return
 	for hero: PlayerBase in Game.level.contact_order():
-		if not hero.is_party_targetable() or hero.is_immune() or hero.is_feasting():
+		# Helper mode (PHYSICS.md C.12): no leech on the helper's back (its drain costs bones and can kill).
+		if not hero.is_party_targetable() or hero.is_immune() or hero.is_feasting() or hero.is_helper():
 			continue
 		if not Overlap.body(hero, enemy, hero) or (Overlap.stomp and hero.yvel >= 0):
 			continue

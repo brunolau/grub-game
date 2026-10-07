@@ -32,15 +32,21 @@ extends BossBase
 ##
 ## **How they move.** Two executors carry out the same orders (WAIT, GOTO, RAID, STACK_BOTTOM, STACK_TOP, CURL, BAT,
 ## CARRY, HATCH - the order set of core-B's ChieftainBrain):
-##  - the **state machine** (the PLAN cut-list fallback, default while [member hero_bot_enabled] is false): Brute-style
-##    moves on the enemy physics (walk 4 px per tick, hops, leaps), the hero's strike scripts and club boxes;
-##  - **hero physics driven by HeroBot** ([member hero_bot_enabled], PLAN.md P2.3 / P2.5): each chieftain owns a body -
-##    an instance of `scenes/player/player.tscn` that is NOT in the level (not one of level.heroes), slot 2 (Gorm) / 3
-##    (Gulla) - fed every tick by `HeroBot.for_boss` (core-B) through its GameInput slot, with its own seeded SimRng;
-##    the shell steps the body's PLAYER update itself in its ENEMIES phase and mirrors its position, boxes and pose; the
-##    party moves between the two bodies (the curl, the stack, the bat) are applied by the shell (the bodies are no
-##    party heroes). Their club boxes and stomps hit the heroes as a boss body (one bone, the boss knock-back); their
-##    bodies are not solid; a hero landing on a chieftain bounces and harms nobody.
+##  - **hero physics driven by HeroBot** (the default, [member hero_bot_enabled]; PLAN.md P2.3 / P2.5): each chieftain
+##    owns a body - an instance of `scenes/player/player.tscn` that is NOT in the level (not one of level.heroes, not
+##    registered with Sim), slot 2 (Gorm) / 3 (Gulla) - fed every tick by `HeroBot.for_boss` (core-B) through that
+##    GameInput slot, with its own seeded SimRng, seeing the heroes `reaction` ticks late (Hunter on Beginner, Chief on
+##    Expert). The shell steps the body's PLAYER and POST phases itself in its ENEMIES phase and mirrors its position,
+##    box and pose. Of the party rules only player-A's curl and ball flight run on the body; what two party heroes do
+##    to each other the shell does for the two bodies: the ride on the mate's head (the stack) and the bat. A counted
+##    hit makes the body flinch BOT_FLINCH_TICKS (the hero's hurt state). It needs the level's bot graph
+##    (res://resources/bots/<level_id>.json, core-B's baker): without one the state machine plays
+##    ([method bot_executor_wanted]);
+##  - the **state machine** (the PLAN cut 8 fallback; [member hero_bot_enabled] false or no graph): Brute-style moves on
+##    the enemy physics (walk 4 px per tick, hops, straight leaps up to a ledge or the altar), the hero's strike scripts
+##    and club boxes.
+## Either way their club boxes, an announced stomp and a batted ball hit the heroes as a boss body (one bone, the boss
+## knock-back); their bodies are not solid; a hero landing on a chieftain bounces and harms nobody.
 ##
 ## Parameters: `name`, `mate` (the other's name), `arena` zone name, `drops` [the lead: trophy], `hp` pips [4].
 
@@ -56,12 +62,15 @@ const PLAYER_SCENE: String = "res://scenes/player/player.tscn"
 const SKIN_GORM: String = "chieftain_gorm"
 const SKIN_GULLA: String = "chieftain_gulla"
 const SKIN_FALLBACK: String = "rival"
+## The revive egg (art-B's egg_kid roll frames in the chieftains' palettes; roles `gorm`, `gulla`).
+const EGG_SHEET: String = "chieftain_egg"
 const TINT_GORM: Color = Color(0.5, 0.46, 0.46)
 const TINT_GULLA: Color = Color(1.0, 0.72, 0.42)
 
-## Use the hero-physics executor driven by HeroBot (PLAN.md P2.3: the state machine stays the default until the bot
-## version passes its tests). Tests and the developer menu may switch it; read when a fight starts.
-static var hero_bot_enabled: bool = false
+## Use the hero-physics executor driven by HeroBot (PLAN.md P2.3; the default since its tests pass). False: the
+## Brute-style state machine (the PLAN cut 8 fallback). Read when a fight starts; a level without its bot graph plays
+## the state machine either way ([method bot_executor_wanted]).
+static var hero_bot_enabled: bool = true
 
 # --- Private tuning (enemies-C; to move into EnemyTuning with enemies-A) -----------------------------------------------
 const PIPS: int = 4                        ## [G 13.6]
@@ -92,10 +101,12 @@ const STACK_TICKS: int = 132
 const SOLO_RAID_TICKS: int = 110           ## solo P2: raids this long between two bats
 const THIEF_RETRY_TICKS: int = 66          ## after dropping the roast he raids this long before the next try
 const ARRIVE_PX: int = 6
-const PERCH_INSET_PX: int = 24
+const PERCH_INSET_PX: int = 4               ## the perch: this far from the wall a chieftain would touch
 const STACK_HEAD_PX: int = 34              ## the top stands this far above the bottom's feet (Totem Ride: K.y - 34)
 const BOT_SLOT_BASE: int = 2               ## the bodies read GameInput slots 2 (lead) and 3
 const BOT_SEED: int = 0x0C41EF
+const STOMP_WINDOW_TICKS: int = 40         ## an announced stomp: the crouch (14) and the jump until it lands
+const BOT_FLINCH_TICKS: int = 8            ## a counted hit stuns the body this long (the hero's hurt state)
 ## Strike scripts and their front-box ticks (PHYSICS.md 8.1).
 const STRIKE_TICKS: int = 7
 const STRIKE_FRONT: Vector2i = Vector2i(4, 6)
@@ -130,13 +141,16 @@ var _done: bool = false
 var _hup: Label = null
 var _hup_ticks: int = 0
 var _roast_drawing: Node2D = null
+var _egg_sprite: Sprite2D = null
 var _arena_found: bool = false
 ## The lead: the Totem routine's roles are swapped (the other chief is the bottom).
 var _stack_swapped: bool = false
-## Hero-physics executor: the body, its bot, true while it runs.
+## Hero-physics executor: the body, its bot, true while it runs; ticks left in which a falling body hurts a hero below
+## (only after an announced stomp jump).
 var _body: PlayerBase = null
 var _bot: HeroBot = null
 var _bot_on: bool = false
+var _stomp_window: int = 0
 
 
 func _default_skin() -> String:
@@ -164,6 +178,40 @@ func _ready() -> void:
 	_hup.position = Vector2(-20.0, -float(BOX.y + 22) * Tuning.ART_SCALE)
 	_hup.add_theme_color_override(&"font_color", Color(1.0, 0.95, 0.6))
 	add_child(_hup)
+
+
+## The picture: the body's pose, or the rocking egg (its own sheet) while he is an egg (cosmetic).
+func _refresh_visual() -> void:
+	super._refresh_visual()
+	var egg: bool = life == Life.EGG and visible
+	if egg and _egg_sprite == null:
+		_build_egg_sprite()
+	if _egg_sprite == null:
+		return
+	_egg_sprite.visible = egg
+	if not egg:
+		return
+	if _sprite != null:
+		_sprite.visible = false
+	var sheet: EnemySkin = EnemySkin.find(EGG_SHEET)
+	var rock: Vector4i = sheet.anim(&"gulla" if _is_gulla() else &"gorm")
+	var frame: int = rock.x + (_egg_timer / maxi(rock.z, 1)) % maxi(rock.y, 1)
+	if _egg_sprite.frame != frame:
+		_egg_sprite.frame = frame
+
+
+func _build_egg_sprite() -> void:
+	var sheet: EnemySkin = EnemySkin.find(EGG_SHEET)
+	if sheet == null:
+		return
+	_egg_sprite = Sprite2D.new()
+	_egg_sprite.name = "EggSprite"
+	_egg_sprite.texture = load(sheet.texture_path) as Texture2D
+	_egg_sprite.centered = false
+	_egg_sprite.hframes = sheet.columns
+	_egg_sprite.vframes = sheet.rows
+	_egg_sprite.offset = sheet.sprite_offset()
+	add_child(_egg_sprite)
 
 
 func _exit_tree() -> void:
@@ -195,8 +243,8 @@ func get_act() -> int:
 
 ## True while the "HUP!" telegraph crouch runs.
 func is_telegraphing() -> bool:
-	if _bot_on and _bot != null and _bot.brain != null:
-		return bool(_bot.brain.call(&"telegraphing"))
+	if _bot_on and _bot != null and _bot.brain is ChieftainBrain:
+		return (_bot.brain as ChieftainBrain).telegraphing()
 	return _act == Act.TELEGRAPH
 
 
@@ -248,7 +296,7 @@ func start_fight() -> void:
 		roast_holder = null
 	else:
 		life = Life.FIGHT if _coop else Life.WAIT
-	if hero_bot_enabled:
+	if bot_executor_wanted():
 		_start_bot()
 	super.start_fight()
 	_show_roast()
@@ -503,8 +551,27 @@ func _perch_point() -> Vector2i:
 			count += 1
 	var mid: int = room.get_center().x
 	var heroes_mid: int = heroes_x / count if count > 0 else mid
-	var x: int = room.position.x + PERCH_INSET_PX if heroes_mid >= mid else room.end.x - PERCH_INSET_PX
+	var side: int = -1 if heroes_mid >= mid else 1
+	var x: int = _edge_x(side, floor_y)
 	return Vector2i(x, _floor_under(x, floor_y - Tuning.TILE * 2))
+
+
+## The x nearest to the room's edge on `side` (-1 left, 1 right) where a chieftain standing on the floor at `floor_y`
+## touches no wall (his half width and PERCH_INSET_PX from the wall face).
+func _edge_x(side: int, floor_y: int) -> int:
+	var room: Rect2i = _room()
+	var half: int = BOX.x >> 1
+	var x: int = room.position.x + half if side < 0 else room.end.x - half - 1
+	var level: LevelBase = Game.level
+	if level == null:
+		return x - side * PERCH_INSET_PX
+	var row: int = Tuning.to_cell(floor_y) - 1
+	for i: int in room.size.x >> 1:
+		var probe: int = x + side * half
+		if level.grid.side_at(Tuning.to_cell(probe), row) != TileGrid.SIDE_WALL:
+			break
+		x -= side
+	return x - side * PERCH_INSET_PX
 
 
 # --- Orders ---------------------------------------------------------------------------------------------------------
@@ -543,7 +610,7 @@ func _fsm_execute() -> void:
 	match _act:
 		Act.TELEGRAPH:
 			xvel = 0
-			_physics()
+			_ride_or_physics()
 			_play(&"crouch")
 			if _act_timer >= TELEGRAPH_TICKS:
 				_begin_attack()
@@ -690,12 +757,13 @@ func _bat() -> void:
 	var toward: int = 1
 	if target != null:
 		toward = 1 if target.sim_pos.x >= mate.sim_pos.x else -1
-	var stand: Vector2i = Vector2i(mate.sim_pos.x - toward * BAT_STAND_PX, mate.sim_pos.y)
-	if mate._act != Act.CURLED:
-		_walk_to(stand, WALK_XVEL)
+	# He bats on his own floor: behind the mate (the mate between him and the target), never jumping.
+	var stand: Vector2i = Vector2i(mate.sim_pos.x - toward * BAT_STAND_PX, sim_pos.y)
+	if mate._act != Act.CURLED or not mate._grounded:
+		_walk_to(stand, WALK_XVEL, false)
 		_play_move()
 		return
-	if not _walk_to(stand, WALK_XVEL):
+	if not _walk_to(stand, WALK_XVEL, false):
 		_play_move()
 		return
 	facing = toward
@@ -770,30 +838,62 @@ func _set_act(act: int) -> void:
 	_act_timer = 0
 
 
-## Walk toward `goal` (x; hop when a wall or a ledge up to 3 rows high is in the way, leap up to the altar when it is
-## right above). True when standing there.
+## Walk toward `goal` (it settles on the exact x; hop when a wall is in the way; a goal on a ledge or the altar above:
+## walk under it, then leap straight up - through a one-way floor - onto it; a goal below: walk off the ledge). True
+## when standing within ARRIVE_PX of it.
 func _walk_to(goal: Vector2i, speed: int, may_jump: bool = true) -> bool:
 	var dx: int = goal.x - sim_pos.x
-	if absi(dx) <= ARRIVE_PX and absi(goal.y - sim_pos.y) <= 4:
-		xvel = 0
+	var up: int = sim_pos.y - goal.y
+	if absi(dx) <= ARRIVE_PX and absi(up) <= 4:
+		xvel = (signi(dx) * mini(speed, absi(dx) * 16)) if _grounded else 0
 		_physics()
 		return _grounded
-	xvel = signi(dx) * speed if absi(dx) > 2 else 0
+	xvel = signi(dx) * mini(speed, absi(dx) * 16)
+	if up < -Tuning.TILE and _grounded:
+		# The goal is below, under the floor he stands on: walk off its nearer end (then back on the floor below).
+		var drop: int = _drop_dir(goal.x)
+		if drop != 0:
+			xvel = drop * speed
 	if xvel != 0:
 		facing = signi(xvel)
 	if may_jump and _grounded:
-		var up: int = sim_pos.y - goal.y
 		var grid: TileGrid = Game.level.grid if Game.level != null else null
 		var blocked: bool = grid != null and xvel != 0 and _blocked_ahead(grid, signi(xvel))
-		if up > Tuning.TILE and absi(dx) <= Tuning.TILE * 4:
+		if up > Tuning.TILE and absi(dx) <= 2:
 			yvel = HIGH_LEAP_YVEL if up > 55 else HOP_YVEL
-			xvel = clampi(dx * 16 / 14, -LEAP_XVEL_MAX, LEAP_XVEL_MAX)
+			xvel = 0
 			_grounded = false
 		elif blocked:
 			yvel = HOP_YVEL
 			_grounded = false
 	_physics()
 	return false
+
+
+## The goal (x) lies below the run of floor cells he stands on: the direction (-1 / 1) of the run's nearer end to walk
+## off; 0 when the goal is beyond the run (walking toward it drops him anyway) or the run ends at a wall on both sides.
+func _drop_dir(goal_x: int) -> int:
+	var level: LevelBase = Game.level
+	if level == null:
+		return 0
+	var grid: TileGrid = level.grid
+	var row: int = Tuning.to_cell(sim_pos.y)
+	var col: int = Tuning.to_cell(sim_pos.x)
+	var c0: int = col
+	var c1: int = col
+	while c0 > 0 and TileGrid.is_ground(grid.floor_at(c0 - 1, row)):
+		c0 -= 1
+	while c1 < grid.cols - 1 and TileGrid.is_ground(grid.floor_at(c1 + 1, row)):
+		c1 += 1
+	var x0: int = c0 * Tuning.TILE
+	var x1: int = (c1 + 1) * Tuning.TILE
+	if goal_x < x0 or goal_x >= x1:
+		return 0
+	var left_open: bool = c0 > 0 and grid.side_at(c0 - 1, row - 1) != TileGrid.SIDE_WALL
+	var right_open: bool = c1 < grid.cols - 1 and grid.side_at(c1 + 1, row - 1) != TileGrid.SIDE_WALL
+	if left_open and (not right_open or sim_pos.x - x0 <= x1 - sim_pos.x):
+		return -1
+	return 1 if right_open else 0
 
 
 ## The enemy physics of the arena (gravity, floors, walls), inside the arena room.
@@ -841,23 +941,43 @@ func _club_rect(frame: int) -> Rect2i:
 # The hero-physics executor (HeroBot, core-B's boss interface)
 # =================================================================================================================
 
+## True when this fight runs on hero physics: the flag is on and the level has its bot graph (core-B's
+## res://resources/bots/<level_id>.json, or one a test baked and cached) - without a graph a body could not climb to
+## the pyre or the altar, so the state machine plays instead.
+static func bot_executor_wanted() -> bool:
+	var level: LevelBase = Game.level
+	return hero_bot_enabled and level != null and ResourceLoader.exists(PLAYER_SCENE) \
+			and NavGraph.load_for_level(level.level_id) != null
+
+
+## The hero body and its HeroBot (core-B: HeroBot.for_boss with a ChieftainBrain), installed on GameInput slot
+## BOT_SLOT_BASE + 0 (the lead) / + 1, which the body reads; the body is NOT in the level (no level.heroes, no Sim
+## registration): this shell steps it.
 func _start_bot() -> void:
-	if _bot_on or not ResourceLoader.exists(PLAYER_SCENE):
+	if _bot_on:
 		return
 	var key: int = BOT_SLOT_BASE + (0 if is_lead() else 1)
 	_body = (load(PLAYER_SCENE) as PackedScene).instantiate() as PlayerBase
 	if _body == null:
 		return
 	_body.spawn_setup(sim_pos, {"slot": key})
+	_body.respawn_at(sim_pos)
 	_body.facing = facing
-	_body.grounded = true
 	_body.run.reset_energy()
-	var level_id: int = 1 if Game.difficulty == Defs.Difficulty.BEGINNER else 2
-	_bot = HeroBot.for_boss(_body, BOT_SEED + key, Defs.BotLevel.HUNTER if level_id == 1 else Defs.BotLevel.CHIEF,
-			key)
+	# Of the party rules only the curl and the ball flight run on the body (player-A's component, PHYSICS.md C.11):
+	# a chieftain is no co-op or versus hero (no edge walls, leash, eggs or versus hurt table).
+	var party: HeroParty = (_body as Player).hero_party if _body is Player else null
+	if party != null:
+		party.active = true
+		party.coop = false
+		party.versus = false
+	var level: int = Defs.BotLevel.HUNTER if Game.difficulty == Defs.Difficulty.BEGINNER else Defs.BotLevel.CHIEF
+	_bot = HeroBot.for_boss(_body, BOT_SEED + key, level, key)
 	_bot.install()
-	if _bot.brain != null and _bot.brain.get(&"on_telegraph") != null:
-		_bot.brain.set(&"on_telegraph", func(_kind: int) -> void: _show_hup(true))
+	var brain: ChieftainBrain = _bot.brain as ChieftainBrain
+	if brain != null:
+		brain.on_telegraph = _on_bot_telegraph
+	_stomp_window = 0
 	_bot_on = true
 
 
@@ -871,55 +991,103 @@ func _stop_bot() -> void:
 	_bot_on = false
 
 
-## One tick on hero physics: the orders go to the brain, the body runs its own PLAYER update with the flags the bot put
-## into its GameInput slot, then the shell applies what the bodies cannot do with each other (the curl, the stack,
-## the bat) and mirrors the body.
+## The brain announces an attack (its first crouch tick): the "HUP!"; a stomp jump may hurt for STOMP_WINDOW_TICKS.
+func _on_bot_telegraph(kind: int) -> void:
+	_show_hup(true)
+	if kind == ChieftainBrain.ATTACK_STOMP:
+		_stomp_window = STOMP_WINDOW_TICKS
+
+
+## Put this chieftain at `pos`, at rest (his body too, respawned there: control on, uncurled).
+func _place(pos: Vector2i) -> void:
+	teleport(pos)
+	xvel = 0
+	yvel = 0
+	if _body != null:
+		_body.respawn_at(pos)
+		_body.facing = facing
+
+
+## One tick on hero physics: the order goes to the brain (which acts on it from the next GameInput sample), the body
+## runs its own PLAYER and POST steps with the flags the bot put into its slot, then the shell applies what the
+## bodies cannot do to each other - they are no party heroes: the curl, the ride on the mate's head (the stack), the
+## bat and the ball's daze - and mirrors the body.
 func _bot_execute() -> void:
-	var brain: Object = _bot.brain
-	if mate != null and mate._bot_on:
-		brain.set(&"mate", mate._body)
-	var slot: int = order_target.slot if order_target != null else -1
-	var pos: Vector2i = order_pos if order_kind in [Order.WAIT, Order.GOTO, Order.CARRY, Order.HATCH] \
-			else BotSenses.NO_POS
-	brain.call(&"order", order_kind, slot, pos)
+	var brain: ChieftainBrain = _bot.brain as ChieftainBrain
 	var body: PlayerBase = _body
+	var mate_body: PlayerBase = null
+	if mate != null and mate._bot_on and mate._body != null and mate.life == Life.FIGHT:
+		mate_body = mate._body
+	if brain != null:
+		brain.mate = mate_body
+		var pos: Vector2i = BotSenses.NO_POS
+		match order_kind:
+			Order.WAIT, Order.GOTO, Order.CARRY:
+				pos = order_pos
+			Order.HATCH:
+				pos = order_pos + Vector2i(0, -EGG_BOX.y)
+		# The target: the brain's own lone rule on what it saw (-1), never the shell's live pick (no cheating).
+		brain.order(order_kind, -1, pos)
+	if _stomp_window > 0:
+		_stomp_window -= 1
+	# The ball and the daze run without control; the rest of the time the bot drives.
 	if _act == Act.DAZED:
-		body.set_control_enabled(false)
 		_act_timer += 1
 		if _act_timer >= DAZE_TICKS:
 			_set_act(Act.IDLE)
-			body.set_control_enabled(true)
-	body.sim_prev = body.sim_pos
+	body.set_control_enabled(_act != Act.DAZED and _act != Act.BALL)
+	# The hero's platform pass (WEAPONS phase): the mate's head is his only platform.
+	body.on_platform = _rides(body, mate_body)
 	body._sim_tick(Defs.Phase.PLAYER)
 	body._sim_tick(Defs.Phase.POST)
-	# The curl (the body is no party hero: Down + Swap does nothing for it).
-	if order_kind == Order.CURL and body.is_grounded() and body.curl == PlayerBase.CURL_NONE:
-		body.curl = PlayerBase.CURL_CURLED
-		Audio.play_sfx(Sfx.CURL)
-	elif order_kind != Order.CURL and body.curl == PlayerBase.CURL_CURLED:
-		body.curl = PlayerBase.CURL_NONE
-	# The ball lands: dazed where it lands.
+	if body.dead:
+		# Hero physics can kill a body (a pit, a hazard): the chieftain is knocked out where he fell.
+		_mirror(body)
+		hp = 0
+		Events.boss_energy_changed.emit(self, 0, get_max_pips())
+		_knocked_out()
+		return
+	# The curl is the brain's Down + Swap and the ball flight the hero's own (the party component's curl and ball run on
+	# the body, PHYSICS.md C.11); when the ball uncurls (it landed, or met a wall) he lies dazed where he comes down.
 	if body.curl == PlayerBase.CURL_BALL:
 		if _act != Act.BALL:
 			_set_act(Act.BALL)
-		elif body.grounded and _act_timer > 2:
-			body.curl = PlayerBase.CURL_NONE
-			_set_act(Act.DAZED)
 		_act_timer += 1
-	# The stack: on the mate's head (the Totem Ride rule: feet 34 px above his).
-	if order_kind == Order.STACK_TOP and mate != null and mate._bot_on and mate._body != null:
-		var other: PlayerBase = mate._body
-		if absi(body.sim_pos.x - other.sim_pos.x) <= Tuning.TILE and body.yvel >= 0 \
-				and absi(body.sim_pos.y - (other.sim_pos.y - STACK_HEAD_PX)) <= 8:
-			body.sim_pos = Vector2i(other.sim_pos.x, other.sim_pos.y - STACK_HEAD_PX)
-			body.yvel = 0
-			body.on_platform = true
-	# The bat: this body's front club box on the curled mate launches him as a line drive.
-	if mate != null and mate._bot_on and mate._body != null and body.club_box_active \
-			and mate._body.curl == PlayerBase.CURL_CURLED and Overlap.rects(body.club_box, mate._body.get_box()):
-		mate._body.bat(body.facing * BAT_XVEL, BAT_YVEL, body)
+	elif _act == Act.BALL:
+		body.set_control_enabled(false)
+		if body.is_grounded():
+			_set_act(Act.DAZED)
+	# The stack: on the mate's head (the Totem Ride rule: feet STACK_HEAD_PX above his), carried as he walks.
+	if order_kind == Order.STACK_TOP and mate_body != null and body.yvel >= 0 \
+			and absi(body.sim_pos.x - mate_body.sim_pos.x) <= Tuning.TILE \
+			and absi(body.sim_pos.y - (mate_body.sim_pos.y - STACK_HEAD_PX)) <= 8:
+		body.sim_pos = Vector2i(mate_body.sim_pos.x, mate_body.sim_pos.y - STACK_HEAD_PX)
+		body.yvel = 0
+		body.on_platform = true
+	# The bat: this body's club box on the curled mate launches him as a line drive (PHYSICS.md C.11; the bodies are no
+	# party heroes, so the shell does what the co-op weapon pass does for two heroes).
+	if mate_body != null and body.club_box_active and mate_body.curl == PlayerBase.CURL_CURLED \
+			and Overlap.weapon(body.club_box, body.club_box_xo, mate_body):
+		body.club_box_active = false
+		mate_body.bat(body.facing * BAT_XVEL, BAT_YVEL, body)
+		mate._set_act(Act.BALL)
 		Audio.play_sfx(Sfx.BAT_HIT)
-	teleport(body.sim_pos)
+		_done = true
+	_mirror(body)
+
+
+## True when `body` stands on `mate_body`'s head as the top of a stack (this tick's ride).
+func _rides(body: PlayerBase, mate_body: PlayerBase) -> bool:
+	return order_kind == Order.STACK_TOP and mate_body != null \
+			and absi(body.sim_pos.x - mate_body.sim_pos.x) <= Tuning.TILE \
+			and body.sim_pos.y == mate_body.sim_pos.y - STACK_HEAD_PX
+
+
+## The shell shows and is the body: position, motion, facing, box, pose.
+func _mirror(body: PlayerBase) -> void:
+	sim_pos = body.sim_pos
+	xvel = body.xvel
+	yvel = body.yvel
 	facing = body.facing
 	_grounded = body.is_grounded()
 	set_box(Vector3i(body.box_w, body.box_h, body.box_xo))
@@ -979,6 +1147,10 @@ func _poll_hits() -> void:
 	if _act == Act.TELEGRAPH or _act == Act.STRIKE or _act == Act.HIGH:
 		_set_act(Act.IDLE)
 		_show_hup(false)
+	if _bot_on and _body != null and _act != Act.BALL:
+		# The body flinches (the hero's hurt state): an announced attack is dropped.
+		_body.hit_timer = maxi(_body.hit_timer, Tuning.HIT_STUN_MIN + BOT_FLINCH_TICKS)
+		_show_hup(false)
 	apply_boss_hit(1)
 
 
@@ -989,18 +1161,27 @@ func _attack_heroes() -> void:
 	if level == null:
 		return
 	var box: Rect2i = get_attack_box()
-	var falling: bool = (yvel > 0 and _act == Act.LEAP) or _act == Act.BALL
+	var ball: bool = _act == Act.BALL
+	# A stomp only after an announced leap / stomp jump (every attack is telegraphed).
+	var stomping: bool = yvel > 0 and _act == Act.LEAP
 	if _bot_on and _body != null:
-		falling = _body.yvel > 0 and not _body.is_grounded()
+		stomping = _stomp_window > 0 and _body.yvel > 0 and not _body.is_grounded()
 	for hero: PlayerBase in level.contact_order():
 		if hero.dead or hero.is_down() or hero.is_immune() or hero.is_feasting():
 			continue
 		if box.size.x > 0 and Overlap.rects(box, hero.get_box()):
 			touch_hero(hero)
 			continue
-		if falling and Overlap.body(self, hero, self) and (Overlap.stomp or _act == Act.BALL):
+		if not ball and not stomping:
+			continue
+		if Overlap.body(self, hero, self) and (ball or Overlap.stomp):
 			touch_hero(hero)
-			if _act == Act.LEAP:
+			if ball:
+				continue
+			if _bot_on and _body != null:
+				_body.bounce(STOMP_BOUNCE_YVEL, Overlap.depth)
+				_stomp_window = 0
+			else:
 				yvel = STOMP_BOUNCE_YVEL
 
 
@@ -1127,15 +1308,14 @@ func _hatch_egg() -> void:
 	set_box(BOX)
 	Audio.play_sfx(Sfx.EGG_HATCH)
 	Events.boss_energy_changed.emit(self, get_pips(), get_max_pips())
-	if _bot_on and _body != null:
-		_body.set_control_enabled(true)
 	if _coop:
 		life = Life.FIGHT
+		_place(sim_pos)
 		if mate != null and mate.order_kind == Order.HATCH:
 			mate.give_order(Order.RAID, _pick_target(), Vector2i.ZERO)
 	else:
 		life = Life.WAIT
-		teleport(_post)
+		_place(_post)
 
 
 ## Out of the fight (the egg smashed, or knocked out with no mate left): when both are out the fight is won.
@@ -1143,6 +1323,7 @@ func _go_out() -> void:
 	life = Life.OUT
 	visible = false
 	hp = 0
+	_stop_bot()
 	_spawn_optional(&"fx/poof", sim_pos + Vector2i(0, -12))
 	Events.boss_energy_changed.emit(self, 0, get_max_pips())
 	if mate == null or mate.life == Life.OUT:
@@ -1220,22 +1401,28 @@ func _find_arena() -> void:
 	var room: Rect2i = _room()
 	var x: int = room.get_center().x
 	altar = Vector2i(x, _floor_under(x, room.position.y))
-	perch = Vector2i(room.position.x + PERCH_INSET_PX, _post.y)
+	perch = Vector2i(_edge_x(-1, _post.y), _post.y)
 	_arena_found = true
 	if mate != null:
 		mate.altar = altar
 		mate._arena_found = true
 
 
-## The first floor surface at or below `from_y` in the column of `x` (the record's floor when none).
+## The first floor surface at or below `from_y` in the column of `x` that has open air above it: solid cells at the
+## start (the room's ceiling) are skipped (the record's floor when none).
 func _floor_under(x: int, from_y: int) -> int:
 	var level: LevelBase = Game.level
 	if level == null:
 		return _post.y
+	var grid: TileGrid = level.grid
 	var col: int = Tuning.to_cell(x)
-	for row: int in range(maxi(Tuning.to_cell(from_y), 0), level.grid.rows):
-		if TileGrid.is_ground(level.grid.floor_at(col, row)):
-			return row * Tuning.TILE + level.grid.surface_offset(col, row, x)
+	var row: int = maxi(Tuning.to_cell(from_y), 0)
+	while row < grid.rows and grid.side_at(col, row) == TileGrid.SIDE_WALL:
+		row += 1
+	while row < grid.rows:
+		if TileGrid.is_ground(grid.floor_at(col, row)):
+			return row * Tuning.TILE + grid.surface_offset(col, row, x)
+		row += 1
 	return _post.y
 
 

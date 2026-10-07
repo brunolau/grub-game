@@ -128,10 +128,14 @@ static func level_has_tar(level: LevelBase) -> bool:
 	return answer
 
 
-## True when `grid` has at least one tar floor cell (a full scan; [method level_has_tar] keeps the answer).
+## True when `grid` has at least one tar floor cell ([method level_has_tar] keeps the answer). Asks TileGrid's own
+## `has_tar()` when core-A's grid has it (a native search of its material table, requested in
+## build/engine_requests/wf8_player_b_to_core_a.txt); else a full scan (about 3.6 ms for a 230 x 40 stage on a desktop).
 static func grid_has_tar(grid: TileGrid) -> bool:
 	if grid == null:
 		return false
+	if grid.has_method(&"has_tar"):
+		return bool(grid.call(&"has_tar"))
 	for row: int in grid.rows:
 		for col: int in grid.cols:
 			if grid.is_tar(col, row):
@@ -218,8 +222,12 @@ func find_vine(x: int, y: int) -> Object:
 		if absi(x - _vine_geo[base]) > Tuning.VINE_GRAB_DX or y <= _vine_geo[base + 1] \
 				or y - Tuning.VINE_HAND_REACH_PX > _vine_geo[base + 2]:
 			continue
-		var candidate: Object = _vines[i]
-		if not is_instance_valid(candidate) or (candidate == regrab_vine and regrab_lock > 0):
+		# Read untyped first: assigning a freed vine (a level part removed) to an Object variable is an engine error.
+		var entry: Variant = _vines[i]
+		if not is_instance_valid(entry):
+			continue
+		var candidate: Object = entry
+		if candidate == regrab_vine and regrab_lock > 0:
 			continue
 		if bool(candidate.call(&"is_climbable")):
 			return candidate

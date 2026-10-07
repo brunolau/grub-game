@@ -332,7 +332,8 @@ func _update_lights() -> void:
 		_status.add_theme_color_override(&"font_color", UiKit.COL_CREAM)
 
 
-## True when a half of the test has Shift on a key (the classic layout: P1's strike).
+## True when a column of the test has Shift on a key (a player who bound it himself: the classic layout keeps Shift
+## free since P1 strikes with Left Ctrl).
 func _shift_bound() -> bool:
 	for light: KeyLight in _lights:
 		if (_keys.get(light, PackedInt32Array()) as PackedInt32Array).has(KEY_SHIFT):

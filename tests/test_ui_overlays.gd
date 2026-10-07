@@ -48,6 +48,28 @@ class FakeReferee:
 		return length
 
 
+## The referee of the other launch modes (world-B's VersusReferee reading API): the mode, the ember's holder, the
+## round score (Clubball: the side's goals; Last Caveman Standing: the hearts), the Stock lives and the round phase.
+class FakeModeReferee:
+	extends FakeReferee
+
+	var mode: int = Defs.VersusMode.GRUB_STACK
+	var phase: int = VersusReferee.PHASE_PLAY
+	var rules: VersusRules = VersusRules.new()
+	var holder: int = -1
+	var scores: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
+	var stocks: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
+
+	func ember_holder() -> int:
+		return holder
+
+	func score_of(slot: int) -> int:
+		return scores[slot]
+
+	func stocks_of(slot: int) -> int:
+		return stocks[slot]
+
+
 ## A level's party driver for the tags test: it only tells the stacks (VersusStackDisplay's towers).
 class FakeDriver:
 	extends SimEntity
@@ -710,6 +732,122 @@ func test_hud_versus_deciding_moment_banner_and_skip() -> void:
 	await get_tree().process_frame
 	assert_null(versus.get_skip_button(), "removed when the replay ends")
 	GameInput.device = device
+
+
+## The corner panels count what the round's mode counts (DESIGN.md E.4): Hot Rock the ember on its holder (his plate
+## glows; no clock, so no sundial), Clubball the side's goals with the coconut (golden on a tie), Last Caveman
+## Standing the hearts and, with Stock, the lives left. Every picture still comes from the atlas.
+func test_hud_versus_panels_count_what_the_mode_counts() -> void:
+	Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.VERSUS, 4)
+	var hud: Hud = await _overlay(Flow.HUD_SCENE) as Hud
+	var versus: HudVersus = hud.get_versus()
+	var referee: FakeModeReferee = FakeModeReferee.new()
+	referee.stacks = PackedInt32Array([7, 0, 0, 0])
+	versus.source = referee
+	# Hot Rock: the ember on P3, no round clock.
+	referee.mode = Defs.VersusMode.HOT_ROCK
+	referee.holder = 2
+	referee.length = 0
+	versus.refresh()
+	for slot: int in 4:
+		var panel: HudVersus.CornerPanel = versus.get_panel(slot)
+		assert_eq(panel.content, HudVersus.Content.EMBER, "Hot Rock: P%d" % (slot + 1))
+		assert_eq(panel.ember, slot == 2, "the ember is P3's: P%d" % (slot + 1))
+		assert_eq(panel.hearts, -1)
+	assert_almost_eq(versus.get_panel(0).rect.size.x, versus.get_panel(2).rect.size.x, 0.5,
+			"room for the ember on every panel: it never jumps when the rock passes")
+	assert_false(versus.get_sundial().visible, "no clock in Hot Rock: no sundial")
+	assert_eq(hud.get_row_bottom(), versus.get_sundial().rect.end.y, "the row still ends where the sundial would")
+	await get_tree().process_frame
+	assert_eq(versus.draw_batches, 2, "the ember comes from the atlas")
+	assert_true(HudAtlas.region(&"ember").has_area() and HudAtlas.region(&"coconut", HudAtlas.COCONUT_GOLDEN).has_area())
+	var image: Image = HudAtlas.texture().get_image()
+	assert_true(image.get_region(Rect2i(HudAtlas.region(&"ember"))).get_used_rect().has_area(), "the ember was copied")
+	# Clubball: each panel shows his side's goals; a tie at the gong plays the golden coconut.
+	referee.mode = Defs.VersusMode.CLUBBALL
+	referee.scores = PackedInt32Array([3, 1, 3, 1])
+	referee.length = 3780
+	referee.left = 400
+	versus.refresh()
+	assert_eq(versus.get_panel(0).content, HudVersus.Content.GOALS)
+	assert_eq(versus.get_panel(2).get_goals_text(), "3", "P3 plays on P1's side")
+	assert_eq(versus.get_panel(1).get_goals_text(), "1")
+	assert_true(versus.get_sundial().visible, "Clubball's three minutes")
+	assert_false(versus.get_panel(0).golden)
+	referee.phase = VersusReferee.PHASE_GOLDEN
+	referee.left = -1
+	referee.scores = PackedInt32Array([3, 3, 3, 3])
+	versus.refresh()
+	assert_true(versus.get_panel(0).golden, "the golden coconut")
+	assert_eq(versus.banner_text, tr("UI_VS_GOLDEN_COCONUT"))
+	assert_eq(versus.banner_hint, tr("UI_VS_GOLDEN_COCONUT_HINT"))
+	assert_almost_eq(versus.get_sundial().elapsed, 1.0, 0.001, "the clock ran out: the shadow covers the dial")
+	await get_tree().process_frame
+	assert_true(versus.draw_batches <= 3)
+	# Last Caveman Standing with Stock: hearts (0 once out) and the lives left.
+	referee.phase = VersusReferee.PHASE_PLAY
+	referee.mode = Defs.VersusMode.LAST_CAVEMAN
+	referee.scores = PackedInt32Array([3, 0, 2, 1])
+	referee.stocks = PackedInt32Array([2, 0, 1, 3])
+	versus.refresh()
+	assert_eq(versus.get_panel(1).hearts, 0, "P2 is out")
+	assert_eq(versus.get_panel(2).hearts, 2)
+	assert_eq(versus.get_panel(0).stock, -1, "no Stock option: no lives")
+	assert_eq(versus.get_panel(0).get_stock_text(), "")
+	var plain_w: float = versus.get_panel(0).rect.size.x
+	referee.rules.stock = true
+	versus.refresh()
+	assert_eq(versus.get_panel(0).get_stock_text(), "x2", "Stock: his lives")
+	assert_eq(versus.get_panel(1).get_stock_text(), "x0")
+	assert_true(versus.get_panel(0).rect.size.x > plain_w, "the panel makes room for them")
+	var view: Rect2 = hud.get_viewport_rect()
+	for slot: int in 4:
+		assert_true(view.encloses(versus.get_panel(slot).get_cover_rect()), "P%d inside the view" % (slot + 1))
+	# Grub Stack: a tie drops the Golden Drumstick.
+	referee.mode = Defs.VersusMode.GRUB_STACK
+	versus.refresh()
+	assert_eq(versus.get_panel(0).content, HudVersus.Content.STACK)
+	assert_eq(versus.get_panel(0).get_stack_text(), "7")
+	Events.round_started.emit(1)
+	referee.phase = VersusReferee.PHASE_GOLDEN
+	versus.refresh()
+	assert_eq(versus.banner_text, tr("UI_VS_GOLDEN_DRUMSTICK"), "a new round: its own golden banner")
+	assert_eq(versus.banner_hint, tr("UI_VS_GOLDEN_DRUMSTICK_HINT"))
+
+
+## "SUDDEN DEATH!" says which one the arena throws in: every theme of VersusSuddenDeath has its line in en.po.
+func test_hud_versus_sudden_death_names_the_theme() -> void:
+	Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.VERSUS, 2)
+	var hud: Hud = await _overlay(Flow.HUD_SCENE) as Hud
+	var versus: HudVersus = hud.get_versus()
+	for theme: StringName in VersusSuddenDeath.THEMES:
+		assert_true(HudVersus.SUDDEN_DEATH_KEYS.has(theme), "a line for %s" % theme)
+		if HudVersus.SUDDEN_DEATH_KEYS.has(theme):
+			var key: String = HudVersus.SUDDEN_DEATH_KEYS[theme]
+			assert_ne(tr(key), key, "%s has an English text" % key)
+	Events.round_sudden_death_started.emit(0, VersusSuddenDeath.STAMPEDE)
+	assert_eq(versus.banner_text, tr("UI_VS_SUDDEN_DEATH"))
+	assert_eq(versus.banner_hint, tr("UI_VS_SD_STAMPEDE"), "Stampede!")
+	await get_tree().process_frame
+	assert_true(hud.get_viewport_rect().encloses(versus.get_banner_rect()), "the banner fits the view")
+	Events.round_sudden_death_started.emit(0, &"unknown_theme")
+	assert_eq(versus.banner_hint, "", "an unknown theme: the banner alone")
+
+
+## A new match with another number of players gets its own set of panels.
+func test_hud_versus_follows_the_number_of_players() -> void:
+	Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.VERSUS, 4)
+	var hud: Hud = await _overlay(Flow.HUD_SCENE) as Hud
+	assert_eq(hud.get_versus().player_count(), 4)
+	Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.VERSUS, 3)
+	assert_eq(hud.get_versus().player_count(), 3, "three players: three panels")
+	assert_null(hud.get_versus().get_panel(3))
+	await get_tree().process_frame
+	var count: int = 0
+	for child: Node in hud.get_children():
+		if child is HudVersus:
+			count += 1
+	assert_eq(count, 1, "the old panels are gone")
 
 
 ## A found Cave Painting that opens a reward (Save.reward_unlocked): "Unlocked: <reward>" under the HUD row for a few

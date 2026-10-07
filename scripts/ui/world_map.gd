@@ -94,7 +94,8 @@ var _slab: PaintingSlab = null
 ## The stone slab of the Far Shore map (DESIGN.md A.1 / C.9), small enough for the open sea under the stops: the 30
 ## paintings as the pieces of the mural they assemble (art-A's `ui/mural.png`, half size: a found painting shows its
 ## piece, a missing one its empty socket), the count on a dark plate, the six rewards (`ui/unlock_icons.png`, half size,
-## lit once open) and the next one ("3 more: Mesa Rodeo arena").
+## lit once open; the next one framed in gold) and the line under them, "3 more: Mesa Rodeo arena" - a line longer
+## than the slab scrolls through it like a ticker ([member line]).
 class PaintingSlab:
 	extends Control
 
@@ -102,6 +103,16 @@ class PaintingSlab:
 	## A mural piece at half size, and the mural of 6 x 5 pieces.
 	const PIECE: Vector2 = Vector2(12.0, 8.0)
 	const ICON: float = 12.0
+	## The ticker: px per second, and the gap before the text comes round again.
+	const TICKER_SPEED: float = 18.0
+	const TICKER_GAP: float = 28.0
+	const LINE_HEIGHT: float = 12.0
+
+	## The line under the rewards (a child that clips the ticker to the slab).
+	var line: Control = null
+	## The text of the line and how far the ticker has scrolled (px).
+	var line_text: String = ""
+	var ticker_offset: float = 0.0
 
 	var _mural: Texture2D = UiKit.tex(UnlocksScreen.TEX_MURAL)
 	var _icons: Texture2D = UiKit.tex(UnlocksScreen.TEX_UNLOCK_ICONS)
@@ -112,6 +123,30 @@ class PaintingSlab:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var mural: Vector2 = PIECE * Vector2(UnlocksScreen.MURAL_COLUMNS, UnlocksScreen.MURAL_ROWS)
 		custom_minimum_size = Vector2(PAD * 3.0 + mural.x + 3.0 * (ICON + 2.0) + 4.0, PAD * 2.0 + mural.y + 13.0)
+		line_text = UnlocksScreen.next_text()
+		line = Control.new()
+		line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		line.clip_contents = true
+		line.draw.connect(_draw_line)
+		add_child(line)
+		resized.connect(_place_line)
+
+	func _process(delta: float) -> void:
+		if is_ticker():
+			ticker_offset = fmod(ticker_offset + delta * TICKER_SPEED, line_width() + TICKER_GAP)
+			line.queue_redraw()
+
+	## True while the line is wider than the slab (it scrolls).
+	func is_ticker() -> bool:
+		return line != null and line_width() > line.size.x
+
+	## Width of the line's text in px.
+	func line_width() -> float:
+		return _small.get_string_size(line_text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, UiKit.SIZE_SMALL).x
+
+	func _place_line() -> void:
+		line.position = Vector2(PAD + 1.0, size.y - PAD - LINE_HEIGHT)
+		line.size = Vector2(size.x - PAD * 2.0 - 2.0, LINE_HEIGHT + PAD - 2.0)
 
 	func _draw() -> void:
 		UnlocksScreen.draw_sand_slab(self, Rect2(Vector2.ZERO, size))
@@ -130,13 +165,25 @@ class PaintingSlab:
 			if _icons != null:
 				draw_texture_rect_region(_icons, Rect2(at, Vector2(ICON, ICON)),
 						UnlocksScreen.reward_icon_region(i, UnlockTable.is_open(UnlockTable.REWARDS[i]["id"])))
-		var next: String = UnlocksScreen.next_text()
-		while next.length() > 4 and _small.get_string_size(next, HORIZONTAL_ALIGNMENT_LEFT, -1.0, UiKit.SIZE_SMALL).x 				> size.x - PAD * 2.0:
-			next = next.left(next.length() - 2) + "."
-		var baseline: Vector2 = Vector2(PAD + 1.0, size.y - PAD - 1.0)
-		draw_string_outline(_small, baseline, next, HORIZONTAL_ALIGNMENT_LEFT, -1.0, UiKit.SIZE_SMALL, 4,
-				Color("4a3a2a"))
-		draw_string(_small, baseline, next, HORIZONTAL_ALIGNMENT_LEFT, -1.0, UiKit.SIZE_SMALL, UiKit.COL_CREAM)
+			if UnlockTable.REWARDS[i]["id"] == next_reward_id():
+				draw_rect(Rect2(at, Vector2(ICON, ICON)).grow(1.0), UiKit.COL_FOCUS, false, 1.0)
+
+	## The line: the text once (or, as a ticker, twice: the second copy follows the first round the slab).
+	func _draw_line() -> void:
+		var baseline: float = LINE_HEIGHT - 1.0
+		var starts: Array[float] = [0.0]
+		if is_ticker():
+			starts = [-roundf(ticker_offset), -roundf(ticker_offset) + line_width() + TICKER_GAP]
+		for x: float in starts:
+			line.draw_string_outline(_small, Vector2(x, baseline), line_text, HORIZONTAL_ALIGNMENT_LEFT, -1.0,
+					UiKit.SIZE_SMALL, 4, Color("4a3a2a"))
+			line.draw_string(_small, Vector2(x, baseline), line_text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, UiKit.SIZE_SMALL,
+					UiKit.COL_CREAM)
+
+	## The reward the next paintings open (&"" once every reward is open).
+	static func next_reward_id() -> StringName:
+		var next: Dictionary = UnlockTable.next_reward()
+		return &"" if next.is_empty() else StringName(str(next["id"]))
 
 
 func _build_screen() -> void:

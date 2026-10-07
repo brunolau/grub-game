@@ -216,6 +216,41 @@ func test_a_respawn_puts_the_band_under_the_checkpoint_and_a_stop_zone_ends_the_
 	assert_eq(level.scroll_flags & Defs.SCROLL_RISING, 0, "for the rest of the stage")
 
 
+func test_rising_tar_for_two_makes_an_egg_of_the_hero_left_behind() -> void:
+	# 6-2b Heart of the Mangrove in co-op: `scroll = rising` + `liquid = tar`. P1 waits on a high ledge, P2 stays on the
+	# floor; the tar takes P2 (his toss, then an egg while P1 plays on), never touches the egg, and no team wipe.
+	var rows: PackedStringArray = _shaft(40)
+	rows[10] = "#########" + ".".repeat(14) + "#"
+	var level: Level = _load("scroll = rising\nrise_speed = 128\nliquid = tar", rows, "", 2)
+	var tide: RisingTide = level.get_rising_tide()
+	var p1: PlayerBase = level.player
+	var p2: PlayerBase = level.get_hero(1)
+	assert_true(level.party_driver is PartyDriver, "a co-op party")
+	p1.teleport(Vector2i(5 * Tuning.TILE + 8, 10 * Tuning.TILE))
+	GameInput.set_scripted(func(_tick: int) -> int: return Defs.IN_LOOK)
+	Sim.step(1)
+	GameInput.clear_scripted()
+	assert_true(tide.started)
+	for i: int in 30:
+		Sim.step(1)
+		if p2.dead:
+			break
+	assert_true(p2.dead, "the tar band passed P2's feet: his death toss")
+	assert_false(p1.dead, "P1 on the ledge is above it")
+	level.stop_rising()
+	var band: int = tide.band_top
+	for i: int in 80:
+		Sim.step(1)
+		if p2.is_down():
+			break
+	assert_true(p2.is_down() and not p2.dead, "after the toss: an egg (the partner plays on)")
+	Sim.step(20)
+	assert_true(p2.is_down() and not p2.dead, "the band never touches an egg")
+	assert_eq(tide.band_top, band, "the rise stopped")
+	assert_false((level.party_driver as PartyDriver).wipe_pending, "no team wipe while P1 stands")
+	assert_false(p1.dead)
+
+
 func test_a_level_without_the_rise_has_no_band() -> void:
 	var level: Level = _load("", _shaft(20))
 	assert_null(level.get_rising_tide())

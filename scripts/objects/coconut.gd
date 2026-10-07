@@ -9,7 +9,10 @@ extends SimEntity
 ##    every hero's club box of the previous tick that is a **front** frame of a melee weapon (forward front = drive
 ##    +/-144, -128; high front = lob +/-32, -240; low front = grounder +/-96, 0) and overlaps the ball (weapon test)
 ##    is a shot; a charged box (club_power over the weapon's power) smashes x3/2. The box is consumed (one target per
-##    box: no rival is hit by it). A shot within VersusTuning.RALLY_WINDOW_TICKS of the previous shot (anyone's)
+##    box: no rival is hit by it). **One shot per swing**: a strike's front frame lasts 3 ticks with a new box on
+##    each, so a hero whose front boxes came on every tick since his shot (the same swing) does not shoot again - those
+##    boxes stay for other targets (a bare PlayerBase without strike scripts has no swing: each box is a strike).
+##    A shot within VersusTuning.RALLY_WINDOW_TICKS of the previous shot (anyone's)
 ##    raises the rally by one, and |xvel| grows by RALLY_STEP per rally step up to BALL_MAX_SPEED (a faster shot,
 ##    a smash, keeps its own speed); a later shot restarts the rally. Two or more boxes on the same tick add up
 ##    (nobody wins by slot order: opposite drives cancel sideways). Every component stays within +/-AXIS_CAP.
@@ -122,6 +125,10 @@ var _missile_mask: int = 0
 var _knock_mark: PackedInt32Array = PackedInt32Array()
 ## Bit per slot that struck the last shot (its grace against its own ball).
 var _shooter_mask: int = 0
+## Per slot: the Sim.tick of his last front box (his swing goes on while one comes on every tick), and 1 when that
+## swing already shot the ball (one shot per swing).
+var _swing_tick: PackedInt32Array = PackedInt32Array()
+var _swing_shot: PackedInt32Array = PackedInt32Array()
 var _sprite: Sprite2D = null
 var _own_sheet: bool = false
 var _roll_px: int = 0
@@ -132,6 +139,10 @@ func _init() -> void:
 	set_box(BOX)
 	_knock_mark.resize(Defs.MAX_PLAYERS)
 	_knock_mark.fill(-1)
+	_swing_tick.resize(Defs.MAX_PLAYERS)
+	_swing_tick.fill(-1)
+	_swing_shot.resize(Defs.MAX_PLAYERS)
+	_swing_shot.fill(0)
 
 
 func _ready() -> void:
@@ -498,8 +509,19 @@ func _shots(level: LevelBase) -> void:
 		if weapon < 0 or weapon >= Tuning.WEAPON_THROWN.size() or Tuning.WEAPON_THROWN[weapon]:
 			continue
 		var kind: int = _shot_kind(hero)
-		if kind < 0 or not Overlap.weapon(hero.club_box, hero.club_box_xo, self):
+		if kind < 0:
 			continue
+		var slot: int = hero.slot
+		if _has_strike_scripts(hero):
+			var same_swing: bool = _swing_tick[slot] == Sim.tick - 1
+			_swing_tick[slot] = Sim.tick
+			if not same_swing:
+				_swing_shot[slot] = 0
+			elif _swing_shot[slot] != 0:
+				continue  # this swing shot the ball already: the box stays for other targets
+		if not Overlap.weapon(hero.club_box, hero.club_box_xo, self):
+			continue
+		_swing_shot[slot] = 1
 		hero.club_box_active = false
 		strikers |= 1 << hero.slot
 		var charged: bool = hero.club_power > Tuning.WEAPON_POWER[weapon]
@@ -522,6 +544,12 @@ func _shots(level: LevelBase) -> void:
 	ObjTuning.play_cue(Sfx.CLUB_HIT_HEAVY if any_charged else Sfx.CLUB_HIT)
 	level.spawn_fx(&"fx/hit_stars", center())
 	shot_made.emit(first_slot, first_kind, any_charged)
+
+
+## True for a hero with strike scripts (Player.club_frame): his front frames come on consecutive ticks of one swing.
+## A bare PlayerBase (tests, stand-ins) has none: each box it is given is a strike of its own.
+static func _has_strike_scripts(hero: PlayerBase) -> bool:
+	return hero.get(&"club_frame") != null
 
 
 ## The shot kind of a hero's club box: a front frame of a melee weapon (Player.club_frame; a bare PlayerBase counts as
@@ -707,6 +735,8 @@ func _on_level_reset() -> void:
 	_reset_left = 0
 	_missile_mask = 0
 	_knock_mark.fill(-1)
+	_swing_tick.fill(-1)
+	_swing_shot.fill(0)
 	teleport(drop_point)
 	xvel = 0
 	yvel = 0

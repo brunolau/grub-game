@@ -7,7 +7,7 @@ extends RefCounted
 ## `cloud` (9-1 Cloudbreak Climb, 9-2 The Roc's Spire, the Storm Roc's nest; default of the `sky` biome) and
 ## `driftwood` (7-2 Sea Caves' drop floes; default of the `coast` biome); the `ruins` biome defaults to `stone`. They
 ## are pictures only: every 48-px skin has the wood platform's box, so the rules and the routes never see a skin.
-## A picture that art-A has not delivered yet (PATHS) is drawn with its STAND_INS skin until the file exists.
+## Their files [M 17.3] have the layout of platform_wood.png: 96 x 16 art px, one cell, pivot (48, 0).
 
 const NAMES: Array[String] = ["wood", "ice", "stone", "small", "cloud", "driftwood"]
 const TEXTURES: Array[Texture2D] = [
@@ -15,14 +15,9 @@ const TEXTURES: Array[Texture2D] = [
 	preload("res://assets/sprites/objects/platform_ice.png"),
 	preload("res://assets/sprites/objects/platform_stone.png"),
 	preload("res://assets/sprites/objects/platform_small.png"),
+	preload("res://assets/sprites/objects/platform_cloud.png"),
+	preload("res://assets/sprites/objects/platform_driftwood.png"),
 ]
-## Files of the 2.0 skins (index - TEXTURES.size()), 96 x 16 art px like platform_wood.png [M 8], and the skin drawn
-## instead while a file does not exist.
-const PATHS: Array[String] = [
-	"res://assets/sprites/objects/platform_cloud.png",
-	"res://assets/sprites/objects/platform_driftwood.png",
-]
-const STAND_INS: Array[int] = [1, 0]
 ## Half width of each picture in art px (the pivot is the top centre).
 const HALF_WIDTHS: Array[int] = [48, 48, 48, 32, 48, 48]
 ## Contact boxes (w, h, x_offset) in logical px: the standing surface is the full picture width.
@@ -49,12 +44,9 @@ static func resolve(skin_name: String) -> int:
 	return NAMES.find(str(BIOME_SKINS.get(biome, NAMES[DEFAULT_SKIN])))
 
 
-## The picture of skin `index` (a 2.0 skin whose file is not there yet: its stand-in's picture).
+## The picture of skin `index`.
 static func texture(index: int) -> Texture2D:
-	if index < TEXTURES.size():
-		return TEXTURES[index]
-	var extra: int = index - TEXTURES.size()
-	return ObjTuning.picture(PATHS[extra], TEXTURES[STAND_INS[extra]])
+	return TEXTURES[index]
 
 
 ## Dress `platform` (its "Sprite" child and its box) in skin `index`.

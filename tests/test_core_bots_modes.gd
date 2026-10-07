@@ -314,7 +314,8 @@ func test_deflect_rates_follow_the_level() -> void:
 	# The thrower far away on the left, the bot standing on the right; the special comes from the right.
 	_level.get_hero(0).respawn_at(Vector2i(40, 160))
 	_level.get_hero(1).respawn_at(Vector2i(240, 160))
-	Sim.step(2)
+	# Past the spawn shield (a bot keeps it: no strike while it is up, BotBrain.may_strike).
+	Sim.step(VersusTuning.SPAWN_SHIELD_TICKS + 2)
 	for bot_level: int in [Defs.BotLevel.ROOKIE, Defs.BotLevel.HUNTER, Defs.BotLevel.CHIEF]:
 		var bot: HeroBot = HeroBot.new(1, bot_level, 40 + bot_level, Defs.VersusMode.LAST_CAVEMAN)
 		bot.bind(_level)
@@ -523,23 +524,28 @@ func test_ball_predictor_bounces_rolls_and_stops() -> void:
 
 
 func test_ball_predictor_matches_the_coconut() -> void:
-	# objects-B's objects/coconut (P2.7): the prediction is its own flight, tick for tick (tiles only).
+	# objects-B's objects/coconut (P2.7) on a Clubball pitch (the coconut sits out every other mode): the prediction is
+	# its own flight, tick for tick (tiles only: the flight stays clear of both heroes and both goal mouths).
 	if not Spawner.exists(&"objects/coconut"):
 		assert_true(true, "objects/coconut does not exist yet")
 		return
-	if not _start(2, {}, 3, FLAT_ARENA):
+	if not _start(2, {}, 3, "", Defs.VersusMode.CLUBBALL, PITCH, PITCH_ID):
 		return
 	GameInput.set_scripted_slot(0, func(_tick: int) -> int: return 0)
 	GameInput.set_scripted_slot(1, func(_tick: int) -> int: return 0)
-	var ball: SimEntity = _level.spawn(&"objects/coconut", Vector2i(160, 64), {}) as SimEntity
+	var ball: SimEntity = _level.spawn(&"objects/coconut", Vector2i(120, 64), {}) as SimEntity
 	assert_not_null(ball)
 	Sim.step(1)
-	ball.xvel = 80
+	ball.xvel = 40
 	ball.yvel = -64
 	var path: Array[Vector2i] = BallPredictor.predict(_level, ball, 40)
-	for t: int in 40:
+	assert_eq(path.size(), 40)
+	var bounced: bool = false
+	for t: int in mini(40, path.size()):
 		Sim.step(1)
 		assert_eq(ball.sim_pos, path[t], "tick %d" % t)
+		bounced = bounced or (t > 0 and path[t].y < path[t - 1].y and path[t - 1].y >= 150)
+	assert_true(bounced, "the flight bounced on the floor (%s)" % [path])
 
 
 func test_clubball_bot_drives_the_ball_at_the_goal() -> void:

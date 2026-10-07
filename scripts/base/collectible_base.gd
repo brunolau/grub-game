@@ -43,6 +43,9 @@ var resting: bool = false
 var _sprite: Sprite2D = null
 var _sprite_rest_y: float = 0.0
 var _bob_phase: int = 0
+## The bob offset (art px) last written to the sprite: the engine write happens only when it changes (2.0, player-A's
+## two-hero performance pass, PLAN P2.12; presentation only).
+var _shown_bob: int = -1
 var _holds_drop_slot: bool = false
 var _removing: bool = false
 ## Sim.get_phase_runs(CONTACT_ITEMS) when the item dozed off (its `age` catches up on waking).
@@ -240,7 +243,10 @@ func _on_level_reset() -> void:
 func _bob_tick() -> void:
 	var sprite: Sprite2D = get_sprite()
 	if sprite != null:
-		sprite.position.y = _sprite_rest_y - float(ObjTuning.BOB_ART[(age + _bob_phase) % ObjTuning.BOB_ART.size()])
+		var bob: int = ObjTuning.BOB_ART[(age + _bob_phase) % ObjTuning.BOB_ART.size()]
+		if bob != _shown_bob:
+			_shown_bob = bob
+			sprite.position.y = _sprite_rest_y - float(bob)
 
 
 ## One tick of the dropped-item physics of GAMEPLAY.md 4.2 / 4.5: integrate, light gravity, bounce off floors

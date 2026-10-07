@@ -822,7 +822,8 @@ stages and same-device versus for 2-4 players with bots. It restates `docs/expan
 as implementable rules; per-tick physics is in `docs/spec/PHYSICS.md` Appendix C ("P-C.n" below), level building in
 `docs/LEVEL_DESIGN.md` 15. Sections 1-12 do not change and remain the spec of Book I solo, which plays exactly as
 1.0.0. Values marked *(tune)* are playtest starting values (register in 13.11); resolutions of DESIGN.md are marked
-**[Rn]** (DESIGN.md "Appendix: P0.2 spec resolutions"). Time conversions: P-C.16.
+**[Rn]** (DESIGN.md "Appendix: P0.2 spec resolutions") and **[Gn]** (DESIGN.md "Appendix: G1 and phase-2
+resolutions"). Time conversions: P-C.16.
 
 ### 13.1 Modes, books and the campaign
 
@@ -842,8 +843,10 @@ as implementable rules; per-tick physics is in `docs/spec/PHYSICS.md` Appendix C
   in the other file (score kept), because the co-op file holds different entities.
 - **Linking** (1.0 rules of 1.1 and LEVEL_DESIGN 3): `w5_l2 -> w5_l2b`, `w6_l2 -> w6_l2b`, `w7_l2 -> w7_l2b`,
   `w8_l2 -> w8_l2b`, `w9_l1 -> w9_l1b`, `w9_l2 -> w9_l2b` (`tally = false` on the first half). Warps: `w5_l2 ->
-  bonus_d`, `w7_l1 -> bonus_e` (a warp in a bonus stage ends the source level with a tally). `w9_l3`'s final boss drops
-  the trophy (the Great Roast), which leads to `ending_b`.
+  bonus_d`, `w7_l1 -> bonus_e` (a warp in a bonus stage ends the source level with a tally, then the level after the
+  source stop, 1.1). A warp from a linked first half skips its sub-stage: 5-2's warp -> Feast Land D -> the tally of
+  the 5-2 stop -> the map of 6-1, passing Tusker's Wallow by, as warping from 3a skipped 3b in the original [G16].
+  `w9_l3`'s final boss drops the trophy (the Great Roast), which leads to `ending_b`.
 - **Expert wall**: a Beginner run ends after `w7_l2b`'s tally with the expert-wall picture "Only an expert eater may
   climb to the Roc!" and returns to the title (the 1.0 flow of 11.1 #10).
 - **Ending**: `ending_b` "The Long Raft Home" has no failure state (no enemies; its raft has `rails`, P-C.7,
@@ -893,15 +896,18 @@ ever needed** on a main path; specials open shortcuts, secrets and paintings (13
   opens hidden spots; at most 2 per hero. A spear that hits a **bark board** sticks and is a 16 px one-way step for
   220 ticks (blinks the last 22). Boards exist only where designers put them (secrets, the Feast Land D warp,
   paintings).
-- **Vines** (P-C.4): Up grabs a vine within 6 px; climb up 2 px/tick, down 3; Up at the top steps onto the ledge; a
-  direction + Jump leaps off; Down + Jump drops; no strikes on a vine; a hit knocks the hero off. **Rolled vines** lie
+- **Vines** (P-C.4): Up (without Down) grabs a vine within 6 px; climb up 2 px/tick, down 3; Up at the top steps onto
+  the ledge (a landing); a direction + Jump leaps off; Down + Jump drops; no strikes on a vine; a hit knocks the hero
+  off. A climber is held by his vine, so vines are climbed from rafts, spear steps and lifts [G8]. **Rolled vines** lie
   coiled on a ledge until one strike unrolls them (they stay unrolled).
-- **Tar** `:` (P-C.5): the hero sinks 6 px, wades at 2 px/tick and only hops (33 px); ground enemies are slowed the
-  same way; dropped items stop dead. `~` of `liquid = tar` kills like water. Honey (Feast Land D) and syrup (Feast
-  Land E) are the same rules in candy skins.
+- **Tar** `:` (P-C.5): the hero sinks 6 px, wades at 2 px/tick and only hops (33 px; on the tar itself the hop lands
+  on tick 16, 32 px out); ground enemies are slowed the same way; dropped items stop dead. The tar rules end at his next
+  landing or when anything but his own hop throws him up (a geyser, a bounce, a launch, a hurt) [G8]. `~` of
+  `liquid = tar` kills like water. Honey (Feast Land D) and syrup (Feast Land E) are the same rules in candy skins.
 - **Geysers** (P-C.6): bubble 22 ticks with a sound, then spout 12 ticks; the spout throws heroes, ground enemies,
-  rafts and drop platforms up with the spring power (default -224, 105 px). Harmless, except `deadly` vents (tar or
-  lava), which a heave boulder can plug. Skins: mud, blowhole, steam, soda.
+  rafts and drop platforms up with the spring power (default -224, 105 px); a geyser on a tar floor gets a wading
+  hero out with full air control. Harmless, except `deadly` vents (tar or lava), which a heave boulder can plug.
+  Skins: mud, blowhole, steam, soda.
 - **Rafts and currents** (P-C.7): rafts float on `~`; currents (1-3 px/tick) carry them; outside a current a raft
   slows by 1 px/tick every 8 ticks; banks stop it; a forward strike on a raft paddles it backward (up to 3 px/tick).
   Water stays deadly (no swimming).
@@ -909,11 +915,17 @@ ever needed** on a main path; specials open shortcuts, secrets and paintings (13
   (or the checkpoint) at `rise_speed` (default 1 px/tick) once the player moves; it kills on touch; the view never
   scrolls down; `zones/autoscroll_stop` ends it.
 - **Alternating gusts** (P-C.6): negative wind pushes right; `wind_loop` repeats a wind script (9-2, Floe Rink, Cloud
-  Top); crouching braces as in 1.0. **Lightning** (`zones/lightning`, 9-1b, Cloud Top): a darkening cloud marks the
-  hero's column 22 ticks before the bolt; a bolt hurts like an enemy (a glider is lost instead of a heart). **Drop
-  clouds / crumbling clouds / driftwood floes** are 1.0 drop platforms in new skins.
-- **Food rain** (`zones/food_rain period skin`, Feast Land E, `ending_b`): the ember-rain zone of 4-1 dropping
-  collectable food (the level's `bonus_tier` table) instead of embers; never hurts [R5].
+  Top); crouching braces as in 1.0; outside the ice biome the wind shows as gust streaks. **Co-op lee** [G23]: a hero
+  up to 64 px downwind of a crouching partner feels no wind, and a jump taken in the lee stays sheltered until he
+  lands - the "lee leapfrog" over gust gaps of up to 3 tiles. **Lightning** (`zones/lightning`, `period` [66]; 9-1b,
+  Cloud Top): a darkening cloud marks a hero's column 22 ticks before the bolt (the target alternates between the
+  heroes inside; eggs are never struck); a bolt hurts like an enemy (a glider is lost instead of a heart); cue
+  `Sfx.LIGHTNING_STRIKE`. **Drop clouds / crumbling clouds / driftwood floes** are 1.0 drop platforms in new skins.
+- **Food rain** (`zones/food_rain period skin=food|fruit`, Feast Land E, `ending_b`): the ember-rain zone of 4-1
+  dropping collectable food (`food`: the level's `bonus_tier` cell; `fruit`: the fruit cells) instead of embers, one
+  stream per hero inside; never hurts [R5].
+- **Lights in the dark**: on a Book II level, an arena or in a party, the night palette of 7.10 keeps a warm glow
+  around every hero and a teal glow around every prop whose picture name holds "glow"; Book I solo keeps the 1.0 look.
 
 ### 13.4 Chomper, the rex you ride
 
@@ -940,7 +952,7 @@ each declares its doze rule; Book I never spawns them). Defaults `hp` [25], `sco
 |---|---|---|
 | `enemies/roller` (13) | walks between `left` / `right` at 32 v16 *(tune)*; when its target is within `range` tiles horizontally and 4 rows vertically *(tune)* it **curls** (a 14-tick visible tuck, no motion) and **rolls** at the target's side at `speed`, following the ground and slopes, +4 v16 per tick while on a descending slope (cap 96); while rolling, weapon hits glance (clank) and its contact hurts; it rolls off ledges (gravity) and into liquids (gone); hitting a wall it stops and is **dizzy** `dizzy` ticks (hittable, harmless to bounce on), then uncurls (8 ticks) and walks; after 154 ticks of rolling it uncurls by itself *(tune)* | `range` [6], `speed` [64], `dizzy` [33], `left` / `right` [-3 / 3] |
 | `enemies/guard` (14) | patrols between `left` / `right` at 24 v16 *(tune)*, faces its target and **turns only every `turn` ticks** (its facing is re-decided on its own `turn`-tick clock); a hit from the side it faces (the striker's x on that side, or a projectile flying into its face) **glances** (the Colossus clank and spark); hits from behind count. Solo answer: bounce over it and strike before it turns | `turn` [33], `left` / `right` [-3 / 3] |
-| `enemies/mimic` (15) | drawn exactly as `objects/container skin=chest`; faces the nearer hero; when a hero comes within 32 px horizontally on its floor it shudders 10 ticks (telegraph), then bites with the snapper rules (`range` 42 px, 22-tick rest); front hits glance; a head bounce dazes it 22 ticks *(tune)* during which any hit counts; hits from behind count; killed, it drops `contents` | `contents` [`treasure`], `range` [42] |
+| `enemies/mimic` (15) | box 24 x 18 (the chest container's); while waiting it is drawn exactly as `objects/container skin=chest`, never mirrored; faces the nearer hero; when a hero comes within 32 px horizontally and 16 px vertically ("on its floor": a hero jumping over it does not wake it) it shudders 10 ticks (telegraph), then bites with the snapper rules (`range` 42 px - the snapper's strip -, recovery, 22-tick rest); front hits glance; a head bounce dazes it 22 ticks *(tune)*, during which it neither turns nor bites and any hit counts; hits from behind count; killed, its `contents` fan out; score index 5 (700) [G11] | `contents` [`treasure`], `range` [42] |
 
 ### 13.6 Bosses
 
@@ -1102,7 +1114,10 @@ Every new cue and music context is the pick of DESIGN.md F.2 (CC0 only; loudness
 context names are fixed in `Sfx` / `AudioTable` (PLAN P0.3). Gameplay emits a cue for: swap, spear stick, vine grab,
 splash / raft, geyser bubble and spout, tar step, egg down, hatch, Shoulder Hop / Totem Ride, curl, bat hit, brace,
 plate, drum (and the window count-in), see-saw, boulder / pulley, daze, Chomper bite, cookpot bank, crate drop, Hot
-Rock fuse. Boss music plays while a boss bar shows; versus has its own lobby, battle and sudden-death contexts.
+Rock fuse, lightning bolt (`Sfx.LIGHTNING_STRIKE`), the round gong (`Sfx.ROUND_GONG`). Boss music plays while a boss
+bar shows (a boss pushes its own `boss_*` context; `zones/arena music=` only overrides); versus has its own lobby,
+battle and sudden-death contexts. The level context of every Book II stage is fixed in LEVEL_DESIGN 15.2; a
+sub-stage keeps its first half's music, a co-op file its solo file's.
 
 ### 13.9 Co-op: the tribe
 
@@ -1115,9 +1130,12 @@ Rock fuse. Boss music plays while a boss bar shows; versus has its own lobby, ba
   Joining or leaving is possible from the panel, the world map or the pause menu; mid-stage it restarts the stage at
   the checkpoint in the other layout (13.1).
 - **Keyboard layouts** (bound by physical key, rebindable per slot; DESIGN.md D.11): Classic WASD + numpad (the versus
-  default, offered first), Two hands each (laptops), One hand each. The key test holds Left + Jump + Strike + Swap for
-  both players at once (ghosting check); NumLock off must still work for P2's numpad (aliases if needed). Left + Right
-  together is Look in every layout. In a party slot 0 uses its generated `p1_*` actions.
+  default, offered first: P1 W A S D, jump Space, **strike Left Ctrl** [G12], swap E, look Q; P2 Num 8 4 5 6, jump
+  Num 0, strike Num Enter, swap Num +, look Num `.`), Two hands each (laptops), One hand each. Left Shift is not a P1
+  key: with NumLock on, Windows wraps a numpad key pressed while Shift is held in synthetic Shift events. The key test
+  holds Left + Jump + Strike + Swap for both players at once (ghosting check); NumLock off works for P2's numpad (the
+  physical keys arrive; no aliases). Left + Right together is Look in every layout. In a party slot 0 uses its
+  generated `p1_*` actions.
 - Pads: one per slot, the solo layout (A jump, X / B strike, Y / RB look, LB swap, Start pause); rumble only on that
   slot's pad. Touch: phones one touch player; tablets of 9 inches or more get the experimental **table mode**.
 - **Emote**: a double tap of Look shows a bubble over the hero ("!", "?", heart, angry).
@@ -1137,39 +1155,52 @@ Rock fuse. Boss music plays while a boss bar shows; versus has its own lobby, ba
   colour) that drifts after his partner; its owner nudges it Left / Right. The partner hatches it with any hit, a
   thrown weapon or a head bounce; a checkpoint touched by either hero hatches every egg. The hatched hero gets 2 hearts
   (Beginner) / 1 (Expert) and 44 ticks of blinking. Expert: an egg not hatched within 243 ticks flies to the
-  checkpoint and waits. **The egg scouts**: hidden spots within 32 px of an egg glint. An egg never touches plates,
-  items or enemies, so it can never solve a gate.
+  checkpoint and waits. **The egg scouts**: every unopened hidden spot whose cell lies within 32 px of an egg's box
+  twinkles (a four-point star) while the egg is there. An egg never touches plates, items or enemies, so it can never
+  solve a gate.
+- **An egg is no springboard** [G1]: the head bounce that hatches an egg is -64 (10 px) with or without Up. A
+  Shoulder Hop needs an **active** partner - one whose own player gave any input since he last hatched or spawned; Up
+  held over an idle partner passes through him, and without Up the Totem Ride still starts (98 px from a still carrier,
+  below every boost ledge). One player can never use an egg or an idle partner as a step.
+- **Flies** (7.9): the flies a hero gathers circle him (one swarm per hero); the water bucket washes only the hero
+  who took it.
 - **Voluntary egg**: Down + Look held 24 ticks. **Helper mode** (Options): P2 cannot be hurt by enemies (pits and
   liquids still egg him); gates unchanged.
 - **Team exit**: the stage ends when both heroes touch the exit totem (an egg anywhere on the view counts as present).
 - **Gates**: Down on a gate takes both heroes; a partner more than one view (320 px across or 176 px up / down) away
   arrives as an egg; eggs travel as eggs.
-- **Camera**: one shared paging camera (P-C.13): the view edges are walls; the vertical follow uses the grounded hero;
-  holding Look claims it; a hero off the view gets an edge arrow with a stone countdown and becomes an egg after 121
-  ticks (Beginner) / 73 (Expert). No zoom, no split screen.
+- **Camera**: one shared paging camera (P-C.13): the view edges are walls; the vertical follow uses the grounded hero,
+  and while both heroes stand with their feet at most 9 rows apart the view keeps both whole; holding Look claims it;
+  a hero off the view (above or below it too, while his partner holds it) gets an edge arrow with a stone countdown and
+  becomes an egg after 121 ticks (Beginner) / 73 (Expert). No zoom, no split screen.
 
 #### 13.9.3 Duo moves and windows
 
 | Move | Rule (P-C.10, P-C.11) | Easy role / hard role |
 |---|---|---|
-| **Shoulder Hop** | land on the partner's head with Up held: bounce -224, feet reach 140 px over the floor | stand still / one held jump |
-| **Totem Ride** | land on the partner without Up: ride his head; his jumps are halved; the rider strikes (high strike 61-77 px over the floor), jumps off (Up; a jump timed 1-5 ticks after the carrier's reaches 8+ tiles) or drops (Down + Jump) | walk / strike |
-| **Batter Up** | Down + Swap curls a hero (up to 66 ticks); the partner's strike launches him: forward line drive 153 px, high lob 120 px up, low grounder 192 px, charged x1.5; the ball breaks `$` blocks, opens spots it touches, knocks enemies with hp < 50 | curl / aim and strike |
+| **Shoulder Hop** | land on an **active** partner's head with Up held: bounce -224, feet reach 140 px over the floor | stand still / one held jump |
+| **Totem Ride** | land on the partner without Up (not curled, not mounted): ride his head; his jumps are halved; the rider strikes (high strike 61-77 px over the floor), jumps off (Up; a jump timed 1-5 ticks after the carrier's reaches 8+ tiles - measured against the carrier's rise, so his halved hop never sheds the rider) or drops (Down + Jump) | walk / strike |
+| **Batter Up** | Down + Swap curls a hero (up to 66 ticks); the partner's strike launches him: forward line drive 153 px, high lob 120 px up, low grounder 192 px, charged x1.5; a line drive or a lob stops where it lands; the ball breaks `$` blocks, opens spots it touches, knocks enemies with hp < 50 | curl / aim and strike |
 | **Brace Wall** | two crouching heroes within 16 px stop a `heavy` dead and daze it 44 ticks with its head open; a lone croucher is trampled | crouch / crouch and line up |
 | **Egg Hatch** | 13.9.2 | be carried / strike the egg |
 
 - **Windows** (twin drums, bonds, split halves, twin boss hits, the tentacle flinch): **24 ticks on Beginner, 12 on
   Expert**, and never longer than the measured solo minimum minus 4 ticks: `window = min(24 B / 12 E, solo_min - 4)`
-  per placed gate or record (`tests/test_coop_gates.gd` measures `solo_min` with the single-hero search). Every window
-  has an audible count-in (three blips 8 ticks apart while a hero stands at each target, then "go"); nothing needs two
-  inputs on the same tick.
+  per placed gate or record (`tests/test_coop_gates.gd` measures `solo_min` with the single-hero search). A record
+  sets its own cap with `window=<ticks>` (bond, split, daze): effective = `min(difficulty value, window)`; a bond uses
+  the smallest `window` of its members; one value serves both difficulties [G2]. Every window has an audible count-in
+  (three blips 8 ticks apart, then "go"): drums while a hatched hero stands within 40 px of every drum; a bond whose
+  members all live, or the two halves of a split, while each member has a hatched hero within 48 px on both axes and
+  those are not all one hero - once per arrival (again only after the heroes left and came back), silent once the
+  window is open. Nothing needs two inputs on the same tick. The values are kept for phase-3 content; the pair
+  playtests of P4.5 may only shorten them [G3].
 - Every launch moves at most 18 px/tick or teleports with `notify_hero_teleported` (the doze rule, P-C.15).
 
 #### 13.9.4 Enemies in co-op: the base rules
 
 - **Target** = the nearest hatched hero (`|dx| + |dy|`, ties -> P1), sticky for `TARGET_HOLD_TICKS` = 22 *(tune)*
   unless that hero stops being hatched. Despawn only when far from both heroes. Zone spawners (types 0, 10, 11, 12)
-  alternate between the heroes inside their zone; their `max` is x1.5 (rounded down). The active cap stays 12. Each
+  alternate between the heroes inside their zone (slot order); their `max` is x1.5 (rounded down). The active cap stays 12. Each
   hero's stolen heart bursts as 6 bones for the team (an enemy that hurt both releases 12). Enemies reset only on a
   team wipe. Hit points are unchanged (two heroes already deal double damage).
 - Per archetype:
@@ -1178,7 +1209,7 @@ Rock fuse. Boss music plays while a boss bar shows; versus has its own lobby, ba
 |---|---|---|
 | 0 Dropper | drops land beside each hero in turn | `bond` (pairs, one by each hero), `split` (tar blobs) |
 | 1 Decoration | none | - |
-| 2 Dangler | unchanged; its thread can be struck (cuts it: the dangler falls off and is gone) *(tune)* | `grab` (Snatcher bat) |
+| 2 Dangler | unchanged; a hero's club box over its thread (4 px wide, attach point to body) cuts it: the dangler falls off, harmless, and is gone without points until a team wipe (the Snatcher bat keeps its thread) | `grab` (Snatcher bat) |
 | 3 Lurker | drops when any hero is in range, chases the nearest | `leech` |
 | 4 Swinger | unchanged | `bond` (pairs swinging in opposition, rare) |
 | 5 Stinger | dives at its target | `lone`, `grab` (Snatcher gull / pterodactyl) |
@@ -1189,7 +1220,7 @@ Rock fuse. Boss music plays while a boss bar shows; versus has its own lobby, ba
 | 10 Digger | rises beside each hero in turn | `lone` |
 | 11 Leaper | leaps at its target | `bond` (twin leapers from two pits) |
 | 12 Charger | runs at its target | `heavy` (Bull Rex), `lone` |
-| Snapper | bites the nearest; the bite tests every hero; its stem is open for 20 ticks after a lunge, only from the side opposite the lunge (bait-and-bite, built in) | - |
+| Snapper | bites the nearest; the bite tests every hero (the 1.0 rules otherwise; the bait-and-bite stem rule is dropped [G10]) | `bond` (twin rattlers) |
 | 13 Roller | rolls at the nearest | `bond` pairs on two slopes |
 | 14 Guard | turn delay 33 as solo | `shell` (turns every tick: the Shellback guard) |
 | 15 Mimic | bites the nearer; its back faces the far hero | none |
@@ -1209,7 +1240,7 @@ of the enemy records carry a trait, and every enemy guarding a main-path chokepo
 | `lone` | while the two hatched heroes are within 64 px of each other on both axes it keeps away (it does not dive, charge or rise; flyers circle 32 px wider); otherwise it targets the hero farther from the view centre (ties -> the higher slot) [R9]. Off on Beginner (plain targeting) | staying together is the defence |
 | `grab` | a hero who touches it from below (his feet below its feet point) or whom it dives onto is **seized** instead of hurt: he cannot move or strike, and it carries him towards its perch (`perch=c,r`, a pit-side cell) at 1 px/tick, dropping him there; the partner frees him with any hit on it (the hit counts; the freed hero falls with 44 ticks of immunity) | a grabbed hero cannot strike |
 | `leech` | it lands on a hero's back (instead of hurting) and drains one bone per 44 ticks; only the partner's weapon reaches it (the host's own boxes skip it); alone it falls off after 220 ticks | a hero cannot hit his own back |
-| `split` | the first hit splits it (no damage) into two halves of `hp` 0 that run apart at 48 v16 for 22 ticks *(tune)*, then act normally; both must die within the window, or the dead half regrows next to the living one and they merge back into the whole | the halves run in opposite directions |
+| `split` | the first hit splits it (no damage) into two halves of `hp` 0 that run apart at 48 v16 for 22 ticks *(tune)*, then go on at their archetype's own speed in the run's direction (the spawned half wears the other palette and shows `squash`); both must die within the window, or the dead half regrows next to the living one and they merge back into the whole. The falling tar blobs of 6-1 are `enemies/dropper coop=split skin=slime` | the halves run in opposite directions |
 
 - Keeper groups: enemies may carry `keeper=<name>` (a group tag; a door `objects/column trigger=keepers:<name>` opens
   when every enemy of the group is dead) [R10].
@@ -1228,24 +1259,34 @@ Presets (archetype + trait + skin), each its own scene, only in `*_coop.lvl` fil
 | `enemies/tar_splitter` | Dropper / Walker + `split` | RPG `slime` (two palettes = two halves) | fen, Feast Land D (honey skin) |
 | `enemies/shaman` | new patroller | `characters/npc/dragon-man` | keep, ruins |
 
-**Shaman**: patrols his platform at 48 v16 *(tune)*, fleeing from the nearer hero (he turns away when a hero comes
-within 64 px); every enemy within 64 px of him wears a bone shield (all its hits glance) until he dies; hp [25]. He
-has to be pinned from both sides.
+**Shaman** [G11]: patrols his platform at 48 v16 *(tune)*, fleeing from the nearer hero within 64 px at about his
+height (32 px vertically) by turning at once; at the edge of his platform he turns (never walks off); cornered while
+fleeing (his limit, a wall or the edge right ahead) he hops over that hero (45 px high, 4 px per tick, harmless to
+touch during the hop) and runs on - so one hero rarely corners him and two pin him. **Bone shield**: every other enemy
+within 64 px on both axes, in a co-op party only (a party of one meets a plain patroller); Shamans and bosses are
+never shielded; a bone floats over each shielded enemy, all its hits glance, and it holds through the tick he dies
+in. hp [25], score index 5.
+
+**As built** [G11]: the Book I Shellback (`skin=turtle|turtle_b`) is a Walker with the shell trait (walker speed 32
+and score, no Guard clock); the bone sheet stays a Guard. **Bull Rex** wakes by the view (not the edge rusher's
+trigger), runs at its target at `speed` [64], turns round when it overran its target by 48 px or at a wall; never
+one-shot. **Snatcher**: `kind=stinger` after a carry flies back to where it seized the hero, then home to its anchor
+(2 px/tick) and hovers; `kind=dangler` takes up its thread at its line again. **Tar Splitter** is the walker form.
 
 #### 13.9.7 Co-op objects
 
 | Id | Rule |
 |---|---|
-| `objects/plate name= count=1\|2 mode=hold\|timed:<ticks>\|latch w=<cells>` | `w` [2] cells of floor; **weight** = hatched heroes standing on it (grounded, feet point inside) + 2 for a mount + 2 for a heave boulder resting on it; enemies and eggs weigh 0. Pressed while weight >= `count`; `timed:T` stays pressed T ticks after the weight leaves (a stone clock shows it); `latch` stays pressed for good. It sinks 2 px (drawing) and clicks |
-| `objects/column ... rise_while=<plate>[,...]` / `sink_while=` | the 1.0 column driven by plates: while **all** listed plates are pressed it rises (sinks) 1 tile per 4 ticks up to `rise`, and returns at the same rate when released; `shake` defaults to 0 for plate columns. A plate stands **8+ tiles** from its door |
-| `objects/column trigger=keepers:<name>` | the **keeper door**: rises once when every enemy with `keeper=<name>` is dead. Keepers carry `shell`, `bond` or `daze` and stand in a hall **3 rows high** |
+| `objects/plate name= count=1\|2 mode=hold\|timed:<ticks>\|latch w=<cells>` | `w` [2] cells of floor, anchored at its **left** cell and covering `w` cells to the right; **weight** = hatched heroes whose feet are over its cells, on its floor or up to 8 px above it and not rising (a screen shake does not release it) + 2 for a mount + 2 for a heave boulder resting on it; enemies and eggs weigh 0. Pressed while weight >= `count`; `timed:T` stays pressed T ticks after the weight leaves (a stone clock shows it); `latch` stays pressed for good. It sinks 2 px (drawing) and clicks |
+| `objects/column ... rise_while=<plate>[,...]` / `sink_while=` | the 1.0 column driven by plates: while **all** listed plates are pressed it rises (sinks) 1 tile per 4 ticks up to `rise`, and returns at the same rate when released; `shake` defaults to 0 for plate columns. A plate stands **8+ tiles** from its door. One door cannot be opened from both sides: a leapfrog uses two doors in two corridors [G9]. **Door rule**: a driven block (plates, keepers, drums) whose next cell in its direction of travel is solid is a door - the cells it leaves become air (a portcullis rising into a ceiling slot, a slab sinking into the floor); a block moving into air keeps the 1.0 pillar rule. A returning door never moves into a hero: it waits |
+| `objects/column trigger=keepers:<name>` | the **keeper door**: rises once when every enemy with `keeper=<name>` is dead. Keepers carry `shell`, `bond` or `daze` and stand in a hall **4 rows high** (the Guard and Shellback art is 54 px tall) [G4]; a keeper door is the bottom cells of a wall that continues above the hall, `rise` = 4 |
 | `objects/column trigger=drums:<bond>`, `objects/gate needs=<bond>` | opened by a drum bond [R10] |
 | `objects/drum bond=<name>` | a hittable (every weapon box, thrown weapon or ball, at most one hit per 6 ticks): the first hit lights it and opens the window; when every drum of the bond is lit within it, the bond succeeds for good (its column rises, its gate unlocks); otherwise all go dark and can be tried again |
-| `objects/seesaw len=<cells>` | [5]; two end platforms 16 px apart in height around the pivot. A body landing on the **high end** (`yvel >= 16` at contact) flips it within 2 ticks and launches whoever stands on the low end with `max(-(yvel + 32) - (64 if hard landing), -288)` (6.5 hard landing; P-C.17 table: 1 tile -128, 4 tiles -272, 5+ tiles -288 = 171 px); a weaker result than -64 only lifts him. Enemies on the low end are thrown off the same way |
+| `objects/seesaw len=<cells> [facing]` | [5]; two end platforms 16 px apart in height around the pivot (the fulcrum at the anchor's feet point, the plank `len * 8` px each side, `facing` names the high end [r]; the low end lies 1 px over the floor, the high end one row higher). Two heroes on one see-saw play ping-pong (the launched hero's landing flips it back). A body landing on the **high end** (`yvel >= 16` at contact) flips it within 2 ticks and launches whoever stands on the low end with `max(-(yvel + 32) - (64 if hard landing), -288)` (6.5 hard landing; P-C.17 table: 1 tile -128, 4 tiles -272, 5+ tiles -288 = 171 px); a weaker result than -64 only lifts him. Enemies on the low end are thrown off the same way |
 | `objects/boulder_heavy` | a 2 x 2-cell solid tile mover; it moves 1 tile once two hatched heroes have pushed the same side (grounded, walking into it) on 6 ticks in a row; it falls 1 tile per 2 ticks when unsupported (never onto a hero: it waits); weight 2 on a plate; it plugs a geyser vent it rests on (P-C.6) |
 | `objects/pulley a=<platform> b=<platform> range=<rows>` | two linked sprite platforms; weight as plates; the heavier side sinks 2 px/tick and the other rises the same, each at most `range` [3] rows from its start; equal weights do not move |
-| `objects/flower_pot` | stands on a ledge edge; a strike pushes it off the edge on the striker's side; it falls (gravity 16) and becomes a permanent `objects/spring` (-224) where it lands (lost in a pit, back on its ledge after a team wipe). Every boost ledge holds a drop gift: a rolled vine or a flower pot |
-| `objects/x2_tablet gate=<name> far=<col>,<row> [secret]` | a stone tablet carved with two cavemen marks every co-op gate and co-op secret (a sign skin, no HUD); `far` is the cell beyond the gate that the solo search must fail to reach (LEVEL_DESIGN 15.7.6) |
+| `objects/flower_pot` | stands on a ledge edge; a strike pushes it in the strike's direction (the striker's facing; a thrown weapon's or ball's flight); it slides to its floor's edge or a wall, falls at 2 px/tick and becomes a permanent `objects/spring` (-224) where it lands, 1-2 cells beyond the ledge's face (lost in a liquid, pit or spikes: back on its ledge after a team wipe; a landed spring stays through team wipes). **It reaches 6 rows from the floor it takes root on** (a 105 px rise from the spring's top, 10 px over the floor: 19 px to spare) [G6]. Every boost ledge holds a drop gift: a rolled vine or a flower pot |
+| `objects/x2_tablet gate=<name> far=<col>,<row> [secret]` | a stone tablet carved with two cavemen marks every co-op gate and co-op secret (a sign skin, no HUD); `far` is the cell beyond the gate that the solo search must fail to reach (LEVEL_DESIGN 15.7.6); it lights its marks once a hatched hero stood in `far`, and stays lit |
 | `objects/hero_start slot=2` | P2's start; ignored in solo |
 | `objects/exit`, `objects/gate` | team exit and team gates (13.9.2) |
 
@@ -1308,10 +1349,11 @@ The Beginner wall is unchanged in both books.
 
 Existing attacks (forward strike damaging from tick 5, high strike as anti-air, low strike, stomp, the crouch-charged
 strike, thrown specials) with the versus rules of P-C.14: hits knock away (+/-64, -128), a charged hit launches,
-clang, deflect, the stomp ladder 1-2-3-4-6-8 with an 8-tick squash, the curl stance (and batting a curled rival into
-a hazard), 12 stunned + 30 immune ticks, hit-stop 2 (4), body bump, 48-tick spawn shield. Everyone starts every round
-with the club; specials come from pterodactyl crates straight onto the belt and are temporary. Spawns rotate every
-round (the physics is left-right asymmetric).
+clang, deflect, the stomp ladder 1-2-3-4-6-8 with an 8-tick squash (a stomp is a landing: a hero standing on a tier
+does not stomp a head that rises into his feet [G15]), the curl stance (and batting a curled rival into a hazard),
+12 stunned + 30 immune ticks, hit-stop 2 (4), body bump, 48-tick spawn shield. Thrown specials that hit a wall lie in
+front of its face, never inside it [G17]. Everyone starts every round with the club; specials come from pterodactyl
+crates straight onto the belt and are temporary. Spawns rotate every round (the physics is left-right asymmetric).
 
 **Currency per mode**: Grub Stack - stack units; Last Caveman Standing - hearts; Hot Rock - none (a hit only passes
 the ember); Clubball - none (a hit only knocks back).
@@ -1337,8 +1379,11 @@ the ember); Clubball - none (a hit only knocks back).
 - **Food sources**: visible hidden spots that refill **364 ticks** (15 s) after they are emptied (they sparkle 49
   ticks before); one big spot (3 hits by anyone) whose giant bonus falls from 7 rows up and **bonks** the head it lands
   on (the 4.5 bounce, plus a 12-tick daze *(tune)*); pterodactyl crates every **486 ticks** (20 s) on marked lanes
-  (`objects/crate_lane`; a shadow 22 ticks ahead): food, a special, one cutlery piece, sometimes a skull or a grenade
-  (`Sim.rng`, round seed).
+  (`objects/crate_lane`; a shadow 22 ticks ahead): **one crate holds all of** food, a special, one cutlery piece and
+  sometimes a skull or a grenade (`Sim.rng`, round seed; the referee's per-mode table: Last Caveman Standing a heart
+  instead of food, Hot Rock no food). One crate per period over all lanes, on a free lane; a lane holds one crate at a
+  time; it falls onto the first floor under the lane's top row inside its rect; one hit opens it; its specials are
+  temporary [G18].
 - **Items**: *Feast* (fork + knife + spoon, each from crates, dropped on a hit): 194 ticks in which your touch knocks
   3 units off anyone and hits cannot touch you; a shake warns 7 ticks before the end. *Skull*: whoever picks it up
   spills everything (all of it bursts out). *Grenade*: every rival spills 5 (or all he has).
@@ -1369,14 +1414,19 @@ picks a new holder among the rest with a new fuse. Last one standing wins; first
 
 1v1, 2v1 or 2v2 on Coconut Cove, club only (no crates).
 - **The coconut** (`objects/coconut`, box 16 x 16): gravity 16 (cap 192); on a floor it bounces with
-  `yvel = -(yvel * 3) >> 2` while `yvel >= 32`, else it rolls, losing 2 v16 per tick *(tune)*; walls and ceilings
-  reflect it at 3/4; a coconut landing on a head bounces up at 3/4 (at least -96).
-- **Shots**: a front box touching it sets its velocity by the strike - forward **drive** (+/-144, -128), high **lob**
-  (+/-32, -240), low **grounder** (+/-96 along the floor), charged **smash** x3/2 - and every strike within 44 ticks
-  of the previous one (anyone's) adds 16 to `|xvel|`, up to 192 (12 px/tick): rallies escalate. Every component stays
-  within +/-288. A curled teammate can be batted into it as a missile (the ball's velocity passes to the coconut).
+  `yvel = -(yvel * 3) >> 2` while `yvel >= 32`, else it rolls, losing 2 v16 per tick *(tune)*; gravity also runs on
+  the bounce tick, so the bounces die down within six [G19]; walls and ceilings reflect it at 3/4; a coconut landing
+  on a head it does not knock down bounces up at 3/4 (at least -96), an immune hero's head too. Order per tick and
+  the prediction the bots share: P-C.14.
+- **Shots**: only a **front** box shoots; it sets its velocity by the strike - forward **drive** (+/-144, -128), high
+  **lob** (+/-32, -240), low **grounder** (+/-96 along the floor), charged **smash** x3/2; boxes on the ball in one
+  tick add up (opposite drives cancel; nobody wins by slot order); one swing shoots it at most once (front boxes on
+  consecutive ticks are one swing) - and every shot within 44 ticks of the previous one (anyone's) adds 16 to
+  `|xvel|`, up to 192 (12 px/tick): rallies escalate; a faster shot (a smash, 216) keeps its own speed. Every
+  component stays within +/-288. The striker is not knocked down by his own shot for 8 ticks. A curled hero flying as
+  a ball passes his velocity to the coconut once per flight (credited to his batter); he flies on.
 - A coconut faster than 8 px/tick on either axis that touches a hero knocks him down (12 stunned ticks, no
-  immunity) and bounces back at half speed.
+  immunity) and bounces back at half speed; a slower one passes through bodies.
 - **Goals** (`zones/goal team=1|2`): a goal mouth 3 rows high at each end; the coconut's centre inside the other
   team's goal scores; it is reset to the drop point 66 ticks later, heroes back at their spawns. First to 5 goals, or
   the most after 4 370 ticks (3 min); a tie plays on with a "golden coconut" (next goal wins).
@@ -1408,8 +1458,12 @@ Ten single-screen arenas, 8 at launch (DESIGN.md E.5; building rules LEVEL_DESIG
 left-right, Grub Stack), Echo Hollow (cave, wrap top-bottom, Hot Rock), Floe Rink (ice, open sides, LCS), Cinder Pit
 (volcano, LCS), Tar Pulleys (swamp, Grub Stack), Coconut Cove (coast, Clubball), Sky Picnic (Feast Land, wrap
 top-bottom, **no deaths**, Hot Rock / Grub Stack), Colossus Hall (keep, Grub Stack; the Colossus spits at the crowned
-leader every 243 ticks with its jaws open 10 ticks ahead), Mesa Rodeo (5 paintings; Chomper leaves his pen every 728
-ticks after a 22-tick rumble; his rider bites, spilling 3, until a stomp unseats him), Cloud Top (20 paintings).
+leader every 243 ticks with its jaws open 10 ticks ahead), Mesa Rodeo (5 paintings; Chomper starts penned and is
+released at every multiple of 728 round ticks while he waits penned, after a 22-tick rumble - his picture shakes and
+the quake cue plays, no screen shake; once out he waits for a rider and stays out; his rider's bite bites rivals
+(Grub Stack: spill 3); a stomp on the rider unseats him - thrown off, no stun - and Chomper stays out for the
+stomper; only a hit sends him back to his pen for the next release [G20]), Cloud Top (20 paintings). Arenas are
+20 x 12 cells (LEVEL_DESIGN 15.8); the Totem Ring as built is DESIGN.md E.5 [G14].
 
 | Sudden death | Rule (every one telegraphed 10+ ticks ahead) *(tune all)* |
 |---|---|
@@ -1450,9 +1504,11 @@ Lava Lover, Head Case (bonked by a giant bonus), Comeback Caveman, Pacifist. **R
 
 ### 13.11 The *(tune)* register
 
-Every starting value below is used from phase 1 on. Co-op windows, dazes and boss timings are tuned in the **pair
-playtests at gate G1** (mixed-skill pairs on every gate type) and written into DESIGN.md before content production;
-windows can only shrink below `solo_min - 4`, never exceed it. Versus values are tuned with the headless bot soak
+Every starting value below is used from phase 1 on. Co-op windows, dazes and boss timings were to be tuned in the
+pair playtests at gate G1; G1 passed on its automated criteria without them, so **every value below stays at its
+start for phase-3 content** and the mixed-skill pair playtests move to P4.5 [G3] (no G1 measurement asked for a
+change; player-A's egg bounce, -64, is the only value G1 changed [G1]); windows can only shrink below
+`solo_min - 4`, never exceed it. Versus values are tuned with the headless bot soak
 (1 000 seeded rounds per mode: round length, win rate per spawn within +/-15 %) and human playtests. The lead designer
 records every change in DESIGN.md, then here and in PHYSICS Appendix C.
 
@@ -1462,9 +1518,10 @@ records every change in DESIGN.md, then here and in PHYSICS Appendix C.
 | Tar hop impulse ticks / tar air cap | 2 / 32 v16 | 6-1 playtests: tar must feel slow, a 1-tile step out must work |
 | Geyser period, deadly vent box, lightning bolt | 88 / 24 x 64 / 4 ticks | stage playtests |
 | Vine re-grab lock | 12 ticks | vine-to-vine leaps |
-| Totem drop lock, egg drift (2 / 6 px), egg nudge | 12 / 2-6 / 1 | G1 pair playtests |
-| Curl box, all Batter Up velocities | 24 x 20; P-C.11 | G1: gap and lob gates |
-| Twin windows / daze | 24 B / 12 E; 14 B / 12 E | G1; always `<= solo_min - 4` |
+| Totem drop lock, egg drift (2 / 6 px), egg nudge | 12 / 2-6 / 1 | P4.5 pair playtests (unchanged at G1) |
+| Curl box, all Batter Up velocities | 24 x 20; P-C.11 | P4.5: gap and lob gates (no Batter Up gate in the G1 slice) |
+| Twin windows / daze | 24 B / 12 E; 14 B / 12 E | P4.5 pair playtests; per record `window=`; always `<= solo_min - 4` |
+| Lee reach | 64 px downwind, 16 px vertical | 3-1b / 9-2 co-op playtests |
 | `TARGET_HOLD_TICKS` | 22 | co-op enemy feel |
 | Roller walk / range / uncurl, Guard patrol, Mimic daze, Shaman speed, split run | 32 v16, 4 rows, 154; 24 v16; 22; 48 v16; 48 v16 for 22 | enemy tests and playtests |
 | Mount food bonus, wild rex pace | 500; 16 v16 | 6-1 playtests |

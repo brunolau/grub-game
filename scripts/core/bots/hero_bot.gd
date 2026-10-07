@@ -85,6 +85,7 @@ var _seen: Array[PackedInt32Array] = []
 var _seen_ticks: PackedInt32Array = PackedInt32Array()
 var _seen_count: int = 0
 var _installed: bool = false
+var _installed_slot: int = 0
 # Levels already reported as having no graph.
 static var _warned: Dictionary = {}
 var _last_pos: Vector2i = Vector2i(-(1 << 20), -(1 << 20))
@@ -103,13 +104,21 @@ func _init(p_slot: int = 0, p_level: int = Defs.BotLevel.HUNTER, p_seed: int = 1
 
 
 ## A bot that drives `p_body`, a hero body of a boss shell (the Rival Chieftains), with a [ChieftainBrain]; `key`
-## mixes into its stream (0 = Gorm, 1 = Gulla) and is the GameInput slot [method install] would feed.
+## mixes into its stream (enemies-C passes 2 for Gorm, 3 for Gulla). [method install] feeds the GameInput slot the
+## body reads (its `slot`; [member input_slot]).
 static func for_boss(p_body: PlayerBase, p_seed: int, p_level: int = Defs.BotLevel.HUNTER, key: int = 0) -> HeroBot:
 	var bot: HeroBot = HeroBot.new(key, p_level, p_seed, Defs.VersusMode.GRUB_STACK)
 	bot.body = p_body
 	bot.brain = ChieftainBrain.new()
 	bot.brain.bot = bot
 	return bot
+
+
+## The GameInput slot this bot feeds: its boss body's slot (the slot the body reads), else [member slot].
+func input_slot() -> int:
+	if body != null and is_instance_valid(body):
+		return clampi(body.slot, 0, Defs.MAX_PLAYERS - 1)
+	return slot
 
 
 ## The seed of a bot's own stream: the match (or round) seed mixed with the slot.
@@ -160,16 +169,17 @@ func set_mode(mode: int) -> void:
 	brain.bot = self
 
 
-## Feed the slot from this bot (GameInput.assign_slot with InputSlot.bot).
+## Feed the slot from this bot (GameInput.assign_slot with InputSlot.bot; [method input_slot]).
 func install() -> void:
-	GameInput.assign_slot(slot, InputSlot.bot(produce))
+	_installed_slot = input_slot()
+	GameInput.assign_slot(_installed_slot, InputSlot.bot(produce))
 	_installed = true
 
 
 ## Give the slot back (it reads nothing until it is assigned again).
 func uninstall() -> void:
 	if _installed:
-		GameInput.assign_slot(slot, null)
+		GameInput.assign_slot(_installed_slot, null)
 	_installed = false
 
 
@@ -180,12 +190,17 @@ func get_hero() -> PlayerBase:
 	return level.get_hero(slot) if level != null else null
 
 
-## True when the hero in `p_slot` is a rival (a boss bot: every hero but its own body; a versus bot:
-## BotSenses.are_rivals).
+## True when the hero in `p_slot` is a rival (a boss bot: every hero of the level but its own body and its mate's; a
+## versus bot: BotSenses.are_rivals). Before the bot is bound it reads Game.level.
 func is_rival(p_slot: int) -> bool:
+	var current: LevelBase = level if level != null else Game.level
 	if body != null:
-		return level == null or level.get_hero(p_slot) != body
-	return BotSenses.are_rivals(level, slot, p_slot)
+		var hero: PlayerBase = current.get_hero(p_slot) if current != null else null
+		if hero == null or hero == body:
+			return false
+		var chieftain: ChieftainBrain = brain as ChieftainBrain
+		return chieftain == null or chieftain.mate != hero
+	return BotSenses.are_rivals(current, slot, p_slot)
 
 
 ## The InputSlot source: the flags for tick `tick` (GameInput.sample(), before the tick runs).
@@ -216,6 +231,10 @@ func produce(tick: int) -> int:
 	if brain.needs_thinking(tick) or (tick + slot) % VersusTuning.BOT_GOAL_PERIOD_TICKS == 0:
 		brain.think(hero, level, tick)
 	var flags: int = brain.act(hero, level, tick)
+	if not brain.may_strike(hero):
+		flags &= ~Defs.IN_FIRE  # keep the spawn shield (BotBrain.may_strike)
+	if body == null and not nav.is_busy():
+		flags = brain.guard_ramming(hero, flags)
 	last_flags = flags
 	return flags
 
@@ -253,6 +272,14 @@ func seen(p_slot: int) -> PackedInt32Array:
 func seen_pos(p_slot: int) -> Vector2i:
 	var s: PackedInt32Array = seen(p_slot)
 	return Vector2i(s[SEEN_X], s[SEEN_Y])
+
+
+## Where the hero of `p_slot` is likely now: his seen feet point moved on by his seen speed over the seen state's age
+## (x only; at most the reaction ticks) - a player's anticipation, still nothing he could not see.
+func predicted_pos(p_slot: int) -> Vector2i:
+	var s: PackedInt32Array = seen(p_slot)
+	var age: int = 0 if (p_slot == slot and body == null) else mini(reaction, maxi(_seen_count - 1, 0))
+	return Vector2i(s[SEEN_X] + Tuning.floor16(s[SEEN_XVEL] * age), s[SEEN_Y])
 
 
 ## True when the seen hero of `p_slot` is in play (present, not dead, down or out).

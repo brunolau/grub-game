@@ -324,6 +324,62 @@ func test_riding_objects_b_mount() -> void:
 	assert_eq(hero.xvel, -MountTuning.HIT_XVEL, "away from the hit")
 
 
+func test_objects_b_mount_over_the_tar_flats_and_into_the_sea() -> void:
+	# Worlds 6-7 (P2.12): Chomper crosses a tar floor at his full 4 px/tick (mounts ignore tar, C.9) and the rider never
+	# wades (no tar rules, the 1.0 limits); walked into `~` every rider dies and the mount bolts (C.9), and the hero is
+	# off the seat for good.
+	var rows: PackedStringArray = PackedStringArray()
+	for row: int in GROUND_ROW + WORLD_ROWS_BELOW:
+		var line: String = ""
+		for col: int in WORLD_COLS:
+			if row == GROUND_ROW and col >= 67 and col <= 80:
+				line += TileGrid.CH_TAR
+			elif row >= GROUND_ROW and col >= 84 and col <= 90:
+				line += TileGrid.CH_LIQUID
+			elif row >= GROUND_ROW:
+				line += TileGrid.CH_SOLID_A
+			else:
+				line += TileGrid.CH_AIR
+		rows.append(line)
+	world_rows(rows)
+	if not Spawner.exists(&"objects/mount") or not Spawner.exists(&"objects/rex_pen"):
+		print("    PENDING objects-B objects/mount")
+		assert_true(true)
+		return
+	var pen_at: Vector2i = START + Vector2i(40, 0)
+	level.spawn(&"objects/rex_pen", pen_at, {"name": "pen"})
+	var rex: SimEntity = level.spawn(&"objects/mount", pen_at, {"kind": "rex", "pen": "pen"})
+	spawn_hero(pen_at - Vector2i(0, 90))
+	hero.grounded = false
+	var ticks: int = 0
+	while not hero.is_mounted() and ticks < 30:
+		play(hold("", 1))
+		ticks += 1
+	assert_true(hero.is_mounted(), "seated")
+	if not hero.is_mounted():
+		return
+	assert_true(hero.hero_climb.active, "a tar level: the climb component runs")
+	var fastest_on_tar: Array[int] = [0]
+	var died: Array[bool] = [false]
+	ticks = 0
+	while not died[0] and ticks < 160:
+		play(hold("R", 1), func(_t: int) -> void:
+			if hero.dead:
+				died[0] = true
+				return
+			if hero.is_mounted() and level.grid.is_tar(Tuning.to_cell(rex.sim_pos.x), GROUND_ROW):
+				fastest_on_tar[0] = maxi(fastest_on_tar[0], rex.xvel)
+				assert_false(hero.hero_climb.on_tar, "a rider never wades")
+				assert_eq([hero.walk_cap, hero.air_cap, hero.jump_impulse_ticks],
+						[Tuning.WALK_CAP, Tuning.WALK_CAP, Tuning.JUMP_IMPULSE_TICKS], "the 1.0 limits in the saddle")
+		)
+		ticks += 1
+	assert_eq(fastest_on_tar[0], MountTuning.WALK_CAP, "full speed over the tar")
+	assert_true(died[0], "the sea killed the rider")
+	assert_false(hero.is_mounted(), "and he is off the seat")
+	assert_false(bool(rex.get(&"present")), "the mount bolted")
+
+
 func test_throw_off_and_respawn() -> void:
 	mount_world()
 	hero.sit_on_mount(mount, PlayerBase.SEAT_GUNNER)

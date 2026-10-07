@@ -284,6 +284,23 @@ func holds_up() -> bool:
 	return (input_flags & Defs.IN_UP) != 0
 
 
+## 2.0 Helper mode (DESIGN.md D.3, PHYSICS.md C.12): true for P2 (slot 1) of a co-op run whose players switched
+## Options > Co-op "Helper mode" on (Game.helper_mode, copied by Flow at the run start; every recorded route has it
+## off). Enemies never hurt him: [method hurt] ignores Defs.HurtKind.ENEMY, BOSS_BODY and BOSS_PROJECTILE (enemy and
+## boss contacts, enemy projectiles, hazards that hurt as enemies); his stomps still bounce, and deadly tiles, pits,
+## liquids, the band, the auto-scroll edge, the leash and a skull trap still act. Enemies that harm a hero outside
+## [method hurt] (a grab that squeezes bones, a drain, a snatch that ends in an egg) skip a hero for whom this is
+## true. Never true in single-player (slot 0) or versus.
+func is_helper() -> bool:
+	return slot == 1 and Game.helper_mode and Game.mode == Defs.GameMode.COOP
+
+
+## True when a hit of `kind` is one Helper mode ignores on this hero ([method is_helper]).
+func helper_ignores(kind: int) -> bool:
+	return (kind == Defs.HurtKind.ENEMY or kind == Defs.HurtKind.BOSS_BODY or kind == Defs.HurtKind.BOSS_PROJECTILE) \
+			and is_helper()
+
+
 ## True when enemies of a party may pick this hero as their target (LevelBase.target_hero): alive and not down. A
 ## party of one never asks (1.0 targets the hero unless he is dead).
 func is_party_targetable() -> bool:
@@ -329,9 +346,11 @@ func is_braced() -> bool:
 ## BOSS_BODY: one bone, yvel -128, xvel +/-128 away from the source with ice = 3, hit_timer 44.
 ## BOSS_PROJECTILE: -1 heart and 6 bones scattered. TRAP: all energy scattered as bones, hurt pose, no death.
 ## Once the level is completed (LevelBase.completed: the exit animation plays) every hit is ignored, and so is every
-## hit on an egg ([member down], 2.0).
+## hit on an egg ([member down], 2.0) and an enemy's hit on a Helper-mode P2 ([method helper_ignores], 2.0).
 func hurt(source: SimEntity, kind: int = Defs.HurtKind.ENEMY) -> bool:
 	if dead or down or (Game.level != null and Game.level.completed):
+		return false
+	if slot != 0 and helper_ignores(kind):
 		return false
 	if hit_timer > 0 and kind != Defs.HurtKind.TRAP and kind != Defs.HurtKind.BOSS_PROJECTILE:
 		return false

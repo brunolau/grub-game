@@ -18,8 +18,9 @@ extends BossBase
 ##    and dims the screen to the night palette for SQUID_DIM_TICKS (the surfacing bubbles stay bright).
 ##  - Phase 3 (below 30 %, red), the Whirlpool: once, the middle island rumbles SQUID_RUMBLE_TICKS (the telegraph) and
 ##    sinks; two log rafts (`objects/raft width=3`) take its place and ride a current over the pool
-##    (`zones/current`) that reverses every SQUID_CURRENT_FLIP ticks; the squid then surfaces in the free water beside
-##    the raft nearest its target and slams at him there. Fight from the raft; paddle with a forward strike.
+##    (`zones/current`) that reverses every SQUID_CURRENT_FLIP ticks; the squid then surfaces in the free water nearest
+##    its target and slams the raft beside it (12-tick telegraph as ever; the raft shakes, nobody is hurt or falls off).
+##    Fight from the raft or a pool-side island; paddle with a forward strike.
 ## Weak point: the top of its head while UP (a high strike from an island edge, a strike after a bounce, a throw).
 ## The body costs a bone; landing on its head always bounces the hero and harms nobody.
 ##
@@ -69,6 +70,7 @@ const SQUID_INK_YACC: int = 8
 const SQUID_DIM_TICKS: int = 66              ## an ink hit dims the screen this long
 const SQUID_RUMBLE_TICKS: int = 22           ## phase 3: the middle island rumbles before it sinks
 const SQUID_RAFT_WIDTH: int = 3
+const SQUID_RAFT_OVERLAP_PX: int = 9         ## the two rafts overlap this much (see _spawn_rafts) [own]
 const SQUID_CURRENT_SPEED: int = 1           ## px per tick
 const SQUID_CURRENT_FLIP: int = 132          ## the current reverses this often
 const SQUID_FLANK_PX: int = 24               ## co-op: a tentacle flinches only for a hero this far out on its side
@@ -113,6 +115,7 @@ var _island_rows: Array[int] = []
 var _flinch: Array[int] = [0, 0]
 var _flinch_slot: Array[int] = [-1, -1]
 var _open: int = 0
+var _opened_tick: int = -1
 var _count_in: int = -1
 var _part_tick: Array[int] = [-1000, -1000]
 ## Statistics for tests and tools: surfacings, slams, spits, ink hits, tentacle flinches (tick, side, slot).
@@ -140,6 +143,7 @@ func _apply_params(params: Dictionary) -> void:
 	super._apply_params(params)
 	surface_y = sim_pos.y
 	_up_x = sim_pos.x
+	_next_x = sim_pos.x
 
 
 func _ready() -> void:
@@ -176,9 +180,9 @@ func is_up() -> bool:
 	return _state == State.UP
 
 
-## The gap (centre x) the bubbles mark, or the squid is up in.
+## The gap (centre x) the bubbles mark, else where the squid is or last was up (its spawn gap before the first).
 func get_spot() -> int:
-	return _next_x if _state == State.BUBBLES or _state == State.DIVE else _up_x
+	return _next_x if _state == State.BUBBLES else _up_x
 
 
 func get_head_rect() -> Rect2i:
@@ -308,6 +312,9 @@ func _ai_tick() -> void:
 	_timer += 1
 	_tick_lock()
 	var power: int = _poll_hits()
+	# The open head counts its polls: SQUID_OPEN_TICKS of them after the tick it opened on.
+	if _open > 0 and _opened_tick != Sim.total_ticks:
+		_open -= 1
 	if power > 0:
 		apply_boss_hit(power)
 		if dead or _state == State.DYING:
@@ -378,6 +385,7 @@ func _begin_rumble() -> void:
 	_state = State.RUMBLE
 	_timer = 0
 	Audio.play_sfx(Sfx.QUAKE)
+	_spawn_rafts()
 
 
 func _up_tick(target: PlayerBase) -> void:
@@ -479,10 +487,24 @@ func _pick_spot(target: PlayerBase) -> int:
 	return gaps[Sim.rng.range_int(0, gaps.size() - 1)]
 
 
+## Where the tentacle comes down: over its target (within SQUID_SLAM_REACH); in the whirlpool on the raft it surfaced
+## beside (GAMEPLAY.md 13.6: it slams the raft).
 func _slam_spot(target: PlayerBase) -> int:
+	if _whirlpool:
+		var raft: SimEntity = _raft_nearest(_up_x)
+		if raft != null:
+			return clampi(raft.sim_pos.x, _up_x - SQUID_SLAM_REACH, _up_x + SQUID_SLAM_REACH)
 	if target == null:
 		return _up_x + SQUID_SLAM_REACH * facing
 	return clampi(target.sim_pos.x, _up_x - SQUID_SLAM_REACH, _up_x + SQUID_SLAM_REACH)
+
+
+func _raft_nearest(x: int) -> SimEntity:
+	var best: SimEntity = null
+	for raft: SimEntity in _rafts:
+		if is_instance_valid(raft) and (best == null or absi(raft.sim_pos.x - x) < absi(best.sim_pos.x - x)):
+			best = raft
+	return best
 
 
 ## Top of whatever the slam lands on at x: an island's floor, a raft, or the water surface.
@@ -501,7 +523,8 @@ func _slam_floor(x: int) -> int:
 
 func _slam_heroes() -> void:
 	var box: Rect2i = get_slam_rect()
-	if box.size.x == 0:
+	if box.size.x == 0 or _whirlpool:
+		# The whirlpool's slam strikes the raft: it shakes (the slam's screen shake), nobody falls off.
 		return
 	for hero: PlayerBase in Game.level.contact_order():
 		if hero.dead or hero.is_down() or hero.is_immune() or hero.is_feasting():
@@ -542,10 +565,30 @@ func _sink_island() -> void:
 			{"rect": "%d,%d,%d,1" % [pool_first, row, pool_last - pool_first + 1], "dir": "r",
 			"speed": SQUID_CURRENT_SPEED}) as SimEntity
 	_current_clock = 0
-	# Two rafts where the island was (a hero standing on it ends up on one).
+	# Fresh rafts where the rumble's rafts lie (they never moved: no current yet): a raft looks for its currents on
+	# its first tick, and this current is new. A hero riding an old one drops 1 px and the new one catches him on the
+	# next tick (it is not on screen yet on this one); he stands 4 px over the water, which he never reaches meanwhile.
+	for raft: SimEntity in _rafts:
+		if is_instance_valid(raft):
+			raft.sim_active = false
+			raft.queue_free()
+	_rafts.clear()
+	_spawn_rafts()
+
+
+## The rumble begins: two log rafts appear lying on the middle island (it floats them when it sinks; _sink_island
+## renews them). They overlap by
+## SQUID_RAFT_OVERLAP_PX: the platform contact halves the leftmost box's width (PHYSICS.md 11.4), so two abutting
+## rafts would leave a strip in the middle that neither carries; overlapping, every x of the island lies on one, and a
+## hero standing there rides a raft before the island goes (he never stands on the sinking cells).
+func _spawn_rafts() -> void:
+	if _island.x < 0 or not _rafts.is_empty():
+		return
+	var row: int = Tuning.to_cell(surface_y)
 	var island_mid: int = ((_island.x + _island.y + 1) * Tuning.TILE) >> 1
 	var half: int = (SQUID_RAFT_WIDTH * Tuning.TILE) >> 1
-	for x: int in [island_mid - half, island_mid + half]:
+	var shift: int = half - ((SQUID_RAFT_OVERLAP_PX + 1) >> 1)
+	for x: int in [island_mid - shift, island_mid + half - (SQUID_RAFT_OVERLAP_PX >> 1) - 1]:
 		var raft: SimEntity = _spawn_optional(RAFT_ID, Vector2i(x, (row + 1) * Tuning.TILE),
 				{"width": SQUID_RAFT_WIDTH, "skin": "log"}) as SimEntity
 		if raft != null:
@@ -635,7 +678,9 @@ func _poll_hits() -> int:
 		if shot == null or shot.spent:
 			continue
 		var box: Rect2i = shot.get_box()
-		if lock:
+		# The crossed tentacles cover the head's top: while locked they take the blow first; once the head is open
+		# (both flinched aside) the head does.
+		if lock and not (head_open and Overlap.rects(box, head)):
 			var side: int = _tentacle_hit(box)
 			if side != 0:
 				shot.consume()
@@ -653,7 +698,7 @@ func _poll_hits() -> int:
 	for hero: PlayerBase in level.contact_order():
 		if not hero.club_box_active:
 			continue
-		if lock:
+		if lock and not (head_open and Overlap.rects(hero.club_box, head)):
 			var side: int = _tentacle_hit(hero.club_box)
 			if side != 0:
 				_strike_tentacle(side, hero, hero.slot, hero.club_box.get_center())
@@ -701,6 +746,7 @@ func _strike_tentacle(side: int, hero: PlayerBase, slot: int, at: Vector2i) -> v
 	Game.level.spawn_fx(&"fx/hit_stars", at)
 	if _flinch[0] > 0 and _flinch[1] > 0 and _flinch_slot[0] != _flinch_slot[1] and _open == 0:
 		_open = SQUID_OPEN_TICKS
+		_opened_tick = now
 		Audio.play_sfx(Sfx.BOSS_ROAR)
 
 
@@ -709,8 +755,6 @@ func _tick_lock() -> void:
 	for i: int in 2:
 		if _flinch[i] > 0:
 			_flinch[i] -= 1
-	if _open > 0:
-		_open -= 1
 	if not _locked() or _state != State.UP or _open > 0:
 		_count_in = -1
 		return

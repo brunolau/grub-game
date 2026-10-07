@@ -683,6 +683,51 @@ msgstr "{players} win the round!"
 msgid "UI_VS_DRAW"
 msgstr "Draw!"
 
+# Versus HUD: the line under "SUDDEN DEATH!" - the arena's themed sudden death (DESIGN.md E.6).
+msgid "UI_VS_SD_STAMPEDE"
+msgstr "Stampede!"
+
+msgid "UI_VS_SD_CAVE_IN"
+msgstr "Cave-in!"
+
+msgid "UI_VS_SD_WHITEOUT"
+msgstr "Whiteout!"
+
+msgid "UI_VS_SD_LAVA_RISE"
+msgstr "The lava rises!"
+
+msgid "UI_VS_SD_TAR_RISE"
+msgstr "The tar rises!"
+
+msgid "UI_VS_SD_HIGH_TIDE"
+msgstr "High tide!"
+
+msgid "UI_VS_SD_SYRUP_FLOOD"
+msgstr "Syrup flood!"
+
+msgid "UI_VS_SD_STALACTITES"
+msgstr "Stalactite storm!"
+
+msgid "UI_VS_SD_ROCKSLIDE"
+msgstr "Rockslide!"
+
+msgid "UI_VS_SD_LIGHTNING"
+msgstr "Lightning!"
+
+# Versus HUD: a tie at the gong (DESIGN.md E.3 / E.4) - Grub Stack drops the Golden Drumstick, Clubball plays the
+# golden coconut.
+msgid "UI_VS_GOLDEN_DRUMSTICK"
+msgstr "GOLDEN DRUMSTICK!"
+
+msgid "UI_VS_GOLDEN_DRUMSTICK_HINT"
+msgstr "Grab it to win the round"
+
+msgid "UI_VS_GOLDEN_COCONUT"
+msgstr "GOLDEN COCONUT!"
+
+msgid "UI_VS_GOLDEN_COCONUT_HINT"
+msgstr "The next goal wins"
+
 # Versus HUD: the deciding moment Flow replays between the gong and the scoreboard (DESIGN.md E.8); any Jump / Strike
 # skips it, touch players get a button.
 msgid "UI_VS_REPLAY_STEAL"

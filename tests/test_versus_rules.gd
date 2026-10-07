@@ -1406,3 +1406,65 @@ func test_scripted_hot_rock_match_a_walk_passes_the_ember() -> void:
 	var walk: String = "R|" if holder == 0 else "|L"
 	run_party_inputs([[20, walk]])
 	assert_eq(referee.ember_holder(), 1 - holder, "the holder walked into his rival: passed")
+
+
+# =================================================================================================================
+# Requests of phase 2 (objects-B's Mesa Rodeo bite, ui-B's hearts, core-A's unlocked Mayhem variants)
+# =================================================================================================================
+
+func test_a_chomper_bite_costs_the_modes_currency() -> void:
+	_arena(3, [100, 125, 250])
+	var mount: SimEntity = SimEntity.new()
+	place(level, mount, Vector2i(100, FLOOR_Y))
+	_give(heroes[1], 10)
+	assert_true(referee.bite_hit(heroes[0], heroes[1], mount), "Grub Stack: the bite lands")
+	assert_eq(referee.stack_of(1), 10 - VersusTuning.RODEO_BITE_SPILL, "the rider's bite spills 3")
+	assert_eq(heroes[1].xvel, VersusTuning.HIT_XVEL, "knocked away from the rider")
+	assert_eq(heroes[1].hit_timer, VersusTuning.HURT_TIMER_TICKS, "the versus hurt timing")
+	assert_false(referee.bite_hit(heroes[0], heroes[1], mount), "immune after the bite: it does not land")
+	referee.teams = PackedInt32Array([1, 2, 1, -1])
+	assert_false(referee.bite_hit(heroes[0], heroes[2], mount), "never a teammate")
+	referee.teams = PackedInt32Array([-1, -1, -1, -1])
+	_mode(Defs.VersusMode.LAST_CAVEMAN)
+	assert_true(referee.bite_hit(heroes[0], heroes[2], mount))
+	assert_eq(Game.runs[2].hearts, VersusTuning.LCS_HEARTS - 1, "Last Caveman Standing: a heart, like a hit")
+	assert_eq(referee.hearts_of(2), VersusTuning.LCS_HEARTS - 1, "the corner panel's hearts (ui-B)")
+	assert_eq(count_items(&"items/bone"), VersusTuning.LCS_HEART_BONES, "the lost heart bursts into bones")
+	referee.end_round(false)
+	assert_false(referee.bite_hit(heroes[0], heroes[1], mount), "nothing after the gong")
+	mount.free()
+
+
+func test_hearts_of_reads_zero_for_an_out_player() -> void:
+	_arena(2, [100, 125])
+	_mode(Defs.VersusMode.LAST_CAVEMAN)
+	assert_eq(referee.hearts_of(1), VersusTuning.LCS_HEARTS)
+	heroes[1].kill(&"lava")
+	Sim.step(1)
+	assert_true(referee.is_out(1))
+	assert_eq(referee.hearts_of(1), 0, "out: no hearts on his panel")
+	assert_eq(referee.hearts_of(7), 0, "an unknown slot")
+
+
+func test_mayhem_rolls_only_variants_the_profile_has_opened() -> void:
+	var closed: Array[StringName] = []
+	for variant: StringName in VersusRules.VARIANTS:
+		if not UnlockTable.is_variant_open(variant):
+			closed.append(variant)
+	assert_false(closed.is_empty(), "a fresh profile has painting-locked variants (DESIGN.md C.9)")
+	var rolled: Dictionary = {}
+	var all_rolled: Dictionary = {}
+	for seed_value: int in 200:
+		rolled[VersusRules.mayhem_variant(seed_value, Defs.VersusMode.GRUB_STACK)] = true
+		all_rolled[VersusRules.mayhem_variant(seed_value, Defs.VersusMode.GRUB_STACK, false)] = true
+	for variant: StringName in closed:
+		assert_false(rolled.has(variant), "%s is closed: never rolled" % variant)
+		assert_true(all_rolled.has(variant), "%s is in the full table" % variant)
+	assert_eq(VersusRules.VARIANTS, VersusMatch.VARIANT_NAMES, "core-A's list mirrors ours")
+	Save.set_unlock_everything(true)
+	var opened: Dictionary = {}
+	for seed_value: int in 200:
+		opened[VersusRules.mayhem_variant(seed_value, Defs.VersusMode.GRUB_STACK)] = true
+	Save.set_unlock_everything(false)
+	for variant: StringName in closed:
+		assert_true(opened.has(variant), "Unlock everything opens %s" % variant)

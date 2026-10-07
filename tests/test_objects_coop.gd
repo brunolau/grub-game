@@ -734,6 +734,48 @@ func test_a_pot_spring_reaches_a_ledge_6_rows_above_its_root() -> void:
 	assert_eq(climber.sim_pos.y, 3 * Tuning.TILE)
 
 
+## 6-2 Spore Hollow: "spore geysers lift drop platforms" (GAMEPLAY.md 13.3: the spout throws heroes and drop
+## platforms up with the spring power, 105 px). A spout launches a drop cloud resting on its floor (DropPlatform.launch,
+## objects-B's Geyser calls it) with a real hero on it: one arc for both (the hero's gravity while rising), then the
+## slower dropper fall - he lands on it again and rides it down to its floor.
+func test_a_spout_lifts_a_drop_cloud_and_its_rider_on_one_arc() -> void:
+	Game.new_game(Defs.Difficulty.BEGINNER)
+	Game.begin_level(&"test_objects")
+	make_ground_level(20, 16, 10)
+	level.meta["biome"] = "sky"
+	var cloud: DropPlatform = spawn(&"objects/drop_platform", feet(10, 2)) as DropPlatform
+	var floor_y: int = FLOOR_Y
+	cloud.teleport(Vector2i(cloud.sim_pos.x, floor_y))
+	# It dropped there earlier and rests (it rests while ridden).
+	cloud.state = DropPlatform.State.REST
+	cloud._rest_left = Tuning.DROPPER_REST_TICKS
+	var rider: Player = (load("res://scenes/player/player.tscn") as PackedScene).instantiate() as Player
+	var top: int = floor_y - cloud.box_h
+	rider.spawn_setup(Vector2i(cloud.sim_pos.x, top), {})
+	level.add_child(rider)
+	rider.respawn_at(Vector2i(cloud.sim_pos.x, top - 4))
+	run_inputs([[8, ""]])
+	assert_true(cloud.ridden, "he stands on the cloud")
+	assert_eq(cloud.state, DropPlatform.State.REST)
+	cloud.launch(ObjTuning.SPRING_DEFAULT_POWER)
+	assert_eq(rider.yvel, ObjTuning.SPRING_DEFAULT_POWER, "its rider is launched with it")
+	var highest: int = cloud.sim_pos.y
+	var apart: int = 0
+	for i: int in 120:
+		run_inputs([[1, ""]])
+		highest = mini(highest, cloud.sim_pos.y)
+		apart = maxi(apart, absi(rider.sim_pos.y - (cloud.sim_pos.y - cloud.box_h)))
+		if cloud.state == DropPlatform.State.REST:
+			break
+	assert_eq(floor_y - highest, 105, "the spring power's rise (the hero's gravity while rising)")
+	assert_true(apart <= 1, "one arc: the rider never leaves the cloud by more than a pixel (%d)" % apart)
+	assert_eq(cloud.state, DropPlatform.State.REST, "back on its floor")
+	assert_eq(cloud.sim_pos.y, floor_y)
+	assert_true(cloud.ridden, "with its rider on it")
+	assert_false(rider.dead)
+	level.meta["biome"] = "jungle"
+
+
 ## A real hero dropped onto the spring at `spring_x` (on the floor) holds Right once it threw him: true when he ends
 ## up standing on the wall whose face is at column `wall_col`.
 func pot_spring_climb(climber: Player, spring_x: int, wall_col: int) -> bool:

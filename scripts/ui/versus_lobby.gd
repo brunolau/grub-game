@@ -15,8 +15,9 @@ extends UiScreen
 ## The menu: the seat cards (confirm on a free seat adds a CPU, Hunter; confirm on a CPU seat steps it Hunter -> Chief
 ## -> Rookie -> free; "back" on a CPU seat removes it), Teams (free-for-all / 2 v 2: the first two seats are the Sun,
 ## the others the Moon; a player switches with his Jump and a CPU of a full team moves over), the rules summary,
-## START (focused first) and Cave Paintings (scenes/ui/unlocks); on the right the shared keyboard preset with the
-## keyboard picture and the key test (Tab), which shows the seated keyboard players in join order. START opens the
+## START (focused first), and under it two small entries: Cave Paintings (scenes/ui/unlocks) and the key test (also
+## Tab), which shows the seated keyboard players in join order; on the right the shared keyboard preset with the
+## keyboard picture. START opens the
 ## rules (scenes/ui/versus_rules) for the player who pressed it once VersusMatch.can_start() - the status line says
 ## what is missing; the rules lead to the arena select, which starts the match. "Back" leaves for the title (the
 ## match keeps its rules for next time).
@@ -61,7 +62,8 @@ var _last_slot: int = -1
 
 
 ## A choice row for a narrow column: its caption in the small face on the left, the value centred in the rest between
-## its arrows, in the HUD face or - when that is too wide (Last Caveman Standing) - the body face. Works like ui-B's
+## its arrows, in the HUD face or - when that is too wide - the body face, or the small face where even that does not
+## fit ("Default (No clock)" beside a caption). Works like ui-B's
 ## UiOptionRow CHOICE (Left / Right, confirm, taps). Also the rows of the rules screen (VersusRulesScreen.RuleRow).
 class ChoiceRow:
 	extends UiOptionRow
@@ -100,13 +102,16 @@ class ChoiceRow:
 		if _hud_font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size).x > room:
 			font = _body_font
 			font_size = UiKit.SIZE_BODY
+			if _body_font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size).x > room:
+				font = _small_font
+				font_size = UiKit.SIZE_SMALL
 		var text_w: float = font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size).x
 		var centre: float = roundf((left + right) * 0.5)
 		var baseline_value: float = roundf((size.y - float(font_size)) * 0.5) + font.get_ascent(font_size)
 		var x: float = roundf(centre - text_w * 0.5)
-		if font == _body_font:
-			draw_string_outline(font, Vector2(x, baseline_value), text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size, 6,
-					UiKit.COL_INK)
+		if font != _hud_font:
+			draw_string_outline(font, Vector2(x, baseline_value), text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size,
+					6 if font == _body_font else 4, UiKit.COL_INK)
 		draw_string(font, Vector2(x, baseline_value), text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size, colour)
 		var arrow_colour: Color = colour if focused else UiKit.COL_DIM
 		var arrow_base: float = roundf((size.y - float(UiKit.SIZE_HUD)) * 0.5) + _hud_font.get_ascent(UiKit.SIZE_HUD)
@@ -164,17 +169,21 @@ func _build_screen() -> void:
 	_summary.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 	_summary.custom_minimum_size = Vector2(200.0, 14.0)
 	rules.add_child(_summary)
-	var buttons: HBoxContainer = HBoxContainer.new()
-	buttons.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	buttons.alignment = BoxContainer.ALIGNMENT_CENTER
-	buttons.add_theme_constant_override(&"separation", 8)
-	rules.add_child(buttons)
 	_start = UiButton.new("UI_VS_START")
+	_start.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_start.pressed.connect(open_rules)
-	buttons.add_child(_start)
-	_paintings = UiButton.new("UI_PAINTINGS")
-	_paintings.pressed.connect(open_paintings)
-	buttons.add_child(_paintings)
+	rules.add_child(_start)
+	# Cave Paintings and the key test as two small entries under START (START keeps the big face; the four seat cards
+	# and the keyboard picture leave no room for three big entries at 640 px).
+	var extras: HBoxContainer = HBoxContainer.new()
+	extras.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	extras.alignment = BoxContainer.ALIGNMENT_CENTER
+	extras.add_theme_constant_override(&"separation", 14)
+	rules.add_child(extras)
+	_paintings = small_button("UI_PAINTINGS", open_paintings)
+	extras.add_child(_paintings)
+	_key_button = small_button("UI_JOIN_KEY_TEST", open_key_test)
+	extras.add_child(_key_button)
 	_status = UiKit.label("", UiKit.Style.SMALL, HORIZONTAL_ALIGNMENT_CENTER)
 	_status.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 	rules.add_child(_status)
@@ -187,17 +196,10 @@ func _build_screen() -> void:
 	_picture = JoinScreen.KeyboardPicture.new()
 	_picture.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	keys.add_child(_picture)
-	var key_row: HBoxContainer = HBoxContainer.new()
-	key_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	key_row.add_theme_constant_override(&"separation", 4)
-	keys.add_child(key_row)
 	_layout_row = ChoiceRow.new("", PackedStringArray(JoinScreen.LAYOUT_KEYS), GameInput.keyboard_layout())
 	_layout_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_layout_row.changed.connect(_on_layout_changed)
-	key_row.add_child(_layout_row)
-	_key_button = UiButton.new("UI_JOIN_KEY_TEST")
-	_key_button.pressed.connect(open_key_test)
-	key_row.add_child(_key_button)
+	keys.add_child(_layout_row)
 	column.add_child(UiKit.panel_box(panel_row, 8))
 
 	var prompts: UiPrompts = UiPrompts.new()
@@ -884,8 +886,24 @@ func _on_tap() -> void:
 	pass
 
 
-## Focus: the seat cards in a row; under them Teams, then START and Cave Paintings side by side on the left, the
-## keyboard preset and the key test on the right. Up from START reaches Teams, Up again the first card.
+## A small menu entry (the fine-print face): Cave Paintings and the key test under START.
+static func small_button(key: String, callback: Callable) -> UiButton:
+	var button: UiButton = UiButton.new(key)
+	button.add_theme_font_override(&"font", UiKit.font(UiKit.Style.SMALL))
+	button.add_theme_font_size_override(&"font_size", UiKit.SIZE_SMALL)
+	button.custom_minimum_size.y = 18.0
+	button.pressed.connect(callback)
+	return button
+
+
+## The key test entry (tests).
+func get_key_test_button() -> UiButton:
+	return _key_button
+
+
+## Focus: the seat cards in a row; under them on the left Teams, START, then Cave Paintings and the key test side by
+## side; the keyboard preset on the right. Up from START reaches Teams, Up again the first card; Up from a card is
+## START.
 func _link_focus() -> void:
 	for slot: int in SEATS:
 		var card: JoinScreen.SeatCard = _cards[slot]
@@ -897,17 +915,15 @@ func _link_focus() -> void:
 	_teams_row.focus_neighbor_bottom = _teams_row.get_path_to(_start)
 	_teams_row.focus_neighbor_right = _teams_row.get_path_to(_layout_row)
 	_start.focus_neighbor_top = _start.get_path_to(_teams_row)
-	_start.focus_neighbor_bottom = _start.get_path_to(_cards[0])
+	_start.focus_neighbor_bottom = _start.get_path_to(_paintings)
 	_start.focus_neighbor_left = _start.get_path_to(_start)
-	_start.focus_neighbor_right = _start.get_path_to(_paintings)
-	_paintings.focus_neighbor_top = _paintings.get_path_to(_teams_row)
-	_paintings.focus_neighbor_bottom = _paintings.get_path_to(_cards[1])
-	_paintings.focus_neighbor_left = _paintings.get_path_to(_start)
-	_paintings.focus_neighbor_right = _paintings.get_path_to(_layout_row)
+	_start.focus_neighbor_right = _start.get_path_to(_layout_row)
+	for button: UiButton in [_paintings, _key_button]:
+		button.focus_neighbor_top = button.get_path_to(_start)
+		button.focus_neighbor_bottom = button.get_path_to(_cards[0] if button == _paintings else _cards[1])
+	_paintings.focus_neighbor_left = _paintings.get_path_to(_key_button)
+	_paintings.focus_neighbor_right = _paintings.get_path_to(_key_button)
+	_key_button.focus_neighbor_left = _key_button.get_path_to(_paintings)
+	_key_button.focus_neighbor_right = _key_button.get_path_to(_layout_row)
 	_layout_row.focus_neighbor_top = _layout_row.get_path_to(_cards[SEATS - 1])
-	_layout_row.focus_neighbor_bottom = _layout_row.get_path_to(_key_button)
-	_layout_row.focus_neighbor_left = _layout_row.get_path_to(_paintings)
-	_key_button.focus_neighbor_top = _key_button.get_path_to(_layout_row)
-	_key_button.focus_neighbor_bottom = _key_button.get_path_to(_cards[SEATS - 1])
-	_key_button.focus_neighbor_left = _key_button.get_path_to(_layout_row)
-	_key_button.focus_neighbor_right = _key_button.get_path_to(_key_button)
+	_layout_row.focus_neighbor_bottom = _layout_row.get_path_to(_start)

@@ -61,6 +61,8 @@ const DROPPER_LAND_TICKS: int = 6        ## landing pose before it starts to wal
 # =================================================================================================================
 const DANGLER_DEPTH: int = 48            ## default `depth`, px
 const DANGLER_SPEED: int = 2             ## default `speed`, px per tick
+## 2.0 co-op: a club box overlapping the dangler's thread, taken this many px wide, cuts it (GAMEPLAY.md 13.9.4) [own]
+const THREAD_CUT_W: int = 4
 const LURKER_RANGE_TILES: int = 4        ## default `range`
 const LURKER_PAUSE: int = 22             ## default `pause`
 const LURKER_DROP_YVEL: int = 32         ## v16: descends 2 px per tick
@@ -177,6 +179,8 @@ const GUARD_TURN_TICKS: int = 33         ## default `turn`: its facing is re-dec
 const GUARD_SPEED: int = 24              ## v16, patrol (tune)
 const GUARD_SHIELD_POSE_TICKS: int = 8   ## the raised-shield pose after a glance [own]
 const GUARD_SWING_TICKS: int = 12        ## the club swing (attack frames 5-10) after its body hurt a hero [own]
+## `enemies/shellback` on these Walker sheets is the Book I variant: a Walker with the `shell` trait [D D.7].
+const SHELLBACK_WALKER_SKINS: PackedStringArray = ["turtle", "turtle_b"]
 ## Front hits (Guard, `shell`, `heavy`, GAMEPLAY.md 13.9.5): a striker within this many px of the feet point counts
 ## as in front.
 const FRONT_DX: int = 4

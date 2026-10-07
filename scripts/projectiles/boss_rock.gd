@@ -9,13 +9,21 @@ extends ProjectileBase
 ## test the floor row and turn every rock back toward the statue), and a rock that has stopped bouncing rolls on for
 ## EnemyTuning.ROCK_REST_TICKS and crumbles, so no rock lies in wait on the floor or on a ledge.
 ##
-## Parameters (set by the boss): `xvel`, `yvel` v16, `life` ticks [132].
+## Parameters (set by the boss): `xvel`, `yvel` v16, `life` ticks [132], `skin` [the 1.0 rock; 2.0 (enemies-C): the
+## Twin Idols' `rock_sun` / `rock_moon` of art-B's idols_parts sheet - the same rules, another picture].
 
 const FX_DEBRIS: StringName = &"fx/debris"
+## 2.0: the sheet of the idols' rocks (EnemySkin case "idols_parts").
+const PARTS_SHEET: String = "idols_parts"
 
 var _sprite: Sprite2D = null
 ## Ticks since its bounce died out (0 = still flying or bouncing).
 var _resting: int = 0
+## Look (`skin` parameter): "" = the 1.0 rock; else a role of PARTS_SHEET.
+var skin: String = ""
+## First frame and frame count of the spin (the 1.0 rock: 0 and EnemyTuning.ROCK_FRAMES).
+var _first_frame: int = 0
+var _frames: int = EnemyTuning.ROCK_FRAMES
 
 
 func _apply_params(params: Dictionary) -> void:
@@ -24,10 +32,24 @@ func _apply_params(params: Dictionary) -> void:
 	from_hero = false
 	hurt_kind = Defs.HurtKind.BOSS_PROJECTILE
 	set_box(EnemyTuning.ROCK_BOX)
+	skin = str(params.get("skin", ""))
 
 
 func _ready() -> void:
 	_sprite = get_node_or_null(^"Sprite") as Sprite2D
+	if _sprite == null or skin.is_empty():
+		return
+	var sheet: EnemySkin = EnemySkin.find(PARTS_SHEET)
+	if sheet == null or not sheet.has_anim(StringName(skin)):
+		return
+	var spin: Vector4i = sheet.anim(StringName(skin))
+	_sprite.texture = load(sheet.texture_path) as Texture2D
+	_sprite.hframes = sheet.columns
+	_sprite.vframes = sheet.rows
+	_sprite.offset = sheet.sprite_offset()
+	_first_frame = spin.x
+	_frames = maxi(spin.y, 1)
+	_sprite.frame = _first_frame
 
 
 func _move_tick() -> void:
@@ -41,7 +63,7 @@ func _move_tick() -> void:
 	if level != null:
 		_collide(level.grid)
 	if _sprite != null:
-		_sprite.frame = (_age / EnemyTuning.ROCK_ANIM_TICKS) % EnemyTuning.ROCK_FRAMES
+		_sprite.frame = _first_frame + (_age / EnemyTuning.ROCK_ANIM_TICKS) % _frames
 		_sprite.flip_h = xvel > 0
 	if _resting > 0:
 		_resting += 1

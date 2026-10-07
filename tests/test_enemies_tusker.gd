@@ -41,12 +41,9 @@ class Lab:
 			Game.start_run(difficulty, Defs.GameMode.COOP, party, 2)
 		else:
 			Game.start_run(difficulty, Defs.GameMode.SINGLE, 1, 2)
-		var text: String = FileAccess.get_file_as_string(path)
+		var text: String = with_boss_params(FileAccess.get_file_as_string(path), boss_id,
+				("form=coop " if coop_form else "") + extra)
 		var id: StringName = StringName(path.get_file().get_basename())
-		if coop_form:
-			text = text.replace("\n%s " % boss_id, "\n%s form=coop " % boss_id)
-		if extra != "":
-			text = text.replace("\n%s " % boss_id, "\n%s %s " % [boss_id, extra])
 		Game.begin_level(id)
 		for slot: int in party:
 			Game.runs[slot].set_weapon(weapon)
@@ -62,6 +59,19 @@ class Lab:
 			GameInput.set_scripted_slot(slot, _flag_of.bind(slot))
 		_first_tick = Sim.tick + 1
 		return boss != null and level.hero_count() == party
+
+	## `text` with `params` (space-separated key=value pairs) appended to every entity line of `boss_id` (after
+	## its col and row, where the level format reads parameters).
+	static func with_boss_params(text: String, boss_id: String, params: String) -> String:
+		params = params.strip_edges()
+		if params == "":
+			return text
+		var lines: PackedStringArray = text.split("\n")
+		for i: int in lines.size():
+			var line: String = lines[i].strip_edges(false, true)
+			if line.begins_with(boss_id + " "):
+				lines[i] = "%s %s" % [line, params]
+		return "\n".join(lines)
 
 	func hero(slot: int = 0) -> PlayerBase:
 		return level.get_hero(slot) if level != null else null
@@ -432,10 +442,15 @@ func test_coop_form_only_the_partner_behind_can_strike_the_rump() -> void:
 	_shot_at(boar.get_rump_rect(), 1)
 	_lab.step(PackedInt32Array([0, 0]))
 	assert_eq(boar.hp, boar.max_hp - 20, "P2 stands behind it: the rump counts")
-	p1.respawn_at(Vector2i(250, 160))
-	p2.respawn_at(Vector2i(80, 160))
+	p1.respawn_at(Vector2i(230, 160))
+	p2.respawn_at(Vector2i(72, 160))
 	_lab.step(PackedInt32Array([0, 0]))
-	assert_eq(boar.facing, 1, "it turned to P1 on the very next tick")
+	assert_eq(boar.facing, 1, "it turned to P1 (now the nearer) on the very next tick")
+	for t: int in Tuning.BOSS_HIT_COOLDOWN:
+		_lab.step(PackedInt32Array([0, 0]))
+	_shot_at(boar.get_rump_rect(), 1)
+	_lab.step(PackedInt32Array([0, 0]))
+	assert_eq(boar.hp, boar.max_hp - 40, "P2, behind it again, strikes the rump again")
 
 
 ## Phase 3: a charge skids and turns 32 px before the wall (no impact, no rocks); a lone croucher is trampled; a Brace
@@ -460,38 +475,44 @@ func test_coop_form_phase_3_skids_and_only_a_brace_wall_stops_it() -> void:
 	assert_true(skidded, "the charge skids before the bank")
 	assert_eq(impacts, 0, "and never crashes")
 	assert_true(boar.pending_rocks().is_empty(), "no rocks")
-	# A lone croucher in its path is trampled.
-	boar.teleport(Vector2i(200, 160))
-	boar._dir = -1
-	boar.facing = -1
-	boar._set_state(Tusker.State.CHARGE)
+	# A lone croucher in its path is trampled (a charge already stuck once wades on through the wallow to him).
+	_charge_left_from(boar, 236)
 	p1.respawn_at(Vector2i(100, 160))
 	p2.respawn_at(Vector2i(288, 112))
 	var hurt: bool = false
-	for t: int in 30:
+	for t: int in 60:
 		_lab.step(PackedInt32Array([Defs.IN_DOWN, 0]))
 		hurt = hurt or p1.hit_timer > 0
+		if hurt:
+			break
 	assert_true(hurt, "one crouching hero is trampled")
 	assert_ne(boar.get_state(), Tusker.State.DAZED)
 	# Two crouching heroes within 16 px brace.
-	boar.teleport(Vector2i(210, 160))
-	boar._dir = -1
-	boar.facing = -1
-	boar._set_state(Tusker.State.CHARGE)
-	p1.respawn_at(Vector2i(100, 160))
-	p2.respawn_at(Vector2i(112, 160))
+	_charge_left_from(boar, 236)
+	p1.respawn_at(Vector2i(96, 160))
+	p2.respawn_at(Vector2i(108, 160))
 	var dazed_at: int = -1
-	for t: int in 40:
+	for t: int in 60:
 		_lab.step(PackedInt32Array([Defs.IN_DOWN, Defs.IN_DOWN]))
-		if dazed_at < 0 and boar.get_state() == Tusker.State.DAZED:
+		if boar.get_state() == Tusker.State.DAZED:
 			dazed_at = t
+			break
 	assert_true(dazed_at >= 0, "the Brace Wall stops it dead")
-	assert_eq(p2.hit_timer, 0, "neither hero is touched")
-	var length: int = 1
-	while boar.get_state() == Tusker.State.DAZED and length < 200:
+	assert_eq(p1.hit_timer, 0, "neither hero is touched")
+	assert_eq(p2.hit_timer, 0)
+	assert_true(boar.get_head_rect().size.x > 0)
+	var hp: int = boar.hp
+	_shot_at(boar.get_head_rect(), 0)
+	_lab.step(PackedInt32Array([Defs.IN_DOWN, Defs.IN_DOWN]))
+	assert_eq(boar.hp, hp - 20, "dazed by the Brace Wall its head is open to the hero in front")
+	# Ticks it was seen dazed so far: the tick of the brace and the tick of the hit.
+	var length: int = 2
+	while length < 200:
 		_lab.step(PackedInt32Array([0, 0]))
+		if boar.get_state() != Tusker.State.DAZED:
+			break
 		length += 1
-	assert_eq(length, Tusker.TUSKER_BRACE_DAZE_TICKS, "dazed 66 ticks [R24]")
+	assert_eq(length, Tusker.TUSKER_BRACE_DAZE_TICKS, "dazed 66 ticks [R24], a hit does not lengthen it")
 
 
 ## The co-op weak window for one hero is shorter than his measured solo minimum: alone he is always the nearer hero,
@@ -554,6 +575,17 @@ func test_the_single_hero_search_cannot_hurt_the_coop_form() -> void:
 # =================================================================================================================
 # Helpers
 # =================================================================================================================
+
+## Put the boar at x `x` of the pit floor in a charge to the left that was already stuck in the wallow once (it wades
+## on through the mud at 2 px per tick and runs on).
+func _charge_left_from(boar: Tusker, x: int) -> void:
+	boar.teleport(Vector2i(x, 160))
+	boar._dir = -1
+	boar.facing = -1
+	boar._stuck_done = true
+	boar._wallow_centre = Tusker.NO_WALLOW
+	boar._set_state(Tusker.State.CHARGE)
+
 
 ## A hero's thrown axe (power 20) right on `rect` this tick (slot `owner`).
 func _shot_at(rect: Rect2i, owner: int = 0) -> void:
@@ -795,5 +827,13 @@ class TuskerBot:
 
 
 ## Recorded by test_the_club_bot_still_wins with TUSKER_ROUTE=1 (Beginner, Expert).
-const ROUTE_BEGINNER: String = ""
-const ROUTE_EXPERT: String = ""
+const ROUTE_BEGINNER: String = (
+	"3:L,3:,2:R,63:,11:R,5:F,3:L,1:R,31:F,4:L,12:LU,12:L,3:R,53:,11:R,3:F,6:L,1:R,30:F,17:LU,12:L,3:R,47:,3:L," +
+	"4:R,19:,2:L,1:,5:R,32:,11:R,2:F,7:L,1:R,6:F,17:LU,12:L,3:R,24:,10:R,5:F,15:L,17:LU,12:L,2:R"
+)
+const ROUTE_EXPERT: String = (
+	"3:L,3:,2:R,63:,11:R,5:F,3:L,1:R,31:F,4:L,12:LU,12:L,3:R,53:,11:R,3:F,6:L,1:R,30:F,17:LU,12:L,3:R,47:,3:L," +
+	"4:R,19:,2:L,1:,5:R,32:,11:R,2:F,7:L,1:R,6:F,17:LU,12:L,3:R,41:,3:L,4:R,19:,2:L,1:,5:R,32:,11:R,2:F,7:L,1:R," +
+	"6:F,17:LU,12:L,3:R,41:,3:L,4:R,19:,2:L,1:,5:R,32:,11:R,2:F,7:L,1:R,6:F,17:LU,12:L,3:R,24:,10:R,5:F,3:L,1:R," +
+	"22:F,14:L,12:LU,12:L,3:R,4:"
+)

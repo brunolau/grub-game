@@ -10,6 +10,7 @@ extends TestCase
 ## GAMEPLAY.md 13.10.9), plus levels/test_objects_versus.lvl through the real loader.
 
 const LEVEL_SCENE: String = "res://scenes/world/level.tscn"
+const PLAYER_SCENE: String = "res://scenes/player/player.tscn"
 const VERSUS_LEVEL: String = "res://levels/test_objects_versus.lvl"
 const BASE_VIEW: Vector2i = Vector2i(640, 360)
 ## The Clubball pitch of DESIGN.md E.5 (Coconut Cove; the goal mouths are zones, the coconut drops in at column 9).
@@ -364,6 +365,31 @@ func test_spawn_list_starts_at_the_hero_start_then_by_index() -> void:
 		LevelText.cell_to_feet(18, 9),
 	] as Array[Vector2i], "'@' is spawn 1, then index 2, 3, 4")
 	assert_eq(_spawn_point(2, 9).index, Defs.MAX_PLAYERS, "index is clamped to 2..4")
+
+
+## show_player: the slot default from the pad sheet, or - with the colour the player wears (UiPlayers.colour_index,
+## passed by the caller) - art-A's lit sheet; idle and neutral always from the pad sheet.
+func test_a_spawn_pad_lights_in_the_slot_or_the_worn_colour() -> void:
+	_arena()
+	var pad: SpawnPoint = _spawn_point(6, 2)
+	var sprite: Sprite2D = pad.get_node(^"Sprite") as Sprite2D
+	var pad_sheet: Texture2D = sprite.texture
+	pad.show_player(1)
+	assert_eq([sprite.texture, sprite.frame], [pad_sheet, 2], "P2's default (blue)")
+	pad.show_player(-1)
+	assert_eq(sprite.frame, SpawnPoint.FRAME_IDLE)
+	pad.show_player(Defs.MAX_PLAYERS)
+	assert_eq(sprite.frame, SpawnPoint.FRAME_NEUTRAL)
+	if not ResourceLoader.exists(SpawnPoint.LIT_SHEET_PATH):
+		assert_true(true, "the lit sheet is optional")
+		return
+	pad.show_player(3, UiPlayers.PALETTE_ORDER.find(&"white"))
+	assert_eq(sprite.texture.resource_path, SpawnPoint.LIT_SHEET_PATH, "the colour he wears")
+	assert_eq(sprite.frame, 4, "white (green on a jungle arena)")
+	assert_eq(sprite.hframes, SpawnPoint.LIT_SHEET_CELLS, "the same slicing as the pad sheet")
+	assert_eq(sprite.texture.get_size(), pad_sheet.get_size())
+	pad.show_player(-1)
+	assert_eq([sprite.texture, sprite.frame], [pad_sheet, SpawnPoint.FRAME_IDLE], "back to the idle pad")
 
 
 func test_spawns_rotate_every_round() -> void:
@@ -1021,6 +1047,32 @@ func test_the_referee_clock_contents_hook_and_manual_drops() -> void:
 	assert_eq(lane.state, CrateLane.STATE_FALLING, "lead 0: released at once")
 
 
+## The referee's begin_round on the same level (round_ticks back to 0): the lanes empty and the schedule starts over,
+## so the first crate of the new round comes at the same round tick as in the last one.
+func test_a_new_round_on_the_same_level_empties_the_lanes_and_restarts_the_schedule() -> void:
+	_arena()
+	var referee: FakeReferee = FakeReferee.new()
+	level.register_party_driver(referee)
+	var lane: CrateLane = _lane("2,1,16,10")
+	var first_at: int = VersusTuning.CRATE_PERIOD_TICKS - VersusTuning.CRATE_SHADOW_TICKS
+	referee.round_ticks = first_at
+	Sim.step(1)
+	assert_eq(lane.state, CrateLane.STATE_INCOMING)
+	referee.round_ticks += VersusTuning.CRATE_SHADOW_TICKS + 30
+	Sim.step(VersusTuning.CRATE_SHADOW_TICKS + 30)
+	assert_true(lane.has_crate(), "round 1's crate lies there")
+	referee.round_ticks = 0
+	Sim.step(1)
+	assert_eq(lane.state, CrateLane.STATE_IDLE, "a new round: the old crate is gone")
+	assert_true(lane.opened, "nothing left to hit")
+	referee.round_ticks = first_at
+	Sim.step(1)
+	assert_eq(lane.state, CrateLane.STATE_INCOMING, "the same round tick drops the first crate again")
+	assert_eq(lane.crates_dropped, 1, "(released 22 ticks later)")
+	Sim.step(VersusTuning.CRATE_SHADOW_TICKS)
+	assert_eq(lane.crates_dropped, 2)
+
+
 # =================================================================================================================
 # Chomper in the arena (Mesa Rodeo)
 # =================================================================================================================
@@ -1086,6 +1138,23 @@ func test_chomper_waits_in_his_pen_and_leaves_it_every_30_s() -> void:
 	_drop_on_mount(hero, mount)
 	Sim.step(1)
 	assert_true(hero.is_mounted(), "now he can be ridden")
+
+
+## PHYSICS.md C.14: after a versus hit a hero is stunned 12 ticks, then immune 30 ticks with full control - in which
+## he may sit on Chomper (the campaign's "not hurt" threshold would refuse him for 9 of them).
+func test_a_hero_in_his_versus_immunity_may_sit_on_chomper() -> void:
+	var mount: Mount = _rodeo()
+	mount.release()
+	var hero: PlayerBase = _hero(0, Vector2i(20, 160))
+	hero.hit_timer = VersusTuning.STUN_HIT_TIMER_MIN + 2
+	_drop_on_mount(hero, mount)
+	Sim.step(1)
+	assert_false(hero.is_mounted(), "stunned: no seat")
+	hero.hit_timer = VersusTuning.STUN_HIT_TIMER_MIN - 1
+	assert_true(hero.hit_timer >= Tuning.HIT_STUN_MIN, "a timer the campaign would still call hurt")
+	_drop_on_mount(hero, mount)
+	Sim.step(1)
+	assert_true(hero.is_mounted(), "immune with full control: he sits down")
 
 
 func test_the_pen_follows_the_referees_round_clock() -> void:
@@ -1190,6 +1259,140 @@ func test_a_hit_rider_sends_chomper_home_penned_until_the_next_release() -> void
 	assert_true(left > 0 and left <= VersusTuning.RODEO_CHOMPER_PERIOD_TICKS)
 	Sim.step(left)
 	assert_false(mount.is_penned(), "out again on the next multiple of 728")
+
+
+## The referee's begin_round on the same level (round_ticks back to 0): riders off, Chomper penned at home, and the
+## pen timer of the new round releases him on its own 728th tick.
+func test_a_new_round_on_the_same_level_pens_chomper_again() -> void:
+	var mount: Mount = _rodeo()
+	var referee: FakeReferee = FakeReferee.new()
+	level.register_party_driver(referee)
+	var period: int = VersusTuning.RODEO_CHOMPER_PERIOD_TICKS
+	referee.round_ticks = period
+	Sim.step(1)
+	assert_false(mount.is_penned(), "round 1: out on its 728th tick")
+	var rider: PlayerBase = _hero(0, Vector2i(20, 160))
+	_drop_on_mount(rider, mount)
+	Sim.step(1)
+	assert_eq(mount.driver, rider)
+	referee.round_ticks = 0
+	Sim.step(1)
+	assert_false(rider.is_mounted(), "a new round: off the saddle")
+	assert_true(mount.is_penned(), "and Chomper back in his pen")
+	assert_eq(mount.sim_pos, LevelText.cell_to_feet(14, 9))
+	assert_false(mount.is_remount_locked(rider), "no remount lock carried into the new round")
+	assert_eq(mount.ticks_to_release(), period)
+	referee.round_ticks = period - VersusTuning.RODEO_RUMBLE_TICKS
+	Sim.step(1)
+	assert_true(mount.is_rumbling(), "the new round's rumble")
+	referee.round_ticks = period
+	Sim.step(1)
+	assert_false(mount.is_penned(), "released again on the same round tick as in round 1")
+
+
+# =================================================================================================================
+# The real hero (scenes/player): his strike scripts against the coconut and a crate
+# =================================================================================================================
+
+## The real hero (scene) of player slot 0 at `pos`, facing right.
+func _player(pos: Vector2i) -> Player:
+	var hero: Player = (load(PLAYER_SCENE) as PackedScene).instantiate() as Player
+	hero.spawn_setup(pos, {})
+	level.add_child(hero)
+	hero.respawn_at(pos)
+	return hero
+
+
+## Press `keys` for one tick and let the strike script run out: the shots the coconut took ([slot, kind, charged]).
+func _strike_at(ball: Coconut, keys: String) -> Array:
+	var shots: Array = []
+	var record: Callable = func(slot: int, kind: int, charged: bool) -> void: shots.append([slot, kind, charged])
+	ball.shot_made.connect(record)
+	run_inputs([[1, keys], [14, ""]])
+	ball.shot_made.disconnect(record)
+	return shots
+
+
+## PHYSICS.md 4.3: FIRE = strike (its front frame drives), DOWN + FIRE = low strike (grounder), UP + FIRE = high
+## strike (lob). The real hero's boxes reach the coconut in the WEAPONS step after the frame that made them.
+func test_the_real_heros_strike_scripts_shoot_the_coconut() -> void:
+	_arena()
+	var ball: Coconut = _ball(10)
+	var hero: Player = _player(Vector2i(150, 160))
+	Sim.step(2)
+	assert_eq(_strike_at(ball, "F"), [[0, Coconut.SHOT_DRIVE, false]], "a forward strike drives (once per swing)")
+	assert_eq(ball.rally, 0, "the 3 front frames of one swing make no rally of their own")
+	assert_eq(ball.shots, 1)
+	assert_true(ball.sim_pos.x > 168, "away to the right")
+	assert_eq(ball.last_touch_slot, 0)
+	assert_eq(hero.hit_timer, 0, "his own ball never knocks him down")
+	ball.reset_after(0)
+	Sim.step(VersusTuning.RALLY_WINDOW_TICKS + 20)
+	ball.teleport(Vector2i(168, 160))
+	ball.xvel = 0
+	ball.yvel = 0
+	hero.teleport(Vector2i(150, 160))
+	hero.facing = 1
+	Sim.step(2)
+	assert_eq([ball.sim_pos, ball.xvel, ball.yvel], [Vector2i(168, 160), 0, 0], "at rest again")
+	var shots: Array = []
+	var record: Callable = func(slot: int, kind: int, charged: bool) -> void: shots.append([slot, kind, charged])
+	ball.shot_made.connect(record)
+	var flags: PackedInt32Array = GameInput.expand_runs([[1, "DF"], [14, ""]])
+	var first_tick: int = Sim.tick + 1
+	GameInput.set_scripted(func(tick: int) -> int:
+		var index: int = tick - first_tick
+		return flags[index] if index >= 0 and index < flags.size() else 0
+	)
+	var shot_yvel: int = 0
+	var seen: bool = false
+	for i: int in flags.size():
+		Sim.step(1)
+		if not shots.is_empty() and not seen:
+			seen = true
+			shot_yvel = ball.yvel
+	GameInput.clear_scripted()
+	ball.shot_made.disconnect(record)
+	assert_eq(shots, [[0, Coconut.SHOT_GROUNDER, false]], "a low strike sends a grounder")
+	assert_eq(shot_yvel, 0, "along the floor")
+	assert_true(ball.sim_pos.x > 168)
+
+
+## The lob: the ball rests on a one-way ledge at head height, where the high strike's front box reaches.
+func test_the_real_heros_high_strike_lobs_the_coconut() -> void:
+	level = make_level(PackedStringArray([
+		"....................", "....................", "....................", "....................",
+		"....................", "....................", "....................", "....................",
+		"..........-.........", "....................", "####################", "####################",
+	]))
+	var high_ball: Coconut = _ball(10, 7)
+	var high_hero: Player = _player(Vector2i(150, 160))
+	Sim.step(3)
+	assert_eq(high_ball.sim_pos, Vector2i(168, 128), "resting on the ledge")
+	assert_eq(_strike_at(high_ball, "UF"), [[0, Coconut.SHOT_LOB, false]], "a high strike lobs")
+	assert_eq(high_ball.last_touch_slot, 0)
+	assert_true(high_ball.sim_pos.y < 128, "up and away (-240 rises for 15 ticks)")
+	assert_eq(high_hero.hit_timer, 0)
+
+
+## A crate lying on its lane opens under the real hero's forward strike (his own WEAPONS pass: the lane is a
+## HittableBase) and its contents fly out.
+func test_the_real_heros_strike_opens_a_crate() -> void:
+	_arena()
+	var lane: CrateLane = _lane("2,1,16,10")
+	assert_true(lane.drop(8, "food:2,feast_piece:0", 0))
+	Sim.step(18)
+	assert_true(lane.has_crate())
+	_player(Vector2i(120, 160))
+	Sim.step(2)
+	run_inputs([[1, "F"], [10, ""]])
+	assert_eq(lane.crates_opened, 1, "one strike opens it")
+	assert_false(lane.has_crate())
+	var ids: Array[String] = []
+	for entity: SimEntity in level.get_kind(Defs.Kind.COLLECTIBLE):
+		ids.append(String((entity as CollectibleBase).item_id))
+	ids.sort()
+	assert_eq(ids, ["items/feast_piece", "items/food"], "its contents")
 
 
 # =================================================================================================================

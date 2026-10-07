@@ -299,6 +299,11 @@ func ground_scripts() -> PackedInt32Array:
 	return _ground_scripts
 
 
+## The main direction of script `s` (+1 right, -1 left, 0 straight up).
+func script_dir(s: int) -> int:
+	return _script_dirs[s]
+
+
 ## Take-off points sampled on a node.
 func _samples(node: NavGraph.NavNode) -> PackedInt32Array:
 	var xs: PackedInt32Array = PackedInt32Array()

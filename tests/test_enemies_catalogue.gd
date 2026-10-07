@@ -68,7 +68,15 @@ const ENEMY_SKINS: Dictionary[String, Vector2i] = {
 }
 const BOSS_SKINS: PackedStringArray = [
 	"brute", "brute_enraged", "colossus", "tusker", "tusker_rage", "mangrove", "mangrove_parts",
+	# 2.0 worlds 7-9 (art-B, PLAN.md P2.10): Inkjaw, the Twin Idols, the Storm Roc, the Rival Chieftains
+	"inkjaw", "inkjaw_rage", "inkjaw_parts", "idol_sun", "idol_moon", "idols_parts", "roc", "roc_lightning",
+	"roc_parts", "chieftain_gorm", "chieftain_gulla", "chieftain_egg",
 ]
+## Body boxes of the boss sheets whose box a boss uses as its own (logical w x h; ENEMY_SKIN_ROWS.md).
+const BOSS_BOXES: Dictionary[String, Vector2i] = {
+	"inkjaw": Vector2i(58, 57), "idol_sun": Vector2i(104, 95), "idol_moon": Vector2i(104, 95),
+	"roc": Vector2i(103, 44), "chieftain_gorm": Vector2i(22, 36), "chieftain_gulla": Vector2i(22, 36),
+}
 const MAX_TEXTURE_SIDE: int = 2048
 const ROLES: Array[StringName] = [
 	&"idle", &"walk", &"fly", &"air", &"hang", &"dive", &"leap", &"glide", &"roll", &"land", &"attack", &"windup",
@@ -116,12 +124,37 @@ func test_every_sheet_matches_the_manifest() -> void:
 				"%s fits the 2048 px texture limit of weak devices" % skin_name)
 		if ENEMY_SKINS.has(skin_name):
 			assert_eq(skin.box, ENEMY_SKINS[skin_name], "%s body box" % skin_name)
+		if BOSS_BOXES.has(skin_name):
+			assert_eq(skin.box, BOSS_BOXES[skin_name], "%s body box" % skin_name)
 		for role: StringName in ROLES:
 			var anim: Vector4i = skin.anim(role)
 			assert_true(anim.x >= 0 and anim.x + anim.y <= skin.columns * skin.rows,
 					"%s %s frames inside the sheet" % [skin_name, role])
 			assert_true(anim.y >= 1 and anim.z >= 1)
 	assert_null(EnemySkin.find("no_such_sheet"))
+
+
+## PLAN.md P2.1 "every Book II skin as art lands": every sheet in sprites/enemies/ and sprites/bosses/ has its
+## EnemySkin case (a `_b` / `_rage` / `_enraged` palette through its base case) and is listed above.
+func test_every_sheet_on_disk_has_its_skin() -> void:
+	for dir_path: String in [EnemySkin.ENEMY_DIR, EnemySkin.BOSS_DIR]:
+		var dir: DirAccess = DirAccess.open(dir_path)
+		assert_not_null(dir, dir_path)
+		if dir == null:
+			continue
+		var found: int = 0
+		for file: String in dir.get_files():
+			if file.get_extension() != "png":
+				continue
+			found += 1
+			var skin_name: String = file.get_basename()
+			var skin: EnemySkin = EnemySkin.find(skin_name)
+			assert_not_null(skin, "%s%s has an EnemySkin case" % [dir_path, file])
+			if skin != null:
+				assert_eq(skin.texture_path, dir_path + file, "%s draws its own file" % skin_name)
+			assert_true(ENEMY_SKINS.has(skin_name) or BOSS_SKINS.has(skin_name),
+					"%s is listed in this test (body box / boss sheet)" % skin_name)
+		assert_true(found > 0, "%s holds sheets" % dir_path)
 
 
 func test_every_enemy_works_with_every_enemy_skin() -> void:

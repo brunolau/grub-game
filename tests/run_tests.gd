@@ -22,6 +22,8 @@ extends SceneTree
 ## Discovers `res://tests/test_*.gd`, runs every `test_*` method of each file (see TestCase) and exits with
 ## code 0 when everything passed, 1 otherwise. Any engine error logged while a test runs fails that test.
 ## User data (save, settings) is redirected to res://build/test_user so tests never touch real saves.
+## Files are isolated from each other: a frozen Sim, a Sim.time_scale other than 1 or a paused tree that a file left
+## behind is reset before the next file, with a `note:` line naming the file ([method reset_leaks]).
 ##
 ## NOTE: this script is compiled before the autoloads exist, so it must not mention autoload names or project
 ## classes directly; it reaches them through the scene tree.
@@ -134,6 +136,11 @@ func _run() -> void:
 		var verdict: String = "ok  " if file_failed == 0 else "FAIL"
 		print("  %s %s (%d passed, %d failed, %.1f s)" % [verdict, file, file_passed, file_failed,
 				float(Time.get_ticks_msec() - file_started) / 1000.0])
+		var sim: Node = root.get_node_or_null("Sim")
+		if sim != null:
+			var leaks: PackedStringArray = reset_leaks(sim, self)
+			if not leaks.is_empty():
+				print("       note: %s left %s - reset for the next file" % [file, ", ".join(leaks)])
 	OS.remove_logger(_counter)
 	var seconds: float = float(Time.get_ticks_msec() - started) / 1000.0
 	if files.is_empty():
@@ -155,6 +162,25 @@ func _run() -> void:
 		audio.call("shutdown")
 	await create_timer(0.25).timeout
 	quit(0 if failed == 0 else 1)
+
+
+## Isolation between test files (P2.6): the global clock state a file left behind - a frozen Sim (a Flow transition a
+## failing test never awaited), a Sim.time_scale other than 1 (a deciding-moment replay), a paused tree - is put back,
+## so one file's failure cannot fail the next file's timing tests. Returns what was reset (the runner prints a note
+## naming the file); empty when the file cleaned up after itself.
+static func reset_leaks(sim: Node, tree: SceneTree) -> PackedStringArray:
+	var leaks: PackedStringArray = PackedStringArray()
+	if bool(sim.get("frozen")):
+		leaks.append("Sim.frozen")
+		sim.set("frozen", false)
+	var scale: float = float(sim.get("time_scale"))
+	if not is_equal_approx(scale, 1.0):
+		leaks.append("Sim.time_scale %.2f" % scale)
+		sim.set("time_scale", 1.0)
+	if tree.paused:
+		leaks.append("the tree paused")
+		tree.paused = false
+	return leaks
 
 
 func _discover(filter: String, slow: bool, skipped: PackedStringArray) -> PackedStringArray:

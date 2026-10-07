@@ -7,12 +7,13 @@ extends UiScreen
 ## on a table). Every change goes straight into Game.versus_match; Flow.start_versus remembers the rules for the next
 ## lobby (VersusMatch.remember_rules).
 ##
-## Rows (left, right): Mode (the launch modes) and Preset (Classic / Feast / Mayhem); Rounds to win (the mode's
-## default or 1..10) and Round time (default, 30..180 s); Crates (off with the Classic preset) and Weapons (specials
-## from crates / club only); Sudden death (always at 60 s in Last Caveman Standing) and Stock lives (Last Caveman
-## Standing only). Under them the nine variants as chips; Big Bounce, Lights Out and Giant Rain need 15 Cave Paintings,
-## Spear Party 25 (Save.is_unlocked) - a locked chip shows the count. The line under the chips explains the focused
-## entry. "Choose the arena" opens the arena select; "back" returns to the lobby (seats and ready flags kept).
+## Rows: Mode (the launch modes) and Preset (Classic / Feast / Mayhem) across the panel; then in pairs Rounds to win
+## (the mode's default or 1..10) and Round time (default, 30..180 s); Crates (off with the Classic preset) and Weapons
+## (specials from crates / club only); Sudden death (always at 60 s in Last Caveman Standing) and Stock lives (Last
+## Caveman Standing only). Under them the nine variants as chips; Big Bounce, Lights Out and Giant Rain need 15 Cave
+## Paintings, Spear Party 25 (UnlockTable) - a locked chip shows a lock with the count. The line under the chips
+## explains the focused entry (a locked variant also the paintings it needs). "Choose the arena" opens the arena
+## select; "back" returns to the lobby (seats and ready flags kept).
 
 ## Rounds-to-win choices (0 = the mode's default, VersusMatch.round_wins_needed) and round times in seconds (0 =
 ## the mode's default, VersusMatch.round_ticks).
@@ -38,6 +39,9 @@ const VARIANTS: Array[Array] = [
 	[&"spear_party", "UI_VS_VAR_SPEAR_PARTY", "UI_VS_VAR_SPEAR_PARTY_INFO"],
 ]
 const CHIP_SIZE: Vector2 = Vector2(150.0, 24.0)
+## A rule row of the two columns (Mode and Preset span both: 2 x width + ROW_GAP), so the panel fits a 640 px view.
+const ROW_SIZE: Vector2 = Vector2(286.0, 22.0)
+const ROW_GAP: float = 12.0
 
 ## The player slot whose Start opened the screen (-1 = anybody drives it).
 var owner_slot: int = -1
@@ -66,7 +70,7 @@ class RuleRow:
 
 	func _init(p_caption: String, p_options: PackedStringArray, p_index: int) -> void:
 		super(p_caption, p_options, p_index)
-		custom_minimum_size = Vector2(300.0, 26.0)
+		custom_minimum_size = VersusRulesScreen.ROW_SIZE
 
 	func step(direction: int) -> void:
 		if locked:
@@ -154,9 +158,10 @@ class VariantChip:
 			draw_rect(rect, UiKit.COL_FOCUS, false, 2.0)
 		var caption: String = tr(str(get_meta(&"caption", "")))
 		var colour: Color = UiKit.COL_INK if on else UiKit.COL_CREAM
+		var room: float = size.x - 26.0
 		if is_locked():
-			caption = "%s  %s" % [caption, tr("UI_VS_LOCKED").format({"count": UnlocksScreen.reward_needs(reward)})]
 			colour = UiKit.COL_DIM
+			room -= _draw_lock(Vector2(size.x - 6.0, roundf(size.y * 0.5)))
 		var box: float = 10.0
 		var box_rect: Rect2 = Rect2(6.0, roundf((size.y - box) * 0.5), box, box)
 		draw_rect(box_rect, UiKit.COL_INK)
@@ -166,9 +171,24 @@ class VariantChip:
 		var baseline: float = roundf((size.y - float(UiKit.SIZE_SMALL)) * 0.5) + _font.get_ascent(UiKit.SIZE_SMALL)
 		var shown: String = caption
 		while shown.length() > 3 and _font.get_string_size(shown, HORIZONTAL_ALIGNMENT_LEFT, -1.0, UiKit.SIZE_SMALL).x \
-				> size.x - 26.0:
+				> room:
 			shown = shown.left(shown.length() - 2) + "."
 		draw_string(_font, Vector2(22.0, baseline), shown, HORIZONTAL_ALIGNMENT_LEFT, -1.0, UiKit.SIZE_SMALL, colour)
+
+	## A small padlock with the paintings the variant's reward needs, right-aligned at `right_middle`; returns the
+	## width it took.
+	func _draw_lock(right_middle: Vector2) -> float:
+		var count: String = str(UnlocksScreen.reward_needs(reward))
+		var count_w: float = _font.get_string_size(count, HORIZONTAL_ALIGNMENT_LEFT, -1.0, UiKit.SIZE_SMALL).x
+		var text_x: float = roundf(right_middle.x - count_w)
+		var baseline: float = roundf(right_middle.y - float(UiKit.SIZE_SMALL) * 0.5) + _font.get_ascent(UiKit.SIZE_SMALL)
+		draw_string(_font, Vector2(text_x, baseline), count, HORIZONTAL_ALIGNMENT_LEFT, -1.0, UiKit.SIZE_SMALL,
+				UiKit.COL_FOCUS)
+		var body: Rect2 = Rect2(text_x - 12.0, right_middle.y - 2.0, 9.0, 7.0)
+		draw_arc(Vector2(body.get_center().x, body.position.y), 3.0, PI, TAU, 8, Color("c9b27a"), 1.5)
+		draw_rect(body.grow(1.0), UiKit.COL_INK)
+		draw_rect(body, Color("e8a930"))
+		return count_w + 18.0
 
 
 func _build_screen() -> void:
@@ -187,7 +207,7 @@ func _build_screen() -> void:
 
 	var column: VBoxContainer = VBoxContainer.new()
 	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	column.add_theme_constant_override(&"separation", 3)
+	column.add_theme_constant_override(&"separation", 2)
 	safe.add_child(column)
 	column.add_child(UiKit.label("UI_VS_RULES_HEADING", UiKit.Style.TITLE, HORIZONTAL_ALIGNMENT_CENTER))
 	var owner_line: Label = UiKit.label(owner_text(owner_slot), UiKit.Style.SMALL, HORIZONTAL_ALIGNMENT_CENTER)
@@ -198,22 +218,25 @@ func _build_screen() -> void:
 
 	var inner: VBoxContainer = VBoxContainer.new()
 	inner.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	inner.add_theme_constant_override(&"separation", 2)
-	var grid: GridContainer = GridContainer.new()
-	grid.columns = 2
-	grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	grid.add_theme_constant_override(&"h_separation", 12)
-	grid.add_theme_constant_override(&"v_separation", 0)
-	inner.add_child(grid)
+	inner.add_theme_constant_override(&"separation", 0)
+	# Mode and Preset span the panel (a mode's name is long: "Last Caveman Standing"), the other six rows pair up.
 	_modes = VersusMatch.LAUNCH_MODES.duplicate()
 	var mode_texts: PackedStringArray = PackedStringArray()
 	for mode: int in _modes:
 		mode_texts.append(str(VersusLobbyScreen.MODE_KEYS[mode][0]))
-	_mode_row = _row(grid, "UI_MODE", mode_texts, maxi(_modes.find(versus_match.mode), 0), _on_mode_changed)
+	_mode_row = _row(inner, "UI_MODE", mode_texts, maxi(_modes.find(versus_match.mode), 0), _on_mode_changed)
 	var presets: PackedStringArray = PackedStringArray()
 	for entry: Array in PRESET_KEYS:
 		presets.append(str(entry[0]))
-	_preset_row = _row(grid, "UI_VS_PRESET", presets, versus_match.preset, _on_preset_changed)
+	_preset_row = _row(inner, "UI_VS_PRESET", presets, versus_match.preset, _on_preset_changed)
+	for wide: RuleRow in [_mode_row, _preset_row]:
+		wide.custom_minimum_size.x = ROW_SIZE.x * 2.0 + ROW_GAP
+	var grid: GridContainer = GridContainer.new()
+	grid.columns = 2
+	grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	grid.add_theme_constant_override(&"h_separation", int(ROW_GAP))
+	grid.add_theme_constant_override(&"v_separation", 0)
+	inner.add_child(grid)
 	_rounds_row = _row(grid, "UI_VS_ROUNDS", PackedStringArray(), 0, _on_rounds_changed)
 	_time_row = _row(grid, "UI_VS_ROUND_TIME", PackedStringArray(), 0, _on_time_changed)
 	_crates_row = _row(grid, "UI_VS_CRATES", PackedStringArray(["UI_OFF", "UI_ON"]), 1 if versus_match.crates else 0,
@@ -237,7 +260,7 @@ func _build_screen() -> void:
 		var chip: VariantChip = VariantChip.new(entry[0], str(entry[1]), UnlockTable.reward_of_variant(entry[0]),
 				versus_match.has_variant(entry[0]))
 		chip.toggled_on.connect(_on_variant_toggled.bind(entry[0]))
-		chip.focus_entered.connect(_show_info.bind(_variant_info(entry)))
+		chip.focus_entered.connect(_on_chip_focused.bind(chip, str(entry[2])))
 		chips.add_child(chip)
 		_chips.append(chip)
 	var chips_holder: CenterContainer = CenterContainer.new()
@@ -396,8 +419,17 @@ func _show_info(key: String) -> void:
 	_info.text = tr(key) if key != "" else ""
 
 
-func _variant_info(entry: Array) -> String:
-	return str(entry[2])
+## A variant's info line; a locked one adds the paintings it needs ("Head bounces fly twice as high.  (15 paintings)").
+func _on_chip_focused(chip: VariantChip, info_key: String) -> void:
+	_info.text = variant_info_text(chip, info_key)
+
+
+static func variant_info_text(chip: VariantChip, info_key: String) -> String:
+	var text: String = TranslationServer.translate(info_key)
+	if chip.is_locked():
+		text = "%s  (%s)" % [text, TranslationServer.translate("UI_VS_LOCKED").format(
+				{"count": UnlocksScreen.reward_needs(chip.reward)})]
+	return text
 
 
 func _on_mode_changed(index: int) -> void:
@@ -446,26 +478,21 @@ func _on_variant_toggled(on: bool, variant: StringName) -> void:
 	Game.versus_match.variants = variants
 
 
-## Focus: the rows in two columns (Left / Right change a value, so Up / Down move; the end of a column leads into the
-## other one), the chips in a 3 x 3 grid, then "Choose the arena"; the last wraps to the mode row.
+## Focus: Left / Right change a row's value, so Up / Down walk the rows in reading order (Mode, Preset, then the pairs
+## left before right), then the chips as a 3 x 3 grid, then "Choose the arena"; Up from Mode wraps to it.
 func _link_focus() -> void:
-	var left: Array[Control] = [_mode_row, _rounds_row, _crates_row, _sudden_row]
-	var right: Array[Control] = [_preset_row, _time_row, _weapons_row, _stock_row]
+	var rows: Array[Control] = []
+	for row: RuleRow in get_rows():
+		rows.append(row)
 	var order: Array[Control] = []
-	order.append_array(left)
-	order.append_array(right)
+	order.append_array(rows)
 	for chip: VariantChip in _chips:
 		order.append(chip)
 	order.append(_next)
-	# Rows: down the left column, then down the right one.
-	for i: int in left.size():
-		var row: Control = left[i]
-		row.focus_neighbor_top = row.get_path_to(left[i - 1] if i > 0 else _next)
-		row.focus_neighbor_bottom = row.get_path_to(left[i + 1] if i + 1 < left.size() else right[0])
-	for i: int in right.size():
-		var row: Control = right[i]
-		row.focus_neighbor_top = row.get_path_to(right[i - 1] if i > 0 else left[left.size() - 1])
-		row.focus_neighbor_bottom = row.get_path_to(right[i + 1] if i + 1 < right.size() else _chips[0])
+	for i: int in rows.size():
+		var row: Control = rows[i]
+		row.focus_neighbor_top = row.get_path_to(rows[i - 1] if i > 0 else _next)
+		row.focus_neighbor_bottom = row.get_path_to(rows[i + 1] if i + 1 < rows.size() else _chips[0])
 	for i: int in _chips.size():
 		var chip: VariantChip = _chips[i]
 		var col: int = i % 3
@@ -473,7 +500,7 @@ func _link_focus() -> void:
 		var down: int = i + 3
 		chip.focus_neighbor_left = chip.get_path_to(_chips[i - 1] if col > 0 else _chips[mini(i + 2, _chips.size() - 1)])
 		chip.focus_neighbor_right = chip.get_path_to(_chips[i + 1] if col < 2 and i + 1 < _chips.size() else _chips[i - col])
-		chip.focus_neighbor_top = chip.get_path_to(_chips[up] if up >= 0 else right[right.size() - 1])
+		chip.focus_neighbor_top = chip.get_path_to(_chips[up] if up >= 0 else rows[rows.size() - 1])
 		chip.focus_neighbor_bottom = chip.get_path_to(_chips[down] if down < _chips.size() else _next)
 	_next.focus_neighbor_top = _next.get_path_to(_chips[_chips.size() - 1])
 	_next.focus_neighbor_bottom = _next.get_path_to(_mode_row)

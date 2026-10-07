@@ -13,6 +13,7 @@ from PIL import Image
 from xcommon import AP, EXP, OUTLINE, asset, canvas, colours, load, rgb, save, strip, swap, trim, anim
 from build_coop_objects import grow, rim, paint, shape_mask
 from build_hero_palettes import PALETTES, ui_ramp
+from build_mp_ui import ALL_COLOURS                        # UiPlayers.PALETTE_COLOURS order
 
 import os
 
@@ -247,26 +248,37 @@ def spawn_frame(fill, groove):
 
 
 def build_spawn_point():
+    """the arena spawn pad in its phase-1 layout (6 cells: objects-B's spawn_point.tscn has hframes = 6), and the pad
+    lit in every hero colour as a sheet of its own (a lobby colour choice / the white of a green arena)"""
     frames = [spawn_frame(OCHRE, OCHRE_D)]
     for cname in SLOT_COLOURS:
         r = ui_ramp(PALETTES[cname])
         frames.append(spawn_frame(r["fill"], r["shade"]))
     frames.append(spawn_frame(LIT_W, LIT))
-    for cname in ("white", "gold"):                                 # phase 2: the two other hero colours
-        r = ui_ramp(PALETTES[cname])
-        frames.append(spawn_frame(r["fill"], r["shade"]))
     sheet = strip(frames)
     save(sheet, "sprites/objects/spawn_point.png", kind="object", frame=[SW, SH], grid=[len(frames), 1],
          pivot=[SW // 2, SH],
          source="shipped sprites/objects/code_stone.png (colours) - the slab and the spiral drawn by the pipeline",
          edits="a flat 48 x 15 slab ellipse in the code stone's sandstone colours (2 px #272018 outline, lit upper "
                "left, shaded front) with a 12 x 7 cave-paint spiral in ochre; lit frames recolour the spiral to a "
-               "hero colour's loincloth fill / shadow (hero_palettes ui ramp) or to the anchor's light yellow",
-         note="`objects/spawn_point index=2..4` (arenas; `@` is spawn 1): a floor marker drawn behind the heroes, 3 x 1 "
+               "slot's loincloth fill / shadow (hero_palettes ui ramp) or to the anchor's light yellow",
+         note="`objects/spawn_point index=2..4` (arenas; `@` is spawn 1): a floor marker drawn behind the heroes, 6 x 1 "
               "cells, pivot (24, 16) = floor, bottom-centre on the spawn cell. 0 idle (ochre), 1-4 = the spawn "
-              "about to be used by P1-P4 (the 48-tick respawn wait: show the respawning player's colour - 1 yellow, "
-              "2 blue, 3 pink, 4 green), 5 neutral light (round start, every pad lit), 6 white, 7 gold (the two "
-              "other hero colours, phase 2)", section="versus")
+              "about to be used by P1-P4 (the 48-tick respawn wait: show the respawning player's slot colour), 5 "
+              "neutral light (round start, every pad lit). The pad in every hero colour: spawn_point_lit.png",
+         section="versus")
+    lit = strip([spawn_frame(ui_ramp(PALETTES[c])["fill"], ui_ramp(PALETTES[c])["shade"]) for c in ALL_COLOURS])
+    save(lit, "sprites/objects/spawn_point_lit.png", kind="object", frame=[SW, SH], grid=[len(ALL_COLOURS), 1],
+         pivot=[SW // 2, SH], rows=list(ALL_COLOURS),
+         source="shipped sprites/objects/code_stone.png (colours) - the slab and the spiral drawn by the pipeline "
+                "(the pad of sprites/objects/spawn_point.png)",
+         edits="the spawn pad's spiral recoloured to each hero colour's loincloth fill / shadow (hero_palettes ui "
+               "ramp)",
+         note="the spawn pad lit in the colour the respawning player wears: cell = colour in "
+              "UiPlayers.PALETTE_COLOURS order (0 yellow, 1 blue, 2 pink, 3 green, 4 white, 5 gold), same 48 x 16 "
+              "cell and pivot (24, 16) as spawn_point.png (whose cells 1-4 are the slot defaults yellow, blue, pink, "
+              "green); for a player who picked another colour in the lobby or wears white on a green arena",
+         section="versus")
     return sheet
 
 

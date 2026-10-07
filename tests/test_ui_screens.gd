@@ -355,7 +355,7 @@ func test_world_map_of_a_coop_party() -> void:
 func test_menu_entries_take_the_focus_only_from_a_moving_pointer() -> void:
 	var holder: VBoxContainer = VBoxContainer.new()
 	add_node(holder)
-	var first: UiButton = UiButton.new("UI_TITLE_START")
+	var first: UiButton = UiButton.new("UI_TITLE_PLAY")
 	var second: UiButton = UiButton.new("UI_TITLE_QUIT")
 	var row: UiOptionRow = UiOptionRow.action("UI_TITLE_OPTIONS")
 	for control: Control in [first, second, row]:
@@ -392,6 +392,7 @@ func test_code_entry_accepts_every_campaign_code() -> void:
 		await get_tree().create_timer(CodeEntryScreen.START_DELAY + 0.05).timeout
 		assert_eq(Flow.args.get("level_id"), entry[1], "code %s leads to %s" % [entry[0], entry[1]])
 		assert_eq(Game.difficulty, entry[2], "code %s plays in its mode" % entry[0])
+		assert_eq(Game.book, maxi(Levels.get_book(entry[1]), 1), "code %s plays in its book" % entry[0])
 		await _cleanup()
 
 
@@ -820,6 +821,19 @@ func test_expert_wall_of_book_two() -> void:
 	for label: Node in node.find_children("*", "Label", true, false):
 		texts.append((label as Label).text)
 	assert_true(texts.has("UI_WALL_B2_TEXT"), "the Roc text shows")
+	var panel: PanelContainer = null
+	for label: Node in node.find_children("*", "Label", true, false):
+		if (label as Label).text == "UI_WALL_B2_TEXT":
+			var up: Node = label.get_parent()
+			while up != null and not up is PanelContainer:
+				up = up.get_parent()
+			panel = up as PanelContainer
+	assert_not_null(panel, "the text panel")
+	if panel != null and node.size.x >= float(Tuning.VIEW_W) * Tuning.ART_SCALE:
+		await get_tree().process_frame
+		var spire_x: float = node.global_position.x + roundf(node.size.x * ExpertWallScreen.SPIRE_AT)
+		assert_true(panel.get_global_rect().end.x <= spire_x - ExpertWallScreen.ROC_ORBIT.x * 0.5,
+				"the panel stands left of the spire, so the picture shows beside the words")
 	_press(&"ui_accept")
 	assert_eq(Flow.current_screen, Flow.SCREEN_TITLE)
 	await _cleanup()
@@ -872,6 +886,125 @@ func test_tally_coop_hands_out_medals_by_itself() -> void:
 	Game.new_game(Defs.Difficulty.BEGINNER)
 
 
+## Co-op tally with the "Rival score" option: the board shows each hero's own points, an item paid again counts again
+## for the hero who picked it (and the tribe), each hero's items fall on his side of the companion, and the medals
+## over a hero's head hang nearer to him than to his partner.
+func test_tally_coop_rival_score_and_own_piles() -> void:
+	Settings.set_value(OptionsPanel.KEY_RIVAL_SCORE, true)
+	Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.COOP, 2, 1)
+	Game.begin_level(&"test_example")
+	Game.runs[0].score = 1000
+	Game.runs[1].score = 500
+	Game.runs[0].food = 4
+	Game.runs[0].plates = 2
+	Game.runs[0].hurts = 3
+	Game.runs[1].revives = 1
+	Game.add_tally_item(&"items/food", 1, 100, 0)
+	Game.add_tally_item(&"items/food", 2, 200, 1)
+	Game.add_tally_item(&"items/food", 3, 300, 1)
+	Flow.args = {"level_id": &"test_example", "percent": 50}
+	var node: TallyScreen = await _open(&"tally") as TallyScreen
+	var texts: PackedStringArray = PackedStringArray()
+	for label: Node in node.find_children("*", "Label", true, false):
+		texts.append((label as Label).text)
+	assert_true(texts.has(UiKit.score_text(1000)) and texts.has(UiKit.score_text(500)), "the board shows both own scores")
+	assert_true(node._catch_x(0) < node._catch_x(1), "P1's items fall on his side of the companion, P2's on the other")
+	assert_eq(node._catch_x(1), node._catch_x(2), "P2's items make one pile")
+	_press(&"ui_accept")
+	assert_eq(Game.score, 600, "the tribe score: every item paid again")
+	assert_eq(Game.runs[0].score, 1100, "P1's own score: his item again")
+	assert_eq(Game.runs[1].score, 1000, "P2's own score: his two items again")
+	texts.clear()
+	for label: Node in node.find_children("*", "Label", true, false):
+		texts.append((label as Label).text)
+	assert_true(texts.has(UiKit.score_text(1100)) and texts.has(UiKit.score_text(1000)), "the board follows")
+	var feet: PackedVector2Array = node.get_actor_feet()
+	var heads: Dictionary = node._head_medals
+	assert_eq((heads.get(0, []) as Array).size(), 3, "P1: Most Food, Strongman, Clumsiest")
+	for slot: Variant in heads:
+		var own: float = feet[0].x if int(slot) == 0 else feet[2].x
+		var other: float = feet[2].x if int(slot) == 0 else feet[0].x
+		for icon: Variant in heads[slot]:
+			var centre: float = (icon as Control).position.x + 8.0
+			assert_true(absf(centre - own) < absf(centre - other), "P%d's medal hangs over P%d" % [int(slot) + 1,
+					int(slot) + 1])
+	_press(&"ui_accept")
+	await _cleanup()
+	Settings.set_value(OptionsPanel.KEY_RIVAL_SCORE, false)
+	Game.new_game(Defs.Difficulty.BEGINNER)
+
+
+## The Far Shore slab's line: always the whole "5 more: Big Bounce, Lights Out, Giant Rain"; a line longer than the slab
+## scrolls through it as a ticker, clipped inside the slab; the next reward's icon is framed.
+func test_world_map_slab_line_scrolls_when_long() -> void:
+	Save.reset()
+	for index: int in 10:
+		Save.add_painting(index)
+	assert_eq(WorldMapScreen.PaintingSlab.next_reward_id(), &"variants")
+	var slab: WorldMapScreen.PaintingSlab = WorldMapScreen.PaintingSlab.new()
+	add_node(slab)
+	slab.size = slab.custom_minimum_size
+	await get_tree().process_frame
+	assert_eq(slab.line_text, UnlocksScreen.next_text(), "the whole line, never cut")
+	assert_true(slab.is_ticker(), "the variants' line is longer than the slab")
+	assert_true(Rect2(Vector2.ZERO, slab.size).encloses(Rect2(slab.line.position, slab.line.size)),
+			"the ticker is clipped inside the slab")
+	assert_true(slab.line.clip_contents)
+	var before: float = slab.ticker_offset
+	slab._process(0.5)
+	assert_true(slab.ticker_offset > before, "it scrolls")
+	slab.queue_free()
+	for index: int in Tuning.PAINTING_COUNT:
+		Save.add_painting(index)
+	assert_eq(WorldMapScreen.PaintingSlab.next_reward_id(), &"", "every reward open")
+	Save.reset()
+
+
+## Every phase-2 screen of this file fits the game's 640 x 360 view in a full state (its content needs no more room
+## than that, whatever the test viewport): the Far Shore map, the Book II wall, THE END's mural, the Cave Paintings,
+## the co-op tally with the Rival score and six medals.
+func test_phase_two_screens_fit_the_view() -> void:
+	Save.reset()
+	for index: int in Tuning.PAINTING_COUNT:
+		Save.add_painting(index)
+	var states: Array[Dictionary] = [
+		{"screen": &"world_map", "args": {"level_id": Levels.first_level(Levels.BOOK_2), "book": Levels.BOOK_2}},
+		{"screen": &"expert_wall", "args": {"book": Levels.BOOK_2, "mode": Defs.GameMode.SINGLE}},
+		{"screen": &"the_end", "args": {"book": Levels.BOOK_2, "mode": Defs.GameMode.SINGLE, "mural": true}},
+		{"screen": &"unlocks", "args": {"back": Flow.SCREEN_TITLE}},
+		{"screen": &"tally", "args": {"level_id": &"test_example", "percent": 100}, "coop": true},
+	]
+	Settings.set_value(OptionsPanel.KEY_RIVAL_SCORE, true)
+	var base: Vector2 = Vector2(Tuning.VIEW_W, Tuning.VIEW_H) * float(Tuning.ART_SCALE)
+	for state: Dictionary in states:
+		if state.get("coop", false):
+			Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.COOP, 2, 1)
+			Game.begin_level(&"test_example")
+			for run: PlayerRun in Game.runs:
+				run.food = 3
+				run.best_chain = 2
+				run.revives = 1
+				run.bats = 1
+				run.plates = 1
+				run.deaths = 1
+		else:
+			Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.SINGLE, 1, Levels.BOOK_2)
+		Flow.args = state["args"]
+		var node: UiScreen = await _open(state["screen"])
+		if node is TallyScreen:
+			_press(&"ui_accept")
+			assert_eq((node as TallyScreen).medals_shown, 12, "six medals, each shared by both heroes")
+		await get_tree().process_frame
+		var need: Vector2 = node.safe.get_combined_minimum_size()
+		assert_true(need.x <= base.x and need.y <= base.y, "%s fits the 640 x 360 view (needs %s)" % [state["screen"], need])
+		node.queue_free()
+		await get_tree().process_frame
+	Settings.set_value(OptionsPanel.KEY_RIVAL_SCORE, false)
+	await _cleanup()
+	Game.new_game(Defs.Difficulty.BEGINNER)
+	Save.reset()
+
+
 ## A single-player tally has no medals (the 1.0 tally).
 func test_tally_single_player_has_no_medals() -> void:
 	Game.new_game(Defs.Difficulty.BEGINNER)
@@ -897,6 +1030,13 @@ func test_unlocks_screen_shows_paintings_and_rewards() -> void:
 	assert_eq(node.focused_index, 5, "the hunt goes on at the first painting not found")
 	assert_true(node.get_slot(5).has_focus())
 	assert_true(node.get_info_text().contains(tr("UI_PAINTINGS_MISSING")))
+	assert_eq(node.get_picture().index, 5, "the focused painting's picture")
+	assert_false(node.get_picture().found, "... a carved question mark while it is missing")
+	node.get_slot(2).grab_focus()
+	assert_eq(node.get_picture().index, 2)
+	assert_true(node.get_picture().found, "a found painting shows art-A's picture")
+	assert_true(ResourceLoader.has_cached(UnlocksScreen.TEX_PAINTINGS), "ui/paintings.png")
+	node.get_slot(5).grab_focus()
 	_press(&"ui_down")
 	assert_eq(node.focused_index, 5 + UnlocksScreen.MURAL_COLUMNS, "Down: the socket under it")
 	_press(&"ui_right")

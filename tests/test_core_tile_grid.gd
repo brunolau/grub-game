@@ -190,6 +190,16 @@ func test_tar_floor() -> void:
 	# A fresh grid and a resize hold no material.
 	grid.resize(3, 2)
 	assert_false(grid.is_tar(1, 1))
+	assert_false(grid.has_tar(), "has_tar: a resized grid has none")
+	# has_tar (P2.12): any tar cell of the grid, kept in step by set_char.
+	var plain: TileGrid = TileGrid.from_rows(PackedStringArray(["....", "##%#"]), 1, 2, {})
+	assert_false(plain.has_tar(), "no ':' cell")
+	plain.set_char(2, 1, TileGrid.CH_TAR)
+	assert_true(plain.has_tar(), "one ':' cell")
+	plain.set_char(2, 1, TileGrid.CH_SOLID_A)
+	assert_false(plain.has_tar(), "rewritten: none again")
+	var tarred: TileGrid = TileGrid.from_rows(PackedStringArray([".T.....", "#::#%:T"]), 1, 2, {"T": ":"})
+	assert_true(tarred.has_tar())
 
 
 ## The done-criterion of PLAN.md P0.7: the 15 Book I level files build, through the format-2 TileGrid and LevelData,

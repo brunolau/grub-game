@@ -83,7 +83,9 @@ static func from_match(versus_match: Object, mode: int) -> VersusRules:
 				rules.variants[variant] = true
 	if rules.preset == PRESET_MAYHEM:
 		var seed_value: int = int(versus_match.call(&"round_seed")) if versus_match.has_method(&"round_seed") else 1
-		rules.variants[mayhem_variant(seed_value, mode)] = true
+		var rolled: StringName = mayhem_variant(seed_value, mode)
+		if rolled != &"":
+			rules.variants[rolled] = true
 	var toggle: Variant = versus_match.get(&"sudden_death")
 	rules.sudden_death_event = toggle is bool and bool(toggle)
 	var stock_value: Variant = versus_match.get(&"stock")
@@ -93,15 +95,22 @@ static func from_match(versus_match: Object, mode: int) -> VersusRules:
 	return rules
 
 
-## Mayhem's variant of a round: a pick of SimRng(round seed) among the variants that change something in `mode`.
-static func mayhem_variant(round_seed: int, mode: int) -> StringName:
+## Mayhem's variant of a round: a pick of SimRng(round seed) among the variants that change something in `mode` and
+## that the profile has opened (core-A's UnlockTable.is_variant_open: Big Bounce, Lights Out, Giant Rain and Spear
+## Party open with paintings, DESIGN.md C.9). `open_only` false offers every variant (tests). A closed variant is never
+## rolled; with none left the round plays without one (&"").
+static func mayhem_variant(round_seed: int, mode: int, open_only: bool = true) -> StringName:
 	var choices: Array[StringName] = []
 	for variant: StringName in VARIANTS:
 		if mode == Defs.VersusMode.CLUBBALL and variant in [HAMMER_TIME, AXE_RAIN, SPEAR_PARTY, GIANT_RAIN, ONE_BONK]:
 			continue
 		if mode != Defs.VersusMode.GRUB_STACK and variant == GIANT_RAIN:
 			continue
+		if open_only and not UnlockTable.is_variant_open(variant):
+			continue
 		choices.append(variant)
+	if choices.is_empty():
+		return &""
 	var rng: SimRng = SimRng.new(round_seed * 7 + 0x5EED)
 	return choices[rng.pick_index(choices.size())]
 

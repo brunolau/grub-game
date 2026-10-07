@@ -186,7 +186,8 @@ func act(hero: PlayerBase, level: LevelBase, tick: int) -> int:
 
 ## A strike at the ball facing the attacked goal; -1 when none fits now.
 func _shot(hero: PlayerBase) -> int:
-	if prediction.is_empty() or not hero.is_grounded() or hero.attack_gate or hero.swing_lock > 0 or hero.squash > 0:
+	if prediction.is_empty() or not hero.is_grounded() or hero.attack_gate or hero.swing_lock > 0 or hero.squash > 0 \
+			or not may_strike(hero):
 		return -1
 	var ball: SimEntity = BotSenses.ball(bot.level)
 	if ball == null:

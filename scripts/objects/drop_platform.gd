@@ -1,10 +1,19 @@
 class_name DropPlatform
 extends PlatformBase
-## `objects/drop_platform` (`delay` ticks [0], `skin`): PHYSICS.md 11.4 droppers, GAMEPLAY.md 7.3. It waits; when
-## the hero has stood on it for `delay` ticks (at once while it is still returning) it falls with
-## Tuning.DROPPER_ACCEL v16 per tick up to Tuning.DROPPER_MAX until it reaches a floor or 3 rows below the map;
-## there it rests until the hero has been off it for Tuning.DROPPER_REST_TICKS, then rises back at
-## Tuning.DROPPER_RETURN_SPEED px per tick. The standing surface is the top edge of the cell it is placed in.
+## `objects/drop_platform` (`delay` ticks [0], `skin=wood|ice|stone|small|cloud|driftwood` [by biome, PlatformSkin]):
+## PHYSICS.md 11.4 droppers, GAMEPLAY.md 7.3. It waits; when the hero has stood on it for `delay` ticks (at once while
+## it is still returning) it falls with Tuning.DROPPER_ACCEL v16 per tick up to Tuning.DROPPER_MAX until it reaches a
+## floor or 3 rows below the map; there it rests until the hero has been off it for Tuning.DROPPER_REST_TICKS, then
+## rises back at Tuning.DROPPER_RETURN_SPEED px per tick. The standing surface is the top edge of the cell it is
+## placed in.
+##
+## 2.0 (GAMEPLAY.md 13.3): Book II's drop clouds, crumbling clouds and driftwood floes are this platform in the
+## `cloud` / `driftwood` skins (pictures only). A geyser's spout (objects/geyser, 6-2's spore geysers) throws it up
+## ([method launch]): it enters FALL with a negative `fall_speed` and rises under the hero's gravity (Tuning.GRAVITY:
+## -224 lifts it 105 px, as the spout lifts everything) together with its riders, whom it launches with the same
+## power - one arc for all, as a raft's (Raft.launch). From the top of the arc its dropper fall (DROPPER_ACCEL, slower
+## than a hero's fall) brings it down, so its riders land on it again, until it rests on a floor below its home row.
+## A 1.0 dropper never has a negative `fall_speed`.
 
 enum State { WAIT = 0, FALL = 1, REST = 2 }
 
@@ -54,6 +63,21 @@ func _move_tick() -> void:
 					_delay_left = delay
 
 
+## 2.0: thrown up with `power` v16 (negative) by a geyser's spout (GAMEPLAY.md 13.3): it rises from wherever it is,
+## and every hero riding it (its last ride test, [member rider_mask]) is launched with the same power, keeping his x
+## speed (PlayerBase.launch), so they rise together; see the class comment.
+func launch(power: int) -> void:
+	_doze_wake_now()
+	var level: LevelBase = Game.level
+	if level != null:
+		for hero: PlayerBase in level.contact_order():
+			if (rider_mask & (1 << hero.slot)) != 0 and not hero.dead and not hero.is_down():
+				hero.launch(PlayerBase.LAUNCH_KEEP, power)
+	state = State.FALL
+	fall_speed = power
+	_rest_left = 0
+
+
 func _on_level_reset() -> void:
 	teleport(home)
 	ridden = false
@@ -62,7 +86,10 @@ func _on_level_reset() -> void:
 
 func _fall() -> void:
 	dy = Tuning.floor16(fall_speed)
-	if fall_speed < Tuning.DROPPER_MAX:
+	if fall_speed < 0:
+		# 2.0: rising from a spout (launch) - the hero's gravity up to the top of the arc.
+		fall_speed = mini(fall_speed + Tuning.GRAVITY, 0)
+	elif fall_speed < Tuning.DROPPER_MAX:
 		fall_speed = mini(fall_speed + Tuning.DROPPER_ACCEL, Tuning.DROPPER_MAX)
 	var level: LevelBase = Game.level
 	if level == null:

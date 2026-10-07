@@ -15,6 +15,24 @@ const NUMLOCK_OFF: Dictionary = {
 var _held: Dictionary = {}  # physical key -> true
 
 
+## A screen an earlier test file left behind as the current scene (a Flow scene change after a failed test, e.g. a
+## GameOver over the whole view) would take the taps and keys of these tests: remove it and Flow's overlays, as
+## tests/test_ui_screens.gd does after its own screens.
+func before_each() -> void:
+	if Flow.busy:
+		return
+	get_tree().paused = false
+	var scene: Node = get_tree().current_scene
+	if scene != null and is_instance_valid(scene):
+		get_tree().current_scene = null
+		scene.free()
+		for layer: int in [Defs.LAYER_HUD, Defs.LAYER_TOUCH, Defs.LAYER_MENU]:
+			for child: Node in Flow.get_overlay(layer).get_children():
+				child.free()
+		Flow.current_screen = Flow.SCREEN_BOOT
+		Flow.args = {}
+
+
 func after_each() -> void:
 	_release_keys()
 	GameInput.reset_slots()
@@ -524,9 +542,14 @@ func _key_event(physical: Key) -> InputEventKey:
 	return event
 
 
+## An options panel on a canvas layer of its own above everything else: a screen an earlier test file left in the root
+## (a Flow scene change after a failed test, e.g. a GameOver screen over the whole view) never takes its taps.
 func _panel() -> OptionsPanel:
+	var layer: CanvasLayer = CanvasLayer.new()
+	layer.layer = 120
+	add_node(layer)
 	var panel: OptionsPanel = OptionsPanel.new()
-	add_node(panel)
+	layer.add_child(panel)
 	await get_tree().process_frame
 	return panel
 

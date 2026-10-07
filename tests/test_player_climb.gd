@@ -34,6 +34,20 @@ class FakePlatform:
 		dx = step
 
 
+## A grid answering `has_tar()` itself (the native query requested from core-A), always true.
+class AnsweringGrid:
+	extends TileGrid
+
+	var asked: int = 0
+
+	func _init(p_cols: int, p_rows: int) -> void:
+		super(p_cols, p_rows)
+
+	func has_tar() -> bool:
+		asked += 1
+		return true
+
+
 static var _party_reference: Dictionary = {}
 
 
@@ -215,6 +229,24 @@ func test_the_grab_test_reads_the_vines_kept_geometry_and_the_tar_scan_is_kept()
 	assert_true(level.has_meta(HeroClimb.TAR_META))
 	level.grid = TileGrid.new(8, 8)
 	assert_false(HeroClimb.level_has_tar(level), "another grid: scanned again")
+	# A grid that answers has_tar() itself (core-A's native query, when it exists) is asked instead of scanned.
+	var answering: AnsweringGrid = AnsweringGrid.new(8, 8)
+	assert_true(HeroClimb.grid_has_tar(answering), "its own answer, though no cell is tar")
+	assert_eq(answering.asked, 1)
+
+
+func test_a_vine_freed_meanwhile_is_skipped_quietly() -> void:
+	# The kept vine list holds references; a vine removed with its level part (or by a test) is skipped by the grab test
+	# without an engine error, and the next vine in reach is grabbed.
+	vine_world(false)
+	var gone: FakeVine = add_vine(192, 330)
+	var other: FakeVine = add_vine(200, 330)
+	spawn_hero(Vector2i(VINE_X, 320))
+	gone.free()
+	assert_eq(hero.hero_climb.find_vine(VINE_X, 320), other, "the freed vine is skipped")
+	play(hold("U", 1))
+	assert_true(hero.hero_climb.climbing)
+	assert_eq(hero.hero_climb.vine, other)
 
 
 func test_holding_up_while_jumping_past_a_vine_grabs_it() -> void:

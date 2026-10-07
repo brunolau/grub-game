@@ -7,13 +7,19 @@ extends UiScreen
 ## 2.0 (DESIGN.md A.2, GAMEPLAY.md 13.1, PLAN.md P2.8): a Book II run (Game.book 2, or args {"book": 2}) meets the wall
 ## after the tally of 7-2b with its own picture - "Only an expert eater may climb to the Roc!": the Sky Spire of world
 ## 9 climbs out of the mesa into a storm cloud (slate rock with its ledges, the Far Shore map's colours), the Storm
-## Roc (the pterodactyl at 2x in storm slate) circles its top under the lightning, and a warrior keeps the path at its
-## foot. Same text panel and the same way back to the title.
+## Roc (the pterodactyl in storm slate) circles under the cloud beside the lightning, and a warrior keeps the path at
+## its foot. The spire stands in the right part of the view and the same text panel on the left, so the picture shows
+## beside the words; the same way back to the title.
 
 const PROP_DIR: String = "res://assets/tiles/village/props/"
-## Book II: the Roc's flight, a slow ellipse around the spire top (art px, from the spire's centre top).
-const ROC_ORBIT: Vector2 = Vector2(150.0, 26.0)
+## Book II: the Roc's flight, a slow ellipse under the storm cloud around the spire (art px; the centre's y is the
+## bird's feet line), and where the spire stands (fraction of the view width).
+const ROC_ORBIT: Vector2 = Vector2(104.0, 18.0)
+const ROC_CENTRE_Y: float = 132.0
 const ROC_SECONDS: float = 9.0
+const SPIRE_AT: float = 0.7
+## Book II: the text panel's width on the left (the Book I panel is centred and wider).
+const PANEL_WIDTH_B2: float = 236.0
 ## The storm tint of the Book II sky.
 const STORM_TINT: Color = Color(0.55, 0.6, 0.78)
 ## The spire's storm slate, dark to light (the Far Shore map's spire).
@@ -47,7 +53,6 @@ func _build_screen() -> void:
 		_castle.draw.connect(_draw_spire)
 		add_child(_castle)
 		_roc = UiActor.new(&"pterodactyl", &"fly")
-		_roc.scale = Vector2(2.0, 2.0)
 		_roc.modulate = Color(0.62, 0.68, 0.86)
 		add_child(_roc)
 	else:
@@ -75,10 +80,10 @@ func _build_screen() -> void:
 	text.add_child(heading)
 	var body: Label = UiKit.label(wall_text_key(_book), UiKit.Style.BODY, HORIZONTAL_ALIGNMENT_CENTER)
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	body.custom_minimum_size = Vector2(360.0, 0.0)
+	body.custom_minimum_size = Vector2(PANEL_WIDTH_B2 if _book == Levels.BOOK_2 else 360.0, 0.0)
 	text.add_child(body)
 	var box: PanelContainer = UiKit.panel_box(text, 12)
-	box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	box.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN if _book == Levels.BOOK_2 else Control.SIZE_SHRINK_CENTER
 	column.add_child(box)
 	var spacer: Control = Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -139,7 +144,7 @@ func _reveal(box: Control) -> void:
 
 func _layout() -> void:
 	if _book == Levels.BOOK_2:
-		_guard.position = Vector2(roundf(size.x * 0.5 - 92.0), _ground.position.y + 10.0)
+		_guard.position = Vector2(roundf(_spire_x() - 128.0), _ground.position.y + 10.0)
 		_guard.face(1)
 		_place_roc()
 	else:
@@ -151,9 +156,14 @@ func _layout() -> void:
 ## The Roc circles the spire top: wide and slow, nearer (lower) on the way to the left.
 func _place_roc() -> void:
 	var angle: float = _time * TAU / ROC_SECONDS
-	var centre: Vector2 = Vector2(size.x * 0.5 + 40.0, 96.0)
+	var centre: Vector2 = Vector2(_spire_x(), ROC_CENTRE_Y)
 	_roc.position = (centre + Vector2(cos(angle) * ROC_ORBIT.x, sin(angle) * ROC_ORBIT.y)).round()
 	_roc.face(-1 if sin(angle) > 0.0 else 1)
+
+
+## The x of the spire's centre line (Book II).
+func _spire_x() -> float:
+	return roundf(size.x * SPIRE_AT)
 
 
 func _draw_castle() -> void:
@@ -186,24 +196,25 @@ func _draw_castle() -> void:
 func _draw_spire() -> void:
 	var palette: Array[Color] = SLATE
 	var base: float = _ground.position.y + 4.0
-	var mid: float = roundf(_castle.size.x * 0.5) + 40.0
-	# Half widths from the foot (row 0) to the top (off the view): a wide foot, a waist, a ledge, the narrow top.
+	var mid: float = _spire_x()
+	# Half widths from the foot (row 0) to the top (inside the storm cloud): a wide foot, a waist, a ledge, the
+	# narrow top.
 	var outline: PackedVector2Array = PackedVector2Array()
 	var shape: Array[Vector2] = [
 		Vector2(-96.0, 0.0), Vector2(-74.0, -40.0), Vector2(-60.0, -46.0), Vector2(-58.0, -110.0),
 		Vector2(-70.0, -116.0), Vector2(-46.0, -124.0), Vector2(-40.0, -190.0), Vector2(-48.0, -196.0),
-		Vector2(-30.0, -204.0), Vector2(-26.0, -400.0),
+		Vector2(-30.0, -204.0), Vector2(-26.0, -262.0),
 	]
 	for point: Vector2 in shape:
 		outline.append(Vector2(mid + point.x, base + point.y))
 	var right: Array[Vector2] = [
-		Vector2(24.0, -400.0), Vector2(30.0, -236.0), Vector2(62.0, -230.0), Vector2(56.0, -160.0),
+		Vector2(24.0, -262.0), Vector2(30.0, -236.0), Vector2(62.0, -230.0), Vector2(56.0, -160.0),
 		Vector2(52.0, -96.0), Vector2(84.0, -88.0), Vector2(78.0, -40.0), Vector2(104.0, 0.0),
 	]
 	for point: Vector2 in right:
 		outline.append(Vector2(mid + point.x, base + point.y))
 	_castle.draw_colored_polygon(outline, Color(palette[2]))
-	for y: int in range(int(base) - 400, int(base), 2):
+	for y: int in range(int(base) - 262, int(base), 2):
 		var span: Vector2 = _span(outline, float(y) + 1.0)
 		if span.y <= span.x:
 			continue
@@ -224,7 +235,7 @@ func _draw_spire() -> void:
 	closed.append(outline[0])
 	_castle.draw_polyline(closed, UiKit.COL_INK, 2.0)
 	# The storm cloud over the top, and its lightning.
-	var top: float = base - 300.0
+	var top: float = base - 254.0
 	for blob: Vector3 in [Vector3(-70, 8, 26), Vector3(-30, -6, 36), Vector3(20, -12, 44), Vector3(70, -2, 34),
 			Vector3(112, 10, 24)]:
 		_castle.draw_circle(Vector2(mid + blob.x, top + blob.y), blob.z + 2.0, Color(palette[0]))

@@ -113,8 +113,9 @@ func _search_gates(files: PackedStringArray) -> int:
 					errors += 1
 					print("%s: error: %s: a single hero gets through - %s" % [where, label, result["detail"]])
 				else:
-					print("%s: note: %s refused by the solo search (%d resting points)" % [where, label,
-						int(result["explored"])])
+					print("%s: note: %s refused by the solo search (%d resting points, %d moves played%s)" % [where,
+						label, int(result["explored"]), int(result.get("runs", 0)),
+						"" if bool(result.get("flood", true)) else "; the bare grid has no path either"])
 				for window: Dictionary in result["windows"]:
 					var ok: bool = int(window["window"]) <= int(window["solo_min"]) - PartyTuning.WINDOW_SOLO_MARGIN_TICKS
 					if not ok:

@@ -80,10 +80,44 @@ func test_a_sign_near_the_top_hangs_its_board_under_itself() -> void:
 	assert_true(clear_of(plan.rect, bodies), "both heroes stay visible")
 	assert_true(tail_reaches(plan.rect, sign.x))
 	assert_true(inside_view(plan.rect))
-	var above: SignBoard.BoardPlace = SignBoard.board_place(SignBoard.Place.ABOVE, sign, BOARD, VIEW, 1.0, TOP,
-			NO_PANELS, bodies)
-	assert_true(above.covered > 0.0, "above, under the HUD row, it would cover the reader")
-	assert_almost_eq(above.rect.position.y, TOP, 0.5, "pushed down to the HUD row")
+	for place: int in [SignBoard.Place.ABOVE, SignBoard.Place.ABOVE_LEFT, SignBoard.Place.ABOVE_RIGHT]:
+		assert_null(SignBoard.board_place(place, sign, BOARD, VIEW, 1.0, TOP, NO_PANELS, bodies),
+				"above, the HUD row would push it down over the sign (place %d): no such place" % place)
+	# Without the rule's last resort a board always has a place: a board taller than the whole room above and under
+	# its sign stands clamped into the view.
+	var huge: Vector2 = Vector2(BOARD.x, VIEW.y - TOP - 20.0)
+	var squeezed: SignBoard.BoardPlace = SignBoard.plan_board(sign, huge, VIEW, 1.0, TOP, NO_PANELS, bodies)
+	assert_not_null(squeezed, "never without a place")
+	if squeezed != null:
+		assert_eq(squeezed.place, SignBoard.Place.ABOVE)
+		assert_true(inside_view(squeezed.rect), "clamped into the view: %s" % squeezed.rect)
+
+
+## A sign so high that a standing board would be pushed under the sign's top by the HUD row or P2's panel (ui-B's
+## test_a_board_never_covers_the_p2_panel, signs at x 240-308 logical, y 24-44): the board never stands below the sign
+## with its tail pointing away from it - it hangs under the sign, below the panel with its tail (TAIL_HALF art px,
+## scaled by the view).
+func test_a_board_pushed_over_its_sign_hangs_under_it_clear_of_the_panel_and_its_tail() -> void:
+	var panel: Rect2 = Rect2(464.0, 52.0, 168.0, 44.0)
+	var big: Vector2 = Vector2(329.0, 76.0)
+	for art: float in [1.0, 2.0]:
+		var view: Vector2 = VIEW * art
+		var scaled_panel: Rect2 = Rect2(panel.position * art, panel.size * art)
+		for sign: Vector2 in [Vector2(616.0, 48.0), Vector2(616.0, 88.0), Vector2(560.0, 68.0), Vector2(480.0, 88.0),
+				Vector2(200.0, 48.0)]:
+			var at: Vector2 = sign * art
+			var plan: SignBoard.BoardPlace = SignBoard.plan_board(at, big * art, view, art, TOP * art,
+					[scaled_panel], [])
+			assert_true(plan.place >= SignBoard.Place.BELOW, "art %.0f sign %s: hangs (place %d, %s)" % [
+					art, sign, plan.place, plan.rect])
+			assert_true(plan.rect.position.y > at.y, "under the sign")
+			var tail: Rect2 = Rect2(clampf(at.x, plan.rect.position.x + SignBoard.TAIL_INSET * art,
+					plan.rect.end.x - SignBoard.TAIL_INSET * art) - float(SignBoard.TAIL_HALF) * art,
+					plan.rect.position.y - float(SignBoard.TAIL_HALF) * art, float(2 * SignBoard.TAIL_HALF) * art,
+					float(SignBoard.TAIL_HALF) * art)
+			assert_false(plan.rect.intersects(scaled_panel), "art %.0f sign %s: board %s off the panel" % [
+					art, sign, plan.rect])
+			assert_false(tail.intersects(scaled_panel), "art %.0f sign %s: tail %s off the panel" % [art, sign, tail])
 
 
 ## The partner on a ledge three rows over the sign: every place above covers him (the tail must point at the sign he
@@ -170,12 +204,17 @@ func test_a_board_keeps_its_place_while_it_stays_clear() -> void:
 ## bottom whose board cannot hang under it).
 func test_every_place_stays_inside_the_view() -> void:
 	for sign: Vector2 in [Vector2(10.0, 200.0), Vector2(630.0, 200.0), Vector2(320.0, 40.0), Vector2(320.0, 350.0)]:
+		var fits: int = 0
 		for place: int in SignBoard.Place.size():
 			var at: SignBoard.BoardPlace = SignBoard.board_place(place, sign, BOARD, VIEW, 1.0, TOP, NO_PANELS, [])
 			if at == null:
-				assert_true(place >= SignBoard.Place.BELOW, "only a hanging board may not fit")
+				# A hanging board near the bottom, a standing one the HUD row would push over a sign near the top.
+				assert_true(place >= SignBoard.Place.BELOW if sign.y > VIEW.y * 0.5 else place < SignBoard.Place.BELOW,
+						"sign %s: place %d may not fit" % [sign, place])
 				continue
+			fits += 1
 			assert_true(inside_view(at.rect), "sign %s place %d: %s" % [sign, place, at.rect])
+		assert_true(fits >= 3, "sign %s: three places fit" % sign)
 	assert_null(SignBoard.board_place(SignBoard.Place.BELOW, Vector2(320.0, 350.0), BOARD, VIEW, 1.0, TOP,
 			NO_PANELS, []), "no room under a sign at the bottom")
 

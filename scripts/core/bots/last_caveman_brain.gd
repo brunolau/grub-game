@@ -66,7 +66,7 @@ func think(hero: PlayerBase, level: LevelBase, _tick: int) -> void:
 	# BONES
 	var hurt: bool = hearts < VersusTuning.LCS_HEARTS
 	for item: CollectibleBase in BotSenses.items(level):
-		if item.item_id != &"items/bone":
+		if item.item_id != &"items/bone" or is_dangerous(item.sim_pos):
 			continue
 		var cost: int = _cost(hero, reach, item.sim_pos)
 		if cost >= NavGraph.UNREACHABLE:
@@ -100,10 +100,8 @@ func think(hero: PlayerBase, level: LevelBase, _tick: int) -> void:
 				utility = utility * 3 / 2
 		_offer(best, Goal.ATTACK, utility, pos, null, rival)
 	if not rookie() and hearts <= 1 and threat >= 0 and threat_cost < EVADE_NEAR_TICKS:
-		var away: Array[Vector2i] = [bot.seen_pos(threat)]
-		if restless():
-			away.append(hero.sim_pos)
-		var point: Vector2i = far_point(hero, away, 120)
+		var chasers: Array[int] = [threat]
+		var point: Vector2i = escape_point(hero, chasers, 120, NavGraph.WEIGHT_LIGHT, restless())
 		if point != BotSenses.NO_POS:
 			_goal_to(Goal.EVADE, point, null, threat, SCALE)
 			return
@@ -160,7 +158,7 @@ func act(hero: PlayerBase, level: LevelBase, tick: int) -> int:
 				goal_pos = item.sim_pos
 			nav.set_target(goal_pos, 3)
 		Goal.ATTACK:
-			nav.set_target(bot.seen_pos(goal_slot), 12)
+			nav.set_target(attack_stand(hero, bot.predicted_pos(goal_slot)), 8)
 		Goal.WANDER:
 			nav.set_target(goal_pos, 6)
 		_:

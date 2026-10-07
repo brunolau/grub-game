@@ -91,6 +91,7 @@ func test_single_player_gets_no_driver_and_no_tribe_camera() -> void:
 	assert_null(solo.party_driver, "single-player: no driver")
 	assert_null(solo.get_tribe_camera(), "single-player: the 1.0 camera")
 	assert_eq(solo.get_edge_walls(), Vector2i.ZERO, "no edge walls")
+	assert_null(solo.get_lights(), "a Book I level played solo keeps 1.0's look: no lights")
 
 
 func test_a_coop_party_gets_the_driver_and_the_tribe_camera() -> void:
@@ -106,6 +107,8 @@ func test_a_coop_party_gets_the_driver_and_the_tribe_camera() -> void:
 	assert_eq(frame.size, Vector2i(320, 176), "the authentic 20 x 11-cell view")
 	assert_eq(level.get_edge_walls(), Vector2i(frame.position.x + 8, frame.end.x - 8))
 	assert_eq(level.get_view_rect().position, level.get_tribe_camera().pos, "the base view is the authentic view")
+	assert_not_null(level.get_lights(), "a party keeps seeing itself in the dark: lights")
+	assert_not_null(level.get_egg_scout(), "and the egg scouts' glint")
 
 
 func test_a_versus_party_gets_no_coop_driver() -> void:
@@ -467,6 +470,107 @@ func test_going_down_and_hatching_make_a_hero_idle_again() -> void:
 	p1.grounded = false
 	Sim.step(12)
 	assert_eq(p1.totem_carrier, p2, "no UP: the ride on an idle partner")
+
+
+# =================================================================================================================
+# The lee (co-op gusts: the "lee leapfrog" of DESIGN.md 3-1b / 9-2)
+# =================================================================================================================
+
+## Both heroes on the floor: P1 at x `p1_x`, P2 (who crouches from now on) at x 200; the wind blows at `wind`.
+func _lee_pair(level: Level, p1_x: int, wind: int, p1_y: int = FLOOR_Y) -> void:
+	level.set_wind(wind)
+	level.player.teleport(Vector2i(p1_x, p1_y))
+	level.get_hero(1).teleport(Vector2i(200, FLOOR_Y))
+	_hold(1, Defs.IN_DOWN)
+	Sim.step(2)
+	level.player.teleport(Vector2i(p1_x, p1_y))
+	Sim.step(1)
+
+
+func test_a_crouching_partner_shelters_the_hero_downwind() -> void:
+	var level: Level = _load(2)
+	var p1: PlayerBase = level.player
+	var p2: PlayerBase = level.get_hero(1)
+	level.set_wind(40)
+	Sim.step(2)
+	assert_eq(level.lee_mask, 0, "nobody crouches: no lee")
+	assert_eq(level.wind_for(p1), 40)
+	_lee_pair(level, 200 - 32, 40)
+	assert_eq(p2.state, Defs.HeroState.CROUCH, "P2 crouches")
+	assert_eq(level.wind_for(p1), 0, "the wind blows left: 32 px left of a crouching partner is his lee")
+	assert_eq(level.wind_for(p2), 40, "the windbreak is not sheltered (his crouch braces him anyway)")
+	_lee_pair(level, 200 - PartyDriver.LEE_REACH_PX, 40)
+	assert_eq(level.wind_for(p1), 0, "the lee reaches LEE_REACH_PX downwind")
+	_lee_pair(level, 200 - PartyDriver.LEE_REACH_PX - 1, 40)
+	assert_eq(level.wind_for(p1), 40, "one pixel farther: the wind")
+	_lee_pair(level, 200 + 32, 40)
+	assert_eq(level.wind_for(p1), 40, "upwind of him: no shelter")
+	_lee_pair(level, 200 + 32, -40)
+	assert_eq(level.wind_for(p1), 0, "a wind to the right: the lee is on his right")
+	_lee_pair(level, 200 - 32, 40, FLOOR_Y - PartyDriver.LEE_DY_PX - 16)
+	assert_eq(level.wind_for(p1), 40, "feet two rows over the croucher's: out of his lee")
+	_hold(1, 0)
+	Sim.step(2)
+	assert_eq(level.wind_for(p1), 40, "the partner stood up: the shelter is gone")
+	level.set_wind(0)
+	_lee_pair(level, 200 - 32, 0)
+	assert_eq(level.lee_mask, 0, "no wind, no lee")
+
+
+func test_a_jump_taken_in_the_lee_stays_sheltered_until_it_lands() -> void:
+	var level: Level = _load(2)
+	var p1: PlayerBase = level.player
+	var p2: PlayerBase = level.get_hero(1)
+	_lee_pair(level, 200 - 24, 40)
+	assert_eq(level.wind_for(p1), 0, "in the lee")
+	_hold(0, Defs.IN_UP)
+	var sheltered_high: bool = false
+	for i: int in 8:
+		Sim.step(1)
+		if FLOOR_Y - p1.sim_pos.y > PartyDriver.LEE_DY_PX:
+			sheltered_high = level.wind_for(p1) == 0
+	assert_false(p1.is_grounded(), "he jumped")
+	assert_true(sheltered_high, "higher than the croucher's lee reaches, the jump keeps it")
+	_hold(0, 0)
+	_hold(1, 0)
+	Sim.step(1)
+	assert_eq(level.wind_for(p1), 0, "airborne: sheltered even after the windbreak stood up")
+	for i: int in 60:
+		if p1.is_grounded():
+			break
+		Sim.step(1)
+	assert_true(p1.is_grounded(), "he landed")
+	Sim.step(1)
+	assert_eq(level.wind_for(p1), 40, "landed, nobody crouches: the wind again")
+	# The wind turns in mid-air: the jump loses its shelter.
+	Sim.step(10)
+	_lee_pair(level, 200 - 24, 40)
+	_hold(0, Defs.IN_UP)
+	Sim.step(4)
+	assert_false(p1.is_grounded(), "the second jump")
+	assert_eq(level.wind_for(p1), 0)
+	level.set_wind(-40)
+	Sim.step(1)
+	assert_eq(level.wind_for(p1), -40, "the gust turned: no lee for this jump any more")
+	assert_eq(p2.state, Defs.HeroState.CROUCH, "though his partner still crouches")
+
+
+func test_single_player_and_eggs_have_no_lee() -> void:
+	var solo: Level = _load(1)
+	solo.set_wind(40)
+	_hold(0, Defs.IN_DOWN)
+	Sim.step(3)
+	assert_eq(solo.lee_mask, 0, "single-player: never a lee")
+	assert_eq(solo.wind_for(solo.player), 40, "wind_for is exactly the wind")
+	solo.free()
+	GameInput.clear_scripted()
+	var level: Level = _load(2)
+	_lee_pair(level, 200 - 32, 40)
+	assert_eq(level.wind_for(level.player), 0)
+	level.player.go_down(&"voluntary")
+	Sim.step(1)
+	assert_eq(level.wind_for(level.player), 40, "an egg is in nobody's lee")
+	assert_eq(level.lee_mask, 0)
 
 
 # =================================================================================================================

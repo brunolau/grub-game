@@ -27,6 +27,7 @@ func before_each() -> void:
 func after_each() -> void:
 	Events.boss_defeated.disconnect(_on_defeated)
 	GameInput.clear_scripted()
+	Game.helper_mode = false
 	if _level != null and is_instance_valid(_level):
 		_level.set_wind(0)
 	Game.new_game(Defs.Difficulty.BEGINNER)
@@ -325,6 +326,26 @@ func test_coop_an_unrescued_hero_becomes_an_egg() -> void:
 	assert_true(target.is_down(), "73 ticks without a rescue: an egg")
 	assert_eq(downs, [target] as Array[PlayerBase])
 	assert_null(roc.get_held())
+
+
+## Helper mode (PHYSICS.md C.12): the Snatch makes an egg outside hurt(), so a Helper-mode P2 is never snatched; the
+## dive's touch spares him like every boss body.
+func test_coop_a_helper_is_never_snatched() -> void:
+	Game.difficulty = Defs.Difficulty.EXPERT
+	var roc: Roc = _coop_fight(Vector2i(60, 160), Vector2i(260, 160))
+	Game.helper_mode = true
+	_hero.down = true
+	assert_true(_p2.is_helper())
+	roc._take_off()
+	var dived: bool = false
+	for tick: int in 500:
+		Sim.step(1)
+		_p2.hit_timer = 0
+		dived = dived or roc.get_state() == Roc.State.DIVE
+		assert_null(roc.get_held(), "never holds the helper")
+	assert_true(dived, "it dived at him")
+	assert_false(_p2.is_down(), "no egg")
+	Game.helper_mode = false
 
 
 func test_coop_beginner_has_no_snatch() -> void:

@@ -85,10 +85,17 @@ const MANGROVE_HAND_SINK: int = 12           ## the resting hand's fingers hang 
 const MANGROVE_HAND_FIRST_PAUSE: int = 22    ## the first shake of a stage comes this long after it began [own]
 const MANGROVE_PIN_TICKS: int = 66           ## co-op: a hero standing on the resting fist pins it this long ...
 const MANGROVE_FLING_YVEL: int = Tuning.BOSS_LAUNCH_YVEL  ## ... then it flings him off
-## Co-op: the least ticks one hero needs between a face hit and a hand hit on the test level (spear, axe, swirling
-## axe and club measured by tests/test_enemies_mangrove.gd, which pins this as a lower bound): the twin window is
-## min(PartyTuning.window_ticks, this - PartyTuning.WINDOW_SOLO_MARGIN_TICKS).
-const MANGROVE_SOLO_MIN_TICKS: int = 24
+## Co-op: the pin holds through this many ticks without a rider (a screen-shake nudge lifts a standing hero off the
+## fist's ride band for a tick or two; PHYSICS.md 13.3) [own]
+const MANGROVE_PIN_GRACE: int = 3
+## Co-op: feet up to this far over the fist's top still stand on it (the shake nudge, Tuning.SHAKE_NUDGE) [own]
+const MANGROVE_PIN_HOVER_PX: int = 6
+## Co-op: the least ticks one hero needs between a face hit and a hand hit on the test level, measured by
+## tests/test_enemies_mangrove.gd (launched from the fist with the spear, the axe or the swirling axe, a throw at the face
+## and one back at the resting hand; the axe does it in 10), which pins this as a lower bound: the twin window is
+## min(PartyTuning.window_ticks, this - PartyTuning.WINDOW_SOLO_MARGIN_TICKS) = 6 ticks on both difficulties
+## (GAMEPLAY.md 13.9.3). One hero's two hits never twin anyway (the slot rule of _twin_half).
+const MANGROVE_SOLO_MIN_TICKS: int = 10
 const MANGROVE_COUNT_IN_TICKS: int = 8       ## the twin count-in: three blips 8 ticks apart, then "go"
 const MANGROVE_PART_DEBOUNCE: int = 8        ## one strike lights a part once (its boxes live up to 3 ticks) [own]
 const MANGROVE_DYING_TICKS: int = 44         ## withering before the bonus burst [own]
@@ -131,8 +138,11 @@ var _face_slot: int = -1
 var _face_tick: int = -1
 var _hand_slot: int = -1
 var _hand_tick: int = -1
-## Co-op: ticks the resting fist has been pinned; the count-in clock.
+## Co-op: ticks the resting fist has been pinned, ticks since a hero last stood on it; the count-in clock.
 var _pinned: int = 0
+var _pin_gone: int = 0
+## Co-op: bit per slot - the heroes who stood on the fist during the running pin.
+var _pin_mask: int = 0
 var _count_in: int = -1
 ## Debounce of part hits (Sim.total_ticks of the last one per part).
 var _part_tick: Dictionary = {}
@@ -333,6 +343,8 @@ func _reset_parts() -> void:
 	_hand_slot = -1
 	_hand_tick = -1
 	_pinned = 0
+	_pin_gone = 0
+	_pin_mask = 0
 	_count_in = -1
 	_part_tick.clear()
 	_place_parts()
@@ -409,13 +421,18 @@ func _fist_tick(target: PlayerBase) -> void:
 	match _fist:
 		Fist.REST:
 			_fist_x = fist_rest_x
-			var pinned_now: bool = coop_form and _top != null and _top.riders != 0
+			var standing: int = _standing_mask() if coop_form else 0
+			var ridden: bool = standing != 0
+			_pin_gone = 0 if ridden else _pin_gone + 1
+			var pinned_now: bool = ridden or (_pinned > 0 and _pin_gone <= MANGROVE_PIN_GRACE)
 			if pinned_now:
+				_pin_mask |= standing
 				_pinned += 1
 				if _pinned >= MANGROVE_PIN_TICKS:
 					_fling()
 				return
 			_pinned = 0
+			_pin_mask = 0
 			if _fist_timer >= _fist_len:
 				_start_burst()
 		Fist.DRAW:
@@ -527,13 +544,34 @@ func on_fist_rider(hero: PlayerBase, top: FistTop) -> void:
 	Audio.play_sfx(Sfx.BOUNCE)
 
 
-## Co-op: the pin is over - every hero standing on the fist is flung off towards the face.
+## Co-op: bit per slot - the heroes standing on the resting fist this tick: caught by its top in the last PLATFORMS
+## phase, or with their feet on or just over it and not jumping (the screen-shake nudge of PHYSICS.md 13.3 lifts a
+## standing hero up to 3 px over it for a few ticks, out of the ride band; he still stands there).
+func _standing_mask() -> int:
+	var mask: int = _top.riders if _top != null else 0
+	var top_y: int = floor_y - MANGROVE_FIST_BOX.y
+	for hero: PlayerBase in Game.level.contact_order():
+		if hero.dead or hero.is_down() or hero.yvel <= Tuning.PLATFORM_RIDE_MIN_YVEL_EXCL:
+			continue
+		if absi(hero.sim_pos.x - _fist_x) <= (MANGROVE_FIST_BOX.x >> 1) \
+				and hero.sim_pos.y >= top_y - MANGROVE_PIN_HOVER_PX and hero.sim_pos.y <= top_y + 2:
+			mask |= 1 << hero.slot
+	return mask
+
+
+## Co-op: the pin is over - every hero who pinned it and still stands on (or just over) the fist is flung off upwards.
 func _fling() -> void:
 	_pinned = 0
+	var top_y: int = floor_y - MANGROVE_FIST_BOX.y
 	for hero: PlayerBase in Game.level.contact_order():
-		if _top != null and (_top.riders & (1 << hero.slot)) != 0:
+		if (_pin_mask & (1 << hero.slot)) == 0 or hero.dead or hero.is_down():
+			continue
+		var over: bool = absi(hero.sim_pos.x - _fist_x) <= (MANGROVE_FIST_BOX.x >> 1) + 8 \
+				and hero.sim_pos.y >= top_y - 8 and hero.sim_pos.y <= top_y + 8
+		if over:
 			hero.launch(PlayerBase.LAUNCH_KEEP, MANGROVE_FLING_YVEL)
 			launches += 1
+	_pin_mask = 0
 	Audio.play_sfx(Sfx.BOUNCE)
 	_start_burst()
 
@@ -736,7 +774,7 @@ func _clank(level: LevelBase, at: Vector2i) -> void:
 
 ## Co-op count-in: three blips 8 ticks apart while the hand rests and a hero stands pinned on the fist, then "go".
 func _count_in_tick() -> void:
-	if not coop_form or _stage != 1 or _hand != Hand.REST or _top == null or _top.riders == 0:
+	if not coop_form or _stage != 1 or _hand != Hand.REST or _pinned == 0:
 		_count_in = -1
 		return
 	_count_in += 1

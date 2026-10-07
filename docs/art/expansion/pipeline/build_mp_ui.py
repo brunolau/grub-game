@@ -65,7 +65,7 @@ def build_belt():
         frames.append(f)
     s = strip(frames)
     save(s, "ui/hud_belt.png", kind="ui", frame=[32, 32], grid=[len(frames), 1],
-         source="shipped sprites/items/weapon_club / hammer / axe / boomerang.png and the 2.0 weapon_spear.png",
+         source="shipped sprites/items/weapon_club.png, sprites/items/weapon_hammer.png, sprites/items/weapon_axe.png, sprites/items/weapon_boomerang.png and the 2.0 sprites/items/weapon_spear.png",
          edits="each weapon rotated 45 degrees with the 2 px outline rebuilt, over a strip of stitched leather belt in "
                "the barrel's browns; the handle end may leave the cell",
          note="belt icon next to the hearts (C.1 rule 5, 16 x 16 logical): what a Swap brings. Cells: 0 club, "

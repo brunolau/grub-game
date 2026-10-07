@@ -23,9 +23,16 @@ const FAR_AWAY: int = 1 << 30
 ## Sheet frames: idle pad, P1..P4 lit (1 + slot), neutral (round start).
 const FRAME_IDLE: int = 0
 const FRAME_NEUTRAL: int = 5
+## The pad lit in any colour a player may wear (art-A, ASSET_MANIFEST 17.11): the same 48 x 16 pad and pivot, 6 cells
+## in UiPlayers.PALETTE_ORDER (yellow, blue, pink, green, white, gold). Optional: without it the slot defaults show.
+const LIT_SHEET_PATH: String = "res://assets/sprites/objects/spawn_point_lit.png"
+const LIT_SHEET_CELLS: int = 6
 
 ## Player number of this spawn (2..Defs.MAX_PLAYERS; `@` is player 1).
 var index: int = 2
+
+var _pad_sheet: Texture2D = null
+var _lit_sheet: Texture2D = null
 
 
 func _init() -> void:
@@ -37,17 +44,33 @@ func _apply_params(params: Dictionary) -> void:
 	index = clampi(int(params.get("index", index)), 2, Defs.MAX_PLAYERS)
 
 
-## Cosmetic: light the pad in the colour of player slot `slot` (0..3), -1 = idle, Defs.MAX_PLAYERS = neutral.
-func show_player(slot: int) -> void:
+## Cosmetic: light the pad for player slot `slot` (0..3), -1 = idle, Defs.MAX_PLAYERS = neutral. `colour` >= 0 is
+## the colour that player wears (UiPlayers.colour_index(slot): his lobby choice, white for green on a jungle arena),
+## drawn from [constant LIT_SHEET_PATH]; the caller passes it, so this object never reads the UI tables. Without it
+## (or without that sheet) the pad shows the slot's default colour.
+func show_player(slot: int, colour: int = -1) -> void:
 	var sprite: Sprite2D = get_node_or_null(^"Sprite") as Sprite2D
 	if sprite == null:
 		return
-	if slot < 0:
+	if _pad_sheet == null:
+		_pad_sheet = sprite.texture
+	var lit: bool = slot >= 0 and slot < Defs.MAX_PLAYERS and colour >= 0 and _lit_texture() != null
+	sprite.texture = _lit_sheet if lit else _pad_sheet
+	if lit:
+		sprite.frame = clampi(colour, 0, LIT_SHEET_CELLS - 1)
+	elif slot < 0:
 		sprite.frame = FRAME_IDLE
 	elif slot >= Defs.MAX_PLAYERS:
 		sprite.frame = FRAME_NEUTRAL
 	else:
 		sprite.frame = 1 + slot
+
+
+## art-A's lit sheet (loaded once), null when it is not there.
+func _lit_texture() -> Texture2D:
+	if _lit_sheet == null and ResourceLoader.exists(LIT_SHEET_PATH):
+		_lit_sheet = load(LIT_SHEET_PATH) as Texture2D
+	return _lit_sheet
 
 
 ## Every spawn of the level's arena as feet points: index 0 is `@` ([member LevelBase.start_pos], player 1), then the

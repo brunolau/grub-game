@@ -17,7 +17,7 @@ terrain_b = ice/terrain_rock
 background = ice
 music = level_ice
 author = enemies-C
-notes = "PLAN.md P2.3: the Storm Roc on the shipped pterodactyl at 2x (tinted until art-B's roc re-pack)."
+notes = "PLAN.md P2.3: the Storm Roc on art-B's roc sheet (the pterodactyl at 2x, re-packed 4 x 4)."
 
 [legend]
 

@@ -42,12 +42,14 @@ func get_shield_dir() -> int:
 
 func _on_wake() -> void:
 	super._on_wake()
-	var hero: PlayerBase = _target_hero()
-	_shield = _dir_to(hero) if hero != null else facing
-	facing = _shield
 	_turn_clock = 0
 	_pose = 0
 	_swing = 0
+	if not _bears_shield():
+		return
+	var hero: PlayerBase = _target_hero()
+	_shield = _dir_to(hero) if hero != null else facing
+	facing = _shield
 
 
 func _on_reset() -> void:
@@ -59,6 +61,8 @@ func _on_reset() -> void:
 ## Its body hurt a hero: it holds the stolen heart (EnemyBase) and swings its club at him (the sheet's attack frames).
 func on_hurt_hero(hero: PlayerBase) -> void:
 	super.on_hurt_hero(hero)
+	if not _bears_shield():
+		return
 	_swing = EnemyTuning.GUARD_SWING_TICKS
 	_pose = 0
 	_play(&"attack", true)
@@ -66,16 +70,21 @@ func on_hurt_hero(hero: PlayerBase) -> void:
 
 ## Hits from the front glance (and whatever a co-op trait refuses).
 func accepts_hit_from(source: SimEntity) -> bool:
-	return super.accepts_hit_from(source) and not _hit_from_front(source)
+	return super.accepts_hit_from(source) and not (_bears_shield() and _hit_from_front(source))
 
 
 func _on_hit_refused(source: SimEntity) -> void:
 	super._on_hit_refused(source)
+	if not _bears_shield():
+		return
 	_pose = EnemyTuning.GUARD_SHIELD_POSE_TICKS
 	_play(&"guard", true)
 
 
 func _ai_tick() -> void:
+	if not _bears_shield():
+		super._ai_tick()
+		return
 	_turn_clock += 1
 	if _shell_on():
 		# The Shellback: the shield faces the nearer hatched hero every tick (CoopTraits post_ai does the same).
@@ -104,6 +113,12 @@ func _move_role() -> StringName:
 	if _pose > 0:
 		return &"guard"
 	return super._move_role()
+
+
+## True for a shield guard (the default); false for a preset that patrols as a plain Walker (the Book I Shellback on
+## a turtle sheet: its only shield is the `shell` trait). Override.
+func _bears_shield() -> bool:
+	return true
 
 
 func _shell_on() -> bool:

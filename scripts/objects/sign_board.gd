@@ -22,10 +22,12 @@ extends SimEntity
 ## - **Never over a hero or the HUD**: a board tries the places of [enum Place] in order - above the sign centred on
 ##   it, above it shifted left or right (the tail still points at the sign from near the board's corner), then
 ##   hanging under the sign (centred, left, right; the tail points up) - and takes the first whose rectangle keeps
-##   clear of every hero's body (grown by HERO_ROOM; eggs too). It keeps its place while that stays clear, and moves
-##   only after a hero stayed behind it for MOVE_SECONDS (a hero jumping through it does not make it jump about);
-##   while a hero is behind it the board fades to COVER_ALPHA, so he shows through. When no place keeps clear (heroes
-##   above and below the sign) it stays where it covers the least, translucent. Its top edge never goes above the HUD
+##   clear of every hero's body (grown by HERO_ROOM; eggs too). A board that the HUD row or a panel would push down
+##   over its own sign (a sign near the top of the view) never stands there with its tail pointing away: it hangs.
+##   It keeps its place while that stays clear, and moves only after a hero stayed behind it for MOVE_SECONDS (a hero
+##   jumping through it does not make it jump about); while a hero is behind it the board fades to COVER_ALPHA, so
+##   he shows through. When no place keeps clear (heroes above and below the sign) it stays where it covers the
+##   least, translucent. Its top edge never goes above the HUD
 ##   row (Hud.get_row_bottom(), so the larger safe area of a phone counts) or the boss bar during a fight, and the
 ##   board and its tail keep clear of the HUD's party panels (Hud.get_party_panel_rects(): P2's co-op panel under the
 ##   letters, the versus corners). [method plan_board] is the pure geometry of it.
@@ -62,6 +64,10 @@ const VIEW_TOP_BOSS: float = 96.0
 const P2_PANEL_GAP: float = 4.0
 ## Top edge of a board hanging under its sign, below the sign's feet point (art px).
 const BOARD_BELOW_ART: float = 14.0
+## Top of the sign's picture over its feet point (art px; sign_board.png is 24 art px tall): a board standing above
+## the sign keeps its tail's tip at or over it, so a board pushed down by the HUD row or a panel never ends below the
+## sign with its tail pointing away from it - it hangs under the sign instead.
+const SIGN_TOP_ART: float = -24.0
 ## Room a board keeps around every hero's body (view px), how long a hero may stay behind a board before it moves
 ## to a clear place (seconds), and its alpha while a hero is behind it.
 const HERO_ROOM: float = 6.0
@@ -321,7 +327,8 @@ static func hero_bodies() -> Array[Rect2]:
 ## screen, `board` the board's size, `view` the view's size, `art` view px per art px (vertically), `top` the highest
 ## its top edge may be, `panels` the HUD's party panels, `bodies` the heroes' bodies and `keep` the place the board has
 ## now (-1: none). Returns `keep` while it keeps clear of every body, else the first clear place of [enum Place]; when
-## none is clear, `keep` again (or, without one, the place that covers the least).
+## none is clear, `keep` again (or, without one, the place that covers the least). Never null: when no place fits
+## (a board taller than the room above and under its sign) it is the standing place clamped into the view.
 static func plan_board(sign: Vector2, board: Vector2, view: Vector2, art: float, top: float, panels: Array[Rect2],
 		bodies: Array[Rect2], keep: int = -1) -> BoardPlace:
 	var best: BoardPlace = null
@@ -334,29 +341,40 @@ static func plan_board(sign: Vector2, board: Vector2, view: Vector2, art: float,
 			kept = candidate
 		if best == null or candidate.covered < best.covered:
 			best = candidate
+	if best == null:
+		return _place_at(Place.ABOVE, sign, board, view, art, top, panels, bodies, false)
 	if kept != null and (kept.covered <= 0.0 or best.covered > 0.0):
 		return kept
 	return best
 
 
-## One place of a board (see [method plan_board] for the arguments); null when it does not fit into the view there
-## (a board hanging under a sign near the bottom). Every place keeps the board inside the view's left / right edges,
-## under `top`, and clear of every party panel by P2_PANEL_GAP, its tail included (TAIL_HALF over the top edge of a
-## hanging board, under the bottom edge of a standing one): under a panel of the view's upper half that it lies
-## under, above one of the lower half.
+## One place of a board (see [method plan_board] for the arguments); null when it does not fit there: a board hanging
+## under a sign near the bottom of the view, or a standing board that the HUD row or a panel would push down below
+## the sign's top (SIGN_TOP_ART; it hangs under the sign then). Every place keeps the board inside the view's left /
+## right edges, under `top`, and clear of every party panel by P2_PANEL_GAP, its tail included (TAIL_HALF art px over
+## the top edge of a hanging board, under the bottom edge of a standing one): under a panel of the view's upper half
+## that it lies under, above one of the lower half.
 static func board_place(place: int, sign: Vector2, board: Vector2, view: Vector2, art: float, top: float,
 		panels: Array[Rect2], bodies: Array[Rect2]) -> BoardPlace:
+	return _place_at(place, sign, board, view, art, top, panels, bodies, true)
+
+
+## [method board_place]; `strict` false lets a standing board be pushed down past the sign's top (the last resort of
+## [method plan_board]).
+static func _place_at(place: int, sign: Vector2, board: Vector2, view: Vector2, art: float, top: float,
+		panels: Array[Rect2], bodies: Array[Rect2], strict: bool) -> BoardPlace:
 	var x: float = sign.x - board.x * 0.5
 	match place % 3:
 		1:
-			# Left of the sign: the tail leaves the board TAIL_INSET from its right end.
-			x = sign.x + TAIL_INSET - board.x
+			# Left of the sign: the tail leaves the board TAIL_INSET (art px) from its right end.
+			x = sign.x + TAIL_INSET * art - board.x
 		2:
-			x = sign.x - TAIL_INSET
+			x = sign.x - TAIL_INSET * art
 	x = clampf(x, VIEW_EDGE, maxf(VIEW_EDGE, view.x - VIEW_EDGE - board.x))
 	var hanging: bool = place >= Place.BELOW
-	var tail_up: float = float(TAIL_HALF) if hanging else 0.0
-	var tail_down: float = 0.0 if hanging else float(TAIL_HALF)
+	# The tail is drawn in the board's art px: TAIL_HALF art px tall on screen.
+	var tail_up: float = float(TAIL_HALF) * art if hanging else 0.0
+	var tail_down: float = 0.0 if hanging else float(TAIL_HALF) * art
 	var limit: float = top + tail_up
 	var floor_y: float = view.y - VIEW_EDGE
 	for panel: Rect2 in panels:
@@ -369,6 +387,8 @@ static func board_place(place: int, sign: Vector2, board: Vector2, view: Vector2
 	var y: float = 0.0
 	if not hanging:
 		y = clampf(sign.y + BOARD_BOTTOM_ART * art - board.y, limit, maxf(limit, floor_y - board.y))
+		if strict and y + board.y + tail_down > sign.y + SIGN_TOP_ART * art + 0.5:
+			return null
 	else:
 		y = maxf(sign.y + BOARD_BELOW_ART * art, limit)
 		if y + board.y > floor_y:

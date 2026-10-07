@@ -137,7 +137,8 @@ func test_two_players_on_one_keyboard_with_numlock_off() -> void:
 
 ## The orchestrator's resolution after G1: P1's classic strike is Left Ctrl. On Windows with NumLock on, a numpad key
 ## pressed while Shift is held arrives wrapped in a synthetic Shift release and re-press (what ui-B's key test detects);
-## Godot reports them like real Shift events, so they cannot be filtered. With Ctrl as the strike they reach nobody:
+## Godot reports them like real Shift events, so no filter could be proven (docs/ARCHITECTURE.md 3.7: only a recorded
+## device sequence could; P4.3). With Ctrl as the strike they reach nobody:
 ## P1 keeps charging while P2 moves, whatever the NumLock state; Shift belongs to no player of the classic layout.
 func test_the_classic_strike_is_left_ctrl_and_the_shift_quirk_reaches_nobody() -> void:
 	_classic_party()

@@ -65,6 +65,11 @@ SmartScreen may warn on first start: choose *More info > Run anyway*.
 Keys are bound by their position, so the layout works on every keyboard; Options rebinds every game action for
 keyboard and gamepad. The game pauses by itself when its window loses focus.
 
+Two players on one keyboard (2.0 co-op and versus, the "classic" layout and the versus default): P1 walks with
+W A S D, jumps with Space, strikes with **Left Ctrl**, swaps with E and looks with Q; P2 walks with numpad 8 4 5 6,
+jumps with Num 0, strikes with Num Enter, swaps with Num + and looks with Num . (the numpad works with Num Lock on or
+off). P1's strike is not Shift because Windows lets go of Shift while a numpad key is pressed with Num Lock on.
+
 ## The stages
 
 | Stage | Name | What happens there |
@@ -108,9 +113,11 @@ share the folder; the plain Godot command is in brackets.
 | What | Command |
 |---|---|
 | Import (after a checkout or a new `class_name`) | `bash .tools/gd.sh import` (`godot --headless --path . --import`) |
-| All tests (nearly 600, two to three minutes) | `bash .tools/gd.sh test` (`godot --headless --path . -s res://tests/run_tests.gd`) |
+| All tests (about 1 400, four to six minutes; slow modules skipped) | `GD_TIMEOUT=600 bash .tools/gd.sh test` (`godot --headless --path . -s res://tests/run_tests.gd`) |
 | One module / one test | `bash .tools/gd.sh test player --verbose`, `bash .tools/gd.sh test campaign --only=world_2` |
 | Every route proof (all weapons) and both campaigns, headless | `bash .tools/gd.sh test campaign_routes` |
+| A slow module (co-op gate search, versus bot matches) - named in full, or all with `--slow` | `bash .tools/gd.sh test coop_gates`, `GD_TIMEOUT=900 bash .tools/gd.sh test --slow` |
+| Single-player tick identity of 2.0 (after any code change) | `bash tools/sp_identity.sh` (last line `IDENTICAL`) |
 | Boot check | `bash .tools/gd.sh smoke 3` (`godot --headless --path . -- --smoke=3`; exit code 0 = clean log) |
 | Watch a route | `bash .tools/gd.sh play --autoplay=w2_l2b --difficulty=expert --weapon=axe --inputs-file=tools/autoplay/routes/w2_l2b.expert.axe.inputs --fast` |
 | The whole Expert campaign, played and checked | `GD_TIMEOUT=1800 bash .tools/gd.sh play --flow=tools/autoplay/campaign.flow --fast --fresh-user` |

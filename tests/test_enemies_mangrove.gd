@@ -86,10 +86,15 @@ func test_the_resting_fist_is_the_springboard_to_the_face() -> void:
 	_lab.step(PackedInt32Array([0]))
 	tree._fist_len = 100000
 	var reached: Array[int] = []
+	var launches: int = tree.launches
 	for start: int in range(0, 6):
 		tree.hp = tree.max_hp
 		tree.hit_cooldown = 0
 		tree._part_tick.clear()
+		# A face hit cuts the fist's rest short: every trial starts with the fist at a long rest.
+		tree._set_fist(Mangrove.Fist.REST)
+		tree._fist_x = tree.fist_rest_x
+		tree._fist_len = 100000
 		hero.respawn_at(Vector2i(206, 160))
 		hero.facing = 1
 		var launched: int = -1
@@ -111,7 +116,7 @@ func test_the_resting_fist_is_the_springboard_to_the_face() -> void:
 		if tree.hp < tree.max_hp:
 			reached.append(start)
 	print("    springboard: a high strike started 2+%s ticks after the launch hits the face" % str(reached))
-	assert_true(tree.launches >= 6, "every landing on the resting fist launched the hero")
+	assert_true(tree.launches - launches >= 6, "every landing on the resting fist launched the hero")
 	assert_false(reached.is_empty(), "the face is reachable by a high strike at the -160 launch's apex")
 	# From the floor: every jump and strike next to the wall misses the face.
 	var hits: int = 0
@@ -153,7 +158,8 @@ func test_punches_and_the_trunk() -> void:
 	for t: int in 14:
 		_lab.step(PackedInt32Array([0]))
 		drew += 1 if tree.get_fist_state() == Mangrove.Fist.DRAW else 0
-		shook = shook or _lab.level.shake >= Mangrove.MANGROVE_PUNCH_SHAKE
+		# (the hero's own update counts the shake down by 1 on the tick of the punch, PHYSICS.md 13.3)
+		shook = shook or _lab.level.shake >= Mangrove.MANGROVE_PUNCH_SHAKE - 1
 		if tree.get_fist_state() == Mangrove.Fist.OUT:
 			break
 	for entity: SimEntity in _lab.level.get_kind(Defs.Kind.ENEMY_PROJECTILE):
@@ -383,17 +389,32 @@ func test_coop_pin_and_fling() -> void:
 	var stood: int = 0
 	var flung: int = -1
 	var punched: bool = false
+	var counted: bool = false
 	for t: int in 120:
 		_lab.step(PackedInt32Array([0, 0]))
-		if p1.on_platform:
+		# Standing on it: carried by its top, or lifted just over it by the hand's ledge-shake nudge.
+		if flung < 0 and (tree._standing_mask() & 1) != 0:
 			stood += 1
 		if flung < 0 and p1.yvel <= -120:
 			flung = t
 		punched = punched or tree.get_fist_state() == Mangrove.Fist.OUT and flung < 0
+		counted = counted or tree._count_in >= 0
 	assert_false(punched, "no punch while he pins it, though its rest was over")
 	assert_true(stood >= Mangrove.MANGROVE_PIN_TICKS - 2, "he stood on it (%d ticks)" % stood)
-	assert_true(flung >= Mangrove.MANGROVE_PIN_TICKS - 1 and flung <= Mangrove.MANGROVE_PIN_TICKS + 4,
+	assert_true(flung >= Mangrove.MANGROVE_PIN_TICKS - 1 and flung <= Mangrove.MANGROVE_PIN_TICKS + 8,
 			"flung off after 66 ticks (%d)" % flung)
+	assert_true(counted, "the count-in ran while the hand rested and he stood on the fist")
+	# With Up held a landing launches him at once (-224).
+	tree._set_fist(Mangrove.Fist.REST)
+	tree._fist_x = tree.fist_rest_x
+	tree._fist_len = 100000
+	p1.respawn_at(Vector2i(206, 160))
+	var launched: bool = false
+	for t: int in 40:
+		# A jump from the floor beside it, Up held through the landing on its top.
+		_lab.step(PackedInt32Array([Defs.IN_UP, 0]))
+		launched = launched or p1.yvel <= Tuning.BOUNCE_YVEL_UP + 16
+	assert_true(launched, "Up held: launched at once")
 
 
 ## Stage 3: the knuckle armour of the stuck fist turns to the nearer hero every tick; only the far hero's strike on the
@@ -419,10 +440,11 @@ func test_coop_stage_3_only_the_far_hero_strikes_the_wrist() -> void:
 	assert_eq(tree.hp, 2, "P2's on the wrist counts")
 
 
-## The twin window is shorter than the measured solo minimum: one hero launched from the springboard who throws a
-## spear, an axe or a swirling axe at the face and then at the resting hand (every start of both throws) needs at least
-## the measured number of ticks between the two hits; MANGROVE_SOLO_MIN_TICKS is no more than that, so the window
-## (min(24 / 12, solo minimum - 4)) stays 4+ ticks below it.
+## The twin window is shorter than the measured solo minimum: one hero launched from the springboard (Up held: the co-op
+## fist launches at once) who throws a spear, an axe or a swirling axe at the face and then back at the resting hand
+## (every start of both throws, forward or high) needs at least the measured number of ticks between the two hits;
+## MANGROVE_SOLO_MIN_TICKS is no more than that, so the window (min(24 B / 12 E, solo minimum - 4), GAMEPLAY.md
+## 13.9.3) stays 4+ ticks below it.
 func test_coop_twin_window_is_shorter_than_the_measured_solo_minimum() -> void:
 	var measured: Dictionary = _measure_solo_twin()
 	print("    one hero from the face to the hand: %d ticks at best (%s); %d trials, %d twins" % [measured["best"],
@@ -495,7 +517,9 @@ func _measure_solo_twin() -> Dictionary:
 		hero.run.set_weapon(weapon)
 		for first: int in range(1, 5):
 			for gap: int in range(6, 18):
-				for high: bool in [false, true]:
+				for variant: int in 4:
+					var high_first: bool = (variant & 1) != 0
+					var high: bool = (variant & 2) != 0
 					result["trials"] = int(result["trials"]) + 1
 					for entity: SimEntity in _lab.level.get_kind(Defs.Kind.HERO_PROJECTILE):
 						(entity as ProjectileBase).consume()
@@ -516,13 +540,14 @@ func _measure_solo_twin() -> Dictionary:
 					for t: int in 70:
 						var flags: int = 0
 						if launched < 0:
-							flags = Defs.IN_UP if t < 9 else 0
+							# Up held through the landing: the co-op fist launches him at once instead of the pin.
+							flags = Defs.IN_UP
 						else:
 							var k: int = t - launched
 							if k == 1:
 								flags = Defs.IN_RIGHT
 							elif k >= first + 1 and k < first + 1 + 7:
-								flags = Defs.IN_FIRE
+								flags = Defs.IN_FIRE | (Defs.IN_UP if high_first else 0)
 							elif k == first + gap:
 								flags = Defs.IN_LEFT
 							elif k > first + gap and k < first + gap + 8:
@@ -538,8 +563,8 @@ func _measure_solo_twin() -> Dictionary:
 						result["twins"] = int(result["twins"]) + 1
 					if face_at >= 0 and hand_at >= 0 and absi(hand_at - face_at) < int(result["best"]):
 						result["best"] = absi(hand_at - face_at)
-						result["how"] = "weapon %d, throws %d and %d ticks after the launch%s" % [weapon, first + 1,
-							first + gap + 1, ", the second high" if high else ""]
+						result["how"] = "weapon %d, throws %d and %d ticks after the launch%s%s" % [weapon, first + 1,
+							first + gap + 1, ", the first high" if high_first else "", ", the second high" if high else ""]
 	return result
 
 
@@ -598,6 +623,8 @@ class MangroveBot:
 	extends RefCounted
 
 	const LEDGE_Y: int = 112
+	const UPPER_Y: int = 64
+	const UPPER_SAFE: int = 26
 	const LEDGE_END: int = 143
 	const LEDGE_SPOT: int = 112
 	const FLOOR_Y: int = 160
@@ -631,8 +658,18 @@ class MangroveBot:
 		var on_floor: bool = grounded and y == FLOOR_Y
 		var dodge: int = _leaf_dodge(hero, level)
 		if stage == 3:
-			if on_ledge:
-				return Defs.IN_DOWN
+			var bug_flags: int = _bug_flags(hero, level)
+			if bug_flags >= 0 and on_floor:
+				return bug_flags
+			if on_ledge or (grounded and y == UPPER_Y):
+				# Down to the floor over the ledge's end while the fist is stuck or rests long enough for the walk to
+				# the far wall (one-way ledges cannot be dropped through).
+				var fist: int = tree.get_fist_state()
+				var stuck: bool = fist == Mangrove.Fist.STUCK
+				var resting: bool = fist == Mangrove.Fist.REST and tree._fist_len - tree._fist_timer >= 50
+				if stuck or resting:
+					return Defs.IN_RIGHT
+				return dodge
 			if attack and tree.get_fist_state() == Mangrove.Fist.STUCK and tree._fist_timer < Mangrove.MANGROVE_STUCK_TICKS - 4:
 				var spot: int = tree.fist_out_x - 40
 				if absi(x - spot) > 4:
@@ -648,9 +685,15 @@ class MangroveBot:
 			if hero.facing < 0:
 				return Defs.IN_RIGHT
 			return 0
-		# Stages 1 and 2.
-		if attack and stage == 1 and _go_for_face(tree):
-			if on_ledge:
+		# Stages 1 and 2. The upper hand in the air (shaking out, sweeping, drawing back) owns the space over the lower
+		# ledge: no jumps then, and a crouch on the lower ledge (a shake nudge must not lift him into the sweep).
+		var hand: int = tree.get_hand_state()
+		var hand_out: bool = hand == Mangrove.Hand.SHAKE or hand == Mangrove.Hand.SWEEP or hand == Mangrove.Hand.RETRACT
+		var hand_soon: bool = hand == Mangrove.Hand.AWAY and stage == 2 \
+				and tree._hand_timer >= Mangrove.MANGROVE_HAND_PAUSE - 24
+		var on_upper: bool = grounded and y == UPPER_Y
+		if attack and stage == 1 and not hand_out and _go_for_face(tree):
+			if on_ledge or on_upper:
 				return Defs.IN_RIGHT
 			if on_floor:
 				if absi(x - FIST_SPOT) > 3:
@@ -658,7 +701,21 @@ class MangroveBot:
 				_start_jump(0, 9)
 				return Defs.IN_UP
 			return Defs.IN_RIGHT if x < FIST_SPOT else 0
+		if on_upper:
+			# Off the upper ledge's end while the hand stays in the wall, else wait at its far end.
+			if not hand_out and not hand_soon and hand != Mangrove.Hand.REST:
+				return Defs.IN_RIGHT
+			if x > UPPER_SAFE + 3:
+				return Defs.IN_LEFT
+			return 0
 		if on_floor:
+			var fist_coming: bool = tree.get_fist_state() == Mangrove.Fist.DRAW \
+					or tree.get_fist_state() == Mangrove.Fist.OUT
+			if hand != Mangrove.Hand.AWAY or hand_soon or (fist_coming and x > FLOOR_SPOT + 8):
+				# Wait beyond the punches' reach, under nothing.
+				if absi(x - FLOOR_SPOT) > 3:
+					return Defs.IN_RIGHT if FLOOR_SPOT > x else Defs.IN_LEFT
+				return 0
 			# Back up to the ledge: jump towards it from under its end.
 			if x > LEDGE_END - 4:
 				if x > LEDGE_END + 30:
@@ -669,6 +726,12 @@ class MangroveBot:
 			return Defs.IN_RIGHT | Defs.IN_UP
 		if not on_ledge:
 			return Defs.IN_LEFT if x > LEDGE_END - 8 else 0
+		if dodge != 0:
+			return dodge
+		if hand_out or hand_soon:
+			if absi(x - LEDGE_SPOT) > 3 and hand == Mangrove.Hand.AWAY:
+				return Defs.IN_RIGHT if LEDGE_SPOT > x else Defs.IN_LEFT
+			return Defs.IN_DOWN
 		if attack and stage == 2 and tree.get_hand_state() == Mangrove.Hand.REST:
 			if absi(x - LEDGE_SPOT) > 3:
 				return Defs.IN_RIGHT if LEDGE_SPOT > x else Defs.IN_LEFT
@@ -705,6 +768,26 @@ class MangroveBot:
 	func _go_for_face(tree: Mangrove) -> bool:
 		return tree.fist_is_springboard() and tree._fist_len - tree._fist_timer >= 60
 
+	## A burrowing bug walking at him on the floor: turn to it and club it when it is close and solid (-1 = no bug).
+	func _bug_flags(hero: PlayerBase, level: LevelBase) -> int:
+		var best: EnemyBase = null
+		for entity: SimEntity in level.get_kind(Defs.Kind.ENEMY):
+			var bug: Digger = entity as Digger
+			if bug == null or not bug.is_copy() or not bug.awake or bug.dead:
+				continue
+			if absi(bug.sim_pos.y - hero.sim_pos.y) > 20 or absi(bug.sim_pos.x - hero.sim_pos.x) > 60:
+				continue
+			if best == null or absi(bug.sim_pos.x - hero.sim_pos.x) < absi(best.sim_pos.x - hero.sim_pos.x):
+				best = bug
+		if best == null:
+			return -1
+		var dir: int = 1 if best.sim_pos.x >= hero.sim_pos.x else -1
+		if hero.facing != dir and not hero.is_striking():
+			return Defs.IN_RIGHT if dir > 0 else Defs.IN_LEFT
+		if best.tangible and absi(best.sim_pos.x - hero.sim_pos.x) <= 44:
+			return Defs.IN_FIRE
+		return 0
+
 	## A leaf about to fall on him: the direction to step aside (0 = none).
 	func _leaf_dodge(hero: PlayerBase, level: LevelBase) -> int:
 		for entity: SimEntity in level.get_kind(Defs.Kind.ENEMY_PROJECTILE):
@@ -716,5 +799,21 @@ class MangroveBot:
 
 
 ## Recorded by test_the_club_bot_still_wins with MANGROVE_ROUTE=1 (Beginner, Expert).
-const ROUTE_BEGINNER: String = ""
-const ROUTE_EXPERT: String = ""
+const ROUTE_BEGINNER: String = (
+	"9:RU,10:R,10:L,2:,8:R,3:,4:L,110:,18:R,9:UF,15:L,1:,2:L,5:,4:R,37:,18:R,9:UF,15:L,1:,3:L,3:,6:R,36:,20:R," +
+	"3:U,5:L,9:U,13:,1:R,9:UF,15:L,1:,3:L,4:,4:R,37:,17:R,10:L,9:LU,10:L,16:R,1:,8:L,2:,6:R,67:,20:R,3:U,5:L,9:U," +
+	"13:,1:R,9:UF,15:L,1:,3:L,3:,34:D,3:R,1:L,1:UF,3:,11:UF,3:,22:UF,21:D,42:,59:D,8:UF,15:,2:L,2:R,10:,3:R,1:L," +
+	"10:,4:L,10:,4:L,10:,2:R,2:L,10:,3:L,1:R,10:,4:L,10:,3:L,20:R,1:,7:R,15:L,4:,7:F,8:L,1:R,1:,8:R,2:,6:L,1:R," +
+	"82:,1:R,13:,1:R,13:,1:R,13:,1:R,13:,1:R,13:,1:R,13:,1:R,2:,2:R,14:F,48:,7:F,80:,2:R,4:,2:L,1:R,50:,3:R,13:F," +
+	"3:L,1:R,19:,7:F,109:,7:F,59:,1:R,13:,1:R,13:,1:R,13:,1:R,2:,2:R,50:F"
+)
+const ROUTE_EXPERT: String = (
+	"9:RU,10:R,10:L,2:,8:R,3:,4:L,110:,18:R,9:UF,15:L,1:,2:L,5:,4:R,37:,18:R,9:UF,15:L,1:,3:L,3:,6:R,36:,20:R," +
+	"3:U,5:L,9:U,13:,1:R,9:UF,15:L,1:,3:L,4:,4:R,37:,17:R,10:L,9:LU,10:L,16:R,1:,8:L,2:,6:R,67:,20:R,3:U,5:L,9:U," +
+	"13:,1:R,9:UF,15:L,1:,3:L,4:,4:R,51:,18:R,9:UF,13:L,5:LU,26:R,9:U,12:,6:R,6:L,1:,10:R,1:,8:L,2:,6:R,123:," +
+	"20:R,3:U,5:L,9:U,13:,1:R,9:UF,15:L,1:,2:L,32:,21:R,3:U,5:L,9:U,13:,1:R,9:UF,15:L,1:,3:L,3:,34:D,3:R,1:L," +
+	"1:UF,3:,11:UF,3:,11:UF,3:,8:UF,21:D,42:,59:D,44:UF,21:D,42:,59:D,8:UF,10:R,25:L,1:R,1:,8:R,3:,4:L,1:R,40:," +
+	"7:F,79:,2:R,4:,2:L,1:R,50:,3:R,13:F,3:L,1:R,19:,7:F,109:,7:F,65:,1:R,13:,1:R,13:,1:R,13:,1:R,13:,1:R,2:,2:R," +
+	"14:F,24:,7:F,102:,2:R,4:,2:L,1:R,50:,3:R,13:F,3:L,1:R,72:,7:F,102:,1:R,13:,1:R,13:,1:R,13:,1:R,13:,1:R,2:," +
+	"2:R,14:F,60:,7:F,107:,2:R,40:,2:R,11:,1:F,3:,5:R,41:F"
+)

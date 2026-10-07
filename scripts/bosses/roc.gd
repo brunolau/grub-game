@@ -474,7 +474,7 @@ func _dive_tick(bury: bool) -> void:
 
 
 ## A dive met a hero: the body hurts him (a bone, the boss knock-back) and it pulls up; co-op (Expert): the target is
-## snatched instead. True when the dive ended.
+## snatched instead (never a Helper-mode P2, PlayerBase.is_helper: the touch spares him). True when the dive ended.
 func _dive_contact() -> bool:
 	var level: LevelBase = Game.level
 	if level == null:
@@ -485,7 +485,7 @@ func _dive_contact() -> bool:
 		if not Overlap.body(hero, self, hero):
 			continue
 		if _state == State.DIVE and _coop and PartyTuning.boss_grabs_on(Game.difficulty) \
-				and hero == _target_hero():
+				and hero == _target_hero() and not hero.is_helper():
 			_snatch(hero)
 			return true
 		touch_hero(hero)
@@ -787,13 +787,16 @@ func _poll_hits() -> void:
 
 
 ## Co-op phase 1: the wing shield faces the nearer hatched hero; a hit from that side glances (a thrown weapon by its
-## flight, a striker by his x).
+## flight, a striker by his x), and so does every hit of that hero himself.
 func _is_shielded(source: SimEntity) -> bool:
 	if _state != State.REST and _state != State.WINGS and _state != State.GUST:
 		return false
 	var near: PlayerBase = _nearest_hero()
 	if near == null:
 		return false
+	if Defs.hitter_slot(source) == near.slot:
+		# The shield faces him: none of his own hits gets round it (a boomerang on its way back included).
+		return true
 	var shield_side: int = 1 if near.sim_pos.x >= sim_pos.x else -1
 	var from_side: int = 0
 	if source.get_kind() == Defs.Kind.HERO_PROJECTILE and source.xvel != 0:

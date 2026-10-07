@@ -7,7 +7,8 @@ extends UiScreen
 ## the mural (`ui/mural.png`: painting i is the mural's piece i, so the finds assemble one picture - the mural that
 ## ends The Long Raft Home once all 30 are found), a missing one leaves the socket empty. The count plate says "17/30";
 ## the six carved reward marks light up (`ui/unlock_icons.png`) as their rewards open. The focused socket names where
-## its painting hides ("5-1 Red Mesa Trail", "Co-op: 1-1 ...") and whether it was found. Under the slab the reward
+## its painting hides ("5-1 Red Mesa Trail", "Co-op: 1-1 ...") and whether it was found, and shows its own picture at 2x
+## on a stone left of the slab (`ui/paintings.png`; a carved "?" while it is missing). Under the slab the reward
 ## ladder of C.9 - 5 Mesa Rodeo, 10 loincloths, 15 variants, 20 Cloud Top, 25 Spear Party and gold, 30 the mural - each
 ## "Unlocked!" or the paintings it needs (found paintings, a reward opened by hand or Options > Versus > "Unlock
 ## everything"). Paintings are saved per profile across modes, so this screen reads only Save and UnlockTable.
@@ -23,6 +24,10 @@ extends UiScreen
 const TEX_SLAB: String = "res://assets/ui/painting_slab.png"
 const TEX_MURAL: String = "res://assets/ui/mural.png"
 const TEX_UNLOCK_ICONS: String = "res://assets/ui/unlock_icons.png"
+## art-A's Cave Painting pictures (ui/paintings.png): one 32 x 32 cell per painting index in a row, ochre on
+## transparent; the focused painting shows at 2x on a stone beside the slab.
+const TEX_PAINTINGS: String = "res://assets/ui/paintings.png"
+const PAINTING_CELL: float = 32.0
 ## The mural (ui/mural.png, 144 x 80): 6 x 5 pieces of 24 x 16, piece i = painting i.
 const MURAL_COLUMNS: int = 6
 const MURAL_ROWS: int = 5
@@ -53,6 +58,7 @@ const REWARD_KEYS: Dictionary = {
 var focused_index: int = 0
 
 var _slab: PaintingWall = null
+var _picture: PaintingPicture = null
 var _info: Label = null
 var _rows: Array[Label] = []
 
@@ -117,6 +123,42 @@ class PaintingWall:
 						UnlocksScreen.reward_icon_region(i, true))
 
 
+## The focused painting at 2x on a stone (art-A's picture of it once found; a carved "?" while it is missing).
+class PaintingPicture:
+	extends Control
+
+	## The painting shown (items/painting index) and whether it was found.
+	var index: int = 0
+	var found: bool = false
+	var _sheet: Texture2D = UiKit.tex(UnlocksScreen.TEX_PAINTINGS)
+	var _hud: Font = UiKit.font(UiKit.Style.HUD)
+
+	func _init() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		custom_minimum_size = Vector2(76.0, 76.0)
+
+	## Show painting `p_index`.
+	func show_painting(p_index: int) -> void:
+		index = p_index
+		found = Save.has_painting(index)
+		queue_redraw()
+
+	func _draw() -> void:
+		var rect: Rect2 = Rect2(Vector2.ZERO, custom_minimum_size)
+		UnlocksScreen.draw_sand_slab(self, rect)
+		var inner: Rect2 = rect.grow(-6.0)
+		if found and _sheet != null:
+			draw_texture_rect_region(_sheet, inner, Rect2(float(index) * UnlocksScreen.PAINTING_CELL, 0.0,
+					UnlocksScreen.PAINTING_CELL, UnlocksScreen.PAINTING_CELL))
+			return
+		draw_rect(inner, UnlocksScreen.COL_SOCKET)
+		var mark: String = "?"
+		var width: float = _hud.get_string_size(mark, HORIZONTAL_ALIGNMENT_LEFT, -1.0, UiKit.SIZE_HUD).x
+		var baseline: float = roundf(inner.get_center().y - float(UiKit.SIZE_HUD) * 0.5) + _hud.get_ascent(UiKit.SIZE_HUD)
+		draw_string(_hud, Vector2(roundf(inner.get_center().x - width * 0.5), baseline), mark, HORIZONTAL_ALIGNMENT_LEFT,
+				-1.0, UiKit.SIZE_HUD, UnlocksScreen.COL_GROOVE)
+
+
 ## One socket: focusable, a gold frame while focused.
 class PaintingSlot:
 	extends Control
@@ -162,12 +204,23 @@ func _build_screen() -> void:
 	column.add_theme_constant_override(&"separation", 2)
 	safe.add_child(column)
 	column.add_child(UiKit.label("UI_PAINTINGS_HEADING", UiKit.Style.TITLE, HORIZONTAL_ALIGNMENT_CENTER))
-	var middle: CenterContainer = CenterContainer.new()
+	var middle: HBoxContainer = HBoxContainer.new()
 	middle.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	middle.alignment = BoxContainer.ALIGNMENT_CENTER
+	middle.add_theme_constant_override(&"separation", 8)
 	column.add_child(middle)
+	# The focused painting's picture on the left, the slab in the middle, a spacer as wide as the picture on the right
+	# (the slab stays centred).
+	_picture = PaintingPicture.new()
+	_picture.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	middle.add_child(_picture)
 	_slab = PaintingWall.new()
 	_slab.slot_focused.connect(_on_slot_focused)
 	middle.add_child(_slab)
+	var balance: Control = Control.new()
+	balance.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	balance.custom_minimum_size = _picture.custom_minimum_size
+	middle.add_child(balance)
 	_info = UiKit.label("", UiKit.Style.SMALL, HORIZONTAL_ALIGNMENT_CENTER)
 	_info.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 	column.add_child(_info)
@@ -304,6 +357,11 @@ func get_reward_status() -> PackedStringArray:
 	return result
 
 
+## The picture of the focused painting (tests).
+func get_picture() -> PaintingPicture:
+	return _picture
+
+
 ## The info line of the focused socket.
 func get_info_text() -> String:
 	return _info.text
@@ -343,6 +401,7 @@ func _first_focus() -> int:
 
 func _on_slot_focused(index: int) -> void:
 	focused_index = index
+	_picture.show_painting(index)
 	var found: bool = Save.has_painting(index)
 	_info.text = painting_where(index) if found else "%s  -  %s" % [painting_where(index), tr("UI_PAINTINGS_MISSING")]
 	_info.add_theme_color_override(&"font_color", UiKit.COL_CREAM if found else UiKit.COL_DIM)

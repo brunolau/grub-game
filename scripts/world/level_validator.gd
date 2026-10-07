@@ -35,7 +35,7 @@ const MAX_PLATFORMS: int = Tuning.MAX_PLATFORMS
 const COMMON_PARAMS: Array[String] = ["name", "facing", "expert", "beginner", "dx", "dy", "tile"]
 ## Parameters every enemy and boss accepts. Format 2 (2.0): `coop=<trait>`, `bond=<name>`, `keeper=<name>` and
 ## `perch=c,r` (the trait rules of DESIGN.md D.6; "traits only in co-op files" is a world-B rule of phase 1).
-const ENEMY_PARAMS: Array[String] = ["skin", "hp", "score", "coop", "bond", "keeper", "perch"]
+const ENEMY_PARAMS: Array[String] = ["skin", "hp", "score", "coop", "bond", "keeper", "perch", "window"]
 const ITEM_PARAMS: Array[String] = ["dropped", "fan", "points"]
 ## The catalogue of ARCHITECTURE.md 6.2: id -> its own parameters.
 const CATALOGUE: Dictionary = {
@@ -108,7 +108,7 @@ const CATALOGUE: Dictionary = {
 	"enemies/snatcher": ["kind", "depth", "speed", "range"],
 	"enemies/leech": ["range", "pause"],
 	"enemies/bull_rex": ["speed"],
-	"enemies/tar_splitter": ["left", "right", "speed", "zone", "pause", "max"],
+	"enemies/tar_splitter": ["left", "right", "speed"],
 	"enemies/shaman": ["left", "right", "speed"],
 	"bosses/tusker": ["arena", "drops"],
 	"bosses/mangrove": ["arena", "drops"],
@@ -143,6 +143,11 @@ const CATALOGUE: Dictionary = {
 const SIGN_SCRIPT: String = "res://scripts/objects/sign_board.gd"
 const UI_KIT_SCRIPT: String = "res://scripts/ui/ui_kit.gd"
 const SIGN_MAX_LINES: int = 3
+## zones/lightning defaults (world-A's LightningZone.DEFAULT_PERIOD / mark / BOLT_TICKS; mirrored, the zone is
+## world-A's file): a period under mark + bolt makes the strikes overlap (a warning).
+const LIGHTNING_DEFAULT_PERIOD: int = 66
+const LIGHTNING_DEFAULT_MARK: int = 22
+const LIGHTNING_BOLT_TICKS: int = 4
 ## Format 2 parameters of 1.0 ids (merged into CATALOGUE by [method _catalogue_params]): the column's plate and
 ## trigger rules, the gate's drum lock, the versus weapon pick-up.
 const CATALOGUE_2: Dictionary = {
@@ -171,6 +176,7 @@ const CHOICES: Dictionary = {
 	"items/weapon:kind": ["club", "hammer", "axe", "boomerang", "spear"],
 	"props:layer": ["back", "front"],
 	"zones/ember_rain:skin": ["ember", "leaf"],
+	"zones/food_rain:skin": ["food", "fruit"],
 	"enemies/snatcher:kind": ["dangler", "stinger"],
 	"*:coop": ["shell", "bond", "daze", "heavy", "lone", "grab", "leech", "split"],
 	"objects/bark_board:face": ["l", "r"],
@@ -202,6 +208,7 @@ const RANGES: Dictionary = {
 	"items/random_bonus:tier": Vector2i(0, 2),
 	"*:score": Vector2i(0, 11),
 	"*:hp": Vector2i(0, 9999),
+	"*:window": Vector2i(0, 9999),
 	"zones/ember_rain:period": Vector2i(1, 9999),
 	"zones/flies:count": Vector2i(1, 20),
 	"objects/hero_start:slot": Vector2i(2, Defs.MAX_PLAYERS),
@@ -258,7 +265,8 @@ const TRAIT_KINDS: Array[String] = ["coop", "test"]
 ## The kinds of a solo campaign (no co-op objects there).
 const SOLO_KINDS: Array[String] = ["main", "sub", "bonus", "ending"]
 ## Enemy parameters that are co-op traits (DESIGN.md D.6, R10).
-const TRAIT_PARAMS: Array[String] = ["coop", "bond", "keeper", "perch"]
+## `window=<ticks>` caps a bond / split window or a daze (LEVEL_DESIGN.md 15.7.6, CoopTraits.capped_window).
+const TRAIT_PARAMS: Array[String] = ["coop", "bond", "keeper", "perch", "window"]
 ## Co-op-only enemies (DESIGN.md D.7): presets of an archetype and a trait.
 const COOP_ONLY_ENEMIES: Array[String] = [
 	"enemies/shellback", "enemies/raptor", "enemies/snatcher", "enemies/leech", "enemies/bull_rex",
@@ -746,6 +754,22 @@ func _check_entity(data: LevelData, record: Dictionary, names: Dictionary) -> vo
 		_check_prop_name(path, line, "props/" + str(params["prop"]))
 	if id == "objects/sign" and params.has("text"):
 		_check_sign_text(path, line, str(params["text"]))
+	if id == "zones/lightning":
+		_check_lightning(path, line, params)
+
+
+## A lightning zone whose period is shorter than its mark plus the bolt (LightningZone: period 66, mark 22 by default,
+## bolt 4 ticks) strikes again while the last bolt still burns or its mark still shows: legal, but a WARNING.
+func _check_lightning(path: String, line: int, params: Dictionary) -> void:
+	var period_text: String = str(params.get("period", LIGHTNING_DEFAULT_PERIOD))
+	var mark_text: String = str(params.get("mark", LIGHTNING_DEFAULT_MARK))
+	if not period_text.is_valid_int() or not mark_text.is_valid_int():
+		return  # the range check reports it
+	var period: int = period_text.to_int()
+	var mark: int = mark_text.to_int()
+	if period < mark + LIGHTNING_BOLT_TICKS:
+		_add(path, line, WARNING, "zones/lightning period %d is shorter than its mark %d + the %d-tick bolt: the strikes overlap"
+				% [period, mark, LIGHTNING_BOLT_TICKS])
 
 
 ## A sign's text must fit its board: at most SignBoard.MAX_LINES lines as the board wraps it (objects-A's

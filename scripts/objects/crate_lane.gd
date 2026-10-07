@@ -25,6 +25,10 @@ extends SceneryHittable
 ## and a period with no free lane drops nothing). The referee may take the timing over: [member auto] = false on every
 ## lane ([method set_auto]) and [method drop] when it likes.
 ##
+## A round clock that goes back (the referee's begin_round on the same level: a rematch without a reload) starts a
+## new round: every lane empties (a crate of the last round, lying or on its way, is gone) and the schedule starts
+## over. The real round loop loads the arena again for each round, which gives the same picture.
+##
 ## A refill (the referee's spot refill, the Feast Rush) does nothing: crates come only from the sky. Owner: objects-B
 ## (docs/expansion/PLAN.md 4.1, P2.7). Pictures: sprites/objects/crate.png (ASSET_MANIFEST 9) under
 ## sprites/enemies/pterodactyl.png (fly 0-3, cosmetic flight), a drawn shadow ellipse. Marks: [own] this module.
@@ -82,6 +86,9 @@ var _flyoff_left: int = 0
 var _fly_dir: int = 1
 var _own_clock: int = 0
 var _last_schedule_clock: int = -1
+## The referee's round clock this lane saw on its last WORLD step (-1 = none yet, or no referee): a smaller one is a
+## new round.
+var _seen_clock: int = -1
 var _crate: Sprite2D = null
 var _ptero: Sprite2D = null
 var _anim_time: float = 0.0
@@ -227,6 +234,12 @@ func _sim_tick(phase: int) -> void:
 	var level: LevelBase = Game.level
 	if level == null:
 		return
+	# Only the referee's clock can go back (its begin_round); the lane's own count never does.
+	var driver: SimEntity = level.party_driver
+	var referee_clock: int = int(driver.get(&"round_ticks")) if driver != null and &"round_ticks" in driver else -1
+	if referee_clock >= 0 and referee_clock < _seen_clock:
+		_new_round()
+	_seen_clock = referee_clock
 	match state:
 		STATE_INCOMING:
 			if Sim.tick >= release_tick:
@@ -409,6 +422,14 @@ func _empty() -> void:
 func _on_level_reset() -> void:
 	_flyoff_left = 0
 	_fall_yvel = 0
+	_empty()
+
+
+## The round clock went back (a new round on the same level): the lane empties and the schedule starts over.
+func _new_round() -> void:
+	_flyoff_left = 0
+	_fall_yvel = 0
+	_last_schedule_clock = -1
 	_empty()
 
 

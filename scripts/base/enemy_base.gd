@@ -822,21 +822,26 @@ func _ground_step(climber: bool = false, bouncy: bool = true) -> bool:
 	if _climbing:
 		_climb_step(grid, dir)
 		return false
-	sim_pos.x += Tuning.floor16(xvel)
+	# 2.0 tar floor (PHYSICS.md C.5): a ground enemy standing on a ':' cell moves at most Tuning.TAR_WALK_CAP; its
+	# own speed is kept for when it leaves the tar. Format-1 grids have no tar: `step` is always `xvel` there.
+	var step: int = xvel
+	if dir != 0 and _grounded and grid.is_tar(Tuning.to_cell(sim_pos.x), Tuning.to_cell(sim_pos.y)):
+		step = clampi(xvel, -Tuning.TAR_WALK_CAP, Tuning.TAR_WALK_CAP)
+	sim_pos.x += Tuning.floor16(step)
 	sim_pos.y += Tuning.floor16(yvel)
 	if yvel >= 0 and _sank_in_liquid(grid):
 		return false
 	if dir != 0 and _blocked_ahead(grid, dir):
 		if climber and yvel >= 0 and not _edge_ahead(grid, dir) and not _ceiling_above(grid):
 			# Stay in front of the wall and start to climb it.
-			sim_pos.x -= Tuning.floor16(xvel)
+			sim_pos.x -= Tuning.floor16(step)
 			_climbing = true
 			_grounded = false
 			_ledge_ticks = 0
 			yvel = 0
 			return false
 		xvel = -xvel
-		sim_pos.x += Tuning.floor16(xvel)
+		sim_pos.x += Tuning.floor16(-step)
 		facing = -dir
 	if yvel < 0:
 		yvel = mini(yvel + Tuning.ENEMY_GRAVITY, Tuning.ENEMY_TERMINAL)

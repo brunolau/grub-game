@@ -10,7 +10,8 @@ extends SimEntity
 ## On every spout tick each hero (slot order), ground enemy, raft and drop platform whose feet point is in the vent box
 ## (24 x 16 above the anchor floor: x - 12 .. x + 11, feet y - 16 .. y), with yvel >= 0 and not yet launched by this
 ## spout, is launched: heroes `launch(LAUNCH_KEEP, power)`, enemies `yvel = power`, rafts Raft.launch(power) (their
-## riders go with them), drop platforms rise with `power` and fall back with their dropper fall. -224 rises 105 px.
+## riders go with them), drop platforms DropPlatform.launch(power) (they rise with `power` and their riders with them,
+## then fall back with their dropper fall). -224 rises 105 px.
 ## Gliding heroes and eggs ignore geysers. `deadly` (a vent of tar or lava): the spout is a deadly box 24 x 64 above the
 ## vent (death, or an egg in co-op) instead of a launch; an `objects/boulder_heavy` resting on any geyser plugs it: no
 ## spout at all [R3].
@@ -262,8 +263,8 @@ func _spout(level: LevelBase) -> void:
 			if dropper.fall_speed < 0:
 				continue
 			_first_time(platform)
-			dropper.state = DropPlatform.State.FALL
-			dropper.fall_speed = power
+			# objects-A's launch: FALL with fall_speed = power, and every hero riding it launched with it (one arc).
+			dropper.launch(power)
 			launches += 1
 
 

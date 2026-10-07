@@ -19,7 +19,7 @@ PHASE2 = {"ui/world_map_far_shore.png", "ui/painting_slab.png", "ui/mural.png", 
           "sprites/objects/platform_cloud.png", "sprites/objects/platform_driftwood.png",
           "sprites/objects/spring_cap.png", "sprites/objects/drum_cap.png", "sprites/objects/coconut.png",
           "ui/player_tags.png",
-          "ui/player_arrows.png", "sprites/objects/spawn_point.png"}
+          "ui/player_arrows.png", "sprites/objects/spawn_point.png", "sprites/objects/spawn_point_lit.png"}
 
 
 def is_phase2(key):
@@ -59,11 +59,13 @@ def map_page(P, sheet):
     m.alpha_composite(hero_c(P, sheet, "blue", "stripes", 0), (x - 30 - 88, y - 96))
     m.alpha_composite(hero_c(P, sheet, "yellow", "spots", 0), (x - 88, y - 96))
     view = m.crop((640, 0, 1280, 360))
+    left = m.crop((0, 0, 640, 360))
     slab = slab_state(17, 3)
     view.alpha_composite(slab, (640 - slab.width - 8, 360 - slab.height - 8))
     label(m, "ui/world_map_far_shore.png with the 11 map stops (`markers`), route and plates drawn as world_map.gd", 6, 4)
     label(view, "the right-hand view: P1 + P2 on 9-2, the slab as screen UI (17 paintings, 3 rewards)", 6, 4)
-    return vstack([m, hstack([view, m.crop((0, 0, 640, 360))], 4, BG)], 4, BG)
+    label(left, "the left-hand view (worlds 5-7) at the game's 640 x 360", 6, 4)
+    return vstack([m, hstack([view, left], 4, BG)], 4, BG)
 
 
 # ---------------------------------------------------------------------------------------------------- paintings
@@ -145,7 +147,7 @@ def versus_hud(P, sheet):
         r = COLOURS.index(c)
         sc.alpha_composite(sp.crop((3 * 40, r * 41, 4 * 40, r * 41 + 41)), (x - 20, g - 50))
     label(sc, "versus HUD: corner heads (P1 cheer + crown, P3 ouch), sundial 62 % run, tags by colour row (P4 white), "
-              "hit sparks blue / pink", 6, 344)
+              "hit sparks blue / pink", 6, 62)
     return sc
 
 
@@ -185,7 +187,8 @@ def versus_sheet(P, sheet):
                    scale(asset("ui/sundial.png"), 2), scale(asset("ui/sundial_rush.png"), 2), scale(asset("ui/versus_plate.png"), 2),
                    scale(asset("ui/player_tags.png"), 1), scale(asset("ui/player_arrows.png"), 1)], 8, BG)
     bottom = vstack([pics, scale(asset("ui/medals.png"), 2), asset("sprites/fx/hit_stars_players.png"),
-                     scale(asset("sprites/objects/spawn_point.png"), 2)], 8, BG)
+                     hstack([scale(asset("sprites/objects/spawn_point.png"), 2),
+                             scale(asset("sprites/objects/spawn_point_lit.png"), 2)], 16, BG)], 8, BG)
     return vstack([top, bottom], 6, BG)
 
 

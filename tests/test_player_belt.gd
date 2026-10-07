@@ -29,18 +29,32 @@ class FakeBoard:
 	var face: int = 1
 	var step: FakeStep = null
 	var asked: int = 0
+	## True: stick() hands out a Node step (FakeNodeStep, kept in node_step) instead of a FakeStep.
+	var node_steps: bool = false
+	var node_step: Object = null
 
 	func catches(spear: SimEntity) -> bool:
 		if spear.xvel * face >= 0:
 			return false
 		return Overlap.rects(Rect2i(cell * Tuning.TILE, Vector2i(Tuning.TILE, Tuning.TILE)), spear.get_box())
 
-	func stick(_spear: SimEntity) -> FakeStep:
+	func stick(_spear: SimEntity) -> Object:
 		asked += 1
+		if node_steps:
+			node_step = FakeNodeStep.new()
+			return node_step
 		if step != null and step.is_live():
 			return null
 		step = FakeStep.new()
 		return step
+
+
+## A spear step that is a node (as objects-B's SpearStep is), so a test can free it.
+class FakeNodeStep:
+	extends Node
+
+	func is_live() -> bool:
+		return true
 
 
 ## A flat world whose belt rule is `fresh` (a Book II stage).
@@ -396,6 +410,86 @@ func test_the_boards_are_kept_and_found_again_when_the_level_changes() -> void:
 	assert_true(HeroSpear.throw_from(hero, START + Vector2i(0, -16), 25))
 	play(hold("", 6))
 	assert_eq(board.asked, 1, "and asked by the next spear")
+
+
+func test_a_step_freed_meanwhile_no_longer_counts() -> void:
+	# A step node freed with its level part (or removed on a reset) leaves the per-hero list quietly: no engine error,
+	# and the hero has his two spears again.
+	fresh_flat()
+	spawn_hero()
+	var board: FakeBoard = _board(-1)
+	board.node_steps = true
+	assert_true(HeroSpear.throw_from(hero, START + Vector2i(0, -16), 25))
+	play(hold("", 6))
+	assert_eq(HeroSpear.count_of(level, 0), 1, "the step counts")
+	(board.node_step as Node).free()
+	assert_eq(HeroSpear.count_of(level, 0), 0, "a freed step does not")
+	assert_true(HeroSpear.throw_from(hero, START + Vector2i(0, -60), 25))
+	assert_true(HeroSpear.throw_from(hero, START + Vector2i(0, -80), 25))
+	assert_eq(HeroSpear.count_of(level, 0), 2)
+
+
+func test_a_board_gone_from_the_kept_list_is_looked_for_again() -> void:
+	# The kept list is keyed by the size of the OTHER list; a board freed while another OTHER entity appears in the same
+	# tick leaves the size as it was. The freed board drops the kept list, so the next move finds the new board.
+	fresh_flat()
+	spawn_hero()
+	var first: FakeBoard = _board(-1)
+	assert_eq(HeroSpear.boards_of(level), [first])
+	first.free()
+	var second: FakeBoard = _board(-1)
+	assert_true(HeroSpear.throw_from(hero, START + Vector2i(0, -16), 25))
+	var spear: HeroSpear = _spears()[0]
+	play(hold("", 6))
+	assert_eq(second.asked, 1, "the new board was found")
+	assert_true(spear.spent, "and the spear stuck in it")
+
+
+func test_a_versus_spear_lies_in_front_of_a_walls_face_never_inside_it() -> void:
+	# C.14: a spear whose point enters a wall stops and lies there as a temporary pick-up. Inside a solid wall nobody
+	# could reach it: it lies in the open cell in front of the face and drops to the floor there (worlds of '#': the
+	# arenas' walls are FLOOR and SIDE alike).
+	var rows: PackedStringArray = PackedStringArray()
+	for row: int in GROUND_ROW + WORLD_ROWS_BELOW:
+		var line: String = ""
+		for col: int in WORLD_COLS:
+			var wall: bool = col >= 66 and col <= 67 and row >= GROUND_ROW - 3
+			line += TileGrid.CH_SOLID_A if row >= GROUND_ROW or wall else TileGrid.CH_AIR
+		rows.append(line)
+	world_rows(rows)
+	var grid: TileGrid = level.grid
+	var face_cell_x: int = 65 * Tuning.TILE + Tuning.TILE / 2
+	assert_eq(HeroSpear.lie_spot(grid, Vector2i(66 * 16 + 5, 310), 192), Vector2i(face_cell_x, 304),
+			"into the face: the open cell in front of it")
+	assert_eq(HeroSpear.lie_spot(grid, Vector2i(67 * 16 + 3, 310), 192), Vector2i(face_cell_x, 304),
+			"two cells deep (thrown from inside the wall's reach): still in front of the face")
+	assert_eq(HeroSpear.lie_spot(grid, Vector2i(67 * 16 + 9, 300), -192), Vector2i(68 * 16 + 8, 288),
+			"flying left: the face on the right")
+	assert_eq(HeroSpear.lie_spot(grid, Vector2i(66 * 16 + 5, 275), 192), Vector2i(66 * 16 + 5, 272),
+			"into the wall's top row: on its top")
+	assert_eq(HeroSpear.lie_spot(grid, Vector2i(40 * 16 + 5, 322), 192), Vector2i(40 * 16 + 5, 320),
+			"down onto a floor: on it")
+	# Through the real flight: thrown at the wall, it lies at the foot of the face, where the thrower picks it up.
+	Game.mode = Defs.GameMode.VERSUS
+	spawn_hero()
+	assert_true(HeroSpear.throw_from(hero, START + Vector2i(0, -10), 25))
+	play(hold("", 8))
+	var pickup: CollectibleBase = null
+	for entity: SimEntity in level.get_kind(Defs.Kind.COLLECTIBLE):
+		if entity.spawn_params.get("kind", "") == "spear" and bool(entity.spawn_params.get("temp", false)):
+			pickup = entity as CollectibleBase
+	assert_not_null(pickup, "it lies there as a temporary pick-up")
+	if pickup == null:
+		Game.mode = Defs.GameMode.SINGLE
+		return
+	var ticks: int = 0
+	while not pickup.resting and ticks < 120:
+		play(hold("", 1))
+		ticks += 1
+	Game.mode = Defs.GameMode.SINGLE
+	assert_true(pickup.resting, "it came to rest")
+	assert_eq(pickup.sim_pos, Vector2i(face_cell_x, GROUND_ROW * Tuning.TILE), "on the floor in front of the face")
+	assert_true(pickup.sim_pos.x + 8 <= 66 * Tuning.TILE, "its box stays out of the wall")
 
 
 func test_versus_spear_stops_in_a_wall_and_lies_there() -> void:

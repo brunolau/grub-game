@@ -72,6 +72,44 @@ func test_placed_items_bob_but_keep_their_contact_point() -> void:
 	assert_eq(heights.size(), Tuning.ITEM_BOB_PX * Tuning.ART_SCALE + 1, "bobs over 3 logical px")
 
 
+## 2.0 (player-A's two-hero performance pass): the bob writes the sprite only when its offset changes - the picture is
+## exactly the 1.0 one on every tick, also right after a jump of its age (a dozing item catching up on waking).
+func test_the_bob_picture_follows_the_table_on_every_tick() -> void:
+	var food: CollectibleBase = spawn(&"items/food", Vector2i(200, 160), {"index": 2}) as CollectibleBase
+	var sprite: Sprite2D = food.get_node("Sprite") as Sprite2D
+	Sim.step(2)
+	var rest: float = food._sprite_rest_y
+	var first: int = ObjTuning.BOB_ART[(food.age + food._bob_phase) % ObjTuning.BOB_ART.size()]
+	assert_eq(sprite.position.y, rest - float(first))
+	for i: int in 2 * ObjTuning.BOB_ART.size() + 5:
+		if i == 30:
+			food.age += 7
+		Sim.step(1)
+		var bob: int = ObjTuning.BOB_ART[(food.age + food._bob_phase) % ObjTuning.BOB_ART.size()]
+		assert_eq(sprite.position.y, rest - float(bob), "tick %d" % i)
+
+
+## The lit checkpoint's fire (the frame is written only when it changes): 1-4 at 8 fps, off again when another takes
+## over.
+func test_the_checkpoint_fire_frames_follow_its_animation() -> void:
+	var fire: Checkpoint = spawn(&"objects/checkpoint", Vector2i(200, 160)) as Checkpoint
+	var sprite: Sprite2D = fire.get_node("Sprite") as Sprite2D
+	assert_eq(sprite.frame, Checkpoint.FRAME_OFF)
+	hero.teleport(Vector2i(200, 160))
+	Sim.step(1)
+	assert_true(fire.active)
+	var seen: Dictionary = {}
+	for i: int in 40:
+		Sim.step(1)
+		var lit: int = ObjTuning.anim_frame(fire._anim, Checkpoint.ON_FPS) % Checkpoint.ON_FRAMES
+		var expected: int = Checkpoint.FRAME_ON_FIRST + lit
+		assert_eq(sprite.frame, expected, "tick %d" % i)
+		seen[sprite.frame] = true
+	assert_eq(seen.size(), Checkpoint.ON_FRAMES, "every fire frame shows")
+	fire.deactivate()
+	assert_eq(sprite.frame, Checkpoint.FRAME_OFF, "out")
+
+
 func test_giant_bonus_bounces_off_the_head_once_when_falling_fast() -> void:
 	var giant: CollectibleBase = spawn(&"items/giant_bonus", FEET + Vector2i(0, -30), {
 		"dropped": true, "index": 0, "yvel": 160,

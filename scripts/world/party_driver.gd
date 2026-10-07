@@ -9,9 +9,10 @@ extends SimEntity
 ## line of this file. Everything is integer and deterministic: no signal, no listener, no randomness.
 ##
 ## Per tick (each step runs after every hero's own step of the phase):
-##  - WEAPONS: who is ACTIVE ([method is_active]); the co-op edge walls (C.13) - every hatched hero is fenced into
-##    LevelBase.get_edge_walls() for this tick's x commit (PlayerBase.fence_x; rafts intersect their rails later in
-##    PLATFORMS).
+##  - WEAPONS: who is ACTIVE ([method is_active]); who stands in a crouching partner's lee on this tick
+##    ([method _update_lee], LevelBase.lee_mask / wind_for); the co-op edge walls (C.13) - every hatched hero is
+##    fenced into LevelBase.get_edge_walls() for this tick's x commit (PlayerBase.fence_x; rafts intersect their rails
+##    later in PLATFORMS).
 ##  - PLAYER (after every hero moved): (a) the Totem Ride carry of every rider, (b) new head contacts in slot order -
 ##    Shoulder Hop, ride start, hatch by a stomp (C.10, C.12 b). The rules of both live on the hero
 ##    (PlayerBase.carry_totem / land_on_partner, player-A: the rider's drop and a hurt carrier's throw-off too); the
@@ -35,6 +36,12 @@ extends SimEntity
 const RELAY_COUNT_MAX: int = 15
 ## Kind of the level files that are Feast Lands (a co-op Feast Land is `kind = coop` with `coop_of` a bonus file).
 const FEAST_KIND: String = "bonus"
+## The lee ([method _update_lee]; *(tune)*, PartyTuning rows asked of core-A): how far downwind of a crouching partner
+## (feet to feet, px) a hero is sheltered - 4 tiles, so that a pair leapfrogs gaps of up to 3 tiles: the second
+## hero waits at the near edge in the lee of the first, who crouches just past the far edge - and how far his feet may
+## be above or below the croucher's.
+const LEE_REACH_PX: int = 64
+const LEE_DY_PX: int = 16
 
 ## Ticks every hero has been an egg (index = slot; 0 = hatched). The Expert return starts at
 ## PartyTuning.egg_return_ticks.
@@ -47,6 +54,8 @@ var wipe_pending: bool = false
 ## (the level start, a team-wipe respawn, a hatch). Going down (an egg, a death toss) clears it. See [method is_active].
 var active_mask: int = 0
 
+## Sign of the wind the lee mask of the last tick was made for (0: no lee).
+var _lee_sign: int = 0
 ## Relay Bounce: enemy instance id -> slot of the hero who bounced on it last.
 var _relay_last: Dictionary = {}
 ## Feast Land check of the running level, decided once (-1 = not yet).
@@ -68,6 +77,7 @@ func _sim_tick(phase: int) -> void:
 	match phase:
 		Defs.Phase.WEAPONS:
 			_update_active(level)
+			_update_lee(level)
 			_fence_edge_walls(level)
 		Defs.Phase.PLAYER:
 			_carry_riders(level)
@@ -83,15 +93,20 @@ func _on_level_reset() -> void:
 	_relay_last.clear()
 	wipe_pending = false
 	active_mask = 0
+	_lee_sign = 0
+	var level: LevelBase = Game.level
+	if level != null:
+		level.lee_mask = 0
 
 
 # =================================================================================================================
 # Queries
 # =================================================================================================================
 
-## The heroes of H (PHYSICS.md C.13): alive (no death toss) and hatched.
+## The heroes of H (PHYSICS.md C.13): alive (no death toss) and hatched (PlayerBase.down read directly: this runs
+## about ten times per co-op tick).
 func is_in_tribe(hero: PlayerBase) -> bool:
-	return hero != null and not hero.dead and not hero.is_down()
+	return hero != null and not hero.dead and not hero.down
 
 
 ## The hero whose head `rider` stands on (Totem Ride), null when none.
@@ -112,14 +127,15 @@ func is_active(hero: PlayerBase) -> bool:
 	return is_in_tribe(hero) and (active_mask & (1 << clampi(hero.slot, 0, Defs.MAX_PLAYERS - 1))) != 0
 
 
-## WEAPONS (and POST, without the input): a hero down or in his toss is inactive; a hatched hero becomes active on the
-## first tick his slot holds any input flag. Every hatch the driver makes clears the bit too ([method _deactivate]),
-## so an egg made and hatched inside one tick still pops out inactive.
-func _update_active(level: LevelBase, with_input: bool = true) -> void:
+## WEAPONS: a hero down or in his toss is inactive; a hatched hero becomes active on the first tick his slot holds any
+## input flag. Every hatch the driver makes clears the bit too ([method _deactivate]), so an egg made and hatched inside
+## one tick still pops out inactive; POST clears the bit of every hero who left the tribe during the tick
+## ([method _post]).
+func _update_active(level: LevelBase) -> void:
 	for hero: PlayerBase in level.contact_order():
 		if not is_in_tribe(hero):
 			_deactivate(hero)
-		elif with_input and GameInput.get_flags(hero.slot) != 0:
+		elif GameInput.get_flags(hero.slot) != 0:
 			active_mask |= 1 << clampi(hero.slot, 0, Defs.MAX_PLAYERS - 1)
 
 
@@ -156,6 +172,48 @@ func _fence_edge_walls(level: LevelBase) -> void:
 		hero.clear_fence()
 		# A hero who is outside the walls (a teleport, a snap of the view) may still walk back in, never further out.
 		hero.fence_x(mini(walls.x, hero.sim_pos.x), maxi(walls.y, hero.sim_pos.x + 1))
+
+
+## The lee (co-op gusts: the "lee leapfrog" of DESIGN.md 3-1b / 9-2; rule text proposed to the lead designer in
+## build/engine_requests/wf8_world_a_to_lead_designer.txt #11). From the positions and states at the start of the
+## tick, before any hero moves, LevelBase.lee_mask gets the bit of every hero of H who is sheltered on this tick, and
+## his WIND primitive then feels no wind (LevelBase.wind_for):
+##  - a WINDBREAK is a hero of H in the crouch state (5, not crawl) with ground or a platform under his feet;
+##  - a hero of H is in its lee when his feet are downwind of the windbreak's (to its left while the wind blows left,
+##    `wind > 0`; to its right for `wind < 0`) by 0 .. LEE_REACH_PX and at most LEE_DY_PX above or below them;
+##  - a hero who was sheltered on the previous tick stays sheltered while he is airborne (a jump taken in the lee
+##    crosses the gap in it) until he next has ground, a platform or a carrier under his feet, or the wind turns.
+## No wind, a completed level or one hero of H: nobody is sheltered.
+func _update_lee(level: LevelBase) -> void:
+	var mask: int = 0
+	var sign_now: int = signi(level.wind)
+	if sign_now != 0 and not level.completed:
+		var order: Array[PlayerBase] = level.contact_order()
+		var carry: int = level.lee_mask if sign_now == _lee_sign else 0
+		for hero: PlayerBase in order:
+			if not is_in_tribe(hero):
+				continue
+			var bit: int = 1 << clampi(hero.slot, 0, Defs.MAX_PLAYERS - 1)
+			if (carry & bit) != 0 and not hero.is_grounded():
+				mask |= bit
+			elif in_lee(order, hero, sign_now):
+				mask |= bit
+	level.lee_mask = mask
+	_lee_sign = sign_now if mask != 0 else 0
+
+
+## True when `hero` stands in the lee of a crouching partner of `order` for a wind of sign `wind_sign` (see
+## [method _update_lee]).
+func in_lee(order: Array[PlayerBase], hero: PlayerBase, wind_sign: int) -> bool:
+	for windbreak: PlayerBase in order:
+		if windbreak == hero or not is_in_tribe(windbreak) or windbreak.state != Defs.HeroState.CROUCH \
+				or not windbreak.is_grounded():
+			continue
+		var downwind: int = (windbreak.sim_pos.x - hero.sim_pos.x) * wind_sign
+		if downwind >= 0 and downwind <= LEE_REACH_PX \
+				and absi(windbreak.sim_pos.y - hero.sim_pos.y) <= LEE_DY_PX:
+			return true
+	return false
 
 
 ## The hero's own WEAPONS pass starts here in a party (HeroParty.weapon_pass, PHYSICS.md C.0: "a box first tests
@@ -278,11 +336,15 @@ func _head_contacts(level: LevelBase) -> void:
 		for b: PlayerBase in order:
 			if b == a or b.dead:
 				continue
-			var egg: bool = b.is_down()
-			if not egg and a.holds_up() and not is_active(b):
+			# Overlap.body's coarse reject first (as land_on_partner's own first test): nearly every co-op tick the
+			# two heroes are farther apart than any two boxes reach, and nothing below may happen then.
+			if absi(a.sim_pos.x - b.sim_pos.x) >= Tuning.OVERLAP_MAX_DX \
+					or absi(a.sim_pos.y - b.sim_pos.y) >= Tuning.OVERLAP_MAX_DY:
 				continue
-			if egg:
+			if b.down:
 				_deactivate(b)
+			elif a.holds_up() and not is_active(b):
+				continue
 			var result: int = a.land_on_partner(b)
 			if result == PlayerBase.HEAD_HATCH:
 				egg_ticks[clampi(b.slot, 0, egg_ticks.size() - 1)] = 0
@@ -303,6 +365,9 @@ func end_ride(rider: PlayerBase) -> void:
 func _post(level: LevelBase) -> void:
 	var order: Array[PlayerBase] = level.contact_order()
 	for hero: PlayerBase in order:
+		# A hero who left the tribe this tick is inactive (_make_egg below deactivates the ones it makes).
+		if not is_in_tribe(hero):
+			_deactivate(hero)
 		var rider: PlayerBase = hero.totem_rider
 		if rider == null:
 			continue
@@ -313,7 +378,6 @@ func _post(level: LevelBase) -> void:
 	if not level.completed:
 		_leash(level, order)
 		_eggs(level, order)
-	_update_active(level, false)
 	_wipe_check(level, order)
 
 
@@ -337,13 +401,19 @@ func _leash(level: LevelBase, order: Array[PlayerBase]) -> void:
 ## C.12 eggs: the Expert return to the checkpoint, else the drift after the partner with the owner's nudge, clamped
 ## into the view.
 func _eggs(level: LevelBase, order: Array[PlayerBase]) -> void:
-	var frame: Rect2i = level.get_party_frame()
-	var return_after: int = PartyTuning.egg_return_ticks(Game.difficulty)
+	# The view and the return clock are only asked once an egg is met (nearly every co-op tick has none).
+	var frame: Rect2i = Rect2i()
+	var return_after: int = 0
+	var asked: bool = false
 	for egg: PlayerBase in order:
 		var slot: int = clampi(egg.slot, 0, egg_ticks.size() - 1)
-		if not egg.is_down() or egg.dead:
+		if not egg.down or egg.dead:
 			egg_ticks[slot] = 0
 			continue
+		if not asked:
+			asked = true
+			frame = level.get_party_frame()
+			return_after = PartyTuning.egg_return_ticks(Game.difficulty)
 		egg_ticks[slot] += 1
 		var pos: Vector2i = egg.sim_pos
 		if return_after >= 0 and egg_ticks[slot] > return_after:

@@ -23,9 +23,13 @@ const PHASE_STEP: int = 12
 const PERIOD_MAX: int = 720
 ## Rider movers: stand this long on the part before the take-off of an off link (0 = at once).
 const STAND_TICKS: Array[int] = [0, 8, 16, 32, 64]
-## Board links come from static nodes at most this far from the part (px, by axis).
+## Board links come from static nodes at most this far beside the part (px), at most BOARD_RISE_PX below its top (the
+## light hero's jump rise is 60 px) and at most BOARD_REACH_Y above it.
 const BOARD_REACH_X: int = 96
 const BOARD_REACH_Y: int = 112
+const BOARD_RISE_PX: int = 60
+## A boarding window this wide ends the search of slower scripts for that source node and phase.
+const BOARD_GOOD_WINDOW: int = 8
 ## Take-off points on a part are sampled this far apart.
 const PART_SAMPLE_STEP: int = 8
 
@@ -38,6 +42,10 @@ var link_count: int = 0
 var _node_part: Dictionary = {}
 var _periods: PackedInt32Array = PackedInt32Array()
 var _memo: Dictionary = {}
+# The movers' states after `phase` ticks alone (phase -> Array[PackedInt32Array]) and the probes of off links
+# ("part:phase:stand" -> Outcome): the same world state every time, so simulated once.
+var _phase_states: Dictionary = {}
+var _probes: Dictionary = {}
 
 
 func _init(p_baker: NavBaker) -> void:
@@ -79,9 +87,10 @@ func find_nodes() -> void:
 		node.x1 = box.end.x - 5
 		if node.x0 > node.x1:
 			continue
-		# Stand him on it (fresh world): he must ride it, alive.
+		# Stand him on it (fresh world: every run spawns the movers anew, so the part is matched by its index): he must
+		# ride it, alive.
 		var outcome: NavSim.Outcome = sim.run(Vector2i(node.center_x(), node.y), PackedInt32Array([0, 0, 0]), 8)
-		if outcome.died or outcome.platform != entity:
+		if outcome.died or outcome.platform == null or sim.part_index(outcome.platform) != i:
 			baker.rejected += 1
 			baker.report.append("mover node rejected: %s (he does not ride it at %s)" % [key,
 					Vector2i(node.center_x(), node.y)])
@@ -154,35 +163,44 @@ func _board_links(to: int, part: int, mover: int, phase: int) -> void:
 	var graph: NavGraph = baker.graph
 	var sim: NavSim = baker.sim
 	var home: Vector2i = sim.part_homes[part]
-	var probe: NavSim.Outcome = sim.run(NavSim.PARK, PackedInt32Array(), 0, -1, phase)
-	var state: PackedInt32Array = probe.mover_states[part] if part < probe.mover_states.size() else PackedInt32Array()
+	var states: Array[PackedInt32Array] = phase_states(phase)
+	var state: PackedInt32Array = states[part] if part < states.size() else PackedInt32Array()
 	if state.size() < 4:
 		return
 	var at: Vector2i = home + Vector2i(state[0], state[1])
+	var top_x0: int = at.x
+	var top_x1: int = at.x + graph.nodes[to].x1 - graph.nodes[to].x0 + 8
 	for from: int in graph.nodes.size():
 		var node: NavGraph.NavNode = graph.nodes[from]
-		if node.mover >= 0 or absi(node.y - at.y) > BOARD_REACH_Y:
+		# Out of reach: a jump lifts the feet BOARD_RISE_PX at most; nothing farther than BOARD_REACH_X aside.
+		if node.mover >= 0 or node.y - at.y > BOARD_RISE_PX or at.y - node.y > BOARD_REACH_Y:
 			continue
-		var near: int = clampi(at.x, node.x0, node.x1)
-		if absi(near - at.x) > BOARD_REACH_X and absi(near - (at.x + graph.nodes[to].x1 - graph.nodes[to].x0)) > BOARD_REACH_X:
+		if node.x1 < top_x0 - BOARD_REACH_X or node.x0 > top_x1 + BOARD_REACH_X:
 			continue
 		var xs: PackedInt32Array = PackedInt32Array()
 		var x: int = node.x0
 		while x <= node.x1:
-			if absi(x - at.x) <= BOARD_REACH_X + 48:
+			if x >= top_x0 - BOARD_REACH_X and x <= top_x1 + BOARD_REACH_X:
 				xs.append(x)
 			x += NavBaker.SAMPLE_STEP
 		if xs.is_empty():
 			continue
 		var best: Dictionary = {}
 		for s: int in baker.ground_scripts():
+			# Only the moves toward the part (or straight up under it).
+			var d: int = baker.script_dir(s)
 			for seed_x: int in xs:
+				var toward: int = 0 if seed_x >= top_x0 and seed_x <= top_x1 else (1 if seed_x < top_x0 else -1)
+				if d != 0 and toward != 0 and d != toward:
+					continue
 				if _land(from, s, seed_x, phase, 0, node.y) != to:
 					continue
 				var window: Dictionary = _widen(from, to, s, seed_x, phase, 0, node.y, Vector2i(node.x0, node.x1))
 				var width: int = int(window["x1"]) - int(window["x0"]) + 1
 				if width >= NavBaker.MIN_WINDOW and (best.is_empty() or int(window["ticks"]) < int(best["ticks"])):
 					best = window
+				break
+			if not best.is_empty() and int(best["x1"]) - int(best["x0"]) + 1 >= BOARD_GOOD_WINDOW:
 				break
 		if not best.is_empty():
 			_add(from, to, best, PackedInt32Array([mover, state[0], state[1], state[2], state[3]]), phase, 0)
@@ -226,13 +244,25 @@ func _off_links(from: int, part: int, mover: int, phase: int, stand: int) -> voi
 
 
 func _probe(part: int, phase: int, stand: int, node: NavGraph.NavNode) -> NavSim.Outcome:
+	var key: String = "%d:%d:%d:%d" % [part, phase, stand, node.id]
+	if _probes.has(key):
+		return _probes[key]
 	var sim: NavSim = baker.sim
-	var start_state: NavSim.Outcome = sim.run(NavSim.PARK, PackedInt32Array(), 0, -1, phase)
-	if start_state.mover_states.size() <= part:
+	var states: Array[PackedInt32Array] = phase_states(phase)
+	if states.size() <= part:
 		return null
-	var s: PackedInt32Array = start_state.mover_states[part]
+	var s: PackedInt32Array = states[part]
 	var start: Vector2i = Vector2i(node.center_x() + s[0], node.y + s[1])
-	return sim.run(start, PackedInt32Array([0]), 1, -1, phase, stand)
+	var outcome: NavSim.Outcome = sim.run(start, PackedInt32Array([0]), 1, -1, phase, stand)
+	_probes[key] = outcome
+	return outcome
+
+
+## The state of every mover part after the movers ran `phase` ticks alone from the level start (cached).
+func phase_states(phase: int) -> Array[PackedInt32Array]:
+	if not _phase_states.has(phase):
+		_phase_states[phase] = baker.sim.run(NavSim.PARK, PackedInt32Array(), 0, -1, phase).mover_states
+	return _phase_states[phase]
 
 
 func _same_state(window: Dictionary, state: PackedInt32Array) -> bool:
@@ -261,8 +291,7 @@ func _simulate(from: int, flags: PackedInt32Array, x: int, phase: int, stand: in
 		var part: int = int(_node_part.get(from, -1))
 		if part < 0:
 			return {"to": -1, "ticks": 0, "land": 0, "state": PackedInt32Array()}
-		var at: NavSim.Outcome = sim.run(NavSim.PARK, PackedInt32Array(), 0, -1, phase)
-		var s: PackedInt32Array = at.mover_states[part]
+		var s: PackedInt32Array = phase_states(phase)[part]
 		start = Vector2i(x + s[0], node.y + s[1])
 	var outcome: NavSim.Outcome = sim.run(start, flags, NavBaker.MAX_TICKS, -1, phase, stand)
 	baker.candidates += 1
@@ -389,11 +418,13 @@ func _recipe_for(link: NavGraph.NavLink) -> Vector2i:
 	var stands: Array[int] = [0] if periodic or graph.nodes[link.from].mover < 0 else STAND_TICKS
 	for phase: int in phases:
 		for stand: int in stands:
-			var probe: NavSim.Outcome = null
+			var states: Array[PackedInt32Array] = []
 			if graph.nodes[link.from].mover >= 0:
-				probe = _probe(part, phase, stand, graph.nodes[link.from])
+				var probe: NavSim.Outcome = _probe(part, phase, stand, graph.nodes[link.from])
+				if probe != null:
+					states = probe.mover_states
 			else:
-				probe = baker.sim.run(NavSim.PARK, PackedInt32Array(), 0, -1, phase)
-			if probe != null and probe.mover_states.size() > part and probe.mover_states[part] == want:
+				states = phase_states(phase)
+			if states.size() > part and states[part] == want:
 				return Vector2i(phase, stand)
 	return Vector2i(-1, -1)

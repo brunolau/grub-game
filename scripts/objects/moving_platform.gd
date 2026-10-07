@@ -3,9 +3,9 @@ extends PlatformBase
 ## `objects/platform` (PHYSICS.md 11.4 movers, GAMEPLAY.md 7.3): moves in one of 8 directions and back.
 ##
 ## Parameters: `dir` 0..7 [2] (0 up, clockwise), `speed` px/tick [2], `travel` ticks [44], `mode=always|ride`
-## [always], `skin=wood|ice|stone|small` [by biome]. The speed changes by Tuning.PLATFORM_ACCEL each tick toward a
-## signed target; after `travel` ticks at the target the target is negated (ping-pong). A `ride` platform waits
-## until the hero rides it and stops at the end of the cycle after he stepped off.
+## [always], `skin=wood|ice|stone|small|cloud|driftwood` [by biome, PlatformSkin]. The speed changes by
+## Tuning.PLATFORM_ACCEL each tick toward a signed target; after `travel` ticks at the target the target is negated
+## (ping-pong). A `ride` platform waits until the hero rides it and stops at the end of the cycle after he stepped off.
 ## The standing surface is the top edge of the cell the platform is placed in.
 
 ## Movement per direction 0..7, in units of the speed.

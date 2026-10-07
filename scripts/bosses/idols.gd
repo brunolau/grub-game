@@ -41,6 +41,8 @@ const SUN: int = 1
 const ROCK_ID: StringName = &"projectiles/boss_rock"
 const MASONRY_ID: StringName = &"projectiles/boss_stalactite"
 const MASONRY_SKIN: String = "masonry"
+## The spat rocks in each idol's colour (art-B's idols_parts roles), by idol.
+const ROCK_SKINS: Array[String] = ["rock_moon", "rock_sun"]
 ## The shared attack loop: the Colossus loop (spit, slam, spit, slam, slam; idle pauses COLOSSUS_IDLE_TICKS).
 const LOOP: Array[int] = [Attack.SPIT, Attack.SLAM, Attack.SPIT, Attack.SLAM, Attack.SLAM]
 
@@ -572,7 +574,7 @@ func _spit(idol: int) -> void:
 		var target: PlayerBase = _target_of(idol)
 		if target != null:
 			speed = _aimed_speed(absi(target.sim_pos.x - mouth.x))
-	_spawn_optional(ROCK_ID, mouth, {"xvel": away * speed, "yvel": 0})
+	_spawn_optional(ROCK_ID, mouth, {"xvel": away * speed, "yvel": 0, "skin": ROCK_SKINS[idol]})
 	Audio.play_sfx(Sfx.BOSS_SPIT)
 
 

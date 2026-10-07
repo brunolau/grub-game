@@ -13,7 +13,8 @@ extends ProjectileBase
 ##    platform drawn as the stuck spear) stands for this spear from then on and the flying spear is removed; null
 ##    means the board already holds a live step and the spear glances off (removed; the board plays the clank);
 ##  - versus arenas (C.14): its feet point entering a wall (SIDE 1) or a floor cell stops it, and it lies there as a
-##    temporary pick-up (`items/weapon kind=spear temp=true`).
+##    temporary pick-up (`items/weapon kind=spear temp=true`) - on that cell's top, or in front of a wall's face,
+##    never inside the wall ([method lie_spot]).
 ## Weapon pass: the thrower's own pass (Player._weapon_pass) tests it like the axe - the first enemy it overlaps takes
 ## its power, else the first hidden spot; it is removed on a hit and never pogoes. Removed when it was on no view on
 ## the previous tick.
@@ -32,6 +33,8 @@ const ID_TEMP_PICKUP: StringName = &"items/weapon"
 ## Flight-angle frames of fx/projectile_spear.png (0 flat; 1-3 nose down 15 / 30 / 45 degrees): the yvel (v16) from
 ## which each of frames 1-3 shows (tan of the angle midway between two frames, times 192).
 const DROP_FRAME_YVEL: Array[int] = [25, 80, 150]
+## Versus: how many cells back from a wall's face [method lie_spot] looks for the open cell its pick-up lies in.
+const WALL_BACK_OUT_CELLS: int = 3
 
 ## Set while it flies; false once it stuck, glanced or was pulled out.
 var flying: bool = true
@@ -169,8 +172,9 @@ static func _lists(level: LevelBase) -> Array:
 
 ## True while an entry still counts: a flying spear, or a step that still stands (objects-B's SpearStep.is_solid():
 ## false once it falls or collapsed; `is_live()` is accepted too; without either a step counts while it exists).
-static func _counts(entry: Object) -> bool:
-	if entry == null or not is_instance_valid(entry) or (entry is Node and (entry as Node).is_queued_for_deletion()):
+static func _counts(entry: Variant) -> bool:
+	# Untyped: a step freed meanwhile (a level part removed, a reset) must not be passed as an Object (engine error).
+	if not is_instance_valid(entry) or (entry is Node and (entry as Node).is_queued_for_deletion()):
 		return false
 	if entry is HeroSpear:
 		return (entry as HeroSpear).flying and not (entry as HeroSpear).spent
@@ -193,8 +197,10 @@ static func _pull(entry: Object) -> void:
 
 ## The bark boards of `level` (objects-B's `objects/bark_board`, found by duck typing among its OTHER entities: methods
 ## `catches(spear) -> bool` and `stick(spear)`), in spawn order. Kept on the level (Object metadata BOARDS_META =
-## [size of the OTHER list, boards]) and found again when that list changed size, so a flying spear asks only the
-## boards each tick instead of testing every sign, tablet and checkpoint for the two methods.
+## [size of the OTHER list, boards]) and found again when that list changed size or a kept board is gone
+## ([method _try_board] drops the list then), so a flying spear asks only the boards each tick instead of testing every
+## sign, tablet and checkpoint for the two methods. Boards come only from the level file (a restart builds a new
+## level), so a board appearing while another OTHER entity vanished in the same tick does not happen.
 static func boards_of(level: LevelBase) -> Array:
 	var others: Array[SimEntity] = level.get_kind(Defs.Kind.OTHER)
 	if level.has_meta(BOARDS_META):
@@ -215,9 +221,12 @@ static func boards_of(level: LevelBase) -> Array:
 func _try_board(level: LevelBase) -> bool:
 	var boards: Array = boards_of(level)
 	for i: int in boards.size():
-		var board: Object = boards[i]
-		if not is_instance_valid(board) or (board is Node and (board as Node).is_queued_for_deletion()):
+		# Read untyped first: assigning a freed board to an Object variable is an engine error.
+		var entry: Variant = boards[i]
+		if not is_instance_valid(entry) or (entry is Node and (entry as Node).is_queued_for_deletion()):
+			level.remove_meta(BOARDS_META)  # a kept board is gone: the next call looks again
 			continue
+		var board: Object = entry
 		if not bool(board.call(&"catches", self)):
 			continue
 		var step: Variant = board.call(&"stick", self)
@@ -237,20 +246,44 @@ func _try_board(level: LevelBase) -> bool:
 
 ## Versus (C.14): the feet point entered a wall (SIDE 1) or a floor cell.
 func _hits_tile(level: LevelBase) -> bool:
-	var col: int = Tuning.to_cell(sim_pos.x)
-	var row: int = Tuning.to_cell(sim_pos.y)
-	var floor_value: int = level.grid.floor_at(col, row)
-	return level.grid.side_at(col, row) == TileGrid.SIDE_WALL \
-			or (floor_value != TileGrid.FLOOR_EMPTY and floor_value != TileGrid.FLOOR_NOTHING)
+	return _solid_cell(level.grid, Tuning.to_cell(sim_pos.x), Tuning.to_cell(sim_pos.y))
 
 
-## Versus: lie there as a temporary pick-up.
+## Versus: lie there as a temporary pick-up, at [method lie_spot].
 func _lie_down(level: LevelBase) -> void:
 	flying = false
 	if Spawner.exists(ID_TEMP_PICKUP):
-		var cell_top: int = Tuning.to_cell(sim_pos.y) * Tuning.TILE
-		level.spawn(ID_TEMP_PICKUP, Vector2i(sim_pos.x, cell_top), {"kind": "spear", "temp": true, "dropped": true})
+		level.spawn(ID_TEMP_PICKUP, lie_spot(level.grid, sim_pos, xvel),
+				{"kind": "spear", "temp": true, "dropped": true})
 	_remove()
+
+
+## Where a versus spear whose point entered the solid cell under `point` lies down (C.14 "stops and lies there"), as
+## the feet point of its pick-up (a dropped item: it falls to the floor below it): on the top of that cell when the
+## cell above it is open (it came down onto a floor or flew into the top row of a wall); else it flew into a wall's
+## face, and it lies in the first open cell of that row back towards the thrower (at most WALL_BACK_OUT_CELLS back,
+## also when it was thrown from inside the wall's reach), from where it drops to the floor in front of the face -
+## never inside the wall, where no hero could reach it.
+static func lie_spot(grid: TileGrid, point: Vector2i, p_xvel: int) -> Vector2i:
+	var col: int = Tuning.to_cell(point.x)
+	var row: int = Tuning.to_cell(point.y)
+	var cell_top: int = row * Tuning.TILE
+	if not _solid_cell(grid, col, row - 1):
+		return Vector2i(point.x, cell_top)
+	var back: int = -1 if p_xvel > 0 else 1
+	var c: int = col
+	for i: int in WALL_BACK_OUT_CELLS:
+		c += back
+		if not _solid_cell(grid, c, row):
+			return Vector2i(c * Tuning.TILE + Tuning.TILE / 2, cell_top)
+	return Vector2i(point.x, cell_top)
+
+
+## A cell a versus spear stops in (C.14): a wall (SIDE 1) or any floor.
+static func _solid_cell(grid: TileGrid, col: int, row: int) -> bool:
+	var floor_value: int = grid.floor_at(col, row)
+	return grid.side_at(col, row) == TileGrid.SIDE_WALL \
+			or (floor_value != TileGrid.FLOOR_EMPTY and floor_value != TileGrid.FLOOR_NOTHING)
 
 
 func _remove() -> void:

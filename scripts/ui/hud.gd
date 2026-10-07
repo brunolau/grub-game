@@ -530,6 +530,11 @@ func _apply_layout_mode() -> void:
 	_on_score_changed(Game.score)
 	for node: CanvasItem in _campaign_nodes:
 		node.visible = not versus
+	if versus and _versus != null and _versus.player_count() != HudVersus.players_wanted():
+		# A new match with another number of players: new panels.
+		remove_child(_versus)
+		_versus.queue_free()
+		_versus = null
 	if versus and _versus == null:
 		_versus = HudVersus.new()
 		add_child(_versus)

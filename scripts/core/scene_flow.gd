@@ -1455,10 +1455,11 @@ func _take_level_extras() -> Dictionary:
 ## The new level is loaded and its clock has not ticked yet: seed a versus round's Sim.rng, put the heroes of a party
 ## change at the checkpoint they had reached (Game.set_checkpoint; each hero at his spread respawn point). A
 ## deciding-moment replay ("fast_forward": ticks) runs the round up to its window here, behind the curtain, with the
-## effects muted, then plays on at half speed.
+## effects muted, then plays on at half speed. A versus round plays its round's music (_play_round_music).
 func _apply_level_extras(level_args: Dictionary) -> void:
 	if level_args.has("seed"):
 		Sim.rng.reseed(int(level_args["seed"]))
+		_play_round_music()
 	if level_args.has("fast_forward") and _replaying:
 		Audio.set_effects_muted(true)
 		Sim.step(int(level_args["fast_forward"]))
@@ -1476,6 +1477,19 @@ func _apply_level_extras(level_args: Dictionary) -> void:
 		for hero: PlayerBase in level.contact_order().duplicate():
 			level.respawn_hero(hero, level.get_respawn_pos_for(hero.slot))
 		level.snap_camera()
+
+
+## A versus round's arena is loaded (it started its own `music`): the round's track instead when the arena plays one of
+## the battle tracks (VersusMatch.round_music: A, B, C in turn from round to round). The deciding moment loads the
+## arena with the round's start state, so it plays the round's own track again. Sound only.
+func _play_round_music() -> void:
+	var versus_match: VersusMatch = Game.versus_match
+	if Game.mode != Defs.GameMode.VERSUS or versus_match == null or Game.level == null:
+		return
+	var own: StringName = StringName(str(Levels.get_value(versus_match.round_arena, "music", "")))
+	var music: StringName = VersusMatch.round_music(own, versus_match.round_index)
+	if music != own and AudioTable.MUSIC.has(music):
+		Audio.play_music(music)
 
 
 func _open_book_select() -> void:

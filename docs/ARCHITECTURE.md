@@ -196,7 +196,8 @@ PHYSICS.md 11.2 unchanged. Flat floor cells at the foot of a slope get `PROFILE_
 2.0 (level format 2, 7.11): `CH_TAR` (`:`, the tar floor: '#' with `PROFILE_TAR` = `PROFILE_LOWERED_BASE + 6` and
 the TAR material), a fifth per-cell table `material_at(col, row)` (`MATERIAL_NONE`, `MATERIAL_TAR`) and
 `is_tar(col, row)`; `LEGEND_CHARS` includes `:`. A format-1 level builds exactly the 1.0 tables (fixture
-`tests/fixtures/book1_grid_hashes.txt`).
+`tests/fixtures/book1_grid_hashes.txt`). P2.12 (player-B's A53 pass): `has_tar() -> bool` (any `:` cell, one native
+search; `set_char` keeps it current) - HeroClimb asks it once per level load.
 
 ### 3.3 `Overlap` (`scripts/core/overlap.gd`) - the sprite-overlap test of PHYSICS.md 2.2
 
@@ -418,7 +419,14 @@ which Godot does not expose, differ), and a real `SendInput` sequence could not 
 probe never got the foreground), so no filter can be proven and Shift is not kept as an alias. Ctrl has no such
 quirk. Bindings keep no key side, so Right Ctrl also strikes for P1 in this layout (nobody else uses it there). Note
 for P4.3 (devices): on macOS with two input sources Ctrl + Space is the system's "previous input source" shortcut
-(P1's charged jump); the options rebind P1's strike if that bites. `GameInput.get_scripted_slot(slot) -> Callable`
+(P1's charged jump); the options rebind P1's strike if that bites. Revisiting the alias needs a real recording: on the
+P4.3 device check a person runs the key probe, holds Left Shift with NumLock on and presses Num 4 - the log stamps
+each event with its frame and usec. The one sign Godot does carry is that a numpad key Windows treats as shifted
+arrives with a navigation keycode (`KEY_LEFT` with physical `KEY_KP_4`) right after the synthetic release, in the same
+frame; a filter built on that would also swallow a real Shift release made in the same frame as a numpad press with
+NumLock off, so it may only ship with a test replaying such a recorded sequence (the resolution's condition).
+`tests/test_core_input_presets.gd` proves the Ctrl strike survives the modelled synthetic sequence.
+`GameInput.get_scripted_slot(slot) -> Callable`
 (P2.6: the script driving a slot, Callable() for none; Flow gives it back after a replay).
 
 ### 3.8 `Levels` autoload - level registry
@@ -578,7 +586,10 @@ unlocked, result}]` (the code entry's list per book, the co-op continue; co-op l
 no codes). Codes of both books are found by `Levels.find_by_password` and started by `continue_game` (the level's
 book). Co-op endings: a co-op file plays the route of its solo level (trophy -> the co-op epilogue, ending -> THE END
 with the co-op namespace completed). **Sudden death**: `Events.round_sudden_death_started` pushes
-`Sfx.MUSIC_VERSUS_SUDDEN_DEATH` in a versus level.
+`Sfx.MUSIC_VERSUS_SUDDEN_DEATH` in a versus level. **Round music** (P2.6 polish): when a round's arena is loaded Flow
+plays `VersusMatch.round_music(arena music, round_index)` - an arena whose `music` is one of `VersusMatch.BATTLE_MUSIC`
+(DESIGN.md F.2's battle A / B / C) starts the match with it and each later round takes the next of the three; other
+music stays; the deciding moment plays the replayed round's own track. Sound only.
 
 ### 3.11 `LevelBase` (`scripts/base/level_base.gd`) - what everybody may ask the running level
 
@@ -637,6 +648,10 @@ resolution: an egg is no springboard, PHYSICS.md C.12); `Level.get_egg_scout() -
 `wind_loop` is live (the wind script restarts every `wind_loop` ticks; 0 = the 1.0 script); CurrentZone draws its
 streaks and WorldWeather gust streaks outside the ice biome (presentation only). The tribe camera keeps every grounded
 hero whole on the view while one view can hold them (`PartyTuning.CAM_KEEP_HEAD_PX`, PHYSICS.md C.13).
+The co-op **lee** (PHYSICS.md C.6): `LevelBase.lee_mask` (a bit per slot, written by the PartyDriver in `WEAPONS`;
+always 0 outside a co-op party), `LevelBase.wind_for(hero) -> int` (the wind that hero's `WIND` step feels: the
+level's `wind`, or 0 in a lee), `PartyDriver.in_lee(order, hero, wind_sign)`; the reach is
+`PartyTuning.LEE_REACH_PX` 64 downwind of the croucher's feet and `LEE_DY_PX` 16 up or down *(tune)*.
 
 ### 3.12 `PlayerBase` (`scripts/base/player_base.gd`)
 
@@ -732,7 +747,11 @@ party's Shaman sets it; it holds through the tick he dies in; `accepts_hit_from`
 `kill()` and `on_glider_stomp()`; single-player untouched). `CoopTraits` adds `window_cap` (level parameter `window`),
 `group_window()`, `daze_window()`, static `capped_window(base, params)` (tools), `count_in` (the window count-in on the
 group's leader: `PartyTuning.COUNT_IN_BEEPS` x `Sfx.COUNT_IN`, `PartyTuning.COUNT_IN_SPACING_TICKS` apart, then
-`Sfx.DRUM`), `carries` (grab: the heroes seized).
+`Sfx.DRUM`), `carries` (grab: the heroes seized). P2.1 (enemies-A, resumed run): `_ground_step` caps a grounded
+enemy's step on a `:` tar cell at `Tuning.TAR_WALK_CAP` (PHYSICS.md C.5; its xvel is kept); the Guard has the protected
+hook `_bears_shield()` (false = a preset patrolling as a plain Walker); EnemySkin also knows art-B's boss sheets of
+worlds 7-9 (`inkjaw` [+`_rage`], `inkjaw_parts`, `idol_sun`, `idol_moon`, `idols_parts`, `roc`, `roc_parts`,
+`roc_lightning`, `chieftain_gorm`, `chieftain_gulla`, `chieftain_egg`).
 
 ### 3.14 `ProjectileBase`
 
@@ -799,7 +818,9 @@ bits; action names; groups; z indices; CanvasLayer numbers; physics layer bits; 
   `STUN_HIT_TIMER_MIN` 31, `CLANG_PUSH_EACH_PX`, `STOMP_IMMUNE_TICKS`, `TEAMMATE_BUMP_XVEL`, `CURL_GLANCE_ABOVE_PX`,
   `BODY_KNOCK_XVEL` / `_YVEL`, `HOT_ROCK_FIRST_PICK_TICKS`, `HOT_ROCK_REPICK_TICKS`, `BALL_ROLL_LOSS`,
   `GIANT_BONK_DAZE_TICKS`, `ARENA_FILE_ROWS`) with the helpers `round_seed`, `stack_round_ticks`, `spill`, `stomp_steal`,
-  `stack_walk_cap`, `bot_reaction_ticks`.
+  `stack_walk_cap`, `bot_reaction_ticks`. P2.6 (objects-B's coconut, GAMEPLAY.md 13.10.6): the shots `BALL_DRIVE_XVEL`
+  144 / `BALL_DRIVE_YVEL` -128, `BALL_LOB_XVEL` 32 / `BALL_LOB_YVEL` -240, `BALL_GROUNDER_XVEL` 96, the floor bounce
+  `BALL_BOUNCE_MIN_YVEL` 32 and the head bounce `BALL_HEAD_BOUNCE_MIN_YVEL` -96.
 - `PlayerRun` (3.5), `InputSlot` (3.7). `Sfx`: `EXPANSION_SFX`, `EXPANSION_MUSIC` (3.9). `VersusMatch` (3.5).
   P1.1: `Defs.CURL_BALL_STATE` (= `PlayerBase.CURL_BALL`, for `hitter_slot`: a batted ball credits its batter);
   `PartyTuning.KEEPER_HALL_ROWS = 4` (64 px halls: the Guard and Shellback art is 54 px tall).
@@ -1028,7 +1049,7 @@ dies when hp drops **below** 0, so hp 0..24 = one hit, 25..49 = two):
 | Id | Archetype (GAMEPLAY 5.2) | Default skin | Parameters |
 |---|---|---|---|
 | `enemies/dropper` | 0 sky dropper, zone spawner | `egg_kid` | `zone=c,r,w,h` trigger [10 tiles around], `pause` [44], `speed` v16 [32], `max` alive [2] |
-| `enemies/dangler` | 2 yo-yo dangler | `bat` | `depth` px [48], `speed` px/tick [2] |
+| `enemies/dangler` | 2 yo-yo dangler (2.0, co-op party: a hero's club box over its thread cuts it - it falls off, harmless, gone without points until a team wipe, GAMEPLAY.md 13.9.4; `EnemyTuning.THREAD_CUT_W` = 4 px) | `bat` | `depth` px [48], `speed` px/tick [2] |
 | `enemies/lurker` | 3 ceiling dropper -> chaser | `insect` | `range` tiles [4], `pause` [22] |
 | `enemies/swinger` | 4 pendulum | `bat_b` | `radius` px [40] |
 | `enemies/stinger` | 5 sentry diver | `insect` | `range` tiles [6], `speed` px/tick [3] |
@@ -1101,7 +1122,9 @@ him every `period` ticks; the volcano shaft of GAMEPLAY.md 12.1), `zones/flies` 
 visit adds flies to the cosmetic swarm around the hero, at most `Tuning.MAX_FLIES`; `items/water_bucket` and a
 respawn clear them, GAMEPLAY.md 7.9).
 
-**FX** (objects; cosmetic, free themselves): `fx/dust`, `fx/star_puff`, `fx/hit_stars`, `fx/poof`,
+**FX** (objects; cosmetic, free themselves): `fx/dust`, `fx/star_puff`, `fx/hit_stars` (2.0: `row=<n>` - versus hit
+sparks in a player's colour, row n of `sprites/fx/hit_stars_players.png` in `UiPlayers.PALETTE_COLOURS` order; without
+it the 1.0 sheet; presentation only), `fx/poof`,
 `fx/explosion`, `fx/explosion_big`, `fx/ring`, `fx/splash` (`kind=water|lava`), `fx/debris`
 (`kind=rock|wood|ice|leaf`, `count`), `fx/popup` (`kind=score|multiplier|one_up|heart`, `value`; rises 1 px per
 tick for 44 ticks).
@@ -1123,7 +1146,7 @@ pit-side perch of a `grab` record).
 | `enemies/roller` | walks; curls 14 ticks and rolls at a hero in range; dizzy after a wall | `range` tiles [6], `speed` v16 [64], `dizzy` ticks [33], `left` / `right` [-3 / 3] |
 | `enemies/guard` | patrols with a shield that turns only every `turn` ticks; front hits glance | `turn` [33], `left` / `right` [-3 / 3] |
 | `enemies/mimic` | a chest that bites within 2 cells; dies from behind or after a head bounce; drawn as the `objects/container skin=chest` closed chest (box 24 x 18) | `contents` [`treasure`], `range` px [42] |
-| `enemies/shellback` | co-op only: Guard + `shell` (Book I: `skin=turtle_b`, Walker + `shell`) | as `guard` (+ `speed`) |
+| `enemies/shellback` | co-op only: Guard + `shell`; `skin=turtle\|turtle_b` is the Book I variant: a Walker + `shell` (walker speed [32], score [0], no Guard clock) | as `guard` (+ `speed`) |
 | `enemies/raptor` | co-op only: Hopper + `daze` | as `hopper` |
 | `enemies/snatcher` | co-op only: Dangler or Stinger + `grab` | `kind=dangler\|stinger` (dangler: `bat_b`; stinger: the gull once art-B's sheet lands, else `pterodactyl_b`), `depth`, `speed`, `range` |
 | `enemies/leech` | co-op only: Lurker + `leech` | as `lurker` |
@@ -1693,7 +1716,11 @@ filter that only touches it (`coop`, `gates`) runs the other matching files and 
 check never pays for the slow search (P2.6 sign-off; `run_tests.discover_files` is the rule, `tests/
 test_core_runner.gd` keeps it). They run at every gate and before every merge that touches co-op files or the solo
 search. The default run took about 4 minutes at G1 (1 135 tests); gd.sh's default `GD_TIMEOUT` of 300 s is close: a
-full run passes `GD_TIMEOUT=600`.
+full run passes `GD_TIMEOUT=600`. **Isolation between files** (P2.6): the runner puts back the global clock state a
+file left behind - `Sim.frozen` (a Flow transition that a failing test never awaited), a `Sim.time_scale` other than
+1 (a deciding-moment replay), a paused tree - before the next file, with a `note: <file> left ... - reset` line
+(`run_tests.reset_leaks`), so one file's failure no longer fails the next file's timing tests (seen in phase 2: a red
+boss test left the clock frozen and `test_fidelity_clock.gd` counted 0 ticks).
 
 **Permanent guards of 2.0** (PLAN.md 8 V1, core): `tests/test_core_players.gd` - on a single-player level the
 PlayerSet is the 1.0 hero, `GameInput.get_flags(0) == GameInput.flags` and the free slots read nothing on every
@@ -1755,6 +1782,16 @@ the headless tests; a `play` ends when another stage takes over (sub-stage, bonu
 GD_TIMEOUT=1800 bash .tools/gd.sh play --flow=tools/autoplay/campaign.flow --fast --fresh-user     Expert, all levels
 bash .tools/gd.sh play --flow=tools/autoplay/campaign_beginner.flow --fast --fresh-user            code -> expert wall
 ```
+
+**Headless flows and the view** (P2.6 investigation, core-A): a flow run headless (`scripts/core/dev/
+headless_flow.gd`) must give every level the view of a window. The headless display server keeps a window of its own
+size (`root.size = 1280 x 720` does not stick), so with stretch aspect `expand` each level gets a 640 x 640 art-px
+viewport - a 320 x 320 logical view instead of 320 x 180. A taller view wakes enemies earlier (they wake by the view), so a route recorded in a window diverges: `w1_l2.warp.inputs` leaves the windowed trace at tick 937
+(a bounce the windowed hero never makes), the hero never reaches the 1-2 warp and `campaign.flow` stops waiting for
+`bonus_a` (it was never a Flow bug: `Flow.complete_level` is not even called). The fix is the tool's - on every
+`Flow.screen_changed(&"level")` call `Game.level.set_view_size(Vector2i(640, 360))` (the screen change of a level comes
+before its first tick); with it `campaign.flow` passes headless (116 checks, 30 259 ticks). Tests never depend on the
+headless viewport: those that need a view set it themselves (`set_view_size`).
 
 A plain `--autoplay=<id>` run plays its script in that one stage and ends when another stage takes over (its
 screenshots are never overwritten by the next stage). Its clock stands still until the script's first tick, so the

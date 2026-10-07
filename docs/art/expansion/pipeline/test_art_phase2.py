@@ -117,6 +117,40 @@ class FarShoreMap(unittest.TestCase):
         self.assertEqual({"%d-%d" % k: list(v) for k, v in build_far_shore.MARKERS.items()},
                          ROWS[self.REL]["markers"])
 
+    def test_the_page_is_what_the_builder_makes(self):
+        import build_far_shore
+        np.testing.assert_array_equal(img(self.REL), np.array(build_far_shore.build_map(write=False)))
+
+    def test_the_mesa_rises_out_of_its_island(self):
+        """the mesa is cut out of art-B's layer above its base: every column of its foot ends behind the island
+        (no straight bottom edge floating over the sea)"""
+        import build_far_shore as b
+        mesa = np.array(b.mesa_piece())
+        isle = np.array(b.island("mesa"))
+        ox, oy = b.MESA_ON_ISLE
+        last = mesa.shape[0] - 1
+        feet = np.nonzero(mesa[last, :, 3])[0]
+        self.assertGreater(len(feet), 100)
+        for c in feet:
+            ix, iy = c + ox, last + oy
+            self.assertTrue(0 <= ix < isle.shape[1] and 0 <= iy < isle.shape[0] and isle[iy, ix, 3] > 0,
+                            "mesa column %d ends in front of the sea" % c)
+
+    def test_the_coral_stacks_have_no_cut_flank(self):
+        """the coral group behind 7's isle is cut out of a wider rock group: its left flank slopes down to the foam
+        (no rock in the cut column, the rock top falling at most 2 rows per column towards it)"""
+        import build_far_shore as b
+        piece = np.array(b.slope_left(b.rocks("coast", True).crop((b.COAST_CUT, 0, 214, 52)), b.COAST_SLOPE,
+                                      *b.COAST_ROCK_ROWS))
+        rock = hexrgb(b.ROCK_SKINS["coast"][b.I_GREY])
+        is_rock = np.all(piece[..., :3] == rock, axis=-1) & (piece[..., 3] > 0)
+        self.assertFalse(is_rock[:, 0].any())
+        tops = [int(np.nonzero(is_rock[:, c])[0].min()) for c in range(1, b.COAST_SLOPE + 1)
+                if is_rock[:, c].any()]
+        self.assertGreater(len(tops), b.COAST_SLOPE - 2)
+        for t0, t1 in zip(tops, tops[1:]):
+            self.assertTrue(0 <= t0 - t1 <= 2, tops)
+
 
 # ---------------------------------------------------------------------------------------------------- paintings
 PIGMENTS = {hexrgb(h) for h in ("#b64e13", "#793a15", "#3f2a1c", "#fef8e8", "#c98a2b", "#8c5a1c")}
@@ -337,6 +371,18 @@ class FeastSkins(unittest.TestCase):
 
 # ---------------------------------------------------------------------------------------------------- world objects
 class WorldObjects(unittest.TestCase):
+    def test_a_file_built_from_another_2_0_file_credits_its_packs(self):
+        """origin packs resolve through other 2.0 files too (build_expansion.pack_uses), so CREDITS / THIRD_PARTY
+        are checked against every pack a picture really comes from"""
+        for child, parents in (("sprites/objects/drum_cap.png", ("sprites/objects/drum.png",
+                                                                 "tiles/swamp/props/glowcap_big.png")),
+                               ("sprites/objects/platform_driftwood.png", ("tiles/coast/props/driftwood_log.png",)),
+                               ("ui/world_map_far_shore.png", ("backgrounds/canyon/layer2_mesas.png",
+                                                               "backgrounds/canyon/layer1_far_spires.png"))):
+            got = set(ROWS["assets/" + child]["origin_packs"])
+            for p in parents:
+                self.assertLessEqual(set(ROWS["assets/" + p]["origin_packs"]) - {"own"}, got, (child, p))
+
     def test_platform_skins_have_the_platform_layout(self):
         wood = img("assets/sprites/objects/platform_wood.png")
         for n in ("platform_cloud", "platform_driftwood"):
@@ -400,6 +446,49 @@ class ManifestPhase2(unittest.TestCase):
                     "ui/medals.png", "ui/sundial.png", "tiles/feast/terrain_honeycomb.png",
                     "sprites/objects/drum_cap.png"):
             self.assertIn("`%s`" % rel, text)
+
+    def test_third_party_names_only_shipped_files(self):
+        """docs/THIRD_PARTY.md 2.3 / 2.4 are kept by hand: every file they name (braces expanded, a short path matched
+        as the tail of a shipped path) exists under assets/ - a withdrawn file must leave the lists"""
+        import fnmatch
+        shipped = []
+        for root, _, files in os.walk(ASSETS):
+            for f in files:
+                if not f.endswith(".import"):
+                    shipped.append(os.path.relpath(os.path.join(root, f), ASSETS).replace(os.sep, "/"))
+
+        def expand(p):
+            m = re.search(r"\{([^}]*)\}", p)
+            if not m:
+                return [p]
+            return [q for alt in m.group(1).split(",") for q in expand(p[:m.start()] + alt + p[m.end():])]
+        with open(os.path.join(ROOT, "docs", "THIRD_PARTY.md"), encoding="utf-8") as f:
+            text = f.read()
+        lists = text[text.index("### 2.3"):text.index("### 2.5")]
+        named = [q for tok in re.findall(r"`([^`]+)`", lists) if re.search(r"\.(png|ogg|wav)$|\*$", tok)
+                 for q in expand(tok)]
+        self.assertGreater(len(named), 60)
+        for q in named:
+            self.assertTrue(any(fnmatch.fnmatch(s, q) or fnmatch.fnmatch(s, "*/" + q) for s in shipped),
+                            "THIRD_PARTY names %s, which does not ship" % q)
+
+    def test_every_audio_batch_keeps_its_decisions_in_the_manifest(self):
+        """the audio owner's batch notes live in the unversioned staging folder: the manifest (17.12) carries the
+        music budget and the decisions and flags of every batch"""
+        with open(os.path.join(ROOT, "docs", "ASSET_MANIFEST.md"), encoding="utf-8") as f:
+            text = f.read()
+        a, b = text.index("### 17.12 Audio"), text.index("### 17.13 The Far Shore")
+        sec = text[a:b]
+        import glob
+        docs = sorted(glob.glob(os.path.join(HANDOVER, "audio", "AUDIO_BATCH*.md")))
+        if not docs:
+            self.skipTest("no audio hand-over in this checkout (.tools/ is not versioned)")
+        for path in docs:
+            with open(path, encoding="utf-8") as f:
+                lines = f.read().splitlines()
+            self.assertIn("*%s*" % lines[0].lstrip("# ").strip(), sec, path)
+            first = next(ln for ln in lines[lines.index("## Decisions and flags") + 1:] if ln.strip())
+            self.assertIn(first, sec, path)
 
 
 if __name__ == "__main__":

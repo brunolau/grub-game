@@ -649,6 +649,73 @@ func test_brace_wall_stops_a_heavy_and_a_lone_croucher_is_hurt() -> void:
 	assert_true(p1.hit_timer > 0, "a lone croucher is trampled")
 
 
+## Helper mode (DESIGN.md D.3, PHYSICS.md C.12; Game.helper_mode, copied by Flow at a co-op run's start): P2 is never
+## hurt by an enemy's contact, an enemy projectile or a boss body; P1 is; a skull trap and a kill (pit, liquid) still
+## act on P2; without the mode, and in versus, P2 is hurt as usual.
+func test_helper_mode_shields_p2_from_enemies() -> void:
+	party(Defs.GameMode.COOP)
+	Game.helper_mode = true
+	assert_true(p2.is_helper(), "P2 of a co-op run with Helper mode on")
+	assert_false(p1.is_helper(), "never P1")
+	var hearts: int = p2.run.hearts
+	for kind: int in [Defs.HurtKind.ENEMY, Defs.HurtKind.BOSS_BODY, Defs.HurtKind.BOSS_PROJECTILE]:
+		assert_false(p2.hurt(null, kind), "kind %d ignored" % kind)
+	assert_eq(p2.run.hearts, hearts, "no heart lost")
+	assert_eq(p2.hit_timer, 0, "no hurt timer")
+	assert_eq(p2.yvel, 0, "no knock-back")
+	# An enemy walking into both heroes: P2 walks on unharmed, P1 is hurt.
+	var enemy: EnemyBase = EnemyBase.new()
+	place(Game.level, enemy, p2.sim_pos)
+	enemy.wake()
+	play_party([[3, "|"]])
+	assert_eq(p2.hit_timer, 0, "an enemy's contact never hurts the helper")
+	assert_eq(p2.run.hearts, hearts)
+	var p1_hearts: int = p1.run.hearts
+	assert_true(p1.hurt(enemy, Defs.HurtKind.ENEMY), "P1 is hurt as usual")
+	assert_eq(p1.run.hearts, p1_hearts - 1)
+	# A skull trap (an item, not an enemy) and a pit still act.
+	assert_true(p2.hurt(null, Defs.HurtKind.TRAP), "the skull trap still scatters his energy")
+	p2.hit_timer = 0
+	p2.kill(&"pit")
+	assert_true(p2.dead, "a pit still takes him (the egg follows the toss)")
+	# Off (the default of every route): P2 is hurt.
+	party(Defs.GameMode.COOP)
+	assert_false(Game.helper_mode, "a run starts with Helper mode off")
+	assert_false(p2.is_helper())
+	assert_true(p2.hurt(null, Defs.HurtKind.ENEMY))
+	# Versus: no helper, whatever the flag says.
+	party(Defs.GameMode.VERSUS)
+	Game.helper_mode = true
+	assert_false(p2.is_helper(), "versus has no Helper mode")
+
+
+## The lee (DESIGN.md 3-1b "lee leapfrog"; world-A's PartyDriver writes LevelBase.lee_mask, the stand-in driver here
+## does not, so the test sets it): the hero's WIND step reads LevelBase.wind_for(self) - a sheltered hero feels no
+## wind, the others the level's. A jump from the lee goes as far as with no wind at all.
+func test_a_hero_in_the_lee_feels_no_wind() -> void:
+	var jumps: Array[Vector2i] = []
+	for setup: int in 3:  # 0 calm, 1 wind with P2 in the lee, 2 wind without a lee
+		party(Defs.GameMode.COOP)
+		driver.fence = false
+		var level_now: LevelBase = Game.level
+		if setup > 0:
+			level_now.set_wind(160)  # 20 v16 per WIND step: more than the braking (12), a standing hero drifts
+		if setup == 1:
+			level_now.lee_mask = 1 << p2.slot
+		var p1_x: int = p1.sim_pos.x
+		play_party([[12, "|"]])
+		if setup == 1:
+			assert_eq(p2.sim_pos.x, P2_START.x, "P2 stands in the lee: the wind does not move him")
+			assert_true(p1.sim_pos.x < p1_x, "P1 out of the lee is pushed back")
+		elif setup == 2:
+			assert_true(p2.sim_pos.x < P2_START.x, "without the lee the wind pushes P2 back")
+		var from: Vector2i = p2.sim_pos
+		play_party([[24, "|UR"]])
+		jumps.append(p2.sim_pos - from)
+	assert_eq(jumps[1], jumps[0], "a jump in the lee flies as in calm air")
+	assert_true(jumps[2].x < jumps[0].x, "the same jump in the wind falls short")
+
+
 func test_a_double_tap_of_look_shows_an_emote() -> void:
 	party(Defs.GameMode.COOP)
 	var seen: Array[int] = []
@@ -667,6 +734,16 @@ func test_a_double_tap_of_look_shows_an_emote() -> void:
 	assert_false(bubble.visible, "gone after 2 s")
 	play_party([[1, "K|"], [HeroParty.EMOTE_DOUBLE_TAP_TICKS + 2, "|"], [1, "K|"]])
 	assert_eq(seen.size(), 2, "two presses far apart are no double tap")
+	# Look held is no press: only its edge counts (the previous flags are read on the ticks Look or Swap is held).
+	play_party([[HeroParty.EMOTE_DOUBLE_TAP_TICKS + 2, "|"], [1, "K|"], [3, "|"], [6, "K|"]])
+	assert_eq(seen.size(), 3, "a double tap, then Look held: one emote")
+	play_party([[HeroParty.EMOTE_DOUBLE_TAP_TICKS + 2, "|"]])
+	# An egg's controls are off; his bubble still reads his slot's own keys.
+	p1.go_down(&"voluntary")
+	assert_false(p1.control_enabled)
+	play_party([[1, "K|"], [3, "|"], [1, "KD|"]])
+	assert_eq(seen.size(), 4, "an egg emotes too")
+	assert_eq(seen.back(), HeroParty.Emote.QUESTION, "Down on the second tap: '?'")
 
 
 func test_curl_ball_and_egg_poses() -> void:

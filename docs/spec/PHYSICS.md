@@ -1260,7 +1260,8 @@ building in `docs/LEVEL_DESIGN.md` 15. Every number below was re-derived with th
 writes **`docs/spec/PARTY_REFERENCE.json`**: phase-1 tests load that file (mount jump table, Batter Up flights,
 Shoulder Hop and Totem Ride heights, tar hop, vine leap, see-saw launches, versus knock-backs) instead of copying
 numbers. Where DESIGN.md had to be resolved, the resolution is listed in DESIGN.md "Appendix: P0.2 spec
-resolutions" (marked **[Rn]** below).
+resolutions" (marked **[Rn]** below); what gate G1 and phase 2 resolved is in DESIGN.md "Appendix: G1 and phase-2
+resolutions" (marked **[Gn]**).
 
 ### C.0 Ground rules
 
@@ -1354,25 +1355,32 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
 `objects/vine length=<cells> rolled=<bool>` hangs from the top edge of its cell: `vine_x` = cell centre,
 `top` = cell top, `bottom = top + 16 * length`.
 
-- **Grab** (tested in the hero update before the state table, after override 2 of 4.3): UP held; `hit_timer < 22`;
+- **Grab** (tested in the hero update before the state table, after override 2 of 4.3): UP held **without DOWN**
+  (DOWN + UP is the "let go / get off" chord everywhere: vine drop, dismount, Totem drop) [G8]; `hit_timer < 22`;
   `attack_gate` clear; not carrying the glider, curled, a ball, riding, mounted or an egg; this vine's re-grab lock is
   0; the vine is unrolled; `|x - vine_x| <= 6`; `y > top` and `y - 32 <= bottom` (his hands reach it). Then `x = vine_x`,
   `xvel = yvel = 0`, `jump_ticks = fall_ticks = 0`, `on_platform = false`, state **CLIMB** (outside the 4.3 table).
-  Holding UP while jumping past a vine therefore grabs it; on the ground UP next to a vine climbs instead of jumping.
+  The grab tick only attaches (no 2 px climb on it). Holding UP while jumping past a vine therefore grabs it; on the
+  ground UP next to a vine climbs instead of jumping.
+- **Held by the vine**: while a hero hangs or climbs up, no sprite platform (raft, spear step, lift, drop cloud,
+  see-saw end) catches him - the vine is his carrier for the next tick (`carried_on_tick`); climbing down into one
+  lands on it like climbing down onto a floor. So a vine is climbed from a raft, a spear step or a lift [G8].
 - **CLIMB handler** (replaces handler, integration and the airborne step; no gravity, no WIND, no shake nudge; timers
   of 8i run). Flags decide, first match:
 
 | Flags | Effect |
 |---|---|
 | (LEFT or RIGHT) + UP | **leap off**: facing that way, `launch(+/-32, -128)`; re-grab lock 12 *(tune)* |
-| DOWN + UP | **drop**: leave CLIMB with `yvel = 0` (falls from the next tick); re-grab lock 12 |
+| DOWN + UP | **drop**: leave CLIMB with `yvel = 0` (falls from the next tick); re-grab lock 12; `no_jump = 6` (as a fall) |
 | UP | climb: `y -= 2`; refused if the head probe of the new y (`col, row - 2`) is a ceiling; at `y - 2 <= top`: top step |
-| DOWN | `y += 3`; a floor (FLOOR 1-5) at the new feet tile: land on it (soft-landing bookkeeping, state idle); `y > bottom + 16`: leave CLIMB (falls) |
+| DOWN | `y += 3`; a floor (FLOOR 1-5) at the new feet tile: land on it (soft-landing bookkeeping, state idle); `y > bottom + 16`: leave CLIMB (falls, `no_jump = 6`) |
 | LEFT or RIGHT alone | turn only |
 | nothing, FIRE, LOOK | hang (no strikes on a vine, the glider rule) |
 
 - **Top step**: with `d` = facing, then `-facing`: if `FLOOR(col + d, top >> 4)` is a floor, `x += 12 * d`, `y = top`,
-  grounded idle; with no ledge either side the hero hangs at `y = top + 1`.
+  grounded idle, and it is a landing: `no_jump = 6` (UP, still held from climbing, does not jump off the ledge on the
+  next tick) [G8]; with no ledge either side the hero hangs at `y = top + 1`. Leaving CLIMB by a drop or below
+  `bottom + 16` arms `no_jump = 6` like a fall (releasing DOWN with UP held never starts a jump in mid-air).
 - A hurt (10.1) ends CLIMB (the normal knock-back). Enemies do not climb.
 - Animation: climb frames 44-47, one per 4 px climbed.
 - **Leap** (JSON `vine_leap`): `-128` rises 36 px; with UP still held (the idle handler runs, `no_jump` armed) the hero
@@ -1385,8 +1393,11 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
 
 - Tile `:` = set-A ground (floor, wall, ceiling as `#`) with HEIGHT 6 (a lowered flat surface, 11.1) and the TAR
   flag in `TileGrid`. Walking out of tar onto level ground is the normal snap up of 11.2 (6 px).
-- A hero is **on tar** from a grounded tick whose feet tile is `:` until his next landing anywhere (a hop taken from
-  tar stays a tar hop):
+- A hero is **on tar** from a grounded tick whose feet tile is `:` until his next landing anywhere (a platform, a
+  mount's saddle and a vine count), or until something other than his own hop throws him up - a launch (geyser,
+  see-saw, dismount, Batter Up, hatch), a bounce off an enemy, a head or a spring, a pogo, a hurt [G8]. Only a hop
+  taken from tar, or a fall off a tar ledge, stays under the tar rules. The rules below are the hero's own handlers
+  with three limits (`walk_cap` / `air_cap` 32, `jump_impulse_ticks` 2, never above a versus weight or ember cap):
   - walk handler: `ACCEL(32)` instead of `ACCEL(80)` (2 px/tick; crawling is 32 anyway);
   - jump handler: impulses only while `n < 2` (-65, -51, then 0 for n = 2..8) [R2] *(tune)*: apex **33 px** with UP
     held, landing on tick 17 on a flat floor - **tick 16 (32 px right / 32 px left) on the tar itself**: on tick 16
@@ -1412,18 +1423,38 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
   launched by this spout, is launched: heroes `launch(-, power)` (xvel unchanged), enemies `yvel = power`, rafts as
   C.7, drop platforms `yvel = power` and then their dropper fall (+8 v16/tick, cap 192) back onto a floor, after which
   their 1.0 dropper cycle continues *(tune: objects-B test)*. -224 rises **105 px** (apex tick 14, back on tick 30).
-  Gliding heroes and eggs ignore geysers.
+  Gliding heroes and eggs ignore geysers. A geyser placed on the top edge of a tar floor `:` settles onto the lowered
+  surface (6 px down), so it launches a wading hero, and the launch ends the tar rules (C.5): a geyser is the way out
+  of a tar pit, with full air control [G8].
 - `deadly` (a vent of tar or lava): the spout is a deadly box 24 x 64 above the vent *(tune)* (death, or an egg in
   co-op) instead of a launch. An `objects/boulder_heavy` resting on any geyser plugs it: no spout at all [R3].
 - **Alternating gusts** reuse the wind of 13.1 with negative values for a rightward wind: `WIND` stays
   `xvel -= shr(wind, 3)` (so `wind = -24` adds 3 v16 per call) with the 1.0 leftward floor; no other change is needed
   because every handler that runs `WIND` is followed by an `ACCEL` clamp or `FRICTION`. Crouch and crawl stay immune.
   The `wind` script may now hold negative values and repeat: meta `wind_loop = <ticks>` restarts it every that many
-  ticks [R4]. Bosses (the Storm Roc) set `level.wind` themselves.
-- **Lightning** `zones/lightning period=<ticks> [delay] [mark=22]`: while a hero is inside the rectangle, every
-  `period` ticks the column of the targeted hero's feet is marked by a darkening cloud; **22 ticks** later a bolt fills
+  ticks [R4] (entry ticks count from the start of each round). Bosses (the Storm Roc) set `level.wind` themselves.
+  Outside the ice biome the wind shows as gust streaks instead of snow.
+- **Lee** (co-op only) [G23]: in `WEAPONS`, before any hero moves, a hero of `H` (C.13) is **sheltered** on this tick
+  when his feet are 0..64 px downwind of the feet of a partner of `H` who is in the crouch state (5, not crawl) with
+  ground or a platform under him (downwind = to the croucher's left while `wind > 0`, to his right while `wind < 0`),
+  at most 16 px above or below them; a hero sheltered on the previous tick stays sheltered while airborne until he has
+  ground, a platform or a carrier under his feet again, or the wind changes sign (a jump taken in the lee crosses the
+  gap in it). A sheltered hero's `WIND` primitive sees wind 0. 64 / 16 px *(tune)*: the second hero waits at the near
+  edge in the lee of the first, who crouches just past the far edge, so gaps of up to 3 tiles leapfrog both ways
+  ("lee leapfrog", 3-1b and 9-2 co-op). No wind, a completed level or one hero of `H`: nobody is sheltered. The hero
+  reads the wind per hero (`LevelBase.wind_for(hero)`: 0 in a lee, else the level's wind) in every `WIND` step of
+  5.1 (idle, walk, hurt, both of the jump, the glider take-off).
+- **Lightning** `zones/lightning period=<ticks> [delay] [mark=22]` (`period` default 66): the strike clock counts the
+  ticks a hero is inside the rectangle (from `-delay` when the first one enters); every `period` ticks the column of
+  the targeted hero's feet is marked by a darkening cloud - the target alternates between the heroes inside (slot
+  order, the zone-spawner rule of GAMEPLAY 13.9.4); eggs are never targets nor struck; **22 ticks** later a bolt fills
   that 16 px column inside the rectangle for 4 ticks *(tune)*; a hero touching it is hurt as by an enemy contact (10.1:
-  a glider is lost instead of a heart). Struck one-way cells of `skin=nest` burn 66 ticks (the Storm Roc) [R5].
+  a glider is lost instead of a heart). A marked strike runs to its end even when everybody left; a level reset clears
+  the sky. Struck one-way cells of `skin=nest` burn 66 ticks (the Storm Roc) [R5].
+- **Food rain** `zones/food_rain rect= period= [skin=food|fruit]` [R5]: the ember-rain zone of 4-1 dropping
+  `items/food` with dropped-item physics, 150 px over a hero inside and up to 64 px aside, one stream per hero inside;
+  `skin=food` a food cell of the level's bonus tier, `fruit` the fruit cells of the food sheet, picked by a fixed hash
+  (no `Sim.rng` draw); it never hurts.
 
 ### C.7 Rafts and currents
 
@@ -1497,6 +1528,8 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
   Bosses ignore bites.
 - **Mounting**: a hero (not hurt, `yvel >= 0`, not gliding, remount lock 0) whose stomp test (2.2, the hero against
   the mount box) succeeds on a tame, present mount sits down: driver if the seat is free, else gunner (co-op);
+  "not hurt" is `hit_timer < 22` in the campaign and the versus stun (`hit_timer >= 31`, C.14) in an arena, so a
+  hero in his 30 immune ticks may sit on Chomper there [G20];
   `yvel = 0`, state RIDING. **Dismount**: DOWN + UP: `launch(0, -128)` from the seat; remount lock 22.
 - **Riders**: the driver's own handlers do not run (his flags drive the mount); the gunner cannot move, runs the
   strike handler from the seat with his own hand weapon (LEFT/RIGHT turn him; strike hop skipped as on a platform)
@@ -1523,19 +1556,29 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
   with `yvel >= 0`, not gliding, climbing, curled, a ball, an egg, mounted, already riding, nor in a drop lock, and
   each other hatched hero B in slot order: if `Overlap.body(A, B, A)` and `Overlap.stomp` (2.2: B is the lower
   object, so the stomp flag means A's feet are in the top half of B's box, or A falls at 8 px/tick or more), then
-  **Shoulder Hop** if A holds UP, else **Totem Ride**. At most one head contact per hero per tick.
+  **Shoulder Hop** if A holds UP and B is **active**, else **Totem Ride**; if A holds UP and B is not active there is
+  no head contact at all (A passes through, as heroes do) [G1]. No Totem Ride on a curled or a mounted B (the hop
+  still works on a curled one) [G7]. At most one head contact per hero per tick.
+- **Active**: a hatched hero is active once his own slot held any input flag on a tick since he last became hatched
+  (the level start, a team-wipe respawn, a hatch by a box, a stomp or a checkpoint); going down (an egg, a death toss)
+  clears it (`PartyDriver.is_active`). An idle partner is thus passed through with UP held and carries a Totem Ride
+  without: from a still carrier that reaches 98 px, below every boost ledge, and a Totem launch needs the carrier's own
+  jump, which makes him active. Together with the hatch bounce of C.12 (b) this is the rule **an egg is no
+  springboard**: one player can never use his partner's egg or idle body as a step.
 - **Shoulder Hop**: `A.bounce(-224, depth)` - exactly the enemy bounce of section 9 (`yvel = -224`,
-  `fall_ticks = 0`, `y -= depth`; A's `no_jump` stays armed); B is unaffected; any state of B counts, airborne too
-  ("as on an enemy"). From a standing partner A rises 105 px from the head and his feet reach **140 px** over the
-  floor (8.75 tiles): at or above 112 px (7 tiles) for 16 ticks, at or above 128 px (8 tiles) for 10 ticks (JSON
-  `shoulder_hop`).
+  `fall_ticks = 0`, `y -= depth`; A's `no_jump` stays armed); B is unaffected; any state of an active B counts,
+  airborne too ("as on an enemy"). From a standing partner A rises 105 px from the head and his feet reach **140 px**
+  over the floor (8.75 tiles): at or above 112 px (7 tiles) for 16 ticks, at or above 128 px (8 tiles) for 10 ticks
+  (JSON `shoulder_hop`).
 - **Totem Ride** (rider R on carrier K):
   - **Start**: R is placed with `y = K.y - 34` (K's 32 x 35 riding box, rest 1 px inside it, 11.4), `yvel = 0`,
     `on_platform = true`, grounded bookkeeping (`no_jump - 1`, `jump_ticks = 0`, `last_ground_y`).
   - **Carry** (`PartyDriver` step a, before new contacts, every tick): `dx, dy` = K's motion this tick (`sim_pos -
-    sim_prev`). The ride ends if R jumped (`R.yvel < -16`), dropped, was hurt, or `|R.x + dx - K.x| > 16`. Otherwise
-    `R.x += dx` (x bounds and edge walls only), `R.y = K.y - 34`, `R.yvel = dy * 16`, `on_platform = true`, grounded
-    bookkeeping. **Scrape**: if after the carry R's wall-probe cell (`R.x +/- 9`, `row - 1`) is SIDE 1 or his head
+    sim_prev`). The ride ends if R jumped (`R.yvel - totem_carry_yvel < -16`, his speed measured against the
+    `dy * 16` the last carry gave him, so a carrier rising 2-3 px/tick in his halved hop keeps his rider and the
+    Totem launch of [R6] happens) [G7], dropped, was hurt, or `|R.x + dx - K.x| > 16`. Otherwise
+    `R.x += dx` (x bounds and edge walls only), `R.y = K.y - 34`, `R.yvel = dy * 16` (= `totem_carry_yvel`),
+    `on_platform = true`, grounded bookkeeping. **Scrape**: if after the carry R's wall-probe cell (`R.x +/- 9`, `row - 1`) is SIDE 1 or his head
     probe (`col, row - 2`) is a ceiling, `R.x -= dx` and the ride ends (he falls off).
   - **R's own update** runs with `on_platform` set (no gravity, 11.2 #6): he walks on the head, strikes (strike hop
     skipped), jumps with the normal jump handler - on a rising carrier the jump starts from `yvel = dy * 16`, the
@@ -1573,8 +1616,9 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
 - **Ball flight** (the ball's own `PLAYER` update; inputs ignored): `x += floor16(xvel)` (commit rule and edge walls;
   an edge wall only zeroes `xvel`), `y += floor16(yvel)`; tile collision with the hero's probes; airborne: gravity
   only (no `ACCEL`, `FRICTION` or `WIND`); a ceiling bump zeroes `yvel`. A SIDE-1 wall probe: `xvel = 0` and it
-  uncurls (falls as a hero). **Landing** (line drive, lob): it uncurls with the soft-landing bookkeeping and
-  `no_jump = 6` (the landing lock-out). **Grounder**: on the floor `xvel` stays +/-96 (no friction) for 32 ticks; off a
+  uncurls (falls as a hero). **Landing** (line drive, lob): it uncurls with the soft-landing bookkeeping,
+  `no_jump = 6` (the landing lock-out) and `xvel = 0` - the ball stops where it lands, so the 153 px of a line drive
+  are where the hero stands, not where a 9 px/tick slide begins [G7]. **Grounder**: on the floor `xvel` stays +/-96 (no friction) for 32 ticks; off a
   ledge it falls and rolls on where it lands; it uncurls after the 32 ticks or at a wall. Deadly tiles, liquids and
   pits act as on the hero.
 - **Ball contacts** (the ball box): an enemy with `hp < 50` takes 25 (`Defs.hitter_slot` = the batter), each enemy
@@ -1590,9 +1634,9 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
   range, the rising band, an auto-scroll edge) plays the death toss (10.4 #1-2: 60 ticks, input ignored) and then
   becomes an **egg** at the point where the toss started, clamped into the view (16 px inset). The leash (C.13) and
   the voluntary egg make an egg at once, with no toss. A down never costs a life and never resets anything.
-  *As built at G1:* "out of range" counts rows only while no other hero of `H` is in the level; while a partner of
-  the tribe holds the view, a hero above or below the camera rows is the leash's case (C.13), and the pit rule (below
-  the map) still downs him.
+  "Out of range" counts rows only while no other hero of `H` is in the level; while a partner of the tribe holds the
+  view, a hero above or below the camera rows is the leash's case (C.13), and the pit rule (below the map) still downs
+  him [G13].
 - **Egg**: box 24 x 24, `x_offset` 12 *(tune)*. No tile collision; it touches no enemy, item, plate, zone, hazard,
   gate or exit; `target_hero()` skips it; it is no hero rectangle for dozing and never moves the camera. Drift
   (`POST`, `PartyDriver`): target point `T` = partner feet + (`-24 * partner.facing`, -48); per axis it steps towards
@@ -1601,14 +1645,20 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
   active checkpoint (the start point if none) at 6 px/tick per axis, unclamped, and waits there.
 - **Hatch**: (a) `WEAPONS` phase: a partner's club box (any frame) or projectile overlapping the egg (weapon test)
   hatches it and is consumed; (b) `PLAYER` phase head contact: a partner falling onto the egg with the stomp flag
-  bounces (-224 with UP, else -64) and hatches it; (c) any hero touching a checkpoint hatches every egg in place.
+  bounces **-64** (`Tuning.BOUNCE_YVEL`, the enemy bounce without UP: a 10 px rise, apex tick 4) **whether UP is held
+  or not**, and hatches it - **an egg is no springboard** [G1]; (c) any hero touching a checkpoint hatches every egg
+  in place.
 - **Hatched**: feet at the egg's bottom centre, `launch(0, -64)`; hearts **2** (Beginner) / **1** (Expert), bones 0;
   `shield = 44` (a new hero timer: blinking, enemy contact skipped while it is above 0, full control; it counts down
   in `POST`; `hit_timer` stays 0). His own "since last death" tally list is cleared (GAMEPLAY 3.4).
 - **Voluntary egg**: DOWN + LOOK held together for 24 consecutive ticks while grounded and the partner is hatched:
   an egg at once.
-- **Helper mode** (Options, P2 only): enemy contacts, enemy projectiles and boss bodies never hurt P2 (his stomps
-  still bounce); deadly tiles, pits, liquids, the band and the auto-scroll edge still make him an egg.
+- **Helper mode** (Options, P2 only; slot 1 of a co-op run with `Game.helper_mode`, copied from Options > Co-op at the
+  run start; never in single-player, versus or a route): enemy contacts, enemy projectiles and boss bodies never hurt
+  P2 - any hurt of kind enemy, boss body or boss projectile is ignored (no heart, bone, knock-back or hurt timer;
+  this includes hazards that hurt as enemies, such as a lightning bolt); grabs, squeezes and drains skip him; his
+  stomps still bounce. The skull trap, deadly tiles, pits, liquids, crushes, the band, the auto-scroll edge and the
+  leash still act on him (an egg).
 - **Team wipe**: on the tick a hero goes down while every other hero is down, an egg or dead (or both in one tick):
   the last toss plays out (60 ticks), then exactly 10.4 #3 - the curtain, one life from the tribe pool (game over when
   none is left), the level state reset (enemies, platforms, columns, plates, drums, mounts, bosses), every hero
@@ -1632,9 +1682,16 @@ hero; with `|H| = 0` it holds still. With two heroes:
   device; a refused step keeps x (and `xvel`, like the commit rule).
 - **Vertical**: 12.2 runs on one **anchor** hero: the hero in `H` with the latest tick on which he had ground, a
   platform or a carrier under his feet (ties: lower slot); a hero standing still on the ground in the look-around
-  pose (12.3) is the anchor. A jumping or falling hero never drags the view while his partner stands. *As built at
-  G1:* an anchor farther than the 12.2 curve's 131 px (only possible with two heroes, e.g. on an 8-row boost ledge)
-  is followed at the curve's last speed (16 px/tick) instead of not at all.
+  pose (12.3) is the anchor. A jumping or falling hero never drags the view while his partner stands. An anchor
+  farther than the 12.2 curve's 131 px (only possible with two heroes, e.g. on an 8-row boost ledge) is followed at
+  the curve's last speed (16 px/tick) instead of not at all [G13].
+- **Standing window** [G13]: then, while two or more heroes of `H` have ground, a platform or a carrier under their
+  feet (a hero in CLIMB counts: he holds his place) and one view can hold them all whole - their feet at most 9 rows
+  apart: the top of the view in `[lowest feet - 176, highest feet - 32]` - the view never leaves that window: an
+  anchor's step that would push a standing partner off stops at its edge, and a view outside it moves towards it by
+  the 12.2 step of the distance (at most 16 px per tick). Not on auto-scroll. So a hero on an 8-row boost ledge with
+  his partner standing below is brought onto the view and never leashed; higher than 9 rows, the leash asks the
+  partner to follow.
 - **Look-around** (12.3) by the anchor: a panning step that would put the other hero of `H` at `sc < 1` or
   `sc > 18` is refused.
 - **Leash**: a hero of `H` whose feet point is outside the authentic view rectangle (20 x 11 cells at the camera
@@ -1657,10 +1714,11 @@ hero; with `|H| = 0` it holds still. With two heroes:
 | Hurt timing | `hit_timer = 43`, stunned (state 8) while `hit_timer >= 31`: **12 stunned ticks**, then **30 immune ticks** with control; hittable again 43 ticks after the hit. The immunity ends at once when the victim starts a strike or a throw |
 | Hit-stop | attacker and victim skip their `PLAYER` phase for 2 ticks (4 on a charged hit or the round's deciding hit); every other entity and the round clock run on |
 | Deflect | a rival's thrown special overlapping a **front** box reverses: `xvel = -xvel` plus 32 in the new direction (2 px/tick faster), owner = the striker; the box is consumed |
-| Stomp | A lands on rival B with the stomp flag (2.2), B neither immune nor shielded nor curled: A bounces as on an enemy (-224 with UP, else -64); B is **squashed 8 ticks** (UP and FIRE ignored, walking allowed), then immune 30 ticks; B pays the ladder value of A's stomp chain (paying stomps since A's last grounded tick: 1, 2, 3, 4, 6, 8, then 8). An immune or shielded head is a free springboard (bounce, nothing else); so is a teammate's |
+| Stomp | A lands on rival B with the stomp flag (2.2), B neither immune nor shielded nor curled: A bounces as on an enemy (-224 with UP, else -64); B is **squashed 8 ticks** (UP and FIRE ignored, walking allowed), then immune 30 ticks; B pays the ladder value of A's stomp chain (paying stomps since A's last grounded tick: 1, 2, 3, 4, 6, 8, then 8). An immune or shielded head is a free springboard (bounce, nothing else); so is a teammate's. **A stomp is a landing** [G15]: A had no ground, platform or carrier under his feet at the end of the previous tick - a hero standing on a one-way tier does not stomp a head that rises into his feet (a rival pogoing under a bridge 3 rows up); the two only bump |
 | Curl | a curled hero: stomps bounce the stomper with no effect; boxes from above (the attacker's feet 16+ px above his) glance; front boxes from the side bat him (C.11), costing him nothing by themselves |
 | Body bump | `PartyDriver` step c: two rivals whose body boxes overlap (body test, no stomp flag) each move 1 px apart per tick (commit rule); if both move towards each other at `abs(xvel) >= 64`, both get `xvel = +/-64` apart and `yvel = -64` (a 10 px hop), no damage, no stun *(tune)* |
-| Thrown specials | collide with tiles: a projectile whose point enters a SIDE-1 or floor cell stops and lies there as a temporary pick-up (`items/weapon temp=true`); spears still stick in bark boards (steps for anyone). Wrap arenas: a special crossing the wrap edge wraps once and vanishes 40 ticks later |
+| Thrown specials | collide with tiles: a projectile (spear, axe, swirling axe) whose point enters a SIDE-1 or floor cell stops and lies there as a temporary pick-up (`items/weapon temp=true`): on the top of the cell it entered when the cell above is open (a floor, a wall's top row), else in the open cell in front of the wall's face, from where it drops to the floor - never inside a wall; a special thrown by a hero pressed against a wall drops at his feet [G17]. Spears still stick in bark boards (steps for anyone). Wrap arenas: a special crossing the wrap edge wraps once and vanishes 40 ticks later |
+| Coconut (Clubball) | `objects/coconut`, box 16 x 16, feet point at the bottom centre. Per tick (`ITEMS`): roll loss first (`abs(xvel)` falls by 2 when `yvel == 0` and it rests on a floor), the x step (a SIDE-1 cell or the level edge stops it flush and reflects `xvel` with `-(xvel * 3) >> 2`), the y step (a ceiling reflects at 3/4; landing: `yvel >= 32` bounces `-(yvel * 3) >> 2`, else it rests; `^` counts as a floor; `~` loses it), then gravity +16 (cap 192) whenever it did not land **or it bounced** - the bounce tick runs gravity too, so the bounces die within six [G19]; every component clamped to +/-288. Shots (`WEAPONS`, before the heroes): only **front** frames shoot; every front box on it in one tick adds up (opposite drives cancel); one shot per swing per hero (front boxes on consecutive ticks are one swing); the rally adds 16 to `abs(xvel)` per shot by anyone within 44 ticks of the last, up to 192 (a faster shot keeps its own speed); its striker is not knocked down by it for 8 ticks. Heads (`CONTACT_ITEMS`): a ball faster than 128 v16 on either axis knocks the hero down (versus hurt, 12 stunned ticks, then no immunity) and rebounds at half speed; a ball coming down on a head that it does not knock down (a slower ball, or an immune or shielded hero) bounces at 3/4, at least -96; otherwise a slow ball passes through bodies. A curled hero flying as a ball passes his `xvel` / `yvel` to the coconut once per flight |
 | Temporary specials | from crates, straight onto the belt; lost on a knock-out, after 3 axe / 2 swirling-axe / 3 spear throws, or at the round end; the hammer only on a knock-out or the round end |
 | Spawn shield | 48 ticks after every (re)spawn: no PvP hit, stomp or arena hazard box touches him (pits, liquids and the round's sudden death still do); it ends at once when he starts a strike or a throw |
 | Weight (Grub Stack) | stack of 10+ units: the `ACCEL` limit of the walk handler and of the airborne step is 64; 20+: 48, and every jump impulse is `(impulse * 3) >> 2`: -49, -39, -27, -15, -8, -4, -2, -1, 0 (apex 38 px instead of 60) *(tune)* |
@@ -1697,16 +1755,17 @@ Owner of each table: `Tuning` (core: hero and world rules), `PartyTuning` (core,
 | Rising band | start 6 rows under the start / checkpoint; `rise_speed` 16 | v16/tick | C.8 | Tuning |
 | Launch axis cap | 288 | v16 | C.0 | PartyTuning |
 | Mount | C.9 table | | C.9 | MountTuning |
-| Totem | head 35 / rest 34 px; foot reach 16 px; impulses `>> 1`; drop lock 12 *(tune)* | | C.10 | PartyTuning |
-| Shoulder Hop | -224 (= `Tuning.BOUNCE_YVEL_UP`) | v16 | C.10 | PartyTuning |
+| Totem | head 35 / rest 34 px; foot reach 16 px; jump-off 16 over the carry; impulses `>> 1`; drop lock 12 *(tune)* | | C.10 | PartyTuning |
+| Shoulder Hop | -224 (= `Tuning.BOUNCE_YVEL_UP`), active partner only | v16 | C.10 | PartyTuning |
+| Lee | 64 px downwind, 16 px vertical *(tune)* | px | C.6 | PartyDriver (PartyTuning asked) |
 | Brace | 16 px apart, heavy dazed 44 | | C.10 | PartyTuning |
 | Curl | 66 ticks, box 24 x 20 *(tune)* | | C.11 | PartyTuning |
 | Bat | line +/-144, -128; lob +/-32, -240; grounder +/-96 for 32 ticks; charged x3/2; ball power 25 on `hp < 50` *(tune all)* | | C.11 | PartyTuning |
 | Egg | box 24 x 24; drift 2 (6 beyond 64 px); nudge 1; offset (-24, -48); Expert return 243 at 6 px/tick *(tune)* | | C.12 | PartyTuning |
-| Hatch | hearts 2 B / 1 E; shield 44; pop -64 | | C.12 | PartyTuning |
+| Hatch | hearts 2 B / 1 E; shield 44; pop -64; hatch bounce -64 with or without UP | | C.12 | PartyTuning / Tuning |
 | Voluntary egg | 24 | ticks | C.12 | PartyTuning |
 | Respawn spread | 24 per slot | px | C.12 | PartyTuning |
-| Tribe camera | start col 16 / 4 with the rear at col >= 2 / <= 17; stop col 5 / 15 or rear at 1 / 18; edge walls 8 px | | C.13 | PartyTuning |
+| Tribe camera | start col 16 / 4 with the rear at col >= 2 / <= 17; stop col 5 / 15 or rear at 1 / 18; edge walls 8 px; standing window: feet at most 9 rows apart, view top in [lowest - 176, highest - 32] | | C.13 | PartyTuning |
 | Leash | 121 B / 73 E | ticks | C.13 | PartyTuning |
 | Pull into a locked view | 24 px behind the trigger hero | px | C.13 | PartyTuning |
 | Versus knocks | 64, -128; hammer x3/2; charged 128, -160, ice 3; swirl pop -160 | v16 | C.14 | VersusTuning |
@@ -1720,6 +1779,7 @@ Owner of each table: `Tuning` (core: hero and world rules), `PartyTuning` (core,
 | Temporary specials | axe 3, swirling axe 2, spear 3 throws; wrap life 40 ticks | | C.14 | VersusTuning |
 | Weight | 10 -> cap 64; 20 -> cap 48, impulses x3/4 *(tune)* | units, v16 | C.14 | VersusTuning |
 | Hot Rock holder / King carrier caps | 96 / 64 | v16 | C.14 | VersusTuning |
+| Coconut | box 16 x 16; bounce x3/4 while `yvel >= 32`; roll loss 2 *(tune)*; rally +16 up to 192 within 44 ticks; knock-down above 128; head bounce at least -96 | v16 / ticks | C.14 | VersusTuning / objects-B |
 
 ### C.17 Reference trajectories (`PARTY_REFERENCE.json`)
 

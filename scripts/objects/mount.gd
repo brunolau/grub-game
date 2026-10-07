@@ -42,7 +42,9 @@ extends SimEntity
 ##   rider neither immune nor shielded) **unseats** him: he is thrown off (xvel +/-64 away, yvel -128, no stun) and
 ##   Chomper stays out for the next rider; the referee's own stomp rules apply to the stomp as usual (without a referee
 ##   the stomper bounces here). A hit on a rider (rider_hit) makes him bolt as everywhere; back home he is penned
-##   again until the next release. In an arena he never dozes.
+##   again until the next release. A round clock that goes back (the referee's begin_round on the same level) is a
+##   new round: his riders are put off and he is back in his pen, penned, as at a level start. In an arena he never
+##   dozes.
 ##
 ## Owner: objects-B (docs/expansion/PLAN.md 4.1). The rider's side (no own handler for the driver, the gunner's strikes
 ## and swap, routing a rider's hurt to [method rider_hit]) is player-B's HeroMount (scripts/player/hero_mount.gd).
@@ -127,6 +129,8 @@ var _pen_ticks: int = 0
 var _release_clock: int = -1
 var _rumble_clock: int = -1
 var _rumbling: bool = false
+## Arena: the referee's round clock at the last pen step (-1 = none yet, or no referee); a smaller one is a new round.
+var _seen_clock: int = -1
 
 var _tamer: PlayerBase = null
 var _home: Vector2i = Vector2i.ZERO
@@ -228,10 +232,15 @@ func ticks_to_release(level: LevelBase = Game.level) -> int:
 ## Arena: the round clock of the pen: the referee's `round_ticks` (the level's party driver) when it has one, else
 ## his own count of ticks since the level started.
 func arena_clock(level: LevelBase) -> int:
-	var referee: SimEntity = level.party_driver if level != null else null
-	if referee != null and &"round_ticks" in referee:
-		return int(referee.get(&"round_ticks"))
+	if _has_round_clock(level):
+		return int(level.party_driver.get(&"round_ticks"))
 	return _pen_ticks
+
+
+## True when the level's party driver (the referee) keeps a round clock (`round_ticks`).
+static func _has_round_clock(level: LevelBase) -> bool:
+	var referee: SimEntity = level.party_driver if level != null else null
+	return referee != null and &"round_ticks" in referee
 
 
 ## Arena: out of the pen now (the referee may call it too).
@@ -379,6 +388,13 @@ func _update(level: LevelBase) -> void:
 func _pen_step(level: LevelBase) -> void:
 	_pen_ticks += 1
 	var clock: int = arena_clock(level)
+	var referee_clock: int = clock if _has_round_clock(level) else -1
+	if referee_clock >= 0 and referee_clock < _seen_clock:
+		# A new round on the same level: riders off, back in the pen (_return_home pens him), the timer starts over.
+		_on_level_reset()
+		_release_clock = -1
+		_rumble_clock = -1
+	_seen_clock = referee_clock
 	var period: int = VersusTuning.RODEO_CHOMPER_PERIOD_TICKS
 	var into: int = posmod(clock, period)
 	var waiting: bool = penned and present and clock > 0
@@ -712,10 +728,13 @@ func _stomp_unseat(level: LevelBase) -> bool:
 
 func _seating(level: LevelBase) -> void:
 	var allow_gunner: bool = level.hero_count() > 1 and Game.mode == Defs.GameMode.COOP
+	# "Not hurt": the stunned part of the hit timer - in an arena the versus one (PHYSICS.md C.14: 12 stunned ticks,
+	# then 30 immune ticks with full control, in which he may sit down).
+	var stun_min: int = VersusTuning.STUN_HIT_TIMER_MIN if arena else Tuning.HIT_STUN_MIN
 	for hero: PlayerBase in level.contact_order():
 		if hero.dead or hero.is_down() or hero.is_mounted() or hero.is_gliding() or hero.is_curled():
 			continue
-		if hero.yvel < 0 or hero.hit_timer >= Tuning.HIT_STUN_MIN or is_remount_locked(hero):
+		if hero.yvel < 0 or hero.hit_timer >= stun_min or is_remount_locked(hero):
 			continue
 		if driver != null and (gunner != null or not allow_gunner):
 			return

@@ -91,6 +91,8 @@ class RegistryRows(unittest.TestCase):
                 self.assertTrue(e.get("edits"), rel)
             if rel.endswith(".png"):
                 self.assertTrue(e.get("note"), rel)
+            # the source resolves to the packs it derives from (CREDITS / THIRD_PARTY are checked against them)
+            self.assertTrue(e.get("origin_packs"), "%s: no origin pack resolved from its source" % rel)
 
     def test_phase_one_files_are_registered(self):
         for rel in ("tiles/common/tar.png", "tiles/common/honey.png", "tiles/common/syrup.png",
@@ -288,10 +290,29 @@ class Versus(unittest.TestCase):
         with open(os.path.join(ASSETS, "sprites", "player", "palettes", "hero_palettes.json"), encoding="utf-8") as f:
             pal = json.load(f)
         cs = cells("assets/sprites/objects/spawn_point.png")
-        self.assertEqual(len(cs), 8)
-        for k, name in ((1, "yellow"), (2, "blue"), (3, "pink"), (4, "green"), (6, "white"), (7, "gold")):
+        self.assertEqual(len(cs), 6)
+        for k, name in ((1, "yellow"), (2, "blue"), (3, "pink"), (4, "green")):
             cloth = pal["palettes"][name]["cloth"].lstrip("#")
             self.assertIn(tuple(int(cloth[i:i + 2], 16) for i in (0, 2, 4)), colour_set(cs[k]), name)
+        # the pad in every hero colour (UiPlayers.PALETTE_COLOURS order) is a sheet of its own; its slot-colour
+        # cells are spawn_point.png's cells 1-4 pixel for pixel
+        lit = cells("assets/sprites/objects/spawn_point_lit.png")
+        order = ROWS["assets/sprites/objects/spawn_point_lit.png"]["rows"]
+        self.assertEqual(order, ["yellow", "blue", "pink", "green", "white", "gold"])
+        self.assertEqual(len(lit), 6)
+        for k, name in enumerate(order):
+            cloth = pal["palettes"][name]["cloth"].lstrip("#")
+            self.assertIn(tuple(int(cloth[i:i + 2], 16) for i in (0, 2, 4)), colour_set(lit[k]), name)
+        for k in range(4):
+            np.testing.assert_array_equal(lit[k], cs[1 + k])
+
+    def test_spawn_point_fits_the_scene_that_draws_it(self):
+        """objects-B's scenes/objects/spawn_point.tscn slices the sheet with a fixed hframes: the sheet keeps that
+        many cells (a wider sheet would cut every frame in the wrong place)"""
+        with open(os.path.join(ROOT, "scenes", "objects", "spawn_point.tscn"), encoding="utf-8") as f:
+            m = re.search(r"hframes = (\d+)", f.read())
+        e = ROWS["assets/sprites/objects/spawn_point.png"]
+        self.assertEqual(e["grid"], [int(m.group(1)) if m else 1, 1])
 
     def test_crown_and_stack_pictures_use_the_anchor_outline(self):
         for rel in ("assets/ui/crown.png", "assets/ui/stack_food.png", "assets/sprites/items/golden_drumstick.png"):

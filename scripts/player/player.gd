@@ -211,6 +211,8 @@ func get_anim() -> int:
 func hurt(source: SimEntity, kind: int = Defs.HurtKind.ENEMY) -> bool:
 	if dead or down or _level_completed():
 		return false
+	if slot != 0 and helper_ignores(kind):
+		return false  # 2.0 Helper mode (PlayerBase.is_helper): enemies never hurt a co-op P2 who has it on
 	var pierces_immunity: bool = kind == Defs.HurtKind.TRAP or kind == Defs.HurtKind.BOSS_PROJECTILE
 	if hit_timer > 0 and not pierces_immunity:
 		return false
@@ -603,11 +605,13 @@ func _friction() -> void:
 
 
 ## WIND: the level's wind pushes left (wind >> WIND_SHIFT, Tuning.shr); without wind this is only the floor on
-## leftward speed.
+## leftward speed. 2.0 co-op: a hero in a crouching partner's lee feels no wind (LevelBase.wind_for; the PartyDriver
+## writes LevelBase.lee_mask, which is 0 on every single-player tick - then this reads the level's wind, no call).
 func _wind() -> void:
 	var level: LevelBase = Game.level
 	if level != null:
-		xvel -= level.wind >> Tuning.WIND_SHIFT
+		var wind: int = level.wind if level.lee_mask == 0 else level.wind_for(self)
+		xvel -= wind >> Tuning.WIND_SHIFT
 	if xvel < Tuning.LEFT_FLOOR:
 		xvel = Tuning.LEFT_FLOOR
 
@@ -964,6 +968,7 @@ func _collide(level: LevelBase, body_height: int) -> void:
 	var was_grounded: bool = grounded
 	var airborne: bool = false
 	var above_map: bool = sim_pos.y <= -1
+	var side_above: int = -1  # grid.side_at(col, row - 1) once step 5 read it
 	if above_map:
 		# 3. Above the map there are no tiles: only the airborne step.
 		_airborne_step()
@@ -989,7 +994,7 @@ func _collide(level: LevelBase, body_height: int) -> void:
 			ice = TileGrid.floor_ice(floor_value)
 		# 5. Ceiling block: rising or grounded, never while falling.
 		if row >= Tuning.HEAD_PROBE_ROWS and yvel <= 0:
-			_ceiling_block(grid, col, row)
+			side_above = _ceiling_block(grid, col, row)
 			if dead:
 				return
 	# 6. Airborne result.
@@ -1010,7 +1015,8 @@ func _collide(level: LevelBase, body_height: int) -> void:
 		return
 	# 7. Wall probe: 9 px ahead, in the row above the feet row only.
 	var probe_col: int = (sim_pos.x + edge) >> 4
-	var side: int = grid.side_at(probe_col, row - 1)
+	# The cell step 5 read for the corner slip is not read again (the grid does not change in between; P2.12).
+	var side: int = side_above if probe_col == col and side_above >= 0 else grid.side_at(probe_col, row - 1)
 	if side == TileGrid.SIDE_WALL:
 		sim_pos.x -= xvel >> 4
 		xvel = 0
@@ -1144,7 +1150,8 @@ func _land(level: LevelBase, col: int, row: int, was_grounded: bool) -> bool:
 	return false
 
 
-func _ceiling_block(grid: TileGrid, col: int, row: int) -> void:
+## Step 5. Returns grid.side_at(col, row - 1), which the corner slip reads (-1 when a deadly ceiling killed him).
+func _ceiling_block(grid: TileGrid, col: int, row: int) -> int:
 	var ceiling: int = grid.flags_at(col, row - Tuning.HEAD_PROBE_ROWS) & TileGrid.FLAG_CEILING_MASK  # ceiling_at
 	if ceiling == TileGrid.CEILING_SOLID:
 		if yvel != 0:
@@ -1154,14 +1161,16 @@ func _ceiling_block(grid: TileGrid, col: int, row: int) -> void:
 			bumped_head = true
 	elif ceiling == TileGrid.CEILING_DEADLY:
 		kill(&"spikes")
-		return
+		return -1
 	# Corner slip: inside a wall tile he slides out sideways, 2 px per tick.
-	if (grid.side_at(col, row - 1) & TileGrid.SIDE_WALL) != 0 and sim_pos.y > 0:
+	var side: int = grid.side_at(col, row - 1)
+	if (side & TileGrid.SIDE_WALL) != 0 and sim_pos.y > 0:
 		var step: int = -1 if xvel > 0 else 1
 		if grid.side_at(col + step, row - 1) == TileGrid.SIDE_OPEN:
 			sim_pos.x += Tuning.CORNER_SLIP * step
 		elif grid.side_at(col - step, row - 1) == TileGrid.SIDE_OPEN:
 			sim_pos.x -= Tuning.CORNER_SLIP * step
+	return side
 
 
 ## No ground: air control and gravity, applied AFTER the position was integrated (PHYSICS.md 5.2). Falling
@@ -1212,20 +1221,26 @@ func _tick_timers(level: LevelBase) -> void:
 
 
 ## Sprite box of the pose of this tick, used by every sprite contact (PHYSICS.md 2.1).
+## (SimEntity.set_box written out at the end: three fields - the two-hero performance pass, PLAN.md P2.12.)
 func _update_box() -> void:
+	var box: Vector3i
 	if state == Defs.HeroState.HURT:
-		set_box(Tuning.HERO_BOX_HURT)
+		box = Tuning.HERO_BOX_HURT
 	elif _hard_landed:
-		set_box(Tuning.HERO_BOX_FALL)
+		box = Tuning.HERO_BOX_FALL
 	elif not grounded and yvel > 0 and not attack_gate:
-		var long_fall: bool = fall_ticks >= Tuning.FALL_WIDE_SPRITE_TICKS
-		set_box(Tuning.HERO_BOX_FALL_LONG if long_fall else Tuning.HERO_BOX_FALL)
+		box = Tuning.HERO_BOX_FALL_LONG if fall_ticks >= Tuning.FALL_WIDE_SPRITE_TICKS else Tuning.HERO_BOX_FALL
 	elif handler == Defs.HeroState.JUMP:
-		set_box(Tuning.HERO_BOX_JUMP_UP if jump_ticks <= Tuning.HERO_JUMP_TALL_BOX_TICKS else Tuning.HERO_BOX_JUMP_TOP)
+		box = Tuning.HERO_BOX_JUMP_UP if jump_ticks <= Tuning.HERO_JUMP_TALL_BOX_TICKS else Tuning.HERO_BOX_JUMP_TOP
 	elif state == Defs.HeroState.CROUCH or state == Defs.HeroState.CRAWL:  # is_low()
-		set_box(Tuning.HERO_BOX_CROUCH)
+		box = Tuning.HERO_BOX_CROUCH
 	elif grounded:
-		set_box(Tuning.HERO_BOX_STAND)
+		box = Tuning.HERO_BOX_STAND
+	else:
+		return  # airborne in none of the poses above (a bounce, a hop, a strike in the air): the last box stays
+	box_w = box.x
+	box_h = box.y
+	box_xo = box.z
 
 
 # =================================================================================================================
@@ -1246,13 +1261,14 @@ func _contact_pass() -> void:
 	var x: int = sim_pos.x
 	var y: int = sim_pos.y
 	for i: int in enemies.size():
+		# Overlap.body's coarse reject first, before the cast and every other test (the performance pass, PLAN.md
+		# P2.12: the list holds every enemy of the level, sleeping and dozing ones too, and nearly all are far from each
+		# hero); the outcome is the same, since a pair this far apart never overlaps and the tests are pure.
+		var at: Vector2i = enemies[i].sim_pos
+		if absi(at.x - x) >= Tuning.OVERLAP_MAX_DX or absi(at.y - y) >= Tuning.OVERLAP_MAX_DY:
+			continue
 		var enemy: EnemyBase = enemies[i] as EnemyBase
 		if enemy == null or not enemy.awake or not enemy.contact_hurts:
-			continue
-		# Overlap.body's coarse reject before any call (the performance pass, PLAN.md P2.12: most awake enemies are far
-		# from each hero); the outcome is the same, since a pair this far apart never overlaps.
-		var at: Vector2i = enemy.sim_pos
-		if absi(at.x - x) >= Tuning.OVERLAP_MAX_DX or absi(at.y - y) >= Tuning.OVERLAP_MAX_DY:
 			continue
 		if not enemy.is_targetable() or not Overlap.body(self, enemy, self):
 			continue

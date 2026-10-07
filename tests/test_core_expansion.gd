@@ -186,6 +186,8 @@ func test_physics_appendix_c_constant_sheet() -> void:
 	# Phase 2 rows (P2.6, asked by world-A and enemies-A): C.13 keep-the-head margin, the count-in spacing of 13.9.3.
 	assert_ints_eq([PartyTuning.CAM_KEEP_HEAD_PX, PartyTuning.COUNT_IN_SPACING_TICKS, PartyTuning.COUNT_IN_BEEPS],
 		[32, 8, 3])
+	# The lee of C.6 / C.16 ("64 px downwind, 16 px vertical", asked by world-A in phase 2).
+	assert_ints_eq([PartyTuning.LEE_REACH_PX, PartyTuning.LEE_DY_PX], [64, 16])
 	# VersusTuning (C.14, GAMEPLAY 13.10 / 13.11).
 	assert_ints_eq([VersusTuning.HURT_TIMER_TICKS, VersusTuning.STUN_HIT_TIMER_MIN], [43, 31])
 	# Set to 43 on the hit tick; the following ticks see 42 .. 31 (12 stunned), then 30 .. 1 (30 immune with control).
@@ -359,6 +361,14 @@ func test_versus_tables_fit_the_contract() -> void:
 	assert_eq(VersusTuning.ARENA_FLOOR_ROW, VersusTuning.ARENA_ROWS - 1)
 	assert_true(VersusTuning.HOT_ROCK_FUSE_MIN_TICKS < VersusTuning.HOT_ROCK_FUSE_MAX_TICKS)
 	assert_true(VersusTuning.BALL_KNOCKDOWN_SPEED_EXCL < VersusTuning.BALL_MAX_SPEED)
+	# GAMEPLAY.md 13.10.6 shots (P2.7, the coconut): drive (144, -128), lob (32, -240), grounder (96, 0); a floor
+	# bounce while yvel >= 32; a head bounce at least -96. Every component within the launch axis cap.
+	assert_ints_eq([VersusTuning.BALL_DRIVE_XVEL, VersusTuning.BALL_DRIVE_YVEL, VersusTuning.BALL_LOB_XVEL,
+			VersusTuning.BALL_LOB_YVEL, VersusTuning.BALL_GROUNDER_XVEL, VersusTuning.BALL_BOUNCE_MIN_YVEL,
+			VersusTuning.BALL_HEAD_BOUNCE_MIN_YVEL], [144, -128, 32, -240, 96, 32, -96], "the coconut's shots")
+	for value: int in [VersusTuning.BALL_DRIVE_XVEL, VersusTuning.BALL_DRIVE_YVEL, VersusTuning.BALL_LOB_YVEL,
+			VersusTuning.BALL_GROUNDER_XVEL, VersusTuning.BALL_MAX_SPEED]:
+		assert_true(absi(value) <= PartyTuning.LAUNCH_AXIS_CAP, "a shot stays within the axis cap (%d)" % value)
 	assert_true(VersusTuning.STACK_GUARD_PERCENT.has(100))
 	assert_eq(VersusTuning.LCS_HEART_BONES, Tuning.BONES_PER_HEART)
 	var telegraphs: Array[int] = [VersusTuning.CRATE_SHADOW_TICKS, VersusTuning.STAMPEDE_DUST_TICKS,

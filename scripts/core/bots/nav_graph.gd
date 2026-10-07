@@ -29,7 +29,7 @@ extends RefCounted
 ## JSON format (FORMAT 2; FORMAT 1 = the G1 graphs: no weights, timing or movers, still read):
 ##   {"format": 2, "level": id, "source_sha256": sha256 of the level text (CRLF read as LF), "difficulty": name,
 ##    "cols": int, "rows": int, "wrap": "none" | "lr" | "tb", "weights": [classes baked], "clip": [c, r, w, h] or [],
-##    "movers": [{"key", "id", "col", "row", "kind"}],
+##    "movers": [{"key", "id", "col", "row", "kind", "x", "y", "part", "top"[, "period"]}],
 ##    "baker": {"version", "candidates", "simulated_ticks", "verified_starts", "rejected"},
 ##    "nodes": [{"id", "row", "y", "x0", "x1", "ice"[, "mover"]}],
 ##    "links": [{"id", "from", "to", "kind", "x0", "x1", "dir", "keys", "ticks", "land_x0", "land_x1", "weight"
@@ -244,10 +244,18 @@ static func from_dict(data: Dictionary) -> NavGraph:
 	for item: Variant in data.get("movers", []):
 		if item is Dictionary:
 			var entry: Dictionary = item
-			graph.movers.append({
+			var mover: Dictionary = {
 				"key": str(entry.get("key", "")), "id": str(entry.get("id", "")), "col": int(entry.get("col", 0)),
 				"row": int(entry.get("row", 0)), "kind": str(entry.get("kind", MOVER_PERIODIC)),
-			})
+			}
+			# Where the baker found it (NavMoversLive matches the live entity by them): spawn feet point, part index,
+			# the part's box top-left at the level start.
+			for key: String in ["x", "y", "part", "period"]:
+				if entry.has(key):
+					mover[key] = int(entry[key])
+			if entry.get("top") is Array and (entry["top"] as Array).size() >= 2:
+				mover["top"] = [int(entry["top"][0]), int(entry["top"][1])]
+			graph.movers.append(mover)
 	var stats: Variant = data.get("baker", {})
 	if stats is Dictionary:
 		for key: Variant in stats:

@@ -48,6 +48,24 @@ func test_a_filter_runs_a_slow_module_only_when_it_names_it() -> void:
 	assert_eq(_discover("no_such_module", false, skipped).size(), 0)
 
 
+## A file that leaves the clock frozen (a Flow transition a failing test never awaited), slowed (a replay) or the tree
+## paused cannot fail the next file: the runner puts the state back between files and names what it reset.
+func test_the_runner_resets_the_clock_state_a_file_leaves_behind() -> void:
+	var runner: GDScript = load(RUNNER) as GDScript
+	assert_not_null(runner)
+	if runner == null:
+		return
+	var was_frozen: bool = Sim.frozen
+	Sim.frozen = true
+	Sim.time_scale = 0.5
+	var leaks: PackedStringArray = runner.call("reset_leaks", Sim, get_tree())
+	assert_eq(leaks, PackedStringArray(["Sim.frozen", "Sim.time_scale 0.50"]))
+	assert_false(Sim.frozen)
+	assert_eq(Sim.time_scale, 1.0)
+	assert_true((runner.call("reset_leaks", Sim, get_tree()) as PackedStringArray).is_empty(), "a clean file: nothing")
+	Sim.frozen = was_frozen
+
+
 func test_the_runner_lists_the_slow_modules_of_the_plan() -> void:
 	var runner: GDScript = load(RUNNER) as GDScript
 	assert_not_null(runner)

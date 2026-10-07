@@ -17,7 +17,7 @@ terrain_b = volcano/terrain_obsidian
 background = volcano
 music = level_volcano
 author = enemies-C
-notes = "PLAN.md P2.3: the Rival Chieftains (state-machine executor by default; Chieftain.hero_bot_enabled for HeroBot)."
+notes = "PLAN.md P2.3: the Rival Chieftains on hero physics (HeroBot) where the level has its bot graph; else the state machine."
 
 [legend]
 A = items/weapon kind=spear

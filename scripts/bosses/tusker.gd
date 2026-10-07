@@ -248,8 +248,10 @@ func _ai_tick() -> void:
 		if not fighting:
 			return
 	if _state == State.DORMANT:
+		# The first idle starts on this tick with its clock at 0, like every state entered on a tick.
 		_begin_idle()
-	_timer += 1
+	else:
+		_timer += 1
 	_tick_rocks()
 	if coop_form and is_open() and _state != State.DAZED:
 		_face_nearer()

@@ -634,19 +634,54 @@ func _search_level(id: String, ledge_row: int, entities: String) -> LevelData:
 	return LevelData.parse(StringName(id), text, "%s.lvl" % id)
 
 
+
+## A 30 x 16 co-op map from `rows` (16 strings of 30 cells; '@' and the exit are added at row 13).
+func _search_rows(id: String, rows: PackedStringArray, entities: String) -> LevelData:
+	rows[13] = ".@" + rows[13].substr(2, 26) + "E."
+	var text: String = "[meta]
+format = 2
+id = %s
+kind = coop
+book = 2
+terrain_a = jungle/terrain_grass
+" % id 			+ "music = level_jungle
+coop_of = solo_bonus
+coop_base_hash = %s
+[legend]
+E = objects/exit
+" % "ab".repeat(32) 			+ "[tiles]
+%s
+[entities]
+%s
+" % ["
+".join(rows), entities]
+	return LevelData.parse(StringName(id), text, "%s.lvl" % id)
+
+
+## The plate-door map: a wall at column 22 from row 2 down to the floor, its two bottom cells a door that rises into
+## the wall while plate `p` (columns 10-11, 12 tiles away) is pressed; the far cell 25,13 lies behind it.
+func _door_level(id: String, mode: String) -> LevelData:
+	var rows: PackedStringArray = PackedStringArray()
+	for row: int in 16:
+		rows.append((TileGrid.CH_SOLID_A if row >= 14 else TileGrid.CH_AIR).repeat(30))
+	for row: int in range(2, 14):
+		_paint(rows, row, 22, 22)
+	return _search_rows(id, rows, "
+".join(PackedStringArray([
+		"objects/x2_tablet 6 13 gate=door far=25,13",
+		"objects/plate 10 13 name=p mode=%s" % mode,
+		"objects/column 22 13 size=1,2 rise=2 rise_while=p",
+	])))
+
 func test_search_refuses_a_high_ledge_and_finds_a_low_one() -> void:
 	var high: Dictionary = CoopSearch.search_data(_search_level("high_coop", 6, "objects/x2_tablet 10 13 gate=hop far=16,5"),
 			Defs.Difficulty.BEGINNER, "hop")
 	assert_false(bool(high["reached"]), "8 rows: no single hero gets up there (%s)" % high["detail"])
-	# The static prefilter (G1 integration) already refuses it: no chain of feet cells climbs 8 rows.
-	assert_true(bool(high.get("prefilter", false)), "the prefilter refused it without simulating")
-	# The full search agrees, from the same starts.
-	CoopSearch.prefilter = false
-	var searched: Dictionary = CoopSearch.search_data(_search_level("high_coop", 6,
-			"objects/x2_tablet 10 13 gate=hop far=16,5"), Defs.Difficulty.BEGINNER, "hop")
-	CoopSearch.prefilter = true
-	assert_false(bool(searched["reached"]), "the full search refuses it too (%s)" % searched["detail"])
-	assert_true(int(searched["explored"]) > 10, "the floor was searched (%d resting points)" % int(searched["explored"]))
+	# The flood diagnostic agrees (no chain of feet cells climbs 8 rows), but it decides nothing since v2: the
+	# refusal is the search's own.
+	assert_false(bool(high["flood"]), "the flood finds no chain either")
+	assert_true(int(high["explored"]) > 10, "the floor was searched (%d resting points)" % int(high["explored"]))
+	assert_true(int(high["runs"]) > 100, "with real runs of the hero (%d)" % int(high["runs"]))
 	assert_eq(high["bound"], CoopSearch.BOUND_TICKS)
 	assert_true((high["starts"] as Array).has(Vector2i(10, 13)), "it starts at the tablet")
 	assert_true((high["starts"] as Array).has(Vector2i(1, 13)), "and at the start before it (no checkpoint)")
@@ -719,29 +754,74 @@ func test_search_helpers() -> void:
 			"nothing thrown reaches a cell high up behind the thrower")
 
 
-func test_zz_debug_daze() -> void:
-	var rows: PackedStringArray = PackedStringArray()
-	for row: int in 16:
-		rows.append((TileGrid.CH_SOLID_A if row >= 14 else TileGrid.CH_AIR).repeat(30))
-	var searcher: CoopSearch.Searcher = CoopSearch.Searcher.new()
-	assert_true(searcher.build(&"coop_search_daze", {}, TileGrid.from_rows(rows)))
-	var target: EnemyBase = EnemyBase.new()
-	target.set_box(Vector3i(32, 32, 16))
-	target.spawn_setup(Vector2i(240, 224), {})
-	searcher.level.add_child(target)
-	target.max_hp = 99999
-	target.hp = 99999
-	var hero: PlayerBase = searcher.hero
-	target.teleport(Vector2i(240, 224))
-	target.wake()
-	hero.run.reset_energy()
-	hero.respawn_at(Vector2i(240 - 36, 224))
-	hero.facing = 1
-	var flags: PackedInt32Array = CoopSearch._repeat(Defs.IN_UP | Defs.IN_RIGHT, 5) + CoopSearch._repeat(Defs.IN_RIGHT, 30)
-	searcher._flags = flags
-	searcher._first_tick = Sim.tick + 1
-	for t: int in 40:
-		Sim.step(1)
-		print("t%d hero %s y%d st%d tgt %s awake%s onscr%s targ%s bc%d hp%d dead%s" % [t, hero.sim_pos, hero.yvel, hero.state, target.sim_pos, target.awake, target.on_screen, target.is_targetable(), target.bounce_count, hero.run.hearts, hero.dead])
-	target.free()
-	searcher.close()
+func test_search_world_runs_the_real_doors_and_carries_a_latched_plate() -> void:
+	# One player alone (his partner only ever an egg): a held plate 12 tiles from its door shuts it before he gets
+	# there; the search ran the real plate and door to say so.
+	CoopSearch.idle_partner = false
+	var held: Dictionary = CoopSearch.search_data(_door_level("door_hold_coop", "hold"), Defs.Difficulty.BEGINNER, "door")
+	CoopSearch.idle_partner = true
+	assert_false(bool(held["reached"]), "the door shuts before one hero gets there (%s)" % held["detail"])
+	assert_false(bool(held["flood"]), "the flood sees only the closed door")
+	assert_true(int(held["explored"]) > 5, "the refusal is the search's own (%d resting points)" % int(held["explored"]))
+	# A latch stays down: the changed world (plate pressed, door up) is carried to the next move by its replay.
+	var latched: Dictionary = CoopSearch.search_data(_door_level("door_latch_coop", "latch"), Defs.Difficulty.BEGINNER,
+			"door")
+	assert_true(bool(latched["reached"]), "a latch stays down: the door stays open for the next move")
+	assert_true(str(latched["detail"]).contains("one hero reached 25,13"), str(latched["detail"]))
+	assert_null(Game.level, "the search world is gone again")
+	assert_eq(Game.mode, Defs.GameMode.SINGLE, "the co-op game of the search is put back")
+
+
+func test_search_world_rides_an_idle_partner_but_never_hops_off_him() -> void:
+	# 6 rows (96 px): above a plain jump and its corner catch, below the rider's jump off a still carrier (98 px).
+	var totem: Dictionary = CoopSearch.search_data(_search_level("totem_coop", 8,
+			"objects/x2_tablet 10 13 gate=totem far=16,7"), Defs.Difficulty.BEGINNER, "totem")
+	assert_true(bool(totem["reached"]), "6 rows: a Totem Ride on the idle partner")
+	assert_true(str(totem["detail"]).contains("partner-"), str(totem["detail"]))
+	CoopSearch.idle_partner = false
+	var alone: Dictionary = CoopSearch.search_data(_search_level("totem_coop", 8,
+			"objects/x2_tablet 10 13 gate=totem far=16,7"), Defs.Difficulty.BEGINNER, "totem")
+	CoopSearch.idle_partner = true
+	assert_false(bool(alone["reached"]), "6 rows alone, the partner an egg (-64): %s" % alone["detail"])
+	# 8 rows: test_search_refuses_a_high_ledge_and_finds_a_low_one (the idle partner gives no Shoulder Hop).
+
+
+func test_search_windows_report_the_records_caps() -> void:
+	var entities: String = "
+".join(PackedStringArray([
+		"objects/x2_tablet 10 13 gate=g far=27,13",
+		"enemies/walker 4 13 coop=bond bond=pair window=20",
+		"enemies/walker 24 13 coop=bond bond=pair window=9",
+		"enemies/walker 12 13 coop=bond bond=wide",
+		"enemies/walker 26 13 coop=bond bond=wide",
+		"enemies/raptor 6 13 coop=daze window=5",
+	]))
+	var data: LevelData = _search_level("caps_coop", 6, entities)
+	CoopSearch.measure_daze_solo_min("enemies/raptor")
+	var bare: CoopSearch.Searcher = CoopSearch.Searcher.new()
+	assert_true(bare.build(data.id, data.resolved_meta(Defs.Difficulty.BEGINNER), CoopSearch.grid_at_rest(data,
+			Defs.Difficulty.BEGINNER)))
+	var windows: Array = CoopSearch.measure_windows(data, Defs.Difficulty.BEGINNER, Rect2i(0, 0, 30, 16), bare)
+	bare.close()
+	var by_what: Dictionary = {}
+	for window: Dictionary in windows:
+		by_what[str(window["what"]).get_slice(" at ", 0)] = int(window["window"])
+	assert_eq(by_what.get("bond pair", -1), 9, "a bond: the smallest window= of its members (%s)" % str(windows))
+	assert_eq(by_what.get("bond wide", -1), PartyTuning.window_ticks(Defs.Difficulty.BEGINNER), "no cap: the difficulty's")
+	assert_eq(by_what.get("daze enemies/raptor", -1), 5, "a daze record: its own window=")
+	var validator: LevelValidator = _validator({"solo_bonus": _solo("solo_bonus", "bonus"), "capped_coop":
+			_coop_text("capped_coop", "enemies/walker 3 13 coop=bond bond=b window=x
+enemies/walker 9 13 coop=bond bond=b window=12",
+			PackedStringArray(), "solo_bonus")})
+	assert_false(validator.has_problem("unknown parameter 'window'", LevelValidator.WARNING), _messages(validator))
+	assert_true(validator.has_problem("enemies/walker window"), "an integer: %s" % _messages(validator))
+
+
+
+func test_zz_profile_real() -> void:
+	CoopSearch.use_cache = false
+	for gate: Array in [[&"w1_l1_coop", "hop"], [&"w1_l1_coop", "plates"], [&"w5_l1_coop", "hop"], [&"w5_l1_coop", "plates"], [&"w5_l1_coop", "gully"]]:
+		var t0: int = Time.get_ticks_msec()
+		var r: Dictionary = CoopSearch.search_gate(gate[0], 0, gate[1])
+		print("PROFILE %s %s reached %s explored %d runs %d ms %d flood %s | %s" % [gate[0], gate[1], r["reached"], int(r["explored"]), int(r.get("runs", 0)), Time.get_ticks_msec() - t0, r.get("flood"), r["detail"]])
+	CoopSearch.use_cache = true

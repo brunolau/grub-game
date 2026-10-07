@@ -304,6 +304,13 @@ def section_lines(reg=None):
               [[_short(k), R[k].get("kind", "-"), ", ".join("`%s`" % n for n in R[k].get("names", [])),
                 num(R[k], "seconds", "%.2f"), loop(R[k]), lufs(R[k]), num(R[k], "true_peak_dbtp"),
                 num(R[k], "volume_db"), R[k].get("played_at") or "-", R[k].get("role", "")] for k in ka])
+        anotes = extra.get("audio_notes", [])
+        if anotes:
+            W("Notes from the audio hand-over (the audio owner's words: the music budget and the decisions and flags "
+              "of each batch, kept here because the staging folder is not versioned):")
+            W("")
+            out.extend(anotes)
+            W("")
     # ------------------------------------------------------------------ 17.13 the Far Shore map page, paintings
     kf = keys("far_shore")
     if kf:

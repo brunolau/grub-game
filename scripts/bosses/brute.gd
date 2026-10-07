@@ -569,7 +569,7 @@ func _coop_tick(target: PlayerBase) -> bool:
 ## A grab starts (from watching or attacking, grounded) below half its hit points on Expert when its target stands
 ## close on its floor and the last grab is long enough ago.
 func _grab_wanted(target: PlayerBase) -> bool:
-	if target == null or _grab_cooldown > 0 or not _grounded or hp * 2 >= max_hp:
+	if target == null or _grab_cooldown > 0 or not _grounded or hp * 2 >= max_hp or target.is_helper():
 		return false
 	if not PartyTuning.boss_grabs_on(Game.difficulty):
 		return false
@@ -579,9 +579,10 @@ func _grab_wanted(target: PlayerBase) -> bool:
 
 
 ## The target's feet within GRAB_REACH_PX in front of the feet point, on its floor (16 px up or down). A hero blinking
-## after a hurt is seized all the same (whoever stands that close has touched the body).
+## after a hurt is seized all the same (whoever stands that close has touched the body); a Helper-mode P2
+## (PlayerBase.is_helper, PHYSICS.md C.12) never is.
 func _in_grab_reach(hero: PlayerBase) -> bool:
-	if hero.dead or hero.is_down() or not hero.is_party_targetable():
+	if hero.dead or hero.is_down() or not hero.is_party_targetable() or hero.is_helper():
 		return false
 	var ahead: int = (hero.sim_pos.x - sim_pos.x) * facing
 	return ahead >= 0 and ahead <= GRAB_REACH_PX and absi(hero.sim_pos.y - sim_pos.y) <= Tuning.TILE

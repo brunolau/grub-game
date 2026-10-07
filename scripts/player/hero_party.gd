@@ -165,17 +165,20 @@ func hold_hit_stop() -> void:
 
 
 ## Right after 8b. True = this component ran the rest of the hero's PLAYER phase (egg, curl, ball).
-## (The two-hero performance pass, PLAN.md P2.12: the slot's previous flags are read once for the Swap edge and the
-## emote's Look edge, and the usual tick makes no further call before the egg / curl / ride tests.)
+## (The two-hero performance pass, PLAN.md P2.12: the slot's previous flags are read only on a tick on which Look or
+## Swap is held - once, for the emote's Look edge and the Swap edge - and the usual tick makes no call before the egg /
+## curl / ride tests.)
 func update(level: LevelBase) -> bool:
 	var flags: int = hero._raw_flags
-	var prev: int = GameInput.get_prev_flags(hero.slot)
 	# The emote reads his slot's own flags even while his controls are off (an egg, a cutscene).
 	var slot_flags: int = flags if hero.control_enabled else GameInput.get_flags(hero.slot)
-	if (slot_flags & Defs.IN_LOOK) != 0 and (prev & Defs.IN_LOOK) == 0:
-		_emote_tap(slot_flags)
-	# Swap is edge-triggered (PHYSICS.md C.1), read as the belt reads it (GameInput's flags of the previous tick).
-	var swap_pressed: bool = (flags & Defs.IN_SWAP) != 0 and (prev & Defs.IN_SWAP) == 0
+	var swap_pressed: bool = false
+	if ((slot_flags & Defs.IN_LOOK) | (flags & Defs.IN_SWAP)) != 0:
+		var prev: int = GameInput.get_prev_flags(hero.slot)
+		if (slot_flags & Defs.IN_LOOK) != 0 and (prev & Defs.IN_LOOK) == 0:
+			_emote_tap(slot_flags)
+		# Swap is edge-triggered (PHYSICS.md C.1), read as the belt reads it (GameInput's flags of the previous tick).
+		swap_pressed = (flags & Defs.IN_SWAP) != 0 and (prev & Defs.IN_SWAP) == 0
 	if hero.down:
 		_egg_input()
 		return true

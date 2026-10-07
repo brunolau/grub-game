@@ -157,7 +157,7 @@ def origin_packs(entry, reg1):
             found |= set(p for p in PACKS if p in s1)
             if not any(p in s1 for p in PACKS):
                 found.add("?1.0:" + short)
-    if "drawn by the pipeline" in src or "petroglyph" in src:
+    if "drawn by the pipeline" in src or "petroglyph" in src or "hand-picked" in src or src.endswith(".py"):
         found.add("own")
     return sorted(found)
 
@@ -350,8 +350,21 @@ def check_audio_credits(packs, uses):
 def handover_notes():
     """the explanatory parts of art-B's hand-over documents (*HANDOVER*.md): the biome palette notes, paragraphs
     on body boxes / hit zones / drawing order, and the decisions and flags"""
+    return _doc_notes(sorted(glob.glob(os.path.join(HANDOVER, "*HANDOVER*.md"))),
+                      lambda sec: ("palette notes" in sec) or sec.startswith("decisions"),
+                      ("Body boxes are", "Tusker hit zones", "Draw at y = 0", "Both atlases keep"))
+
+
+def audio_notes():
+    """the explanatory parts of the audio owner's batch documents (_handover/audio/AUDIO_BATCH*.md): the music
+    budget and the decisions and flags of every batch (the staging folder is not versioned, the manifest is)"""
+    return _doc_notes(sorted(glob.glob(os.path.join(AUDIO_HANDOVER, "AUDIO_BATCH*.md"))),
+                      lambda sec: sec.startswith(("music budget", "decisions")), ())
+
+
+def _doc_notes(paths, keep_section, keep_paragraphs):
     out = []
-    for path in sorted(glob.glob(os.path.join(HANDOVER, "*HANDOVER*.md"))):
+    for path in paths:
         with open(path, encoding="utf-8") as f:
             lines = f.read().splitlines()
         title = lines[0].lstrip("# ").strip() if lines else os.path.basename(path)
@@ -361,8 +374,8 @@ def handover_notes():
             if ln.startswith("## "):
                 sec = ln[3:].lower()
                 continue
-            keep_sec = ("palette notes" in sec) or sec.startswith("decisions")
-            keep_par = ln.startswith(("Body boxes are", "Tusker hit zones", "Draw at y = 0", "Both atlases keep"))
+            keep_sec = keep_section(sec)
+            keep_par = bool(keep_paragraphs) and ln.startswith(keep_paragraphs)
             if (keep_sec and ln.strip()) or keep_par:
                 picked.append(ln)
         if picked:
@@ -455,11 +468,26 @@ def write_licence(pack, use):
 
 
 def pack_uses(reg1):
-    uses = {}
-    for rel, e in REGISTRY.items():
-        if not rel.startswith("assets/") or e.get("owner") == "audio":
-            continue
+    """pack -> the 2.0 files that derive from it; a 2.0 file built from another 2.0 file (drum_cap.png from
+    drum.png, an arena frame from art-B's props) inherits that file's packs (resolved to a fixed point)"""
+    rows = {rel: e for rel, e in REGISTRY.items() if rel.startswith("assets/") and e.get("owner") != "audio"}
+    for e in rows.values():
         e["origin_packs"] = origin_packs(e, reg1)
+    names = {rel: rel[len("assets/"):] for rel in rows}
+    changed = True
+    while changed:
+        changed = False
+        for rel, e in rows.items():
+            src = e.get("source", "")
+            got = set(e["origin_packs"])
+            for other, short in names.items():
+                if other != rel and short in src:
+                    got |= set(rows[other]["origin_packs"])
+            if got != set(e["origin_packs"]):
+                e["origin_packs"] = sorted(got)
+                changed = True
+    uses = {}
+    for rel, e in rows.items():
         for p in e["origin_packs"]:
             uses.setdefault(p, []).append(rel)
     return uses
@@ -557,6 +585,7 @@ def main(previews=True):
         "gaps": GAPS,
         "reuse_1_0": REUSE_1_0,
         "handover_notes": handover_notes(),
+        "audio_notes": audio_notes(),
     }
     # every PNG written by art-A: <= 2048 px a side
     for k, e in REGISTRY.items():

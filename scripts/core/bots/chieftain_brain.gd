@@ -115,6 +115,13 @@ func lone_target(level: LevelBase) -> int:
 	return best
 
 
+## The hero an order aims at: its `target_slot` while that hero is a rival in play (as seen), else the lone rule.
+func victim_slot(level: LevelBase) -> int:
+	if target_slot >= 0 and bot.is_rival(target_slot) and bot.seen_alive(target_slot):
+		return target_slot
+	return lone_target(level)
+
+
 ## The hero nearest to `pos` (seen); -1 when none.
 func nearest_hero(pos: Vector2i) -> int:
 	var best: int = -1
@@ -204,7 +211,7 @@ func _wait(hero: PlayerBase, tick: int) -> int:
 
 
 func _raid(hero: PlayerBase, level: LevelBase, tick: int) -> int:
-	var victim: int = target_slot if target_slot >= 0 and bot.is_rival(target_slot) and bot.seen_alive(target_slot) 			else lone_target(level)
+	var victim: int = victim_slot(level)
 	if victim < 0:
 		return _wait(hero, tick)
 	var seen: PackedInt32Array = bot.seen(victim)
@@ -234,7 +241,7 @@ func _raid(hero: PlayerBase, level: LevelBase, tick: int) -> int:
 
 
 func _stack_bottom(hero: PlayerBase, level: LevelBase) -> int:
-	var victim: int = target_slot if target_slot >= 0 and bot.seen_alive(target_slot) else lone_target(level)
+	var victim: int = victim_slot(level)
 	if victim < 0:
 		return 0
 	# Walk only (the mate rides on his head): along his own floor towards the target.
@@ -279,7 +286,7 @@ func _stack_top(hero: PlayerBase, tick: int) -> int:
 func _bat(hero: PlayerBase, level: LevelBase, tick: int) -> int:
 	if mate == null or not is_instance_valid(mate) or _batted:
 		return 0
-	var victim: int = target_slot if target_slot >= 0 and bot.seen_alive(target_slot) else lone_target(level)
+	var victim: int = victim_slot(level)
 	var toward: int = 1
 	if victim >= 0:
 		toward = 1 if bot.seen_pos(victim).x >= mate.sim_pos.x else -1

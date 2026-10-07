@@ -323,15 +323,20 @@ func test_coop_tentacle_lock() -> void:
 	_shot_at(squid.get_tentacle_rect(1), 1)
 	_step2()
 	assert_true(squid.get_open_ticks() > 0, "both flinch: the head opens")
-	assert_eq(squid.get_open_ticks(), Squid.SQUID_OPEN_TICKS - 1)
+	assert_eq(squid.get_open_ticks(), Squid.SQUID_OPEN_TICKS, "for 33 ticks from the next")
 	_shot_at(squid.get_head_rect(), 0)
 	_step2()
 	assert_eq(squid.hp, squid.max_hp - 20, "and takes a hit")
 	# One hero's two flinches never open it.
-	_wait2(Squid.SQUID_OPEN_TICKS)
+	for t: int in Squid.SQUID_OPEN_TICKS:
+		_hold_up(squid, GAP_A)
+		_step2()
+	assert_eq(squid.get_open_ticks(), 0, "the head closed again after its 33 ticks")
+	_hold_up(squid, GAP_A)
 	p1.respawn_at(Vector2i(GAP_A - 37, SURFACE))
 	_shot_at(squid.get_tentacle_rect(-1), 0)
 	_step2()
+	_hold_up(squid, GAP_A)
 	p1.respawn_at(Vector2i(GAP_A + 37, SURFACE))
 	_shot_at(squid.get_tentacle_rect(1), 0)
 	_step2()
@@ -339,9 +344,10 @@ func test_coop_tentacle_lock() -> void:
 	assert_eq(squid.get_open_ticks(), 0, "... for the same hero: shut")
 
 
-## The flinch window is shorter than the measured solo minimum: one hero who flinches the left tentacle from the left
-## island and then crosses over the squid (bouncing off its head) to flinch the right one needs at least the measured
-## ticks; SQUID_SOLO_MIN_TICKS is no more than that, so the flinch (min(24 / 16, solo minimum - 4)) stays 4+ below it.
+## The flinch window is shorter than the measured solo minimum: one hero (every hand weapon) who flinches the left
+## tentacle from the left island and then crosses over the squid (bouncing off its head) to flinch the right one needs
+## at least the measured ticks; SQUID_SOLO_MIN_TICKS is no more than that, so the flinch (min(24 B / 16 E, solo
+## minimum - 4)) stays 4+ below it.
 func test_coop_flinch_window_is_shorter_than_the_measured_solo_minimum() -> void:
 	var squid: Squid = _open(Defs.Difficulty.BEGINNER, 1, true)
 	var hero: PlayerBase = _lab.hero()
@@ -349,7 +355,7 @@ func test_coop_flinch_window_is_shorter_than_the_measured_solo_minimum() -> void
 	var best: int = 100000
 	var how: String = ""
 	var trials: int = 0
-	for weapon: int in [Defs.Weapon.CLUB, Defs.Weapon.SPEAR]:
+	for weapon: int in [Defs.Weapon.CLUB, Defs.Weapon.HAMMER, Defs.Weapon.AXE, Defs.Weapon.BOOMERANG, Defs.Weapon.SPEAR]:
 		hero.run.set_weapon(weapon)
 		for jump_at: int in range(8, 13):
 			for hold: int in [5, 9]:
@@ -518,19 +524,30 @@ func _macros(dir: int) -> Array[PackedInt32Array]:
 # The bot
 # =================================================================================================================
 
-## Plays the solo form with the club: goes to the island edge (or raft) beside the gap the bubbles mark, high-strikes
-## the head as soon as it is up, steps away from the tentacle's shadow and comes back for a second strike; stays by the
-## squid while the jaws are open (the blob arcs over him). With `attack` off it only dodges: it keeps away from the
-## surfacing spot.
+## Plays the solo form with the club: waits on the island edge beside the gap the bubbles mark, 37 px from the
+## squid; when the tentacle marks his spot it steps out from under it on foot (outward, never towards the squid, never
+## over water), comes back, and high-strikes the head once the slam is over (the squid stays up long enough); near the
+## squid the ink blob arcs over him. It never crosses the gap the squid is in (or bubbling up in). With `attack` off it
+## moves the same way and never strikes: the escape test.
 class SquidBot:
 	extends RefCounted
 
 	const SIDE_DX: int = 37
 	const SURFACE_Y: int = 144
+	## Clear of the slam box (12 px either side of its mark) with the hero's half width (16), and a px.
+	const SLAM_CLEAR: int = 29
+	## Never this close to the squid's spot while it occupies it (a dodge slides a few px on).
+	const SQUID_CLEAR: int = 34
+	## Where it waits: at least this far from the edges of the islands (a run takes a few px to stop).
+	const SLIDE_MARGIN: int = 12
+	## A dodge starts from a stand: less slide.
+	const DODGE_MARGIN: int = 6
+	## Up held this long for a jump over a gap: a short hop (a full jump overshoots a 64 px island).
+	const GAP_JUMP_HOLD: int = 5
 	var attack: bool = true
 	var _jump: int = 0
 	var _jump_flags: int = 0
-	var _side: int = -1
+	var _jump_hold: int = 9
 
 	func flags(hero: PlayerBase, squid: Squid, level: LevelBase) -> int:
 		if hero == null or hero.dead or squid == null or squid.dead:
@@ -542,29 +559,42 @@ class SquidBot:
 				_jump = 0
 			else:
 				_jump += 1
-				return _jump_flags | (Defs.IN_UP if _jump <= 9 else 0)
-		var spot_x: int = squid.get_spot()
+				return _jump_flags | (Defs.IN_UP if _jump <= _jump_hold else 0)
+		var spot: int = squid.get_spot()
 		var state: int = squid.get_state()
-		var target: int = _target_x(hero, squid, level, spot_x)
-		# Out from under the tentacle.
+		var occupied: bool = state == Squid.State.BUBBLES or state == Squid.State.RISE or state == Squid.State.UP \
+				or state == Squid.State.SINK
+		# Out from under the tentacle: on foot, on the same ground, not towards the squid.
 		var mark: int = squid.get_slam_mark()
 		var slam: Rect2i = squid.get_slam_rect()
 		var danger: int = mark if mark >= 0 else (slam.get_center().x if slam.size.x > 0 else -1)
-		if danger >= 0 and absi(danger - x) < 34:
-			var away: int = 1 if x >= danger else -1
-			if not _standable(level, squid, x + away * 20):
-				away = -away
-			return _walk(level, squid, hero, x + away * 40)
-		if not attack:
-			# Keep away: the far edge of the current island, never by the spot.
-			var keep: int = _keep_away_x(level, squid, x, spot_x)
-			return _walk(level, squid, hero, keep)
+		if squid.is_whirlpool():
+			danger = -1  # the whirlpool's slam strikes the raft and hurts nobody
+		if danger >= 0 and absi(danger - x) < SLAM_CLEAR and grounded:
+			# Outward (away from the squid) first.
+			var out: int = -1 if danger < spot else 1
+			var best: int = -1
+			for c: int in [danger + out * SLAM_CLEAR, danger - out * SLAM_CLEAR]:
+				if not _same_ground(level, squid, x, c) or not _roomy(level, squid, c, DODGE_MARGIN):
+					continue
+				if occupied and absi(c - spot) < SQUID_CLEAR:
+					continue
+				best = c
+				break
+			if best >= 0:
+				return _step(x, best)
+			return 0
+		var target: int = _target_x(hero, squid, level, spot)
 		if absi(x - target) > 3 or not grounded:
-			return _walk(level, squid, hero, target)
-		var face: int = 1 if spot_x >= x else -1
+			return _go(level, squid, hero, target, spot, occupied)
+		var face: int = 1 if spot >= x else -1
 		if hero.facing != face and not hero.is_striking():
 			return Defs.IN_RIGHT if face > 0 else Defs.IN_LEFT
-		if state == Squid.State.UP or (state == Squid.State.RISE and squid.get_state_ticks() >= 0):
+		# Strike once this surfacing's slam is over (a strike locks him 9 ticks: started before the tentacle marks his
+		# spot, it would keep him under it); the squid stays up long enough for one hit after it.
+		var slam_over: bool = squid.get_state_ticks() > Squid.SQUID_TENTACLE_AT and squid.get_slam_mark() < 0 \
+				and squid.get_slam_rect().size.x == 0
+		if attack and state == Squid.State.UP and slam_over:
 			if squid.hit_cooldown <= 6 or hero.is_striking():
 				return Defs.IN_UP | Defs.IN_FIRE
 		return 0
@@ -573,50 +603,83 @@ class SquidBot:
 	func _target_x(hero: PlayerBase, squid: Squid, level: LevelBase, spot_x: int) -> int:
 		var side: int = -1 if hero.sim_pos.x < spot_x else 1
 		var near: int = spot_x + side * SIDE_DX
-		if _standable(level, squid, near):
+		if _roomy(level, squid, near):
 			return near
 		var far: int = spot_x - side * SIDE_DX
-		if _standable(level, squid, far):
+		if _roomy(level, squid, far):
 			return far
-		return near
+		return hero.sim_pos.x
 
-	func _keep_away_x(level: LevelBase, squid: Squid, x: int, spot_x: int) -> int:
-		var best: int = x
-		var best_score: int = -1
-		for candidate: int in [40, 56, 72, 152, 168, 248, 264, 280]:
-			if not _standable(level, squid, candidate):
-				continue
-			var score: int = absi(candidate - spot_x) * 2 - absi(candidate - x)
-			if score > best_score:
-				best_score = score
-				best = candidate
-		return best
+	## True when going from `a` to `b` passes within SQUID_CLEAR of `spot_x`.
+	static func _passes(a: int, b: int, spot_x: int) -> bool:
+		return mini(a, b) - SQUID_CLEAR < spot_x and spot_x < maxi(a, b) + SQUID_CLEAR
 
-	## Ground (an island) or a raft under the feet at x.
-	func _standable(level: LevelBase, squid: Squid, x: int) -> bool:
+	## Walk (jumping water on the way) towards `goal`; while the squid occupies its spot it never goes past it.
+	func _go(level: LevelBase, squid: Squid, hero: PlayerBase, goal: int, spot_x: int, occupied: bool) -> int:
+		var x: int = hero.sim_pos.x
+		if occupied and _passes(x, goal, spot_x) and not _same_ground(level, squid, x, goal):
+			return 0
+		return _walk(level, squid, hero, goal)
+
+	static func _step(x: int, goal: int) -> int:
+		if absi(goal - x) <= 2:
+			return 0
+		return Defs.IN_RIGHT if goal > x else Defs.IN_LEFT
+
+	## True when every x from `a` to `b` is island ground: no water between.
+	func _same_ground(level: LevelBase, squid: Squid, a: int, b: int) -> bool:
+		var step: int = 4 if b >= a else -4
+		var x: int = a
+		while (step > 0 and x <= b) or (step < 0 and x >= b):
+			if not _standable(level, squid, x):
+				return false
+			x += step
+		return _standable(level, squid, b)
+
+	## Ground under x and `margin` px either side of it: a spot he can stop on from a run.
+	func _roomy(level: LevelBase, squid: Squid, x: int, margin: int = SLIDE_MARGIN) -> bool:
+		return _standable(level, squid, x - margin) and _standable(level, squid, x) and _standable(level, squid, x + margin)
+
+	## Island ground under the feet at x.
+	static func _island(level: LevelBase, x: int) -> bool:
 		var grid: TileGrid = level.grid
-		if TileGrid.is_ground(grid.floor_at(Tuning.to_cell(x), Tuning.to_cell(SURFACE_Y))) \
-				and grid.get_char(Tuning.to_cell(x), Tuning.to_cell(SURFACE_Y)) != TileGrid.CH_LIQUID:
-			return true
-		for raft: SimEntity in squid.get_rafts():
-			if is_instance_valid(raft) and absi(raft.sim_pos.x - x) <= raft.box_xo - 10:
-				return true
-		return false
+		return TileGrid.is_ground(grid.floor_at(Tuning.to_cell(x), Tuning.to_cell(SURFACE_Y))) \
+				and grid.get_char(Tuning.to_cell(x), Tuning.to_cell(SURFACE_Y)) != TileGrid.CH_LIQUID
 
-	## Walk towards `goal`, jumping when the next step is over water.
+	## Ground under the feet at x: island ground only. He never boards a raft - walking onto one from an island drowns
+	## him (his feet leave the island before the raft's ride test can carry him: it carries a hero only while
+	## raft x - 24 < his x < raft x + 16, PHYSICS.md 11.4), and a jump onto one may miss it as it drifts; the squid
+	## surfaces beside the islands as well.
+	func _standable(level: LevelBase, _squid: Squid, x: int) -> bool:
+		return _island(level, x)
+
+	## Walk towards `goal`; at the edge of the ground jump the water ahead when there is ground beyond it (and the goal
+	## lies beyond), else stop at the edge.
 	func _walk(level: LevelBase, squid: Squid, hero: PlayerBase, goal: int) -> int:
 		var x: int = hero.sim_pos.x
 		if absi(goal - x) <= 3:
 			return 0
 		var dir: int = 1 if goal > x else -1
 		var dir_flag: int = Defs.IN_RIGHT if dir > 0 else Defs.IN_LEFT
-		if hero.is_grounded() and not _standable(level, squid, x + dir * 14):
+		if not hero.is_grounded() or _standable(level, squid, x + dir * 14):
+			return dir_flag
+		if absi(goal - x) > 20 and _standable(level, squid, x + dir * 46):
 			_jump = 1
 			_jump_flags = dir_flag
+			_jump_hold = GAP_JUMP_HOLD
 			return dir_flag | Defs.IN_UP
-		return dir_flag
+		return 0
 
 
 ## Recorded by test_the_club_bot_still_wins with SQUID_ROUTE=1 (Beginner, Expert).
-const ROUTE_BEGINNER: String = ""
-const ROUTE_EXPERT: String = ""
+const ROUTE_BEGINNER: String = (
+	"7:R,2:,6:L,1:R,28:,6:R,5:RU,33:R,14:L,1:UF,14:R,1:L,1:,6:L,93:,8:R,13:L,1:UF,14:R,1:L,1:,6:L,3:,2:R,1:L,94:," +
+	"8:R,12:L,2:UF,13:R,9:L,2:,6:R,1:L,91:,8:R,13:L,2:UF,13:R,9:L,1:,8:R,1:L,1:,6:L,82:,8:R,12:L,2:UF,13:R,9:L," +
+	"2:,6:R,1:L,83:,2:R,1:,1:L,41:,8:UF,44:"
+)
+const ROUTE_EXPERT: String = (
+	"7:R,2:,6:L,1:R,28:,6:R,5:RU,33:R,14:L,1:UF,14:R,1:L,1:,6:L,93:,8:R,13:L,1:UF,14:R,1:L,1:,6:L,3:,2:R,1:L,94:," +
+	"8:R,12:L,2:UF,13:R,9:L,2:,6:R,1:L,91:,8:R,13:L,2:UF,13:R,9:L,1:,8:R,1:L,1:,6:L,82:,8:R,12:L,2:UF,13:R,9:L," +
+	"2:,6:R,1:L,61:,4:L,5:LU,34:L,12:R,2:UF,12:L,1:R,1:,6:R,3:,2:L,1:R,91:,8:L,12:R,2:UF,11:L,1:R,7:,1:UF,94:," +
+	"2:L,1:,7:R,3:,2:L,1:R,29:,9:UF,15:,3:UF,117:,8:UF,44:"
+)

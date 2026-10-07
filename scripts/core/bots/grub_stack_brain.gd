@@ -106,7 +106,7 @@ func think(hero: PlayerBase, level: LevelBase, _tick: int) -> void:
 	# FOOD
 	for item: CollectibleBase in BotSenses.items(level):
 		var value: int = BotSenses.food_value(level, item)
-		if value <= 0:
+		if value <= 0 or is_dangerous(item.sim_pos):
 			continue
 		var cost: int = _cost(hero, reach, item.sim_pos)
 		if cost >= NavGraph.UNREACHABLE:
@@ -128,6 +128,8 @@ func think(hero: PlayerBase, level: LevelBase, _tick: int) -> void:
 		if stand.is_empty():
 			continue
 		var stand_pos: Vector2i = Vector2i(int(stand["x"]), graph.nodes[int(stand["node"])].y)
+		if is_dangerous(stand_pos):
+			continue
 		var value: int = SPOT_VALUE_BIG if spot.spot_kind == &"big" else SPOT_VALUE_SMALL
 		var strike: int = BotBrain.strike_ticks(int(stand["kind"])) + spot.cooldown
 		var utility: int = value * SCALE / (cost + COST_BIAS + strike)
@@ -141,7 +143,7 @@ func think(hero: PlayerBase, level: LevelBase, _tick: int) -> void:
 	var banking_now: bool = goal == Goal.BANK
 	if stack > 0 and (stack >= bank_at or banking_now or (rush_near and not rookie())):
 		for pot: SimEntity in BotSenses.cookpots(level):
-			if not BotSenses.pot_usable(level, pot, bot.slot):
+			if not BotSenses.pot_usable(level, pot, bot.slot) or is_dangerous(pot.sim_pos):
 				continue
 			var cost: int = _cost(hero, reach, pot.sim_pos)
 			if cost >= NavGraph.UNREACHABLE:
@@ -293,7 +295,7 @@ func act(hero: PlayerBase, level: LevelBase, tick: int) -> int:
 			nav.set_target(goal_pos, half)
 			var spot: HittableBase = entity as HittableBase
 			if nav.arrived(hero) and hero.is_grounded() and absi(hero.xvel) < 16 and spot != null \
-					and spot.cooldown <= 1:
+					and spot.cooldown <= 1 and may_strike(hero):
 				var kind: int = int(goal_stand.get("kind", STRIKE_FORWARD))
 				var facing: int = int(goal_stand.get("facing", 1))
 				strikes += 1
@@ -310,8 +312,7 @@ func act(hero: PlayerBase, level: LevelBase, tick: int) -> int:
 					return Defs.IN_DOWN
 				nav.set_target(pot.sim_pos, rect.size.x / 2 - 4)
 		Goal.ATTACK:
-			var pos: Vector2i = bot.seen_pos(goal_slot)
-			nav.set_target(pos, 12)
+			nav.set_target(attack_stand(hero, bot.predicted_pos(goal_slot)), 8)
 		_:
 			nav.set_target(goal_pos, 6)
 	return nav.step(hero, tick)

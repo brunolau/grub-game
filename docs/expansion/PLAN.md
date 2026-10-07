@@ -156,6 +156,12 @@ two-stream routes; `arena_totem_ring` playing Grub Stack with two humans and two
 `w5_l1`; the solo search refuses every x2 gate of the two co-op files. Then **pair playtests** with mixed-skill pairs
 on every co-op gate type; window and daze values are tuned and written into DESIGN.md before content production.
 
+**G1 outcome (2026-10-07, commit 7d1306a)**: passed on every automated criterion (1135 tests, single-player
+identical, the slice through the real UI). The pair playtests did not take place: the window and daze values stay at
+their starting values for phase-3 content and the playtests move to P4.5 (they can only shorten windows, which keeps
+every gate solo-impossible). The orchestrator's resolutions and the lead designer's decisions are DESIGN.md "Appendix:
+G1 and phase-2 resolutions"; the phase-3 briefs of worlds 6-9, Feast Land E and the Long Raft Home are DESIGN.md A.6.
+
 ---
 
 ## 5. Phase 2 - entities, bosses, versus modes, UI, art
@@ -231,7 +237,7 @@ co-op routes, belt invariance on all, every x2 gate refused by the search, every
 | P4.2 | core-A / player-A | performance: `--perf` with a two-hero route per world, 4-player arenas; on the Cortex-A53 device: 2-player co-op must meet the 1.0 budget class; 4 heroes on mobile only where the check passes (else capped at 2 there) |
 | P4.3 | ui-B / core-A | devices: shared keyboards (ghosting key test), pads on Windows / Android (reconnect dialog), tablet table mode on a 9-10 inch tablet; touch targets >= 56 art px |
 | P4.4 | audio / art-A | one human listen-through of every music pick; loop seams; licence audit of every new file (manifest, CREDITS, THIRD_PARTY); style review against `_style_tests/biome_all.png` |
-| P4.5 | lead designer | mixed-skill pair playtests of every co-op stage; final *(tune)* values written into DESIGN.md and the specs |
+| P4.5 | lead designer | mixed-skill pair playtests of every co-op stage, including the gate types G1 could not playtest (window and daze values, Batter Up, the lee); an expert told to cheat; final *(tune)* values written into DESIGN.md and the specs |
 | P4.6 | core-A | version 2.0.0, Save v2 migration test on real 1.0 saves, exports (Windows, Android, macOS, iOS presets), `test_core_release` filters, smoke run of the exported build, README / BUILD notes |
 
 ---
@@ -284,7 +290,11 @@ G1 (ARCHITECTURE 11); the A53 device check gates 4-player versus on mobile.
 or taller than 2048 px; `test_core_release` export filters green.
 
 **V7 - Suite budget**: the default `bash .tools/gd.sh test` stays under about 5 minutes; `campaign_routes`, `book2`,
-`coop` and `versus` slow modules run at every gate and before every merge that touches their area.
+`coop` and `versus` slow modules run at every gate and before every merge that touches their area. A slow module is
+listed in `SLOW_FILES` of `tests/run_tests.gd`: a run without a filter skips it with a skip line; it runs by name
+(`bash .tools/gd.sh test coop_gates`) or with `GD_TIMEOUT=900 bash .tools/gd.sh test --slow`. Slow modules today:
+`test_coop_gates` (G1: 66-81 s for the slice's ten gates, the static flood prefilter and the explore cache included)
+and `test_versus_bots` (V4.b).
 
 ---
 

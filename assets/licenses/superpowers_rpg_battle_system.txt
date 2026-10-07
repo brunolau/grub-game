@@ -4,7 +4,7 @@ Superpowers Asset Packs - RPG Battle System
 Author: Pixel-boy (Sparklin Labs)
 Source: https://github.com/sparklinlabs/superpowers-asset-packs/tree/master/rpg-battle-system
 Licence: CC0 1.0 (tier A)
-Used in Club & Grub for: 2.0 (The Far Shore): backgrounds/canyon/ layer1_far_spires; backgrounds/swamp/ layer0_sky; sprites/bosses/ inkjaw_parts, roc_lightning, roc_parts, tusker, tusker_rage; sprites/enemies/ cave_bat, cave_bat_b, ghost, ghost_b, guard, jelly, puffcap, puffcap_b, roller, roller_b, sea_snail, shellback, slime, slime_b + 2 more; tiles/canyon/props/ shell_conch, shell_snail; tiles/coast/props/ shell_conch, shell_snail; tiles/sky/props/ pyre; tiles/swamp/props/ glowcap_big; ui/ crown, stack_food. Per-file sources and edits: docs/ASSET_MANIFEST.md section 17
+Used in Club & Grub for: 2.0 (The Far Shore): backgrounds/canyon/ layer1_far_spires; backgrounds/swamp/ layer0_sky; sprites/bosses/ inkjaw_parts, roc_lightning, roc_parts, tusker, tusker_rage; sprites/enemies/ cave_bat, cave_bat_b, ghost, ghost_b, guard, jelly, puffcap, puffcap_b, roller, roller_b, sea_snail, shellback, slime, slime_b + 2 more; sprites/objects/ drum_cap, spring_cap; tiles/canyon/props/ shell_conch, shell_snail; tiles/coast/props/ shell_conch, shell_snail; tiles/sky/props/ pyre; tiles/swamp/props/ glowcap_big; ui/ crown, medals, mural, paintings, stack_food, world_map_far_shore. Per-file sources and edits: docs/ASSET_MANIFEST.md section 17
 Staging folder: .tools/asset_candidates/expansion/superpowers-rpg-battle-system
 
 ---- Licence evidence recorded when the pack was downloaded ----

@@ -5,12 +5,14 @@ extends ProjectileBase
 ## then falls with the enemy gravity and shatters on the floor. It lives EnemyTuning.STALACTITE_LIFE ticks at most.
 ## A touch costs the hero a heart and scatters bones (Defs.HurtKind.BOSS_PROJECTILE).
 ##
-## Parameters (set by the boss): `life` ticks [66], `skin` [stalactite; `masonry`: the Twin Idols' sandstone block,
-## 2.0 - the same rules, recoloured until art-B's sheet exists].
+## Parameters (set by the boss): `life` ticks [66], `skin` [stalactite; 2.0 (enemies-C) `masonry`: the Twin Idols'
+## sandstone block of art-B's idols_parts sheet - the same rules, another picture].
 
 const FX_DEBRIS: StringName = &"fx/debris"
-## 2.0 (enemies-C): the masonry skin of the Twin Idols (DESIGN.md B.4); a tint of the stalactite picture for now.
+## 2.0 (enemies-C): the masonry skin of the Twin Idols (DESIGN.md B.4): the `masonry` frame of the idols_parts sheet
+## (EnemySkin), else the stalactite picture tinted sandstone.
 const SKIN_MASONRY: String = "masonry"
+const PARTS_SHEET: String = "idols_parts"
 const TINT_MASONRY: Color = Color(1.0, 0.82, 0.55)
 
 var _sprite: Sprite2D = null
@@ -30,8 +32,17 @@ func _apply_params(params: Dictionary) -> void:
 
 func _ready() -> void:
 	_sprite = get_node_or_null(^"Sprite") as Sprite2D
-	if _sprite != null and skin == SKIN_MASONRY:
+	if _sprite == null or skin != SKIN_MASONRY:
+		return
+	var sheet: EnemySkin = EnemySkin.find(PARTS_SHEET)
+	if sheet == null or not sheet.has_anim(&"masonry"):
 		_sprite.self_modulate = TINT_MASONRY
+		return
+	_sprite.texture = load(sheet.texture_path) as Texture2D
+	_sprite.hframes = sheet.columns
+	_sprite.vframes = sheet.rows
+	_sprite.offset = sheet.sprite_offset()
+	_sprite.frame = sheet.anim(&"masonry").x
 
 
 ## True while it still hangs and rattles (tests and tools).

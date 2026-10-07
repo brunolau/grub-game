@@ -1,5 +1,40 @@
 {
  "_meta": {
+  "audio_notes": [
+   "*Audio batch 1 - hand-over from the audio owner to core-A (AudioTable) and art-A (manifest, credits)*",
+   "",
+   "- **Scope**: the whole effects row of DESIGN F.2 (PLAN P1.1 makes AudioTable batch 1 = effects), not only the slice's list, so that no 2.0 effect name is left without a row (`Audio.play_sfx` of a name without a row is an error). Music: only what the slice plays; the rest of F.2's music (worlds 5-9, bosses, battle B / C, sudden-death loop) is batch 2 (P2.6 / P2.11).",
+   "- **Variants with a meaning**: `DUO_HOP` has two files: variant 0 `duo_hop_a.wav` = the boost (Shoulder Hop, Totem launch; F.2's Junkala interaction16), variant 1 `duo_hop_b.wav` = the carry (a rider lands on the carrier; MoxieCat lift). Callers pass the variant (`Audio.play_sfx(Sfx.DUO_HOP, 0 / 1)`); without it the two alternate. `RAFT_SPLASH` (2) and `BAT_HIT` (3) are plain variety variants (cycle).",
+   "- **Shared files**: `drum_beat_a.wav` plays `DRUM`, `COUNT_IN` and `HOT_ROCK_FUSE` (F.2 names Junkala Blip5 for all three; the count-in now beats the very sound the drums make); `splash_heavy_a.wav` plays `SPLASH_HEAVY` and `GEYSER_SPOUT`. A shared file has one volume (tools/audio_loudness.py keys volumes by file).",
+   "- **Round win**: `MUSIC_ROUND_WIN` is MintoDog \"Stage Clear Short\" (F.2's second pick, sibling of the shipped `level_complete_a.ogg`, 3.3 s, carries the scoreboard). E.8's 0.5 s Junkala `fanfare1` gong is not shipped: it would need its own `Sfx` name (a contract request to core-A) and is too short to carry the scoreboard.",
+   "- **Not in batch 1: `MUSIC_VERSUS_SUDDEN_DEATH`** (F.2: Wolfgang_ \"8-Bit Battle Loop\"). It cannot be loop-fixed from the published render: fitted to its 180 BPM grid (190 of 203 onsets, 0.85 ms residual) the 26.65 s file is 22.7 ms short of 80 beats, the music stops 44 ms before the next downbeat and starts after 17 ms of silence, and the track has no rest anywhere else (a dropout plus an early downbeat at every seam); it has no sample-exact internal repeat to cut a loop from either. Batch 2: re-render the author's `famitracker_sources/BattleTheme.ftm` with its loop, or take F.2's runner-up (Junkala Chiptune Heroes \"dangerous encounter A (faster)\"). core-A's stand-in row stays until then. Battle tracks B / C are batch 2.",
+   "- **Chomper bite**: `chomper_bite_a.wav` already holds the growl (dino_voice_b) and the chomp, so a caller plays `CHOMPER_BITE` alone (objects-B's `mount.gd` does); no extra `ENEMY_VOICE`.",
+   "- **Countdown**: `COUNTDOWN_BEEP` is one kheetor beep (played three times); `COUNTDOWN_GO` is Junkala `fanfare2` (E.8: no adult voice). kheetor's own higher 'go' beep is not used (the file cuts it off mid-reverb).",
+   "- **Spear stick**: the F.2 pick (Spring Spring snd_enemyland) is a sub-bass thump (83 % of its energy under 100 Hz), inaudible on phone speakers; it is layered with the shipped wood knock `club_hit_wood_a.wav` and plays at the scenery-hit level of 1.0 (-2 LU). `BRACE` keeps the plain thump (40 Hz high-pass).",
+   "- **Limited files** (true-peak limiter, the least that reaches the target): `tar_glug_a.wav` 8.5 dB off the highest peaks (peak-to-loudness 23.2 -> 14.7 dB); `bat_hit_c.wav` 0.9 dB off the highest peaks (peak-to-loudness 13.1 -> 12.7 dB); `crowd_cheer_a.ogg` 9.8 dB off the highest peaks (peak-to-loudness 21.5 -> 14.7 dB); `level_canyon_a.ogg` 2.4 dB off the highest peaks (peak-to-loudness 18.4 -> 16.4 dB). In the glug and the cheer only 0.1 % or less of the samples (isolated spikes, clap tips) are above the limiter line; unlimited they would play 6-8 LU under their target at the -1 dBTP cap. The canyon theme's limiting is F.2's 'limit'.",
+   "- **Listen-through pending** (P4.4): nothing was auditioned by ear (no audio output on the pipeline machine). Priority for the listen: the canyon theme's limiting, `spear_stick_a` (layer balance), `bat_hit_*` (crack + NES whoosh), `crowd_cheer_a` (limited claps), `countdown_beep_a` against `countdown_go_a` (two authors back to back).",
+   "- **Meter note for core-A** (no action needed for batch 1): `tools/audio_loudness.py` measures a mono file as one channel, while Godot plays a mono stream at full level on both speakers, so every mono file (most 1.0 effects and 26 of these 40) sounds about 3 dB louder than its number next to stereo files. The 1.0 mix already has this bias throughout; batch 1 follows the tool so the two stay consistent.",
+   "- **Boot preload**: `Audio.preload_sfx()` now also loads the 33 batch-1 effect files (2.29 MB on disk; the longest WAV is 2.54 s, the 8.3 s applause stays Vorbis).",
+   "",
+   "*Audio batch 2 - hand-over from the audio owner to core-A (AudioTable) and art-A (manifest, credits)*",
+   "",
+   "DESIGN F.2 asks to cut the nene boss tracks to their loop regions \"(music budget)\"; the budget, as checked by `test_audio_batch2.py`: the 1.0 music is 21 files, 31.0 MB, 926 s (1.48 MB per track, the largest `boss_final_a.ogg` 3.55 MB). Every 2.0 music file stays at most 110 s and 3.55 MB (the largest 1.0 track); the 30 2.0 music files together stay under 30 x the 1.0 average (44.4 MB); the nene loops are at most 90 s. Published OGGs above 256 kbps are re-encoded at q0.6 (the project's transcode quality); the others are byte-identical copies. Result: batch 2 music 35.04 MB (largest file 2.42 MB, longest 106 s), all 2.0 music (batch 1 + 2) 41.42 MB for 30 files (1.38 MB per track); with the 1.0 music the game ships 72.5 MB of music. The five nene renders alone would have been 25.2 MB as q0.6 transcodes (their staged ogg_converted/ copies), the boss loops are 8.7 MB.",
+   "",
+   "- **Nene boss tracks** (F.2: \"cut to 60-90 s loop regions\"): each published render plays one loop several times (per-bar spectral similarity 0.98-1.00 at the repeat lag; the WAV masters were re-fetched, the staged OGGs are transcodes of them). #1 (Tusker) is a 24-bar loop played 4 times, #6 (Storm Roc) a 24-bar loop twice, #2 (Mangrove) a 4-bar intro and a 32-bar loop 4 times: one pass of each is the whole composition (50.9 / 49.8 / 52.9 s) - shorter than 60 s, but a longer region would only repeat the same music inside the file. #3 (Chieftains) plays a 24-bar loop 5 times in three variations and #4 (Inkjaw) a 20-bar theme in three variations: their regions take two different variations (79.4 / 84.2 s). The renders' 3.3-3.6 min (5-6 MB each) became 1.3-2.4 MB.",
+   "- **Seam splices**: where a region is cut out of a render (nene, Typhoon's Theme, Go), the loop starts with the render's own continuation of the region's last frame and crossfades (2-20 ms) into the region's first bar at the moment the two takes agree best; the seam itself is then exactly what the composer's render plays.",
+   "- **6-2 Haunted House: F.2's 'trim the 123 ms tail' is NOT applied**: the master is 112 beats at 150 BPM within 3 ms; the 120 ms of silence at the end is the last beat's staccato rest (the track has 139 ms rests inside); trimming it would make every pass 120 ms short of its bar.",
+   "- **9-1b Typhoon's Theme v3**: F.2 says 'trim the 82 ms lead'; the render also ends with the first 84 ms of the next pass's downbeat (cut off by a fade). The loop is the region from the first sound to that second downbeat (104 beats, matched by the attack envelope), spliced on it.",
+   "- **Tallbeard export tails**: Penultimate (8-2) and Go (battle C) play at exactly 140 / 170 BPM but are 13.7 / 12.9 ms longer than 152 / 200 beats; cut to the exact length (Penultimate's extra is a near-silent tail, dropped; Go's extra is the start of the next pass, spliced). Connected (batch 1), Out of Time and Pixel War 1 are 3-10 ms longer than their nominal bars too, but their music runs 0.01 % slow by the same onset fit (a uniform resampling: the file IS the loop) - kept as published.",
+   "- **9-1 Upbeat Overworld**: kept as published (no gap, no click at the seam); its FamiTracker tempo is not exactly constant, so its bar-exactness is only known to +/-20 ms (the test allows 25 ms). First item for the listen-through.",
+   "- **Sudden death**: F.2's Wolfgang_ \"8-Bit Battle Loop\" cannot loop (batch 1: 22.7 ms short of 80 beats, a dropout at the seam, no internal repeat; a loop offset cannot lengthen a loop that is too short, and re-rendering the author's .ftm needs FamiTracker, a Windows GUI tracker with no headless export). F.2's runner-up ships: Junkala Chiptune Heroes \"dangerous encounter A (faster)\" (designed as a loop: 32 beats at 97.5 BPM to 0.2 ms; 19.7 s, the round's last minute or less).",
+   "- **Limited** (the least circular true-peak limiting that lets a loop reach -18 LUFS under -1 dBTP, as the canyon theme): `level_spore_a.ogg` 1.2 dB off the highest peaks (peak-to-loudness 17.6 -> 16.4 dB); `level_sky_climb_a.ogg` 1.3 dB off the highest peaks (peak-to-loudness 17.6 -> 16.4 dB); `level_storm_glide_a.ogg` 1.4 dB off the highest peaks (peak-to-loudness 17.8 -> 16.4 dB). Battle C's +2.0 dBTP (F.2 'limit') and the Idols' hot master (F.2 'vol -12') need no limiting: their peak-to-loudness ratios are 15 / 7.7 dB, so the AudioTable volume (-1.4 / -12.0 dB) keeps them under -1 dBTP.",
+   "- **Lightning (`Sfx.LIGHTNING_STRIKE`, core-A's phase-2 name; F.2 has no pick)**: MoxieCat's 8-bit `lightningstrike` (CC0, the pack of the batch-1 curl and bat whoosh), an NES noise crash: lead silence cut, kept for 1.5 s with a 500 ms fade (the published file decays for 2.2 s and carries 2.2 s of silence), so repeated bolts (the Roc's phase 3, Cloud Top) do not pile up. A realistic thunder (rubberduck `sfx100v2_thunder_01`) was the alternative; it does not match the chiptune mix. Proposed F.2 row for the lead designer: \"lightning bolt: MoxieCat lightningstrike\".",
+   "- **Round gong (new name `Sfx.ROUND_GONG`)**: E.8 / F.2's Junkala `fanfare1` at the gong that ends a round (byte-identical copy, 0.52 s). Batch 1 could not ship it: it needed a new `Sfx` name (contract file, core-A) and a caller; core-A added `Sfx.ROUND_GONG` and `Flow.end_round` plays it once per round, before the deciding moment / scoreboard.",
+   "- **Battle B / C**: an arena that names a battle track plays the round's track instead (core-A's `VersusMatch.round_music`: A, B, C in turn from round to round; `Flow._play_round_music`), so all three battle loops are heard in a match whatever the arena names.",
+   "- **Listen-through pending** (P4.4): nothing was auditioned by ear. Priority: `level_sky_climb_a` (seam timing), the five nene splices (crossfade between two takes), `level_storm_glide_a` and `versus_battle_c` (splices on the next pass's start), the limited `level_spore_a` / `level_sky_climb_a` / `level_storm_glide_a`, the sudden-death runner-up's mood.",
+   "- **Meter note** (as batch 1): mono files (5 of these 25) sound about 3 dB louder than their number next to stereo files in Godot; the 1.0 mix has the same bias.",
+   ""
+  ],
   "audio_packs": {
    "audio/basto_nes-sounds": {
     "author": "Ba\u015dto",
@@ -75,7 +110,7 @@
    },
    "audio/moxiecat_8bit-platformer-sfx": {
     "author": "MoxieCat",
-    "count": 5,
+    "count": 6,
     "file": "assets/licenses/moxiecat_8bit_platformer_sfx.txt",
     "license": "CC0 1.0",
     "new": false,
@@ -318,7 +353,7 @@
    },
    "pixelboy-ninja-adventure-full": {
     "author": "Pixel-boy and AAA",
-    "count": 56,
+    "count": 60,
     "file": "assets/licenses/pixelboy_ninja_adventure.txt",
     "license": "CC0 1.0",
     "title": "Ninja Adventure - Asset Pack"
@@ -332,21 +367,21 @@
    },
    "superpowers-prehistoric-platformer": {
     "author": "Pixel-boy (Sparklin Labs)",
-    "count": 242,
+    "count": 250,
     "file": "assets/licenses/superpowers_prehistoric_platformer.txt",
     "license": "CC0 1.0",
     "title": "Superpowers Asset Packs - Prehistoric Platformer"
    },
    "superpowers-rpg-battle-system": {
     "author": "Pixel-boy (Sparklin Labs)",
-    "count": 31,
+    "count": 37,
     "file": "assets/licenses/superpowers_rpg_battle_system.txt",
     "license": "CC0 1.0",
     "title": "Superpowers Asset Packs - RPG Battle System"
    },
    "superpowers-western-fps-2d": {
     "author": "Pixel-boy (Sparklin Labs)",
-    "count": 30,
+    "count": 32,
     "file": "assets/licenses/superpowers_western_fps_2d.txt",
     "license": "CC0 1.0",
     "title": "Superpowers Asset Packs - Western FPS 2D"
@@ -2049,6 +2084,37 @@
   "true_peak_dbtp": -10.26,
   "volume_db": 3.6
  },
+ "assets/audio/sfx/lightning_strike_a.wav": {
+  "audio_packs": [
+   "audio/moxiecat_8bit-platformer-sfx"
+  ],
+  "bus": "SFX",
+  "bytes": 130726,
+  "channels": 1,
+  "edits": "MoxieCat's 8-bit lightning strike (the 1.0 / batch-1 pack of the curl and the bat whoosh: an NES noise crash that decays over 2.2 s, then 2.2 s of digital silence): 81 ms of leading silence cut, the crash kept for its first 1.5 s (it is 10 dB down by then) with a 500 ms fade-out, so that the Roc's and Cloud Top's repeated bolts do not pile up; mono; stored at -1 dBTP",
+  "format": "WAV PCM_16",
+  "handover": "audio_batch2.json",
+  "kind": "sfx",
+  "license": "CC0 1.0",
+  "loop": false,
+  "loop_region_frames": null,
+  "lufs_integrated": -14.65,
+  "lufs_short": -9.36,
+  "names": [
+   "LIGHTNING_STRIKE"
+  ],
+  "owner": "audio",
+  "played_at": "-14.0 LUFS short, -5.6 dBTP",
+  "rate": 44100,
+  "role": "a lightning bolt strikes (zones/lightning: 9-1b, Cloud Top, the Storm Roc's phase 3)",
+  "seconds": 1.482,
+  "section": "audio",
+  "sha256": "4b2c4661df9b029198bbc050bf9a31bfcfc6dcd3cbdc92eef67286fb944aca20",
+  "source": "moxiecat_8bit-platformer-sfx: lightningstrike.wav",
+  "target": -14.0,
+  "true_peak_dbtp": -1.0,
+  "volume_db": -4.6
+ },
  "assets/audio/sfx/party_join_a.wav": {
   "audio_packs": [
    "audio/ctske_8bit-sound-effects"
@@ -2226,7 +2292,7 @@
   "owner": "audio",
   "played_at": "-14.0 LUFS short, -9.8 dBTP",
   "rate": 44100,
-  "role": "versus: the gong that ends a round (before the deciding moment / scoreboard); needs the new name Sfx.ROUND_GONG",
+  "role": "versus: the gong that ends a round (Flow.end_round, before the deciding moment / scoreboard)",
   "seconds": 0.516,
   "section": "audio",
   "sha256": "f66509a79af67f2cc3efd3c524d54809c2be2235bf27562e5d6fd0542c2fcad3",
@@ -3707,7 +3773,7 @@
    22,
    36
   ],
-  "edits": "re-packed on a uniform 96x96 grid (8 x 5 cells), pivot (cell_w / 2, cell_h - 16); rival's 36 frames in source order: skin colours -> #1a1820, #2a2834, #3c3a48, #54525e, the darker face shade (cheeks, mouth) -> war paint #e8dcc0, the green loincloth -> #6e6252, #a49680, #d8ccb0; the anchor dino skull (item 57, gradient-mapped bone) worn over the head of every standing frame (covering the figure's top 9 rows, centred 2 px behind them; roll, hurt and lying frames bare); the cell grows upward for the headdress, pivot = rival's feet point",
+  "edits": "re-packed on a uniform 96x96 grid (8 x 5 cells), pivot (cell_w / 2, cell_h - 16); rival's 36 frames in source order: skin colours -> #1a1820, #2a2834, #3c3a48, #54525e, the darker face shade (cheeks, mouth) -> war paint #e8dcc0 (the far side of the body, the same red in rival.png, -> the lighter slate #4c4858), the green loincloth -> #6e6252, #a49680, #d8ccb0; the anchor dino skull (item 57, gradient-mapped bone) worn over the head of every standing frame (covering the figure's top 9 rows, centred 2 px behind them; roll, hurt and lying frames bare); the cell grows upward for the headdress, pivot = rival's feet point",
   "facing": "right",
   "frame": [
    96,
@@ -3843,7 +3909,7 @@
    22,
    36
   ],
-  "edits": "re-packed on a uniform 96x96 grid (8 x 5 cells), pivot (cell_w / 2, cell_h - 16); rival's 36 frames in source order: skin colours -> #5a3410, #8a5a1e, #b8842e, #dcae50, the darker face shade (cheeks, mouth) -> war paint #c0281e, the green loincloth -> #4a1612, #7a2418, #a83a22; the anchor dino skull (item 58, gradient-mapped red-stained) worn over the head of every standing frame (covering the figure's top 9 rows, centred 2 px behind them; roll, hurt and lying frames bare); the cell grows upward for the headdress, pivot = rival's feet point",
+  "edits": "re-packed on a uniform 96x96 grid (8 x 5 cells), pivot (cell_w / 2, cell_h - 16); rival's 36 frames in source order: skin colours -> #5a3410, #8a5a1e, #b8842e, #dcae50, the darker face shade (cheeks, mouth) -> war paint #c0281e (and the far side of the body, the same red in rival.png), the green loincloth -> #4a1612, #7a2418, #a83a22; the anchor dino skull (item 58, gradient-mapped red-stained) worn over the head of every standing frame (covering the figure's top 9 rows, centred 2 px behind them; roll, hurt and lying frames bare); the cell grows upward for the headdress, pivot = rival's feet point",
   "facing": "right",
   "frame": [
    96,
@@ -4739,6 +4805,13 @@
     ],
     "loop": false
    },
+   "land": {
+    "fps": 1,
+    "frames": [
+     4
+    ],
+    "loop": false
+   },
    "perch": {
     "fps": 1,
     "frames": [
@@ -4913,7 +4986,7 @@
    18,
    17
   ],
-  "edits": "re-packed on a uniform 160x88 grid (8 x 1 cells), pivot (cell_w / 2, cell_h - 16); feather = anchor feathers 43 / 44 gradient-mapped to slate with a gold tip (1x) and the first mirrored (flutter); storm_mark = the Ninja Adventure cloud (2x) in dark slate-violet, the darkening cloud that marks a struck column 22 ticks ahead (a lit and a dim frame); gust = the RPG wind swirl (frames 2-4) in pale storm greys (the gale's direction cue)",
+  "edits": "re-packed on a uniform 160x88 grid (8 x 1 cells), pivot (cell_w / 2, cell_h - 16); feather = anchor feathers 43 / 44 gradient-mapped to slate with a gold tip (1x) and the first mirrored (flutter); storm_mark = the Ninja Adventure cloud silhouette (2x) shaded as a thunderhead (anchor outline inside the silhouette, 2 px rim light on the lobes, slate body, 5 px dark belly; the lit frame adds a small yellow spark in the belly), the darkening cloud that marks a struck column 22 ticks ahead (lit and dim frames alternate); gust = the RPG wind swirl (frames 2-4) in pale storm greys (the gale's direction cue)",
   "facing": "front",
   "frame": [
    160,
@@ -6955,7 +7028,7 @@
   ],
   "body_box_logical": [
    24,
-   14
+   18
   ],
   "edits": "re-packed on a uniform 80x56 grid (8 x 2 cells), pivot (cell_w / 2, cell_h - 16); idle = the shipped treasure chest's cell 0 unchanged (the container's closed chest); windup = the 10-tick shudder (the chest 1 px left / right) and the lid lifted (cell 1) with two glowing eyes (#ffe060, a dark pupil) in its gap; bite = the open chest (cells 2-3) with white fangs on the rim and the lid's edge, a red tongue and the eyes, lunging 3 / 6 px forward; awake / recover = the lifted lid with eyes and a blink; hurt = a 50 % white flash and a jolt; dead = the open chest in dull grey-brown; eyes, fangs and tongue drawn by the pipeline",
   "facing": "right",
@@ -7203,7 +7276,7 @@
   ],
   "body_box_logical": [
    16,
-   16
+   15
   ],
   "edits": "re-packed on a uniform 32x64 grid (8 x 2 cells), pivot (cell_w / 2, cell_h - 32); outline #141b1b -> #272018; integer 2x (DESIGN F.1); front frames (column 0) = idle / hang, side frames (column 3, facing right) = walk; hurt / dead = side frames upside down; hang = the front view upside down (on the ceiling)",
   "facing": "right",
@@ -7910,8 +7983,8 @@
    35
   ],
   "body_box_logical": [
-   30,
-   18
+   26,
+   15
   ],
   "edits": "per frame: the RPG spiral shell (outline -> #272018, 1x) laid over the turtle's hexagon shell (centred on its bounding box, bottoms aligned); the teal body gradient-mapped to a grey sea slug (#4a5a6a-#d8e2e4); layout, frames and pivot unchanged (EnemySkin 'turtle' row: 64x56, 8x3, pivot (32, 40))",
   "facing": "right",
@@ -9275,7 +9348,10 @@
   "kind": "object",
   "license": "CC0 1.0",
   "note": "twin drums made of glowing caps (6-2 Spore Hollow co-op; objects-A drum.gd): exactly the layout of drum.png - 5 cells of 40 x 44, pivot (20, 44), 0 idle, 1-2 struck, 3 lit (waiting for its bond partners), 4 struck while lit",
-  "origin_packs": [],
+  "origin_packs": [
+   "superpowers-prehistoric-platformer",
+   "superpowers-rpg-battle-system"
+  ],
   "owner": "art-A",
   "pivot": [
    20,
@@ -9563,6 +9639,7 @@
   "license": "CC0 1.0",
   "note": "driftwood drop floe (`objects/platform` default skin of the `coast` biome, 7-2 Sea Caves; objects-A platform_skin.gd): the layout of platform_wood.png, 96 x 16, pivot (48, 0) = top centre = the standing surface (box 48 x 8 logical)",
   "origin_packs": [
+   "pixelboy-ninja-adventure-full",
    "superpowers-prehistoric-platformer"
   ],
   "owner": "art-A",
@@ -9867,18 +9944,18 @@
   "source": "shipped 2.0 sprites/objects/seesaw_plank.png (shipped sprites/objects/platform_wood.png + superpowers-prehistoric-platformer: items/15.png)"
  },
  "assets/sprites/objects/spawn_point.png": {
-  "edits": "a flat 48 x 15 slab ellipse in the code stone's sandstone colours (2 px #272018 outline, lit upper left, shaded front) with a 12 x 7 cave-paint spiral in ochre; lit frames recolour the spiral to a hero colour's loincloth fill / shadow (hero_palettes ui ramp) or to the anchor's light yellow",
+  "edits": "a flat 48 x 15 slab ellipse in the code stone's sandstone colours (2 px #272018 outline, lit upper left, shaded front) with a 12 x 7 cave-paint spiral in ochre; lit frames recolour the spiral to a slot's loincloth fill / shadow (hero_palettes ui ramp) or to the anchor's light yellow",
   "frame": [
    48,
    16
   ],
   "grid": [
-   8,
+   6,
    1
   ],
   "kind": "object",
   "license": "CC0 1.0",
-  "note": "`objects/spawn_point index=2..4` (arenas; `@` is spawn 1): a floor marker drawn behind the heroes, 3 x 1 cells, pivot (24, 16) = floor, bottom-centre on the spawn cell. 0 idle (ochre), 1-4 = the spawn about to be used by P1-P4 (the 48-tick respawn wait: show the respawning player's colour - 1 yellow, 2 blue, 3 pink, 4 green), 5 neutral light (round start, every pad lit), 6 white, 7 gold (the two other hero colours, phase 2)",
+  "note": "`objects/spawn_point index=2..4` (arenas; `@` is spawn 1): a floor marker drawn behind the heroes, 6 x 1 cells, pivot (24, 16) = floor, bottom-centre on the spawn cell. 0 idle (ochre), 1-4 = the spawn about to be used by P1-P4 (the 48-tick respawn wait: show the respawning player's slot colour), 5 neutral light (round start, every pad lit). The pad in every hero colour: spawn_point_lit.png",
   "origin_packs": [
    "own",
    "superpowers-prehistoric-platformer"
@@ -9890,10 +9967,47 @@
   ],
   "section": "versus",
   "size": [
-   384,
+   288,
    16
   ],
   "source": "shipped sprites/objects/code_stone.png (colours) - the slab and the spiral drawn by the pipeline"
+ },
+ "assets/sprites/objects/spawn_point_lit.png": {
+  "edits": "the spawn pad's spiral recoloured to each hero colour's loincloth fill / shadow (hero_palettes ui ramp)",
+  "frame": [
+   48,
+   16
+  ],
+  "grid": [
+   6,
+   1
+  ],
+  "kind": "object",
+  "license": "CC0 1.0",
+  "note": "the spawn pad lit in the colour the respawning player wears: cell = colour in UiPlayers.PALETTE_COLOURS order (0 yellow, 1 blue, 2 pink, 3 green, 4 white, 5 gold), same 48 x 16 cell and pivot (24, 16) as spawn_point.png (whose cells 1-4 are the slot defaults yellow, blue, pink, green); for a player who picked another colour in the lobby or wears white on a green arena",
+  "origin_packs": [
+   "own",
+   "superpowers-prehistoric-platformer"
+  ],
+  "owner": "art-A",
+  "pivot": [
+   24,
+   16
+  ],
+  "rows": [
+   "yellow",
+   "blue",
+   "pink",
+   "green",
+   "white",
+   "gold"
+  ],
+  "section": "versus",
+  "size": [
+   288,
+   16
+  ],
+  "source": "shipped sprites/objects/code_stone.png (colours) - the slab and the spiral drawn by the pipeline (the pad of sprites/objects/spawn_point.png)"
  },
  "assets/sprites/objects/spring_cap.png": {
   "anims": {
@@ -9929,7 +10043,8 @@
   "license": "CC0 1.0",
   "note": "glowing mushroom-cap spring (6-2 Spore Hollow: 'caps are springs'; objects-A spring.gd): exactly the layout of spring.png - 5 cells of 64 x 26, pivot (32, 26), idle 0, bounce 1, 2, 3, 4, 0 @16 fps",
   "origin_packs": [
-   "superpowers-prehistoric-platformer"
+   "superpowers-prehistoric-platformer",
+   "superpowers-rpg-battle-system"
   ],
   "owner": "art-A",
   "pivot": [
@@ -10325,7 +10440,9 @@
   "kind": "lut",
   "license": "CC0 1.0",
   "note": "hero colour 'blue'",
-  "origin_packs": [],
+  "origin_packs": [
+   "own"
+  ],
   "owner": "art-A",
   "section": "palettes",
   "size": [
@@ -10347,7 +10464,9 @@
   "kind": "lut",
   "license": "CC0 1.0",
   "note": "hero colour 'gold'",
-  "origin_packs": [],
+  "origin_packs": [
+   "own"
+  ],
   "owner": "art-A",
   "section": "palettes",
   "size": [
@@ -10369,7 +10488,9 @@
   "kind": "lut",
   "license": "CC0 1.0",
   "note": "hero colour 'green'",
-  "origin_packs": [],
+  "origin_packs": [
+   "own"
+  ],
   "owner": "art-A",
   "section": "palettes",
   "size": [
@@ -10415,7 +10536,9 @@
   "kind": "lut",
   "license": "CC0 1.0",
   "note": "hero colour 'pink'",
-  "origin_packs": [],
+  "origin_packs": [
+   "own"
+  ],
   "owner": "art-A",
   "section": "palettes",
   "size": [
@@ -10437,7 +10560,9 @@
   "kind": "lut",
   "license": "CC0 1.0",
   "note": "hero colour 'white'",
-  "origin_packs": [],
+  "origin_packs": [
+   "own"
+  ],
   "owner": "art-A",
   "section": "palettes",
   "size": [
@@ -10459,7 +10584,9 @@
   "kind": "lut",
   "license": "CC0 1.0",
   "note": "hero colour 'yellow' (= key: the 1.0 look)",
-  "origin_packs": [],
+  "origin_packs": [
+   "own"
+  ],
   "owner": "art-A",
   "section": "palettes",
   "size": [
@@ -10877,7 +11004,9 @@
   "kind": "data",
   "license": "CC0 1.0",
   "note": "colour names -> LUT roles (hex), slot defaults, arena swaps, pattern list, cloth window, UI colours",
-  "origin_packs": [],
+  "origin_packs": [
+   "own"
+  ],
   "owner": "art-A",
   "section": "palettes",
   "source": "build_hero_palettes.py"
@@ -10896,7 +11025,9 @@
   "kind": "terrain",
   "license": "CC0 1.0",
   "note": "canyon skin of the ':' tar-floor tile (Tusker's wallow, mud flats); collision = the tar floor's, drawn by world",
-  "origin_packs": [],
+  "origin_packs": [
+   "superpowers-prehistoric-platformer"
+  ],
   "owner": "art-B",
   "section": "worlds",
   "size": [
@@ -13663,7 +13794,9 @@
   "kind": "terrain",
   "license": "CC0 1.0",
   "note": "the ':' tar floor for `liquid = tar` on every biome (the layout of tiles/canyon/mud_floor.png: 0 top_left, 1 top, 2 top_right, 3 fill; drawn surface at art row 6, collision at row 12); identical to the Tar Fen's own tiles/swamp/tar_floor.png (staged by art-B as `staged/common/tar_floor.png`, given this home by art-A)",
-  "origin_packs": [],
+  "origin_packs": [
+   "superpowers-prehistoric-platformer"
+  ],
   "owner": "art-B",
   "section": "worlds",
   "size": [
@@ -17263,7 +17396,9 @@
   "kind": "terrain",
   "license": "CC0 1.0",
   "note": "swamp skin of the ':' tar-floor tile (`liquid = tar`: 6-1 tar flats, 6-2b); collision and slowing are the tar floor's, drawn by world-A (same 4-tile layout as tiles/canyon/mud_floor.png)",
-  "origin_packs": [],
+  "origin_packs": [
+   "superpowers-prehistoric-platformer"
+  ],
   "owner": "art-B",
   "section": "worlds",
   "size": [
@@ -17395,7 +17530,11 @@
   "kind": "frame",
   "license": "CC0 1.0",
   "note": "the left frame of a coast arena on screens wider than 20 cells (mirror it for the right side); suggested home assets/ui/arena/frame_coast.png beside frame_jungle.png (staged by art-B as `staged/arena/frame_coast.png`, given this home by art-A)",
-  "origin_packs": [],
+  "origin_packs": [
+   "pixelboy-ninja-adventure-full",
+   "superpowers-prehistoric-platformer",
+   "superpowers-western-fps-2d"
+  ],
   "owner": "art-B",
   "section": "worlds",
   "size": [
@@ -17419,6 +17558,7 @@
   "license": "CC0 1.0",
   "note": "the left frame of a feast arena on screens wider than 20 cells (mirror it for the right side); suggested home assets/ui/arena/frame_feast.png beside frame_jungle.png (staged by art-B as `staged/arena/frame_feast.png`, given this home by art-A)",
   "origin_packs": [
+   "own",
    "superpowers-prehistoric-platformer"
   ],
   "owner": "art-B",
@@ -17427,7 +17567,7 @@
    160,
    360
   ],
-  "source": "assets/tiles/feast/terrain_biscuit.png, assets/tiles/sky/props/cloud_puff.png"
+  "source": "assets/tiles/feast/props/cherries.png, assets/tiles/feast/props/cream_swirl.png, assets/tiles/feast/props/honey_drips_a.png, assets/tiles/feast/props/jelly_pink.png, assets/tiles/feast/props/pudding.png, assets/tiles/feast/props/wafer_sticks.png, assets/tiles/feast/terrain_biscuit.png"
  },
  "assets/ui/arena/frame_ice.png": {
   "edits": "the biome's terrain fill tile at 45 % brightness as a wall, its right-edge tile column at 70 % on the inner edge, props darkened to 62 % (outline kept), fill #1c2a3c, a 2 px #272018 edge on the arena side (the frame_jungle.png recipe)",
@@ -17494,6 +17634,7 @@
   "license": "CC0 1.0",
   "note": "the left frame of a keep arena on screens wider than 20 cells (mirror it for the right side); suggested home assets/ui/arena/frame_keep.png beside frame_jungle.png (staged by art-B as `staged/arena/frame_keep.png`, given this home by art-A)",
   "origin_packs": [
+   "pixelboy-ninja-adventure-full",
    "superpowers-prehistoric-platformer"
   ],
   "owner": "art-B",
@@ -17518,7 +17659,10 @@
   "kind": "frame",
   "license": "CC0 1.0",
   "note": "the left frame of a swamp arena on screens wider than 20 cells (mirror it for the right side); suggested home assets/ui/arena/frame_swamp.png beside frame_jungle.png (staged by art-B as `staged/arena/frame_swamp.png`, given this home by art-A)",
-  "origin_packs": [],
+  "origin_packs": [
+   "pixelboy-ninja-adventure-full",
+   "superpowers-prehistoric-platformer"
+  ],
   "owner": "art-B",
   "section": "worlds",
   "size": [
@@ -17740,14 +17884,16 @@
   "kind": "ui",
   "license": "CC0 1.0",
   "note": "belt icon next to the hearts (C.1 rule 5, 16 x 16 logical): what a Swap brings. Cells: 0 club, 1 hammer, 2 axe, 3 boomerang (= the swirling axe), 4 spear",
-  "origin_packs": [],
+  "origin_packs": [
+   "superpowers-prehistoric-platformer"
+  ],
   "owner": "art-A",
   "section": "ui",
   "size": [
    160,
    32
   ],
-  "source": "shipped sprites/items/weapon_club / hammer / axe / boomerang.png and the 2.0 weapon_spear.png"
+  "source": "shipped sprites/items/weapon_club.png, sprites/items/weapon_hammer.png, sprites/items/weapon_axe.png, sprites/items/weapon_boomerang.png and the 2.0 sprites/items/weapon_spear.png"
  },
  "assets/ui/medals.png": {
   "edits": "a 28 px gold disc (2 px darker rim, lit upper left, shaded lower right, a glint) with an engraved emblem drawn by the pipeline (8-10 px glyphs at double size, the 12 px bounce arcs at 1x) with a light lip under every stroke",
@@ -17784,7 +17930,8 @@
   "license": "CC0 1.0",
   "note": "the medal discs of the co-op tally (D.11, PlayerRun.COOP_MEDALS order: cells 0-5 = most_food, best_bounce_chain, hatchling, slugger, strongman, clumsiest) and of the versus awards (E.8, PlayerRun.VERSUS_AWARDS order: cells 6-18 = leaning_tower, pickpocket, glutton, butterfingers, chain_gang, clang_master, slugger, home_run, hot_potato, lava_lover, head_case, comeback_caveman, pacifist); `ids` names every cell (co-op ones prefixed coop_). The screen draws the ribbon in the winner's colour and the disc over it; pivot (16, 16) = the disc's centre. Emblems: apple, bounce arcs, hatching egg, club and ball, boulder, banana peel; tilted food tower, grabbing hand, drumstick, dropped food, chain, crossed clubs, club and ball, ball arc, hot rock, flame, bonked head, up arrow, flower",
   "origin_packs": [
-   "own"
+   "own",
+   "superpowers-rpg-battle-system"
   ],
   "owner": "art-A",
   "pivot": [
@@ -17813,7 +17960,8 @@
   "note": "the Cave Painting mural (C.9): the story of Book II painted on the slab - the homecoming feast, the Storm Roc carrying off the Great Roast with Gorm and Gulla, the raft, the five lands and their guardians, the last stand at the pyre and the feast at home. 30 pieces of 24 x 16 (`pieces`): painting i shows the rect (i % 6 * 24, i / 6 * 16, 24, 16) in the slab's socket i once found. The whole mural is the last picture of The Long Raft Home when all 30 are found (draw it at an integer scale, 2x = 288 x 160 or 3x = 432 x 240, ideally inside painting_slab.png at the same scale)",
   "origin_packs": [
    "own",
-   "superpowers-prehistoric-platformer"
+   "superpowers-prehistoric-platformer",
+   "superpowers-rpg-battle-system"
   ],
   "owner": "art-A",
   "pieces": {
@@ -17910,7 +18058,8 @@
   "note": "the 30 Cave Paintings as pictures (C.9; ui-A's slab, unlocks screen and mural): cell = painting index 0..29, 32 x 32, ochre on transparent - draw them on stone. `themes` gives each index the level whose story it suits (0-19 the Book II levels in campaign order, 20-29 the Book I co-op secrets); the designers' index choice wins. ui/mural.png is the alternative where the 30 pieces assemble one picture",
   "origin_packs": [
    "own",
-   "superpowers-prehistoric-platformer"
+   "superpowers-prehistoric-platformer",
+   "superpowers-rpg-battle-system"
   ],
   "owner": "art-A",
   "section": "far_shore",
@@ -18384,7 +18533,7 @@
   "source": "drawn by the pipeline in the four colours of shipped sprites/objects/pot.png (clay) and the colour's UI ramp (palettes/hero_palettes.json)"
  },
  "assets/ui/world_map_far_shore.png": {
-  "edits": "the 1.0 sky and sea rebuilt exactly as the 1.0 map; four copies of island-1's big island (made narrower by a slice out of the middle at the best-matching seam, some mirrored) and its grey rocks, recoloured by exact swaps (mesa reds, fen bark and tar, coral and pale sand, jungle with sandstone, storm slate); on them a canyon mesa and the far spire (palette-snapping gradient maps), the swamp dead tree on the mangrove trunk under murky canopies (the giant mangrove), tar pools in the tar liquid's colours; drawn by the pipeline in background-element style (flat tones, no outline): three tiny cacti, the temple gate with two jade idols, the lightning bolts, and the storm cloud's silhouette (round puffs filled with cloud-1's own three tones in slate); every prop's anchor outline turned into its darkest shade",
+  "edits": "the 1.0 sky and sea rebuilt exactly as the 1.0 map; four copies of island-1's big island (made narrower by a slice out of the middle at the best-matching seam, some mirrored) and its grey rocks, recoloured by exact swaps (mesa reds, fen bark and tar, coral and pale sand, jungle with sandstone, storm slate; the coral group's cut flank sloped down to its foam); on them a canyon mesa (its foot carried down behind the island) and the far spire (palette-snapping gradient maps), the swamp dead tree on the mangrove trunk under murky canopies (the giant mangrove), tar pools in the tar liquid's colours; drawn by the pipeline in background-element style (flat tones, no outline): three tiny cacti, the temple gate with two jade idols, the lightning bolts, and the storm cloud's silhouette (round puffs filled with cloud-1's own three tones in slate); every prop's anchor outline turned into its darkest shade",
   "frame": [
    1280,
    360
@@ -18443,7 +18592,9 @@
   },
   "note": "Book II's map page (A.1, ui-A P2.8): the second 1280 x 360 page, east of the home islands, drawn like world_map_background.png (SKY_COLOR / SEA_COLOR fill beyond it). Islands left to right: 5 the red mesa, 6 the tar delta with the giant mangrove, 7 the coral coast with its sea stacks, 8 the idol isle with its temple gate, 9 the spire into the storm; the speck on the far-left horizon is home. `markers` (map px, by 'world-stage') = the 11 stops on sand or grass with their number plates clear (world_map.gd MARKERS_B2); every marker y is at most 238, so the sea under y 262 stays free for the painting slab that world_map.gd draws as screen UI in the lower-right corner",
   "origin_packs": [
-   "superpowers-prehistoric-platformer"
+   "superpowers-prehistoric-platformer",
+   "superpowers-rpg-battle-system",
+   "superpowers-western-fps-2d"
   ],
   "owner": "art-A",
   "section": "far_shore",
@@ -18451,6 +18602,6 @@
    1280,
    360
   ],
-  "source": "shipped ui/world_map_background.png's own pieces (superpowers-prehistoric-platformer: background-elements/sky-1.png, sea-1.png, island-1.png, cloud-1.png); art-B's backgrounds/canyon/layer2_mesas.png and layer1_far_spires.png, tiles/swamp/props/dead_tree.png, mangrove_trunk.png, canopy_murky.png and canopy_moss.png"
+  "source": "shipped ui/world_map_background.png's own pieces (superpowers-prehistoric-platformer: background-elements/sky-1.png, sea-1.png, island-1.png, cloud-1.png); art-B's backgrounds/canyon/layer2_mesas.png, backgrounds/canyon/layer1_far_spires.png, tiles/swamp/props/dead_tree.png, tiles/swamp/props/mangrove_trunk.png, tiles/swamp/props/canopy_murky.png and tiles/swamp/props/canopy_moss.png"
  }
 }

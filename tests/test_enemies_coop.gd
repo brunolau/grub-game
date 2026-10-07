@@ -331,6 +331,49 @@ func test_kill_points_are_shared_out_for_the_rival_score() -> void:
 	assert_eq(Game.score, Tuning.SCORE_LADDER[3])
 
 
+func test_a_struck_dangler_thread_is_cut_and_the_dangler_falls_away() -> void:
+	var dangler: Dangler = _enemy(&"enemies/dangler", Vector2i(200, 80), {"depth": 0}) as Dangler
+	_hero.teleport(Vector2i(120, 160))
+	_p2.teleport(Vector2i(180, 160))
+	Sim.step(2)
+	var thread: Rect2i = dangler.get_thread_rect()
+	assert_true(thread.size.y > 0, "it hangs on its thread")
+	# A club box beside the body only (not the thread): nothing.
+	_p2.club_box = Rect2i(dangler.sim_pos.x + 20, dangler.sim_pos.y - 20, 16, 16)
+	_p2.club_box_active = true
+	Sim.step(1)
+	assert_false(dangler.is_cut())
+	_p2.club_box = Rect2i(thread.position.x - 8, thread.position.y + (thread.size.y >> 1), 16, 8)
+	Sim.step(1)
+	_p2.club_box_active = false
+	assert_true(dangler.is_cut(), "P2's strike cut the thread")
+	assert_false(dangler.contact_hurts, "falling, it is harmless")
+	var y0: int = dangler.sim_pos.y
+	Sim.step(10)
+	assert_true(dangler.sim_pos.y > y0, "it falls")
+	assert_eq(dangler.get_thread_rect(), Rect2i(), "no thread any more")
+	var gone: int = _step_until(func() -> bool: return dangler.dead, 120)
+	assert_true(gone > 0, "out of the view it is gone")
+	assert_eq(Game.score, 0, "without points")
+	_level.reset_entities()
+	assert_false(dangler.is_cut() or dangler.dead or dangler.one_shot, "a team wipe hangs it up again")
+	assert_true(dangler.contact_hurts)
+
+
+func test_alone_a_struck_dangler_thread_holds() -> void:
+	_p2.free()
+	var dangler: Dangler = _enemy(&"enemies/dangler", Vector2i(200, 80), {"depth": 0}) as Dangler
+	_hero.teleport(Vector2i(180, 160))
+	Sim.step(2)
+	var thread: Rect2i = dangler.get_thread_rect()
+	_hero.club_box = Rect2i(thread.position.x - 8, thread.position.y + (thread.size.y >> 1), 16, 8)
+	_hero.club_box_active = true
+	Sim.step(3)
+	_hero.club_box_active = false
+	assert_false(dangler.is_cut(), "a party of one: the 1.0 dangler, its thread is only drawn")
+	assert_eq(dangler.sim_pos, Vector2i(200, 80))
+
+
 func test_keepers_and_drums_share_the_registry() -> void:
 	var guard_a: EnemyBase = _enemy(&"enemies/walker", Vector2i(120, 160), {"keeper": "gully"})
 	var guard_b: EnemyBase = _enemy(&"enemies/walker", Vector2i(200, 160), {"keeper": "gully"})
@@ -589,6 +632,28 @@ func test_a_leech_rides_drains_and_only_the_partner_clubs_it_off() -> void:
 	assert_null(leech.coop_traits().host, "the partner clubs it off")
 	assert_eq(leech.hp, 75, "and the hit counts")
 	assert_true(leech.contact_hurts)
+
+
+func test_helper_mode_spares_p2_the_leech_and_the_grab() -> void:
+	Game.helper_mode = true
+	assert_true(_p2.is_helper() and not _hero.is_helper(), "Helper mode: P2 of a co-op run")
+	var leech: EnemyBase = _leech(Vector2i(200, 160))
+	var bat: EnemyBase = _grabber(Vector2i(400, 140))
+	_hero.teleport(Vector2i(40, 160))
+	_p2.teleport(Vector2i(190, 160))
+	_p2.facing = 1
+	Sim.step(20)
+	assert_null(leech.coop_traits().host, "no leech on the helper's back")
+	_p2.teleport(Vector2i(400, 160))
+	Sim.step(3)
+	assert_null(bat.coop_traits().held, "the helper is never seized")
+	assert_true(_p2.control_enabled)
+	_hero.teleport(Vector2i(190, 160))
+	_hero.facing = 1
+	_p2.teleport(Vector2i(40, 160))
+	var latched: int = _step_until(func() -> bool: return leech.coop_traits().host == _hero, 40)
+	assert_true(latched > 0, "P1 is no helper: it lands on his back")
+	Game.helper_mode = false
 
 
 func test_alone_a_leech_falls_off_after_220_ticks() -> void:

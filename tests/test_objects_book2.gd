@@ -527,6 +527,31 @@ func test_a_spout_launches_enemies_drop_platforms_and_rafts() -> void:
 	assert_eq(geyser.launches, 2)
 
 
+## objects-A's DropPlatform.launch (wf8_objects_a_to_objects_b.txt): a hero riding a drop platform the spout throws up
+## rises with it, though he stands outside the vent box (6-2's spore geysers lifting drop platforms).
+func test_a_spout_lifts_a_drop_platform_with_its_rider_outside_the_vent() -> void:
+	_geyser_level()
+	var geyser: Geyser = _spawn(&"objects/geyser", 5, 9, {"period": 40}) as Geyser
+	var dropper: DropPlatform = DropPlatform.new()
+	# Placed a cell lower, so its home (its standing surface: the top edge of the placement cell) is the floor; a long
+	# delay keeps it waiting under its rider until the spout.
+	place(level, dropper, Vector2i(92, 160 + Tuning.TILE - 8), {"delay": 999})
+	assert_eq(dropper.sim_pos, Vector2i(92, 160), "waiting on the floor over the vent")
+	Sim.step(1)
+	# 1 px into the contact band (as the raft tests stand a rider on a raft), right of the vent box: the ride test
+	# (PHYSICS.md 11.4, the original's overlap) lends half the platform's width, so his box's left edge (x - 16) must
+	# be left of the platform's centre - x 104 rides, and the vent box ends at x 99.
+	var rider: PlayerBase = _hero(Vector2i(104, dropper.sim_pos.y - dropper.box_h + 1))
+	assert_false(geyser.vent_rect().has_point(rider.sim_pos), "he stands outside the vent box")
+	Sim.step(1)
+	assert_ne(dropper.rider_mask, 0, "riding it (platform %s, hero %s)" % [dropper.sim_pos, rider.sim_pos])
+	_until_spout(geyser)
+	assert_eq(dropper.state, DropPlatform.State.FALL)
+	assert_true(dropper.fall_speed < 0, "thrown up")
+	assert_eq(rider.yvel, Tuning.GEYSER_POWER, "and its rider with it, with the same power")
+	assert_eq(geyser.launches, 1, "the vent launched the platform; the platform its rider")
+
+
 func test_a_deadly_vent_kills_and_a_boulder_plugs_it() -> void:
 	_geyser_level()
 	var vent: Geyser = _spawn(&"objects/geyser", 5, 9, {"period": 40, "deadly": true}) as Geyser

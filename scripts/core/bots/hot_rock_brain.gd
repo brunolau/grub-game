@@ -42,6 +42,10 @@ func holding(level: LevelBase) -> bool:
 	return BotSenses.ember_holder(level) == bot.slot
 
 
+func wants_contact() -> bool:
+	return holding(bot.level)
+
+
 func may_contact(rival: int) -> bool:
 	var level: LevelBase = bot.level
 	var holder: int = BotSenses.ember_holder(level)
@@ -97,11 +101,12 @@ func think(hero: PlayerBase, level: LevelBase, _tick: int) -> void:
 	if restless():
 		away.append(hero.sim_pos)  # stood here long enough: somewhere else
 	if holder >= 0 and bot.seen_alive(holder):
-		away.append(bot.seen_pos(holder))
 		# The Rookie re-plans its escape only every other decision (it hesitates).
 		if goal == Goal.FLEE and rookie() and _decisions_made % 2 == 1 and not restless():
 			return
-		var point: Vector2i = far_point(hero, away, FLEE_MAX_COST)
+		# Where the holder (the faster walker, planning with his own links) arrives latest, never past him.
+		var chasers: Array[int] = [holder]
+		var point: Vector2i = escape_point(hero, chasers, FLEE_MAX_COST, NavGraph.WEIGHT_HOLDER, restless())
 		if point != BotSenses.NO_POS:
 			_goal_to(Goal.FLEE, point, holder)
 			return

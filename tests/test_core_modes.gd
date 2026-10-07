@@ -20,6 +20,11 @@ const W_BONUS: StringName = &"zz_w_bonus"
 const W_B: StringName = &"zz_w_b"
 const W_C: StringName = &"zz_w_c"
 const W_END: StringName = &"zz_w_end"
+# A book's last stop as Book I's 4-2 / 4-2b / Way Home and Book II's 9-3 / The Long Raft Home are wired: a main half
+# (`tally = false`) -> the final boss (its trophy) -> the ending, each with a co-op file (the co-op endings, P2.6).
+const F_MAIN: StringName = &"zz_f_main"
+const F_BOSS: StringName = &"zz_f_boss"
+const F_END: StringName = &"zz_f_end"
 
 var _metas_added: bool = false
 var _signals: Array = []
@@ -116,6 +121,28 @@ func _add_warp_book() -> void:
 		meta[coop] = {"id": String(coop), "kind": "coop", "coop_of": String(id), "book": 2}
 		Levels._paths[coop] = Levels.get_level_path(PARTY_LEVEL)
 	for id: StringName in [W_A, W_A_BOSS, W_BONUS, W_B, W_C, W_END]:
+		Levels._paths[id] = Levels.get_level_path(PARTY_LEVEL)
+	Levels._index_campaign()
+
+
+## The last stop of book `book` in memory (see F_MAIN): F_MAIN -> F_BOSS (trophy) -> F_END, Expert only, with co-op
+## files for each (F_END's only with `coop_ending`).
+func _add_final_stop(book: int, coop_ending: bool) -> void:
+	_metas_added = true
+	var meta: Dictionary = Levels._meta
+	meta[F_MAIN] = {"id": String(F_MAIN), "kind": "main", "order": 9300 + book, "book": book, "tally": false,
+			"next": String(F_BOSS), "min_difficulty": "expert"}
+	meta[F_BOSS] = {"id": String(F_BOSS), "kind": "sub", "book": book, "next": String(F_END),
+			"min_difficulty": "expert"}
+	meta[F_END] = {"id": String(F_END), "kind": "ending", "book": book, "min_difficulty": "expert"}
+	var with_coop: Array[StringName] = [F_MAIN, F_BOSS]
+	if coop_ending:
+		with_coop.append(F_END)
+	for id: StringName in with_coop:
+		var coop: StringName = StringName(String(id) + "_coop")
+		meta[coop] = {"id": String(coop), "kind": "coop", "coop_of": String(id), "book": book}
+		Levels._paths[coop] = Levels.get_level_path(PARTY_LEVEL)
+	for id: StringName in [F_MAIN, F_BOSS, F_END]:
 		Levels._paths[id] = Levels.get_level_path(PARTY_LEVEL)
 	Levels._index_campaign()
 
@@ -350,6 +377,52 @@ func test_book_two_ends_at_the_expert_wall_or_with_the_end() -> void:
 	await _finish()
 
 
+## The co-op endings of both books (PLAN.md P2.6): the final boss's trophy in its co-op file leads to the co-op file of
+## the ending (no tally between, the stop's result recorded in the co-op namespace), whose tally ends the book with THE
+## END in co-op - the co-op namespace completed, the solo one untouched. A book whose ending has no co-op file yet ends
+## at the boss's tally.
+func test_the_coop_endings_of_both_books() -> void:
+	for book: int in [1, 2]:
+		Levels.rescan()
+		_add_final_stop(book, true)
+		var boss_coop: StringName = StringName(String(F_BOSS) + "_coop")
+		var end_coop: StringName = StringName(String(F_END) + "_coop")
+		var coop_space: String = "coop/book%d/expert" % book
+		assert_eq(Levels.next_level(boss_coop, Defs.Difficulty.EXPERT), end_coop, "the trophy's co-op epilogue")
+		Game.start_run(Defs.Difficulty.EXPERT, Defs.GameMode.COOP, 2, book)
+		Game.begin_level(boss_coop, true)
+		Game.add_score(7000)
+		Flow.complete_level(&"trophy")
+		if Flow.busy:
+			await Flow.transition_finished
+		assert_eq(Game.level_id, end_coop, "book %d: the boss's trophy starts the co-op epilogue" % book)
+		assert_eq(int(Save.get_level_result_in(coop_space, F_MAIN)["score"]), 7000, "the stop's result, co-op space")
+		assert_eq(int(Save.get_level_result_in("single/book%d/expert" % book, F_MAIN)["clears"]), 0)
+		Flow.finish_tally()
+		if Flow.busy:
+			await Flow.transition_finished
+		assert_eq(Flow.current_screen, Flow.SCREEN_THE_END, "book %d: the co-op epilogue ends with THE END" % book)
+		assert_eq(Flow.args, {"book": book, "mode": Defs.GameMode.COOP, "mural": false})
+		assert_true(Save.is_game_completed_in(coop_space))
+		assert_false(Save.is_game_completed_in("single/book%d/expert" % book), "the solo book is not finished by it")
+		await _finish()
+	Levels.rescan()
+	_add_final_stop(2, false)
+	Save.reset()
+	Game.start_run(Defs.Difficulty.EXPERT, Defs.GameMode.COOP, 2, 2)
+	Game.begin_level(StringName(String(F_BOSS) + "_coop"), true)
+	Flow.complete_level(&"trophy")
+	if Flow.busy:
+		await Flow.transition_finished
+	if Flow.current_screen == Flow.SCREEN_TALLY:
+		Flow.finish_tally()
+		if Flow.busy:
+			await Flow.transition_finished
+	assert_eq(Flow.current_screen, Flow.SCREEN_THE_END, "no co-op epilogue yet: the boss's tally ends the book")
+	assert_true(Save.is_game_completed_in("coop/book2/expert"))
+	await _finish()
+
+
 func test_the_level_select_of_a_book_with_its_codes() -> void:
 	_add_warp_book()
 	var stops: Array[Dictionary] = Flow.level_select(Defs.GameMode.SINGLE, 2, Defs.Difficulty.BEGINNER)
@@ -564,6 +637,44 @@ func test_a_versus_match_runs_its_rounds() -> void:
 	assert_eq(versus_match.round_index, 0, "a rematch starts again")
 	assert_eq(versus_match.match_seed, 41)
 	assert_eq(Flow.current_screen, Flow.SCREEN_LEVEL)
+	await _finish()
+
+
+## Round loop polish (P2.6): an arena that names a battle track starts the match with it and every later round plays
+## the next of the three (DESIGN.md F.2: battle A, B, C), so a match hears them all; an arena with music of its own keeps
+## it.
+func test_the_rounds_of_a_match_turn_through_the_battle_music() -> void:
+	_add_book_two()
+	assert_eq(VersusMatch.round_music(Sfx.MUSIC_VERSUS_BATTLE_A, 0), Sfx.MUSIC_VERSUS_BATTLE_A)
+	assert_eq(VersusMatch.round_music(Sfx.MUSIC_VERSUS_BATTLE_A, 1), Sfx.MUSIC_VERSUS_BATTLE_B)
+	assert_eq(VersusMatch.round_music(Sfx.MUSIC_VERSUS_BATTLE_A, 2), Sfx.MUSIC_VERSUS_BATTLE_C)
+	assert_eq(VersusMatch.round_music(Sfx.MUSIC_VERSUS_BATTLE_A, 3), Sfx.MUSIC_VERSUS_BATTLE_A)
+	assert_eq(VersusMatch.round_music(Sfx.MUSIC_VERSUS_BATTLE_C, 1), Sfx.MUSIC_VERSUS_BATTLE_A, "it starts at the arena's")
+	assert_eq(VersusMatch.round_music(Sfx.MUSIC_JUNGLE, 4), Sfx.MUSIC_JUNGLE, "music of its own stays")
+	assert_eq(VersusMatch.round_music(&"", 1), &"")
+	(Levels._meta[ARENA] as Dictionary)["music"] = String(Sfx.MUSIC_VERSUS_BATTLE_A)
+	VersusMatch.bot_factory = func(_slot: int, _level: int, _seed: int) -> Callable:
+		return func(_tick: int) -> int: return 0
+	var versus_match: VersusMatch = VersusMatch.new()
+	versus_match.arena = ARENA
+	versus_match.rounds_to_win = 3
+	versus_match.seat_bot(Defs.BotLevel.ROOKIE)
+	versus_match.seat_bot(Defs.BotLevel.ROOKIE)
+	assert_true(Flow.start_versus(versus_match, 3))
+	if Flow.busy:
+		await Flow.transition_finished
+	for round_index: int in [1, 2]:
+		Flow.end_round(PackedInt32Array([0]))
+		if Flow.busy:
+			await Flow.transition_finished
+		if Flow.current_screen == Flow.SCREEN_VERSUS_SCOREBOARD:
+			Flow.next_round()
+			if Flow.busy:
+				await Flow.transition_finished
+		assert_eq(versus_match.round_index, round_index)
+		assert_eq(Audio.get_music_context(), VersusMatch.BATTLE_MUSIC[round_index],
+				"round %d plays battle track %d" % [round_index, round_index])
+	Audio.stop_music(0.0)
 	await _finish()
 
 

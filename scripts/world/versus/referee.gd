@@ -580,6 +580,35 @@ func cutlery_of(slot: int) -> int:
 	return _cutlery[slot] if slot >= 0 and slot < Defs.MAX_PLAYERS else 0
 
 
+## Last Caveman Standing: the hearts of `slot` (0 while out or down; ui-B's corner panel). Other modes: his run's.
+func hearts_of(slot: int) -> int:
+	var hero: PlayerBase = level.get_hero(slot) if level != null and slot >= 0 and slot < Defs.MAX_PLAYERS else null
+	if hero == null:
+		return 0
+	if mode == Defs.VersusMode.LAST_CAVEMAN and (_out[slot] != 0 or hero.dead):
+		return 0
+	return hero.run.hearts
+
+
+## Mesa Rodeo (objects-B's objects/mount in an arena, GAMEPLAY.md 13.10.9): the rider `driver`'s Chomper bites
+## `victim` - a hit of the mode's currency (Grub Stack: VersusTuning.RODEO_BITE_SPILL units; Last Caveman Standing: a
+## heart; Hot Rock: an ember contact) with the knock-back, hurt timing, hit-stop and knock-out credit of a club hit
+## from `mount`. False when it did not land (the round not running, the victim out, immune, shielded, curled or a
+## teammate). The leaf shield absorbs it like a hit (true: the bite landed on the shield).
+func bite_hit(driver: PlayerBase, victim: PlayerBase, mount: SimEntity) -> bool:
+	if victim == null or not _round_live() or not _in_play(victim) or victim == driver:
+		return false
+	if _teammates(driver, victim) or _pvp_immune(victim) or victim.is_curled():
+		return false
+	if _leaf[victim.slot] != 0:
+		_leaf[victim.slot] = 0
+		victim.xvel = VersusTuning.TEAMMATE_BUMP_XVEL * _away(driver, victim, mount if mount != null else driver)
+		_sfx(SFX_CLANG)
+		return true
+	_apply_hit(driver, mount, victim, false, -1, false, VersusTuning.RODEO_BITE_SPILL)
+	return true
+
+
 ## objects-B's crate lanes ask the party driver what the next crate holds (CrateLane, P2.7): ItemContents tokens of
 ## [method VersusCrates.contents_for] for this round's mode and rules ("" = the lane's default table).
 func crate_contents(_lane: Object) -> String:
@@ -1139,6 +1168,10 @@ func _apply_hit(attacker: PlayerBase, source: SimEntity, victim: PlayerBase, cha
 		_stat(attacker, &"hits", 1)
 	_stat(victim, &"hurts", 1)
 	_sfx(Sfx.CLUB_HIT_HEAVY if charged or weapon == Defs.Weapon.HAMMER else Sfx.CLUB_HIT)
+	# Hit sparks in the attacker's colour (DESIGN.md E.9; art-A's colour rows of fx/hit_stars, FxAnim `row`).
+	if attacker != null:
+		_fx(&"fx/hit_stars", Vector2i(victim.sim_pos.x, victim.sim_pos.y - victim.box_h / 2),
+				{"row": UiPlayers.colour_index(attacker.slot)})
 	_daze_left[victim.slot] = 0
 	_drop_cutlery(victim)
 	var one_bonk: bool = rules.has(VersusRules.ONE_BONK)
@@ -2030,9 +2063,9 @@ func _sfx(event: StringName) -> void:
 		Audio.play_sfx(event)
 
 
-func _fx(id: StringName, pos: Vector2i) -> void:
+func _fx(id: StringName, pos: Vector2i, params: Dictionary = {}) -> void:
 	if level != null and Spawner.exists(id):
-		level.spawn_fx(id, pos)
+		level.spawn_fx(id, pos, params)
 
 
 ## The tower of food pictures over every head and the leader's crown (presentation only).

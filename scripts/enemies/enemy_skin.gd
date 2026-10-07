@@ -414,6 +414,94 @@ static func _build(skin_name: String) -> EnemySkin:
 			skin._add(&"hurt", 12, 2, 3, true)
 			skin._add(&"rage", 14, 2, 3, true)
 			skin._add(&"dead", 16, 1, 1, false)
+		# --- 2.0 boss sheets of art-B for worlds 7-9 (ENEMY_SKIN_ROWS.md, phase 2): Inkjaw (enemies-B; `inkjaw_rage`
+		# shares the case), the Twin Idols, the Storm Roc and the Rival Chieftains (enemies-C) ---------------------------
+		"inkjaw":
+			skin.texture_path = BOSS_DIR + skin_name + ".png"
+			skin._layout(136, 152, 8, 4, 68, 120, 58, 57, 114)
+			skin._add(&"idle", 0, 4, 4, true)
+			skin._add(&"surface", 4, 4, 3, true)
+			skin._add(&"slam", 8, 6, 2, false)
+			skin._add(&"slam_hold", 14, 4, 3, true)
+			skin._add(&"spit", 18, 5, 2, false)
+			skin._add(&"hurt", 23, 4, 2, false)
+			skin._add(&"dead", 27, 1, 1, false)
+		"inkjaw_parts":
+			skin.texture_path = BOSS_DIR + skin_name + ".png"
+			skin._layout(80, 96, 8, 2, 40, 80, 19, 39, 78)
+			skin._add(&"tentacle_up", 0, 1, 1, false)
+			skin._add(&"tentacle_flinch", 1, 1, 1, false)
+			skin._add(&"tentacle_slam", 2, 1, 1, false)
+			skin._add(&"bead_base", 3, 1, 1, false)
+			skin._add(&"bead_mid", 4, 1, 1, false)
+			skin._add(&"bead_tip", 5, 1, 1, false)
+			skin._add(&"ink", 6, 4, 2, true)
+			skin._add(&"bubbles", 10, 3, 3, true)
+			skin._add(&"shadow", 13, 1, 1, false)
+		"idol_sun", "idol_moon":
+			# The Colossus frame numbers plus `sleep` (6 x 4 grid). The Moon Idol is pre-mirrored: its pivot is on the
+			# left edge of the cell (faces right, no flip in code); the Sun Idol keeps the Colossus pivot.
+			skin.texture_path = BOSS_DIR + skin_name + ".png"
+			skin._layout(260, 224, 6, 4, 0 if skin_name == "idol_moon" else 260, 208, 104, 95, 208)
+			skin._add(&"idle", 0, 6, 4, true)
+			skin._add(&"spit", 6, 4, 3, false)
+			skin._add(&"slam", 10, 2, 4, false)
+			skin._add(&"hurt", 12, 2, 3, true)
+			skin._add(&"rage", 14, 2, 3, true)
+			skin._add(&"dead", 16, 1, 1, false)
+			skin._add(&"sleep", 17, 6, 6, true)
+		"idols_parts":
+			skin.texture_path = BOSS_DIR + skin_name + ".png"
+			skin._layout(32, 56, 8, 2, 16, 40, 11, 20, 40)
+			skin._add(&"masonry", 0, 1, 1, false)
+			skin._add(&"block", 1, 1, 1, false)
+			skin._add(&"rock_sun", 2, 4, 2, true)
+			skin._add(&"rock_moon", 6, 4, 2, true)
+		"roc":
+			# The shipped pterodactyl at 2x (the pterodactyl frame numbers, re-packed 4 x 4).
+			skin.texture_path = BOSS_DIR + skin_name + ".png"
+			skin._layout(288, 240, 4, 4, 144, 208, 103, 44, 116)
+			skin._add(&"fly", 0, 4, 3, true)
+			skin._add(&"land", 4, 1, 1, false)  # the pterodactyl role name the Roc plays on the nest rim
+			skin._add(&"perch", 4, 1, 1, false)
+			skin._add(&"rise", 5, 2, 3, true)
+			skin._add(&"dive", 7, 2, 2, true)
+			skin._add(&"screech", 9, 2, 3, true)
+			skin._add(&"hurt", 11, 4, 2, false)
+			skin._add(&"dead", 15, 1, 1, false)
+		"roc_lightning":
+			skin.texture_path = BOSS_DIR + skin_name + ".png"
+			skin._layout(72, 112, 3, 1, 36, 96, 36, 48, 96)
+			skin._add(&"bolt", 0, 2, 2, true)
+			skin._add(&"flash", 2, 1, 1, false)
+		"roc_parts":
+			skin.texture_path = BOSS_DIR + skin_name + ".png"
+			skin._layout(160, 88, 8, 1, 80, 72, 18, 17, 34)
+			skin._add(&"feather", 0, 2, 6, true)
+			skin._add(&"feather_b", 2, 1, 1, false)
+			skin._add(&"storm_mark", 3, 2, 6, true)
+			skin._add(&"gust", 5, 3, 2, true)
+		"chieftain_gorm", "chieftain_gulla":
+			# rival.png's 36 frames in the Tar Tribe palettes with a headdress (the cell grew 16 px upward: not the
+			# rival layout); the hero's anim state names map 1:1 to these roles.
+			skin.texture_path = BOSS_DIR + skin_name + ".png"
+			skin._layout(96, 96, 8, 5, 48, 80, 22, 36, 71)
+			skin._add(&"idle", 0, 6, 3, true)
+			skin._add(&"walk", 6, 8, 2, true)
+			skin._add(&"air", 14, 3, 3, false)
+			skin._add(&"fall", 17, 3, 3, false)
+			skin._add(&"land", 20, 1, 3, false)
+			skin._add(&"roll", 21, 3, 2, true)
+			skin._add(&"crouch", 24, 1, 3, false)
+			skin._add(&"attack", 25, 4, 2, false)
+			skin._add(&"hurt", 29, 2, 3, true)
+			skin._add(&"dead", 31, 5, 3, false)
+		"chieftain_egg":
+			# Their revive eggs: the egg_kid roll frames in Gorm's and Gulla's palettes.
+			skin.texture_path = BOSS_DIR + skin_name + ".png"
+			skin._layout(64, 56, 6, 1, 32, 40, 22, 16, 34)
+			skin._add(&"gorm", 0, 3, 3, true)
+			skin._add(&"gulla", 3, 3, 3, true)
 		_:
 			return null
 	return skin

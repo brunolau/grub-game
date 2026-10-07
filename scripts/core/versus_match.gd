@@ -40,6 +40,11 @@ const VARIANT_NAMES: Array[StringName] = [
 	&"hammer_time", &"axe_rain", &"big_bounce", &"one_bonk", &"slippery", &"lights_out", &"gusty", &"giant_rain",
 	&"spear_party",
 ]
+## The three round tracks of DESIGN.md F.2 ("Versus ... battle"), in the order a match cycles through them
+## ([method round_music]).
+const BATTLE_MUSIC: Array[StringName] = [
+	Sfx.MUSIC_VERSUS_BATTLE_A, Sfx.MUSIC_VERSUS_BATTLE_B, Sfx.MUSIC_VERSUS_BATTLE_C,
+]
 ## Developer arenas (levels/test_world_arena_*.lvl ...) are never offered (available_arenas); chosen by id they play.
 const DEVELOPER_ARENA_PREFIX: String = "test_"
 ## Settings key of the last rules (DESIGN.md E.8: "the last rules are remembered"); see rules_to_dict.
@@ -450,6 +455,17 @@ static func open_variants(names: PackedStringArray) -> PackedStringArray:
 		if VARIANT_NAMES.has(StringName(name)) and UnlockTable.is_variant_open(StringName(name)) and not result.has(name):
 			result.append(name)
 	return result
+
+
+## The music of round `p_round_index` on an arena whose `music` meta names `arena_music` (P2.6 round loop): an arena that
+## plays one of the BATTLE_MUSIC tracks starts the match with it and every later round takes the next of the three
+## (A -> B -> C -> A ...), so a match hears all of them; an arena with music of its own keeps it every round. Sound
+## only (Flow plays it when the round's level is loaded; the deciding moment replays the round's own track).
+static func round_music(arena_music: StringName, p_round_index: int) -> StringName:
+	var at: int = BATTLE_MUSIC.find(arena_music)
+	if at < 0:
+		return arena_music
+	return BATTLE_MUSIC[posmod(at + p_round_index, BATTLE_MUSIC.size())]
 
 
 ## The modes an arena supports among the launch modes (its meta `modes`), in Defs.VersusMode order.
