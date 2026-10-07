@@ -111,9 +111,16 @@ const SFX: Dictionary = {
 	Sfx.SUDDEN_DEATH: {"files": ["sudden_death_a.wav"], "db": [-7.0]},
 	# Versus clang (DESIGN.md E.2 "the Colossus clank"): the shipped glance-off clank of the armoured Colossus.
 	Sfx.CLANG: {"files": ["club_hit_wood_a.wav"], "db": [-5.3]},
+	# --- 2.0 batch 2 (PLAN.md P2.6 / P2.11; _handover/audio/AUDIO_BATCH2.md): the bolt of zones/lightning (world-A)
+	# and the gong that ends a versus round (DESIGN.md E.8, Junkala fanfare1; Flow.end_round plays it). ----------------
+	Sfx.LIGHTNING_STRIKE: {"files": ["lightning_strike_a.wav"], "db": [-4.6]},
+	Sfx.ROUND_GONG: {"files": ["round_gong_a.wav"], "db": [-2.1]},
 }
 
-## context -> { "file", "db", "loop" }.
+## context -> { "file", "db", "loop" [, "loop_start"] }. "loop_start" (2.0, AudioTable batch 2): seconds into the file
+## where the loop restarts - the intro before it plays once, the loop runs from there to the end of the file (the audio
+## owner cuts each file at its loop end; Ogg Vorbis cannot end a loop early). Missing = the whole file loops. A file
+## keeps one loop flag and one loop start in every row that names it (Audio caches one stream per file).
 const MUSIC: Dictionary = {
 	Sfx.MUSIC_TITLE: {"file": "title_a.ogg", "db": -9.7, "loop": true},
 	Sfx.MUSIC_MENU: {"file": "password_screen_a.ogg", "db": -9.5, "loop": true},
@@ -137,39 +144,53 @@ const MUSIC: Dictionary = {
 	Sfx.MUSIC_ENDING: {"file": "ending_a.ogg", "db": -5.5, "loop": true},
 	Sfx.MUSIC_CREDITS: {"file": "credits_a.ogg", "db": -1.7, "loop": true},
 	# --- 2.0: every context of Sfx.EXPANSION_MUSIC (DESIGN.md F.2). Batch 1 delivered the G1 slice's tracks (canyon,
-	# co-op menu, lobby, battle A, the round / match jingles, results; whole-file loops); the others are "temp" as in
-	# SFX - a 1.0 track of the same mood at its measured volume until batch 2 (PLAN.md P2.6 / P2.11) replaces it. ----
+	# co-op menu, lobby, battle A, the round / match jingles, results), batch 2 (PLAN.md P2.6 / P2.11, the audio owner's
+	# _handover/audio/AUDIO_BATCH2.md) every other one: CC0, measured with tools/audio_loudness.py, whole-file loops (the
+	# loop regions are cut out of the renders, so no row needs "loop_start"). No 2.0 row is a stand-in any more. -------
 	Sfx.MUSIC_CANYON: {"file": "level_canyon_a.ogg", "db": -0.1, "loop": true},
-	Sfx.MUSIC_GULCH: {"file": "level_jungle_a.ogg", "db": -6.2, "loop": true, "temp": true},
-	Sfx.MUSIC_FEN: {"file": "level_extra_b.ogg", "db": -8.2, "loop": true, "temp": true},
-	Sfx.MUSIC_SPORE: {"file": "level_cave_a.ogg", "db": -10.9, "loop": true, "temp": true},
-	Sfx.MUSIC_MANGROVE_CLIMB: {"file": "level_extra_a.ogg", "db": -11.1, "loop": true, "temp": true},
-	Sfx.MUSIC_COAST: {"file": "level_jungle_a.ogg", "db": -6.2, "loop": true, "temp": true},
-	Sfx.MUSIC_SEA_CAVES: {"file": "level_extra_b.ogg", "db": -8.2, "loop": true, "temp": true},
-	Sfx.MUSIC_RUINS: {"file": "level_cave_a.ogg", "db": -10.9, "loop": true, "temp": true},
-	Sfx.MUSIC_IDOL_HALL: {"file": "level_extra_b.ogg", "db": -8.2, "loop": true, "temp": true},
-	Sfx.MUSIC_SKY_CLIMB: {"file": "level_ice_a.ogg", "db": -10.8, "loop": true, "temp": true},
-	Sfx.MUSIC_STORM_GLIDE: {"file": "level_ice_a.ogg", "db": -10.8, "loop": true, "temp": true},
-	Sfx.MUSIC_SPIRE: {"file": "level_volcano_a.ogg", "db": -6.7, "loop": true, "temp": true},
-	Sfx.MUSIC_PYRE: {"file": "level_volcano_a.ogg", "db": -6.7, "loop": true, "temp": true},
-	Sfx.MUSIC_BONUS_LAGOON: {"file": "bonus_room_a.ogg", "db": -4.7, "loop": true, "temp": true},
-	Sfx.MUSIC_ENDING_RAFT: {"file": "ending_a.ogg", "db": -5.5, "loop": true, "temp": true},
-	Sfx.MUSIC_BOSS_TUSKER: {"file": "boss_a.ogg", "db": -6.6, "loop": true, "temp": true},
-	Sfx.MUSIC_BOSS_MANGROVE: {"file": "boss_a.ogg", "db": -6.6, "loop": true, "temp": true},
-	Sfx.MUSIC_BOSS_INKJAW: {"file": "boss_a.ogg", "db": -6.6, "loop": true, "temp": true},
-	Sfx.MUSIC_BOSS_IDOLS: {"file": "boss_a.ogg", "db": -6.6, "loop": true, "temp": true},
-	Sfx.MUSIC_BOSS_ROC: {"file": "boss_final_a.ogg", "db": -6.9, "loop": true, "temp": true},
-	Sfx.MUSIC_BOSS_CHIEFTAINS: {"file": "boss_final_a.ogg", "db": -6.9, "loop": true, "temp": true},
+	Sfx.MUSIC_GULCH: {"file": "level_gulch_a.ogg", "db": -5.0, "loop": true},
+	Sfx.MUSIC_FEN: {"file": "level_fen_a.ogg", "db": -7.6, "loop": true},
+	Sfx.MUSIC_SPORE: {"file": "level_spore_a.ogg", "db": -0.1, "loop": true},
+	Sfx.MUSIC_MANGROVE_CLIMB: {"file": "level_mangrove_climb_a.ogg", "db": -8.2, "loop": true},
+	Sfx.MUSIC_COAST: {"file": "level_coast_a.ogg", "db": -4.4, "loop": true},
+	Sfx.MUSIC_SEA_CAVES: {"file": "level_sea_caves_a.ogg", "db": -5.6, "loop": true},
+	Sfx.MUSIC_RUINS: {"file": "level_ruins_a.ogg", "db": -8.0, "loop": true},
+	Sfx.MUSIC_IDOL_HALL: {"file": "level_idol_hall_a.ogg", "db": -5.4, "loop": true},
+	Sfx.MUSIC_SKY_CLIMB: {"file": "level_sky_climb_a.ogg", "db": -0.1, "loop": true},
+	Sfx.MUSIC_STORM_GLIDE: {"file": "level_storm_glide_a.ogg", "db": -0.1, "loop": true},
+	Sfx.MUSIC_SPIRE: {"file": "level_spire_a.ogg", "db": -6.6, "loop": true},
+	Sfx.MUSIC_PYRE: {"file": "level_pyre_a.ogg", "db": -7.4, "loop": true},
+	Sfx.MUSIC_BONUS_LAGOON: {"file": "bonus_lagoon_a.ogg", "db": -5.7, "loop": true},
+	Sfx.MUSIC_ENDING_RAFT: {"file": "ending_raft_a.ogg", "db": -3.0, "loop": true},
+	Sfx.MUSIC_BOSS_TUSKER: {"file": "boss_tusker_a.ogg", "db": -1.4, "loop": true},
+	Sfx.MUSIC_BOSS_MANGROVE: {"file": "boss_mangrove_a.ogg", "db": -1.3, "loop": true},
+	Sfx.MUSIC_BOSS_INKJAW: {"file": "boss_inkjaw_a.ogg", "db": -1.5, "loop": true},
+	Sfx.MUSIC_BOSS_IDOLS: {"file": "boss_idols_a.ogg", "db": -12.0, "loop": true},
+	Sfx.MUSIC_BOSS_ROC: {"file": "boss_roc_a.ogg", "db": -1.0, "loop": true},
+	Sfx.MUSIC_BOSS_CHIEFTAINS: {"file": "boss_chieftains_a.ogg", "db": -2.0, "loop": true},
 	Sfx.MUSIC_COOP_MENU: {"file": "coop_menu_a.ogg", "db": -5.9, "loop": true},
 	Sfx.MUSIC_VERSUS_LOBBY: {"file": "versus_lobby_a.ogg", "db": -2.6, "loop": true},
 	Sfx.MUSIC_VERSUS_BATTLE_A: {"file": "versus_battle_a.ogg", "db": -8.6, "loop": true},
-	Sfx.MUSIC_VERSUS_BATTLE_B: {"file": "level_volcano_a.ogg", "db": -6.7, "loop": true, "temp": true},
-	Sfx.MUSIC_VERSUS_BATTLE_C: {"file": "level_extra_a.ogg", "db": -11.1, "loop": true, "temp": true},
-	Sfx.MUSIC_VERSUS_SUDDEN_DEATH: {"file": "boss_final_a.ogg", "db": -6.9, "loop": true, "temp": true},
+	Sfx.MUSIC_VERSUS_BATTLE_B: {"file": "versus_battle_b.ogg", "db": -8.3, "loop": true},
+	Sfx.MUSIC_VERSUS_BATTLE_C: {"file": "versus_battle_c.ogg", "db": -1.4, "loop": true},
+	# Sudden death (DESIGN.md E.6): Flow pushes it on Events.round_sudden_death_started for the rest of the round. The
+	# F.2 pick (Wolfgang_ "8-Bit Battle Loop") is too short to loop; F.2's runner-up ships (Junkala "dangerous encounter A
+	# (faster)", a 32-beat loop).
+	Sfx.MUSIC_VERSUS_SUDDEN_DEATH: {"file": "versus_sudden_death_a.ogg", "db": -4.7, "loop": true},
 	Sfx.MUSIC_ROUND_WIN: {"file": "round_win_a.ogg", "db": -8.0, "loop": false},
 	Sfx.MUSIC_MATCH_WIN: {"file": "match_win_a.ogg", "db": 2.8, "loop": false},
 	Sfx.MUSIC_VERSUS_RESULTS: {"file": "versus_results_a.ogg", "db": -3.8, "loop": true},
 }
+
+
+## 2.0 (batch 2): where the loop of a music context restarts, in seconds of its file (the row's "loop_start"; 0 = the
+## whole file loops, also for a jingle or an unknown context).
+static func loop_start(context: StringName) -> float:
+	var entry: Dictionary = MUSIC.get(context, {})
+	if not bool(entry.get("loop", false)):
+		return 0.0
+	var value: Variant = entry.get("loop_start", 0.0)
+	return maxf(float(value), 0.0) if value is float or value is int else 0.0
 
 
 ## True while the row of an effect or music name still plays a stand-in 1.0 file (`"temp": true`, see SFX).

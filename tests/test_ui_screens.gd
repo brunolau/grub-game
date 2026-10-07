@@ -6,7 +6,7 @@ extends TestCase
 
 const SCREENS: Array[StringName] = [
 	&"title", &"mode_select", &"code_entry", &"options", &"world_map", &"tally", &"game_over", &"expert_wall",
-	&"the_end", &"credits", &"book_select", &"join",
+	&"the_end", &"credits", &"book_select", &"join", &"unlocks",
 ]
 
 
@@ -220,13 +220,13 @@ func test_join_panel_colour_ready_and_leave() -> void:
 	var pattern: int = Game.runs[1].pattern
 	_key(KEY_KP_5)
 	assert_ne(Game.runs[1].pattern, pattern, "Down: P2's loincloth")
-	_key(KEY_SHIFT, true)
+	_key(_p1_strike(), true)
 	node._process(JoinScreen.READY_SECONDS * 0.5)
 	assert_almost_eq(node.hold_progress(0), 0.5, 0.05, "the hold fills")
 	assert_false(node.is_ready(0))
 	node._process(JoinScreen.READY_SECONDS * 0.6)
 	assert_true(node.is_ready(0), "held for a second: ready")
-	_key(KEY_SHIFT, false)
+	_key(_p1_strike(), false)
 	var colour: StringName = Game.runs[0].palette
 	_key(KEY_D)
 	assert_eq(Game.runs[0].palette, colour, "a ready player's colour stays")
@@ -261,12 +261,12 @@ func test_join_panel_keyboard_presets_picture_and_key_test() -> void:
 	assert_true(bool(left["taken"]), "P1 sits at the left half")
 	assert_false(bool(right["taken"]), "the numpad is free")
 	assert_eq(left["colour"], UiPlayers.PALETTE_COLOURS[&"yellow"][UiPlayers.FILL], "in P1's colour")
-	for code: Key in [KEY_W, KEY_A, KEY_S, KEY_D, KEY_SPACE, KEY_SHIFT, KEY_E, KEY_Q]:
+	for code: Key in [KEY_W, KEY_A, KEY_S, KEY_D, KEY_SPACE, _p1_strike(), KEY_E, KEY_Q]:
 		assert_true((left["keys"] as Array).has(code), "the left half has %s" % OS.get_keycode_string(code))
 	for code: Key in [KEY_KP_8, KEY_KP_4, KEY_KP_5, KEY_KP_6, KEY_KP_0, KEY_KP_ENTER, KEY_KP_ADD, KEY_KP_PERIOD]:
 		assert_true((right["keys"] as Array).has(code), "the right half has %s" % OS.get_keycode_string(code))
-	assert_eq(picture.half_of(KEY_SHIFT, 1), Defs.InputSlotKind.KEYBOARD_LEFT, "Left Shift is P1's strike")
-	assert_eq(picture.half_of(KEY_SHIFT, 2), Defs.InputSlotKind.NONE, "Right Shift is nobody's")
+	assert_eq(picture.half_of(_p1_strike(), 1), Defs.InputSlotKind.KEYBOARD_LEFT, "the left one is P1's strike")
+	assert_eq(picture.half_of(_p1_strike(), 2), Defs.InputSlotKind.NONE, "the right one is nobody's")
 	assert_eq(node.get_legend_text(Defs.InputSlotKind.KEYBOARD_LEFT, &"move"), "W A S D")
 	assert_eq(node.get_legend_text(Defs.InputSlotKind.KEYBOARD_RIGHT, &"move"), "NUM 8 4 5 6")
 	assert_eq(node.get_legend_text(Defs.InputSlotKind.KEYBOARD_RIGHT, Defs.ACT_ATTACK), "NUM ENTER")
@@ -313,19 +313,20 @@ func test_join_panel_touch_takes_a_seat() -> void:
 	await _cleanup()
 
 
-## The classic one-keyboard path of the flows (tools/autoplay/campaign_coop.flow): Space and Num 0 join, Left Shift and
-## Num Enter held together make both ready, and the panel moves on by itself.
+## The classic one-keyboard path of the flows (tools/autoplay/campaign_coop.flow): Space and Num 0 join, P1's Strike
+## (the classic layout's: Left Ctrl since the orchestrator's G1 resolution, Left Shift before) and Num Enter held
+## together make both ready, and the panel moves on by itself.
 func test_join_panel_two_players_on_the_classic_keys() -> void:
 	var node: JoinScreen = await _open_join()
 	_key(KEY_SPACE)
 	_key(KEY_KP_0)
-	_key(KEY_SHIFT, true)
+	_key(_p1_strike(), true)
 	_key(KEY_KP_ENTER, true)
 	var waited: float = 0.0
 	while not node.leaving and waited < 4.0:
 		await get_tree().create_timer(0.1).timeout
 		waited += 0.1
-	_key(KEY_SHIFT, false)
+	_key(_p1_strike(), false)
 	_key(KEY_KP_ENTER, false)
 	assert_true(node.leaving, "both held Strike: ready, and the panel moved on (%.1f s)" % waited)
 	assert_true(waited < JoinScreen.READY_SECONDS + JoinScreen.FINISH_DELAY + 1.0, "in about 1.6 s")
@@ -374,9 +375,10 @@ func test_menu_entries_take_the_focus_only_from_a_moving_pointer() -> void:
 func test_code_entry_accepts_every_campaign_code() -> void:
 	var codes: Array[Array] = []
 	for level_id: StringName in Levels.all_ids():
-		# The Book I codes (2.0: Book II codes come with their campaign plumbing, PLAN.md P2.6 / P2.8).
+		# The solo codes of both books (2.0: Book II codes start a Book II run, Flow.continue_game, PLAN.md P2.6 / P2.8;
+		# co-op files have none).
 		if str(Levels.get_value(level_id, "kind", Levels.KIND_MAIN)) == Levels.KIND_TEST \
-				or Levels.get_book(level_id) != Levels.BOOK_1 or not Levels.is_solo_level(level_id):
+				or not Levels.get_book(level_id) in [Levels.BOOK_1, Levels.BOOK_2] or not Levels.is_solo_level(level_id):
 			continue
 		for difficulty: int in [Defs.Difficulty.BEGINNER, Defs.Difficulty.EXPERT]:
 			var code: String = Levels.get_password(level_id, difficulty)
@@ -665,6 +667,254 @@ func test_credits_are_generated_from_credits_md() -> void:
 		assert_eq(fonts.size(), 2, "both SIL OFL attributions")
 	if by_heading.has("UI_CREDITS_PACKS"):
 		assert_true((by_heading["UI_CREDITS_PACKS"] as Array).size() >= 20, "every source pack")
+
+
+# =================================================================================================================
+# 2.0 phase 2 (ui-A, PLAN.md P2.8): key test order, the Far Shore map, the Book II wall, co-op medals, paintings
+# =================================================================================================================
+
+## "The key test must show players in join order": the numpad player who joins first is P1, so the test's first column
+## is P1 on the numpad in his colour, lit by his own keys; the second column is P2 on W A S D. Before the partner joins
+## his half is a "free" column with the layout's keys.
+func test_key_test_shows_players_in_join_order() -> void:
+	var node: JoinScreen = await _open_join()
+	_key(KEY_KP_0)
+	node.open_key_test()
+	var test: JoinScreen.PartyKeyTest = node.get_key_test()
+	assert_eq(test.columns_shown, [Vector2i(0, Defs.InputSlotKind.KEYBOARD_RIGHT),
+			Vector2i(-1, Defs.InputSlotKind.KEYBOARD_LEFT)] as Array[Vector2i], "P1 on the numpad, then the free half")
+	assert_eq(test.column_tag(0), "P1")
+	assert_eq(test.column_tag(1), tr("UI_JOIN_FREE"))
+	node.close_key_test()
+	_key(KEY_SPACE)
+	node.open_key_test()
+	assert_eq(test.column_tag(0), "P1", "join order: the numpad player first")
+	assert_eq(test.column_tag(1), "P2", "then the W A S D player")
+	_key(KEY_KP_ENTER, true)
+	assert_true(test.is_lit(0, &"attack"), "P1's Num Enter lights P1's Strike")
+	assert_false(test.is_lit(1, &"attack"))
+	_key(KEY_KP_ENTER, false)
+	_key(KEY_SPACE, true)
+	assert_true(test.is_lit(1, &"jump"), "Space lights P2's Jump")
+	assert_false(test.is_lit(0, &"jump"), "... not P1's")
+	_key(KEY_SPACE, false)
+	await _cleanup()
+
+
+## Book II plays on the Far Shore page: its own markers (MARKERS_B2) and the painting slab; Book I has neither.
+func test_world_map_far_shore_page_and_slab() -> void:
+	Save.reset()
+	Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.SINGLE, 1, Levels.BOOK_2)
+	var first: StringName = Levels.first_level(Levels.BOOK_2)
+	assert_ne(first, &"", "Book II has a first stop")
+	Flow.args = {"level_id": first, "book": Levels.BOOK_2, "mode": Defs.GameMode.SINGLE}
+	var node: WorldMapScreen = await _open(&"world_map") as WorldMapScreen
+	assert_eq(node.get_book(), Levels.BOOK_2)
+	assert_eq(node.get_marker_ids(), Levels.get_campaign(Defs.Difficulty.BEGINNER, Levels.BOOK_2), "Book II's stops")
+	var key: Vector2i = Vector2i(int(Levels.get_value(first, "world", 0)), int(Levels.get_value(first, "stage", 0)))
+	assert_eq(node.get_markers()[0], WorldMapScreen.MARKERS_B2[key], "5-1 stands on the red mesa")
+	assert_not_null(node.get_slab(), "the painting slab")
+	assert_true(ResourceLoader.has_cached(WorldMapScreen.MAP_TEXTURE_B2), "the Far Shore page shows")
+	assert_eq(node.get_map_rect().size, Vector2(1280.0, 360.0), "a 1280 x 360 page")
+	var slab: Rect2 = node.get_slab().get_global_rect()
+	var map_top: float = node.get_map_rect().position.y
+	if node.size.y >= float(Tuning.VIEW_H) * Tuning.ART_SCALE:
+		# On the game's 360-row view (or a taller one; an earlier test may leave the root viewport smaller).
+		for marker: Vector2 in WorldMapScreen.MARKERS_B2.values():
+			var plate_bottom: float = map_top + marker.y + WorldMapScreen.PLATE_GAP + WorldMapScreen.PLATE_HEIGHT
+			assert_true(plate_bottom <= slab.position.y, "the slab stays under every stop and its plate (%s)" % marker)
+	node.queue_free()
+	await get_tree().process_frame
+	Game.new_game(Defs.Difficulty.BEGINNER)
+	Flow.args = {"level_id": Levels.first_level()}
+	node = await _open(&"world_map") as WorldMapScreen
+	assert_eq(node.get_book(), 1)
+	assert_null(node.get_slab(), "Book I's page has no slab")
+	await _cleanup()
+
+
+## Every stop of the Far Shore page (MARKERS_B2, art-A's points) keeps its number plate clear of the other markers and
+## plates, and the hero on a stop covers no other marker or plate (the Book I rule, test above). The eleven stops are
+## injected as fake Book II levels: the build has only some of them yet.
+func test_world_map_far_shore_markers_keep_their_distance() -> void:
+	const GAP: float = 6.0
+	const HERO: Rect2 = Rect2(-24.0, -52.0, 48.0, 52.0)
+	var ids: Array[StringName] = []
+	var order: int = 900
+	for key: Vector2i in WorldMapScreen.MARKERS_B2:
+		var id: StringName = StringName("zz_far_shore_%d_%d" % [key.x, key.y])
+		var text: String = "[meta]\nformat = 2\nid = %s\nname = \"%s\"\nkind = main\nbook = 2\nworld = %d\nstage = %d\norder = %d\n" \
+				% [id, id, key.x, key.y, order]
+		Levels._meta[id] = Levels.parse_meta(text)
+		Levels._paths[id] = Levels.get_level_path(&"test_example")
+		ids.append(id)
+		order += 1
+	Levels._index_campaign()
+	Game.start_run(Defs.Difficulty.EXPERT, Defs.GameMode.SINGLE, 1, Levels.BOOK_2)
+	Flow.args = {"level_id": ids[0], "book": Levels.BOOK_2, "campaign": ids}
+	var node: WorldMapScreen = await _open(&"world_map") as WorldMapScreen
+	var markers: Array[Vector2] = node.get_markers()
+	assert_eq(markers.size(), ids.size())
+	var dots: Array[Rect2] = []
+	var plates: Array[Rect2] = []
+	for i: int in markers.size():
+		var radius: float = WorldMapScreen.MARKER_RADIUS + 2.0
+		dots.append(Rect2(markers[i] - Vector2(radius, radius), Vector2(radius, radius) * 2.0))
+		plates.append(node.number_plate(markers[i], UiKit.level_number(ids[i])))
+	for i: int in markers.size():
+		assert_true(Rect2(Vector2.ZERO, node.get_map_rect().size).encloses(plates[i]), "%s: plate on the map" % ids[i])
+		for j: int in markers.size():
+			if i == j:
+				continue
+			var pair: String = "%s / %s" % [ids[i], ids[j]]
+			assert_false(plates[i].grow(GAP).intersects(dots[j]), "%s: plate clear of the marker" % pair)
+			assert_false(plates[i].grow(GAP).intersects(plates[j]), "%s: plates clear of each other" % pair)
+			var hero: Rect2 = Rect2(markers[i] + HERO.position, HERO.size)
+			assert_false(hero.intersects(dots[j]), "%s: the hero on the stop leaves the marker free" % pair)
+			assert_false(hero.intersects(plates[j]), "%s: the hero on the stop leaves the plate free" % pair)
+	node.queue_free()
+	await get_tree().process_frame
+	Levels.rescan()
+	Game.new_game(Defs.Difficulty.BEGINNER)
+
+
+## THE END of Book II with every painting found shows the cave mural; confirm leads to the credits.
+func test_the_end_shows_the_mural() -> void:
+	Flow.args = {"book": Levels.BOOK_2, "mode": Defs.GameMode.SINGLE, "mural": true}
+	var node: TheEndScreen = await _open(&"the_end") as TheEndScreen
+	assert_true(node.is_mural())
+	assert_true(ResourceLoader.has_cached(UnlocksScreen.TEX_MURAL), "the mural picture shows")
+	_press(&"ui_accept")
+	assert_eq(Flow.current_screen, Flow.SCREEN_CREDITS)
+	await _cleanup()
+
+
+## The slab and the Cave Painting screen read the same state: found paintings, the next reward and its distance.
+func test_painting_texts_follow_the_save() -> void:
+	Save.reset()
+	assert_eq(UnlocksScreen.next_text(), tr("UI_PAINTINGS_NEXT").format({"count": 5, "reward": tr("UI_REWARD_MESA_RODEO")}))
+	for index: int in [0, 1, 2, 20, 21]:
+		Save.add_painting(index)
+	assert_eq(UnlocksScreen.next_text(), tr("UI_PAINTINGS_NEXT").format({"count": 5, "reward": tr("UI_REWARD_LOINCLOTHS")}),
+			"5 found: Mesa Rodeo open, 5 more for the loincloths")
+	assert_eq(UnlocksScreen.mural_region(7), Rect2(24.0, 16.0, 24.0, 16.0), "painting 7 is the mural's piece (1, 1)")
+	assert_eq(UnlocksScreen.mural_region(29), Rect2(120.0, 64.0, 24.0, 16.0), "29 its last piece")
+	assert_eq(UnlocksScreen.reward_icon_region(2, true), Rect2(48.0, 24.0, 24.0, 24.0), "row 1: the lit icon")
+	assert_true(UnlocksScreen.painting_where(20).begins_with(tr("UI_PAINTINGS_COOP").get_slice("{", 0)),
+			"20-29 hide in Book I co-op files")
+	assert_true(UnlocksScreen.painting_where(0).contains(UiKit.level_name(&"w5_l1")), "0 is in 5-1")
+	for index: int in Tuning.PAINTING_COUNT:
+		Save.add_painting(index)
+	assert_eq(UnlocksScreen.next_text(), tr("UI_PAINTINGS_ALL"))
+	Save.reset()
+
+
+## Book II's wall: "Only an expert eater may climb to the Roc!" over the Sky Spire; confirm returns to the title.
+func test_expert_wall_of_book_two() -> void:
+	Flow.args = {"book": Levels.BOOK_2, "mode": Defs.GameMode.SINGLE}
+	var node: ExpertWallScreen = await _open(&"expert_wall") as ExpertWallScreen
+	assert_eq(node.get_book(), Levels.BOOK_2)
+	assert_eq(ExpertWallScreen.wall_text_key(Levels.BOOK_2), "UI_WALL_B2_TEXT")
+	assert_eq(ExpertWallScreen.wall_text_key(1), "UI_WALL_TEXT", "Book I keeps its castle text")
+	var texts: PackedStringArray = PackedStringArray()
+	for label: Node in node.find_children("*", "Label", true, false):
+		texts.append((label as Label).text)
+	assert_true(texts.has("UI_WALL_B2_TEXT"), "the Roc text shows")
+	_press(&"ui_accept")
+	assert_eq(Flow.current_screen, Flow.SCREEN_TITLE)
+	await _cleanup()
+
+
+## The co-op tally (DESIGN.md D.11): both heroes walk in, the companion hands out the medals of the stage to their
+## winners (ties share one), a skip hands out the rest; the tribe score is paid as before.
+func test_tally_coop_medals_for_both_heroes() -> void:
+	Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.COOP, 2, 1)
+	Game.begin_level(&"test_example")
+	Game.runs[0].food = 6
+	Game.runs[1].food = 2
+	Game.runs[1].revives = 1
+	Game.runs[0].hurts = 1
+	Game.runs[1].hurts = 1
+	Game.add_tally_item(&"items/food", 3, 100)
+	Flow.args = {"level_id": &"test_example", "percent": 50}
+	var node: TallyScreen = await _open(&"tally") as TallyScreen
+	assert_eq(node.get_actor_feet().size(), 3, "P1, the companion and P2")
+	var medals: Array[Array] = node.get_medals()
+	assert_eq(medals, [[&"most_food", 0], [&"hatchling", 1], [&"clumsiest", 0], [&"clumsiest", 1]] as Array[Array],
+			"Most Food to P1, Hatchling to P2, a shared Clumsiest")
+	assert_eq(node.get_board_texts(0).size(), 0, "nothing handed out yet")
+	_press(&"ui_accept")
+	assert_eq(node.medals_shown, medals.size(), "a skip hands out every medal")
+	assert_eq(node.get_board_texts(0), PackedStringArray(["most_food", "clumsiest"]))
+	assert_eq(node.get_board_texts(1), PackedStringArray(["hatchling", "clumsiest"]))
+	assert_eq(Game.score, 100, "the tribe score: the item paid once")
+	_press(&"ui_accept")
+	assert_true(node.leaving)
+	await _cleanup()
+	Game.new_game(Defs.Difficulty.BEGINNER)
+
+
+## The co-op tally runs through its medals by itself.
+func test_tally_coop_hands_out_medals_by_itself() -> void:
+	Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.COOP, 2, 1)
+	Game.begin_level(&"test_example")
+	Game.runs[1].food = 3
+	Flow.args = {"level_id": &"test_example", "percent": 100}
+	var node: TallyScreen = await _open(&"tally") as TallyScreen
+	var waited: float = 0.0
+	while not node.leaving and waited < 12.0:
+		await get_tree().create_timer(0.25).timeout
+		waited += 0.25
+	assert_true(node.leaving, "the tally finishes without input")
+	assert_eq(node.medals_shown, 1)
+	assert_eq(node.get_board_texts(1), PackedStringArray(["most_food"]))
+	await _cleanup()
+	Game.new_game(Defs.Difficulty.BEGINNER)
+
+
+## A single-player tally has no medals (the 1.0 tally).
+func test_tally_single_player_has_no_medals() -> void:
+	Game.new_game(Defs.Difficulty.BEGINNER)
+	Game.begin_level(&"test_example")
+	Game.runs[0].food = 9
+	Flow.args = {"level_id": &"test_example", "percent": 100}
+	var node: TallyScreen = await _open(&"tally") as TallyScreen
+	assert_eq(node.get_medals().size(), 0)
+	assert_eq(node.get_actor_feet().size(), 2)
+	await _cleanup()
+
+
+## The Cave Painting screen: 30 slots (found ones show their picture), the focus on the first painting still missing,
+## the reward ladder; "back" returns to where it was opened.
+func test_unlocks_screen_shows_paintings_and_rewards() -> void:
+	Save.reset()
+	for index: int in [0, 1, 2, 3, 4]:
+		Save.add_painting(index)
+	Flow.args = {"back": Flow.SCREEN_TITLE}
+	var node: UnlocksScreen = await _open(&"unlocks") as UnlocksScreen
+	assert_true(node.get_slot(0).found)
+	assert_false(node.get_slot(5).found)
+	assert_eq(node.focused_index, 5, "the hunt goes on at the first painting not found")
+	assert_true(node.get_slot(5).has_focus())
+	assert_true(node.get_info_text().contains(tr("UI_PAINTINGS_MISSING")))
+	_press(&"ui_down")
+	assert_eq(node.focused_index, 5 + UnlocksScreen.MURAL_COLUMNS, "Down: the socket under it")
+	_press(&"ui_right")
+	assert_eq(node.focused_index, UnlocksScreen.MURAL_COLUMNS, "Right from the row's end wraps to its start")
+	var status: PackedStringArray = node.get_reward_status()
+	assert_eq(status.size(), UnlockTable.REWARDS.size())
+	assert_eq(status[0], tr("UI_PAINTINGS_OPEN"), "5 paintings: Mesa Rodeo is open")
+	assert_eq(status[1], tr("UI_PAINTINGS_NEEDS").format({"count": 10}))
+	_press(&"ui_cancel")
+	assert_eq(Flow.current_screen, Flow.SCREEN_TITLE)
+	await _cleanup()
+	Save.reset()
+
+
+## The classic layout's Strike key of P1 (Left Ctrl since the orchestrator's G1 resolution; the tests follow the
+## layout table, InputSlot, instead of naming the key).
+func _p1_strike() -> Key:
+	return InputSlot.default_keys(InputSlot.KeyboardLayout.CLASSIC, Defs.InputSlotKind.KEYBOARD_LEFT, Defs.ACT_ATTACK)[0]
 
 
 ## The join panel of a co-op front end with every seat free.

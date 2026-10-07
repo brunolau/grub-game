@@ -87,7 +87,9 @@ def section_lines(reg=None):
       "Proof sheets: `docs/art/expansion/*.png` (hero colours `heroes_*.png`, `hero_patterns*.png`, "
       "`hero_palette_swatches.png`; objects `coop_objects_frames.png`, `coop_scene_canyon.png`, `coop_scene_cave.png`, "
       "`book2_objects.png`, `book2_scene_fen.png`, `book2_scene_gulch.png`; liquids `liquids_tar_floor.png`; versus "
-      "`versus_totem_ring.png`; readability `mp_indicators.png`, `eggs_p1_p4.png`).")
+      "`versus_totem_ring.png`; readability `mp_indicators.png`, `eggs_p1_p4.png`; phase 2: the map page "
+      "`far_shore_map.png`, the paintings `paintings_slab_mural.png`, versus screens and HUD `versus_screens.png`, "
+      "Feast Lands `feast_d_e.png`, world objects `world_objects_p2.png`).")
     W("")
 
     # ------------------------------------------------------------------ 17.1 hero colours
@@ -257,10 +259,15 @@ def section_lines(reg=None):
     # ------------------------------------------------------------------ 17.11 versus
     kv = keys("versus")
     if kv:
-        W("### 17.11 Versus art: Grub Stack (DESIGN E.3 / E.9)")
+        W("### 17.11 Versus art (DESIGN E.3 / E.8 / E.9)")
         W("")
-        W("The cookpot, the spawn pads, the crown and the stack pictures of the G1 slice (Totem Ring, Grub Stack). "
-          "The Golden Drumstick item is in 17.4.")
+        W("The cookpot, the spawn pads, the crown and the stack pictures of the G1 slice (Totem Ring, Grub Stack), "
+          "and phase 2's who-is-who and screen art: portraits and corner-panel heads in every hero colour and three "
+          "expressions, the round sundial, the medal discs of the awards and tally medals, the scoreboard plate, the "
+          "results cave wall with the heroes painted on it. The Golden Drumstick item is in 17.4, the hit sparks in "
+          "the attacker's colour (`sprites/fx/hit_stars_players.png`) in 17.4 too. Colour rows follow "
+          "`UiPlayers.PALETTE_COLOURS` (yellow, blue, pink, green, white, gold); the tags and arrows of 17.5 have a "
+          "row per colour as well.")
         W("")
         table(["File", "Size", "Frame", "Grid", "Pivot", "Animations", "Use"],
               [[_short(k), _sz(R[k]), _fr(R[k]), _gr(R[k]), _pv(R[k]), _anims(R[k]), R[k].get("note", "")]
@@ -297,6 +304,51 @@ def section_lines(reg=None):
               [[_short(k), R[k].get("kind", "-"), ", ".join("`%s`" % n for n in R[k].get("names", [])),
                 num(R[k], "seconds", "%.2f"), loop(R[k]), lufs(R[k]), num(R[k], "true_peak_dbtp"),
                 num(R[k], "volume_db"), R[k].get("played_at") or "-", R[k].get("role", "")] for k in ka])
+    # ------------------------------------------------------------------ 17.13 the Far Shore map page, paintings
+    kf = keys("far_shore")
+    if kf:
+        W("### 17.13 The Far Shore map page and the Cave Paintings (DESIGN A.1, C.9)")
+        W("")
+        W("Book II's map page and the pictures of the 30 Cave Paintings for ui-A's map, slab and unlocks screen. "
+          "The painting slab is screen UI in the lower-right corner of the map screen (world_map.gd), not part of "
+          "the map picture.")
+        W("")
+        table(["File", "Size", "Frame", "Grid", "Use"],
+              [[_short(k), _sz(R[k]), _fr(R[k]), _gr(R[k]), R[k].get("note", "")] for k in kf])
+        mp = R.get("assets/ui/world_map_far_shore.png", {})
+        if mp.get("markers"):
+            W("Map stops on `ui/world_map_far_shore.png` (map px, the marker's centre; the hero stands on it, the "
+              "number plate 12-24 px below):")
+            W("")
+            table(["Stop"] + list(mp["markers"].keys()),
+                  [["(x, y)"] + ["(%d, %d)" % tuple(v) for v in mp["markers"].values()]])
+        pt = R.get("assets/ui/paintings.png", {})
+        if pt.get("themes"):
+            W("Painting pictures (`ui/paintings.png`, cell = index) and the level whose story each suits:")
+            W("")
+            table(["Index", "Figure", "Suits"], [[t["index"], t["figure"], t["suggested_for"]] for t in pt["themes"]])
+
+    # ------------------------------------------------------------------ 17.14 feast
+    kfe = keys("feast")
+    if kfe:
+        W("### 17.14 Feast Land D / E skins (DESIGN A.3)")
+        W("")
+        W("Honey Falls (`bonus_d`) and Pudding Lagoon (`bonus_e`): two terrain atlases in the 40-tile layout and "
+          "collision of 10.1, and `props/feast/<name>` pictures (`assets/tiles/feast/props/`, no collision). Their "
+          "liquids (`honey`, `syrup`), ':' floors, the soda geyser and the wafer raft are phase-1 files (17.3, 17.10).")
+        W("")
+        table(["File", "Size", "Pivot", "Use"],
+              [[_short(k), _sz(R[k]), _pv(R[k]), R[k].get("note", "")] for k in kfe])
+
+    # ------------------------------------------------------------------ 17.15 new uses of 1.0 files
+    uses = extra.get("reuse_1_0", [])
+    if uses:
+        W("### 17.15 2.0 uses of shipped 1.0 files")
+        W("")
+        W("Shipped 1.0 files (sections 3-12, unchanged) that 2.0 code draws for a new purpose:")
+        W("")
+        table(["File", "2.0 use"], [["`%s`" % f, u] for f, u in uses])
+
     W(END)
     return out
 

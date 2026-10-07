@@ -21,11 +21,36 @@ extends BossBase
 ## Parameters: `arena` zone name, `left`, `right` absolute columns [10 columns around the anchor], `hp` [64],
 ## `speed` class 0..4 [2], `enraged` flag (red from the start: the Expert rematch), `drops` [fire_starter],
 ## `skin` [brute / brute_enraged].
+##
+## 2.0 co-op form (DESIGN.md B.7, GAMEPLAY.md 13.6; enemies-C, PLAN.md P2.3) - only in a co-op game of two heroes on a
+## co-op file (`kind = coop`: w2_l2b_coop); everywhere else, a party of one included, the Brute above runs unchanged:
+##  - hit points x5/4 (64 -> 80; PartyTuning.BOSS_HP_MAX_NUM / DEN);
+##  - it targets whoever hit it last (the nearest hatched hero before the first hit, or when he is down);
+##  - its **arm guard** faces its target: every head hit of the target hero glances off (a clank and a spark), a club
+##    or a throw alike - only the partner reaches the head, from any side; a target riding his partner's head (Totem
+##    Ride) is above the guard and his strikes count;
+##  - below half its hit points (Expert; PartyTuning.boss_grabs_on) the **Grab**: a GRAB_BEAT_TICKS chest beat, then
+##    its hands open GRAB_OPEN_TICKS; a target whose feet are within GRAB_REACH_PX in front is squeezed: he cannot move
+##    or strike and loses a bone every GRAB_SQUEEZE_TICKS; wriggling (Left and Right pressed in turn) shortens the hold
+##    by GRAB_WRIGGLE_TICKS per press; his partner's head hit frees him (and counts) and staggers the Brute
+##    BRUTE_STAGGER_TICKS. A hold ends after GRAB_HOLD_TICKS at most; the next grab waits GRAB_COOLDOWN_TICKS.
+##  - the ground pound shakes both heroes (the level's shake; crouch to stand firm), as in 1.0.
 
-enum State { IDLE, WATCH, JUMP, ATTACK, POUND, STAGGER, BACK_HOP, DYING }
+enum State { IDLE, WATCH, JUMP, ATTACK, POUND, STAGGER, BACK_HOP, DYING, GRAB_BEAT, GRAB_OPEN, HOLD }
 
 const SKIN_CALM: String = "brute"
 const SKIN_ENRAGED: String = "brute_enraged"
+
+# --- Co-op form tuning (enemies-C; private until moved into EnemyTuning with enemies-A) ----------------------------
+const GRAB_BEAT_TICKS: int = 22          ## the chest beat before the hands open (the telegraph) [G 13.6]
+const GRAB_OPEN_TICKS: int = 8           ## hands open [G 13.6]
+const GRAB_REACH_PX: int = 30            ## a target's feet within this many px in front are seized [G 13.6]
+const GRAB_TRIGGER_PX: int = 60          ## it starts a grab when its target is this close (grounded, same floor)
+const GRAB_SQUEEZE_TICKS: int = 44       ## one bone per this many ticks held [G 13.6]
+const GRAB_WRIGGLE_TICKS: int = 4        ## each Left / Right press in turn shortens the hold this much [G 13.6]
+const GRAB_HOLD_TICKS: int = 132         ## a hold ends after this long at most (tune)
+const GRAB_COOLDOWN_TICKS: int = 132     ## ticks between two grabs (tune)
+const GRAB_FREE_SHIELD_TICKS: int = 44   ## a freed or released hero blinks this long (the grab trait's rule)
 
 ## Left and right limits of the feet point, logical px (level parameters `left` / `right`, absolute columns).
 var left_x: int = 0
@@ -40,6 +65,16 @@ var _counter: int = 0
 var _anger: int = 0
 var _air_ticks: int = 0
 var _punch_rest: int = 0
+
+# 2.0 co-op form (every field keeps its default in a party of one).
+var _coop: bool = false
+var _solo_hp: int = 0
+var _held: PlayerBase = null
+var _held_took_control: bool = false
+var _hold_left: int = 0
+var _hold_ticks: int = 0
+var _wriggle_dir: int = 0
+var _grab_cooldown: int = 0
 
 
 func _default_skin() -> String:
@@ -58,6 +93,7 @@ func _apply_params(params: Dictionary) -> void:
 	var right_col: int = int(params.get("right", cell_col() + reach))
 	left_x = mini(left_col, right_col) * Tuning.TILE + (Tuning.TILE >> 1)
 	right_x = maxi(left_col, right_col) * Tuning.TILE + (Tuning.TILE >> 1)
+	_solo_hp = max_hp
 
 
 ## Current state (State), for tests and tools.
@@ -68,6 +104,21 @@ func get_state() -> int:
 ## Anger counter of the watch state, for tests and tools.
 func get_anger() -> int:
 	return _anger
+
+
+## 2.0: true in the co-op form (DESIGN.md B.7).
+func is_coop_form() -> bool:
+	return _coop
+
+
+## 2.0: the hero the co-op Grab holds, or null.
+func get_held() -> PlayerBase:
+	return _held
+
+
+## 2.0: hold ticks left of the co-op Grab (0 when it holds nobody).
+func get_hold_left() -> int:
+	return _hold_left if _held != null else 0
 
 
 ## The weak point this tick (logical px): the top 30 px of the body, mirrored by the facing.
@@ -107,9 +158,13 @@ func _on_reset() -> void:
 	_punch_rest = 0
 	if skin == SKIN_ENRAGED and not enraged:
 		_apply_skin(SKIN_CALM)
+	if _coop or _held != null:
+		_coop_reset()
 
 
 func _on_lethal_hit() -> void:
+	if _held != null:
+		_release(true)
 	_set_state(State.DYING)
 	xvel = 0
 	yvel = EnemyTuning.BRUTE_DEFEAT_YVEL
@@ -135,10 +190,15 @@ func _ai_tick() -> void:
 			return
 	if _state == State.IDLE:
 		_set_state(State.WATCH)
-	var power: int = poll_weapon_hit(get_head_rect())
+	var power: int = _coop_poll(hero) if _coop else poll_weapon_hit(get_head_rect())
 	if power > 0:
 		_on_head_hit(power, hero)
 		if dead or _state == State.DYING:
+			return
+	if _coop:
+		hero = _target_hero()
+		if _coop_tick(hero):
+			_update_box()
 			return
 	if hero == null:
 		_play(&"idle")
@@ -349,6 +409,13 @@ func _on_head_hit(power: int, hero: PlayerBase) -> void:
 		hero.set_glider(false)
 	if hp < EnemyTuning.BRUTE_SKIP_WATCH_HP and skin == SKIN_CALM:
 		_apply_skin(SKIN_ENRAGED)
+	if _coop and _held != null and last_hitter != _held:
+		# 2.0 co-op Grab: the partner's head hit frees the held hero and staggers the Brute.
+		_release(true)
+		_stagger_from(last_hitter)
+		return
+	if _coop and last_hitter != null:
+		hero = last_hitter
 	if power > EnemyTuning.BRUTE_STAGGER_MIN_POWER:
 		var away: int = -_dir_to(hero) if hero != null else -facing
 		xvel = away * EnemyTuning.BRUTE_STAGGER_XVEL
@@ -356,6 +423,262 @@ func _on_head_hit(power: int, hero: PlayerBase) -> void:
 		_grounded = false
 		_set_state(State.STAGGER)
 		_play(&"hurt", true)
+
+
+# =================================================================================================================
+# 2.0 co-op form (DESIGN.md B.7): last hitter, arm guard, the Grab
+# =================================================================================================================
+
+## Start the fight (the arena zone or the wake rule): the form is fixed first, so the bar opens with its hit points.
+func start_fight() -> void:
+	if not fighting and not dead:
+		_configure_form()
+	super.start_fight()
+
+
+## Co-op: it targets whoever hit it last (BossBase.last_hitter) while he may be targeted; else the party's rule
+## (EnemyBase._choose_target). A party of one: the 1.0 target.
+func _choose_target() -> PlayerBase:
+	if _coop and last_hitter != null and is_instance_valid(last_hitter) and last_hitter.is_party_targetable():
+		return last_hitter
+	return super._choose_target()
+
+
+## The co-op form in a co-op game of two or more heroes on a co-op file; the hit points x5/4. Idempotent; a party of
+## one, a solo file or another mode keeps (or gets back) the 1.0 Brute.
+func _configure_form() -> void:
+	var level: LevelBase = Game.level
+	var want: bool = level != null and Game.mode == Defs.GameMode.COOP and level.hero_count() > 1 \
+			and str(level.meta.get("kind", "")) == "coop"
+	if want == _coop:
+		return
+	_coop = want
+	if _coop:
+		max_hp = _solo_hp * PartyTuning.BOSS_HP_MAX_NUM / PartyTuning.BOSS_HP_MAX_DEN
+	else:
+		max_hp = _solo_hp
+	hp = max_hp
+
+
+func _coop_reset() -> void:
+	if _held != null:
+		_release(false)
+	_hold_left = 0
+	_hold_ticks = 0
+	_wriggle_dir = 0
+	_grab_cooldown = 0
+	_coop = false
+	max_hp = _solo_hp
+	hp = max_hp
+
+
+## The weapon test of the co-op form (BossBase.poll_weapon_hit's order and cooldown): a hit by the target hero glances
+## off the arm guard unless he rides his partner's head; the held hero cannot strike. Returns the power that counts.
+func _coop_poll(target: PlayerBase) -> int:
+	if hit_cooldown > 0:
+		hit_cooldown -= 1
+	if _glance_ticks > 0:
+		_glance_ticks -= 1
+	var level: LevelBase = Game.level
+	if level == null or dead or not fighting:
+		return 0
+	var head: Rect2i = get_head_rect()
+	var projectiles: Array[SimEntity] = level.get_kind(Defs.Kind.HERO_PROJECTILE)
+	for i: int in range(projectiles.size() - 1, -1, -1):
+		var projectile: ProjectileBase = projectiles[i] as ProjectileBase
+		if projectile == null or projectile.spent or not Overlap.rects(projectile.get_box(), head):
+			continue
+		projectile.consume()
+		if _guarded(level.get_hero(projectile.owner_slot), target):
+			_guard_glance(level, head.get_center())
+			return 0
+		if hit_cooldown > 0:
+			return 0
+		_note_hitter(level, projectile.owner_slot)
+		return projectile.power
+	if hit_cooldown > 0:
+		return 0
+	for hero: PlayerBase in level.contact_order():
+		if hero == _held or not hero.club_box_active or not Overlap.rects(hero.club_box, head):
+			continue
+		if _guarded(hero, target):
+			_guard_glance(level, hero.club_box.intersection(head).get_center())
+			continue
+		hero.notify_weapon_hit()
+		_note_hitter(level, hero.slot)
+		return hero.club_power
+	return 0
+
+
+## True when the arm guard stops a hit of `hitter`: he is the target (the guard faces him) and does not ride a Totem.
+## During a Grab the guard is down: only the held hero cannot hit (his partner always can).
+func _guarded(hitter: PlayerBase, target: PlayerBase) -> bool:
+	if hitter == null:
+		return false
+	if _held != null:
+		return hitter == _held
+	return hitter == target and not hitter.is_riding_totem()
+
+
+func _guard_glance(level: LevelBase, point: Vector2i) -> void:
+	if _glance_ticks > 0:
+		return
+	_glance_ticks = GLANCE_TICKS
+	Audio.play_sfx(Sfx.CLUB_HIT_SCENERY)
+	level.spawn_fx(&"fx/hit_stars", point)
+
+
+## The co-op parts of a tick: the grab cooldown and the Grab states. True when the Grab ran the tick.
+func _coop_tick(target: PlayerBase) -> bool:
+	if _grab_cooldown > 0:
+		_grab_cooldown -= 1
+	match _state:
+		State.GRAB_BEAT:
+			_counter += 1
+			xvel = 0
+			_play(&"taunt")
+			if _counter == 1:
+				Audio.play_sfx(Sfx.BOSS_CHEST_BEAT)
+			if _counter >= GRAB_BEAT_TICKS:
+				_set_state(State.GRAB_OPEN)
+			if target != null:
+				_contact_every(target)
+			return true
+		State.GRAB_OPEN:
+			_counter += 1
+			_play(&"attack")
+			if target != null and _in_grab_reach(target):
+				_seize(target)
+				return true
+			if _counter >= GRAB_OPEN_TICKS:
+				_grab_cooldown = GRAB_COOLDOWN_TICKS
+				_set_state(State.WATCH)
+			if target != null:
+				_contact_every(target)
+			return true
+		State.HOLD:
+			_hold_tick()
+			return true
+	if _grab_wanted(target):
+		facing = _dir_to(target)
+		_set_state(State.GRAB_BEAT)
+		return true
+	return false
+
+
+## A grab starts (from watching or attacking, grounded) below half its hit points on Expert when its target stands
+## close on its floor and the last grab is long enough ago.
+func _grab_wanted(target: PlayerBase) -> bool:
+	if target == null or _grab_cooldown > 0 or not _grounded or hp * 2 >= max_hp:
+		return false
+	if not PartyTuning.boss_grabs_on(Game.difficulty):
+		return false
+	if _state != State.WATCH and _state != State.ATTACK:
+		return false
+	return absi(target.sim_pos.x - sim_pos.x) <= GRAB_TRIGGER_PX and absi(target.sim_pos.y - sim_pos.y) <= Tuning.TILE
+
+
+## The target's feet within GRAB_REACH_PX in front of the feet point, on its floor (16 px up or down). A hero blinking
+## after a hurt is seized all the same (whoever stands that close has touched the body).
+func _in_grab_reach(hero: PlayerBase) -> bool:
+	if hero.dead or hero.is_down() or not hero.is_party_targetable():
+		return false
+	var ahead: int = (hero.sim_pos.x - sim_pos.x) * facing
+	return ahead >= 0 and ahead <= GRAB_REACH_PX and absi(hero.sim_pos.y - sim_pos.y) <= Tuning.TILE
+
+
+func _seize(hero: PlayerBase) -> void:
+	_held = hero
+	_held_took_control = hero.control_enabled
+	if _held_took_control:
+		hero.set_control_enabled(false)
+	_hold_left = GRAB_HOLD_TICKS
+	_hold_ticks = 0
+	_wriggle_dir = 0
+	_set_state(State.HOLD)
+	_place_held()
+	if Game.level != null:
+		Game.level.notify_hero_teleported(hero)
+	Audio.play_sfx(Sfx.BOSS_ROAR)
+
+
+## One tick of the hold: squeeze (a bone per GRAB_SQUEEZE_TICKS), read the wriggle (his own slot's keys, GameInput:
+## Left and Right in turn), keep him in the hands; the hold ends when its time is used up.
+func _hold_tick() -> void:
+	_play(&"crouch")
+	xvel = 0
+	if _held == null or not is_instance_valid(_held) or _held.dead or _held.is_down():
+		_release(false)
+		_after_grab()
+		return
+	_hold_ticks += 1
+	_hold_left -= 1
+	var keys: int = GameInput.get_flags(_held.slot) & (Defs.IN_LEFT | Defs.IN_RIGHT)
+	var dir: int = 0
+	if keys == Defs.IN_LEFT:
+		dir = -1
+	elif keys == Defs.IN_RIGHT:
+		dir = 1
+	if dir != 0 and dir != _wriggle_dir:
+		if _wriggle_dir != 0:
+			_hold_left -= GRAB_WRIGGLE_TICKS
+		_wriggle_dir = dir
+	if _hold_ticks % GRAB_SQUEEZE_TICKS == 0:
+		var hero: PlayerBase = _held
+		Audio.play_sfx(Sfx.PLAYER_HURT_HEAVY)
+		if hero.run.lose_bone():
+			_release(false)
+			hero.kill(&"enemy")
+			_after_grab()
+			return
+	if _hold_left <= 0:
+		_release(true)
+		_after_grab()
+		return
+	_place_held()
+	_contact_every(_held)
+
+
+## The held hero stands in the hands: his feet GRAB_REACH_PX in front, on the Brute's floor, no motion, no strike.
+func _place_held() -> void:
+	if _held == null:
+		return
+	_held.sim_pos = Vector2i(sim_pos.x + facing * GRAB_REACH_PX, sim_pos.y)
+	_held.xvel = 0
+	_held.yvel = 0
+	_held.attack_gate = false
+	_held.club_box_active = false
+
+
+## Let the held hero go (`shielded`: he blinks GRAB_FREE_SHIELD_TICKS, contact skipped).
+func _release(shielded: bool) -> void:
+	var hero: PlayerBase = _held
+	_held = null
+	_hold_left = 0
+	if hero == null or not is_instance_valid(hero):
+		_held_took_control = false
+		return
+	if _held_took_control and not hero.dead and not hero.is_down():
+		hero.set_control_enabled(true)
+	_held_took_control = false
+	if shielded and not hero.dead and not hero.is_down():
+		hero.shield = maxi(hero.shield, GRAB_FREE_SHIELD_TICKS)
+
+
+func _after_grab() -> void:
+	_grab_cooldown = GRAB_COOLDOWN_TICKS
+	_set_state(State.WATCH)
+
+
+## The partner's hit during a hold: thrown back away from him for BRUTE_STAGGER_TICKS (the 1.0 stagger).
+func _stagger_from(hitter: PlayerBase) -> void:
+	var away: int = -_dir_to(hitter) if hitter != null else -facing
+	xvel = away * EnemyTuning.BRUTE_STAGGER_XVEL
+	yvel = EnemyTuning.BRUTE_STAGGER_YVEL
+	_grounded = false
+	_grab_cooldown = GRAB_COOLDOWN_TICKS
+	_set_state(State.STAGGER)
+	_play(&"hurt", true)
 
 
 ## Wake rule (BossBase._wakes_for_any): the hero is within BRUTE_WAKE_RANGE px horizontally, at about its height.
@@ -392,7 +715,7 @@ func _contact_every(target: PlayerBase) -> void:
 
 ## Body, head and fist against the hero: a landing on the head bounces him, everything else costs a bone.
 func _contact(hero: PlayerBase) -> void:
-	if _state == State.STAGGER:
+	if _state == State.STAGGER or hero == _held:
 		return
 	if Overlap.body(hero, self, hero):
 		if Overlap.stomp and hero.yvel >= 0 and not hero.is_gliding():

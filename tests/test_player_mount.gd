@@ -244,6 +244,45 @@ func test_a_hit_on_a_seated_rider_is_the_mounts() -> void:
 	hero.run.reset_energy()
 
 
+func test_the_saddle_ends_the_tar_rules_and_the_dismount_flies_normally() -> void:
+	# 6-1 Bubbling Fen: a hero hops from the tar onto Chomper, rides the tar flats (mounts ignore tar, C.9) and gets off.
+	var rows: PackedStringArray = PackedStringArray()
+	for row: int in GROUND_ROW + WORLD_ROWS_BELOW:
+		var line: String = ""
+		for col: int in WORLD_COLS:
+			if row == GROUND_ROW and col >= 50 and col <= 80:
+				line += TileGrid.CH_TAR
+			elif row >= GROUND_ROW:
+				line += TileGrid.CH_SOLID_A
+			else:
+				line += TileGrid.CH_AIR
+		rows.append(line)
+	world_rows(rows)
+	var surface: int = START.y + Tuning.TAR_SURFACE_DROP_PX
+	mount = FakeMount.new()
+	place(level, mount, Vector2i(START_X + 40, surface))
+	spawn_hero(Vector2i(START_X, surface))
+	play(hold("R", 3))
+	assert_true(hero.hero_climb.on_tar, "wading")
+	assert_eq(hero.walk_cap, Tuning.TAR_WALK_CAP)
+	hero.sit_on_mount(mount, PlayerBase.SEAT_DRIVER)
+	play(hold("", 2))
+	assert_true(hero.is_mounted())
+	assert_false(hero.hero_climb.on_tar, "the saddle is a landing")
+	assert_eq([hero.walk_cap, hero.air_cap, hero.jump_impulse_ticks],
+			[Tuning.WALK_CAP, Tuning.WALK_CAP, Tuning.JUMP_IMPULSE_TICKS], "the 1.0 limits in the saddle")
+	# The dismount over the tar (objects-B's Mount: leave the seat, launch(0, -128)) has full air control ...
+	hero.leave_mount()
+	hero.launch(0, MountTuning.DISMOUNT_YVEL)
+	var fastest: Array[int] = [0]
+	play(hold("R", 8), func(_t: int) -> void: fastest[0] = maxi(fastest[0], hero.xvel))
+	assert_eq(fastest[0], Tuning.WALK_CAP, "a dismount is no tar hop")
+	# ... and the landing in the tar is wading again.
+	play(hold("", 30))
+	assert_true(hero.grounded)
+	assert_true(hero.hero_climb.on_tar, "back in the tar")
+
+
 func test_riding_objects_b_mount() -> void:
 	world_flat()
 	if not Spawner.exists(&"objects/mount") or not Spawner.exists(&"objects/rex_pen"):

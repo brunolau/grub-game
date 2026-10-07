@@ -42,6 +42,11 @@ const FALLBACKS: Dictionary[StringName, Array] = {
 	&"dizzy": [&"hurt", &"idle", &"fly"],
 	&"guard": [&"hurt", &"idle", &"fly"],
 	&"rear": [&"windup", &"attack", &"idle", &"fly"],
+	# 2.0 phase 2 (P2.1): the Mimic's telegraph, a Leech riding a back, a freshly split half.
+	&"shudder": [&"windup", &"idle", &"fly"],
+	&"front": [&"idle", &"fly", &"walk"],
+	&"squash": [&"land", &"idle", &"walk"],
+	&"cast": [&"attack", &"idle", &"walk"],
 }
 
 ## Sheet name this skin was asked for ("turtle_b").
@@ -170,7 +175,9 @@ static func _build(skin_name: String) -> EnemySkin:
 			skin._add(&"hurt", 12, 3, 3, false)
 			skin._add(&"recover", 15, 6, 2, false)
 			skin._add(&"dead", 21, 3, 4, false)
-		"pterodactyl":
+		"pterodactyl", "gull", "storm_ptero":
+			# 2.0 recolours on this layout (art-B, worlds 7-9): the coast gull (gull, pterodactyl recoloured white-grey;
+			# gull_b = pterodactyl_b recoloured, the co-op Snatcher's gull) and the storm pterodactyl of 9-1b / 9-2.
 			skin._layout(144, 120, 8, 2, 72, 104, 52, 22, 58)
 			skin._add(&"fly", 0, 4, 3, true)
 			skin._add(&"land", 4, 1, 1, false)
@@ -185,7 +192,7 @@ static func _build(skin_name: String) -> EnemySkin:
 			skin._add(&"attack", 14, 5, 2, false)
 			skin._add(&"hurt", 19, 2, 3, false)
 			skin._add(&"dead", 21, 3, 4, false)
-		"rival":
+		"rival", "rival_tar":  # 2.0: rival_tar = the Tar Tribe warrior (Charger, DESIGN.md A.5 desert tribesmen)
 			skin._layout(96, 80, 8, 5, 48, 64, 22, 26, 51)
 			skin._add(&"idle", 0, 6, 3, true)
 			skin._add(&"walk", 6, 8, 2, true)
@@ -195,7 +202,7 @@ static func _build(skin_name: String) -> EnemySkin:
 			skin._add(&"attack", 25, 4, 2, false)
 			skin._add(&"hurt", 29, 2, 3, true)
 			skin._add(&"dead", 31, 5, 3, false)
-		"turtle":
+		"turtle", "sea_snail":  # 2.0: the coast's sea snail (Dropper) is turtle_b with a shell recolour (art-B)
 			skin._layout(64, 56, 8, 3, 32, 40, 26, 15, 30)
 			skin._add(&"idle", 0, 4, 4, true)
 			skin._add(&"walk", 4, 6, 3, true)
@@ -262,7 +269,7 @@ static func _build(skin_name: String) -> EnemySkin:
 			skin._add(&"hurt", 4, 1, 1, false)
 			skin._add(&"dead", 6, 1, 1, false)
 		# --- 2.0 world 6 sheets (art-B's ENEMY_SKIN_ROWS.md; ahead of phase 2) -------------------------------------
-		"slime":
+		"slime", "jelly":  # 2.0: jelly flyers are the slime recoloured translucent blue (DESIGN.md F.1)
 			skin._layout(120, 96, 8, 3, 60, 80, 36, 28, 55)
 			skin._add(&"idle", 0, 5, 3, true)
 			skin._add(&"walk", 0, 5, 2, true)
@@ -299,6 +306,58 @@ static func _build(skin_name: String) -> EnemySkin:
 			skin._add(&"front", 4, 4, 3, true)
 			skin._add(&"hang", 4, 1, 1, false)
 			skin._add(&"dead", 8, 1, 1, false)
+		"mimic":
+			# 2.0 archetype 15 (GAMEPLAY.md 13.5: "drawn exactly as a chest"): art-B built this sheet from the chest
+			# container's sprites/objects/chest.png - frame 0 is its closed cell pixel for pixel at the same feet point
+			# (the chest's pivot (24, 36) of 60 x 36 = (40, 40) of 80 x 56). Then the shudder with the lid lifting on two
+			# eyes (windup 1-3), the fangs (bite 4-6), the lid up (awake / recover 7-8), hurt 9-10 (also the daze),
+			# dead 11. The box is the container chest's (EnemyTuning.MIMIC_BOX). One palette: no `mimic_b`.
+			if skin_name != "mimic":
+				return null
+			skin._layout(80, 56, 8, 2, 40, 40, EnemyTuning.MIMIC_BOX.x, EnemyTuning.MIMIC_BOX.y, 27)
+			skin._add(&"idle", 0, 1, 1, false)
+			skin._add(&"windup", 1, 3, 3, false)
+			skin._add(&"shudder", 1, 3, 3, false)
+			skin._add(&"bite", 4, 3, 2, false)
+			skin._add(&"awake", 7, 2, 6, true)
+			skin._add(&"recover", 7, 2, 4, false)
+			skin._add(&"hurt", 9, 2, 2, false)
+			skin._add(&"dizzy", 9, 2, 4, true)
+			skin._add(&"dead", 11, 1, 1, false)
+		"shaman":
+			# 2.0 co-op Shaman (DESIGN.md D.7: AP npc dragon-man at 1x, art-B): idle loop, walk, cast (the bone shield).
+			skin._layout(64, 88, 8, 2, 32, 72, 24, 32, 63)
+			skin._add(&"idle", 0, 10, 3, true)
+			skin._add(&"walk", 0, 10, 2, true)
+			skin._add(&"cast", 5, 5, 2, false)
+			skin._add(&"hurt", 10, 1, 1, false)
+			skin._add(&"dead", 11, 1, 1, false)
+		"ghost":
+			# 2.0 ruin ghost (Harrier; ghost_b shares the case), art-B world 8.
+			skin._layout(120, 104, 8, 4, 60, 88, 39, 41, 82)
+			skin._add(&"fly", 0, 6, 3, true)
+			skin._add(&"screech", 6, 3, 3, false)
+			skin._add(&"dive", 9, 3, 2, true)
+			skin._add(&"vanish", 12, 14, 2, false)
+			skin._add(&"hurt", 26, 4, 2, false)
+			skin._add(&"dead", 30, 1, 1, false)
+		"octopus":
+			# 2.0 sea caves: the octopus on a kelp thread (Dangler, `hang` = front view) and the red one on the ceiling
+			# (octopus_b, Lurker: `hang` upside down, `walk` after the drop), art-B world 7.
+			skin._layout(32, 64, 8, 2, 16, 32, 16, 15, 30)
+			skin._add(&"hang", 0, 4, 4, true)
+			skin._add(&"idle", 0, 4, 4, true)
+			skin._add(&"walk", 4, 4, 3, true)
+			skin._add(&"hurt", 8, 1, 1, false)
+			skin._add(&"dead", 9, 1, 1, false)
+		"fish":
+			# 2.0 leaping fish (Leaper; fish_b = the red one), art-B world 7.
+			skin._layout(32, 64, 4, 1, 16, 32, 15, 8, 16)
+			skin._add(&"idle", 0, 1, 1, false)
+			skin._add(&"leap", 1, 1, 1, false)
+			skin._add(&"glide", 2, 1, 1, false)
+			skin._add(&"dead", 3, 1, 1, false)
+			skin._add(&"hurt", 3, 1, 1, false)
 		"brute":
 			skin.texture_path = BOSS_DIR + skin_name + ".png"
 			skin._layout(288, 176, 7, 6, 144, 144, 55, 61, 122)

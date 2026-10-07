@@ -32,6 +32,15 @@ extends Node
 ## starts a [VersusMatch] (Game.versus_match), every round is an arena start ([method start_round]) seeded from the
 ## match; the referee ends a round with [method end_round]; then the scoreboard ([method next_round]) and after the
 ## last round the results ([method rematch], [method leave_versus]).
+##
+## 2.0, phase 2 (PLAN.md P2.6). Every versus round is recorded - its input log and start snapshot (VersusReplay) - and
+## between the gong and the scoreboard its deciding moment plays again at half speed ([method play_deciding_moment]:
+## the last 3 s, in Grub Stack the biggest steal; any Jump / Strike / accept / pause skips it, [method skip_replay];
+## off in headless runs, [member deciding_moment]). A sudden death switches the round to the sudden-death music. Book
+## II: a warp ends its source stop as in 1.0 (the stop after it follows, its linked sub-stage is passed over); the
+## expert wall and THE END get the book and mode (and THE END of Book II the mural once every painting is found,
+## UnlockTable); [method level_select] lists a book's stops with their codes for the code entry and the co-op
+## continue.
 
 ## A screen or the level became active. `screen` is one of the SCREEN_* names or SCREEN_LEVEL.
 signal screen_changed(screen: StringName)
@@ -46,6 +55,11 @@ signal party_changed(size: int)
 signal pad_lost(slot: int)
 ## 2.0: a pad connected and took the seat of player slot `slot`, whose pad was lost.
 signal pad_reconnected(slot: int)
+## 2.0: the deciding moment of versus round `round_index` plays (ticks `first`..`last` of the round at half speed;
+## `steal`: it shows Grub Stack's biggest steal, else the last seconds). The HUD shows its banner and the skip hint.
+signal replay_started(round_index: int, first: int, last: int, steal: bool)
+## 2.0: the deciding moment ended - played to its end, or skipped (`skipped`). The scoreboard (or the results) follows.
+signal replay_finished(skipped: bool)
 
 const MAIN_SCENE: String = "res://scenes/main.tscn"
 const LEVEL_SCENE: String = "res://scenes/world/level.tscn"
@@ -86,6 +100,8 @@ const SCREEN_VERSUS_RULES: StringName = &"versus_rules" ## args: {"owner": slot 
 const SCREEN_VERSUS_ARENA: StringName = &"versus_arena" ## arena thumbnails, Random, Party Mix
 const SCREEN_VERSUS_SCOREBOARD: StringName = &"versus_scoreboard" ## args: {"round_index": int, "winners": PackedInt32Array}
 const SCREEN_VERSUS_RESULTS: StringName = &"versus_results" ## args: {"winners": PackedInt32Array, "awards": {slot: [id]}}
+## 2.0: the Options > Co-op switch that a co-op run copies into Game.helper_mode (DESIGN.md D.3).
+const HELPER_MODE_KEY: String = "coop/helper_mode"
 
 ## Active screen name.
 var current_screen: StringName = SCREEN_BOOT
@@ -112,6 +128,9 @@ var pause_slot: int = 0
 ## them to Solo / Book I. They decide what start_selected_game starts; a running game's mode and book are Game's.
 var play_mode: int = Defs.GameMode.SINGLE
 var play_book: int = 1
+## 2.0: show the deciding moment of every versus round between the gong and the scoreboard (DESIGN.md E.8 step 5).
+## Off in headless runs (tests and flow scripts drive rounds tick by tick; a test that wants it switches it on).
+var deciding_moment: bool = true
 var _layer: CanvasLayer = null
 var _cover: TransitionCover = null
 var _cover_tween: Tween = null
@@ -131,6 +150,15 @@ var _lost_pads: PackedInt32Array = PackedInt32Array()
 # party change ([has, pos]; empty = none) and the Sim.rng seed of a versus round (-1 = none).
 var _entry_checkpoint: Array = []
 var _pending_seed: int = -1
+# 2.0: the deciding-moment replay (play_deciding_moment): on / off, the ticks to run behind the curtain before it shows,
+# the window, what follows it ([round index, winners]), the match state the round left (restored afterwards) and the
+# scripts of the slots it feeds (given back afterwards).
+var _replaying: bool = false
+var _pending_fast_forward: int = -1
+var _replay_window: Vector2i = Vector2i.ZERO
+var _replay_after: Array = []
+var _replay_end_state: Dictionary = {}
+var _replay_saved_scripts: Dictionary = {}
 
 
 ## Background loading of what a level start needs (ARCHITECTURE.md 11 "Loading"). The pictures, sounds and fonts
@@ -298,10 +326,12 @@ func _ready() -> void:
 	_warmup = Warmup.new()
 	add_child(_warmup)
 	Input.joy_connection_changed.connect(notify_pad_connection)
+	Events.round_sudden_death_started.connect(_on_sudden_death_started)
 	if DisplayServer.get_name() == "headless":
 		instant_transitions = true
 		# Tests and smoke checks load what they use themselves; nothing runs behind their back.
 		background_loading = false
+		deciding_moment = false
 
 
 func _notification(what: int) -> void:
@@ -338,6 +368,11 @@ func _process(_delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _replaying and current_screen == SCREEN_LEVEL and not busy and _skips_replay(event):
+		# The deciding moment is skippable (DESIGN.md E.8): the pause key skips it instead of pausing.
+		skip_replay()
+		get_viewport().set_input_as_handled()
+		return
 	if current_screen == SCREEN_LEVEL and not busy and event.is_action_pressed(Defs.ACT_PAUSE):
 		# A button that both pauses and confirms (gamepad Start) confirms the focused entry of the pause menu.
 		if get_tree().paused and event.is_action(&"ui_accept", true) and get_viewport().gui_get_focus_owner() != null:
@@ -372,6 +407,8 @@ func goto_screen(screen: StringName, transition: int = Defs.Transition.FADE, p_a
 ## Title screen (also the target of "quit to title" and of the end of a run). 2.0: the front-end choice goes back
 ## to Solo / Book I, and a party's input slots back to single-player (every device feeds P1).
 func goto_title() -> void:
+	_cancel_replay()
+	_record_round(false)
 	Audio.stop_all_sfx()
 	play_mode = Defs.GameMode.SINGLE
 	play_book = 1
@@ -515,10 +552,12 @@ func finish_tally() -> void:
 	var finished: StringName = Game.level_id
 	var difficulty: int = Game.difficulty
 	var space_key: String = save_space()
+	var warped: bool = false
 	# A bonus stage ends its SOURCE level (GAMEPLAY.md 1.1).
 	if Game.warp_return_level != &"":
 		finished = Game.warp_return_level
 		Game.warp_return_level = &""
+		warped = true
 	elif _campaign_kind(finished) == Levels.KIND_BONUS:
 		# A bonus stage entered without its source level's warp (debug level select): nothing to record or unlock,
 		# and it never ends the game. The run goes back to the title.
@@ -535,17 +574,17 @@ func finish_tally() -> void:
 	Game.clear_tally()
 	_store_belts(space_key)
 	var kind: String = _campaign_kind(finished)
-	var next: StringName = Levels.next_level(finished, difficulty)
+	var next: StringName = stop_after_warp(finished, difficulty) if warped else Levels.next_level(finished, difficulty)
 	if kind == Levels.KIND_ENDING or (next == &"" and not Levels.has_locked_successor(finished, difficulty)):
 		Save.set_game_completed_in(space_key)
 		Save.submit_score_in(space_key, Game.score)
 		Save.save_game()
-		goto_screen(SCREEN_THE_END)
+		goto_screen(SCREEN_THE_END, Defs.Transition.FADE, ending_args())
 		return
 	if next == &"":
 		Save.submit_score_in(space_key, Game.score)
 		Save.save_game()
-		goto_screen(SCREEN_EXPERT_WALL)
+		goto_screen(SCREEN_EXPERT_WALL, Defs.Transition.FADE, {"book": maxi(Game.book, 1), "mode": Game.mode})
 		return
 	Save.unlock_level_in(space_key, _map_stop(next))
 	Save.save_game()
@@ -654,6 +693,7 @@ func start_coop_game(difficulty: int, party: int = PartyTuning.COOP_PLAYERS, boo
 	play_book = clampi(book, 1, Levels.BOOK_2)
 	_ensure_party_inputs(size)
 	Game.start_run(difficulty, Defs.GameMode.COOP, size, play_book)
+	Game.helper_mode = Settings.get_bool(HELPER_MODE_KEY)
 	Settings.set_value("game/last_difficulty", difficulty)
 	var first: StringName = _map_stop(at_level)
 	if first != &"":
@@ -688,6 +728,59 @@ func level_to_play(level_id: StringName) -> StringName:
 func save_space() -> String:
 	var mode: int = Game.mode if Save.SPACE_MODES.has(Game.mode) else Defs.GameMode.SINGLE
 	return Save.space(mode, maxi(Game.book, 1), Game.difficulty)
+
+
+## 2.0: where the campaign continues when a warp ended the stop of `level_id` (a bonus stage's warp: tally, then "the
+## level after the source level - so warping from 3a skips 3b", GAMEPLAY.md 1.1 / 13.1): the next stop of its book's
+## campaign for `difficulty`, passing over the stop's linked sub-stages (Book II: 5-2 -> Feast Land D -> 6-1, Tusker's
+## Wallow is passed over). Book I's warp stops have no sub-stage, so they continue exactly as Levels.next_level says.
+## In co-op the next stop's co-op file when it has one. "" at the end of the campaign of that difficulty (the flow then
+## shows the expert wall or THE END).
+func stop_after_warp(level_id: StringName, difficulty: int) -> StringName:
+	var stop: StringName = Levels.parent_level(level_id, difficulty)
+	if stop == &"" or str(Levels.get_value(stop, "next", "", difficulty)) == "":
+		return Levels.next_level(level_id, difficulty)
+	var campaign: Array[StringName] = Levels.get_campaign(difficulty, maxi(Levels.get_book(stop), 1))
+	var at: int = campaign.find(stop)
+	if at < 0 or at + 1 >= campaign.size():
+		return &""
+	var following: StringName = campaign[at + 1]
+	if Levels.is_coop_level(level_id):
+		var coop: StringName = Levels.get_coop_level(following)
+		return coop if coop != &"" else following
+	return following
+
+
+## 2.0: the arguments of THE END (ui-A's the_end screen): "book" (1 / 2), "mode" (Defs.GameMode) and "mural" (true at
+## the end of Book II once every Cave Painting was found - The Long Raft Home ends with the cave mural, DESIGN.md C.9).
+func ending_args() -> Dictionary:
+	var book: int = maxi(Game.book, 1)
+	return {"book": book, "mode": Game.mode, "mural": book >= Levels.BOOK_2 and UnlockTable.is_mural_open()}
+
+
+## 2.0: the level select of a campaign (the code entry's list, the co-op continue): one entry per map stop of `book` for
+## `difficulty` in `mode` (Defs.GameMode SINGLE or COOP), in map order - "level_id" (the solo map stop), "code" (its
+## code for that difficulty; "" in co-op, whose files have none), "unlocked" (startable: the first stop always, else
+## reached in that save namespace), "result" (Save.get_level_result_in: percent, score, clears). Co-op lists only the
+## stops that have a co-op file. Start one with continue_game (solo, also by its code) or start_coop_game(..., at_level).
+func level_select(mode: int, book: int, difficulty: int) -> Array[Dictionary]:
+	var coop: bool = mode == Defs.GameMode.COOP
+	var space_key: String = Save.space(Defs.GameMode.COOP if coop else Defs.GameMode.SINGLE, maxi(book, 1), difficulty)
+	var stops: Array[StringName] = []
+	if coop:
+		for file: StringName in Levels.get_coop_campaign(difficulty, maxi(book, 1)):
+			stops.append(Levels.get_coop_base(file))
+	else:
+		stops = Levels.get_campaign(difficulty, maxi(book, 1))
+	var result: Array[Dictionary] = []
+	for index: int in stops.size():
+		var id: StringName = stops[index]
+		result.append({
+			"level_id": id, "code": "" if coop else Levels.get_password(id, difficulty),
+			"unlocked": index == 0 or Save.is_level_unlocked_in(space_key, id),
+			"result": Save.get_level_result_in(space_key, id),
+		})
+	return result
 
 
 # =================================================================================================================
@@ -894,6 +987,7 @@ func start_round() -> void:
 	var versus_match: VersusMatch = Game.versus_match
 	if versus_match == null or busy:
 		return
+	_cancel_replay()
 	if versus_match.is_over():
 		_show_versus_results()
 		return
@@ -905,6 +999,8 @@ func start_round() -> void:
 	versus_match.begin_round(arena_id)
 	_assign_bot_inputs(versus_match)
 	_pending_seed = versus_match.round_seed()
+	versus_match.replay = VersusReplay.begin(versus_match, arena_id, _pending_seed, Game.runs)
+	_record_round(true)
 	start_level(arena_id, Defs.Transition.CURTAIN)
 
 
@@ -916,15 +1012,72 @@ func end_round(winners: PackedInt32Array) -> void:
 	if Game.mode != Defs.GameMode.VERSUS or versus_match == null or not versus_match.round_open:
 		return
 	var index: int = versus_match.round_index
+	Audio.play_sfx(Sfx.ROUND_GONG)
+	_record_round(false)
+	if versus_match.replay != null:
+		versus_match.replay.finish(Sim.tick, Game.runs)
 	versus_match.record_round(winners)
 	var recorded: PackedInt32Array = versus_match.history[-1]["winners"]
 	Events.round_ended.emit(index, recorded)
-	if versus_match.is_over():
-		_show_versus_results()
-	elif has_screen(SCREEN_VERSUS_SCOREBOARD):
-		goto_screen(SCREEN_VERSUS_SCOREBOARD, Defs.Transition.IRIS, {"round_index": index, "winners": recorded})
-	else:
-		next_round()
+	if deciding_moment and play_deciding_moment():
+		return
+	_after_round(index, recorded)
+
+
+## 2.0: play the deciding moment of the round that just ended (DESIGN.md E.8 step 5; [member deciding_moment] makes
+## end_round call it): the round's arena loads again behind the curtain with the round's seed and its start snapshot
+## (VersusReplay: the match's round state and every hero's run), every hero is fed from the input log, the ticks before
+## the window run at once with the effects muted, and the window (VersusReplay.window: the last 3 s, Grub Stack the
+## biggest steal) plays at half speed (Sim.time_scale). Then - at the window's end or on [method skip_replay] - the
+## match state and the runs the round left come back and the scoreboard (or the results) follows. Returns false (nothing
+## happens) when no recorded round waits for its replay.
+func play_deciding_moment() -> bool:
+	var versus_match: VersusMatch = Game.versus_match
+	if busy or _replaying or versus_match == null or versus_match.round_open or versus_match.history.is_empty():
+		return false
+	var replay: VersusReplay = versus_match.replay
+	if replay == null or not replay.can_replay() or not Levels.has_level(replay.arena) or _level_scene_path().is_empty():
+		return false
+	var history: Dictionary = versus_match.history[-1]
+	_replay_after = [replay.round_index, history["winners"]]
+	_replay_end_state = {
+		"round_index": versus_match.round_index, "round_mode": versus_match.round_mode,
+		"round_arena": versus_match.round_arena, "round_wins": versus_match.round_wins.duplicate(),
+	}
+	_replaying = true
+	_replay_window = replay.window()
+	_pending_seed = replay.seed_value
+	_pending_fast_forward = _replay_window.x - 1
+	# The round's own level stops at once (its gong tick still ends): a tick more would write the runs again. The start
+	# state goes back while the curtain hides it, before the level loads again (its heroes spawn from the runs).
+	Sim.frozen = true
+	if not transition_covered.is_connected(_prepare_replay):
+		transition_covered.connect(_prepare_replay, CONNECT_ONE_SHOT)
+	start_level(replay.arena, Defs.Transition.CURTAIN)
+	return true
+
+
+## 2.0: true while the deciding moment of a versus round plays (Flow.play_deciding_moment).
+func is_replaying() -> bool:
+	return _replaying
+
+
+## 2.0: the ticks of the round the deciding moment shows, first and last (Vector2i.ZERO while none plays).
+func replay_window() -> Vector2i:
+	return _replay_window if _replaying else Vector2i.ZERO
+
+
+## 2.0: skip the deciding moment (any player's Jump, Strike, accept or pause does; the HUD's touch button calls it):
+## the scoreboard (or the results) follows at once. Nothing happens while none plays.
+func skip_replay() -> void:
+	if not _replaying:
+		return
+	if busy:
+		# The curtain is still opening on the replay: skip the moment it is open.
+		if not transition_finished.is_connected(skip_replay):
+			transition_finished.connect(skip_replay, CONNECT_ONE_SHOT)
+		return
+	_finish_replay(true)
 
 
 ## The scoreboard is done: the next round (or the results when the match is over).
@@ -937,6 +1090,7 @@ func rematch() -> void:
 	var versus_match: VersusMatch = Game.versus_match
 	if versus_match == null:
 		return
+	_cancel_replay()
 	versus_match.rematch()
 	_begin_versus_run(versus_match)
 	start_round()
@@ -944,6 +1098,8 @@ func rematch() -> void:
 
 ## Leave the match: back to the lobby (seats and rules kept) or, with `to_title` or without a lobby screen, the title.
 func leave_versus(to_title: bool = false) -> void:
+	_cancel_replay()
+	_record_round(false)
 	if Game.versus_match != null:
 		Game.versus_match.round_open = false
 	if to_title or not has_screen(SCREEN_VERSUS_LOBBY):
@@ -1269,6 +1425,7 @@ func _apply_party_change() -> void:
 	if mode == Game.mode and size == Game.party:
 		return
 	Game.set_party(mode, size)
+	Game.helper_mode = mode == Defs.GameMode.COOP and Settings.get_bool(HELPER_MODE_KEY)
 	play_mode = mode
 	if current_screen != SCREEN_LEVEL or Game.level_id == &"":
 		return
@@ -1287,16 +1444,31 @@ func _take_level_extras() -> Dictionary:
 		extras["entry_checkpoint"] = _entry_checkpoint
 	if _pending_seed >= 0:
 		extras["seed"] = _pending_seed
+	if _pending_fast_forward >= 0:
+		extras["fast_forward"] = _pending_fast_forward
 	_entry_checkpoint = []
 	_pending_seed = -1
+	_pending_fast_forward = -1
 	return extras
 
 
 ## The new level is loaded and its clock has not ticked yet: seed a versus round's Sim.rng, put the heroes of a party
-## change at the checkpoint they had reached (Game.set_checkpoint; each hero at his spread respawn point).
+## change at the checkpoint they had reached (Game.set_checkpoint; each hero at his spread respawn point). A
+## deciding-moment replay ("fast_forward": ticks) runs the round up to its window here, behind the curtain, with the
+## effects muted, then plays on at half speed.
 func _apply_level_extras(level_args: Dictionary) -> void:
 	if level_args.has("seed"):
 		Sim.rng.reseed(int(level_args["seed"]))
+	if level_args.has("fast_forward") and _replaying:
+		Audio.set_effects_muted(true)
+		Sim.step(int(level_args["fast_forward"]))
+		Audio.set_effects_muted(false)
+		Sim.time_scale = VersusReplay.REPLAY_SPEED
+		if not Sim.tick_finished.is_connected(_on_replay_tick):
+			Sim.tick_finished.connect(_on_replay_tick)
+		var replay: VersusReplay = Game.versus_match.replay if Game.versus_match != null else null
+		replay_started.emit(_replay_after[0] if not _replay_after.is_empty() else 0, _replay_window.x,
+				_replay_window.y, replay != null and replay.shows_steal())
 	var entry: Array = level_args.get("entry_checkpoint", [])
 	var level: LevelBase = Game.level
 	if entry.size() == 2 and bool(entry[0]) and level != null:
@@ -1360,6 +1532,163 @@ func _bot_source(versus_match: VersusMatch, slot: int, bot_level: int) -> Callab
 
 func _idle_bot(_tick: int) -> int:
 	return 0
+
+
+## What follows a recorded round (and its deciding moment): the results after the last round, else the scoreboard (whose
+## end calls next_round), else at once the next round.
+func _after_round(index: int, winners: PackedInt32Array) -> void:
+	var versus_match: VersusMatch = Game.versus_match
+	if versus_match == null:
+		goto_title()
+	elif versus_match.is_over():
+		_show_versus_results()
+	elif has_screen(SCREEN_VERSUS_SCOREBOARD):
+		goto_screen(SCREEN_VERSUS_SCOREBOARD, Defs.Transition.IRIS, {"round_index": index, "winners": winners})
+	else:
+		next_round()
+
+
+## Start (true) or stop (false) logging the round being played into Game.versus_match.replay (VersusReplay): the flags of
+## every hero after each tick's sampling, the steals after each tick. Connected only while a round plays, so a
+## single-player tick never runs a handler of it.
+func _record_round(on: bool) -> void:
+	for pair: Array in [[Sim.tick_started, _on_round_tick_started], [Sim.tick_finished, _on_round_tick_finished]]:
+		var source: Signal = pair[0]
+		var handler: Callable = pair[1]
+		if on and not source.is_connected(handler):
+			source.connect(handler)
+		elif not on and source.is_connected(handler):
+			source.disconnect(handler)
+
+
+## The round's own level runs tick `tick`: log the flags its heroes play (GameInput sampled them just before).
+func _on_round_tick_started(tick: int) -> void:
+	var replay: VersusReplay = _round_replay()
+	if replay == null:
+		return
+	var flags: PackedInt32Array = PackedInt32Array()
+	for slot: int in replay.players:
+		flags.append(GameInput.get_flags(slot))
+	replay.log_tick(tick, flags)
+
+
+func _on_round_tick_finished(tick: int) -> void:
+	var replay: VersusReplay = _round_replay()
+	if replay != null:
+		replay.note_tick(tick, Game.runs)
+
+
+## The recording of the round being played on its own level (null otherwise: another level, no round, the replay).
+func _round_replay() -> VersusReplay:
+	var versus_match: VersusMatch = Game.versus_match
+	if _replaying or versus_match == null or not versus_match.round_open or versus_match.replay == null:
+		return null
+	var level: LevelBase = Game.level
+	if level == null or level.level_id != versus_match.replay.arena:
+		return null
+	return versus_match.replay
+
+
+## The curtain hides the ended round (play_deciding_moment): the match's round state and every run go back to how the
+## round started, and the log feeds every hero, before the arena loads again.
+func _prepare_replay() -> void:
+	var versus_match: VersusMatch = Game.versus_match
+	if not _replaying or versus_match == null or versus_match.replay == null:
+		return
+	var replay: VersusReplay = versus_match.replay
+	replay.apply_start_state(versus_match)
+	# The snapshot was taken just before the round's start_level; its begin_level then reset energy and glider: again.
+	VersusReplay.restore_runs(replay.start_runs, Game.runs)
+	Game.begin_level(replay.arena, false)
+	_replay_saved_scripts.clear()
+	for slot: int in replay.players:
+		_replay_saved_scripts[slot] = GameInput.get_scripted_slot(slot)
+		GameInput.set_scripted_slot(slot, _replay_flags.bind(slot))
+
+
+## The flags of slot `slot` on tick `tick` of the replayed round (its scripted source).
+func _replay_flags(tick: int, slot: int) -> int:
+	var replay: VersusReplay = Game.versus_match.replay if Game.versus_match != null else null
+	return replay.flags_at(tick, slot) if replay != null else 0
+
+
+## The replay's clock reached the end of its window: the round goes on to its scoreboard.
+func _on_replay_tick(tick: int) -> void:
+	if _replaying and tick >= _replay_window.y:
+		_finish_replay(false)
+
+
+## End the deciding moment: the clock stops at once (a tick after the window would write the runs again), the scripts
+## and the match state the round left come back, then the scoreboard or the results.
+func _finish_replay(skipped: bool) -> void:
+	var after: Array = _replay_after
+	_end_replay_state()
+	replay_finished.emit(skipped)
+	if after.size() == 2:
+		_after_round(int(after[0]), after[1])
+
+
+## Leave a replay without what follows it (title, lobby, rematch, a new round): only the state comes back.
+func _cancel_replay() -> void:
+	if _replaying:
+		_end_replay_state()
+		replay_finished.emit(true)
+
+
+func _end_replay_state() -> void:
+	_replaying = false
+	Sim.frozen = true
+	Sim.time_scale = 1.0
+	_pending_fast_forward = -1
+	if Sim.tick_finished.is_connected(_on_replay_tick):
+		Sim.tick_finished.disconnect(_on_replay_tick)
+	if transition_covered.is_connected(_prepare_replay):
+		transition_covered.disconnect(_prepare_replay)
+	if transition_finished.is_connected(skip_replay):
+		transition_finished.disconnect(skip_replay)
+	Audio.set_effects_muted(false)
+	for slot: int in _replay_saved_scripts:
+		var saved: Callable = _replay_saved_scripts[slot]
+		if saved.is_valid():
+			GameInput.set_scripted_slot(slot, saved)
+		else:
+			GameInput.clear_scripted_slot(slot)
+	_replay_saved_scripts.clear()
+	var versus_match: VersusMatch = Game.versus_match
+	if versus_match != null and not _replay_end_state.is_empty():
+		versus_match.round_index = int(_replay_end_state["round_index"])
+		versus_match.round_mode = int(_replay_end_state["round_mode"])
+		versus_match.round_arena = _replay_end_state["round_arena"]
+		versus_match.round_wins = (_replay_end_state["round_wins"] as PackedInt32Array).duplicate()
+		if versus_match.replay != null:
+			VersusReplay.restore_runs(versus_match.replay.end_runs, Game.runs)
+	_replay_end_state = {}
+	_replay_after = []
+	_replay_window = Vector2i.ZERO
+
+
+## The keys that skip the deciding moment: any player's Jump or Strike (every slot's own actions too), accept, cancel,
+## pause, a tap.
+func _skips_replay(event: InputEvent) -> bool:
+	if event.is_echo() or not event.is_pressed():
+		return false
+	if event is InputEventScreenTouch:
+		return true
+	for action: StringName in [&"ui_accept", &"ui_cancel", Defs.ACT_PAUSE, Defs.ACT_JUMP, Defs.ACT_ATTACK]:
+		if InputMap.has_action(action) and event.is_action_pressed(action):
+			return true
+	for slot: int in Defs.MAX_PLAYERS:
+		for action: StringName in [Defs.ACT_JUMP, Defs.ACT_ATTACK]:
+			var generated: StringName = GameInput.slot_action(slot, action)
+			if InputMap.has_action(generated) and event.is_action_pressed(generated):
+				return true
+	return false
+
+
+## A versus round's themed sudden death began (the referee, DESIGN.md E.6): its music plays for the rest of the round.
+func _on_sudden_death_started(_round_index: int, _kind: StringName) -> void:
+	if Game.mode == Defs.GameMode.VERSUS and current_screen == SCREEN_LEVEL:
+		Audio.push_music(Sfx.MUSIC_VERSUS_SUDDEN_DEATH)
 
 
 func _show_versus_results() -> void:

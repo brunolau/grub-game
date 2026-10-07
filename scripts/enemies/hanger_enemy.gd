@@ -24,7 +24,10 @@ func _draw() -> void:
 		return
 	var top: Vector2 = Vector2(_thread_top) * float(Tuning.ART_SCALE) - position
 	var end: Vector2 = Vector2(0.0, -float(_thread_end_art()))
-	draw_line(top, end, EnemyTuning.THREAD_COLOR, EnemyTuning.THREAD_WIDTH)
+	# 2.0: the sea caves' octopus hangs on a kelp thread (art-B: "the kelp thread is yours to draw").
+	var kelp: bool = skin.begins_with(EnemyTuning.KELP_SKIN)
+	draw_line(top, end, EnemyTuning.KELP_COLOR if kelp else EnemyTuning.THREAD_COLOR,
+			EnemyTuning.KELP_WIDTH if kelp else EnemyTuning.THREAD_WIDTH)
 
 
 ## Where the thread meets the body, in art px above the feet point.

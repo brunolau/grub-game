@@ -1,8 +1,7 @@
 class_name HeroClimb
 extends RefCounted
-## The terrain that takes over the hero's own update: vines and the CLIMB state (docs/spec/PHYSICS.md C.4;
-## DESIGN.md C.3) - grab, climb, top step, leap and drop - and the tar floor `:` (C.5; DESIGN.md C.4) - wading, the
-## tar hop and its air control.
+## The hero's Book II terrain: vines and the CLIMB state (docs/spec/PHYSICS.md C.4; DESIGN.md C.3) - grab, climb, top
+## step, leap and drop - and the tar floor `:` (C.5; DESIGN.md C.4) - wading, the tar hop and its air control.
 ##
 ## Owner: player-B (docs/expansion/PLAN.md 4.1). A component of [Player], created with him; the calls below are the
 ## hooks of PLAN.md P0.8 and are made only while [member active] is true: a level with a vine (objects-B's
@@ -13,9 +12,20 @@ extends RefCounted
 ## the handler (8d). Returning true means it ran the rest of the PLAYER phase itself:
 ##  - the CLIMB handler (C.4) replaces handler, integration and the airborne step (no gravity, no WIND); it still
 ##    runs the hero's 8i timers (`hero._tick_timers(level)`) and sets his box;
-##  - on tar (C.5) it runs the hero's own 8d-8i (his handlers, x and y steps, tile collision, glider tilt, timers, box)
-##    with the three tar rules applied around them: the walk handler's ACCEL limit TAR_WALK_CAP, jump thrust only on
-##    the first TAR_JUMP_IMPULSE_TICKS jump ticks, the airborne step's ACCEL limit TAR_AIR_CAP (the "tar hop").
+##  - tar (C.5) never takes the update over (false): while he is on tar this component writes the hero's movement
+##    limits (PlayerBase.walk_cap, air_cap, jump_impulse_ticks - player-A's hooks, read by his own walk handler, jump
+##    handler and airborne step) to the tar values TAR_WALK_CAP, TAR_AIR_CAP and TAR_JUMP_IMPULSE_TICKS (never above
+##    what versus weight already set) and restores them when the tar ends; the hero's own 8d-8i then run unchanged,
+##    so nothing of his update is duplicated here.
+##
+## The tar ends at his next landing anywhere (a platform, a mount's saddle and a vine count), and also when something
+## else throws him up before that (a launch - geyser, see-saw, dismount, Batter Up -, a bounce off an enemy, a head or a
+## spring, a hurt): only a hop taken from tar stays a tar hop (player-B's resolution for worlds 6-9, P2.12: a geyser in
+## a tar pit is an escape with full air control). Noticed as "yvel changed between his last 8i and this update".
+##
+## A climber is held by his vine: no sprite platform catches him while he hangs or climbs up (rafts, spear steps, drop
+## clouds and lifts beside a vine), climbing down into one lands on it like climbing down onto a floor. UP grabs a vine,
+## DOWN + UP never does (the drop / dismount / Totem-drop chord).
 ##
 ## Vines are found by duck typing (objects-B's class Vine is not referenced, so this file never depends on theirs): an
 ## entity of the level's HITTABLE (or OTHER) list with a method `is_climbable() -> bool` and the members `vine_x`,
@@ -25,6 +35,8 @@ extends RefCounted
 const CLIMB_FRAME_FIRST: int = 44
 const CLIMB_FRAME_COUNT: int = 4
 const CLIMB_FRAME_PX: int = 4
+## Object metadata of the running level: [grid, has tar] (see [method level_has_tar]).
+const TAR_META: StringName = &"_hero_climb_tar"
 
 ## The hero this component belongs to.
 var hero: Player = null
@@ -45,10 +57,22 @@ var on_tar: bool = false
 
 ## The vines of the level (cached by [method setup] / [method refresh]).
 var _vines: Array[Object] = []
+## Their geometry, three ints per vine in [member _vines] order: vine_x, top, bottom (fixed once a vine is spawned:
+## objects-B's Vine sets them in _apply_params). The grab test reads these instead of three dynamic gets per vine.
+var _vine_geo: PackedInt32Array = PackedInt32Array()
 ## True when the level's grid has a tar floor cell.
 var _has_tar: bool = false
 ## y he hangs at (a shake nudge cannot move a climbing hero: PHYSICS.md C.4 "no shake nudge").
 var _climb_y: int = 0
+## The geometry of [member vine] while climbing.
+var _vine_x: int = 0
+var _vine_top: int = 0
+var _vine_bottom: int = 0
+## True while the hero's movement limits hold the tar values written by this component.
+var _tar_limits: bool = false
+## The hero's yvel at the end of his last update (step 8i): a different yvel at the start of this one means something
+## else threw him up meanwhile (the end of a tar hop's tar rules).
+var _yvel_at_8i: int = 0
 
 
 func _init(p_hero: Player) -> void:
@@ -61,7 +85,7 @@ func setup(level: LevelBase) -> void:
 	vine = null
 	regrab_vine = null
 	regrab_lock = 0
-	on_tar = false
+	end_tar()
 	refresh(level)
 
 
@@ -69,6 +93,7 @@ func setup(level: LevelBase) -> void:
 ## there are any. Never switches off a component that is on.
 func refresh(level: LevelBase) -> void:
 	_vines.clear()
+	_vine_geo.clear()
 	_has_tar = false
 	if level == null:
 		return
@@ -76,7 +101,10 @@ func refresh(level: LevelBase) -> void:
 		for entity: SimEntity in level.get_kind(kind):
 			if is_vine(entity) and not _vines.has(entity):
 				_vines.append(entity)
-	_has_tar = grid_has_tar(level.grid)
+				_vine_geo.append(int(entity.get(&"vine_x")))
+				_vine_geo.append(int(entity.get(&"top")))
+				_vine_geo.append(int(entity.get(&"bottom")))
+	_has_tar = level_has_tar(level)
 	if not _vines.is_empty() or _has_tar:
 		active = true
 
@@ -86,7 +114,21 @@ static func is_vine(entity: Object) -> bool:
 	return entity != null and entity.has_method(&"is_climbable") and entity.get(&"vine_x") != null
 
 
-## True when `grid` has at least one tar floor cell.
+## True when the grid of `level` has a tar floor cell. Scanned once per grid and kept on the level (Object metadata
+## TAR_META = [grid, answer]): every hero of a party asks at his setup, and a 230 x 40 stage is 9 200 cells.
+static func level_has_tar(level: LevelBase) -> bool:
+	if level == null or level.grid == null:
+		return false
+	if level.has_meta(TAR_META):
+		var cached: Array = level.get_meta(TAR_META)
+		if cached.size() == 2 and cached[0] == level.grid:
+			return bool(cached[1])
+	var answer: bool = grid_has_tar(level.grid)
+	level.set_meta(TAR_META, [level.grid, answer])
+	return answer
+
+
+## True when `grid` has at least one tar floor cell (a full scan; [method level_has_tar] keeps the answer).
 static func grid_has_tar(grid: TileGrid) -> bool:
 	if grid == null:
 		return false
@@ -97,34 +139,36 @@ static func grid_has_tar(grid: TileGrid) -> bool:
 	return false
 
 
-## PLAYER phase, after 8c: the grab test and, while climbing, the CLIMB handler (C.4); on tar the tar update (C.5).
-## True = it ran the rest of the hero's PLAYER phase this tick.
+## PLAYER phase, after 8c: the grab test and, while climbing, the CLIMB handler (C.4); on a tar level the tar flag and
+## the hero's movement limits for this tick (C.5). True = it ran the rest of the hero's PLAYER phase this tick (CLIMB
+## only: on tar the hero's own 8d-8i run with the tar limits).
 func update(level: LevelBase) -> bool:
 	if climbing:
 		if _still_on_vine():
 			_climb_tick(level)
 			return true
 		leave_vine()
-	if not _vines.is_empty() and (hero._raw_flags & Defs.IN_UP) != 0 and can_grab(level):
+	# UP grabs; DOWN + UP never does - it is the "let go / get off" chord (the vine drop, the mount's dismount, the
+	# Totem drop), so a dismount beside a vine flies off instead of grabbing it for one tick.
+	if not _vines.is_empty() and (hero._raw_flags & (Defs.IN_UP | Defs.IN_DOWN)) == Defs.IN_UP:
 		var found: Object = find_vine(hero.sim_pos.x, hero.sim_pos.y)
-		if found != null:
+		if found != null and can_grab(level):
 			_grab(found)
 			_finish_climb_tick(level)
 			return true
 	if _has_tar:
 		_update_tar_flag(level)
-		if on_tar:
-			_tar_tick(level)
-			return true
+		_apply_tar_limits()
 	return false
 
 
-## Step 8i (run by the hero's timer step): the re-grab lock.
+## Step 8i (run by the hero's timer step): the re-grab lock; the yvel the tar rule compares with on the next tick.
 func tick_timers() -> void:
 	if regrab_lock > 0:
 		regrab_lock -= 1
 		if regrab_lock == 0:
 			regrab_vine = null
+	_yvel_at_8i = hero.yvel
 
 
 ## The hero was hurt; a hurt ends CLIMB (the normal knock-back follows). Never takes the hit (false).
@@ -140,7 +184,8 @@ func on_respawn() -> void:
 		leave_vine()
 	regrab_vine = null
 	regrab_lock = 0
-	on_tar = false
+	end_tar()
+	_yvel_at_8i = hero.yvel
 
 
 ## Sheet frame of the climb animation (44-47, one per CLIMB_FRAME_PX px climbed), for HeroAnim (player-A).
@@ -162,34 +207,42 @@ func can_grab(level: LevelBase) -> bool:
 	return not _rides_partner(level)
 
 
-## The first vine (in spawn order) a hero with his feet at (x, y) can grab: climbable (unrolled), not under this hero's
-## re-grab lock, |x - vine_x| <= Tuning.VINE_GRAB_DX, y > top and y - Tuning.VINE_HAND_REACH_PX <= bottom (his hands
-## reach it). Null when none.
+## The first vine (in spawn order) a hero with his feet at (x, y) can grab: |x - vine_x| <= Tuning.VINE_GRAB_DX,
+## y > top and y - Tuning.VINE_HAND_REACH_PX <= bottom (his hands reach it), not under this hero's re-grab lock,
+## climbable (unrolled). Null when none. The geometry comes from the cache, so a vine out of reach costs a few integer
+## compares; only a vine in reach is asked `is_climbable()`.
 func find_vine(x: int, y: int) -> Object:
-	for candidate: Object in _vines:
+	var count: int = _vines.size()
+	for i: int in count:
+		var base: int = i * 3
+		if absi(x - _vine_geo[base]) > Tuning.VINE_GRAB_DX or y <= _vine_geo[base + 1] \
+				or y - Tuning.VINE_HAND_REACH_PX > _vine_geo[base + 2]:
+			continue
+		var candidate: Object = _vines[i]
 		if not is_instance_valid(candidate) or (candidate == regrab_vine and regrab_lock > 0):
 			continue
-		if not bool(candidate.call(&"is_climbable")):
-			continue
-		var vine_x: int = int(candidate.get(&"vine_x"))
-		var top: int = int(candidate.get(&"top"))
-		var bottom: int = int(candidate.get(&"bottom"))
-		if absi(x - vine_x) <= Tuning.VINE_GRAB_DX and y > top and y - Tuning.VINE_HAND_REACH_PX <= bottom:
+		if bool(candidate.call(&"is_climbable")):
 			return candidate
 	return null
 
 
-## Let go of the vine (a hurt, a respawn, a leap, a drop, being moved off it). He falls from the next tick.
+## Let go of the vine (a hurt, a respawn, a leap, a drop, being moved off it). He falls from the next tick; platforms
+## may catch him again from the next PLATFORMS phase on.
 func leave_vine() -> void:
 	climbing = false
 	vine = null
+	if hero.carried_on_tick > Sim.total_ticks:
+		hero.carried_on_tick = -1
 
 
 func _grab(target: Object) -> void:
 	climbing = true
 	vine = target
-	on_tar = false
-	hero.sim_pos.x = int(target.get(&"vine_x"))
+	_vine_x = int(target.get(&"vine_x"))
+	_vine_top = int(target.get(&"top"))
+	_vine_bottom = int(target.get(&"bottom"))
+	end_tar()
+	hero.sim_pos.x = _vine_x
 	hero.xvel = 0
 	hero.yvel = 0
 	hero.jump_ticks = 0
@@ -208,7 +261,7 @@ func _still_on_vine() -> bool:
 		return false
 	if hero.curl != PlayerBase.CURL_NONE or hero.on_platform or hero.xvel != 0 or hero.yvel != 0:
 		return false
-	if hero.sim_pos.x != int(vine.get(&"vine_x")):
+	if hero.sim_pos.x != _vine_x:
 		return false
 	hero.sim_pos.y = _climb_y
 	return true
@@ -228,6 +281,9 @@ func _climb_tick(level: LevelBase) -> void:
 		_climb_up(level)
 	elif down:
 		_climb_down(level)
+		# Climbing down into a sprite platform lands on it, as onto a floor: its next ride test may take him.
+		_finish_climb_tick(level, false)
+		return
 	# LEFT or RIGHT alone turns him (8b already did); nothing, FIRE or LOOK: he hangs (no strikes on a vine).
 	_finish_climb_tick(level)
 
@@ -270,9 +326,8 @@ func _climb_up(level: LevelBase) -> void:
 	var col: int = Tuning.to_cell(hero.sim_pos.x)
 	if grid.ceiling_at(col, Tuning.to_cell(new_y) - Tuning.HEAD_PROBE_ROWS) != TileGrid.CEILING_NONE:
 		return
-	var top: int = int(vine.get(&"top"))
-	if new_y <= top:
-		_top_step(grid, top)
+	if new_y <= _vine_top:
+		_top_step(grid, _vine_top)
 		return
 	hero.sim_pos.y = new_y
 	_add_climb_px(Tuning.VINE_CLIMB_UP_PX)
@@ -318,15 +373,14 @@ func _climb_down(level: LevelBase) -> void:
 		return
 	hero.sim_pos.y = new_y
 	_climb_y = new_y
-	if new_y > int(vine.get(&"bottom")) + Tuning.TILE:
+	if new_y > _vine_bottom + Tuning.TILE:
 		leave_vine()
 		_let_go()
 
 
-## Count px climbed (the climb frames): here and in the hero's own `climb_px`, which HeroAnim (player-A) reads.
+## Count px climbed (the climb frames; HeroAnim, player-A, reads [member climb_px]).
 func _add_climb_px(px: int) -> void:
 	climb_px += px
-	hero.set(&"climb_px", climb_px)
 
 
 ## Grounded idle after the top step or a climb down onto a floor (the soft-landing bookkeeping of PHYSICS.md 11.2).
@@ -344,13 +398,19 @@ func _stand(ice: int) -> void:
 	hero.handler = Defs.HeroState.IDLE
 
 
-## The end of a tick on the vine (or the tick that left it): state, the 8i timers, the box.
-func _finish_climb_tick(level: LevelBase) -> void:
+## The end of a tick on the vine (or the tick that left it): state, the 8i timers, the box. Still on the vine and
+## `held`: the vine holds him through the next tick's PLATFORMS phase - no sprite platform (raft, spear step, drop
+## cloud, lift, see-saw) catches him there, so a hero can grab a vine from a platform and climb on, and a platform
+## passing a climber goes by (PlatformBase's "one platform per hero per tick" guard, PlayerBase.carried_on_tick, is
+## set to that tick: the vine is his carrier then).
+func _finish_climb_tick(level: LevelBase, held: bool = true) -> void:
 	if climbing:
 		hero.state = Defs.HeroState.CLIMB
 		hero.handler = Defs.HeroState.CLIMB
 		hero.xvel = 0
 		hero.yvel = 0
+		if held:
+			hero.carried_on_tick = Sim.total_ticks + 1
 	hero._tick_timers(level)
 	if climbing or hero.grounded:
 		hero.set_box(Tuning.HERO_BOX_STAND)
@@ -369,57 +429,54 @@ func _rides_partner(level: LevelBase) -> bool:
 # Tar floor (PHYSICS.md C.5)
 # =================================================================================================================
 
+## Off the tar now (a respawn, a stage start, a vine or a mount's saddle: a landing elsewhere); the hero's movement
+## limits go back to what they are without tar at once.
+func end_tar() -> void:
+	on_tar = false
+	if _tar_limits:
+		_restore_limits()
+
+
 ## On tar from a grounded tick whose feet tile is tar until the next landing anywhere: decided at the start of his
-## update from where the last tick left him (a platform under his feet is a landing elsewhere).
+## update from where the last tick left him (a platform under his feet is a landing elsewhere). In the air the tar
+## rules last only while nothing else threw him up since his last update: his yvel is still the one his own update
+## left (8i), so a geyser, a see-saw, a dismount, Batter Up, a bounce off an enemy, a head or a spring, a pogo or a hurt
+## ends them - only a hop taken from tar (or a fall off a tar ledge) stays under them.
 func _update_tar_flag(level: LevelBase) -> void:
 	var was: bool = on_tar
 	if hero.on_platform:
 		on_tar = false
 	elif hero.grounded:
 		on_tar = level.grid.is_tar(Tuning.to_cell(hero.sim_pos.x), Tuning.to_cell(hero.sim_pos.y))
+	elif on_tar and hero.yvel != _yvel_at_8i:
+		on_tar = false
 	if on_tar and not was:
 		HeroBelt._play_cue(Sfx.TAR_GLUG)
 
 
-## The hero's 8d-8i on tar: his own handler, re-done where the tar rules differ; the x and y steps; tile collision;
-## the airborne step's ACCEL limit; the glider tilt; timers; box.
-func _tar_tick(level: LevelBase) -> void:
-	var selected: int = hero.state
-	var xvel_before: int = hero.xvel
-	var yvel_before: int = hero.yvel
-	var jump_ticks_before: int = hero.jump_ticks
-	# 8d: the hero's own handler.
-	if hero.run.has_glider:
-		hero._run_glider(selected)
-	else:
-		hero._run_handler(selected)
-	if hero.handler == Defs.HeroState.WALK:
-		# The walk handler with ACCEL(TAR_WALK_CAP) instead of ACCEL(WALK_CAP) (its WIND after it, as in 1.0).
-		hero.xvel = xvel_before
-		hero._accel(Tuning.TAR_WALK_CAP)
-		hero._wind()
-	elif hero.handler == Defs.HeroState.JUMP and hero.jump_ticks == jump_ticks_before + 1 \
-			and jump_ticks_before >= Tuning.TAR_JUMP_IMPULSE_TICKS \
-			and jump_ticks_before < Tuning.JUMP_IMPULSE_TICKS:
-		# The jump body ran with n >= 2: on tar its impulse is 0 (it only added the impulse to yvel on this tick).
-		hero.yvel = yvel_before
-	# 8e: x step (commit rule, this tick's fence); 8f: y step.
-	var next_x: int = hero.sim_pos.x + Tuning.floor16(hero.xvel)
-	if next_x >= Tuning.X_MIN and next_x < level.grid.x_max_excl() and hero.fence_allows(next_x):
-		hero.sim_pos.x = next_x
-	hero.clear_fence()
-	hero.sim_pos.y += Tuning.floor16(hero.yvel)
-	# 8g: tile collision.
-	var low: bool = selected == Defs.HeroState.CRAWL or selected == Defs.HeroState.CROUCH
-	hero._collide(level, Tuning.HERO_PROBE_H_CROUCH if low else Tuning.HERO_PROBE_H_STAND)
-	if hero.dead:
-		return
-	if not hero.grounded:
-		# The airborne step ran ACCEL(WALK_CAP); clamped again it is ACCEL(TAR_AIR_CAP) (the clamp is the last step).
-		hero.xvel = clampi(hero.xvel, -Tuning.TAR_AIR_CAP, Tuning.TAR_AIR_CAP)
-	# 8h: the glider nose returns to neutral; 8i: timers.
-	var steering: bool = (hero._raw_flags & (Defs.IN_UP | Defs.IN_DOWN)) != 0
-	if hero.run.has_glider and not steering and hero.glider_tilt != Tuning.GLIDER_TILT_NEUTRAL:
-		hero.glider_tilt += 1 if hero.glider_tilt < Tuning.GLIDER_TILT_NEUTRAL else -1
-	hero._tick_timers(level)
-	hero._update_box()
+## The hero's movement limits of this tick (PHYSICS.md C.5): on tar the walk handler's ACCEL limit TAR_WALK_CAP, the
+## airborne step's TAR_AIR_CAP (never above a versus weight cap already in force) and jump thrust only on the first
+## TAR_JUMP_IMPULSE_TICKS jump ticks; off tar what they were.
+func _apply_tar_limits() -> void:
+	if on_tar:
+		var base: int = _base_walk_cap()
+		hero.walk_cap = mini(base, Tuning.TAR_WALK_CAP)
+		hero.air_cap = mini(base, Tuning.TAR_AIR_CAP)
+		hero.jump_impulse_ticks = mini(Tuning.JUMP_IMPULSE_TICKS, Tuning.TAR_JUMP_IMPULSE_TICKS)
+		_tar_limits = true
+	elif _tar_limits:
+		_restore_limits()
+
+
+## The limits without tar: the versus weight / ember cap when world-B's referee set one (PlayerBase.walk_cap_override,
+## for the walk handler and the airborne step alike), else the 1.0 values.
+func _restore_limits() -> void:
+	var base: int = _base_walk_cap()
+	hero.walk_cap = base
+	hero.air_cap = base
+	hero.jump_impulse_ticks = Tuning.JUMP_IMPULSE_TICKS
+	_tar_limits = false
+
+
+func _base_walk_cap() -> int:
+	return hero.walk_cap_override if hero.walk_cap_override > 0 else Tuning.WALK_CAP

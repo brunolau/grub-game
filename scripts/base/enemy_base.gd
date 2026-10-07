@@ -22,6 +22,9 @@ extends SimEntity
 ## archetype gets the trait rules. A party (LevelBase.hero_count() > 1) targets the nearest hatched hero, sticky for
 ## PartyTuning.TARGET_HOLD_TICKS (GAMEPLAY.md 13.9.4). A record without a trait in a party of one runs exactly the
 ## 1.0 code: every 2.0 branch below is behind `_traits != null` or `hero_count() > 1`.
+## 2.0 phase 2 (PLAN.md P2.1): the co-op Shaman's bone shield ([method wear_bone_shield], [method bone_shielded]: every
+## hit glances while a Shaman stands near; only a co-op party's Shaman ever sets it) and the hook
+## [method _on_coop_copy] for the half a `split` record spawns.
 
 ## Emitted once when the enemy dies.
 signal died(enemy: EnemyBase, cause: StringName)
@@ -64,7 +67,7 @@ var one_shot: bool = false
 var bounce_count: int = 0
 ## Hang-glider dive stomps received; the third kills.
 var dive_count: int = 0
-## True after this enemy hurt the hero: it bursts into 6 bones when killed.
+## True after this enemy hurt the hero: it bursts into 6 bones when killed (2.0: 6 per hero it hurt, below).
 var stole_heart: bool = false
 ## Ticks left of the hit flash (cosmetic).
 var flash: int = 0
@@ -120,6 +123,13 @@ var _held_target: PlayerBase = null
 var _held_until: int = 0
 ## 2.0: Sim.total_ticks of the last glance clank and spark (EnemyTuning.GLANCE_TICKS apart).
 var _glance_tick: int = -1000
+## 2.0 co-op Shaman (GAMEPLAY.md 13.9.6): Sim.total_ticks on which a Shaman last put his bone shield on it (it holds
+## through the next tick: the Shaman renews it every ENEMIES phase); the bone drawn over it (created on first use).
+var _bone_shield_tick: int = -1000
+var _bone_sprite: Sprite2D = null
+## 2.0 co-op (GAMEPLAY.md 13.9.4: "each hero's stolen heart bursts as bones for the team - an enemy that hurt both
+## releases 12"): bit per player slot of the heroes it hurt since it last came back.
+var _hurt_slots: int = 0
 
 static var _warned_skins: Dictionary[String, bool] = {}
 
@@ -297,6 +307,7 @@ func on_bounced(hero: PlayerBase) -> int:
 ## The hero dive-stomped it with the hang-glider: 1 000 / 5 000 / 10 000 points, the third stomp kills.
 func on_glider_stomp(hero: PlayerBase) -> void:
 	var index: int = mini(dive_count, Tuning.GLIDER_DIVE_SCORES.size() - 1)
+	_credit_points(hero, Tuning.GLIDER_DIVE_SCORES[index])
 	Game.add_score(Tuning.GLIDER_DIVE_SCORES[index])
 	Events.popup_requested.emit(&"score", Tuning.GLIDER_DIVE_SCORES[index], sim_pos)
 	dive_count += 1
@@ -304,9 +315,21 @@ func on_glider_stomp(hero: PlayerBase) -> void:
 		kill(&"glider", hero)
 
 
-## This enemy just hurt the hero: it now "holds" the stolen heart.
-func on_hurt_hero(_hero: PlayerBase) -> void:
+## This enemy just hurt the hero: it now "holds" the stolen heart (2.0: one per hero it hurt).
+func on_hurt_hero(hero: PlayerBase) -> void:
 	stole_heart = true
+	if hero != null and is_instance_valid(hero) and hero.slot >= 0:
+		_hurt_slots |= 1 << hero.slot
+
+
+## Hearts it holds: one per hero it hurt (at least one once it stole a heart; a party of one: exactly the 1.0 one).
+func _hearts_held() -> int:
+	var count: int = 0
+	var mask: int = _hurt_slots
+	while mask != 0:
+		mask &= mask - 1
+		count += 1
+	return maxi(count, 1)
 
 
 ## 2.0 Brace Wall (PHYSICS.md C.10), asked by a braced crouching hero's contact pass (player-A) before a contact would
@@ -321,9 +344,23 @@ func brace_stop(_hero: PlayerBase, _partner: PlayerBase) -> bool:
 ## hero) hurt it now? False = the hit glances ([method take_hit] consumes it without damage; [method _on_hit_refused]
 ## shows it). Override for "shielded from the front", heavy enemies only a braced or charged hit breaks, the Shaman's
 ## bone shields (DESIGN.md D.6). Default true: every 1.0 hit counts; a record with a co-op trait asks its rules
-## (CoopTraits.accepts_hit: the front of `shell` / `heavy`, an undazed `daze`). Overrides call super.
+## (CoopTraits.accepts_hit: the front of `shell` / `heavy`, an undazed `daze`); a record under a Shaman's bone shield
+## refuses every hit ([method bone_shielded]). Overrides call super.
 func accepts_hit_from(source: SimEntity) -> bool:
+	if _bone_shield_tick >= Sim.total_ticks - 1:
+		return false
 	return _traits == null or _traits.accepts_hit(source)
+
+
+## 2.0 co-op Shaman (GAMEPLAY.md 13.9.6): a living Shaman within PartyTuning.SHAMAN_SHIELD_TILES puts his bone shield
+## on it for this tick and the next (he renews it every tick). Called by enemies/shaman only.
+func wear_bone_shield() -> void:
+	_bone_shield_tick = Sim.total_ticks
+
+
+## 2.0: true while a Shaman's bone shield covers it (every weapon hit glances).
+func bone_shielded() -> bool:
+	return _bone_shield_tick >= Sim.total_ticks - 1
 
 
 ## Points paid when it dies now: ladder value x head-bounce multiplier.
@@ -352,13 +389,14 @@ func kill(cause: StringName, killer: SimEntity = null) -> void:
 	var was_awake: bool = awake
 	dead = true
 	var points: int = get_points()
+	_credit_points(killer, points)
 	Game.add_score(points)
 	_credit_kill(killer)
 	Events.popup_requested.emit(&"score", points, sim_pos)
 	sleep()
 	var thrown: bool = was_awake and cause != &"feast" and not stole_heart
 	if stole_heart:
-		for i: int in Tuning.BONES_PER_HEART:
+		for i: int in Tuning.BONES_PER_HEART * _hearts_held():
 			_spawn_optional(ITEM_BONE, sim_pos + Vector2i(0, EnemyTuning.BURST_DY), {"dropped": true, "fan": i})
 	if thrown:
 		_start_corpse(killer)
@@ -452,6 +490,7 @@ func _on_level_reset() -> void:
 	bounce_count = 0
 	dive_count = 0
 	stole_heart = false
+	_hurt_slots = 0
 	flash = 0
 	xvel = 0
 	yvel = 0
@@ -634,6 +673,7 @@ func _coop_revive(pos: Vector2i) -> void:
 	xvel = 0
 	yvel = 0
 	stole_heart = false
+	_hurt_slots = 0
 	_grounded = false
 	_climbing = false
 	_ledge_ticks = 0
@@ -677,7 +717,15 @@ func _coop_spawn_copy(extra: Dictionary) -> EnemyBase:
 		return null
 	copy.one_shot = true
 	copy.wake()
+	copy._on_coop_copy(self)
 	return copy
+
+
+## 2.0 co-op (the `split` trait): this enemy was just made by `source`'s [method _coop_spawn_copy] and woke. Archetypes
+## that keep a state of their own (a sky dropper falling or walking) take the source's here. Override; nothing by
+## default.
+func _on_coop_copy(_source: EnemyBase) -> void:
+	pass
 
 
 ## 2.0 co-op: a record made by [method _coop_spawn_copy] leaves the level for good (merged, or a team wipe).
@@ -696,6 +744,18 @@ func _credit_kill(killer: SimEntity) -> void:
 	var slot: int = Defs.hitter_slot(killer)
 	if slot >= 0:
 		Game.runs[slot].kills += 1
+
+
+## 2.0 co-op "Rival score" (DESIGN.md D.11; ui-B's request): in a co-op party the hero who earned `points` - the hero
+## of Defs.hitter_slot(`source`) - keeps his share of the tribe score in PlayerRun.score, as collectibles do. Called
+## just before Game.add_score (the HUD refreshes both on Game.score_changed). Statistics only; a party of one and
+## versus never take this branch.
+func _credit_points(source: SimEntity, points: int) -> void:
+	if points <= 0 or Game.mode != Defs.GameMode.COOP or Game.level == null or Game.level.hero_count() <= 1:
+		return
+	var slot: int = Defs.hitter_slot(source)
+	if slot >= 0:
+		Game.runs[slot].score += points
 
 
 ## +1 when `target` is to the right of this enemy (or exactly above it), else -1.
@@ -828,6 +888,8 @@ func _refresh_visual() -> void:
 	if _sprite.flip_h != flip:
 		_sprite.flip_h = flip
 	_sprite.modulate = FLASH_COLOR if (flash & EnemyTuning.FLASH_PERIOD_MASK) != 0 else Color.WHITE
+	if _bone_sprite != null or _bone_shield_tick >= Sim.total_ticks - 1:
+		_show_bone_shield(not food and not dead and bone_shielded())
 
 
 ## True while the enemy is drawn as food (feast mode, GAMEPLAY.md 5.3; a party: while any hero feasts).
@@ -999,6 +1061,24 @@ func _away_from(killer: SimEntity) -> int:
 	if killer.sim_pos.x == sim_pos.x:
 		return killer.facing
 	return 1 if sim_pos.x > killer.sim_pos.x else -1
+
+
+## The Shaman's bone over its head (cosmetic): shown while [method bone_shielded].
+func _show_bone_shield(on: bool) -> void:
+	if _bone_sprite == null:
+		if not on:
+			return
+		_bone_sprite = Sprite2D.new()
+		_bone_sprite.name = "BoneShield"
+		_bone_sprite.texture = load(EnemyTuning.BONE_SHIELD_TEXTURE) as Texture2D
+		_bone_sprite.hframes = EnemyTuning.BONE_SHIELD_FRAMES
+		_bone_sprite.frame = 0
+		var height: int = _skin.body_height if _skin != null else box_h * Tuning.ART_SCALE
+		_bone_sprite.position = Vector2(0.0, -float(height + EnemyTuning.BONE_SHIELD_ABOVE_ART
+				+ (EnemyTuning.BONE_SHIELD_CELL >> 1)))
+		add_child(_bone_sprite)
+	if _bone_sprite.visible != on:
+		_bone_sprite.visible = on
 
 
 func _show_food() -> void:

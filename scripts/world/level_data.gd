@@ -27,7 +27,8 @@ const BIOMES: Array[String] = [
 ]
 const LIQUIDS: Array[String] = ["water", "lava", "ice_water", "tar", "honey", "syrup"]
 const BACKGROUNDS: Array[String] = [
-	"jungle", "cave", "ice", "volcano", "volcano_shaft", "feast", "canyon", "swamp", "mushroom", "mangrove", "none",
+	"jungle", "cave", "ice", "volcano", "volcano_shaft", "feast", "canyon", "swamp", "mushroom", "mangrove", "coast",
+	"sea_cave", "ruins", "temple", "sky", "storm", "pyre", "none",
 ]
 const SCROLLS: Array[String] = ["normal", "vertical", "autoscroll", "rising"]
 const DIFFICULTIES: Array[String] = ["beginner", "expert"]
@@ -39,16 +40,18 @@ const SUDDEN_DEATHS: Array[String] = [
 	"rockslide", "lightning",
 ]
 
-## Parallax set used when `background` is missing, by biome (2.0: the Book II biomes as their backdrops arrive -
-## canyon and swamp now; coast, ruins and sky fall back to the jungle's until art-B draws them).
+## Parallax set used when `background` is missing, by biome (2.0: every Book II biome has its outdoor set; the cave
+## and storm variants - mushroom, mangrove, sea_cave, temple, storm, pyre - are named by the level files).
 const BIOME_BACKGROUND: Dictionary = {
 	"jungle": "jungle", "cave": "cave", "ice": "ice", "volcano": "volcano", "feast": "feast", "village": "jungle",
-	"canyon": "canyon", "swamp": "swamp",
+	"canyon": "canyon", "swamp": "swamp", "coast": "coast", "ruins": "ruins", "sky": "sky",
 }
-## Music context used when `music` is missing, by biome (2.0: world 5's theme for the canyon).
+## Music context used when `music` is missing, by biome (2.0: each Book II world's first stage theme - every one has
+## its AudioTable row, a stand-in until the audio owner's batch 2 lands).
 const BIOME_MUSIC: Dictionary = {
 	"jungle": Sfx.MUSIC_JUNGLE, "cave": Sfx.MUSIC_CAVE, "ice": Sfx.MUSIC_ICE, "volcano": Sfx.MUSIC_VOLCANO,
 	"feast": Sfx.MUSIC_BONUS, "village": Sfx.MUSIC_ENDING, "canyon": Sfx.MUSIC_CANYON, "swamp": Sfx.MUSIC_FEN,
+	"coast": Sfx.MUSIC_COAST, "ruins": Sfx.MUSIC_RUINS, "sky": Sfx.MUSIC_SKY_CLIMB,
 }
 ## Terrain atlas used when `terrain_a` is missing or does not exist, by biome. The Book II biomes name their own
 ## sets (LEVEL_DESIGN.md 15.2); WorldTileSet falls back while an atlas is not drawn yet. (Their backdrop and music

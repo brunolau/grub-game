@@ -1,0 +1,40 @@
+# Club & Grub level file - format 2 (docs/ARCHITECTURE.md 7.11). Storm Nest: developer level of enemies-C for the
+# Storm Roc (docs/expansion/PLAN.md P2.3; DESIGN.md B.5, GAMEPLAY.md 13.6): one 20 x 12 screen at the spire top, a stick
+# nest of one-way cells (cols 6-13, row 8) with the Roc perched on it, a stone floor at row 10 with a 4-cell runway on
+# each side and two drop clouds (one-way here) at row 5. Phase 1 blows gusts across the nest, phase 2 dives, phase 3
+# the lightning and the hang-glider dives (the gliders appear on the nest). tests/test_enemies_roc.gd builds its own
+# room of these cells; this file is for visual QA in the windowed game. Not part of any campaign (kind = test).
+
+[meta]
+format = 2
+id = test_enemies_roc
+name = "Storm Nest"
+kind = test
+book = 2
+biome = ice
+terrain_a = ice/terrain
+terrain_b = ice/terrain_rock
+background = ice
+music = level_ice
+author = enemies-C
+notes = "PLAN.md P2.3: the Storm Roc on the shipped pterodactyl at 2x (tinted until art-B's roc re-pack)."
+
+[legend]
+
+[tiles]
+|..................|
+|..................|
+|..................|
+|..................|
+|..................|
+|.---..........---.|
+|..................|
+|..................|
+|.....--------.....|
+|.@................|
+####################
+####################
+
+[entities]
+zones/arena 2 9 name=nest rect=0,0,20,12 music=boss_roc
+bosses/roc 9 7 arena=nest

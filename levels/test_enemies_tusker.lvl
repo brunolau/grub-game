@@ -1,0 +1,40 @@
+# Tusker's Test Wallow: developer level of enemies-B (PLAN.md P2.2) - the walled pit of Tusker, the Boar King
+# (DESIGN.md B.1) for tests/test_enemies_tusker.gd: the club route of the solo form, the fairness checks and the
+# single-hero search against the co-op form (the test loads this file with `form=coop` on the boss and a second
+# hero at the objects/hero_start marker).
+# Built one screen wide, with mesa banks 3 rows up in both corners (3 columns each, so the 76 px boar has room to
+# charge: with the 4-column banks of B.1 its feet never leave a 6-cell wallow) and a 4-cell mud wallow in the middle.
+
+[meta]
+format = 2
+id = test_enemies_tusker
+name = "Tusker's Test Wallow"
+kind = test
+book = 2
+biome = canyon
+terrain_a = canyon/terrain
+terrain_b = canyon/terrain_mesa
+background = canyon
+music = level_canyon
+author = enemies-B
+
+[legend]
+
+[tiles]
+####################
+#..................#
+#..................#
+#..................#
+#..................#
+#..................#
+#.@................#
+####............####
+####............####
+####............####
+########::::########
+####################
+
+[entities]
+zones/arena 9 9 name=wallow rect=0,0,20,12 music=boss_tusker
+bosses/tusker 7 9 arena=wallow
+objects/hero_start 17 6 slot=2

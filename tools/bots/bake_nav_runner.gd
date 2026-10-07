@@ -11,6 +11,8 @@ func run(arguments: PackedStringArray) -> int:
 	var verify: bool = false
 	var verbose: bool = false
 	var difficulty: int = Defs.Difficulty.BEGINNER
+	var classes: PackedInt32Array = PackedInt32Array()
+	var clip: Rect2i = Rect2i()
 	var files: PackedStringArray = PackedStringArray()
 	for argument: String in arguments:
 		if argument.begins_with("--out="):
@@ -27,6 +29,18 @@ func run(arguments: PackedStringArray) -> int:
 				print("bake_nav: unknown difficulty %s" % value)
 				return 2
 			difficulty = Defs.Difficulty.EXPERT if value == "expert" else Defs.Difficulty.BEGINNER
+		elif argument.begins_with("--classes="):
+			for part: String in argument.trim_prefix("--classes=").split(",", false):
+				if not part.is_valid_int() or int(part) < 0 or int(part) >= NavGraph.WEIGHT_CLASSES:
+					print("bake_nav: bad weight class %s (0..%d)" % [part, NavGraph.WEIGHT_CLASSES - 1])
+					return 2
+				classes.append(int(part))
+		elif argument.begins_with("--clip="):
+			var parts: PackedStringArray = argument.trim_prefix("--clip=").split(",", false)
+			if parts.size() != 4:
+				print("bake_nav: --clip needs col,row,cols,rows")
+				return 2
+			clip = Rect2i(int(parts[0]), int(parts[1]), int(parts[2]), int(parts[3]))
 		elif argument.begins_with("--"):
 			print("bake_nav: unknown option %s" % argument)
 			return 2
@@ -51,7 +65,7 @@ func run(arguments: PackedStringArray) -> int:
 			continue
 		var baker: NavBaker = NavBaker.new()
 		baker.progress_every = 1000 if verbose else 0
-		var graph: NavGraph = baker.bake_file(self, path, difficulty)
+		var graph: NavGraph = baker.bake_file(self, path, difficulty, classes, _clip_of(target, clip))
 		for line: String in baker.report:
 			print("bake_nav: " + line)
 		if graph == null:
@@ -87,6 +101,17 @@ static func default_levels() -> PackedStringArray:
 	return result
 
 
+## The clip to bake with: the one given, else the one the committed graph was baked with (a re-bake or --check of a
+## clipped boss arena keeps its clip).
+static func _clip_of(target: String, clip: Rect2i) -> Rect2i:
+	if clip.size.x > 0:
+		return clip
+	var committed: NavGraph = NavGraph.load_file(target) if FileAccess.file_exists(target) else null
+	if committed != null and committed.clip.size() == 4:
+		return Rect2i(committed.clip[0], committed.clip[1], committed.clip[2], committed.clip[3])
+	return Rect2i()
+
+
 func _verify(path: String, target: String, difficulty: int) -> bool:
 	var graph: NavGraph = NavGraph.load_file(target)
 	if graph == null:
@@ -104,7 +129,8 @@ func _verify(path: String, target: String, difficulty: int) -> bool:
 	baker.sim.teardown()
 	for problem: String in problems:
 		print("bake_nav: %s: %s" % [graph.level_id, problem])
-	print("bake_nav: %s: %d links verified, %d problem(s)" % [graph.level_id, graph.links.size(), problems.size()])
+	print("bake_nav: %s: %d links verified (classes %s, format %d), %d problem(s)" % [graph.level_id, graph.links.size(),
+			Array(graph.weights), graph.format, problems.size()])
 	return problems.is_empty()
 
 

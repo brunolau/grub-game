@@ -6,7 +6,9 @@ extends RefCounted
 ##
 ## Owner: ui-B. The colours are the `ui_colours` of `assets/sprites/player/palettes/hero_palettes.json`, kept here as
 ## constants (the JSON is reference data that the export does not carry, ASSET_MANIFEST.md 17.9). A player's own
-## colour is `PlayerRun.palette` (chosen on the join panel / in the lobby); `&""` means the slot's default.
+## colour is `PlayerRun.palette` (chosen on the join panel / in the lobby); `&""` means the slot's default. The 2.0 HUD
+## sheets have a row per colour in PALETTE_ORDER (ASSET_MANIFEST.md 17.5 / 17.11): a tag, an arrow or a corner-panel
+## head is drawn in the colour the player wears, not his slot's default.
 
 ## Side of the view a hero is off (the columns of `ui/player_arrows.png`).
 enum Side { LEFT = 0, RIGHT = 1, UP = 2, DOWN = 3 }
@@ -30,6 +32,11 @@ const PALETTE_COLOURS: Dictionary = {
 	&"white": [Color("f7f4ec"), Color("ffffff"), Color("b7bfd2"), Color("2c2c3a")],
 	&"gold": [Color("ffc928"), Color("fff7c2"), Color("c97d10"), Color("3f2508")],
 }
+## Order of the colour rows of the HUD sheets (player_tags, player_arrows, portrait_heads): PALETTE_COLOURS' order.
+const PALETTE_ORDER: Array[StringName] = [&"yellow", &"blue", &"pink", &"green", &"white", &"gold"]
+## Columns of ui/portrait_heads.png (28 x 28 cells, a row per colour).
+enum Face { NORMAL = 0, OUCH = 1, CHEER = 2 }
+const HEAD_CELL: Vector2i = Vector2i(28, 28)
 ## `arena_swaps` of hero_palettes.json, by palette: biome -> the palette worn there in versus.
 const ARENA_SWAPS: Dictionary = {&"green": {"jungle": &"white", "swamp": &"white"}}
 ## Index of each colour in a PALETTE_COLOURS entry.
@@ -61,6 +68,27 @@ static func colour(slot: int, which: int = FILL) -> Color:
 	return entry[clampi(which, 0, entry.size() - 1)]
 
 
+## Row of the colour player slot `slot` wears in the HUD sheets (PALETTE_ORDER; 0 = yellow).
+static func colour_index(slot: int) -> int:
+	return maxi(PALETTE_ORDER.find(palette_of(slot)), 0)
+
+
+## Cell of ui/player_tags.png: the "P1".."P4" tag of `slot` in the colour he wears (row 0 holds the slot defaults,
+## rows 1-6 every tag in each colour: (1 + colour) * 4 + slot).
+static func tag_cell(slot: int) -> int:
+	return (1 + colour_index(slot)) * 4 + clampi(slot, 0, Defs.MAX_PLAYERS - 1)
+
+
+## Cell of ui/player_arrows.png: the arrow of `slot` pointing to `side` (Side), in the colour he wears.
+static func arrow_cell(slot: int, side: int) -> int:
+	return colour_index(slot) * 4 + clampi(side, Side.LEFT, Side.DOWN)
+
+
+## Cell of ui/portrait_heads.png: the head of `slot` in the colour he wears with face `face` (Face).
+static func head_cell(slot: int, face: int = Face.NORMAL) -> int:
+	return colour_index(slot) * 3 + clampi(face, Face.NORMAL, Face.CHEER)
+
+
 ## A colour of `slot` that reads as text on the HUD's dark plates and over the scenery: the fill, lifted towards
 ## its light colour for the two dark cloths (pink, green), so that every tag stays legible.
 static func text_colour(slot: int) -> Color:
@@ -75,10 +103,9 @@ static func tag(slot: int) -> String:
 	return "P%d" % (clampi(slot, 0, Defs.MAX_PLAYERS - 1) + 1)
 
 
-## Edge arrow of player slot `slot` pointing to `side` (Side).
+## Edge arrow of player slot `slot` pointing to `side` (Side), in the colour he wears.
 static func arrow(slot: int, side: int) -> AtlasTexture:
-	var row: int = clampi(slot, 0, Defs.MAX_PLAYERS - 1)
-	return UiKit.cell(TEX_ARROWS, CELL, row * 4 + clampi(side, Side.LEFT, Side.DOWN))
+	return UiKit.cell(TEX_ARROWS, CELL, arrow_cell(slot, side))
 
 
 ## Countdown stone showing `digit` (1..STONE_MAX, clamped).

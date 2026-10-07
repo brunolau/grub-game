@@ -12,6 +12,11 @@ extends Node
 ## feast or a boss instead of starting over. hold_music() / release_music() (2.0) are the same for music that several
 ## holders share (the feast music while any hero of a party feasts). set_suspended() halts everything while the
 ## application is in the background (called by Flow).
+##
+## 2.0 loop regions (AudioTable batch 2, PLAN.md P2.6): a music row may carry "loop_start" (seconds, AudioTable.
+## loop_start): the track plays its intro once and then loops from there to its end (the audio owner cuts every file at
+## its loop end). Resume points and the silent clock wrap into that region. set_effects_muted() (2.0) silences effects
+## and loops while Flow fast-forwards the deciding-moment replay of a versus round; music is not touched.
 
 ## The music context changed ("" = silence).
 signal music_changed(context: StringName)
@@ -42,11 +47,14 @@ var _next_voice: int = 0
 var _silent: bool = false
 ## True while the application is in the background (set_suspended).
 var _suspended: bool = false
+## True while effects are muted (set_effects_muted).
+var _effects_muted: bool = false
 # Clock of the current track for silent runs, where no player reports a position.
 var _clock_base: float = 0.0     # position when the clock was last started or stopped
 var _clock_since_msec: int = -1  # Time.get_ticks_msec() when it was started; -1 = standing still
 var _clock_length: float = 0.0   # length of the track (0 = unknown)
 var _clock_loops: bool = false
+var _clock_loop_start: float = 0.0  # where the loop restarts (AudioTable loop_start)
 
 
 func _ready() -> void:
@@ -84,6 +92,7 @@ func shutdown() -> void:
 	_music_after_jingle = &""
 	_music_context = &""
 	_suspended = false
+	_effects_muted = false
 	_stop_clock()
 	for player: AudioStreamPlayer in _sfx_players:
 		player.stop()
@@ -115,7 +124,7 @@ func preload_sfx() -> void:
 func preload_music(context: StringName) -> void:
 	var entry: Dictionary = AudioTable.MUSIC.get(context, {})
 	if not entry.is_empty():
-		_get_stream(AudioTable.MUSIC_DIR + str(entry["file"]), bool(entry["loop"]))
+		_get_stream(AudioTable.MUSIC_DIR + str(entry["file"]), bool(entry["loop"]), AudioTable.loop_start(context))
 
 
 ## Release the tracks of every music context except `contexts`, the one playing and the interrupted ones
@@ -142,8 +151,8 @@ func play_sfx(event: StringName, variant: int = -1, volume_offset_db: float = 0.
 	if entry.is_empty():
 		push_error("Audio.play_sfx: unknown event '%s'" % event)
 		return
-	if _suspended:
-		# Nobody is listening; a cue must not wait for the player to come back.
+	if _suspended or _effects_muted:
+		# Nobody is listening (or the replay fast-forwards); a cue must not wait for the player to come back.
 		return
 	var frame: int = Engine.get_process_frames()
 	if int(_sfx_started_frame.get(event, -1)) == frame:
@@ -167,7 +176,7 @@ func play_sfx(event: StringName, variant: int = -1, volume_offset_db: float = 0.
 
 ## Start an ambience loop (Sfx.LOOP_*). No effect when it already plays.
 func start_loop(event: StringName) -> void:
-	if _loops.has(event):
+	if _loops.has(event) or _effects_muted:
 		return
 	var entry: Dictionary = AudioTable.SFX.get(event, {})
 	if entry.is_empty():
@@ -333,6 +342,20 @@ func is_suspended() -> bool:
 	return _suspended
 
 
+## 2.0: mute (true) or unmute (false) the sound effects: while muted, play_sfx and start_loop do nothing and the
+## ambience loops that play are stopped. Music is not touched. Flow mutes them while it fast-forwards the
+## deciding-moment replay of a versus round (hundreds of ticks in one frame behind the curtain).
+func set_effects_muted(muted: bool) -> void:
+	if muted and not _effects_muted:
+		stop_all_sfx()
+	_effects_muted = muted
+
+
+## True between set_effects_muted(true) and set_effects_muted(false).
+func are_effects_muted() -> bool:
+	return _effects_muted
+
+
 ## Stop all sound effects and loops at once (scene change).
 func stop_all_sfx() -> void:
 	for player: AudioStreamPlayer in _sfx_players:
@@ -372,11 +395,12 @@ func _start(player: AudioStreamPlayer, from_position: float) -> void:
 		player.stream_paused = true
 
 
-func _start_clock(from_position: float, stream: AudioStream, loops: bool) -> void:
+func _start_clock(from_position: float, stream: AudioStream, loops: bool, loop_start: float = 0.0) -> void:
 	_clock_base = from_position
 	_clock_since_msec = -1 if _suspended else Time.get_ticks_msec()
 	_clock_length = stream.get_length() if stream != null else 0.0
 	_clock_loops = loops
+	_clock_loop_start = loop_start
 
 
 func _stop_clock() -> void:
@@ -384,6 +408,7 @@ func _stop_clock() -> void:
 	_clock_since_msec = -1
 	_clock_length = 0.0
 	_clock_loops = false
+	_clock_loop_start = 0.0
 
 
 func _clock_position() -> float:
@@ -391,8 +416,20 @@ func _clock_position() -> float:
 	if _clock_since_msec >= 0:
 		position += float(Time.get_ticks_msec() - _clock_since_msec) / 1000.0
 	if _clock_length > 0.0:
-		position = fposmod(position, _clock_length) if _clock_loops else minf(position, _clock_length)
+		position = loop_position(position, _clock_length, _clock_loop_start) if _clock_loops \
+				else minf(position, _clock_length)
 	return position
+
+
+## 2.0: where a looping track of `length` seconds whose loop restarts at `loop_start` (its intro plays once) is after
+## `elapsed` seconds of playing: `elapsed` itself during the first pass, then wrapped into [loop_start, length).
+static func loop_position(elapsed: float, length: float, loop_start: float = 0.0) -> float:
+	if length <= 0.0 or elapsed < length:
+		return maxf(elapsed, 0.0)
+	var start: float = clampf(loop_start, 0.0, length)
+	if length - start <= 0.0:
+		return 0.0
+	return start + fposmod(elapsed - start, length - start)
 
 
 func _make_music_player() -> AudioStreamPlayer:
@@ -409,13 +446,15 @@ func _switch_music(context: StringName, fade_seconds: float, restart: bool, from
 	var stream: AudioStream = null
 	var target_db: float = 0.0
 	var loops: bool = false
+	var loop_start: float = 0.0
 	if context != &"":
 		var entry: Dictionary = AudioTable.MUSIC.get(context, {})
 		if entry.is_empty():
 			push_error("Audio.play_music: unknown context '%s'" % context)
 			return
 		loops = bool(entry["loop"])
-		stream = _get_stream(AudioTable.MUSIC_DIR + str(entry["file"]), loops)
+		loop_start = AudioTable.loop_start(context)
+		stream = _get_stream(AudioTable.MUSIC_DIR + str(entry["file"]), loops, loop_start)
 		target_db = float(entry["db"])
 	_music_context = context
 	# Cross-fade: _music_a is always the incoming player.
@@ -427,11 +466,11 @@ func _switch_music(context: StringName, fade_seconds: float, restart: bool, from
 	_music_a.stop()
 	_stop_clock()
 	if stream != null:
-		var start_at: float = _resume_point(stream, loops, from_position)
+		var start_at: float = _resume_point(stream, loops, from_position, loop_start)
 		_music_a.stream = stream
 		_music_a.volume_db = target_db
 		_start(_music_a, start_at)
-		_start_clock(start_at, stream, loops)
+		_start_clock(start_at, stream, loops, loop_start)
 		if _silent and not loops:
 			# No device: a jingle "ends" at once so that flows waiting for it still continue.
 			_on_music_finished.call_deferred(_music_a)
@@ -446,14 +485,14 @@ func _switch_music(context: StringName, fade_seconds: float, restart: bool, from
 	music_changed.emit(context)
 
 
-## Where to start `stream` so that it continues at `position`: inside the track for a loop; a jingle that was
-## interrupted at its very end starts over.
-func _resume_point(stream: AudioStream, loops: bool, position: float) -> float:
+## Where to start `stream` so that it continues at `position`: inside the track for a loop (inside its loop region
+## once past the end, [method loop_position]); a jingle that was interrupted at its very end starts over.
+func _resume_point(stream: AudioStream, loops: bool, position: float, loop_start: float = 0.0) -> float:
 	var length: float = stream.get_length()
 	if position <= 0.0 or length <= 0.0:
 		return maxf(position, 0.0)
 	if loops:
-		return fposmod(position, length)
+		return loop_position(position, length, loop_start)
 	return position if position < length else 0.0
 
 
@@ -483,7 +522,9 @@ func _free_voice() -> AudioStreamPlayer:
 	return stolen
 
 
-func _get_stream(path: String, loop: bool) -> AudioStream:
+## The stream of a file with its loop set up (`loop_start`: where the loop restarts, seconds; AudioTable keeps one
+## loop flag and one loop start per file, so the cached stream fits every row that names the file).
+func _get_stream(path: String, loop: bool, loop_start: float = 0.0) -> AudioStream:
 	if _streams.has(path):
 		return _streams[path]
 	var stream: AudioStream = null
@@ -494,10 +535,12 @@ func _get_stream(path: String, loop: bool) -> AudioStream:
 	elif stream is AudioStreamOggVorbis:
 		var ogg: AudioStreamOggVorbis = stream
 		ogg.loop = loop
+		ogg.loop_offset = maxf(loop_start, 0.0) if loop else 0.0
 	elif stream is AudioStreamWAV:
 		var wav: AudioStreamWAV = stream
 		if loop:
 			wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
+			wav.loop_begin = int(maxf(loop_start, 0.0) * float(wav.mix_rate))
 			wav.loop_end = int(wav.get_length() * float(wav.mix_rate))
 	_streams[path] = stream
 	return stream

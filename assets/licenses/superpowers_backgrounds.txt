@@ -1,0 +1,36 @@
+Superpowers Asset Packs - Backgrounds
+=====================================
+
+Author: Pixel-boy (Sparklin Labs)
+Source: https://github.com/sparklinlabs/superpowers-asset-packs/tree/master/backgrounds
+Licence: CC0 1.0 (tier A)
+Used in Club & Grub for: 2.0 (The Far Shore): backgrounds/sky/ layer1_far_isles, pyre_layer1_far_isles, storm_layer1_far_isles. Per-file sources and edits: docs/ASSET_MANIFEST.md section 17
+Staging folder: .tools/asset_candidates/environment/superpowers-backgrounds
+
+---- Licence evidence recorded when the pack was downloaded ----
+
+# LICENSE_INFO - superpowers-backgrounds
+
+- **Pack**: Superpowers Asset Packs - Backgrounds
+- **Author**: Pixel-boy (Sparklin Labs)
+- **License**: CC0 1.0 Universal
+- **License tier**: A
+- **Source page(s)**:
+  - https://github.com/sparklinlabs/superpowers-asset-packs/tree/master/backgrounds
+- **Download URL(s)**:
+  - git clone https://github.com/sparklinlabs/superpowers-asset-packs (commit e8674a03ab4456802f71f848c4df79eccca23f7a, 2019-09-21); zip: https://github.com/sparklinlabs/superpowers-asset-packs/archive/refs/heads/master.zip
+- **Date checked / downloaded**: 2026-10-04
+
+## Exact license wording (quoted)
+- repo README.md (saved as REPO_README.md):
+  > The assets in this repository are created at Sparklin Labs by Pixel-boy. They are released under the Creative Commons Zero (CC0) license. [...] You can use the assets found in this repository in your own games, even commercial ones. Attribution is not required but appreciated.
+- repo LICENSE.txt (saved as REPO_LICENSE_CC0.txt):
+  > CC0 1.0 Universal [full legal code]
+
+## Evidence saved in this folder
+- `REPO_README.md` (shipped by the author)
+- `REPO_LICENSE_CC0.txt` (shipped by the author)
+
+---- Licence ----
+
+CC0 1.0 Universal: the full legal code ships as cc0_1.0_legal_code.txt in this folder.

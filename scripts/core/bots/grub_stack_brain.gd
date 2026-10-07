@@ -1,21 +1,21 @@
 class_name GrubStackBrain
 extends BotBrain
 ## The Grub Stack bot (docs/expansion/DESIGN.md E.3 / E.7, GAMEPLAY.md 13.10.3 / 13.10.10): seek food, strike the
-## visible spots, attack rivals with tall stacks, bank at the cookpot when the stack is tall - Rookie and Hunter
-## (and a first Chief: Hunter decisions on a 3-tick reaction). Owner: core-B.
+## visible spots, attack rivals with tall stacks, bank at the cookpot when the stack is tall. Owner: core-B.
 ##
 ## Goals (re-chosen every VersusTuning.BOT_GOAL_PERIOD_TICKS by utility = value / ticks to get there, one route search
-## per decision): FOOD (an item lying in the arena, by its stack value; the skull is avoided), SPOT (a visible spot:
-## walk to a stand from which a strike reaches its cell - the bot never knows what is inside), BANK (crouch in an open
-## cookpot once the stack reaches BANK_AT, sooner when the Feast Rush is near), ATTACK (a rival carrying food; the
-## Hunter prefers the leader and the banker, whom a stomp robs double), WANDER (nothing better: never idle). A goal is
-## kept unless another is clearly better (HYSTERESIS_PERCENT).
-## Combat micro-rules, on what the bot saw `reaction` ticks ago: a forward strike when a rival's body will be in the
-## club's front box, a high strike against a jumper above within VersusTuning.BOT_ANTI_AIR_PX; the Hunter also
-## crouch-charges against an approaching rival and jumps to stomp a croucher (a banker). The Rookie never charges,
-## never stomps on purpose and hesitates (it acts on a micro-rule only half of the time, its own SimRng).
+## per decision): SAFETY (a telegraphed danger reaches the hero: get out), FOOD (an item lying in the arena, by its
+## stack value; the skull is avoided), SPOT (a visible spot: walk to a stand from which a strike reaches its cell -
+## the bot never knows what is inside; a spot a rival stands nearer to is worth half: the bots spread out), BANK
+## (crouch in an open cookpot once the stack reaches BANK_AT, sooner when the Feast Rush is near), ATTACK (a rival
+## carrying food; the Hunter and the Chief prefer the leader and the banker, whom a stomp robs double), WANDER (nothing
+## better: never idle). A goal is kept unless another is clearly better (HYSTERESIS_PERCENT).
+## Combat: the micro-rules of [BotBrain] on rivals worth hitting (food on the head, the goal, or a striker). Levels:
+## Rookie (10-tick reaction, hesitates, banks early, attacks only near rivals), Hunter (6 ticks; stomps, charges,
+## deflects now and then), Chief (3 ticks; stomp chains, deflects half the time, banks before the rush like the
+## Hunter).
 
-enum Goal { NONE, WANDER, FOOD, SPOT, BANK, ATTACK }
+enum Goal { NONE, WANDER, FOOD, SPOT, BANK, ATTACK, SAFETY }
 
 ## Stack at which banking becomes the plan, per Defs.BotLevel (Rookie, Hunter, Chief).
 const BANK_AT: Array[int] = [6, 9, 9]
@@ -33,15 +33,8 @@ const SPOT_VALUE_SMALL: int = 1
 const SPOT_VALUE_BIG: int = 3
 ## The Rookie attacks only rivals this close (ticks).
 const ROOKIE_ATTACK_TICKS: int = 72
-## Hunter: crouch-charge when a rival walks toward it from this far (px), for this long (ticks).
-const CHARGE_FROM_PX: int = 96
-const CHARGE_TO_PX: int = 44
-const CHARGE_TICKS: int = 10
-## Hunter: jump at a croucher this far away (px, same floor).
-const STOMP_MIN_PX: int = 10
-const STOMP_MAX_PX: int = 56
-## Ticks the strike rule looks ahead on the seen rival (the front box is out on ticks 5-7 of the swing).
-const STRIKE_LEAD_TICKS: int = 5
+## A spot struck this often without effect is given up for the level (a stand that does not reach it after all).
+const SPOT_TRIES_MAX: int = 4
 
 var goal: int = Goal.NONE
 var goal_pos: Vector2i = Vector2i.ZERO
@@ -51,19 +44,11 @@ var goal_entity: Object = null
 var goal_slot: int = -1
 ## SPOT: the stand {"node", "x", "facing", "kind"}.
 var goal_stand: Dictionary = {}
-## Statistics (tests): decisions per goal kind, strikes, charges, stomp jumps.
-var decisions: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0, 0])
-var strikes: int = 0
-var charges: int = 0
-var stomp_jumps: int = 0
+## Statistics (tests): decisions per goal kind.
+var decisions: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0, 0, 0])
 
-var _sequence: Array[Vector2i] = []
 # Strikes at a spot that did not lower its hits: instance id -> [strikes, hits_left when counted].
 var _spot_tries: Dictionary = {}
-
-
-## A spot struck this often without effect is given up for the level (a stand that does not reach it after all).
-const SPOT_TRIES_MAX: int = 4
 
 
 func reset() -> void:
@@ -73,8 +58,16 @@ func reset() -> void:
 	goal_slot = -1
 	goal_stand = {}
 	goal_utility = 0
-	_sequence.clear()
 	_spot_tries.clear()
+
+
+func nav_class(_hero: PlayerBase, level: LevelBase) -> int:
+	return weight_class(BotSenses.stack_of(level, bot.slot))
+
+
+func worth_hitting(rival: int, seen: PackedInt32Array) -> bool:
+	return seen[HeroBot.SEEN_STACK] > 0 or goal_slot == rival \
+			or (seen[HeroBot.SEEN_BITS] & HeroBot.SEEN_STRIKING) != 0
 
 
 func _note_spot_strike(spot: HittableBase) -> void:
@@ -101,15 +94,14 @@ func needs_thinking(_tick: int) -> bool:
 
 func think(hero: PlayerBase, level: LevelBase, _tick: int) -> void:
 	var graph: NavGraph = bot.nav.graph
-	var reach: Dictionary = {}
-	if graph != null:
-		var from: int = bot.nav.node_of(hero)
-		if from < 0:
-			from = graph.node_below(hero.sim_pos)
-		if from < 0:
-			from = graph.nearest_node(hero.sim_pos)
-		reach = graph.reach_from(from, hero.sim_pos.x, bot.nav.blocked)
 	var best: Dictionary = {"goal": Goal.WANDER, "utility": 0}
+	var safe: Vector2i = safety_target(hero, level)
+	if safe != BotSenses.NO_POS:
+		best = {"goal": Goal.SAFETY, "utility": SCALE * 100, "score": SCALE * 100, "pos": safe, "entity": null,
+				"slot": -1, "stand": {}}
+		_choose(best, hero)
+		return
+	var reach: Dictionary = bot.nav.reach(hero)
 	var stack: int = BotSenses.stack_of(level, bot.slot)
 	# FOOD
 	for item: CollectibleBase in BotSenses.items(level):
@@ -138,13 +130,16 @@ func think(hero: PlayerBase, level: LevelBase, _tick: int) -> void:
 		var stand_pos: Vector2i = Vector2i(int(stand["x"]), graph.nodes[int(stand["node"])].y)
 		var value: int = SPOT_VALUE_BIG if spot.spot_kind == &"big" else SPOT_VALUE_SMALL
 		var strike: int = BotBrain.strike_ticks(int(stand["kind"])) + spot.cooldown
-		_offer(best, Goal.SPOT, value * SCALE / (cost + COST_BIAS + strike), stand_pos, spot, -1, stand)
+		var utility: int = value * SCALE / (cost + COST_BIAS + strike)
+		if _contested(hero, stand_pos):
+			utility /= 2
+		_offer(best, Goal.SPOT, utility, stand_pos, spot, -1, stand)
 	# BANK
 	var bank_at: int = BANK_AT[bot.bot_level]
 	var left: int = BotSenses.ticks_left(level)
 	var rush_near: bool = left >= 0 and left <= VersusTuning.FEAST_RUSH_TICKS + BANK_BEFORE_RUSH_TICKS
 	var banking_now: bool = goal == Goal.BANK
-	if stack > 0 and (stack >= bank_at or banking_now or (rush_near and bot.bot_level != Defs.BotLevel.ROOKIE)):
+	if stack > 0 and (stack >= bank_at or banking_now or (rush_near and not rookie())):
 		for pot: SimEntity in BotSenses.cookpots(level):
 			if not BotSenses.pot_usable(level, pot, bot.slot):
 				continue
@@ -158,7 +153,7 @@ func think(hero: PlayerBase, level: LevelBase, _tick: int) -> void:
 	# ATTACK
 	var leader: int = _leader(level)
 	for rival: int in Defs.MAX_PLAYERS:
-		if not BotSenses.are_rivals(level, bot.slot, rival):
+		if not bot.is_rival(rival):
 			continue
 		var seen: PackedInt32Array = bot.seen(rival)
 		var bits: int = seen[HeroBot.SEEN_BITS]
@@ -173,7 +168,7 @@ func think(hero: PlayerBase, level: LevelBase, _tick: int) -> void:
 			continue
 		var gain: int = 1 + rival_stack / VersusTuning.SPILL_HIT_DIV
 		var utility: int = gain * SCALE / (cost + COST_BIAS + 16)
-		if bot.bot_level == Defs.BotLevel.ROOKIE:
+		if rookie():
 			if cost > ROOKIE_ATTACK_TICKS:
 				continue
 			utility /= 2
@@ -185,6 +180,18 @@ func think(hero: PlayerBase, level: LevelBase, _tick: int) -> void:
 				utility *= 2
 		_offer(best, Goal.ATTACK, utility, pos, null, rival, {})
 	_choose(best, hero)
+
+
+## True when a rival (as seen) stands nearer to `pos` than the hero (in px): someone else is going for it.
+func _contested(hero: PlayerBase, pos: Vector2i) -> bool:
+	var mine: int = absi(hero.sim_pos.x - pos.x) + absi(hero.sim_pos.y - pos.y)
+	for rival: int in Defs.MAX_PLAYERS:
+		if rival == bot.slot or not bot.seen_alive(rival):
+			continue
+		var other: Vector2i = bot.seen_pos(rival)
+		if absi(other.x - pos.x) + absi(other.y - pos.y) + 8 < mine:
+			return true
+	return false
 
 
 func _cost(hero: PlayerBase, reach: Dictionary, pos: Vector2i) -> int:
@@ -221,8 +228,9 @@ func _choose(best: Dictionary, hero: PlayerBase) -> void:
 		goal_pos = best["pos"]
 	if changed:
 		decisions[kind] += 1
-		action_ticks = 0
-		_sequence.clear()
+		if kind == Goal.SAFETY:
+			escapes += 1
+		cancel_actions()
 
 
 func _goal_valid() -> bool:
@@ -265,22 +273,14 @@ func _leader(level: LevelBase) -> int:
 
 func act(hero: PlayerBase, level: LevelBase, tick: int) -> int:
 	var nav: BotNavigator = bot.nav
-	nav.set_weight_class(weight_class(BotSenses.stack_of(level, bot.slot)))
-	var stun_min: int = VersusTuning.STUN_HIT_TIMER_MIN if Game.mode == Defs.GameMode.VERSUS else Tuning.HIT_STUN_MIN
-	if hero.hit_timer >= stun_min:
-		# Stunned: the hero ignores every input; drop what was planned for these ticks.
-		action_ticks = 0
-		_sequence.clear()
-		return 0
-	if nav.is_busy():
-		return nav.step(hero, tick)
-	if not _sequence.is_empty():
-		return _play_sequence()
-	if action_ticks > 0:
-		return hold_action()
-	var micro: int = _micro_rules(hero, level)
-	if micro >= 0:
-		return micro
+	var common: int = -1
+	if goal == Goal.BANK and hero.is_low():
+		# Banking: the Rookie keeps crouching whatever happens; the others still fight back.
+		common = act_common(hero, level, tick) if not rookie() else -1
+	else:
+		common = act_common(hero, level, tick)
+	if common >= 0:
+		return common
 	var entity: Object = goal_entity if goal_entity != null and is_instance_valid(goal_entity) else null
 	match goal:
 		Goal.FOOD:
@@ -317,83 +317,10 @@ func act(hero: PlayerBase, level: LevelBase, tick: int) -> int:
 	return nav.step(hero, tick)
 
 
-## The combat micro-rules; -1 when none applies.
-func _micro_rules(hero: PlayerBase, level: LevelBase) -> int:
-	if not hero.is_grounded() or hero.attack_gate or hero.swing_lock > 0:
-		return -1
-	var hunter: bool = bot.bot_level != Defs.BotLevel.ROOKIE
-	var me: Vector2i = hero.sim_pos
-	var banking: bool = goal == Goal.BANK and hero.is_low()
-	for rival: int in Defs.MAX_PLAYERS:
-		if not BotSenses.are_rivals(level, bot.slot, rival):
-			continue
-		var seen: PackedInt32Array = bot.seen(rival)
-		var bits: int = seen[HeroBot.SEEN_BITS]
-		if (bits & HeroBot.SEEN_PRESENT) == 0 or (bits & HeroBot.SEEN_SAFE) != 0:
-			continue
-		var pos: Vector2i = Vector2i(seen[HeroBot.SEEN_X], seen[HeroBot.SEEN_Y])
-		var ahead: Vector2i = pos + Vector2i(Tuning.floor16(seen[HeroBot.SEEN_XVEL] * STRIKE_LEAD_TICKS),
-				Tuning.floor16(seen[HeroBot.SEEN_YVEL] * STRIKE_LEAD_TICKS))
-		var dx: int = ahead.x - me.x
-		var facing: int = 1 if dx >= 0 else -1
-		var worth: bool = seen[HeroBot.SEEN_STACK] > 0 or goal_slot == rival \
-				or (seen[HeroBot.SEEN_BITS] & HeroBot.SEEN_STRIKING) != 0
-		if banking and not hunter:
-			continue
-		# Anti-air: a jumper above within reach.
-		if (bits & HeroBot.SEEN_GROUNDED) == 0 and pos.y < me.y - 16 and absi(pos.x - me.x) <= VersusTuning.BOT_ANTI_AIR_PX \
-				and front_box(me, facing, STRIKE_HIGH).intersects(body_box(ahead)):
-			if _decide():
-				strikes += 1
-				return start_action(dir_flag(facing) | STRIKE_FLAGS[STRIKE_HIGH], strike_ticks(STRIKE_HIGH))
-		# Forward strike: his body will be in the front box.
-		if worth and front_box(me, facing, STRIKE_FORWARD).intersects(body_box(ahead)):
-			if _decide():
-				strikes += 1
-				return start_action(dir_flag(facing) | STRIKE_FLAGS[STRIKE_FORWARD], strike_ticks(STRIKE_FORWARD))
-		if not hunter or banking:
-			continue
-		var same_floor: bool = absi(pos.y - me.y) <= 8 and (bits & HeroBot.SEEN_GROUNDED) != 0
-		var distance: int = absi(pos.x - me.x)
-		# Stomp a croucher (a banker pays double).
-		if same_floor and (bits & HeroBot.SEEN_CROUCHING) != 0 and distance >= STOMP_MIN_PX \
-				and distance <= STOMP_MAX_PX and hero.no_jump == 0:
-			stomp_jumps += 1
-			var toward: int = dir_flag(pos.x - me.x)
-			var drift: int = clampi(distance / 3, 2, 14)
-			_sequence = [Vector2i(Defs.IN_UP | toward, drift), Vector2i(Defs.IN_UP, 14 - mini(drift, 13)),
-					Vector2i(0, 8)]
-			return _play_sequence()
-		# Crouch-charge against a rival walking in.
-		var closing: bool = seen[HeroBot.SEEN_XVEL] != 0 and (seen[HeroBot.SEEN_XVEL] > 0) == (pos.x < me.x)
-		if worth and same_floor and closing and distance <= CHARGE_FROM_PX and distance >= CHARGE_TO_PX \
-				and hero.charge == 0 and absi(hero.xvel) < 16:
-			charges += 1
-			return start_action(Defs.IN_DOWN, CHARGE_TICKS)
-	return -1
-
-
-## Weight class of a stack (PHYSICS.md C.14: 10+ units heavy, 20+ heavier).
+## Weight class of a stack (PHYSICS.md C.14: 10+ units heavy, 20+ heavier) as NavGraph.WEIGHT_*.
 static func weight_class(stack: int) -> int:
 	if stack >= VersusTuning.STACK_HEAVIER:
-		return 2
+		return NavGraph.WEIGHT_HEAVIER
 	if stack >= VersusTuning.STACK_HEAVY:
-		return 1
-	return 0
-
-
-## The Rookie hesitates: it takes a micro-rule only half of the time (its own SimRng).
-func _decide() -> bool:
-	if bot.bot_level == Defs.BotLevel.ROOKIE:
-		return bot.rng.chance(1, 2)
-	return true
-
-
-func _play_sequence() -> int:
-	while not _sequence.is_empty() and _sequence[0].y <= 0:
-		_sequence.pop_front()
-	if _sequence.is_empty():
-		return 0
-	var step: Vector2i = _sequence[0]
-	_sequence[0] = Vector2i(step.x, step.y - 1)
-	return step.x
+		return NavGraph.WEIGHT_HEAVY
+	return NavGraph.WEIGHT_LIGHT

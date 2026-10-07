@@ -25,15 +25,20 @@ const KEYBOARD_LAYOUT_NAMES: Array[String] = ["classic", "two_hands", "one_hand"
 # Look in every layout" is the hero's rule; Up jumps as the setting "controls/up_jumps" says, except ONE_HAND, the
 # Up-jumps scheme, where the up key is the jump key. Bindings keep no key side (the Settings token "key:<code>"):
 # KEY_SHIFT / KEY_CTRL are either Shift / Ctrl, which is safe because no layout gives both sides of one to two
-# players (CLASSIC: P1 Left Shift; ONE_HAND: P2 Right Ctrl and Right Shift). The numpad is bound by physical key,
+# players (CLASSIC: P1 Left Ctrl; ONE_HAND: P2 Right Ctrl and Right Shift). The numpad is bound by physical key,
 # so NumLock does not change it (see NUMPAD_KEYS).
+# CLASSIC strike is Left Ctrl, not Left Shift (resolution after gate G1, docs/expansion/DESIGN.md D.11): on Windows a
+# numpad key pressed with NumLock on while Shift is held makes the system wrap it in a synthetic Shift release and
+# re-press, which would cut P1's held strike whenever P2 moves. Godot reports those synthetic events exactly like
+# real ones (physical KEY_SHIFT, left location; only the message timing and the NumLock state - which Godot does not
+# expose - tell them apart), so no filter can be proven and Shift is not kept as an alias. Ctrl has no such quirk.
 const _LEFT_KEYS: Dictionary = {
 	&"move_left": [[KEY_A], [KEY_A], [KEY_A]],
 	&"move_right": [[KEY_D], [KEY_D], [KEY_D]],
 	&"move_up": [[KEY_W], [KEY_W], []],
 	&"move_down": [[KEY_S], [KEY_S], [KEY_S]],
 	&"jump": [[KEY_SPACE], [KEY_G], [KEY_W]],
-	&"attack": [[KEY_SHIFT], [KEY_F], [KEY_SPACE]],
+	&"attack": [[KEY_CTRL], [KEY_F], [KEY_SPACE]],
 	&"look": [[KEY_Q], [KEY_R], [KEY_Q]],
 	&"swap": [[KEY_E], [KEY_T], [KEY_E]],
 	&"pause": [[], [], []],

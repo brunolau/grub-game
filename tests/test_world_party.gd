@@ -155,6 +155,31 @@ func test_a_hero_off_the_view_becomes_an_egg_after_the_leash() -> void:
 			"the egg is inside the view")
 
 
+func test_a_hero_standing_on_a_high_ledge_is_never_leashed() -> void:
+	# 30 rows, the floor's feet at y 416 (row 26); a pillar at columns 12-15 whose top is 8 rows higher (y 288): an
+	# Expert boost ledge. P1 stands on the floor, P2 on the ledge - neither moves for longer than the leash.
+	var lines: PackedStringArray = PackedStringArray()
+	for row: int in 30:
+		var line: String = (TileGrid.CH_SOLID_A if row >= 26 else TileGrid.CH_AIR).repeat(COLS)
+		if row >= 18 and row < 26:
+			line = line.substr(0, 12) + TileGrid.CH_SOLID_A.repeat(4) + line.substr(16)
+		if row == 25:
+			line = line.substr(0, 4) + TileGrid.CH_PLAYER_START + line.substr(5)
+		lines.append(line)
+	var level: Level = _load(2, "", "test", "\n".join(lines), Defs.Difficulty.EXPERT)
+	var p1: PlayerBase = level.player
+	var p2: PlayerBase = level.get_hero(1)
+	Sim.step(30)
+	p2.teleport(Vector2i(13 * 16 + 8, 18 * 16))
+	assert_false(level.get_party_frame().has_point(p2.sim_pos - Vector2i(0, LevelCamera.KEEP_HEAD_PX)),
+			"the set-up: the ledge is above the view")
+	Sim.step(PartyTuning.LEASH_EGG_TICKS_BEGINNER + 10)
+	assert_false(p2.is_down(), "never leashed: the view came up to the hero on the ledge")
+	assert_true(level.get_party_frame().has_point(p2.sim_pos - Vector2i(0, LevelCamera.KEEP_HEAD_PX)), "P2 whole")
+	assert_true(level.get_party_frame().has_point(p1.sim_pos - Vector2i(0, 1)), "P1 still on the view")
+	assert_eq(p2.leash, 0)
+
+
 func test_the_leash_resets_when_the_hero_is_back() -> void:
 	var level: Level = _load(2, "", "test", "", Defs.Difficulty.EXPERT)
 	var p2: PlayerBase = level.get_hero(1)
@@ -310,6 +335,7 @@ func test_landing_on_the_partner_hops_with_up_and_rides_without() -> void:
 	var level: Level = _load(2)
 	var p1: PlayerBase = level.player
 	var p2: PlayerBase = level.get_hero(1)
+	_wake(level, p2)
 	p2.teleport(Vector2i(200, FLOOR_Y))
 	p1.teleport(Vector2i(200, FLOOR_Y - 40))
 	p1.yvel = 64
@@ -337,6 +363,110 @@ func test_landing_on_the_partner_hops_with_up_and_rides_without() -> void:
 	Sim.step(10)
 	assert_eq(p1.sim_pos.x - x1, p2.sim_pos.x - x2, "carried along")
 	assert_eq(p1.totem_carrier, p2)
+
+
+## `hero` presses Swap for one tick (refused with an empty belt: nothing moves) - his player is there: ACTIVE.
+func _wake(level: Level, hero: PlayerBase) -> void:
+	_hold(hero.slot, Defs.IN_SWAP)
+	Sim.step(1)
+	GameInput.clear_scripted()
+	assert_true(_driver(level).is_active(hero), "any input makes a hatched hero active")
+
+
+## P1 falls with UP held from `drop` px over the floor onto x = 200 and keeps UP held for `ticks` ticks; returns
+## [the most negative yvel, the highest feet y] seen after the first head contact (`first_contact` is the yvel then).
+func _fall_with_up(level: Level, drop: int, ticks: int) -> Array[int]:
+	var p1: PlayerBase = level.player
+	p1.end_totem_ride()
+	p1.teleport(Vector2i(200, FLOOR_Y - drop))
+	p1.yvel = 64
+	p1.grounded = false
+	p1.no_jump = Tuning.NO_JUMP_TICKS
+	_hold(0, Defs.IN_UP)
+	var low_yvel: int = 0
+	var high_y: int = FLOOR_Y
+	for i: int in ticks:
+		Sim.step(1)
+		low_yvel = mini(low_yvel, p1.yvel)
+		high_y = mini(high_y, p1.sim_pos.y)
+	GameInput.clear_scripted()
+	return [low_yvel, high_y]
+
+
+func test_an_egg_is_no_springboard() -> void:
+	var level: Level = _load(2)
+	var p1: PlayerBase = level.player
+	var p2: PlayerBase = level.get_hero(1)
+	p1.facing = 1
+	p2.go_down(&"voluntary")
+	assert_false(_driver(level).is_active(p2), "an egg is never active")
+	# The egg floats behind P1's head (feet + (-24, -48)); P1 drops onto it with UP held.
+	p2.teleport(Vector2i(200, FLOOR_Y - 30))
+	p1.teleport(Vector2i(200, FLOOR_Y - 90))
+	p1.yvel = 64
+	p1.grounded = false
+	p1.no_jump = Tuning.NO_JUMP_TICKS
+	_hold(0, Defs.IN_UP)
+	var hatch_yvel: int = 0
+	for i: int in 20:
+		Sim.step(1)
+		if not p2.is_down():
+			hatch_yvel = p1.yvel
+			break
+	assert_false(p2.is_down(), "the stomp hatches the egg (as designed)")
+	assert_eq(hatch_yvel, Tuning.BOUNCE_YVEL, "but with the plain enemy bounce, UP held or not - never -224")
+	assert_false(_driver(level).is_active(p2), "he pops out idle")
+	# Up stays held: P1 comes down on the idle body that popped out - no Shoulder Hop off it.
+	var low_yvel: int = 0
+	var high_y: int = FLOOR_Y
+	for i: int in 50:
+		Sim.step(1)
+		low_yvel = mini(low_yvel, p1.yvel)
+		high_y = mini(high_y, p1.sim_pos.y)
+	GameInput.clear_scripted()
+	assert_true(low_yvel > Tuning.BOUNCE_YVEL_UP + 24, "no Shoulder Hop from the hatched egg (yvel %d)" % low_yvel)
+	assert_true(FLOOR_Y - high_y < 7 * Tuning.TILE, "nowhere near a boost ledge: %d px" % (FLOOR_Y - high_y))
+
+
+func test_only_an_active_partners_head_gives_the_shoulder_hop() -> void:
+	var level: Level = _load(2)
+	var p2: PlayerBase = level.get_hero(1)
+	var driver: PartyDriver = _driver(level)
+	p2.teleport(Vector2i(200, FLOOR_Y))
+	Sim.step(2)
+	assert_false(driver.is_active(p2), "no input since the level start: idle")
+	var idle: Array[int] = _fall_with_up(level, 60, 30)
+	assert_true(idle[0] > Tuning.BOUNCE_YVEL_UP + 24, "an idle head is no springboard (yvel %d)" % idle[0])
+	assert_null(level.player.totem_carrier, "and with UP held no ride either: P1 passes through")
+	_wake(level, p2)
+	var active: Array[int] = _fall_with_up(level, 60, 30)
+	assert_eq(active[0], PartyTuning.SHOULDER_HOP_YVEL, "an active partner's head: the full Shoulder Hop")
+	assert_true(FLOOR_Y - active[1] >= 8 * Tuning.TILE, "a boost-ledge height: %d px" % (FLOOR_Y - active[1]))
+
+
+func test_going_down_and_hatching_make_a_hero_idle_again() -> void:
+	var level: Level = _load(2)
+	var p1: PlayerBase = level.player
+	var p2: PlayerBase = level.get_hero(1)
+	var driver: PartyDriver = _driver(level)
+	_wake(level, p2)
+	p2.go_down(&"voluntary")
+	Sim.step(1)
+	assert_false(driver.is_active(p2), "an egg")
+	assert_eq(driver.hatch_all(p1), 1)
+	assert_false(driver.is_active(p2), "hatched by the checkpoint: idle until his player presses something")
+	Sim.step(5)
+	assert_false(driver.is_active(p2))
+	_wake(level, p2)
+	# Without UP an idle partner still carries a Totem Ride (a still carrier's jump stays below every boost ledge).
+	p2.go_down(&"voluntary")
+	assert_eq(driver.hatch_all(p1), 1)
+	p2.teleport(Vector2i(200, FLOOR_Y))
+	p1.teleport(Vector2i(200, FLOOR_Y - 40))
+	p1.yvel = 64
+	p1.grounded = false
+	Sim.step(12)
+	assert_eq(p1.totem_carrier, p2, "no UP: the ride on an idle partner")
 
 
 # =================================================================================================================
@@ -466,6 +596,52 @@ func test_an_egg_touches_no_zone() -> void:
 	zone._sim_tick(Defs.Phase.CONTACT_ITEMS)
 	assert_false(zone.found, "an egg finds no secret")
 	assert_eq(zone.inside_mask & 2, 0)
+
+
+func test_hidden_spots_within_two_tiles_of_an_egg_glint() -> void:
+	var rows: String = _flat()
+	var lines: PackedStringArray = rows.split("\n")
+	lines[12] = lines[12].substr(0, 20) + "?" + lines[12].substr(21, 19) + "?" + lines[12].substr(41)
+	var level: Level = _load(2, "", "test", "\n".join(lines))
+	var p2: PlayerBase = level.get_hero(1)
+	assert_not_null(level.get_egg_scout(), "a co-op party scouts")
+	assert_true(EggScout.spots_near_eggs(level).is_empty(), "no egg, no glint")
+	p2.go_down(&"voluntary")
+	p2.teleport(Vector2i(20 * 16 + 8, FLOOR_Y - 10))
+	assert_eq(EggScout.spots_near_eggs(level), [Vector2i(20, 12)] as Array[Vector2i], "the spot under the egg")
+	# The egg's box reaches 12 px right of its x; the spot glints while the gap is at most 32 px (2 tiles).
+	p2.teleport(Vector2i(21 * 16 + 32 + 12 - 1, FLOOR_Y - 10))
+	assert_eq(EggScout.spots_near_eggs(level).size(), 1, "2 tiles away: still")
+	p2.teleport(Vector2i(21 * 16 + 32 + 12 + 1, FLOOR_Y - 10))
+	assert_true(EggScout.spots_near_eggs(level).is_empty(), "farther: no glint")
+	p2.teleport(Vector2i(40 * 16 + 8, FLOOR_Y - 10))
+	assert_eq(EggScout.spots_near_eggs(level), [Vector2i(40, 12)] as Array[Vector2i])
+	for entity: SimEntity in level.get_kind(Defs.Kind.HITTABLE):
+		if (entity as HittableBase).cell == Vector2i(40, 12):
+			(entity as HittableBase).opened = true
+	assert_true(EggScout.spots_near_eggs(level).is_empty(), "an opened spot never glints")
+	p2.hatch(null, 2)
+	assert_true(EggScout.spots_near_eggs(level).is_empty(), "hatched: no egg, no glint")
+
+
+func test_every_hero_has_his_own_fly_swarm() -> void:
+	var level: Level = _load(2, "zones/flies 10 11 rect=9,10,3,2 count=6")
+	var p1: PlayerBase = level.player
+	var p2: PlayerBase = level.get_hero(1)
+	p2.teleport(Vector2i(10 * 16 + 8, FLOOR_Y))
+	level.notify_hero_teleported(p2)
+	Sim.step(2)
+	assert_eq(level.get_fly_count(1), 6, "P2 walked over the dirty ground: his swarm")
+	assert_eq(level.get_fly_count(0), 0, "not P1's")
+	p1.teleport(Vector2i(11 * 16 + 8, FLOOR_Y))
+	level.notify_hero_teleported(p1)
+	Sim.step(2)
+	assert_eq(level.get_fly_count(0), 6)
+	assert_eq(level.get_fly_count(), 12, "two swarms")
+	p1.teleport(Vector2i(100, FLOOR_Y))
+	Events.item_collected.emit(&"items/water_bucket", 0, 0, p1.sim_pos)
+	assert_eq(level.get_fly_count(0), 0, "the bucket washes the hero who took it ...")
+	assert_eq(level.get_fly_count(1), 6, "... not his partner")
 
 
 func test_a_small_locked_view_is_the_party_frame() -> void:

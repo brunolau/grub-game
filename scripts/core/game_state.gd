@@ -120,6 +120,15 @@ var secrets_found: int = 0
 var tally_item_ids: Array[StringName] = []
 var tally_item_indices: PackedInt32Array = PackedInt32Array()
 var tally_item_points: PackedInt32Array = PackedInt32Array()
+## 2.0 (P2.6): the player slot that picked each item of the tally list, parallel to the three above (the co-op tally's
+## companion catches each hero's items in his own pile, DESIGN.md D.11). Always 0 in single-player; nothing in the
+## simulation reads it.
+var tally_item_slots: PackedInt32Array = PackedInt32Array()
+## 2.0 (P2.6): Helper mode of a co-op run (DESIGN.md D.3, Options > Co-op "coop/helper_mode"): P2 cannot be hurt by
+## enemies. Copied from the setting when a co-op run starts or a partner joins (Flow), so the simulation reads run
+## state, never Settings; false in single-player and versus and for every recorded route. The rule is the hero's
+## (player-A).
+var helper_mode: bool = false
 
 var _next_life_at: int = Tuning.EXTRA_LIFE_EVERY
 # The run as it was when the current level was entered (begin_level), for restore_level_entry(). Empty = none.
@@ -156,6 +165,7 @@ func start_run(p_difficulty: int, p_mode: int = Defs.GameMode.SINGLE, p_party: i
 	feast_kit = 0
 	warp_return_level = &""
 	level_id = &""
+	helper_mode = false
 	_next_life_at = Tuning.EXTRA_LIFE_EVERY
 	_entry = {}
 	# P1 (the 1.0 weapon, glider and energy) and every other slot: club, empty belt, no glider, full energy.
@@ -229,7 +239,8 @@ func begin_level(p_level_id: StringName, carry_progress: bool = false) -> void:
 		"feast_kit": feast_kit, "weapon": weapon, "spots_total": spots_total, "spots_opened": spots_opened,
 		"items_total": items_total, "items_collected": items_collected, "secrets_found": secrets_found,
 		"tally_ids": tally_item_ids.duplicate(), "tally_indices": tally_item_indices.duplicate(),
-		"tally_points": tally_item_points.duplicate(), "hands": _party_hands(), "belts": _party_belts(),
+		"tally_points": tally_item_points.duplicate(), "tally_slots": tally_item_slots.duplicate(),
+		"hands": _party_hands(), "belts": _party_belts(),
 	}
 	runs[0].emit_energy()
 	runs[0].emit_glider()
@@ -263,6 +274,7 @@ func restore_level_entry() -> bool:
 	tally_item_ids = (_entry["tally_ids"] as Array[StringName]).duplicate()
 	tally_item_indices = (_entry["tally_indices"] as PackedInt32Array).duplicate()
 	tally_item_points = (_entry["tally_points"] as PackedInt32Array).duplicate()
+	tally_item_slots = (_entry["tally_slots"] as PackedInt32Array).duplicate()
 	var hands: PackedInt32Array = _entry["hands"]
 	var belts: PackedInt32Array = _entry["belts"]
 	runs[0].belt = belts[0]
@@ -432,11 +444,13 @@ func completion_percent() -> int:
 	return clampi((spots_opened + items_collected) * 100 / total, 0, 100)
 
 
-## Remember a collected bonus item for the end-of-level double (GAMEPLAY.md 3.4).
-func add_tally_item(item_id: StringName, index: int, points: int) -> void:
+## Remember a collected bonus item for the end-of-level double (GAMEPLAY.md 3.4). 2.0: `slot` = the player slot of the
+## hero who picked it (tally_item_slots; 0 in single-player).
+func add_tally_item(item_id: StringName, index: int, points: int, slot: int = 0) -> void:
 	tally_item_ids.append(item_id)
 	tally_item_indices.append(index)
 	tally_item_points.append(points)
+	tally_item_slots.append(slot)
 
 
 ## Forget the tally list (death, or after the tally was paid).
@@ -444,6 +458,7 @@ func clear_tally() -> void:
 	tally_item_ids.clear()
 	tally_item_indices.clear()
 	tally_item_points.clear()
+	tally_item_slots.clear()
 
 
 ## Number of items waiting for the tally.

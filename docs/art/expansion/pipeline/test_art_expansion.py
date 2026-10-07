@@ -288,10 +288,10 @@ class Versus(unittest.TestCase):
         with open(os.path.join(ASSETS, "sprites", "player", "palettes", "hero_palettes.json"), encoding="utf-8") as f:
             pal = json.load(f)
         cs = cells("assets/sprites/objects/spawn_point.png")
-        self.assertEqual(len(cs), 6)
-        for k, name in enumerate(("yellow", "blue", "pink", "green")):
+        self.assertEqual(len(cs), 8)
+        for k, name in ((1, "yellow"), (2, "blue"), (3, "pink"), (4, "green"), (6, "white"), (7, "gold")):
             cloth = pal["palettes"][name]["cloth"].lstrip("#")
-            self.assertIn(tuple(int(cloth[i:i + 2], 16) for i in (0, 2, 4)), colour_set(cs[1 + k]), name)
+            self.assertIn(tuple(int(cloth[i:i + 2], 16) for i in (0, 2, 4)), colour_set(cs[k]), name)
 
     def test_crown_and_stack_pictures_use_the_anchor_outline(self):
         for rel in ("assets/ui/crown.png", "assets/ui/stack_food.png", "assets/sprites/items/golden_drumstick.png"):

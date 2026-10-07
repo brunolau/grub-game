@@ -236,6 +236,36 @@ func test_format_2_entities() -> void:
 	assert_true(validator.has_problem("zones/current speed = 4 must be an integer 1..3"))
 
 
+func test_book2_skins_and_sign_length() -> void:
+	var entities: String = "
+".join(PackedStringArray([
+		"objects/seesaw 3 10 len=5 skin=mushroom",
+		"objects/container 4 10 skin=chest",
+		"objects/platform 5 8 skin=cloud",
+		"objects/drop_platform 6 8 skin=driftwood",
+		"objects/spring 7 10 skin=cap",
+		"objects/drum 8 10 bond=pair skin=cap",
+		"objects/drum 9 10 bond=pair skin=drum",
+		"items/trophy 10 10 skin=roast",
+		"objects/spring 11 10 skin=mushroom",
+		"objects/sign 12 10 text=SIGN_SHORT",
+	]))
+	var validator: LevelValidator = _validator({"skins": _level("skins", "", "", PLAIN_ROWS, entities)
+			.replace("format = 1", "format = 2")})
+	assert_false(validator.has_problem("unknown parameter", LevelValidator.WARNING), _messages(validator))
+	for accepted: String in ["seesaw skin", "container skin", "platform skin", "drop_platform skin", "trophy skin",
+			"drum skin"]:
+		assert_false(validator.has_problem("objects/%s" % accepted) or validator.has_problem("items/%s" % accepted),
+				"%s accepted: %s" % [accepted, _messages(validator)])
+	assert_true(validator.has_problem("objects/spring skin 'mushroom'"), "the spring is a flower or a cap")
+	assert_false(validator.has_problem("sign text 'SIGN_SHORT'", LevelValidator.WARNING))
+	if ResourceLoader.exists(LevelValidator.SIGN_SCRIPT):
+		# An untranslated key is measured as it stands: a long text takes more than three board lines.
+		validator._check_sign_text("skins.lvl", 13, "A very long sign text that goes on and on about clubbing. ".repeat(3))
+		assert_true(validator.has_problem("board lines (at most 3", LevelValidator.WARNING),
+				"a sign longer than three board lines is warned: %s" % _messages(validator))
+
+
 func test_exit_path_rules() -> void:
 	var none: LevelValidator = _validator({"no_exit": _level("no_exit", "", "", PLAIN_ROWS.replace("E", "."))
 			.replace("kind = test", "kind = main")})
@@ -687,3 +717,31 @@ func test_search_helpers() -> void:
 	assert_true(CoopSearch.throw_crosses([Vector2i(56, 224)] as Array[Vector2i], Vector2i(12, 13)))
 	assert_false(CoopSearch.throw_crosses([Vector2i(56, 224)] as Array[Vector2i], Vector2i(4, 2)),
 			"nothing thrown reaches a cell high up behind the thrower")
+
+
+func test_zz_debug_daze() -> void:
+	var rows: PackedStringArray = PackedStringArray()
+	for row: int in 16:
+		rows.append((TileGrid.CH_SOLID_A if row >= 14 else TileGrid.CH_AIR).repeat(30))
+	var searcher: CoopSearch.Searcher = CoopSearch.Searcher.new()
+	assert_true(searcher.build(&"coop_search_daze", {}, TileGrid.from_rows(rows)))
+	var target: EnemyBase = EnemyBase.new()
+	target.set_box(Vector3i(32, 32, 16))
+	target.spawn_setup(Vector2i(240, 224), {})
+	searcher.level.add_child(target)
+	target.max_hp = 99999
+	target.hp = 99999
+	var hero: PlayerBase = searcher.hero
+	target.teleport(Vector2i(240, 224))
+	target.wake()
+	hero.run.reset_energy()
+	hero.respawn_at(Vector2i(240 - 36, 224))
+	hero.facing = 1
+	var flags: PackedInt32Array = CoopSearch._repeat(Defs.IN_UP | Defs.IN_RIGHT, 5) + CoopSearch._repeat(Defs.IN_RIGHT, 30)
+	searcher._flags = flags
+	searcher._first_tick = Sim.tick + 1
+	for t: int in 40:
+		Sim.step(1)
+		print("t%d hero %s y%d st%d tgt %s awake%s onscr%s targ%s bc%d hp%d dead%s" % [t, hero.sim_pos, hero.yvel, hero.state, target.sim_pos, target.awake, target.on_screen, target.is_targetable(), target.bounce_count, hero.run.hearts, hero.dead])
+	target.free()
+	searcher.close()

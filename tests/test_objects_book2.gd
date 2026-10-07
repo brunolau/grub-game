@@ -458,6 +458,25 @@ func test_a_spout_launches_a_standing_hero_once_per_spout() -> void:
 	assert_eq(hero.yvel, Tuning.GEYSER_POWER, "the next spout launches again")
 
 
+func test_a_geyser_over_tar_launches_the_hero_wading_there() -> void:
+	_rows([
+		"....................", "....................", "....................", "....................",
+		"....................", "....................", "....................", "....................",
+		"....................", "....................", "###:::::::##########", "####################",
+	])
+	var geyser: Geyser = _spawn(&"objects/geyser", 5, 9, {"period": 40}) as Geyser
+	var surface: int = 160 + Tuning.TAR_SURFACE_DROP_PX
+	assert_eq(geyser.sim_pos, Vector2i(88, surface), "placed by the loader's rule, the vent sits on the tar surface")
+	assert_eq(geyser.vent_rect(), Rect2i(76, surface - 16, 24, 16))
+	var wader: PlayerBase = _hero(Vector2i(90, surface))
+	_until_spout(geyser)
+	assert_eq(wader.yvel, Tuning.GEYSER_POWER, "a hero wading in the tar is launched (the way out of a tar pit)")
+	var on_rock: Geyser = _spawn(&"objects/geyser", 14, 9) as Geyser
+	assert_eq(on_rock.sim_pos.y, 160, "on level ground nothing moves")
+	var placed_low: Geyser = level.spawn(&"objects/geyser", Vector2i(120, surface)) as Geyser
+	assert_eq(placed_low.sim_pos.y, surface, "a vent placed on the surface itself stays there")
+
+
 func test_gliders_eggs_and_rising_heroes_ignore_a_spout() -> void:
 	_geyser_level()
 	var geyser: Geyser = _spawn(&"objects/geyser", 5, 9, {"period": 40}) as Geyser

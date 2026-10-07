@@ -183,6 +183,9 @@ func test_physics_appendix_c_constant_sheet() -> void:
 	assert_ints_eq([PartyTuning.PULL_IN_BEHIND_PX, PartyTuning.TARGET_HOLD_TICKS, PartyTuning.LONE_KEEP_AWAY_PX,
 		PartyTuning.LONE_CIRCLE_WIDER_PX, PartyTuning.PLATE_WEIGHT_BOULDER, PartyTuning.PULLEY_RANGE_ROWS],
 		[24, 22, 64, 32, 2, 3])
+	# Phase 2 rows (P2.6, asked by world-A and enemies-A): C.13 keep-the-head margin, the count-in spacing of 13.9.3.
+	assert_ints_eq([PartyTuning.CAM_KEEP_HEAD_PX, PartyTuning.COUNT_IN_SPACING_TICKS, PartyTuning.COUNT_IN_BEEPS],
+		[32, 8, 3])
 	# VersusTuning (C.14, GAMEPLAY 13.10 / 13.11).
 	assert_ints_eq([VersusTuning.HURT_TIMER_TICKS, VersusTuning.STUN_HIT_TIMER_MIN], [43, 31])
 	# Set to 43 on the hit tick; the following ticks see 42 .. 31 (12 stunned), then 30 .. 1 (30 immune with control).
@@ -485,5 +488,6 @@ func test_sfx_names_are_unique_and_every_2_0_name_is_listed() -> void:
 		assert_true(effects.has(event), "the 1.0 effect %s is still a Sfx name" % event)
 	for context: StringName in AudioTable.MUSIC:
 		assert_true(music.has(context), "the 1.0 context %s is still a Sfx name" % context)
-	assert_eq(Sfx.EXPANSION_SFX.size(), 33, "the 32 effects of DESIGN.md F.2 and the versus clang (E.2)")
+	assert_eq(Sfx.EXPANSION_SFX.size(), 35,
+			"the 32 effects of DESIGN.md F.2, the versus clang (E.2), the lightning bolt and the round gong (P2.6)")
 	assert_eq(Sfx.EXPANSION_MUSIC.size(), 30)

@@ -1,8 +1,9 @@
 # Club & Grub level file - format 2 (docs/ARCHITECTURE.md 7.11). Test screen of objects-B's versus objects
-# (docs/expansion/PLAN.md P2.7, pulled into phase 1): an arena-shaped single screen (20 x 12, floor row 10, row 0
-# empty) with '@' and objects/spawn_point index=2..4 on the floor and two objects/cookpot on contested ground, mirrored
-# tiers 3 rows apart. It is `kind = test`, not `arena`, so that it never appears in the versus arena list
-# (LevelRegistry.get_arenas); tests/test_objects_versus.gd loads it through the real loader.
+# (docs/expansion/PLAN.md P2.7): an arena-shaped single screen (20 x 12, row 0 empty) with '@' and
+# objects/spawn_point index=2..4, two objects/cookpot on contested ground, mirrored tiers 3 rows apart, the Clubball
+# coconut's drop point in the middle and one pterodactyl crate lane over the whole screen. It is `kind = test`, not
+# `arena`, so that it never appears in the versus arena list (LevelRegistry.get_arenas); tests/test_objects_versus.gd
+# loads it through the real loader.
 
 [meta]
 format = 2
@@ -15,7 +16,7 @@ terrain_b = jungle/terrain
 background = jungle
 music = level_jungle
 author = objects-B
-notes = "objects-B test screen: four spawns and two cookpots (Grub Stack banking), never part of any campaign or arena list."
+notes = "objects-B test screen: four spawns, two cookpots, a coconut and a crate lane; never part of any campaign or arena list."
 
 [legend]
 K = objects/cookpot
@@ -39,5 +40,8 @@ f = items/food index=3
 objects/spawn_point 18 10 index=2
 objects/spawn_point 6 4 index=3
 objects/spawn_point 13 4 index=4
+# The Clubball ball's drop point, and a crate lane: the pterodactyl flies along row 1 over columns 2-17.
+objects/coconut 9 10
+objects/crate_lane 2 1 rect=2,1,16,11
 # A way out like every developer level (the validator's no-exit rule); out of the way on the right upper tier.
 objects/exit 17 4

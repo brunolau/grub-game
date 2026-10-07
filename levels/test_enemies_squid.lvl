@@ -1,0 +1,42 @@
+# Inkjaw's Test Grotto: developer level of enemies-B (PLAN.md P2.2) - the grotto of Inkjaw, the Grotto Squid
+# (DESIGN.md B.3) for tests/test_enemies_squid.gd: the club route of the solo form, the fairness checks and the
+# single-hero search against the co-op form's Tentacle Lock (the test loads this file with `form=coop` on the boss and
+# a second hero at the objects/hero_start marker).
+# One screen: deadly water across the floor, rock islands at columns 2-5, 8-11 and 14-17 (surface row 9), the squid
+# surfaces in the gap 6-7 or 12-13; one-way root ledges at row 6 over the gaps. In phase 3 the middle island sinks and
+# two rafts ride a current over the pool.
+
+[meta]
+format = 2
+id = test_enemies_squid
+name = "Inkjaw's Test Grotto"
+kind = test
+book = 2
+biome = coast
+terrain_a = coast/terrain
+terrain_b = coast/terrain_cave
+background = cave
+music = level_sea_caves
+liquid = water
+author = enemies-B
+
+[legend]
+
+[tiles]
+####################
+#..................#
+#..................#
+#..................#
+#..................#
+#..................#
+#.....--....--.....#
+#..................#
+#.@................#
+#~####~~####~~####~#
+#~####~~####~~####~#
+####################
+
+[entities]
+zones/arena 9 8 name=grotto rect=0,0,20,12 music=boss_inkjaw
+bosses/squid 6 8 arena=grotto
+objects/hero_start 16 8 slot=2

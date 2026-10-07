@@ -1,0 +1,42 @@
+# Club & Grub level file - format 2 (docs/ARCHITECTURE.md 7.11). Idol Court: developer level of enemies-C for the
+# Twin Idols (docs/expansion/PLAN.md P2.3; DESIGN.md B.4, GAMEPLAY.md 13.6): one fixed screen, the Sun Idol in the
+# right wall (the boss record) and the Moon Idol mirrored in the left wall, a 2-row altar block in the middle and a
+# one-way ledge in front of each idol's jaws (a forward strike from the ledge reaches the idle head). Solo: one idol
+# awake, the other asleep and armoured. Played as a co-op game (two heroes) the idols wake as the Twin Hit only in a
+# co-op file (kind = coop); here they keep their solo form. tests/test_enemies_idols.gd builds its own rooms; this
+# file is for visual QA in the windowed game. Not part of any campaign (kind = test).
+
+[meta]
+format = 2
+id = test_enemies_idols
+name = "Idol Court"
+kind = test
+book = 2
+biome = volcano
+terrain_a = volcano/terrain
+terrain_b = volcano/terrain_obsidian
+background = volcano
+music = level_volcano
+author = enemies-C
+notes = "PLAN.md P2.3: the Twin Idols on the shipped colossus sheet (mirrored and tinted until art-B's idol sheets)."
+
+[legend]
+A = items/weapon kind=spear
+
+[tiles]
+####################
+#..................#
+#..................#
+#..................#
+#..................#
+#..................#
+#.....--....--.....#
+#..................#
+#........@A........#
+#.......####.......#
+#.......####.......#
+####################
+
+[entities]
+zones/arena 9 8 name=court rect=0,0,20,12 music=boss_idols
+bosses/idols 18 10 arena=court

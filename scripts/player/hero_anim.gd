@@ -122,10 +122,13 @@ static func is_airborne_pose(hero: Player) -> bool:
 	return hero.jump_ticks > 0 or hero.fall_ticks >= FALL_POSE_TICKS or hero.yvel <= HOP_MAX_RISE_YVEL
 
 
+## (The two-hero performance pass, PLAN.md P2.12: this runs for every hero on every tick, so the small queries are
+## written out - `(glide & 1) != 0` is is_gliding(), `run.has_glider` is is_carrying_glider() - and the frame cycles
+## are computed in place of _cycle(); the pictures are the same.)
 func _choose(hero: Player) -> int:
 	if hero.dead:
 		return Anim.DEATH
-	if hero.is_gliding():
+	if (hero.glide & 1) != 0:
 		return Anim.GLIDE
 	if hero.curl != PlayerBase.CURL_NONE:
 		return Anim.BALL if hero.curl == PlayerBase.CURL_BALL else Anim.CURL
@@ -165,14 +168,15 @@ func _choose_grounded(hero: Player) -> int:
 	if hero.victorious:
 		return Anim.VICTORY
 	# With the hang-glider every ground state except walking runs the crouch handler: show what is held instead.
-	var pose: int = hero.state if hero.is_carrying_glider() else hero.handler
+	var glider: bool = hero.run.has_glider
+	var pose: int = hero.state if glider else hero.handler
 	match pose:
 		Defs.HeroState.WALK:
 			return Anim.WALK
 		Defs.HeroState.CROUCH:
 			return Anim.CROUCH
 		Defs.HeroState.CRAWL:
-			return Anim.CROUCH if hero.is_carrying_glider() else Anim.CRAWL
+			return Anim.CROUCH if glider else Anim.CRAWL
 	if hero.state == Defs.HeroState.CRAWL:
 		return Anim.CROUCH  # entered a crawl too fast: he slides on his knees until slow enough
 	if hero.land_pose > 0:
@@ -185,23 +189,24 @@ func _choose_grounded(hero: Player) -> int:
 
 
 func _frame(hero: Player) -> int:
+	const TPS: int = Tuning.ANIM_TICKS_PER_SECOND
 	match anim:
 		Anim.IDLE:
-			return IDLE_FIRST + _cycle(IDLE_FPS, IDLE_COUNT)
+			return IDLE_FIRST + (clock * IDLE_FPS / TPS) % IDLE_COUNT
 		Anim.PANT:
-			return IDLE_FIRST + _cycle(PANT_FPS, IDLE_COUNT)
+			return IDLE_FIRST + (clock * PANT_FPS / TPS) % IDLE_COUNT
 		Anim.SKID, Anim.LAND:
 			return LAND
 		Anim.WALK:
 			return WALK_FIRST + _walk_step(hero)
 		Anim.JUMP:
-			return JUMP_FIRST + mini(clock * JUMP_FPS / Tuning.ANIM_TICKS_PER_SECOND, JUMP_COUNT - 1)
+			return JUMP_FIRST + mini(clock * JUMP_FPS / TPS, JUMP_COUNT - 1)
 		Anim.FALL:
-			return FALL_FIRST + _cycle(FALL_FPS, FALL_COUNT)
+			return FALL_FIRST + (clock * FALL_FPS / TPS) % FALL_COUNT
 		Anim.CROUCH:
 			return CROUCH
 		Anim.CRAWL:
-			return CRAWL_FIRST + _cycle(CRAWL_FPS, CRAWL_COUNT)
+			return CRAWL_FIRST + (clock * CRAWL_FPS / TPS) % CRAWL_COUNT
 		Anim.STRIKE:
 			if hero.strike_tick >= FORWARD_FOLLOW_TICK:
 				return ATTACK_FOLLOW
@@ -215,17 +220,17 @@ func _frame(hero: Player) -> int:
 		Anim.STRIKE_LOW:
 			return ATTACK_LOW_HIT if hero.strike_tick >= LONG_HIT_TICK else ATTACK_LOW_WINDUP
 		Anim.HURT:
-			return HURT_FIRST + _cycle(HURT_FPS, HURT_COUNT)
+			return HURT_FIRST + (clock * HURT_FPS / TPS) % HURT_COUNT
 		Anim.DEATH:
-			return DEATH_FIRST + _cycle(DEATH_FPS, DEATH_AIR_COUNT)
+			return DEATH_FIRST + (clock * DEATH_FPS / TPS) % DEATH_AIR_COUNT
 		Anim.GLIDE:
-			return GLIDE_FIRST + _cycle(GLIDE_FPS, GLIDE_COUNT)
+			return GLIDE_FIRST + (clock * GLIDE_FPS / TPS) % GLIDE_COUNT
 		Anim.VICTORY:
-			return VICTORY_FIRST + _cycle(VICTORY_FPS, VICTORY_COUNT)
+			return VICTORY_FIRST + (clock * VICTORY_FPS / TPS) % VICTORY_COUNT
 		Anim.CURL:
 			return ROLL_FIRST
 		Anim.BALL:
-			return ROLL_FIRST + _cycle(ROLL_FPS, ROLL_COUNT)
+			return ROLL_FIRST + (clock * ROLL_FPS / TPS) % ROLL_COUNT
 		Anim.CLIMB:
 			return CLIMB_FIRST + (absi(hero.hero_climb.climb_px) / CLIMB_PX_PER_FRAME) % CLIMB_COUNT
 		Anim.RIDE:
@@ -234,7 +239,8 @@ func _frame(hero: Player) -> int:
 
 
 static func _is_strike(handler: int) -> bool:
-	return handler == Defs.HeroState.STRIKE or handler == Defs.HeroState.HIGH_STRIKE 			or handler == Defs.HeroState.LOW_STRIKE
+	return handler == Defs.HeroState.STRIKE or handler == Defs.HeroState.HIGH_STRIKE \
+			or handler == Defs.HeroState.LOW_STRIKE
 
 
 ## Looping frame index of the current animation at `fps`.

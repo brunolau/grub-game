@@ -210,6 +210,149 @@ func test_a_shellback_is_a_guard_alone_and_turns_every_tick_in_a_coop_party() ->
 	assert_eq(plain.coop_traits().kind, Defs.CoopTrait.BOND, "a level's coop= replaces the preset's trait")
 
 
+func test_the_guard_swings_after_its_body_hurt_a_hero() -> void:
+	var guard: Guard = _enemy(&"enemies/guard", Vector2i(200, 160), {"speed": 0}) as Guard
+	_hero.teleport(Vector2i(150, 160))
+	Sim.step(2)
+	guard.on_hurt_hero(_hero)
+	assert_true(guard.stole_heart)
+	var frames: Array[int] = []
+	for tick: int in EnemyTuning.GUARD_SWING_TICKS:
+		Sim.step(1)
+		assert_eq(guard._anim_role, &"attack", "the swing (tick %d)" % tick)
+		var frame: int = (guard.get_node(^"Sprite") as Sprite2D).frame
+		if frames.is_empty() or frames.back() != frame:
+			frames.append(frame)
+	assert_true(frames.size() >= 4, "it runs through its attack frames (%s)" % [frames])
+	Sim.step(1)
+	assert_eq(guard._anim_role, &"idle", "then it stands again")
+
+
+# =================================================================================================================
+# Mimic
+# =================================================================================================================
+
+func test_the_mimic_is_a_chest_that_shudders_then_bites() -> void:
+	var mimic: Mimic = _enemy(&"enemies/mimic", Vector2i(200, 160)) as Mimic
+	assert_eq(mimic.skin, "mimic")
+	var sprite: Sprite2D = mimic.get_node(^"Sprite")
+	assert_eq(sprite.texture.resource_path, EnemySkin.ENEMY_DIR + "mimic.png", "the sheet built from the chest")
+	assert_eq(Vector2i(mimic.box_w, mimic.box_h), EnemyTuning.MIMIC_BOX)
+	assert_eq(mimic.score_index, EnemyTuning.SCORE_MIMIC)
+	assert_eq(mimic.reach, EnemyTuning.SNAPPER_RANGE, "the snapper's bite")
+	_hero.teleport(Vector2i(100, 160))
+	Sim.step(3)
+	assert_eq(mimic.facing, -1, "it faces the hero")
+	assert_eq(sprite.frame, 0, "closed")
+	_hero.teleport(Vector2i(180, 160 - 40))
+	Sim.step(2)
+	assert_eq(mimic.get_state(), Snapper.State.IDLE, "a hero above it (a jump over) does not wake it")
+	_hero.teleport(Vector2i(200 - EnemyTuning.MIMIC_SENSE_PX, 160))
+	Sim.step(1)
+	assert_eq(mimic.get_state(), Snapper.State.WINDUP, "within 32 px on its floor: it shudders")
+	assert_eq(mimic._anim_role, &"shudder")
+	var shudder: int = 1
+	while mimic.get_state() == Snapper.State.WINDUP and shudder < 40:
+		Sim.step(1)
+		if mimic.get_state() == Snapper.State.WINDUP:
+			shudder += 1
+		assert_eq(Game.hearts, Tuning.ENERGY_START, "the shudder is only a telegraph")
+	assert_eq(shudder, EnemyTuning.MIMIC_SHUDDER_TICKS, "for 10 ticks")
+	assert_eq(mimic.get_state(), Snapper.State.BITE)
+	var bitten: int = -1
+	for tick: int in 10:
+		Sim.step(1)
+		if Game.hearts < Tuning.ENERGY_START:
+			bitten = tick
+			break
+	assert_true(bitten >= 0, "then it bites")
+	assert_true(sprite.frame >= 4 and sprite.frame <= 6, "on its fangs frames (%d)" % sprite.frame)
+	assert_true(mimic.stole_heart)
+
+
+func test_the_mimic_glances_in_front_and_a_head_bounce_dazes_it() -> void:
+	var mimic: Mimic = _enemy(&"enemies/mimic", Vector2i(200, 160), {"hp": 100}) as Mimic
+	_hero.teleport(Vector2i(140, 160))
+	Sim.step(2)
+	assert_eq(mimic.facing, -1)
+	var sparks: int = _count_fx(&"fx/hit_stars")
+	assert_true(mimic.take_hit(25, _hero))
+	assert_eq(mimic.hp, 100, "a strike into its face glances")
+	assert_eq(_count_fx(&"fx/hit_stars"), sparks + 1, "with the clank and spark")
+	_hero.teleport(Vector2i(260, 160))
+	mimic.take_hit(25, _hero)
+	assert_eq(mimic.hp, 75, "from behind it counts")
+	var into_face: ProjectileBase = _shot(Vector2i(150, 150), 208)
+	mimic.take_hit(20, into_face)
+	assert_eq(mimic.hp, 75, "a throw into its face glances too")
+	_hero.teleport(Vector2i(185, 160))
+	mimic.on_bounced(_hero)
+	assert_eq(mimic.get_dazed(), EnemyTuning.MIMIC_DAZE_TICKS, "a head bounce dazes it")
+	Sim.step(1)
+	assert_eq(mimic._anim_role, &"dizzy")
+	mimic.take_hit(25, _hero)
+	assert_eq(mimic.hp, 50, "dazed, any hit counts")
+	Sim.step(EnemyTuning.MIMIC_DAZE_TICKS - 2)
+	assert_eq(Game.hearts, Tuning.ENERGY_START, "dazed, it does not bite the hero beside it")
+	assert_eq(mimic.get_state(), Snapper.State.REST)
+	Sim.step(1)
+	assert_eq(mimic.get_dazed(), 0)
+	mimic.take_hit(25, _hero)
+	assert_eq(mimic.hp, 50, "the daze is over: the front glances again")
+
+
+func test_the_mimic_throws_out_its_contents() -> void:
+	var mimic: Mimic = _enemy(&"enemies/mimic", Vector2i(200, 160)) as Mimic
+	var custom: Mimic = _enemy(&"enemies/mimic", Vector2i(260, 160), {"contents": "food:3,heart"}) as Mimic
+	Sim.step(2)
+	assert_eq(_of_scene(Defs.Kind.COLLECTIBLE, &"items/treasure").size(), 0)
+	mimic.kill(&"weapon", _hero)
+	assert_eq(_of_scene(Defs.Kind.COLLECTIBLE, &"items/treasure").size(), 1, "a treasure by default")
+	custom.kill(&"weapon", _hero)
+	assert_eq(_of_scene(Defs.Kind.COLLECTIBLE, &"items/food").size(), 1)
+	assert_eq(_of_scene(Defs.Kind.COLLECTIBLE, &"items/heart").size(), 1, "every token of its contents")
+	custom.kill(&"weapon", _hero)
+	assert_eq(_of_scene(Defs.Kind.COLLECTIBLE, &"items/food").size(), 1, "once")
+
+
+func test_a_waiting_mimic_is_drawn_as_the_chest_and_mirrors_once_revealed() -> void:
+	var mimic: Mimic = _enemy(&"enemies/mimic", Vector2i(200, 160)) as Mimic
+	var sprite: Sprite2D = mimic.get_node(^"Sprite")
+	_hero.teleport(Vector2i(100, 160))
+	Sim.step(2)
+	assert_eq(mimic.facing, -1)
+	assert_false(sprite.flip_h, "waiting, it is the chest container's closed chest: never mirrored ...")
+	assert_eq(sprite.offset, Vector2(-40, -40), "... at its feet point")
+	assert_eq(sprite.frame, 0)
+	_hero.teleport(Vector2i(200 - EnemyTuning.MIMIC_SENSE_PX, 160))
+	Sim.step(2)
+	assert_eq(mimic.get_state(), Snapper.State.WINDUP)
+	assert_true(sprite.flip_h, "revealed, it faces the hero on its left")
+	assert_true(sprite.offset.x == -40.0 or sprite.offset.x == -39.0, "about its feet point (and rattling)")
+
+
+func test_in_a_party_the_mimic_faces_the_nearer_hero_and_shows_its_back_to_the_far_one() -> void:
+	Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.COOP, 2)
+	Game.begin_level(&"test")
+	_flat_level(60, 16, 10)
+	var p2: PlayerBase = PlayerBase.new()
+	place(_level, p2, Vector2i(300, 160), {"slot": 1})
+	p2.respawn_at(Vector2i(300, 160))
+	var mimic: Mimic = _enemy(&"enemies/mimic", Vector2i(200, 160), {"hp": 100}) as Mimic
+	assert_null(mimic.coop_traits(), "no trait: a solo joke stays a solo joke")
+	_hero.teleport(Vector2i(150, 160))
+	Sim.step(2)
+	assert_eq(mimic.facing, -1, "it faces the nearer hero")
+	_hero.teleport(Vector2i(100, 160))
+	p2.teleport(Vector2i(250, 160))
+	Sim.step(1)
+	assert_eq(mimic.facing, 1, "it turns to whoever is nearer")
+	mimic.take_hit(25, p2)
+	assert_eq(mimic.hp, 100, "the near hero is in front")
+	mimic.take_hit(25, _hero)
+	assert_eq(mimic.hp, 75, "the far hero hits its back")
+
+
 # =================================================================================================================
 # The rattler
 # =================================================================================================================
@@ -244,6 +387,7 @@ func test_the_canyon_level_names_the_world_5_enemies() -> void:
 	assert_true(records["R"] is Roller)
 	assert_true(records["G"] is Guard)
 	assert_true(records["K"] is Shellback)
+	assert_true(records["M"] is Mimic)
 	assert_eq((records["N"] as EnemyBase).skin, "snake")
 	assert_eq(_level.grid.get_char(48, 7), TileGrid.CH_SOLID_A, "the Guard's hall has a roof ...")
 	for row: int in range(8, 12):

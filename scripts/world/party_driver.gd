@@ -9,12 +9,16 @@ extends SimEntity
 ## line of this file. Everything is integer and deterministic: no signal, no listener, no randomness.
 ##
 ## Per tick (each step runs after every hero's own step of the phase):
-##  - WEAPONS: the co-op edge walls (C.13) - every hatched hero is fenced into LevelBase.get_edge_walls() for this
-##    tick's x commit (PlayerBase.fence_x; rafts intersect their rails later in PLATFORMS).
+##  - WEAPONS: who is ACTIVE ([method is_active]); the co-op edge walls (C.13) - every hatched hero is fenced into
+##    LevelBase.get_edge_walls() for this tick's x commit (PlayerBase.fence_x; rafts intersect their rails later in
+##    PLATFORMS).
 ##  - PLAYER (after every hero moved): (a) the Totem Ride carry of every rider, (b) new head contacts in slot order -
 ##    Shoulder Hop, ride start, hatch by a stomp (C.10, C.12 b). The rules of both live on the hero
 ##    (PlayerBase.carry_totem / land_on_partner, player-A: the rider's drop and a hurt carrier's throw-off too); the
-##    driver only decides who meets whom and when.
+##    driver only decides who meets whom and when. **An egg is no springboard** (orchestrator resolution after G1):
+##    the stomp that hatches an egg bounces Tuning.BOUNCE_YVEL (-64), UP held or not (the hero's rule), and a hero
+##    holding UP meets only an ACTIVE partner's head - the full Shoulder Hop never comes from an egg nor from the idle
+##    body that pops out of one.
 ##  - POST: rides whose rider or carrier left the tribe end; the leash (C.13: a hero off the authentic view becomes an egg after
 ##    PartyTuning.leash_egg_ticks); the egg drift, the owner's nudge, the clamp into the view and the Expert return
 ##    (C.12); the team wipe of a party whose last hatched hero became an egg without a death toss.
@@ -39,6 +43,9 @@ var egg_ticks: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 var exit_mask: int = 0
 ## True from a team wipe the driver started until the level reset that follows it.
 var wipe_pending: bool = false
+## Bit per slot: the hero is ACTIVE - hatched, and his own slot held some input flag since he last became hatched
+## (the level start, a team-wipe respawn, a hatch). Going down (an egg, a death toss) clears it. See [method is_active].
+var active_mask: int = 0
 
 ## Relay Bounce: enemy instance id -> slot of the hero who bounced on it last.
 var _relay_last: Dictionary = {}
@@ -60,6 +67,7 @@ func _sim_tick(phase: int) -> void:
 		return
 	match phase:
 		Defs.Phase.WEAPONS:
+			_update_active(level)
 			_fence_edge_walls(level)
 		Defs.Phase.PLAYER:
 			_carry_riders(level)
@@ -74,6 +82,7 @@ func _on_level_reset() -> void:
 	egg_ticks.fill(0)
 	_relay_last.clear()
 	wipe_pending = false
+	active_mask = 0
 
 
 # =================================================================================================================
@@ -93,6 +102,30 @@ func carrier_of(rider: PlayerBase) -> PlayerBase:
 ## The hero standing on `carrier`'s head (Totem Ride), null when none.
 func rider_of(carrier: PlayerBase) -> PlayerBase:
 	return carrier.totem_rider if carrier != null else null
+
+
+## True when `hero` is ACTIVE: hatched (in H) and his own slot held some input flag (GameInput.get_flags) on a tick
+## since he last became hatched - the level start, a team-wipe respawn or a hatch. Only an active partner's head gives
+## the full Shoulder Hop (G1 resolution: the egg and the idle body that pops out of it are no springboard); an idle
+## partner still carries a Totem Ride (a still carrier's 98 px are below every boost ledge).
+func is_active(hero: PlayerBase) -> bool:
+	return is_in_tribe(hero) and (active_mask & (1 << clampi(hero.slot, 0, Defs.MAX_PLAYERS - 1))) != 0
+
+
+## WEAPONS (and POST, without the input): a hero down or in his toss is inactive; a hatched hero becomes active on the
+## first tick his slot holds any input flag. Every hatch the driver makes clears the bit too ([method _deactivate]),
+## so an egg made and hatched inside one tick still pops out inactive.
+func _update_active(level: LevelBase, with_input: bool = true) -> void:
+	for hero: PlayerBase in level.contact_order():
+		if not is_in_tribe(hero):
+			_deactivate(hero)
+		elif with_input and GameInput.get_flags(hero.slot) != 0:
+			active_mask |= 1 << clampi(hero.slot, 0, Defs.MAX_PLAYERS - 1)
+
+
+func _deactivate(hero: PlayerBase) -> void:
+	if hero != null:
+		active_mask &= ~(1 << clampi(hero.slot, 0, Defs.MAX_PLAYERS - 1))
 
 
 ## The first other hero of the party (slot order) who is alive and hatched, null when none: the partner an egg drifts
@@ -143,6 +176,7 @@ func weapon_pass(hero: PlayerBase) -> void:
 		var egg: PlayerBase = _egg_under(level, hero, shot.sim_pos.x, shot.sim_pos.y, shot.box_w, shot.box_h,
 				shot.box_xo)
 		if egg != null:
+			_deactivate(egg)
 			egg.hatch(hero, hearts)
 			egg_ticks[clampi(egg.slot, 0, egg_ticks.size() - 1)] = 0
 			shot.consume()
@@ -158,6 +192,7 @@ func weapon_pass(hero: PlayerBase) -> void:
 		return
 	var egg: PlayerBase = _egg_under(level, hero, origin_x, box.end.y, box.size.x, box.size.y, hero.club_box_xo)
 	if egg != null:
+		_deactivate(egg)
 		egg.hatch(hero, hearts)
 		egg_ticks[clampi(egg.slot, 0, egg_ticks.size() - 1)] = 0
 		hero.club_box_active = false
@@ -232,6 +267,9 @@ func _carry_riders(level: LevelBase) -> void:
 
 ## Step (b): new head contacts, every hero A in slot order against every other hero B in slot order, at most one per
 ## hero and tick (PlayerBase.land_on_partner tests A's conditions and the stomp contact, then hops, rides or hatches).
+## An egg is no springboard (G1 resolution): a hatch by a stomp bounces Tuning.BOUNCE_YVEL (-64) whatever UP does
+## (the hero side's rule, PlayerBase.land_on_partner), and A holding UP meets no hatched B that is not ACTIVE
+## ([method is_active]): no Shoulder Hop off the idle body that pops out of an egg; A passes through as heroes do.
 func _head_contacts(level: LevelBase) -> void:
 	var order: Array[PlayerBase] = level.contact_order()
 	for a: PlayerBase in order:
@@ -240,6 +278,11 @@ func _head_contacts(level: LevelBase) -> void:
 		for b: PlayerBase in order:
 			if b == a or b.dead:
 				continue
+			var egg: bool = b.is_down()
+			if not egg and a.holds_up() and not is_active(b):
+				continue
+			if egg:
+				_deactivate(b)
 			var result: int = a.land_on_partner(b)
 			if result == PlayerBase.HEAD_HATCH:
 				egg_ticks[clampi(b.slot, 0, egg_ticks.size() - 1)] = 0
@@ -270,6 +313,7 @@ func _post(level: LevelBase) -> void:
 	if not level.completed:
 		_leash(level, order)
 		_eggs(level, order)
+	_update_active(level, false)
 	_wipe_check(level, order)
 
 
@@ -360,6 +404,7 @@ func _make_egg(level: LevelBase, hero: PlayerBase, cause: StringName, at: Vector
 		end_ride(rider)
 	if hero.totem_carrier != null:
 		end_ride(hero)
+	_deactivate(hero)
 	hero.go_down(cause)
 	hero.teleport(clamp_egg(at, level.get_party_frame()))
 	egg_ticks[clampi(hero.slot, 0, egg_ticks.size() - 1)] = 0
@@ -456,6 +501,7 @@ func travel_party(user: PlayerBase, from_pos: Vector2i, to_pos: Vector2i) -> voi
 		hero.xvel = 0
 		hero.yvel = 0
 		if hero.is_down() or far:
+			_deactivate(hero)
 			if not hero.is_down():
 				hero.go_down(&"gate")
 				egg_ticks[clampi(hero.slot, 0, egg_ticks.size() - 1)] = 0
@@ -474,6 +520,7 @@ func hatch_all(by: PlayerBase) -> int:
 	var count: int = 0
 	for hero: PlayerBase in level.contact_order():
 		if hero.is_down() and not hero.dead:
+			_deactivate(hero)
 			hero.hatch(by, PartyTuning.hatch_hearts(Game.difficulty))
 			egg_ticks[clampi(hero.slot, 0, egg_ticks.size() - 1)] = 0
 			count += 1

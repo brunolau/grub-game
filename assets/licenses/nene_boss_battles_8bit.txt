@@ -1,0 +1,86 @@
+Boss Battle #1 - #6 [8-bit]
+===========================
+
+Author: nene
+Source: https://opengameart.org/content/boss-battle-1-8-bit-re-upload
+Licence: CC0 1.0 (tier A)
+Used in Club & Grub for: 2.0 (The Far Shore): audio/music/boss_chieftains_a.ogg, audio/music/boss_inkjaw_a.ogg, audio/music/boss_mangrove_a.ogg, audio/music/boss_roc_a.ogg, audio/music/boss_tusker_a.ogg. Per-file sources and edits: docs/ASSET_MANIFEST.md section 17
+Staging folder: .tools/asset_candidates/expansion/audio/nene_boss-battles-8bit
+Page: Boss Battle #1 [8-bit re-upload] - https://opengameart.org/content/boss-battle-1-8-bit-re-upload
+Page: Boss Battle #2 [8-bit Re-upload] - https://opengameart.org/content/boss-battle-2-8-bit-re-upload
+Page: Boss Battle #3 [8-bit re-upload] - https://opengameart.org/content/boss-battle-3-8-bit-re-upload
+Page: Boss Battle #4 [8-bit re-upload] - https://opengameart.org/content/boss-battle-4-8-bit-re-upload
+Page: Boss Battle #6 [8-bit] - https://opengameart.org/content/boss-battle-6-8-bit
+
+---- Licence evidence recorded when the pack was downloaded ----
+
+# LICENSE_INFO - nene - Boss Battle #1 - #6 [8-bit]
+
+- **Author:** nene (OpenGameArt user 'nene')
+- **License:** CC0 1.0  (tier A)
+- **Date checked / downloaded:** 2026-10-06
+- **Source page(s) (saved copies in `../_pages/oga_<slug>.html`):**
+  - https://opengameart.org/content/boss-battle-1-8-bit-re-upload
+  - https://opengameart.org/content/boss-battle-2-8-bit-re-upload
+  - https://opengameart.org/content/boss-battle-3-8-bit-re-upload
+  - https://opengameart.org/content/boss-battle-4-8-bit-re-upload
+  - https://opengameart.org/content/boss-battle-5-8-bit
+  - https://opengameart.org/content/boss-battle-6-8-bit
+- **Download URL(s)** (every file attached to the page; the ones fetched are marked):
+  - https://opengameart.org/sites/default/files/Boss%20Battle%20%231%20V1.wav (fetched, transcoded to ogg_converted/, WAV deleted)
+  - https://opengameart.org/sites/default/files/Boss%20Battle%20%231%20V2.wav (not fetched)
+  - https://opengameart.org/sites/default/files/Boss%20Battle%20%232%20V1.wav (fetched, transcoded to ogg_converted/, WAV deleted)
+  - https://opengameart.org/sites/default/files/Boss%20Battle%20%232%20V2.wav (not fetched)
+  - https://opengameart.org/sites/default/files/Boss%20Battle%20%233%20V1.wav (fetched, transcoded to ogg_converted/, WAV deleted)
+  - https://opengameart.org/sites/default/files/Boss%20Battle%20%233%20V2.wav (not fetched)
+  - https://opengameart.org/sites/default/files/Boss%20Battle%20%233%20V3.wav (fetched)
+  - https://opengameart.org/sites/default/files/Boss%20Battle%20%234%20V1.wav (fetched, transcoded to ogg_converted/, WAV deleted)
+  - https://opengameart.org/sites/default/files/Boss%20Battle%20%234%20V2_0.wav (not fetched)
+  - https://opengameart.org/sites/default/files/Boss%20Battle%20%23%205%20V1.wav (fetched)
+  - https://opengameart.org/sites/default/files/Boss%20Battle%20%235%20V2.wav (not fetched)
+  - https://opengameart.org/sites/default/files/Boss_Battle_5.mid (fetched)
+  - https://opengameart.org/sites/default/files/Boss%20Battle%206%20V1.wav (fetched, transcoded to ogg_converted/, WAV deleted)
+  - https://opengameart.org/sites/default/files/Boss%20Battle%206%20V2.wav (not fetched)
+  - https://opengameart.org/sites/default/files/Boss%20Battle%206.mid (fetched)
+
+## Exact licence wording (quoted from the source)
+
+> https://opengameart.org/content/boss-battle-1-8-bit-re-upload - page title "Boss Battle #1 [8-bit re-upload]", author "nene", posted Wednesday, May 16, 2018 - 10:27
+>
+> License(s): CC0
+>
+> Description: "Re-upload! Including two versions, both are loopable."
+
+> https://opengameart.org/content/boss-battle-2-8-bit-re-upload - page title "Boss Battle #2 [8-bit Re-upload]", author "nene", posted Wednesday, May 16, 2018 - 10:32
+>
+> License(s): CC0
+>
+> Description: "Re-upload! Includes two versions, both are loopable. P.S. The other Boss Battle #2 is in removal condition, it's been so for long time. This new upload includes two versions."
+
+> https://opengameart.org/content/boss-battle-3-8-bit-re-upload - page title "Boss Battle #3 [8-bit re-upload]", author "nene", posted Wednesday, May 16, 2018 - 10:38
+>
+> License(s): CC0
+>
+> Description: "Re-upload! Includes three versions, all are loopable."
+
+> https://opengameart.org/content/boss-battle-4-8-bit-re-upload - page title "Boss Battle #4 [8-bit re-upload]", author "nene", posted Wednesday, May 16, 2018 - 10:41
+>
+> License(s): CC0
+>
+> Description: "Re-upload! Includes two versions, both are loopable"
+
+> https://opengameart.org/content/boss-battle-5-8-bit - page title "Boss Battle #5 [8-bit]", author "nene", posted Friday, May 18, 2018 - 15:32
+>
+> License(s): CC0
+>
+> Description: "New stuff! Two versions, as always and midi."
+
+> https://opengameart.org/content/boss-battle-6-8-bit - page title "Boss Battle #6 [8-bit]", author "nene", posted Wednesday, June 19, 2019 - 14:05
+>
+> License(s): CC0
+>
+> Description: "Man I love composing boss battle musics... Two versions and midi file."
+
+---- Licence ----
+
+CC0 1.0 Universal: the full legal code ships as cc0_1.0_legal_code.txt in this folder.

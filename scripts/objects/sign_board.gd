@@ -5,30 +5,47 @@ extends SimEntity
 ##
 ## The rule (when the text shows) is the objects module's and runs in the tick; how it looks is the ui module's: the
 ## board is the menu panel (`ui/panel.png`, nine-patch) with a wooden tail that points down at the sign, and the
-## text is set like the in-level hint panel of the HUD (HUD face in cream, the same line spacing and balanced
-## wrapping, the same fade). The board lives in the world, so it has no safe-area margins; it is kept inside the
-## view and below the HUD row, so a sign near an edge of the view stays readable.
+## text is set like the in-level hint panel of the HUD (HUD face in cream, balanced wrapping, the same fade; 2.0: a
+## tighter line spacing). The board lives in the world, so it has no safe-area margins; it is kept inside the view
+## and below the HUD row, so a sign near an edge of the view stays readable.
 ##
 ## Read time (presentation only, the tick rule is unchanged): once shown, a board stays at least READ_SECONDS, and
 ## LINGER_SECONDS after the hero left the sign, while the sign is in or near the view (the board waits at the view's
 ## edge when the camera pages on) - a hero walking past at full speed overlaps it for half a second. The level's
 ## intro banner gives way to a board that appears under it (Hud.dismiss_intro()), so the first sign of a stage is
 ## never hidden by the stage name.
-## One board at a time (2.0, G1 verification): the board a hero came to last is in front; any other board - held for
-## its read time or read by the partner - fades out while it shows, so two boards never cover each other (co-op signs
-## stand a few columns apart). A board over the HUD's co-op P2 panel stays below it.
-## A board that would have to come down over the heads of the heroes at the sign (a sign near the top of the view)
-## hangs under the sign instead, its tail pointing up.
+##
+## 2.0 (G1 follow-up; presentation only, the tick rule and the digest are untouched):
+## - **One board at a time**: the board a hero came to last is in front; any other board - held for its read time or
+##   read by the partner - fades out while it shows, so two boards never cover each other (co-op signs stand a few
+##   columns apart). When the front board's reader has left, a board a hero still stands at comes back to the front.
+## - **Never over a hero or the HUD**: a board tries the places of [enum Place] in order - above the sign centred on
+##   it, above it shifted left or right (the tail still points at the sign from near the board's corner), then
+##   hanging under the sign (centred, left, right; the tail points up) - and takes the first whose rectangle keeps
+##   clear of every hero's body (grown by HERO_ROOM; eggs too). It keeps its place while that stays clear, and moves
+##   only after a hero stayed behind it for MOVE_SECONDS (a hero jumping through it does not make it jump about);
+##   while a hero is behind it the board fades to COVER_ALPHA, so he shows through. When no place keeps clear (heroes
+##   above and below the sign) it stays where it covers the least, translucent. Its top edge never goes above the HUD
+##   row (Hud.get_row_bottom(), so the larger safe area of a phone counts) or the boss bar during a fight, and the
+##   board and its tail keep clear of the HUD's party panels (Hud.get_party_panel_rects(): P2's co-op panel under the
+##   letters, the versus corners). [method plan_board] is the pure geometry of it.
+## - **Small boards**: tight padding and line spacing; a sign's text should take at most MAX_LINES lines of the board
+##   (LEVEL_DESIGN.md 15: about 60 characters); [method text_lines] measures a text the way the board wraps it.
+
+## The places a board tries, in this order (see the class comment).
+enum Place { ABOVE, ABOVE_LEFT, ABOVE_RIGHT, BELOW, BELOW_LEFT, BELOW_RIGHT }
 
 ## Widest text line (art px) and the room around the text inside the board.
 const TEXT_MAX_W: float = 360.0
-const PAD_X: int = 14
-const PAD_Y: int = 10
-const LINE_SPACING: int = 4
+const PAD_X: int = 12
+const PAD_Y: int = 6
+const LINE_SPACING: int = 2
+## Most lines a sign's text should take on its board (designers' rule, LEVEL_DESIGN.md 15).
+const MAX_LINES: int = 3
 ## Lowest edge of the board above the feet point (art px): with the tail under it, clear of the hero's head.
 const BOARD_BOTTOM_ART: float = -90.0
-## Distance the board keeps from the left / right edge of the view, and the top edge it never goes above (under
-## the HUD row of lives, hearts and letters), view px.
+## Distance the board keeps from the left / right / bottom edge of the view, and the top edge it never goes above
+## (under the HUD row of lives, hearts and letters; the HUD's own row height wins when it is lower), view px.
 const VIEW_EDGE: float = 8.0
 const VIEW_TOP: float = 56.0
 ## Fade in / out, like the HUD's hint panel.
@@ -41,12 +58,17 @@ const HOLD_MARGIN: float = 200.0
 ## Top edge of the board while a boss bar shows under the hearts (view px): the board stays below the bar, and a
 ## held board gives way to the fight.
 const VIEW_TOP_BOSS: float = 96.0
-## Gap kept under the HUD's co-op P2 panel by a board that lies under it (view px).
+## Gap a board and its tail keep from the HUD's party panels and the boss bar (view px).
 const P2_PANEL_GAP: float = 4.0
-## A board whose bottom edge would come lower than this above the feet point (art px) covers the reader's head: it
-## hangs this far under the feet point instead (art px), when it fits into the view there.
-const HEAD_ART: float = 80.0
+## Top edge of a board hanging under its sign, below the sign's feet point (art px).
 const BOARD_BELOW_ART: float = 14.0
+## Room a board keeps around every hero's body (view px), how long a hero may stay behind a board before it moves
+## to a clear place (seconds), and its alpha while a hero is behind it.
+const HERO_ROOM: float = 6.0
+const MOVE_SECONDS: float = 0.25
+const COVER_ALPHA: float = 0.35
+## Most px the top limit is probed below VIEW_TOP for the HUD row's bottom edge, from a HUD without get_row_bottom().
+const ROW_PROBE_MAX: int = 64
 ## Colours of ui/panel.png's edge: outline, rim and face. The tail is drawn with them.
 const COL_EDGE: Color = Color8(46, 39, 31)
 const COL_RIM: Color = Color8(108, 61, 40)
@@ -72,9 +94,21 @@ var _boss_bar: bool = false
 ## Presentation: a hero was at the board on the last frame; the board in front (the one a hero came to last).
 var _was_near: bool = false
 static var _front: SignBoard = null
-## Presentation: the board hangs under the sign (no room above it); the HUD's co-op P2 panel (empty = none).
+## Presentation: the board hangs under the sign; its place (a Place, -1 = not placed since it appeared); seconds a
+## hero has been behind it while a clear place waits; true while a hero is behind it.
 var _flipped: bool = false
-var _p2_rect: Rect2 = Rect2()
+var _place: int = -1
+var _cover_for: float = 0.0
+var _covering: bool = false
+
+
+## A place of a board: which [enum Place], its rectangle (view px) and how much of the heroes' bodies it covers
+## (view px squared; 0 = clear). See [method plan_board].
+class BoardPlace:
+	extends RefCounted
+	var place: int = 0
+	var rect: Rect2 = Rect2()
+	var covered: float = 0.0
 
 
 func _init() -> void:
@@ -145,19 +179,16 @@ func _can_doze() -> bool:
 	return not _near
 
 
-## Presentation only: fade the board, hold it for the read time, keep it inside the view.
+## Presentation only: fade the board, hold it for the read time, keep it inside the view and clear of the heroes.
 func _process(delta: float) -> void:
 	if _label == null or not _label.visible:
 		_shown_for = 0.0
+		_place = -1
 		return
 	var hud: Node = get_tree().get_first_node_in_group(Defs.GROUP_HUD)
 	if _shown_for == 0.0 and hud != null and hud.has_method(&"dismiss_intro"):
 		hud.call(&"dismiss_intro")
 	_boss_bar = hud != null and hud.has_method(&"is_boss_bar_visible") and bool(hud.call(&"is_boss_bar_visible"))
-	_p2_rect = Rect2()
-	var panel: Control = hud.get(&"_p2_panel") as Control if hud != null else null
-	if panel != null and panel.is_visible_in_tree():
-		_p2_rect = panel.get_global_rect()
 	_shown_for += delta
 	_away_for = 0.0 if _near else _away_for + delta
 	var front_valid: bool = is_instance_valid(_front) and _front.is_inside_tree()
@@ -168,13 +199,14 @@ func _process(delta: float) -> void:
 	var held: bool = (_shown_for < READ_SECONDS or _away_for < LINGER_SECONDS) and _sign_in_view() and not _boss_bar
 	var behind: bool = front_valid and _front != self and _front.is_board_shown()
 	var wanted: bool = (_near or held) and not behind
-	_alpha = move_toward(_alpha, 1.0 if wanted else 0.0, delta / FADE_SECONDS)
+	_place_board(hud, delta)
+	var shown: float = COVER_ALPHA if _covering else 1.0
+	_alpha = move_toward(_alpha, shown if wanted else 0.0, delta / FADE_SECONDS)
 	_label.modulate.a = _alpha
 	if _alpha <= 0.0 and not wanted:
 		_label.visible = false
 		_shown_for = 0.0
-		return
-	_place_board()
+		_place = -1
 
 
 ## True while the sign is inside the view or less than HOLD_MARGIN beyond its edge: the camera pages ahead of a
@@ -202,36 +234,178 @@ func _board_style() -> StyleBoxTexture:
 	return style
 
 
-## Centre the board over the sign, then move it inside the view (left / right edge, below the HUD row).
-func _place_board() -> void:
+## Put the board at its place (see the class comment): the place it has while that keeps clear of the heroes, else
+## the first clear one once a hero stayed behind it for MOVE_SECONDS (at once when it has no place yet). Sets
+## `_covering` while a hero is behind the board.
+func _place_board(hud: Node, delta: float) -> void:
 	var canvas: Transform2D = get_global_transform_with_canvas()
-	var scale_x: float = maxf(absf(canvas.get_scale().x), 0.001)
-	var scale_y: float = maxf(absf(canvas.get_scale().y), 0.001)
+	var zoom: Vector2 = Vector2(maxf(absf(canvas.get_scale().x), 0.001), maxf(absf(canvas.get_scale().y), 0.001))
 	var origin: Vector2 = canvas.origin
 	var view: Vector2 = get_viewport_rect().size
-	var board: Vector2 = _label.size * Vector2(scale_x, scale_y)
-	var left: float = origin.x - board.x * 0.5
-	left = clampf(left, VIEW_EDGE, maxf(VIEW_EDGE, view.x - VIEW_EDGE - board.x))
-	var limit: float = VIEW_TOP_BOSS if _boss_bar else VIEW_TOP
-	if _p2_rect.size.x > 0.0 and left < _p2_rect.end.x and left + board.x > _p2_rect.position.x:
-		limit = maxf(limit, _p2_rect.end.y + P2_PANEL_GAP)
-	var top: float = maxf(origin.y + BOARD_BOTTOM_ART * scale_y - board.y, limit)
-	var flip: bool = false
-	if top + board.y > origin.y - HEAD_ART * scale_y:
-		var below: float = origin.y + BOARD_BELOW_ART * scale_y
-		if below + board.y <= view.y - VIEW_EDGE:
-			top = below
-			flip = true
-	var target: Vector2 = Vector2(roundf((left - origin.x) / scale_x), roundf((top - origin.y) / scale_y))
+	var board: Vector2 = _label.size * zoom
+	var top: float = _top_limit(hud)
+	var panels: Array[Rect2] = _panel_rects(hud)
+	var bodies: Array[Rect2] = hero_bodies()
+	var plan: BoardPlace = plan_board(origin, board, view, zoom.y, top, panels, bodies, _place)
+	if _place >= 0 and plan.place != _place:
+		var kept: BoardPlace = board_place(_place, origin, board, view, zoom.y, top, panels, bodies)
+		if kept != null:
+			_cover_for += delta
+			if _cover_for < MOVE_SECONDS:
+				plan = kept
+	if plan.place != _place or plan.covered <= 0.0:
+		_cover_for = 0.0
+	_place = plan.place
+	_covering = plan.covered > 0.0
+	var flip: bool = plan.place >= Place.BELOW
+	var target: Vector2 = ((plan.rect.position - origin) / zoom).round()
 	if target != _label.position or flip != _flipped:
 		_label.position = target
 		_flipped = flip
 		_tail.queue_redraw()
 
 
+## Highest the board's top edge may be (view px): under the HUD row (VIEW_TOP, or lower where the HUD says its row
+## ends lower, e.g. inside a phone's larger safe area) and under the boss bar during a fight.
+func _top_limit(hud: Node) -> float:
+	var top: float = VIEW_TOP
+	if hud != null and hud.has_method(&"get_row_bottom"):
+		top = maxf(top, float(hud.call(&"get_row_bottom")))
+	elif hud != null and hud.has_method(&"is_under_row"):
+		var steps: int = 0
+		while steps < ROW_PROBE_MAX and bool(hud.call(&"is_under_row", top)):
+			top += 1.0
+			steps += 1
+	if _boss_bar:
+		top = maxf(top, VIEW_TOP_BOSS)
+		if hud.has_method(&"get_boss_bar_rect"):
+			top = maxf(top, (hud.call(&"get_boss_bar_rect") as Rect2).end.y + P2_PANEL_GAP)
+	return top
+
+
+## The HUD's party panels on screen (view px): Hud.get_party_panel_rects() - P2's co-op panel, the versus corner
+## panels - or, from a HUD without it, P2's panel (Hud.get_p2_panel()).
+static func _panel_rects(hud: Node) -> Array[Rect2]:
+	var rects: Array[Rect2] = []
+	if hud == null:
+		return rects
+	if hud.has_method(&"get_party_panel_rects"):
+		for rect: Rect2 in hud.call(&"get_party_panel_rects"):
+			rects.append(rect)
+		return rects
+	if hud.has_method(&"get_p2_panel"):
+		var panel: Control = hud.call(&"get_p2_panel") as Control
+		if panel != null and panel.is_visible_in_tree():
+			rects.append(panel.get_global_rect())
+	return rects
+
+
+## The bodies of the living heroes of the running level on screen (view px; eggs too): their contact boxes.
+static func hero_bodies() -> Array[Rect2]:
+	var bodies: Array[Rect2] = []
+	var level: LevelBase = Game.level
+	if level == null:
+		return bodies
+	for hero: PlayerBase in level.heroes:
+		if not is_instance_valid(hero) or not hero.is_inside_tree() or hero.dead:
+			continue
+		var canvas: Transform2D = hero.get_global_transform_with_canvas()
+		var zoom: Vector2 = Vector2(absf(canvas.get_scale().x), absf(canvas.get_scale().y)) * float(Tuning.ART_SCALE)
+		var feet: Vector2 = canvas.origin
+		bodies.append(Rect2(feet.x - float(hero.box_xo) * zoom.x, feet.y - float(hero.box_h) * zoom.y,
+				float(hero.box_w) * zoom.x, float(hero.box_h) * zoom.y))
+	return bodies
+
+
+## Where a board goes (pure geometry in view px; the board and the tests call it). `sign` is the sign's feet point on
+## screen, `board` the board's size, `view` the view's size, `art` view px per art px (vertically), `top` the highest
+## its top edge may be, `panels` the HUD's party panels, `bodies` the heroes' bodies and `keep` the place the board has
+## now (-1: none). Returns `keep` while it keeps clear of every body, else the first clear place of [enum Place]; when
+## none is clear, `keep` again (or, without one, the place that covers the least).
+static func plan_board(sign: Vector2, board: Vector2, view: Vector2, art: float, top: float, panels: Array[Rect2],
+		bodies: Array[Rect2], keep: int = -1) -> BoardPlace:
+	var best: BoardPlace = null
+	var kept: BoardPlace = null
+	for place: int in Place.size():
+		var candidate: BoardPlace = board_place(place, sign, board, view, art, top, panels, bodies)
+		if candidate == null:
+			continue
+		if place == keep:
+			kept = candidate
+		if best == null or candidate.covered < best.covered:
+			best = candidate
+	if kept != null and (kept.covered <= 0.0 or best.covered > 0.0):
+		return kept
+	return best
+
+
+## One place of a board (see [method plan_board] for the arguments); null when it does not fit into the view there
+## (a board hanging under a sign near the bottom). Every place keeps the board inside the view's left / right edges,
+## under `top`, and clear of every party panel by P2_PANEL_GAP, its tail included (TAIL_HALF over the top edge of a
+## hanging board, under the bottom edge of a standing one): under a panel of the view's upper half that it lies
+## under, above one of the lower half.
+static func board_place(place: int, sign: Vector2, board: Vector2, view: Vector2, art: float, top: float,
+		panels: Array[Rect2], bodies: Array[Rect2]) -> BoardPlace:
+	var x: float = sign.x - board.x * 0.5
+	match place % 3:
+		1:
+			# Left of the sign: the tail leaves the board TAIL_INSET from its right end.
+			x = sign.x + TAIL_INSET - board.x
+		2:
+			x = sign.x - TAIL_INSET
+	x = clampf(x, VIEW_EDGE, maxf(VIEW_EDGE, view.x - VIEW_EDGE - board.x))
+	var hanging: bool = place >= Place.BELOW
+	var tail_up: float = float(TAIL_HALF) if hanging else 0.0
+	var tail_down: float = 0.0 if hanging else float(TAIL_HALF)
+	var limit: float = top + tail_up
+	var floor_y: float = view.y - VIEW_EDGE
+	for panel: Rect2 in panels:
+		if not panel.has_area() or x >= panel.end.x or x + board.x <= panel.position.x:
+			continue
+		if panel.get_center().y < view.y * 0.5:
+			limit = maxf(limit, panel.end.y + P2_PANEL_GAP + tail_up)
+		else:
+			floor_y = minf(floor_y, panel.position.y - P2_PANEL_GAP - tail_down)
+	var y: float = 0.0
+	if not hanging:
+		y = clampf(sign.y + BOARD_BOTTOM_ART * art - board.y, limit, maxf(limit, floor_y - board.y))
+	else:
+		y = maxf(sign.y + BOARD_BELOW_ART * art, limit)
+		if y + board.y > floor_y:
+			return null
+	var result: BoardPlace = BoardPlace.new()
+	result.place = place
+	result.rect = Rect2(x, y, board.x, board.y)
+	for body: Rect2 in bodies:
+		var hit: Rect2 = result.rect.intersection(body.grow(HERO_ROOM))
+		if hit.has_area():
+			result.covered += hit.get_area()
+	return result
+
+
+## Lines `text` (translated) takes on a board: the balanced wrap of the board within TEXT_MAX_W. Designers keep every
+## sign within MAX_LINES (LEVEL_DESIGN.md 15).
+static func text_lines(text: String) -> int:
+	if text.is_empty():
+		return 0
+	var text_font: Font = UiKit.font(UiKit.Style.HUD)
+	var width: float = UiKit.balanced_width(text, text_font, UiKit.SIZE_HUD, TEXT_MAX_W)
+	var block: Vector2 = text_font.get_multiline_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, width, UiKit.SIZE_HUD)
+	return maxi(1, roundi(block.y / maxf(text_font.get_height(UiKit.SIZE_HUD), 1.0)))
+
+
 ## Board rectangle in the sign's own coordinates (art px), e.g. for tests and previews.
 func get_board_rect() -> Rect2:
 	return Rect2(_label.position, _label.size) if _label != null else Rect2()
+
+
+## The board's place now (a [enum Place]; -1 while it is not shown), and true while a hero is behind it.
+func get_board_place() -> int:
+	return _place
+
+
+func is_covering_a_hero() -> bool:
+	return _covering
 
 
 ## The tail under the board, pointing at the sign: a 45-degree wedge in the board's outline, rim and face colours

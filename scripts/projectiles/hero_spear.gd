@@ -25,6 +25,8 @@ const ID: StringName = &"projectiles/hero_spear"
 ## Object metadata of the running level: Array (index = player slot) of Arrays of this hero's spears and the steps
 ## they made, oldest first.
 const HEROES_META: StringName = &"_hero_spears"
+## Object metadata of the running level: [size of its OTHER list, its bark boards] (see [method boards_of]).
+const BOARDS_META: StringName = &"_hero_spear_boards"
 ## The temporary versus pick-up a spear becomes when it hits a tile in an arena (C.14).
 const ID_TEMP_PICKUP: StringName = &"items/weapon"
 ## Flight-angle frames of fx/projectile_spear.png (0 flat; 1-3 nose down 15 / 30 / 45 degrees): the yvel (v16) from
@@ -189,14 +191,32 @@ static func _pull(entry: Object) -> void:
 		(entry as Node).queue_free()
 
 
-## The bark boards (objects-B's `objects/bark_board`, found by duck typing among the level's OTHER entities: a method
-## `catches(spear) -> bool` - its 16 x 16 cell overlaps this box and xvel points into its face - and `stick(spear)`):
-## the first board that catches this spear is asked for a step. True when the spear is gone (stuck or glanced).
-func _try_board(level: LevelBase) -> bool:
+## The bark boards of `level` (objects-B's `objects/bark_board`, found by duck typing among its OTHER entities: methods
+## `catches(spear) -> bool` and `stick(spear)`), in spawn order. Kept on the level (Object metadata BOARDS_META =
+## [size of the OTHER list, boards]) and found again when that list changed size, so a flying spear asks only the
+## boards each tick instead of testing every sign, tablet and checkpoint for the two methods.
+static func boards_of(level: LevelBase) -> Array:
 	var others: Array[SimEntity] = level.get_kind(Defs.Kind.OTHER)
+	if level.has_meta(BOARDS_META):
+		var cached: Array = level.get_meta(BOARDS_META)
+		if cached.size() == 2 and int(cached[0]) == others.size():
+			return cached[1]
+	var boards: Array = []
 	for i: int in others.size():
-		var board: SimEntity = others[i]
-		if board == null or not board.has_method(&"catches") or not board.has_method(&"stick"):
+		var entity: SimEntity = others[i]
+		if entity != null and entity.has_method(&"catches") and entity.has_method(&"stick"):
+			boards.append(entity)
+	level.set_meta(BOARDS_META, [others.size(), boards])
+	return boards
+
+
+## The first bark board ([method boards_of]) that catches this spear - its 16 x 16 cell overlaps this box and xvel
+## points into its face - is asked for a step. True when the spear is gone (stuck or glanced).
+func _try_board(level: LevelBase) -> bool:
+	var boards: Array = boards_of(level)
+	for i: int in boards.size():
+		var board: Object = boards[i]
+		if not is_instance_valid(board) or (board is Node and (board as Node).is_queued_for_deletion()):
 			continue
 		if not bool(board.call(&"catches", self)):
 			continue

@@ -6,6 +6,7 @@ Source: https://opengameart.org/content/well-done
 Licence: CC0 1.0 (tier A)
 Used in Club & Grub for: 2.0 (The Far Shore): audio/sfx/crowd_cheer_a.ogg. Per-file sources and edits: docs/ASSET_MANIFEST.md section 17
 Staging folder: .tools/asset_candidates/expansion/audio/qubodup_well-done
+Note: relicensed CC0 by the author on 2024-10-05; the source file name still says 'CCBY3' (the page: 'Feel free to ignore the "CCBY3" in the filename now')
 
 ---- Licence evidence recorded when the pack was downloaded ----
 

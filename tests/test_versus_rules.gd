@@ -725,3 +725,684 @@ func test_emptied_spots_refill_after_fifteen_seconds() -> void:
 	referee._start_feast_rush()
 	assert_eq(spot.refills, 2, "the Feast Rush refills every spot at once")
 	assert_eq(count_items(&"items/giant_bonus"), 1, "and drops a second giant bonus")
+
+
+# =================================================================================================================
+# PLAN.md P2.4: the other launch modes, sudden deaths, crates, temporary specials, the feast, presets and variants
+# =================================================================================================================
+
+## Switch the running round to `mode` (round 0 begins again: heroes back at their spawns), the round running.
+func _mode(mode: int) -> void:
+	referee.mode = mode
+	referee.begin_round(0)
+	referee.start_round_now()
+	_unshield()
+
+
+## An arena (as _arena) whose referee first gets `rules`, then begins round 0 in `mode`.
+func _arena_rules(count: int, mode: int, rules: VersusRules, xs: Array = [64, 128, 192, 256]) -> void:
+	_arena(count, xs)
+	referee.rules = rules
+	_mode(mode)
+
+
+## Feed `slot` a scripted flags stream from the next tick on (GameInput, as a human or a bot would).
+func _script_slot(slot: int, flags: PackedInt32Array) -> void:
+	var first_tick: int = Sim.tick + 1
+	GameInput.set_scripted_slot(slot, func(tick: int) -> int:
+		var index: int = tick - first_tick
+		return flags[index] if index >= 0 and index < flags.size() else 0
+	)
+
+
+func _flags(value: int, count: int) -> PackedInt32Array:
+	var result: PackedInt32Array = PackedInt32Array()
+	result.resize(count)
+	result.fill(value)
+	return result
+
+
+# --- Last Caveman Standing ------------------------------------------------------------------------------------------
+
+func test_lcs_bones_heal_a_heart_up_to_three() -> void:
+	_arena(2, [100, 250])
+	_mode(Defs.VersusMode.LAST_CAVEMAN)
+	var hero: PlayerBase = heroes[0]
+	hero.run.hearts = 2
+	for i: int in VersusTuning.LCS_HEART_BONES:
+		spawn(&"items/bone", hero.sim_pos)
+	Sim.step(1)
+	assert_eq(hero.run.hearts, 3, "six bones heal a heart")
+	for i: int in VersusTuning.LCS_HEART_BONES:
+		spawn(&"items/bone", hero.sim_pos)
+	Sim.step(1)
+	assert_eq(hero.run.hearts, 3, "never more than 3")
+
+
+func test_lcs_stock_respawns_until_the_last_life() -> void:
+	var rules: VersusRules = VersusRules.new()
+	rules.stock = true
+	_arena_rules(2, Defs.VersusMode.LAST_CAVEMAN, rules, [60, 260])
+	assert_false(referee.knockouts_final, "Stock: a knock-out is not final")
+	assert_eq(referee.stocks_of(1), VersusTuning.LCS_STOCKS)
+	for life: int in VersusTuning.LCS_STOCKS - 1:
+		heroes[1].kill(&"liquid")
+		Sim.step(VersusTuning.RESPAWN_TICKS + 1)
+		assert_false(heroes[1].dead, "respawned (life %d)" % life)
+		assert_eq(heroes[1].run.hearts, VersusTuning.LCS_HEARTS, "with full hearts")
+		assert_eq(ended.size(), 0, "the round goes on")
+		_unshield()
+	assert_eq(referee.stocks_of(1), 1)
+	heroes[1].kill(&"liquid")
+	Sim.step(2)
+	assert_true(referee.is_out(1), "the last life is gone: out")
+	assert_eq(ended.size(), 1)
+	assert_eq(ended[0], PackedInt32Array([0]), "the last caveman standing")
+
+
+func test_lcs_an_out_player_rides_a_grudge_pterodactyl_and_his_rock_dazes() -> void:
+	_arena(3, [100, 160, 220])
+	_mode(Defs.VersusMode.LAST_CAVEMAN)
+	var below: PlayerBase = heroes[1]   # x 160: no one-way ledge over him (FLAT_ROWS row 7)
+	heroes[2].teleport(Vector2i(140, FLOOR_Y))
+	heroes[2].kill(&"liquid")
+	Sim.step(1)
+	assert_true(referee.is_out(2))
+	assert_eq(referee.grudge_pos(2), Vector2i(-1, -1), "not yet in the air")
+	Sim.step(VersusTuning.RESPAWN_TICKS)
+	var at: Vector2i = referee.grudge_pos(2)
+	assert_eq(at, Vector2i(140, VersusGrudge.RIDE_Y), "a Grudge Pterodactyl along row 1 over where he fell")
+	assert_true(referee.grudge_ready(2))
+	# Right for 5 ticks: 4 px per tick, then a Strike: the 10-tick squawk, then the rock.
+	_script_slot(2, _flags(Defs.IN_RIGHT, 5) + _flags(0, 1) + _flags(Defs.IN_FIRE, 1))
+	Sim.step(7)
+	assert_eq(referee.grudge_pos(2).x, 160, "steered 20 px to the right")
+	assert_false(referee.grudge_ready(2), "squawking")
+	var hearts: int = below.run.hearts
+	var dazed_on: int = -1
+	for t: int in 60:
+		Sim.step(1)
+		if referee.is_dazed(1):
+			dazed_on = t
+			break
+	GameInput.clear_scripted()
+	assert_true(dazed_on >= VersusTuning.GRUDGE_SQUAWK_TICKS - 1, "the rock falls after the squawk (%d)" % dazed_on)
+	assert_eq(below.run.hearts, hearts, "a rock costs no heart")
+	assert_eq(below.hit_timer, VersusTuning.HURT_TIMER_TICKS, "stunned")
+	Sim.step(VersusTuning.GRUDGE_ROCK_DAZE_TICKS)
+	assert_false(referee.is_dazed(1))
+	assert_eq(below.hit_timer, 0, "12 ticks, then no immunity")
+	assert_false(referee.grudge_ready(2), "one rock per 73 ticks")
+	Sim.step(VersusTuning.GRUDGE_ROCK_PERIOD_TICKS)
+	assert_true(referee.grudge_ready(2))
+
+
+func test_lcs_sudden_death_starts_at_sixty_seconds() -> void:
+	_arena(2, [100, 250])
+	_mode(Defs.VersusMode.LAST_CAVEMAN)
+	var started: Array[StringName] = []
+	var on_start: Callable = func(_r: int, kind: StringName) -> void: started.append(kind)
+	Events.round_sudden_death_started.connect(on_start)
+	referee.round_ticks = VersusTuning.SUDDEN_DEATH_AT_TICKS - 2
+	Sim.step(1)
+	assert_false(referee.sudden_death.is_running())
+	Sim.step(1)
+	Events.round_sudden_death_started.disconnect(on_start)
+	assert_true(referee.sudden_death.is_running(), "at 1 457 ticks")
+	assert_eq(started, [VersusSuddenDeath.STAMPEDE] as Array[StringName], "the jungle's Stampede")
+
+
+func test_one_bonk_and_big_bounce() -> void:
+	var rules: VersusRules = VersusRules.new()
+	rules.set_variant(VersusRules.ONE_BONK)
+	rules.set_variant(VersusRules.BIG_BOUNCE)
+	_arena_rules(3, Defs.VersusMode.LAST_CAVEMAN, rules, [100, 125, 220])
+	_box(heroes[0], 1)
+	Sim.step(1)
+	assert_eq(Game.runs[1].hearts, 0, "One-Bonk: a hit costs every heart")
+	assert_true(heroes[1].dead)
+	var stomper: PlayerBase = heroes[0]
+	stomper.teleport(Vector2i(220, FLOOR_Y - 30))
+	stomper.yvel = 64
+	stomper.grounded = false
+	_script_slot(0, _flags(Defs.IN_UP, 2))
+	Sim.step(1)
+	GameInput.clear_scripted()
+	assert_eq(stomper.yvel, VersusRules.BIG_BOUNCE_YVEL, "Big Bounce: Up gives -288")
+
+
+# --- Hot Rock ---------------------------------------------------------------------------------------------------------
+
+func test_hot_rock_first_pick_fuse_and_the_holders_speed() -> void:
+	_arena(3, [60, 160, 260])
+	var picks: Array[int] = []
+	referee.ember_changed.connect(func(slot: int) -> void: picks.append(slot))
+	_mode(Defs.VersusMode.HOT_ROCK)
+	assert_true(referee.knockouts_final, "Hot Rock: a pop is final")
+	assert_eq(referee.round_length(), 0, "no clock: last one standing")
+	Sim.step(VersusTuning.HOT_ROCK_FIRST_PICK_TICKS - 1)
+	assert_eq(referee.ember_holder(), -1, "nobody before 66 ticks")
+	Sim.step(1)
+	var holder: int = referee.ember_holder()
+	assert_true(holder >= 0, "picked by Sim.rng 66 ticks after the gong")
+	assert_eq(picks, [holder] as Array[int])
+	assert_true(referee.hot_rock.fuse_total >= VersusTuning.HOT_ROCK_FUSE_MIN_TICKS
+			and referee.hot_rock.fuse_total <= VersusTuning.HOT_ROCK_FUSE_MAX_TICKS, "a 12-20 s fuse")
+	Sim.step(1)
+	assert_eq(referee.walk_cap_of(holder), VersusTuning.HOT_ROCK_HOLDER_WALK_CAP, "the holder is the faster one")
+	assert_eq(referee.walk_cap_of((holder + 1) % 3), Tuning.WALK_CAP)
+	assert_eq(heroes[holder].walk_cap, VersusTuning.HOT_ROCK_HOLDER_WALK_CAP, "written to the hero")
+
+
+func test_hot_rock_passes_on_a_touch_and_the_passer_cannot_get_it_back() -> void:
+	_arena(2, [100, 250])
+	_mode(Defs.VersusMode.HOT_ROCK)
+	referee.hot_rock.pass_to(0, referee.round_ticks)
+	referee.hot_rock.fuse_left = 400
+	heroes[1].teleport(Vector2i(108, FLOOR_Y))
+	Sim.step(1)
+	assert_eq(referee.ember_holder(), 1, "a body touch passes it")
+	assert_eq(Game.runs[0].passes, 1, "Hot Potato")
+	assert_true(referee.ember_pass_immune(0) > 0, "the passer cannot get it back")
+	heroes[0].teleport(heroes[1].sim_pos)
+	Sim.step(1)
+	assert_eq(referee.ember_holder(), 1, "still with P2 while P1's 44 ticks run")
+	Sim.step(VersusTuning.HOT_ROCK_PASS_IMMUNE_TICKS)
+	heroes[0].teleport(heroes[1].sim_pos)
+	Sim.step(1)
+	assert_eq(referee.ember_holder(), 0, "after 44 ticks it can come back")
+
+
+func test_hot_rock_passes_on_a_hit_and_a_stomp_and_hits_cost_nothing() -> void:
+	_arena(3, [100, 125, 250])
+	_mode(Defs.VersusMode.HOT_ROCK)
+	referee.hot_rock.pass_to(0, referee.round_ticks)
+	referee.hot_rock.fuse_left = 400
+	_box(heroes[0], 1)
+	Sim.step(1)
+	assert_eq(referee.ember_holder(), 1, "the holder's hit passes it to the victim")
+	assert_eq(heroes[1].xvel, VersusTuning.HIT_XVEL, "a hit only knocks back")
+	assert_eq(Game.runs[1].hearts, Tuning.ENERGY_START)
+	var stomper: PlayerBase = heroes[2]
+	stomper.teleport(Vector2i(heroes[1].sim_pos.x, FLOOR_Y - 30))
+	heroes[1].hit_timer = 0
+	stomper.yvel = 64
+	stomper.grounded = false
+	Sim.step(1)
+	assert_eq(referee.ember_holder(), 2, "a stomp on the holder passes it to the stomper")
+
+
+func test_hot_rock_the_fuse_pops_the_holder_and_the_last_one_standing_wins() -> void:
+	_arena(3, [60, 160, 260])
+	_mode(Defs.VersusMode.HOT_ROCK)
+	referee.hot_rock.pass_to(1, referee.round_ticks)
+	referee.hot_rock.fuse_left = 5
+	Sim.step(4)
+	assert_true(referee.ember_hurry(), "it bubbles faster at the end")
+	assert_false(heroes[1].dead)
+	Sim.step(1)
+	assert_true(heroes[1].dead, "the holder pops")
+	Sim.step(1)
+	assert_true(referee.is_out(1), "and is out")
+	assert_eq(kos.size(), 1)
+	assert_eq(kos[0][2], &"hot_rock")
+	assert_eq(referee.ember_holder(), -1)
+	assert_eq(ended.size(), 0, "two still stand")
+	Sim.step(VersusTuning.HOT_ROCK_REPICK_TICKS)
+	var holder: int = referee.ember_holder()
+	assert_true(holder == 0 or holder == 2, "66 ticks later a new holder among the rest")
+	referee.hot_rock.fuse_left = 1
+	Sim.step(2)
+	assert_eq(ended.size(), 1)
+	assert_eq(ended[0], PackedInt32Array([2 - holder]), "the last one standing wins")
+
+
+# --- Clubball ---------------------------------------------------------------------------------------------------------
+
+## A Clubball arena of two bare heroes and objects-B's coconut on its drop point (column 9, the floor), spawned
+## before the referee as in a loaded arena (level entities tick before the heroes and the driver).
+func _clubball(xs: Array = [64, 256]) -> Coconut:
+	Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.VERSUS, 2)
+	Game.begin_level(&"test_versus")
+	make_recording_level(FLAT_ROWS)
+	level.meta = {"kind": "arena", "players": 2, "modes": "clubball", "wrap": "none"}
+	level.start_pos = Vector2i(int(xs[0]), FLOOR_Y)
+	level.start_positions.clear()
+	heroes.clear()
+	for slot: int in Defs.MAX_PLAYERS:
+		level.start_positions.append(Vector2i(int(xs[slot % xs.size()]), FLOOR_Y))
+	var coconut: Coconut = spawn(&"objects/coconut", Vector2i(9 * 16 + 8, FLOOR_Y)) as Coconut
+	for slot: int in 2:
+		var hero: PlayerBase = PlayerBase.new()
+		place(level, hero, Vector2i(int(xs[slot]), FLOOR_Y), {"slot": slot})
+		hero.respawn_at(Vector2i(int(xs[slot]), FLOOR_Y))
+		heroes.append(hero)
+	referee = VersusArena.setup(level)
+	referee.start_round_now()
+	_unshield()
+	return coconut
+
+
+func test_clubball_sides_goal_pause_and_kickoff() -> void:
+	var coconut: Coconut = _clubball()
+	assert_not_null(coconut, "objects/coconut exists (objects-B)")
+	if coconut == null:
+		return
+	assert_eq(referee.mode, Defs.VersusMode.CLUBBALL)
+	assert_eq(referee.round_length(), VersusTuning.CLUBBALL_MATCH_TICKS, "3 minutes")
+	assert_eq(referee.team_of(0), 1)
+	assert_eq(referee.team_of(1), 2, "two sides even in 1v1")
+	assert_eq(referee.goal_rect(1), Rect2i(0, 112, 16, 48), "team 1 defends the left mouth, 3 rows high")
+	assert_eq(referee.ball(), coconut)
+	var goals: Array[Array] = []
+	referee.goal_scored.connect(func(team: int, a: int, b: int) -> void: goals.append([team, a, b]))
+	heroes[0].teleport(Vector2i(150, FLOOR_Y))
+	coconut.teleport(Vector2i(312, FLOOR_Y - 8))
+	coconut.xvel = 0
+	coconut.yvel = 0
+	Sim.step(1)
+	assert_eq(goals, [[1, 1, 0]] as Array[Array], "the centre in team 2's goal: team 1 scores")
+	assert_eq(referee.score_of(0), 1)
+	assert_false(coconut.in_play(), "out of play for the pause")
+	Sim.step(VersusTuning.BALL_RESET_TICKS - 1)
+	assert_eq(heroes[0].sim_pos.x, 150, "still the pause")
+	Sim.step(1)
+	assert_true(coconut.in_play(), "back at its drop point")
+	assert_eq(heroes[0].sim_pos, Vector2i(64, FLOOR_Y), "kick-off: every hero at his side's spawn")
+	assert_eq(heroes[0].shield, VersusTuning.SPAWN_SHIELD_TICKS - 1, "shielded (counting)")
+
+
+func test_clubball_rallies_escalate_through_the_coconut() -> void:
+	var coconut: Coconut = _clubball([120, 260])
+	if coconut == null:
+		return
+	coconut.teleport(Vector2i(140, FLOOR_Y))
+	heroes[0].teleport(Vector2i(118, FLOOR_Y))
+	_box(heroes[0], 1)
+	Sim.step(1)
+	assert_eq(coconut.xvel, Coconut.DRIVE_XVEL, "a drive")
+	coconut.teleport(Vector2i(140, FLOOR_Y))
+	_box(heroes[0], 1)
+	Sim.step(1)
+	assert_eq(coconut.xvel, Coconut.DRIVE_XVEL + VersusTuning.RALLY_STEP, "a strike within 44 ticks adds 16")
+	assert_eq(heroes[1].hit_timer, 0, "the shot hits nobody")
+
+
+func test_clubball_first_to_five_and_the_golden_coconut() -> void:
+	var coconut: Coconut = _clubball()
+	if coconut == null:
+		return
+	referee.clubball.goals = PackedInt32Array([0, 4, 3])
+	coconut.teleport(Vector2i(312, FLOOR_Y - 8))
+	Sim.step(1)
+	assert_eq(ended.size(), 1, "five goals end the game")
+	assert_eq(ended[0], PackedInt32Array([0]), "team 1 (P1) wins")
+	# A tie at the clock's end plays on with the golden coconut.
+	coconut = _clubball()
+	referee.round_ticks = VersusTuning.CLUBBALL_MATCH_TICKS - 1
+	Sim.step(1)
+	assert_eq(referee.phase, VersusReferee.PHASE_GOLDEN, "0 : 0 at the gong")
+	assert_true(coconut.golden, "the golden coconut")
+	assert_eq(referee.round_ticks_left(), -1, "the clock stops")
+	coconut.teleport(Vector2i(8, FLOOR_Y - 8))
+	Sim.step(1)
+	assert_eq(ended.size(), 2, "the next goal wins")
+	assert_eq(ended[1], PackedInt32Array([1]), "team 2 scored in team 1's goal")
+
+
+# --- Themed sudden deaths --------------------------------------------------------------------------------------------
+
+func test_every_sudden_death_is_telegraphed_ten_ticks_ahead() -> void:
+	for theme: StringName in VersusSuddenDeath.THEMES:
+		_arena(2, [40, 280])
+		_mode(Defs.VersusMode.LAST_CAVEMAN)
+		referee.start_sudden_death(theme)
+		var armed: Array[String] = []
+		for t: int in 260:
+			Sim.step(1)
+			for node: Node in get_tree().get_nodes_in_group(VersusReferee.ROUND_GROUP):
+				var hazard: VersusHazard = node as VersusHazard
+				if hazard != null and hazard.armed_tick == Sim.tick:
+					armed.append("%s:%d" % [hazard.kind, hazard.armed_tick - hazard.warn_tick])
+					assert_true(hazard.armed_tick - hazard.warn_tick >= VersusSuddenDeath.MIN_TELEGRAPH_TICKS,
+							"%s: %s armed %d ticks after its telegraph" % [theme, hazard.kind,
+							hazard.armed_tick - hazard.warn_tick])
+		var threats: Array[Dictionary] = referee.sudden_death.threats
+		assert_true(threats.size() >= 1, "%s: at least one threat in 260 ticks" % theme)
+		for threat: Dictionary in threats:
+			assert_true(int(threat["strike"]) - int(threat["warn"]) >= VersusSuddenDeath.MIN_TELEGRAPH_TICKS,
+					"%s: %s telegraphed %d ticks ahead" % [theme, threat["what"],
+					int(threat["strike"]) - int(threat["warn"])])
+		if not VersusSuddenDeath.is_band(theme) and theme != VersusSuddenDeath.WHITEOUT:
+			assert_true(armed.size() >= 1, "%s: a hazard turned deadly" % theme)
+
+
+func test_stampede_spares_a_hero_during_the_dust_then_runs_him_down() -> void:
+	_arena(2, [24, 280])
+	_mode(Defs.VersusMode.LAST_CAVEMAN)
+	referee.start_sudden_death(VersusSuddenDeath.STAMPEDE)
+	Sim.step(1)
+	var lane: Array[Rect2i] = referee.danger_rects(VersusTuning.STAMPEDE_DUST_TICKS)
+	assert_eq(lane.size(), 1, "the charger's lane shows with its dust")
+	Sim.step(VersusTuning.STAMPEDE_DUST_TICKS - 2)
+	assert_false(heroes[0].dead, "safe during the 22 ticks of dust")
+	Sim.step(12)
+	assert_true(heroes[0].dead, "the charger runs along the floor")
+	Sim.step(1)
+	assert_eq(kos.size(), 1)
+	assert_eq(kos[0][2], &"sudden_death")
+
+
+func test_lava_rises_a_row_per_44_ticks() -> void:
+	_arena(2, [100, 250])
+	_mode(Defs.VersusMode.LAST_CAVEMAN)
+	referee.start_sudden_death(VersusSuddenDeath.LAVA_RISE)
+	var band: VersusSuddenDeath = referee.sudden_death
+	assert_eq(band.band_top, 176, "the band starts under the floor")
+	Sim.step(VersusSuddenDeath.BAND_RUMBLE_TICKS + 1)
+	assert_eq(band.band_top, FLOOR_Y, "one row after the rumble: level with the floor")
+	assert_false(heroes[0].dead)
+	Sim.step(VersusTuning.LAVA_RISE_ROW_TICKS)
+	assert_eq(band.band_top, FLOOR_Y - Tuning.TILE, "the next row 44 ticks later")
+	assert_true(heroes[0].dead, "feet under a deadly band")
+
+
+func test_syrup_flood_only_slows() -> void:
+	_arena(2, [100, 250])
+	_mode(Defs.VersusMode.GRUB_STACK)
+	referee.start_sudden_death(VersusSuddenDeath.SYRUP_FLOOD)
+	Sim.step(VersusSuddenDeath.BAND_RUMBLE_TICKS + 2 + VersusTuning.LAVA_RISE_ROW_TICKS)
+	assert_eq(referee.sudden_death.band_top, FLOOR_Y - Tuning.TILE, "two rows up")
+	assert_false(heroes[0].dead, "syrup never kills")
+	assert_eq(referee.walk_cap_of(0), VersusSuddenDeath.SYRUP_WALK_CAP, "it slows to the tar caps")
+	Sim.step(VersusTuning.LAVA_RISE_ROW_TICKS * 6)
+	assert_eq(referee.sudden_death.band_top, VersusSuddenDeath.SYRUP_TOP_ROW * Tuning.TILE, "up to row 7, no higher")
+
+
+func test_cave_in_fills_the_edge_columns() -> void:
+	_arena(2, [100, 250])
+	_mode(Defs.VersusMode.LAST_CAVEMAN)
+	referee.start_sudden_death(VersusSuddenDeath.CAVE_IN)
+	Sim.step(60)
+	assert_eq(level.grid.get_char(0, 9), TileGrid.CH_SOLID_A, "the first block settled at the left edge")
+	assert_eq(level.grid.get_char(19, 9), TileGrid.CH_SOLID_A, "the second at the right edge")
+
+
+func test_whiteout_wind_grows_and_alternates() -> void:
+	_arena(2, [100, 250])
+	_mode(Defs.VersusMode.LAST_CAVEMAN)
+	referee.start_sudden_death(VersusSuddenDeath.WHITEOUT)
+	Sim.step(VersusSuddenDeath.WHITEOUT_WARN_TICKS - 1)
+	assert_eq(level.wind, 0, "announced 22 ticks ahead")
+	Sim.step(1)
+	assert_eq(level.wind, VersusSuddenDeath.WHITEOUT_STEP)
+	Sim.step(VersusTuning.WHITEOUT_STEP_TICKS)
+	assert_eq(level.wind, -2 * VersusSuddenDeath.WHITEOUT_STEP, "it grows by 8 and turns")
+
+
+func test_sudden_death_as_an_event_in_grub_stack() -> void:
+	var rules: VersusRules = VersusRules.new()
+	rules.sudden_death_event = true
+	_arena_rules(2, Defs.VersusMode.GRUB_STACK, rules)
+	assert_eq(referee.sudden_death_at, VersusTuning.STACK_ROUND_TICKS_2P - VersusTuning.FEAST_RUSH_TICKS,
+			"a 60 s round: with the Feast Rush")
+	_arena_rules(2, Defs.VersusMode.GRUB_STACK, VersusRules.new())
+	assert_eq(referee.sudden_death_at, -1, "off unless toggled")
+
+
+# --- Crates, temporary specials, the feast ---------------------------------------------------------------------------
+
+func test_crate_contents_follow_the_mode_and_the_rules() -> void:
+	Sim.start(7)
+	var stack: String = VersusCrates.contents_for(Defs.VersusMode.GRUB_STACK, VersusRules.new())
+	assert_true(stack.begins_with("food:"), "Grub Stack crates hold food: %s" % stack)
+	assert_true(stack.contains("weapon:") and stack.contains("feast_piece:"))
+	var lcs: String = VersusCrates.contents_for(Defs.VersusMode.LAST_CAVEMAN, VersusRules.new())
+	assert_true(lcs.contains("heart") and not lcs.contains("food") and not lcs.contains("skull"), lcs)
+	assert_eq(VersusCrates.contents_for(Defs.VersusMode.CLUBBALL, VersusRules.new()), "", "no crates in Clubball")
+	var rain: VersusRules = VersusRules.new()
+	rain.set_variant(VersusRules.AXE_RAIN)
+	assert_eq(VersusCrates.contents_for(Defs.VersusMode.HOT_ROCK, rain), "weapon:axe", "Axe Rain")
+	var club: VersusRules = VersusRules.new()
+	club.club_only = true
+	for i: int in 20:
+		assert_false(VersusCrates.contents_for(Defs.VersusMode.GRUB_STACK, club).contains("weapon:"), "club only")
+	var tokens: ItemContents = ItemContents.parse(stack)
+	assert_eq(tokens.size(), stack.split(",").size(), "every token names an item")
+
+
+func test_a_crate_lane_asks_the_referee_for_its_contents() -> void:
+	_arena(2, [100, 250])
+	_mode(Defs.VersusMode.LAST_CAVEMAN)
+	var lane: SimEntity = spawn(&"objects/crate_lane", Vector2i(2 * 16 + 8, 32), {"rect": "2,1,16,9"}) as SimEntity
+	assert_not_null(lane, "objects/crate_lane exists (objects-B)")
+	if lane == null:
+		return
+	Sim.step(VersusTuning.CRATE_PERIOD_TICKS)
+	var contents: String = str(lane.get(&"contents"))
+	assert_true(contents.contains("heart") and not contents.contains("food"),
+			"the lane holds what the referee answered for LCS: %s" % contents)
+
+
+func test_temporary_specials_run_out_after_their_throws() -> void:
+	_arena(2, [100, 250])
+	var hero: PlayerBase = heroes[0]
+	spawn(&"items/weapon", hero.sim_pos, {"kind": "boomerang", "temp": true})
+	Sim.step(1)
+	assert_eq(hero.run.special(), Defs.Weapon.BOOMERANG)
+	assert_eq(referee.throws_left(0), VersusTuning.SPECIAL_THROWS[Defs.Weapon.BOOMERANG], "a swirling axe: 2 throws")
+	for i: int in 2:
+		spawn(&"projectiles/hero_boomerang", Vector2i(100, 120), {"from_hero": true, "power": 20, "xvel": 0,
+				"yvel": 0, "owner": 0})
+		Sim.step(1)
+	assert_eq(referee.throws_left(0), 0)
+	assert_eq(hero.run.weapon, Defs.Weapon.CLUB, "gone after the last throw")
+	assert_eq(hero.run.belt, PlayerRun.BELT_EMPTY)
+	spawn(&"items/weapon", hero.sim_pos, {"kind": "hammer", "temp": true})
+	Sim.step(1)
+	assert_eq(hero.run.special(), Defs.Weapon.HAMMER)
+	hero.kill(&"liquid")
+	Sim.step(1)
+	assert_eq(hero.run.special(), PlayerRun.BELT_EMPTY, "the hammer goes on a knock-out")
+	Sim.step(VersusTuning.RESPAWN_TICKS)
+	spawn(&"items/weapon", hero.sim_pos, {"kind": "axe", "temp": true})
+	Sim.step(1)
+	referee.end_round(false)
+	assert_eq(hero.run.special(), PlayerRun.BELT_EMPTY, "and every special at the round end")
+
+
+func test_the_versus_feast_is_each_heros_own() -> void:
+	_arena(2, [100, 250])
+	var feaster: PlayerBase = heroes[0]
+	for index: int in 2:
+		spawn(&"items/feast_piece", feaster.sim_pos, {"index": index})
+		Sim.step(1)
+	spawn(&"items/feast_piece", heroes[1].sim_pos, {"index": 2})
+	Sim.step(1)
+	assert_eq(feaster.feast, 0, "a spoon in another hand does not complete his kit")
+	assert_eq(referee.cutlery_of(0), 3)
+	assert_eq(referee.cutlery_of(1), 4)
+	assert_eq(Game.feast_kit, 0, "the 1.0 team kit is not used in versus")
+	# A hit drops the victim's cutlery.
+	heroes[1].teleport(Vector2i(250, FLOOR_Y))
+	heroes[0].teleport(Vector2i(225, FLOOR_Y))
+	_box(heroes[0], 1)
+	Sim.step(1)
+	assert_eq(referee.cutlery_of(1), 0, "dropped on a hit")
+	assert_eq(count_items(&"items/feast_piece"), 1)
+	heroes[1].hit_timer = 0
+	spawn(&"items/feast_piece", feaster.sim_pos, {"index": 2})
+	Sim.step(1)
+	assert_eq(feaster.feast, VersusTuning.FEAST_TICKS - 1, "his third piece: 8 s of feast")
+	_give(heroes[1], 9)
+	heroes[1].teleport(Vector2i(feaster.sim_pos.x + 10, FLOOR_Y))
+	Sim.step(1)
+	assert_eq(referee.stack_of(1), 9 - VersusTuning.FEAST_TOUCH_SPILL, "a feaster's touch knocks 3 off")
+	_box(heroes[1], -1)
+	heroes[1].hit_timer = 0
+	_give(heroes[0], 5)
+	Sim.step(1)
+	assert_eq(referee.stack_of(0), 5, "hits cannot touch the feaster")
+
+
+# --- Presets, variants, handicap, Party Mix --------------------------------------------------------------------------
+
+func test_rules_from_a_match_presets_variants_and_auto_handicap() -> void:
+	var versus_match: VersusMatch = VersusMatch.new()
+	versus_match.seat_bot(Defs.BotLevel.HUNTER)
+	versus_match.seat_bot(Defs.BotLevel.HUNTER)
+	versus_match.preset = VersusMatch.Preset.CLASSIC
+	var classic: VersusRules = VersusRules.from_match(versus_match, Defs.VersusMode.GRUB_STACK)
+	assert_true(classic.club_only, "Classic: club only")
+	assert_eq(classic.crate_period, 0, "no crates")
+	versus_match.preset = VersusMatch.Preset.FEAST
+	versus_match.variants = PackedStringArray(["gusty", "not_a_variant"])
+	var feast: VersusRules = VersusRules.from_match(versus_match, Defs.VersusMode.GRUB_STACK)
+	assert_eq(feast.crate_period, VersusTuning.CRATE_PERIOD_TICKS)
+	assert_true(feast.has(VersusRules.GUSTY))
+	assert_eq(feast.variants.size(), 1, "unknown names are left out")
+	versus_match.preset = VersusMatch.Preset.MAYHEM
+	versus_match.variants = PackedStringArray()
+	var mayhem: VersusRules = VersusRules.from_match(versus_match, Defs.VersusMode.GRUB_STACK)
+	assert_eq(mayhem.crate_period, VersusTuning.MAYHEM_CRATE_PERIOD_TICKS)
+	assert_eq(mayhem.variants.size(), 1, "Mayhem: a random variant per round")
+	assert_eq(VersusRules.from_match(versus_match, Defs.VersusMode.GRUB_STACK).variants, mayhem.variants,
+			"drawn from the round seed: the same every time")
+	var clubball: VersusRules = VersusRules.from_match(versus_match, Defs.VersusMode.CLUBBALL)
+	assert_eq(clubball.crate_period, 0, "Clubball has no crates")
+	assert_false(clubball.has(VersusRules.GIANT_RAIN) or clubball.has(VersusRules.HAMMER_TIME))
+	versus_match.round_wins = PackedInt32Array([2, 0, 0, 0])
+	versus_match.get_seat(1).auto_handicap = true
+	versus_match.preset = VersusMatch.Preset.FEAST
+	var auto: VersusRules = VersusRules.from_match(versus_match, Defs.VersusMode.GRUB_STACK)
+	assert_eq(auto.leaf_shield, PackedByteArray([0, 1, 0, 0]), "Auto: two rounds behind gets a leaf shield")
+
+
+func test_the_leaf_shield_absorbs_one_hit() -> void:
+	var rules: VersusRules = VersusRules.new()
+	rules.leaf_shield = PackedByteArray([0, 1, 0, 0])
+	_arena_rules(2, Defs.VersusMode.GRUB_STACK, rules, [100, 125])
+	_give(heroes[1], 10)
+	assert_true(referee.has_leaf(1))
+	_box(heroes[0], 1)
+	Sim.step(1)
+	assert_eq(referee.stack_of(1), 10, "the leaf takes the hit")
+	assert_false(referee.has_leaf(1))
+	assert_eq(heroes[1].hit_timer, 0)
+	heroes[0].teleport(Vector2i(100, FLOOR_Y))
+	heroes[1].teleport(Vector2i(125, FLOOR_Y))
+	_box(heroes[0], 1)
+	Sim.step(1)
+	assert_eq(referee.stack_of(1), 7, "the next one counts")
+
+
+func test_hammer_time_spear_party_slippery_gusty_lights_out_and_giant_rain() -> void:
+	var rules: VersusRules = VersusRules.new()
+	for variant: StringName in [VersusRules.HAMMER_TIME, VersusRules.SPEAR_PARTY, VersusRules.SLIPPERY,
+			VersusRules.GUSTY, VersusRules.LIGHTS_OUT, VersusRules.GIANT_RAIN]:
+		rules.set_variant(variant)
+	_arena_rules(2, Defs.VersusMode.GRUB_STACK, rules, [100, 250])
+	var hero: PlayerBase = heroes[0]
+	assert_eq(hero.run.weapon, Defs.Weapon.HAMMER, "Hammer Time: the hammer in the hand")
+	assert_eq(hero.run.belt, Defs.Weapon.SPEAR, "Spear Party: a spear on the belt")
+	assert_eq(referee.throws_left(0), -1, "that never runs out")
+	assert_true(level.dark, "Lights Out")
+	Sim.step(1)
+	assert_eq(hero.ice, VersusRules.SLIPPERY_ICE, "Slippery: every floor is ice 2")
+	assert_eq(level.wind, VersusRules.GUSTY_WIND, "Gusty")
+	Sim.step(VersusRules.GUSTY_PERIOD_TICKS)
+	assert_eq(level.wind, -VersusRules.GUSTY_WIND, "alternating every 66 ticks")
+	var before: int = count_items(&"items/giant_bonus")
+	Sim.step(VersusRules.GIANT_RAIN_PERIOD_TICKS - VersusRules.GUSTY_PERIOD_TICKS - 1)
+	assert_eq(count_items(&"items/giant_bonus"), before + 1, "Giant Rain: a giant bonus every 364 ticks")
+
+
+func test_party_mix_mode_and_match_rules_reach_the_referee() -> void:
+	var versus_match: VersusMatch = VersusMatch.new()
+	versus_match.seat_bot(Defs.BotLevel.HUNTER)
+	versus_match.seat_bot(Defs.BotLevel.HUNTER)
+	versus_match.arena = VersusMatch.ARENA_PARTY_MIX
+	versus_match.stock = true
+	versus_match.begin_match(5)
+	versus_match.round_mode = Defs.VersusMode.LAST_CAVEMAN
+	Game.versus_match = versus_match
+	_arena(2, [100, 250])
+	Game.versus_match = null
+	assert_eq(referee.mode, Defs.VersusMode.LAST_CAVEMAN, "the round's mode as Party Mix picked it")
+	assert_true(referee.rules.stock, "the match's Stock option")
+	assert_false(referee.knockouts_final)
+
+
+# --- Dazes --------------------------------------------------------------------------------------------------------
+
+func test_a_daze_stuns_twelve_ticks_and_leaves_no_immunity() -> void:
+	_arena(2, [100, 125])
+	_give(heroes[1], 10)
+	referee.daze(heroes[1], VersusTuning.STUN_TICKS)
+	spawn(&"items/food", heroes[1].sim_pos, {"index": 0})
+	Sim.step(1)
+	assert_eq(referee.stack_of(1), 10, "no pick-ups while dazed")
+	assert_true(referee.is_pvp_immune(heroes[1]), "not hit while stunned")
+	Sim.step(VersusTuning.STUN_TICKS - 1)
+	assert_eq(heroes[1].hit_timer, 0, "no immunity after a daze")
+	_box(heroes[0], 1)
+	Sim.step(1)
+	assert_true(referee.stack_of(1) < 11, "hittable at once")
+
+
+func test_a_falling_giant_bonus_bonks_the_head_it_lands_on() -> void:
+	_arena(2, [100, 250])
+	var giant: Node = spawn(&"items/giant_bonus", Vector2i(100, FLOOR_Y - 34), {"index": 0, "dropped": true,
+			"xvel": 0, "yvel": 64})
+	assert_not_null(giant)
+	Sim.step(1)
+	assert_true(referee.is_dazed(0), "bonked")
+	assert_eq(Game.runs[0].bonks, 1, "Head Case")
+
+
+# --- Scripted multi-stream matches on the flat arena -----------------------------------------------------------------
+
+## The flat arena file with real heroes, a match of `mode` in Game.versus_match (Party Mix style round_mode).
+func _real_match(count: int, mode: int) -> Level:
+	var versus_match: VersusMatch = VersusMatch.new()
+	for i: int in count:
+		versus_match.seat_bot(Defs.BotLevel.HUNTER)
+	versus_match.begin_match(3)
+	versus_match.round_mode = mode
+	Game.versus_match = versus_match
+	var real: Level = _real_arena(count)
+	Game.versus_match = null
+	referee = VersusArena.setup(real)
+	referee.start_round_now()
+	return real
+
+
+func test_scripted_last_caveman_match_strikes_cost_hearts() -> void:
+	var real: Level = _real_match(2, Defs.VersusMode.LAST_CAVEMAN)
+	var p1: PlayerBase = real.get_hero(0)
+	var p2: PlayerBase = real.get_hero(1)
+	assert_eq(referee.mode, Defs.VersusMode.LAST_CAVEMAN)
+	p2.teleport(Vector2i(p1.sim_pos.x + 40, p1.sim_pos.y))
+	# The shields run out, P1 walks up to P2 and strikes; P2 stands still (immune 30 ticks after each hit).
+	var runs: Array = [[VersusTuning.SPAWN_SHIELD_TICKS + 1, "|"], [3, "R|"]]
+	for i: int in 3:
+		runs.append([1, "F|"])
+		runs.append([VersusTuning.HURT_TIMER_TICKS + 4, "|"])
+		runs.append([2, "R|"])
+	run_party_inputs(runs)
+	assert_true(Game.runs[1].hearts < VersusTuning.LCS_HEARTS, "P1's strikes cost P2 hearts: %d left"
+			% Game.runs[1].hearts)
+	assert_eq(Game.runs[0].hearts, VersusTuning.LCS_HEARTS, "P1 untouched")
+
+
+func test_scripted_hot_rock_match_a_walk_passes_the_ember() -> void:
+	var real: Level = _real_match(2, Defs.VersusMode.HOT_ROCK)
+	var p1: PlayerBase = real.get_hero(0)
+	var p2: PlayerBase = real.get_hero(1)
+	p2.teleport(Vector2i(p1.sim_pos.x + 48, p1.sim_pos.y))
+	run_party_inputs([[VersusTuning.HOT_ROCK_FIRST_PICK_TICKS, "|"]])
+	var holder: int = referee.ember_holder()
+	assert_true(holder >= 0, "the first pick")
+	var walk: String = "R|" if holder == 0 else "|L"
+	run_party_inputs([[20, walk]])
+	assert_eq(referee.ember_holder(), 1 - holder, "the holder walked into his rival: passed")

@@ -25,6 +25,9 @@ extends Node
 signal saved
 ## Data was read from disk (or reset).
 signal loaded
+## 2.0: a found Cave Painting opened reward `reward` (Save.UNLOCK_*; UnlockTable.REWARDS) that was closed before -
+## emitted by add_painting, once per reward, in ladder order (the HUD's / map's "new reward" notice).
+signal reward_unlocked(reward: StringName)
 
 const FILE_NAME: String = "save.json"
 const TEMP_NAME: String = "save.json.tmp"
@@ -331,7 +334,8 @@ func set_belt_in(space_key: String, slot: int, hand: int, belt: int) -> void:
 # =================================================================================================================
 
 ## Record Cave Painting `index` (0..Tuning.PAINTING_COUNT - 1) as found. Returns true when it is new. Does not write
-## to disk.
+## to disk. A painting that opens a reward announces it ([signal reward_unlocked]; not for a reward already open by
+## hand or by "Unlock everything").
 func add_painting(index: int) -> bool:
 	if index < 0 or index >= Tuning.PAINTING_COUNT:
 		push_error("Save.add_painting: no painting %d" % index)
@@ -339,8 +343,16 @@ func add_painting(index: int) -> bool:
 	var paintings: Array = _data["paintings"]
 	if paintings.has(index):
 		return false
+	var before: int = paintings.size()
+	var closed: Array[StringName] = []
+	for reward: StringName in UNLOCK_PAINTINGS:
+		if not is_unlocked(reward):
+			closed.append(reward)
 	paintings.append(index)
 	paintings.sort()
+	for reward: StringName in UnlockTable.rewards_between(before, paintings.size()):
+		if closed.has(reward):
+			reward_unlocked.emit(reward)
 	return true
 
 

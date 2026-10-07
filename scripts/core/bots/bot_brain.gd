@@ -2,10 +2,21 @@ class_name BotBrain
 extends RefCounted
 ## The decisions of a [HeroBot] in one versus mode (DESIGN.md E.7): [method think] chooses a goal every
 ## VersusTuning.BOT_GOAL_PERIOD_TICKS by utility, [method act] turns the goal and the combat micro-rules into this
-## tick's flags. Owner: core-B. This base class only wanders (a mode without a brain of its own); see [GrubStackBrain].
+## tick's flags. Owner: core-B. This base class only wanders (a mode without a brain of its own); the modes:
+## [GrubStackBrain], [LastCavemanBrain], [HotRockBrain], [ClubballBrain]; the boss: [ChieftainBrain].
 ##
-## Shared helpers: the strike geometry of the club (Tuning.STRIKE_SCRIPT_* / CLUB_ORIGIN / CLUB_BOX, PHYSICS.md 8.1 -
-## 8.3), where to stand to strike a spot, timed actions (hold some flags for n ticks), wandering.
+## Shared here: the strike geometry of the club (Tuning.STRIKE_SCRIPT_* / CLUB_ORIGIN / CLUB_BOX, PHYSICS.md 8.1 -
+## 8.3), where to stand to strike a spot, timed actions (hold some flags for n ticks), wandering, safety from the
+## telegraphed dangers, and the **combat micro-rules** of E.7 on what the bot saw `reaction` ticks ago:
+##  - anti-air: a high strike against a jumper above within VersusTuning.BOT_ANTI_AIR_PX (every level);
+##  - a forward strike when a rival worth hitting ([method worth_hitting]) will be in the club's front box;
+##  - bat a curled rival towards a hazard (a front box from the side, PHYSICS.md C.11);
+##  - Hunter and Chief: stomp a croucher (jump at him), crouch-charge against a rival walking in;
+##  - deflect a rival's thrown special with a forward strike: never the Rookie, the Hunter HUNTER_DEFLECT_PERCENT of
+##    the time, the Chief VersusTuning.BOT_CHIEF_DEFLECT_PERCENT (decided once per projectile, on the bot's SimRng);
+##  - Chief: stomp chains - falling, he steers onto the next rival head and holds UP for the big bounce;
+##  - the Rookie hesitates (takes a micro-rule only half of the time), never charges, stomps or deflects.
+## A mode narrows them with [method worth_hitting] and [method may_contact] (Hot Rock: never touch the holder).
 
 ## Strike kinds: the keys pressed with the facing direction, and the frames they play.
 const STRIKE_FORWARD: int = 0
@@ -14,6 +25,22 @@ const STRIKE_LOW: int = 2
 const STRIKE_FLAGS: Array[int] = [Defs.IN_FIRE, Defs.IN_FIRE | Defs.IN_UP, Defs.IN_FIRE | Defs.IN_DOWN]
 ## Ticks a wander target is kept at most.
 const WANDER_TICKS: int = 146
+## Hunter: crouch-charge when a rival walks toward it from this far (px), for this long (ticks).
+const CHARGE_FROM_PX: int = 96
+const CHARGE_TO_PX: int = 44
+const CHARGE_TICKS: int = 10
+## Hunter: jump at a croucher this far away (px, same floor).
+const STOMP_MIN_PX: int = 10
+const STOMP_MAX_PX: int = 56
+## Ticks the strike rule looks ahead on the seen rival (the front box is out on ticks 5-7 of the swing).
+const STRIKE_LEAD_TICKS: int = 5
+## The Hunter deflects a rival's special this often (percent; the Chief: VersusTuning.BOT_CHIEF_DEFLECT_PERCENT).
+const HUNTER_DEFLECT_PERCENT: int = 25
+## A bot that stood still this long (HeroBot.idle_ticks) looks for another place (never idle 10 s, PLAN 8 V4.b).
+const RESTLESS_TICKS: int = 96
+## Look this far ahead for telegraphed dangers (ticks) and keep this far away from them (px).
+const DANGER_LOOKAHEAD_TICKS: int = 24
+const DANGER_MARGIN_PX: int = 12
 
 ## The bot this brain decides for (held weakly: the bot owns the brain, so a strong reference back would be a
 ## reference cycle that never frees).
@@ -25,15 +52,28 @@ var bot: HeroBot:
 var _bot_ref: WeakRef = null
 static var _stand_cache: Dictionary = {}
 
+## The timed action being held (flags) and its ticks left.
+var action_flags: int = 0
+var action_ticks: int = 0
+## Statistics (tests): strikes, charges, stomp jumps, deflects, bats, chain steers, danger escapes.
+var strikes: int = 0
+var charges: int = 0
+var stomp_jumps: int = 0
+var deflects: int = 0
+var bats: int = 0
+var chain_steers: int = 0
+var escapes: int = 0
+var _wander: Vector2i = Vector2i(-1, -1)
+var _wander_age: int = 0
+var _sequence: Array[Vector2i] = []
+# Projectile instance id -> true (deflect) / false (let it be): decided once each.
+var _deflect_choice: Dictionary = {}
+var _projectile_seen: Dictionary = {}
+
 
 ## Forget the cached spot stands (tests; a re-baked graph).
 static func clear_cache() -> void:
 	_stand_cache.clear()
-## The timed action being held (flags) and its ticks left.
-var action_flags: int = 0
-var action_ticks: int = 0
-var _wander: Vector2i = Vector2i(-1, -1)
-var _wander_age: int = 0
 
 
 ## Forget goals and actions (a new level or round).
@@ -42,6 +82,9 @@ func reset() -> void:
 	action_ticks = 0
 	_wander = Vector2i(-1, -1)
 	_wander_age = 0
+	_sequence.clear()
+	_deflect_choice.clear()
+	_projectile_seen.clear()
 
 
 ## True when the brain wants a decision this tick outside the regular period (no goal yet).
@@ -55,15 +98,61 @@ func think(hero: PlayerBase, _level: LevelBase, _tick: int) -> void:
 
 
 ## The flags of this tick.
-func act(hero: PlayerBase, _level: LevelBase, tick: int) -> int:
-	if bot.nav.is_busy():
-		return bot.nav.step(hero, tick)
-	if action_ticks > 0:
-		return hold_action()
+func act(hero: PlayerBase, level: LevelBase, tick: int) -> int:
+	var common: int = act_common(hero, level, tick)
+	if common >= 0:
+		return common
 	if _wander.x < 0:
 		_pick_wander(hero)
 	bot.nav.set_target(_wander, 6)
 	return bot.nav.step(hero, tick)
+
+
+## The flags of a tick while the hero is out of play (dead, out of the round): 0 here; the Last Caveman Standing
+## brain steers its Grudge Pterodactyl.
+func act_out(_level: LevelBase, _tick: int) -> int:
+	return 0
+
+
+## The weight class of the hero for the navigator (NavGraph.WEIGHT_*): light here.
+func nav_class(_hero: PlayerBase, _level: LevelBase) -> int:
+	return NavGraph.WEIGHT_LIGHT
+
+
+## Is the seen rival in `rival` worth a strike? (every rival here)
+func worth_hitting(_rival: int, _seen: PackedInt32Array) -> bool:
+	return true
+
+
+## May the bot touch (strike, stomp, bump) the rival in `rival`? (always here; Hot Rock: never the holder)
+func may_contact(_rival: int) -> bool:
+	return true
+
+
+## The part of [method act] every mode shares; -1 when the mode decides: a stunned hero presses nothing, a link or a
+## held action or sequence continues, the micro-rules.
+func act_common(hero: PlayerBase, level: LevelBase, tick: int) -> int:
+	var stun_min: int = VersusTuning.STUN_HIT_TIMER_MIN if Game.mode == Defs.GameMode.VERSUS else Tuning.HIT_STUN_MIN
+	if hero.hit_timer >= stun_min:
+		# Stunned: the hero ignores every input; drop what was planned for these ticks.
+		action_ticks = 0
+		_sequence.clear()
+		return 0
+	if bot.nav.is_busy():
+		var air: int = air_steer(hero, level)
+		if air >= 0 and not (bot.nav.link.kind in [NavGraph.KIND_SPRING, NavGraph.KIND_GEYSER]):
+			bot.nav.link = null
+			return air
+		return bot.nav.step(hero, tick)
+	if not _sequence.is_empty():
+		return play_sequence()
+	if action_ticks > 0:
+		return hold_action()
+	if not hero.is_grounded():
+		var steer: int = air_steer(hero, level)
+		if steer >= 0:
+			return steer
+	return combat(hero, level)
 
 
 ## Start holding `flags` for `ticks` ticks (a strike, a crouch).
@@ -80,6 +169,239 @@ func hold_action() -> int:
 	action_ticks -= 1
 	return action_flags
 
+
+## Start a sequence of (flags, ticks) steps.
+func start_sequence(steps: Array[Vector2i]) -> int:
+	_sequence = steps.duplicate()
+	return play_sequence()
+
+
+## True while a sequence is being played.
+func in_sequence() -> bool:
+	return not _sequence.is_empty()
+
+
+## One tick of the sequence.
+func play_sequence() -> int:
+	while not _sequence.is_empty() and _sequence[0].y <= 0:
+		_sequence.pop_front()
+	if _sequence.is_empty():
+		return 0
+	var step: Vector2i = _sequence[0]
+	_sequence[0] = Vector2i(step.x, step.y - 1)
+	return step.x
+
+
+## Drop what is being held (a new goal).
+func cancel_actions() -> void:
+	action_ticks = 0
+	_sequence.clear()
+
+
+## True when the hero has stood still RESTLESS_TICKS: time to move somewhere else.
+func restless() -> bool:
+	return bot.idle_ticks >= RESTLESS_TICKS
+
+
+func rookie() -> bool:
+	return bot.bot_level == Defs.BotLevel.ROOKIE
+
+
+func chief() -> bool:
+	return bot.bot_level == Defs.BotLevel.CHIEF
+
+
+## The Rookie hesitates: it takes a micro-rule only half of the time (its own SimRng).
+func decide() -> bool:
+	if rookie():
+		return bot.rng.chance(1, 2)
+	return true
+
+
+# =================================================================================================================
+# Combat micro-rules (DESIGN.md E.7)
+# =================================================================================================================
+
+## The grounded micro-rules on the seen rivals; -1 when none applies.
+func combat(hero: PlayerBase, level: LevelBase) -> int:
+	if not hero.is_grounded() or hero.attack_gate or hero.swing_lock > 0 or hero.is_curled() or hero.squash > 0:
+		return -1
+	var deflect: int = _deflect(hero, level)
+	if deflect >= 0:
+		return deflect
+	var me: Vector2i = hero.sim_pos
+	for rival: int in Defs.MAX_PLAYERS:
+		if not bot.is_rival(rival) or not may_contact(rival):
+			continue
+		var seen: PackedInt32Array = bot.seen(rival)
+		var bits: int = seen[HeroBot.SEEN_BITS]
+		if (bits & HeroBot.SEEN_PRESENT) == 0 or (bits & HeroBot.SEEN_GONE) != 0:
+			continue
+		var pos: Vector2i = Vector2i(seen[HeroBot.SEEN_X], seen[HeroBot.SEEN_Y])
+		var ahead: Vector2i = pos + Vector2i(Tuning.floor16(seen[HeroBot.SEEN_XVEL] * STRIKE_LEAD_TICKS),
+				Tuning.floor16(seen[HeroBot.SEEN_YVEL] * STRIKE_LEAD_TICKS))
+		var dx: int = ahead.x - me.x
+		var facing: int = 1 if dx >= 0 else -1
+		# Bat a curled rival towards a hazard (no immunity protects a curled hero from a bat).
+		if (bits & HeroBot.SEEN_CURLED) != 0:
+			var hazard: int = BotSenses.hazard_side(level, pos)
+			if hazard != 0 and hazard == facing and front_box(me, facing, STRIKE_FORWARD).intersects(body_box(ahead)) \
+					and decide():
+				bats += 1
+				strikes += 1
+				return start_action(dir_flag(facing) | STRIKE_FLAGS[STRIKE_FORWARD], strike_ticks(STRIKE_FORWARD))
+			continue
+		if (bits & HeroBot.SEEN_SAFE) != 0:
+			continue
+		# Anti-air: a jumper above within reach.
+		if (bits & HeroBot.SEEN_GROUNDED) == 0 and pos.y < me.y - 16 and absi(pos.x - me.x) <= VersusTuning.BOT_ANTI_AIR_PX \
+				and front_box(me, facing, STRIKE_HIGH).intersects(body_box(ahead)):
+			if decide():
+				strikes += 1
+				return start_action(dir_flag(facing) | STRIKE_FLAGS[STRIKE_HIGH], strike_ticks(STRIKE_HIGH))
+		var worth: bool = worth_hitting(rival, seen)
+		# Forward strike: his body will be in the front box.
+		if worth and front_box(me, facing, STRIKE_FORWARD).intersects(body_box(ahead)):
+			if decide():
+				strikes += 1
+				return start_action(dir_flag(facing) | STRIKE_FLAGS[STRIKE_FORWARD], strike_ticks(STRIKE_FORWARD))
+		if rookie():
+			continue
+		var same_floor: bool = absi(pos.y - me.y) <= 8 and (bits & HeroBot.SEEN_GROUNDED) != 0
+		var distance: int = absi(pos.x - me.x)
+		# Stomp a croucher (a banker pays double).
+		if worth and same_floor and (bits & HeroBot.SEEN_CROUCHING) != 0 and distance >= STOMP_MIN_PX \
+				and distance <= STOMP_MAX_PX and hero.no_jump == 0:
+			stomp_jumps += 1
+			var toward: int = dir_flag(pos.x - me.x)
+			var drift: int = clampi(distance / 3, 2, 14)
+			return start_sequence([Vector2i(Defs.IN_UP | toward, drift), Vector2i(Defs.IN_UP, 14 - mini(drift, 13)),
+					Vector2i(0, 8)])
+		# Crouch-charge against a rival walking in.
+		var closing: bool = seen[HeroBot.SEEN_XVEL] != 0 and (seen[HeroBot.SEEN_XVEL] > 0) == (pos.x < me.x)
+		if worth and same_floor and closing and distance <= CHARGE_FROM_PX and distance >= CHARGE_TO_PX \
+				and hero.charge == 0 and absi(hero.xvel) < 16:
+			charges += 1
+			return start_action(Defs.IN_DOWN, CHARGE_TICKS)
+	return -1
+
+
+## Airborne steering onto a rival head below (Hunter: a croucher; Chief: any head - stomp chains), UP held for the
+## big bounce when the Chief chains; -1 when there is none to steer at.
+func air_steer(hero: PlayerBase, _level: LevelBase) -> int:
+	if rookie() or hero.is_grounded() or hero.yvel < 0 or hero.is_curled():
+		return -1
+	var me: Vector2i = hero.sim_pos
+	var best: int = -1
+	var best_dx: int = 1 << 20
+	for rival: int in Defs.MAX_PLAYERS:
+		if not bot.is_rival(rival) or not may_contact(rival):
+			continue
+		var seen: PackedInt32Array = bot.seen(rival)
+		var bits: int = seen[HeroBot.SEEN_BITS]
+		if (bits & HeroBot.SEEN_PRESENT) == 0 or (bits & (HeroBot.SEEN_GONE | HeroBot.SEEN_CURLED)) != 0:
+			continue
+		if not chief() and (bits & HeroBot.SEEN_CROUCHING) == 0:
+			continue
+		if not worth_hitting(rival, seen):
+			continue
+		var head: int = seen[HeroBot.SEEN_Y] - Tuning.HERO_BOX_STAND.y
+		var below: int = head - me.y
+		var dx: int = seen[HeroBot.SEEN_X] - me.x
+		# Reachable while falling: under him, not too far aside for the fall left.
+		if below < 4 or below > 96 or absi(dx) > 8 + below:
+			continue
+		if absi(dx) < absi(best_dx):
+			best_dx = dx
+			best = rival
+	if best < 0:
+		return -1
+	chain_steers += 1
+	var flags: int = dir_flag(best_dx) if absi(best_dx) > 3 else 0
+	if chief():
+		flags |= Defs.IN_UP
+	return flags
+
+
+## Deflect a rival's special flying at the hero: a forward strike timed so that the front box meets it.
+func _deflect(hero: PlayerBase, level: LevelBase) -> int:
+	if rookie():
+		return -1
+	var percent: int = VersusTuning.BOT_CHIEF_DEFLECT_PERCENT if chief() else HUNTER_DEFLECT_PERCENT
+	var me: Vector2i = hero.sim_pos
+	for projectile: SimEntity in BotSenses.rival_projectiles(level, bot.slot if bot.body == null else -1):
+		var id: int = projectile.get_instance_id()
+		# Seen as late as the heroes: only after `reaction` ticks in the air.
+		var first: int = int(_projectile_seen.get(id, Sim.tick))
+		_projectile_seen[id] = first
+		if Sim.tick - first < bot.reaction:
+			continue
+		var toward: int = -1 if projectile.xvel > 0 else 1  # the side of the hero it comes from
+		if (projectile.sim_pos.x - me.x) * toward <= 0 or projectile.xvel == 0:
+			continue
+		var at: Vector2i = projectile.sim_pos + Vector2i(Tuning.floor16(projectile.xvel * STRIKE_LEAD_TICKS),
+				Tuning.floor16(projectile.yvel * STRIKE_LEAD_TICKS))
+		var box: Rect2i = Rect2i(at.x - projectile.box_xo, at.y - projectile.box_h, projectile.box_w, projectile.box_h)
+		if not front_box(me, toward, STRIKE_FORWARD).intersects(box):
+			continue
+		if not _deflect_choice.has(id):
+			_deflect_choice[id] = bot.rng.chance(percent, 100)
+		if not bool(_deflect_choice[id]):
+			continue
+		deflects += 1
+		strikes += 1
+		return start_action(dir_flag(toward) | STRIKE_FLAGS[STRIKE_FORWARD], strike_ticks(STRIKE_FORWARD))
+	return -1
+
+
+# =================================================================================================================
+# Safety
+# =================================================================================================================
+
+## A feet point out of every telegraphed danger near the hero (the cheapest node point whose body box stays
+## DANGER_MARGIN_PX away from every danger box); BotSenses.NO_POS when the hero is safe (or nowhere is).
+func safety_target(hero: PlayerBase, level: LevelBase) -> Vector2i:
+	var dangers: Array[Rect2i] = BotSenses.danger_rects(level, DANGER_LOOKAHEAD_TICKS)
+	if dangers.is_empty() or not _in_danger(hero.sim_pos, dangers):
+		return BotSenses.NO_POS
+	var graph: NavGraph = bot.nav.graph
+	var best: Vector2i = BotSenses.NO_POS
+	var best_cost: int = NavGraph.UNREACHABLE
+	if graph == null:
+		for dx: int in [-48, 48, -96, 96]:
+			var p: Vector2i = Vector2i(hero.sim_pos.x + dx, hero.sim_pos.y)
+			if not _in_danger(p, dangers) and absi(dx) < best_cost:
+				best_cost = absi(dx)
+				best = p
+		return best
+	var reach: Dictionary = bot.nav.reach(hero)
+	for node: NavGraph.NavNode in graph.nodes:
+		var x0: int = graph.node_x0(node)
+		var x1: int = graph.node_x1(node)
+		var y: int = graph.node_y(node)
+		var x: int = x0
+		while x <= x1:
+			var p: Vector2i = Vector2i(x, y)
+			if not _in_danger(p, dangers):
+				var cost: int = graph.reach_cost(reach, p)
+				if cost < best_cost:
+					best_cost = cost
+					best = p
+			x += 8
+	return best
+
+
+static func _in_danger(feet: Vector2i, dangers: Array[Rect2i]) -> bool:
+	var box: Rect2i = body_box(feet).grow(DANGER_MARGIN_PX)
+	for rect: Rect2i in dangers:
+		if rect.intersects(box):
+			return true
+	return false
+
+
+# =================================================================================================================
+# Geometry
+# =================================================================================================================
 
 ## Direction flag toward `dx` (0 when dx is 0).
 static func dir_flag(dx: int) -> int:
@@ -147,7 +469,7 @@ static func body_box(feet: Vector2i) -> Rect2i:
 ## (node, strike kind, facing) - the longest run of feet x on that node from which a strike of that kind, facing
 ## that way, reaches the cell (never from inside the cell's own column); `x` is the run's middle. Ordered by
 ## preference: forward strikes first, then high, then low; wider runs first. Cached per graph and cell (the stands of
-## a level never change).
+## a level never change). Mover nodes are skipped.
 static func spot_stands(graph: NavGraph, cell: Vector2i) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	if graph == null:
@@ -156,6 +478,8 @@ static func spot_stands(graph: NavGraph, cell: Vector2i) -> Array[Dictionary]:
 	if _stand_cache.has(key):
 		return _stand_cache[key]
 	for node: NavGraph.NavNode in graph.nodes:
+		if node.mover >= 0:
+			continue
 		if absi(node.row - cell.y) > 4 or node.x1 < (cell.x - 3) * Tuning.TILE or node.x0 > (cell.x + 4) * Tuning.TILE:
 			continue
 		for kind: int in [STRIKE_FORWARD, STRIKE_HIGH, STRIKE_LOW]:
@@ -164,7 +488,8 @@ static func spot_stands(graph: NavGraph, cell: Vector2i) -> Array[Dictionary]:
 				var best1: int = -1
 				var run0: int = -1
 				for x: int in range(node.x0, node.x1 + 2):
-					var hits: bool = x <= node.x1 and (x >> 4) != cell.x 							and strike_hits_cell(Vector2i(x, node.y), facing, kind, cell)
+					var hits: bool = x <= node.x1 and (x >> 4) != cell.x \
+							and strike_hits_cell(Vector2i(x, node.y), facing, kind, cell)
 					if hits and run0 < 0:
 						run0 = x
 					elif not hits and run0 >= 0:
@@ -192,6 +517,10 @@ static func spot_stands(graph: NavGraph, cell: Vector2i) -> Array[Dictionary]:
 	return result
 
 
+# =================================================================================================================
+# Wandering
+# =================================================================================================================
+
 func _pick_wander(hero: PlayerBase) -> void:
 	var graph: NavGraph = bot.nav.graph
 	if graph == null or graph.nodes.is_empty():
@@ -209,3 +538,32 @@ func wander_target(hero: PlayerBase) -> Vector2i:
 	if _wander.x < 0 or _wander_age > WANDER_TICKS or (bot.nav.arrived(hero) and bot.nav.target == _wander):
 		_pick_wander(hero)
 	return _wander
+
+
+## The point of `graph`'s nodes (sampled every 16 px) farthest from `away` among those the hero reaches within
+## `max_cost` ticks; score = min(distance, cap) * 4 - cost. NO_POS when there is no graph.
+func far_point(hero: PlayerBase, away: Array[Vector2i], max_cost: int, cap: int = 160) -> Vector2i:
+	var graph: NavGraph = bot.nav.graph
+	if graph == null:
+		var side: int = 1 if away.is_empty() or away[0].x < hero.sim_pos.x else -1
+		return Vector2i(hero.sim_pos.x + side * 64, hero.sim_pos.y)
+	var reach: Dictionary = bot.nav.reach(hero)
+	var best: Vector2i = BotSenses.NO_POS
+	var best_score: int = -(1 << 30)
+	for node: NavGraph.NavNode in graph.nodes:
+		var x: int = graph.node_x0(node)
+		var x1: int = graph.node_x1(node)
+		var y: int = graph.node_y(node)
+		while x <= x1:
+			var p: Vector2i = Vector2i(x, y)
+			var cost: int = graph.reach_cost(reach, p)
+			if cost <= max_cost:
+				var nearest: int = cap
+				for other: Vector2i in away:
+					nearest = mini(nearest, absi(other.x - p.x) + absi(other.y - p.y))
+				var score: int = nearest * 4 - cost
+				if score > best_score:
+					best_score = score
+					best = p
+			x += 16
+	return best

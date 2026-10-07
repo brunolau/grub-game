@@ -1,0 +1,53 @@
+# Club & Grub level file - format 2 (docs/ARCHITECTURE.md 7.11). Co-op Bestiary: developer level of the enemies
+# module (docs/expansion/PLAN.md P2.1). The seven co-op-only enemies of DESIGN.md D.7 / GAMEPLAY.md 13.9.6 along one
+# floor, left to right: a Shellback keeper in a 4-row hall, a Shaman on his platform between two walkers he shields,
+# a Leech under a ledge, a Raptor, a Bull Rex in a 4-row brace corridor, a Snatcher bat on its thread and a Snatcher
+# gull hovering under the cave roof (both with a perch over the pit), and a Tar Splitter.
+# tests/test_enemies_presets.gd loads its records; play it as a co-op game (two heroes) for visual QA. A party of one
+# meets the plain archetypes. Not part of any campaign (kind = test).
+
+[meta]
+format = 2
+id = test_enemies_bestiary
+name = "Co-op Bestiary"
+kind = test
+book = 2
+biome = canyon
+terrain_a = canyon/terrain
+terrain_b = canyon/terrain_mesa
+background = canyon
+music = level_canyon
+author = enemies-A
+notes = "PLAN.md P2.1: every co-op-only enemy once; their traits act only with two heroes in a co-op game."
+
+[legend]
+K = enemies/shellback keeper=hall left=-1 right=1 speed=0
+M = enemies/shaman left=-1 right=1
+W = enemies/walker skin=turtle speed=0 left=0 right=0
+V = enemies/walker skin=turtle_b speed=0 left=0 right=0
+L = enemies/leech range=3
+R = enemies/raptor range=4
+X = enemies/bull_rex speed=48
+S = enemies/snatcher depth=40 perch=87,10
+G = enemies/snatcher kind=stinger range=5 perch=88,10
+T = enemies/tar_splitter left=-2 right=2
+E = objects/exit locked=false
+
+[tiles]
+#............................................................................................................#
+#............................................................................................................#
+#............................................................................................................#
+#............................................................................................................#
+#...............................................................................###################..........#
+#............................................................................................................#
+#.......................................#######.................................................G............#
+#.............###########..................L................################.................................#
+#..............................W.M..V...............................................S........................#
+#.............................########.......................................................................#
+#............................................................................................................#
+#..@...............K................................R...............X...............................T.....E..#
+######################################################################################~~~#####################
+##############################################################################################################
+
+[entities]
+objects/hero_start 2 11 slot=2

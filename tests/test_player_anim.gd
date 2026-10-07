@@ -128,6 +128,58 @@ func test_sprite_box_per_pose() -> void:
 	assert_eq(_box(), Tuning.HERO_BOX_HURT, "hurt 48 x 32")
 
 
+## The performance pass (PLAN.md P2.12) writes the frame cycles out in HeroAnim._frame: every looping animation still
+## shows FIRST + _cycle(fps, count) on every clock value, as before.
+func test_written_out_frame_cycles_equal_the_cycle_helper() -> void:
+	world_flat()
+	spawn_hero()
+	var animator: HeroAnim = HeroAnim.new()
+	var cycles: Array = [
+		[HeroAnim.Anim.IDLE, HeroAnim.IDLE_FIRST, HeroAnim.IDLE_FPS, HeroAnim.IDLE_COUNT],
+		[HeroAnim.Anim.PANT, HeroAnim.IDLE_FIRST, HeroAnim.PANT_FPS, HeroAnim.IDLE_COUNT],
+		[HeroAnim.Anim.FALL, HeroAnim.FALL_FIRST, HeroAnim.FALL_FPS, HeroAnim.FALL_COUNT],
+		[HeroAnim.Anim.CRAWL, HeroAnim.CRAWL_FIRST, HeroAnim.CRAWL_FPS, HeroAnim.CRAWL_COUNT],
+		[HeroAnim.Anim.HURT, HeroAnim.HURT_FIRST, HeroAnim.HURT_FPS, HeroAnim.HURT_COUNT],
+		[HeroAnim.Anim.DEATH, HeroAnim.DEATH_FIRST, HeroAnim.DEATH_FPS, HeroAnim.DEATH_AIR_COUNT],
+		[HeroAnim.Anim.GLIDE, HeroAnim.GLIDE_FIRST, HeroAnim.GLIDE_FPS, HeroAnim.GLIDE_COUNT],
+		[HeroAnim.Anim.VICTORY, HeroAnim.VICTORY_FIRST, HeroAnim.VICTORY_FPS, HeroAnim.VICTORY_COUNT],
+		[HeroAnim.Anim.BALL, HeroAnim.ROLL_FIRST, HeroAnim.ROLL_FPS, HeroAnim.ROLL_COUNT],
+	]
+	for cycle: Array in cycles:
+		animator.anim = int(cycle[0])
+		for clock: int in 100:
+			animator.clock = clock
+			var want: int = int(cycle[1]) + animator._cycle(int(cycle[2]), int(cycle[3]))
+			assert_eq(animator._frame(hero), want, "anim %d clock %d" % [cycle[0], clock])
+	animator.anim = HeroAnim.Anim.JUMP
+	for clock: int in 40:
+		animator.clock = clock
+		assert_eq(animator._frame(hero), HeroAnim.JUMP_FIRST + mini(clock * HeroAnim.JUMP_FPS
+				/ Tuning.ANIM_TICKS_PER_SECOND, HeroAnim.JUMP_COUNT - 1), "jump clock %d" % clock)
+
+
+## The crouch charge glows (PHYSICS.md 8.5 presentation) and the tint goes back to white when the charge is spent;
+## a hero without a charge never writes the tint (the performance pass keeps the usual tick at two field tests).
+func test_charge_tint_comes_and_goes() -> void:
+	world_flat()
+	spawn_hero()
+	var sprite: Sprite2D = hero.get_node(^"Sprite") as Sprite2D
+	play(hold("", 4))
+	assert_eq(sprite.self_modulate, Color.WHITE, "no charge: white")
+	play(hold("D", 12))
+	assert_true(hero.charge > 0)
+	assert_ne(sprite.self_modulate, Color.WHITE, "charged: the glow")
+	var glow_seen: Array[bool] = [false]
+	play(hold("", 80), func(_t: int) -> void:
+		if hero.charge > 0 and sprite.self_modulate != Color.WHITE:
+			glow_seen[0] = true
+		if hero.charge == 0:
+			assert_eq(sprite.self_modulate, Color.WHITE, "the charge is spent: white again")
+	)
+	assert_true(glow_seen[0], "the glow lasts while the charge does")
+	assert_eq(hero.charge, 0)
+
+
 func _frames(flags: PackedInt32Array) -> Array[int]:
 	var frames: Array[int] = []
 	var sprite: Sprite2D = hero.get_node(^"Sprite") as Sprite2D

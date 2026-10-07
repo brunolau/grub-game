@@ -56,6 +56,66 @@ func test_options_apply_and_persist() -> void:
 	assert_eq(str(Settings.get_value(OptionsPanel.KEY_TOUCH_LAYOUT, "")), "swapped")
 
 
+## ui-A's join panel / lobby: the key test shows the seated keyboard players in join order (the numpad player who
+## joined first is P1), each lit by his own keys, then the half nobody sits at as "Free" with the layout's keys.
+func test_key_test_shows_seated_players_in_join_order() -> void:
+	var panel: OptionsPanel = await _panel()
+	panel.open_key_test()
+	await get_tree().process_frame
+	var test: UiKeyTest = panel.get_key_test()
+	assert_eq(test.columns, [Vector2i(0, Defs.InputSlotKind.NONE), Vector2i(1, Defs.InputSlotKind.NONE)] \
+			as Array[Vector2i], "the options page: the P1 / P2 profiles as before")
+	GameInput.assign_slot(0, InputSlot.keyboard(Defs.InputSlotKind.KEYBOARD_RIGHT))
+	test.set_players(PackedInt32Array([0]))
+	assert_eq(test.columns, [Vector2i(0, Defs.InputSlotKind.KEYBOARD_RIGHT),
+			Vector2i(-1, Defs.InputSlotKind.KEYBOARD_LEFT)] as Array[Vector2i], "P1 on the numpad, then the free half")
+	assert_eq(test.get_column_tag(0), "P1")
+	assert_eq(test.get_column_tag(1), tr("UI_JOIN_FREE"))
+	_key(KEY_KP_ENTER, true)
+	assert_true(test.is_lit(0, &"attack"), "Num Enter lights P1's Strike")
+	_key(KEY_KP_ENTER, false)
+	_key(KEY_SPACE, true)
+	assert_true(test.is_lit(-1, &"jump"), "Space lights the free half's Jump")
+	assert_false(test.is_lit(0, &"jump"))
+	_key(KEY_SPACE, false)
+	GameInput.assign_slot(1, InputSlot.keyboard(Defs.InputSlotKind.KEYBOARD_LEFT))
+	test.set_players(PackedInt32Array([0, 1]))
+	assert_eq(test.get_column_tag(1), "P2", "then the W A S D player")
+	_key(KEY_SPACE, true)
+	assert_true(test.is_lit(1, &"jump"), "Space lights P2's Jump")
+	assert_false(test.is_lit(0, &"jump"), "... not P1's")
+	_key(KEY_SPACE, false)
+	_release_keys()
+
+
+## Options > Co-op (DESIGN.md D.3 / D.11): "Rival score" and "Helper mode", both off by default, applied at once and
+## kept in settings.cfg.
+func test_coop_options_rival_score_and_helper_mode() -> void:
+	var panel: OptionsPanel = await _panel()
+	for key: String in [OptionsPanel.KEY_RIVAL_SCORE, OptionsPanel.KEY_HELPER_MODE]:
+		var row: UiOptionRow = panel.get_row(key)
+		assert_not_null(row, "a row for %s" % key)
+		if row == null:
+			continue
+		assert_eq(row.kind, UiOptionRow.Kind.TOGGLE)
+		assert_eq(row.index, 0, "off by default")
+		assert_false(Settings.get_bool(key))
+		row.activate()
+		assert_true(Settings.get_bool(key), "switched on at once")
+	assert_eq(panel.get_row(OptionsPanel.KEY_RIVAL_SCORE).caption, "UI_OPT_RIVAL_SCORE")
+	assert_eq(panel.get_row(OptionsPanel.KEY_HELPER_MODE).caption, "UI_OPT_HELPER_MODE")
+	panel.close()
+	Settings.load_settings()
+	assert_true(Settings.get_bool(OptionsPanel.KEY_RIVAL_SCORE), "kept after a reload")
+	assert_true(Settings.get_bool(OptionsPanel.KEY_HELPER_MODE), "kept after a reload")
+	panel = await _panel()
+	assert_eq(panel.get_row(OptionsPanel.KEY_HELPER_MODE).index, 1, "a new panel shows the stored value")
+	Settings.reset()
+	panel._sync_rows()
+	assert_eq(panel.get_row(OptionsPanel.KEY_RIVAL_SCORE).index, 0, "reset: off again")
+	assert_false(Settings.get_bool(OptionsPanel.KEY_HELPER_MODE))
+
+
 ## On a desktop without a touch screen (and touch buttons not switched on) the touch section is left out.
 func test_touch_options_only_where_touch_can_be_used() -> void:
 	Settings.set_value("controls/touch_always", false)
@@ -231,7 +291,9 @@ func test_bindings_page_has_swap_and_the_player_profiles() -> void:
 	assert_eq(panel.binding_text(&"jump", Defs.Device.GAMEPAD), "A", "the solo pad layout on every slot")
 	assert_true(swap.value_text.begins_with("NUM +"), "the row shows it: %s" % swap.value_text)
 	panel.set_bind_profile(0)
-	assert_eq(panel.binding_text(&"attack", Defs.Device.KEYBOARD), "SHIFT", "classic: P1 strikes with Left Shift")
+	assert_eq(panel.binding_text(&"attack", Defs.Device.KEYBOARD), UiGlyphs.event_text(_key_event(_p1_strike())),
+			"classic: P1 strikes with the preset's key (Left Ctrl)")
+	assert_ne(_p1_strike(), KEY_SHIFT, "never Shift: Windows lifts Shift while NumLock-on numpad keys are pressed")
 	assert_eq(panel.binding_text(&"jump", Defs.Device.KEYBOARD), "SPACE")
 	panel.set_bind_profile(2)
 	assert_false(panel.get_row(OptionsPanel.ROW_LAYOUT).visible)
@@ -296,7 +358,7 @@ func test_key_test_lights_both_players_and_passes() -> void:
 	var test: UiKeyTest = panel.get_key_test()
 	assert_true(test.is_visible_in_tree(), "the test page shows")
 	assert_false(test.all_lit())
-	var combo: Array[Key] = [KEY_A, KEY_SPACE, KEY_SHIFT, KEY_E, KEY_KP_4, KEY_KP_0, KEY_KP_ENTER, KEY_KP_ADD]
+	var combo: Array[Key] = [KEY_A, KEY_SPACE, _p1_strike(), KEY_E, KEY_KP_4, KEY_KP_0, KEY_KP_ENTER, KEY_KP_ADD]
 	for code: Key in combo:
 		# Num 4 and Num 0 arrive as NumLock off sends them (keycodes Left / Insert, physical keys of the numpad).
 		_key(code, true, code != KEY_KP_4 and code != KEY_KP_0)
@@ -307,7 +369,7 @@ func test_key_test_lights_both_players_and_passes() -> void:
 	assert_true(test.has_passed)
 	assert_eq(test.get_status_text(), tr("UI_KEYTEST_PASSED"))
 	assert_true(test.is_visible_in_tree(), "Num Enter and Space pressed no menu entry")
-	_key(KEY_SHIFT, false)
+	_key(_p1_strike(), false)
 	assert_false(test.is_lit(0, &"attack"))
 	assert_true(test.has_passed, "a pass is kept")
 	for i: int in 3:
@@ -321,12 +383,17 @@ func test_key_test_lights_both_players_and_passes() -> void:
 
 
 ## Windows with NumLock ON lifts Shift while a numpad key is pressed with Shift held (and presses it again after):
-## in the classic layout that drops P1's strike. The test spots the pattern and asks for NumLock off.
+## that drops the action of a player who bound Shift (the classic preset no longer does: P1 strikes with Left Ctrl).
+## The test spots the pattern and asks for NumLock off.
 func test_key_test_spots_the_numlock_shift_quirk() -> void:
+	var shift: InputEventKey = InputEventKey.new()
+	shift.physical_keycode = KEY_SHIFT
+	Settings.set_slot_binding(0, &"attack", shift, 0)
 	var panel: OptionsPanel = await _panel()
 	panel.open_key_test()
 	await get_tree().process_frame
 	var test: UiKeyTest = panel.get_key_test()
+	test.start()
 	_key(KEY_SHIFT, true)
 	await get_tree().process_frame
 	assert_true(test.is_lit(0, &"attack"))
@@ -350,10 +417,17 @@ func test_key_test_spots_the_numlock_shift_quirk() -> void:
 	_key(KEY_KP_5, true)
 	_key(KEY_KP_5, false)
 	assert_false(test.numlock_warning, "an ordinary Shift release some frames earlier is no quirk")
+	Settings.reset_slot_bindings(0)
+	test.start()
+	_key(KEY_SHIFT, true)
+	_key(KEY_SHIFT, false)
+	_key(KEY_KP_8, true, false)
+	_key(KEY_KP_8, false, false)
+	assert_false(test.numlock_warning, "nobody has Shift on a key: nothing to warn about")
 
 
 ## DESIGN.md D.11 / E.9: a two-player Grub Stack match on world-B's flat arena, driven only by the physical keys of the
-## classic preset as the options set it up - P1 W A S D + Space + Left Shift, P2 the numpad with NumLock on and off -
+## classic preset as the options set it up - P1 W A S D + Space + Left Ctrl, P2 the numpad with NumLock on and off -
 ## while the versus HUD shows the referee's numbers and the round result.
 func test_a_two_player_match_from_the_classic_keys() -> void:
 	OptionsPanel.apply_keyboard_preset(InputSlot.KeyboardLayout.TWO_HANDS)
@@ -425,10 +499,10 @@ func test_a_two_player_match_from_the_classic_keys() -> void:
 	versus.refresh()
 	assert_eq(versus.get_panel(1).get_stack_text(), "10", "P2's panel shows his stack")
 	_drive({KEY_D: true}, 2)
-	_drive({KEY_SHIFT: true}, 9)
+	_drive({_p1_strike(): true}, 9)
 	_drive({}, 30)
 	var left: int = int(referee.call(&"stack_of", 1))
-	assert_true(left < 10, "Left Shift: P1's club knocked food off P2's head (%d left)" % left)
+	assert_true(left < 10, "P1's strike key: his club knocked food off P2's head (%d left)" % left)
 	versus.refresh()
 	assert_eq(versus.get_panel(1).get_stack_text(), str(left), "the HUD follows the stack")
 	referee.call(&"add_food", p1, 20)
@@ -437,6 +511,18 @@ func test_a_two_player_match_from_the_classic_keys() -> void:
 	assert_true(versus.banner_text.contains("P1"), "the gong: P1 wins the round (%s)" % versus.banner_text)
 	_release_keys()
 	assert_false(GameInput.is_scripted(), "no script drove a hero")
+
+## P1's strike key of the classic shared-keyboard preset (InputSlot's table, owned by core-A).
+func _p1_strike() -> Key:
+	var keys: Array = InputSlot.default_keys(InputSlot.KeyboardLayout.CLASSIC, InputSlot.default_half(0), &"attack")
+	return keys[0] if not keys.is_empty() else KEY_NONE
+
+
+func _key_event(physical: Key) -> InputEventKey:
+	var event: InputEventKey = InputEventKey.new()
+	event.physical_keycode = physical
+	return event
+
 
 func _panel() -> OptionsPanel:
 	var panel: OptionsPanel = OptionsPanel.new()

@@ -4,7 +4,7 @@ Superpowers Asset Packs - Western FPS 2D
 Author: Pixel-boy (Sparklin Labs)
 Source: https://github.com/sparklinlabs/superpowers-asset-packs/tree/master/western-fps-2d
 Licence: CC0 1.0 (tier A)
-Used in Club & Grub for: 2.0 (The Far Shore): backgrounds/canyon/ layer0_sky, layer2_mesas, layer3_ridge; sprites/enemies/ bear, bear_b; tiles/canyon/props/ bone_small, branch_dead, cactus_short, cactus_small, cactus_tall, dead_tree_big, dry_bush, grass_dry, grass_dry_b, jar_a, jar_b, pebble_small, pebbles, rock_arch + 5 more. Per-file sources and edits: docs/ASSET_MANIFEST.md section 17
+Used in Club & Grub for: 2.0 (The Far Shore): backgrounds/canyon/ layer0_sky, layer2_mesas, layer3_ridge; sprites/enemies/ bear, bear_b; tiles/canyon/props/ bone_small, branch_dead, cactus_short, cactus_small, cactus_tall, dead_tree_big, dry_bush, grass_dry, grass_dry_b, jar_a, jar_b, pebble_small, pebbles, rock_arch + 5 more; tiles/coast/props/ pebbles, rock_sea_a, rock_sea_b, sea_stack; tiles/ruins/props/ jar_a, jar_b. Per-file sources and edits: docs/ASSET_MANIFEST.md section 17
 Staging folder: .tools/asset_candidates/expansion/superpowers-western-fps-2d
 
 ---- Licence evidence recorded when the pack was downloaded ----

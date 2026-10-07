@@ -315,6 +315,33 @@ func reset_stats() -> void:
 	comeback = 0
 
 
+## 2.0: every field of this run as plain data - energy, hand, belt, glider, the statistics of [constant STATS] and
+## the look (the versus deciding-moment replay keeps a round's start and end, VersusReplay). See [method from_dict].
+func to_dict() -> Dictionary:
+	var data: Dictionary = {
+		"hearts": hearts, "bones": bones, "weapon": weapon, "belt": belt, "has_glider": has_glider,
+		"palette": palette, "pattern": pattern,
+	}
+	for stat: StringName in STATS:
+		data[String(stat)] = int(get(stat))
+	return data
+
+
+## 2.0: put back a state of [method to_dict] (fields it does not hold keep their value). No signal: the caller emits
+## what its listeners need (emit_energy, emit_weapon ...).
+func from_dict(data: Dictionary) -> void:
+	hearts = int(data.get("hearts", hearts))
+	bones = int(data.get("bones", bones))
+	weapon = int(data.get("weapon", weapon))
+	belt = int(data.get("belt", belt))
+	has_glider = bool(data.get("has_glider", has_glider))
+	palette = StringName(str(data.get("palette", palette)))
+	pattern = int(data.get("pattern", pattern))
+	for stat: StringName in STATS:
+		if data.has(String(stat)):
+			set(stat, int(data[String(stat)]))
+
+
 ## A chain of `length` head bounces / stomps ended (or grew): keeps the longest ([member best_chain]).
 func note_chain(length: int) -> void:
 	best_chain = maxi(best_chain, length)

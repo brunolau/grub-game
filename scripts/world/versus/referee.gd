@@ -21,7 +21,13 @@ extends SimEntity
 ##    farthest from the rivals with a 48-tick spawn shield, the referee's own counters (spawn shield, squash, hit-stop,
 ##    stomp immunity) written to the heroes.
 ## The mode's currency: Grub Stack (the stack on the head, banking in the cookpot, spills and steals) and Last
-## Caveman Standing (hearts); Hot Rock and Clubball hits only knock back (their rules are PLAN.md P2.4).
+## Caveman Standing (hearts, bones, Stock, Grudge Pterodactyls [VersusGrudge]); Hot Rock ([VersusHotRock]: the ember)
+## and Clubball ([VersusClubball]: shots, goals) - their hits only knock back.
+## PLAN.md P2.4 (phase 2): the themed sudden deaths ([VersusSuddenDeath], at 1 457 ticks in Last Caveman Standing,
+## an event toggle elsewhere), pterodactyl crates ([VersusCrates]), temporary specials (throws counted, lost on a
+## knock-out or at the round end), the versus feast (per hero cutlery; a feaster's touch costs a rival), presets,
+## variants and the Auto handicap ([VersusRules]), dazes (a Grudge rock, a giant bonus bonk, a Clubball knock-down:
+## 12 stunned ticks and no immunity after).
 ##
 ## The hero side of a hit is the contract call `victim.hurt(source, Defs.HurtKind.RIVAL)` (the hero's party
 ## component, player-A); right after it the referee writes the C.14 values itself and puts the run's hearts, bones
@@ -36,6 +42,10 @@ extends SimEntity
 
 ## A hero's stack, bank or both changed (HUD, stack display).
 signal stack_changed(slot: int, stack: int, banked: int)
+## Hot Rock: the ember went to `slot` (-1 = it popped / nobody holds it).
+signal ember_changed(slot: int)
+## Clubball: `team` (1 / 2) scored; the score after it.
+signal goal_scored(team: int, goals_team_1: int, goals_team_2: int)
 
 ## Round phases.
 const PHASE_INTRO: int = 0   ## "3, 2, 1, GRUB!": heroes frozen at their spawns
@@ -58,6 +68,8 @@ const BIG_FOOD_MIN_POINTS: int = 600
 const COOKPOT_SCRIPT: String = "res://scripts/objects/cookpot.gd"
 ## The clang (DESIGN.md E.2, the Colossus clank); Sfx.IMPACT while AudioTable has no row for it.
 const SFX_CLANG: StringName = Sfx.CLANG
+## Node group of everything a round spawns (hazards, crates, Grudge Pterodactyls): freed when the next round begins.
+const ROUND_GROUP: StringName = &"versus_round"
 
 ## The level this referee runs (Game.level when it entered the tree).
 var level: LevelBase = null
@@ -85,6 +97,14 @@ var knockouts_final: bool = false
 var winner_slots: PackedInt32Array = PackedInt32Array()
 ## Spawn index per slot this round (index into VersusArena.spawn_points; -1 = rotate by round_index).
 var spawn_of: PackedInt32Array = PackedInt32Array([-1, -1, -1, -1])
+## The round's rules (presets, variants, crates, Stock, Auto handicap); tests may change them before begin_round.
+var rules: VersusRules = VersusRules.new()
+## The mode modules (PLAN.md P2.4).
+var hot_rock: VersusHotRock = null
+var clubball: VersusClubball = null
+var sudden_death: VersusSuddenDeath = null
+## Round tick at which the themed sudden death starts (-1 = never this round).
+var sudden_death_at: int = -1
 
 # --- Per slot (index = player slot) -------------------------------------------------------------------------------
 var _stack: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
@@ -107,6 +127,24 @@ var _throws_left: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 var _death_pos: Array[Vector2i] = [Vector2i.ZERO, Vector2i.ZERO, Vector2i.ZERO, Vector2i.ZERO]
 var _death_cause: Array[StringName] = [&"", &"", &"", &""]
 var _walk_cap: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
+## Ticks of daze left (12 stunned ticks, then hit_timer 0: no immunity after).
+var _daze_left: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
+## Last Caveman Standing, option Stock: lives left.
+var _stocks: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
+## The Auto handicap's leaf shield (absorbs one hit).
+var _leaf: PackedByteArray = PackedByteArray([0, 0, 0, 0])
+## The versus feast: cutlery pieces each hero holds (bit mask) and the referee's feast clock.
+var _cutlery: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
+var _feast_left: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
+## Round tick at which an out hero's Grudge Pterodactyl takes off (-1 = none pending).
+var _grudge_at: PackedInt32Array = PackedInt32Array([-1, -1, -1, -1])
+## Entities the referee spawned this round (grudges, hazards, crates): freed at the next round.
+var _spawned: Array[Node] = []
+## Hero projectiles already counted for the temporary specials (instance id -> true).
+var _thrown_seen: Dictionary = {}
+## Giant bonuses that bonked a head already (instance id -> true).
+var _bonked: Dictionary = {}
+var _gust_sign: int = 1
 
 var _intro_ticks: int = 0
 var _feast_rush: bool = false
@@ -127,6 +165,8 @@ func _init() -> void:
 	box_w = 0
 	box_h = 0
 	box_xo = 0
+	hot_rock = VersusHotRock.new(self)
+	clubball = VersusClubball.new(self)
 
 
 func _sim_phases() -> PackedInt32Array:
@@ -147,6 +187,8 @@ func _enter_tree() -> void:
 
 func _exit_tree() -> void:
 	_exit_display()
+	if sudden_death != null:
+		sudden_death.stop()
 	if _current == self:
 		_current = null
 	if Events.item_collected.is_connected(_on_item_collected):
@@ -211,13 +253,34 @@ func begin_round(index: int) -> void:
 		_bank_seen[slot] = -1
 		_throws_left[slot] = 0
 		_walk_cap[slot] = Tuning.WALK_CAP
+		_daze_left[slot] = 0
+		_stocks[slot] = VersusTuning.LCS_STOCKS if mode == Defs.VersusMode.LAST_CAVEMAN and rules.stock else 0
+		_leaf[slot] = rules.leaf_shield[slot] if slot < rules.leaf_shield.size() else 0
+		_cutlery[slot] = 0
+		_feast_left[slot] = 0
+		_grudge_at[slot] = -1
+	knockouts_final = (mode == Defs.VersusMode.LAST_CAVEMAN and not rules.stock) or mode == Defs.VersusMode.HOT_ROCK
+	_clear_spawned()
+	_thrown_seen.clear()
+	_bonked.clear()
+	_gust_sign = 1
+	hot_rock.reset()
 	if level == null:
 		return
+	if sudden_death != null:
+		sudden_death.stop()
+	sudden_death = VersusSuddenDeath.new(self, level)
+	sudden_death_at = _sudden_death_start()
+	level.set_wind(0)
+	level.set_darkness(rules.has(VersusRules.LIGHTS_OUT))
 	var spawns: Array[Vector2i] = VersusArena.spawn_points(level)
+	var sides: Dictionary = _clubball_spawns(spawns) if mode == Defs.VersusMode.CLUBBALL else {}
 	for hero: PlayerBase in _heroes():
 		var slot: int = hero.slot
 		var spawn: int = spawn_of[slot] if spawn_of[slot] >= 0 else slot + round_index
 		var pos: Vector2i = spawns[posmod(spawn, spawns.size())] if not spawns.is_empty() else hero.sim_pos
+		if sides.has(slot):
+			pos = sides[slot]
 		level.respawn_hero(hero, pos)
 		hero.facing = 1 if pos.x < VersusArena.view_rect().get_center().x else -1
 		hero.run.hearts = start_hearts[slot] if mode == Defs.VersusMode.LAST_CAVEMAN else Tuning.ENERGY_START
@@ -225,7 +288,68 @@ func begin_round(index: int) -> void:
 		hero.run.emit_energy()
 		_picked_seen[slot] = hero.run.picked
 		hero.set_control_enabled(false)
+		hero.feast = 0
+		_arm_round_weapons(hero)
 		_emit_stack(slot)
+	if mode == Defs.VersusMode.CLUBBALL:
+		clubball.reset()
+
+
+## Everyone starts every round with the club in the hand and an empty belt (DESIGN.md E.2); Hammer Time puts the
+## hammer in the hand and the club on the belt, Spear Party a spear on the belt that never runs out.
+func _arm_round_weapons(hero: PlayerBase) -> void:
+	var run: PlayerRun = hero.run
+	var slot: int = hero.slot
+	if rules.has(VersusRules.HAMMER_TIME):
+		run.set_weapon(Defs.Weapon.HAMMER)
+		run.set_belt(Defs.Weapon.CLUB)
+	else:
+		run.set_weapon(Defs.Weapon.CLUB)
+		run.set_belt(PlayerRun.BELT_EMPTY)
+	if rules.has(VersusRules.SPEAR_PARTY):
+		run.set_belt(Defs.Weapon.SPEAR)
+		_throws_left[slot] = -1
+	else:
+		_throws_left[slot] = 0
+
+
+## When the themed sudden death starts this round (round ticks; -1 = never): Last Caveman Standing at
+## VersusTuning.SUDDEN_DEATH_AT_TICKS; as the event toggle in the other modes at the same time, or at the Feast Rush
+## when the round is shorter.
+func _sudden_death_start() -> int:
+	if mode == Defs.VersusMode.LAST_CAVEMAN:
+		return VersusTuning.SUDDEN_DEATH_AT_TICKS
+	if not rules.sudden_death_event:
+		return -1
+	if round_total > 0 and round_total - VersusTuning.FEAST_RUSH_TICKS < VersusTuning.SUDDEN_DEATH_AT_TICKS:
+		return maxi(round_total - VersusTuning.FEAST_RUSH_TICKS, 0)
+	return VersusTuning.SUDDEN_DEATH_AT_TICKS
+
+
+## Clubball: each side at the spawn points nearest its own goal (team 1 the left ones when it defends the left goal),
+## in slot order. slot -> feet point.
+func _clubball_spawns(spawns: Array[Vector2i]) -> Dictionary:
+	var result: Dictionary = {}
+	if spawns.is_empty():
+		return result
+	if clubball.zones.is_empty():
+		clubball.zones = VersusClubball.goal_zones(level)
+	var sorted: Array[Vector2i] = spawns.duplicate()
+	sorted.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return a.x < b.x or (a.x == b.x and a.y < b.y))
+	var centre: int = VersusArena.view_rect().get_center().x
+	var used: Dictionary = {}
+	for hero: PlayerBase in _heroes():
+		var side: int = clubball.side_of(hero.slot)
+		var left: bool = clubball.own_goal_x(side) < centre
+		var order: Array[Vector2i] = sorted if left else sorted.duplicate()
+		if not left:
+			order.reverse()
+		for point: Vector2i in order:
+			if not used.has(point):
+				used[point] = true
+				result[hero.slot] = point
+				break
+	return result
 
 
 ## Skip the intro: the round starts now (tests, a rematch without countdown).
@@ -238,6 +362,15 @@ func start_round_now() -> void:
 ## Drumstick instead unless `allow_golden` is false).
 func end_round(allow_golden: bool = true) -> void:
 	if phase == PHASE_OVER:
+		return
+	if mode == Defs.VersusMode.CLUBBALL:
+		var lead: int = clubball.leader()
+		if lead == 0 and allow_golden:
+			# A tie at the clock's end: the golden coconut - the next goal wins (the clock stops).
+			clubball.start_golden()
+			phase = PHASE_GOLDEN
+			return
+		_finish(clubball.slots_of(lead) if lead > 0 else PackedInt32Array())
 		return
 	var best: PackedInt32Array = _best_slots()
 	if best.size() > 1 and allow_golden and mode == Defs.VersusMode.GRUB_STACK and _team_count(best) > 1:
@@ -257,6 +390,37 @@ func _start_play() -> void:
 	Events.round_started.emit(round_index)
 
 
+## Clubball after a goal's pause: every hero back at his side's spawn, shielded, playing on (the clock runs).
+func kickoff() -> void:
+	if level == null:
+		return
+	var sides: Dictionary = _clubball_spawns(VersusArena.spawn_points(level))
+	for hero: PlayerBase in _heroes():
+		if not sides.has(hero.slot):
+			continue
+		var pos: Vector2i = sides[hero.slot]
+		level.respawn_hero(hero, pos)
+		hero.facing = 1 if pos.x < VersusArena.view_rect().get_center().x else -1
+		_shield_left[hero.slot] = VersusTuning.SPAWN_SHIELD_TICKS
+		hero.shield = VersusTuning.SPAWN_SHIELD_TICKS
+		_daze_left[hero.slot] = 0
+		_dead_tick[hero.slot] = -1
+		if phase == PHASE_OVER:
+			hero.set_control_enabled(false)
+
+
+## Start the arena's themed sudden death now (`theme` "" = the arena's own, VersusSuddenDeath.theme_of).
+func start_sudden_death(theme: StringName = &"") -> void:
+	if level == null:
+		return
+	if sudden_death == null:
+		sudden_death = VersusSuddenDeath.new(self, level)
+	var chosen: StringName = theme if theme != &"" else VersusSuddenDeath.theme_of(level.meta)
+	sudden_death.start(chosen)
+	_sfx(Sfx.SUDDEN_DEATH)
+	Events.round_sudden_death_started.emit(round_index, chosen)
+
+
 func _start_golden() -> void:
 	phase = PHASE_GOLDEN
 	var view: Rect2i = VersusArena.view_rect()
@@ -273,8 +437,14 @@ func _start_golden() -> void:
 func _finish(winners: PackedInt32Array) -> void:
 	phase = PHASE_OVER
 	winner_slots = _with_teammates(winners)
+	if sudden_death != null:
+		sudden_death.stop()
+	if level != null:
+		level.set_wind(0)
 	for hero: PlayerBase in _heroes():
 		hero.set_control_enabled(false)
+		# Temporary specials end with the round (DESIGN.md E.2).
+		_lose_special(hero)
 	# A match round: Flow records it (VersusMatch.record_round) and emits Events.round_ended once; without a match
 	# (tests, a free round) the referee emits it itself.
 	var versus_match: Object = _versus_match()
@@ -311,6 +481,7 @@ func _read_setup() -> void:
 	knockouts_final = false
 	var versus_match: Object = _versus_match()
 	if versus_match == null:
+		rules = VersusRules.from_match(null, mode)
 		return
 	var round_mode: Variant = versus_match.get(&"round_mode")
 	if round_mode is int and int(round_mode) >= 0:
@@ -335,8 +506,8 @@ func _read_setup() -> void:
 		var hearts: Variant = seat.get(&"hearts")
 		if hearts is int and int(hearts) > 0:
 			start_hearts[slot] = clampi(int(hearts), VersusTuning.HANDICAP_HEARTS_MIN, VersusTuning.HANDICAP_HEARTS_MAX)
-	var stock: Variant = versus_match.get(&"stock")
-	knockouts_final = mode == Defs.VersusMode.LAST_CAVEMAN and not (stock is bool and bool(stock))
+	rules = VersusRules.from_match(versus_match, mode)
+	knockouts_final = (mode == Defs.VersusMode.LAST_CAVEMAN and not rules.stock) or mode == Defs.VersusMode.HOT_ROCK
 
 
 ## Game.versus_match while a match is set up (null otherwise or before core-A's member exists).
@@ -358,14 +529,131 @@ func banked_of(slot: int) -> int:
 	return _pot[_pot_index(slot)] if slot >= 0 and slot < Defs.MAX_PLAYERS else 0
 
 
-## The round score of `slot`: Grub Stack banked + stack; Last Caveman Standing the hearts left (0 when out).
+## The round score of `slot`: Grub Stack banked + stack; Last Caveman Standing the hearts left (0 when out); Hot Rock
+## 1 while standing; Clubball his side's goals.
 func score_of(slot: int) -> int:
 	if slot < 0 or slot >= Defs.MAX_PLAYERS:
 		return 0
-	if mode == Defs.VersusMode.LAST_CAVEMAN:
-		var hero: PlayerBase = level.get_hero(slot) if level != null else null
-		return 0 if hero == null or _out[slot] != 0 else hero.run.hearts
+	match mode:
+		Defs.VersusMode.LAST_CAVEMAN:
+			var hero: PlayerBase = level.get_hero(slot) if level != null else null
+			return 0 if hero == null or _out[slot] != 0 else hero.run.hearts
+		Defs.VersusMode.HOT_ROCK:
+			return 0 if _out[slot] != 0 else 1
+		Defs.VersusMode.CLUBBALL:
+			return clubball.goals[clubball.side_of(slot)]
 	return _stack[slot] + banked_of(slot)
+
+
+## Hot Rock: the slot holding the ember (-1 = nobody).
+func ember_holder() -> int:
+	return hot_rock.holder if mode == Defs.VersusMode.HOT_ROCK else -1
+
+
+## Clubball: the goals of `team` (1 / 2).
+func goals_of(team: int) -> int:
+	return clubball.goals[team] if team == 1 or team == 2 else 0
+
+
+## Throws a temporary special of `slot` has left (0 = none counted, -1 = never runs out).
+func throws_left(slot: int) -> int:
+	return _throws_left[slot] if slot >= 0 and slot < Defs.MAX_PLAYERS else 0
+
+
+## Last Caveman Standing with Stock: lives left of `slot`.
+func stocks_of(slot: int) -> int:
+	return _stocks[slot] if slot >= 0 and slot < Defs.MAX_PLAYERS else 0
+
+
+## True while `slot` carries the Auto handicap's leaf shield.
+func has_leaf(slot: int) -> bool:
+	return slot >= 0 and slot < Defs.MAX_PLAYERS and _leaf[slot] != 0
+
+
+## True while `slot` is dazed (a Grudge rock, a giant bonus bonk, a Clubball knock-down).
+func is_dazed(slot: int) -> bool:
+	return slot >= 0 and slot < Defs.MAX_PLAYERS and _daze_left[slot] > 0
+
+
+## The cutlery pieces `slot` holds (bit mask of feast-kit indices).
+func cutlery_of(slot: int) -> int:
+	return _cutlery[slot] if slot >= 0 and slot < Defs.MAX_PLAYERS else 0
+
+
+## objects-B's crate lanes ask the party driver what the next crate holds (CrateLane, P2.7): ItemContents tokens of
+## [method VersusCrates.contents_for] for this round's mode and rules ("" = the lane's default table).
+func crate_contents(_lane: Object) -> String:
+	return VersusCrates.contents_for(mode, rules)
+
+
+# --- What the bots read (core-B, wf8_core-B_to_world-B.txt; read-only, between ticks) ------------------------------
+
+## Last Caveman Standing: the feet point of `slot`'s Grudge Pterodactyl, Vector2i(-1, -1) while he rides none.
+func grudge_pos(slot: int) -> Vector2i:
+	var grudge: VersusGrudge = _grudge_of(slot)
+	return grudge.sim_pos if grudge != null else Vector2i(-1, -1)
+
+
+## True when a Strike of `slot` would make his Grudge Pterodactyl squawk and drop a rock now.
+func grudge_ready(slot: int) -> bool:
+	var grudge: VersusGrudge = _grudge_of(slot)
+	return grudge != null and grudge.cooldown == 0 and grudge.squawk == 0
+
+
+## Hot Rock: ticks left in which `slot` cannot receive the ember back (0 = he can).
+func ember_pass_immune(slot: int) -> int:
+	if mode != Defs.VersusMode.HOT_ROCK or slot < 0 or slot >= Defs.MAX_PLAYERS:
+		return 0
+	return maxi(hot_rock.immune_until[slot] - round_ticks, 0)
+
+
+## Hot Rock: true in the fuse's last VersusTuning.HOT_ROCK_HURRY_TICKS (the visible fast bubbling).
+func ember_hurry() -> bool:
+	return mode == Defs.VersusMode.HOT_ROCK and hot_rock.in_hurry()
+
+
+## Clubball: the coconut (objects-B's Coconut; null outside Clubball or without one).
+func ball() -> SimEntity:
+	return clubball.ball() if mode == Defs.VersusMode.CLUBBALL else null
+
+
+## Clubball: the goal mouth `team` (1 / 2) defends, logical px (the other team scores in it).
+func goal_rect(team: int) -> Rect2i:
+	return clubball.goal_rect(team)
+
+
+## The boxes (logical px) that are deadly now or whose telegraph is showing and that turn deadly within
+## `lookahead_ticks`: armed and telegraphing sudden-death hazards, the rising band (and its next row once the rumble
+## announced it). A Grudge rock is a daze, not listed. Only what a player can see.
+func danger_rects(lookahead_ticks: int) -> Array[Rect2i]:
+	var result: Array[Rect2i] = []
+	if level == null or not level.is_inside_tree():
+		return result
+	for node: Node in level.get_tree().get_nodes_in_group(ROUND_GROUP):
+		var hazard: VersusHazard = node as VersusHazard
+		if hazard == null or hazard.is_queued_for_deletion() or hazard.effect != VersusHazard.EFFECT_KILL:
+			continue
+		if not hazard.is_warning():
+			result.append(hazard.danger_rect())
+		elif hazard.warn_tick + hazard.warn_ticks - Sim.tick <= lookahead_ticks:
+			result.append(hazard.danger_rect())
+	if sudden_death != null and sudden_death.band_top >= 0 and sudden_death.theme != VersusSuddenDeath.SYRUP_FLOOD:
+		var view: Rect2i = VersusArena.view_rect()
+		var top: int = sudden_death.band_top
+		if sudden_death.band_step_tick >= 0 and sudden_death.band_step_tick - Sim.tick <= lookahead_ticks:
+			top -= Tuning.TILE
+		result.append(Rect2i(view.position.x, top, view.size.x, maxi(view.end.y + Tuning.TILE - top, 0)))
+	return result
+
+
+func _grudge_of(slot: int) -> VersusGrudge:
+	if level == null or not level.is_inside_tree():
+		return null
+	for node: Node in level.get_tree().get_nodes_in_group(ROUND_GROUP):
+		var grudge: VersusGrudge = node as VersusGrudge
+		if grudge != null and grudge.slot == slot and not grudge.is_queued_for_deletion():
+			return grudge
+	return null
 
 
 ## The crowned slot: the tallest stack (Grub Stack: units on the head; ties and an empty arena: -1).
@@ -420,9 +708,13 @@ func round_wins_of(slot: int) -> int:
 	return 0
 
 
-## The team of `slot` (-1 = free for all).
+## The team of `slot` (-1 = free for all). Clubball always has two sides: 1 or 2 for every slot (VersusClubball).
 func team_of(slot: int) -> int:
-	return teams[slot] if slot >= 0 and slot < Defs.MAX_PLAYERS else -1
+	if slot < 0 or slot >= Defs.MAX_PLAYERS:
+		return -1
+	if mode == Defs.VersusMode.CLUBBALL:
+		return clubball.side_of(slot)
+	return teams[slot]
 
 
 ## Units `item` adds to a stack when picked up (core-B's bots): food by class, 0 = not food, -1 = harmful (the skull
@@ -572,6 +864,7 @@ func _sim_tick(sim_phase: int) -> void:
 			for hero: PlayerBase in _heroes():
 				_picked_seen[hero.slot] = hero.run.picked
 			if _round_live():
+				_giant_bonks()
 				_weapons_step()
 		Defs.Phase.PLAYER:
 			_player_step()
@@ -586,6 +879,109 @@ func _sim_tick(sim_phase: int) -> void:
 
 func _round_live() -> bool:
 	return phase == PHASE_PLAY or phase == PHASE_GOLDEN
+
+
+## True while the round is played (after the countdown, before the gong).
+func round_live() -> bool:
+	return _round_live()
+
+
+## In play: alive, hatched, not out of the round (the mode modules' test).
+func is_in_play(hero: PlayerBase) -> bool:
+	return _in_play(hero)
+
+
+## The heroes of the arena in slot order.
+func heroes_in_order() -> Array[PlayerBase]:
+	return _heroes()
+
+
+## Immune to PvP right now (spawn shield, hurt immunity, stomp immunity, the feast).
+func is_pvp_immune(hero: PlayerBase) -> bool:
+	return _pvp_immune(hero)
+
+
+## The club frame of the hero's box (Tuning.ClubFrame).
+func frame_of(hero: PlayerBase) -> int:
+	return _frame_of(hero)
+
+
+## True when the hero's box is a front frame (clangs, deflects, bats, shoots the coconut).
+func is_front_box(hero: PlayerBase) -> bool:
+	return _is_front(hero)
+
+
+## True when the hero's box is charged (power x4).
+func is_charged_box(hero: PlayerBase) -> bool:
+	return _is_charged(hero)
+
+
+## Daze `hero` for `ticks` (a Grudge rock, a giant bonus bonk, a Clubball knock-down): stunned (hit_timer 43, so
+## the HURT state and no pick-ups), then hit_timer 0 at once - no immunity after. His box ends; no currency.
+func daze(hero: PlayerBase, ticks: int) -> void:
+	if hero == null or hero.dead or hero.is_down():
+		return
+	var slot: int = hero.slot
+	_daze_left[slot] = maxi(ticks, 1)
+	hero.hit_timer = VersusTuning.HURT_TIMER_TICKS
+	hero.club_box_active = false
+	hero.attack_gate = false
+	hero.charge = 0
+	_bank_count[slot] = 0
+	_sfx(Sfx.DAZE)
+
+
+## A [VersusHazard] touched `hero` (its CONTACT_ITEMS step): a sudden-death kill (the spawn shield does not help), a
+## Grudge rock's daze (shield, immunity and the curl do), a crate nothing. Only while the round is played.
+func hazard_contact(hero: PlayerBase, hazard: VersusHazard) -> void:
+	if hero == null or hazard == null or not _round_live() or not _in_play(hero):
+		return
+	var slot: int = hero.slot
+	match hazard.effect:
+		VersusHazard.EFFECT_KILL:
+			_death_cause[slot] = hazard.cause
+			_death_pos[slot] = hero.sim_pos
+			hero.kill(hazard.cause)
+		VersusHazard.EFFECT_DAZE:
+			if _pvp_immune(hero) or hero.is_curled():
+				return
+			daze(hero, VersusTuning.GRUDGE_ROCK_DAZE_TICKS)
+			if hazard.owner_slot >= 0:
+				_last_hitter[slot] = hazard.owner_slot
+				_last_hit_tick[slot] = Sim.tick
+
+
+## A cave-in block settled into `cell`: a hero whose body is in it is crushed.
+func crush_cell(cell: Vector2i) -> void:
+	var rect: Rect2i = Rect2i(cell * Tuning.TILE, Vector2i(Tuning.TILE, Tuning.TILE))
+	for hero: PlayerBase in _heroes():
+		if _in_play(hero) and Overlap.rects(rect, hero.get_box()):
+			_death_cause[hero.slot] = &"crush"
+			_death_pos[hero.slot] = hero.sim_pos
+			hero.kill(&"crush")
+
+
+## A giant bonus falling onto a head bonks it (DESIGN.md E.3: the 4.5 bounce of the item, plus a 12-tick daze); each
+## falling bonus bonks once (Head Case).
+func _giant_bonks() -> void:
+	if mode != Defs.VersusMode.GRUB_STACK:
+		return
+	for entity: SimEntity in level.get_kind(Defs.Kind.COLLECTIBLE):
+		var item: CollectibleBase = entity as CollectibleBase
+		if item == null or item.collected or item.item_id != &"items/giant_bonus" or item.yvel <= 0:
+			continue
+		var id: int = item.get_instance_id()
+		if _bonked.has(id):
+			continue
+		for hero: PlayerBase in _heroes():
+			if not _in_play(hero) or _pvp_immune(hero):
+				continue
+			var head: Rect2i = Rect2i(hero.sim_pos.x - 8, hero.sim_pos.y - hero.box_h - 4, 16, 8)
+			if Overlap.rects(head, item.get_box()):
+				_bonked[id] = true
+				daze(hero, VersusTuning.GIANT_BONK_DAZE_TICKS)
+				_stat(hero, &"bonks", 1)
+				break
 
 
 # --- WEAPONS: gather, then apply ------------------------------------------------------------------------------------
@@ -687,13 +1083,20 @@ func _resolve_hit(hit: Dictionary, victim_immune: bool) -> void:
 		return
 	if victim_immune or victim.is_curled():
 		return
+	if _leaf[victim.slot] != 0:
+		# The Auto handicap's leaf shield absorbs one hit: a bump, nothing else.
+		_leaf[victim.slot] = 0
+		victim.xvel = VersusTuning.TEAMMATE_BUMP_XVEL * _away(attacker, victim, hit["source"])
+		_sfx(SFX_CLANG)
+		return
 	_apply_hit(attacker, hit["source"], victim, bool(hit["charged"]), int(hit["weapon"]), thrown)
 
 
 ## The C.14 hit: the contract call victim.hurt(source, RIVAL), then the referee's table (knock-back, hurt timer,
-## hit-stop) and the mode's currency. The run's hearts / bones / glider are put back after the call.
+## hit-stop) and the mode's currency. The run's hearts / bones / glider are put back after the call. `spill_units`
+## >= 0 replaces the Grub Stack spill formula (a feaster's touch: VersusTuning.FEAST_TOUCH_SPILL).
 func _apply_hit(attacker: PlayerBase, source: SimEntity, victim: PlayerBase, charged: bool, weapon: int,
-		thrown: bool) -> void:
+		thrown: bool, spill_units: int = -1) -> void:
 	var run: PlayerRun = victim.run
 	var hearts: int = run.hearts
 	var bones: int = run.bones
@@ -736,6 +1139,9 @@ func _apply_hit(attacker: PlayerBase, source: SimEntity, victim: PlayerBase, cha
 		_stat(attacker, &"hits", 1)
 	_stat(victim, &"hurts", 1)
 	_sfx(Sfx.CLUB_HIT_HEAVY if charged or weapon == Defs.Weapon.HAMMER else Sfx.CLUB_HIT)
+	_daze_left[victim.slot] = 0
+	_drop_cutlery(victim)
+	var one_bonk: bool = rules.has(VersusRules.ONE_BONK)
 	# The mode's currency.
 	match mode:
 		Defs.VersusMode.GRUB_STACK:
@@ -744,9 +1150,19 @@ func _apply_hit(attacker: PlayerBase, source: SimEntity, victim: PlayerBase, cha
 				divisor = VersusTuning.SPILL_CHARGED_DIV
 			elif thrown:
 				divisor = VersusTuning.SPILL_THROWN_DIV
-			spill(victim, VersusTuning.spill(_stack[victim.slot], divisor), true)
+			var units: int = VersusTuning.spill(_stack[victim.slot], divisor)
+			if spill_units >= 0:
+				units = mini(spill_units, _stack[victim.slot])
+			if one_bonk:
+				units = _stack[victim.slot]
+			spill(victim, units, true)
 		Defs.VersusMode.LAST_CAVEMAN:
-			_lose_hearts(victim, VersusTuning.LCS_CHARGED_HEARTS if charged else 1, attacker, &"hit")
+			var hearts_lost: int = VersusTuning.LCS_CHARGED_HEARTS if charged else 1
+			if one_bonk:
+				hearts_lost = victim.run.hearts
+			_lose_hearts(victim, hearts_lost, attacker, &"hit")
+		Defs.VersusMode.HOT_ROCK:
+			hot_rock.contact(attacker, victim, round_ticks)
 
 
 func _set_stop(hero: PlayerBase, ticks: int) -> void:
@@ -828,10 +1244,29 @@ func _player_step() -> void:
 				_stomp_immune[slot] = 0
 		if hero.is_grounded():
 			_chain[slot] = 0
+			if rules.has(VersusRules.SLIPPERY):
+				hero.ice = maxi(hero.ice, VersusRules.SLIPPERY_ICE)
 		_apply_weight(hero)
 	_wrap_projectiles()
 	if _round_live():
+		_feast_touches(heroes)
 		_body_bump(heroes)
+		if mode == Defs.VersusMode.HOT_ROCK:
+			hot_rock.touch(round_ticks)
+
+
+## The versus feast (DESIGN.md E.3): a feaster's touch knocks VersusTuning.FEAST_TOUCH_SPILL units off any rival he
+## overlaps (a hit with its knock-back; Last Caveman Standing a heart) - hits cannot touch him meanwhile.
+func _feast_touches(heroes: Array[PlayerBase]) -> void:
+	for feaster: PlayerBase in heroes:
+		if _feast_left[feaster.slot] <= 0 or not _in_play(feaster):
+			continue
+		for victim: PlayerBase in heroes:
+			if victim == feaster or not _in_play(victim) or _teammates(feaster, victim) or _pvp_immune(victim):
+				continue
+			if victim.is_curled() or not Overlap.body(feaster, victim):
+				continue
+			_apply_hit(feaster, feaster, victim, false, feaster.run.weapon, false, VersusTuning.FEAST_TOUCH_SPILL)
 
 
 ## The lr / tb wrap of an arena (VersusArena.wrap_step, after every hero moved).
@@ -912,6 +1347,10 @@ func _apply_weight(hero: PlayerBase) -> void:
 	if mode == Defs.VersusMode.GRUB_STACK:
 		cap = VersusTuning.stack_walk_cap(_stack[slot])
 		heavy = _stack[slot] >= VersusTuning.STACK_HEAVIER
+	elif mode == Defs.VersusMode.HOT_ROCK:
+		cap = hot_rock.walk_cap_for(slot)
+	if sudden_death != null and sudden_death.band_effect(hero) == &"slow":
+		cap = mini(cap, VersusSuddenDeath.SYRUP_WALK_CAP)
 	_walk_cap[slot] = cap
 	if &"walk_cap_override" in hero:
 		hero.set(&"walk_cap_override", 0 if cap == Tuning.WALK_CAP else cap)
@@ -941,8 +1380,11 @@ func _stomp_step() -> void:
 		var victim: PlayerBase = stomp["victim"]
 		var up: bool = (GameInput.get_flags(stomper.slot) & Defs.IN_UP) != 0 and stomper.control_enabled \
 				and _squash_left[stomper.slot] == 0
-		stomper.bounce(Tuning.BOUNCE_YVEL_UP if up else Tuning.BOUNCE_YVEL, int(stomp["depth"]))
+		var up_yvel: int = VersusRules.BIG_BOUNCE_YVEL if rules.has(VersusRules.BIG_BOUNCE) else Tuning.BOUNCE_YVEL_UP
+		stomper.bounce(up_yvel if up else Tuning.BOUNCE_YVEL, int(stomp["depth"]))
 		_sfx(Sfx.BOUNCE)
+		if mode == Defs.VersusMode.HOT_ROCK and not _teammates(stomper, victim):
+			hot_rock.contact(stomper, victim, round_ticks)
 		if _teammates(stomper, victim) or bool(immune_before[victim.slot]) or victim.is_curled():
 			continue  # a free springboard
 		_chain[stomper.slot] += 1
@@ -982,6 +1424,9 @@ func _round_step() -> void:
 				_start_play()
 		PHASE_PLAY:
 			round_ticks += 1
+			_world_rules()
+			if phase != PHASE_PLAY:
+				return  # a goal ended the game
 			if mode == Defs.VersusMode.GRUB_STACK:
 				_refill_spots()
 			if mode == Defs.VersusMode.GRUB_STACK and round_total > 0 and not _feast_rush \
@@ -989,14 +1434,47 @@ func _round_step() -> void:
 				_start_feast_rush()
 			if round_total > 0 and round_ticks >= round_total:
 				end_round()
-			elif mode == Defs.VersusMode.LAST_CAVEMAN:
+			elif mode == Defs.VersusMode.LAST_CAVEMAN or mode == Defs.VersusMode.HOT_ROCK:
 				var standing: PackedInt32Array = _standing_slots()
 				if _team_count(standing) <= 1 and level.hero_count() > 1:
 					_finish(standing)
 		PHASE_GOLDEN:
 			round_ticks += 1
-			if _golden == null or not is_instance_valid(_golden):
+			if mode == Defs.VersusMode.CLUBBALL:
+				_world_rules()
+			elif _golden == null or not is_instance_valid(_golden):
 				_finish(_best_slots())
+
+
+## The WORLD part of the mode modules and the round's rules: Hot Rock's ember, Clubball's goals, the variants on a
+## clock (Gusty, Giant Rain), the themed sudden death (start, threats, the band).
+func _world_rules() -> void:
+	match mode:
+		Defs.VersusMode.HOT_ROCK:
+			hot_rock.tick(round_ticks)
+		Defs.VersusMode.CLUBBALL:
+			var scorer: int = clubball.tick()
+			if scorer > 0 and clubball.has_won(scorer):
+				_finish(clubball.slots_of(scorer))
+				return
+	if rules.has(VersusRules.GUSTY) and round_ticks % VersusRules.GUSTY_PERIOD_TICKS == 1:
+		level.set_wind(VersusRules.GUSTY_WIND * _gust_sign)
+		_gust_sign = -_gust_sign
+	if rules.has(VersusRules.GIANT_RAIN) and mode == Defs.VersusMode.GRUB_STACK \
+			and round_ticks % VersusRules.GIANT_RAIN_PERIOD_TICKS == 0 and Spawner.exists(&"items/giant_bonus"):
+		var view: Rect2i = VersusArena.view_rect()
+		var x: int = view.position.x + Tuning.TILE + Sim.rng.next_int(view.size.x - 2 * Tuning.TILE)
+		_spawned.append(level.spawn(&"items/giant_bonus", Vector2i(x, Tuning.TILE * 2),
+				{"index": SPILL_GIANT_INDEX, "dropped": true, "xvel": 0, "yvel": 0}))
+	if sudden_death_at >= 0 and round_ticks == sudden_death_at and not sudden_death.is_running():
+		start_sudden_death()
+	if sudden_death != null and sudden_death.is_running():
+		sudden_death.tick()
+		for hero: PlayerBase in _heroes():
+			if _in_play(hero) and sudden_death.band_effect(hero) == &"kill":
+				_death_cause[hero.slot] = &"liquid"
+				_death_pos[hero.slot] = hero.sim_pos
+				hero.kill(&"liquid")
 
 
 ## The Feast Rush (DESIGN.md E.3): the bell, every spot refills at once, a second giant bonus drops in the middle,
@@ -1037,18 +1515,86 @@ func _refill_spots() -> void:
 # --- POST: knock-outs, respawns, counters -----------------------------------------------------------------------------
 
 func _post_step() -> void:
+	_count_throws()
 	for hero: PlayerBase in _heroes():
 		var slot: int = hero.slot
 		if hero.dead:
 			if _dead_tick[slot] < 0:
 				_dead_tick[slot] = Sim.tick
 				_knocked_out(hero)
-			elif not knockouts_final and _out[slot] == 0 and _round_live() \
-					and Sim.tick - _dead_tick[slot] >= VersusTuning.RESPAWN_TICKS:
+			elif _out[slot] == 0 and _round_live() and Sim.tick - _dead_tick[slot] >= VersusTuning.RESPAWN_TICKS:
 				_respawn(hero)
+			if _grudge_at[slot] >= 0 and _round_live() and round_ticks >= _grudge_at[slot]:
+				_launch_grudge(hero)
 			continue
 		_dead_tick[slot] = -1
 		_count_down(hero)
+
+
+## Temporary specials (PHYSICS.md C.14): every new throw of a hero counts against his special's
+## VersusTuning.SPECIAL_THROWS (axe 3, swirling axe 2, spear 3; the hammer never); at 0 the special is gone (the club
+## in the hand, the belt empty). Spear Party's spear never runs out.
+func _count_throws() -> void:
+	if level == null:
+		return
+	var projectiles: Array[SimEntity] = level.get_kind(Defs.Kind.HERO_PROJECTILE)
+	for i: int in projectiles.size():
+		var projectile: ProjectileBase = projectiles[i] as ProjectileBase
+		if projectile == null or not projectile.from_hero:
+			continue
+		var id: int = projectile.get_instance_id()
+		if _thrown_seen.has(id):
+			continue
+		_thrown_seen[id] = true
+		var slot: int = projectile.owner_slot
+		if slot < 0 or slot >= Defs.MAX_PLAYERS or _throws_left[slot] <= 0:
+			continue
+		_throws_left[slot] -= 1
+		if _throws_left[slot] == 0:
+			var hero: PlayerBase = level.get_hero(slot)
+			if hero != null:
+				_lose_special(hero)
+
+
+## The hero's special is gone: the club in the hand, the belt empty (Hammer Time keeps the hammer: it is the round's
+## weapon).
+func _lose_special(hero: PlayerBase) -> void:
+	var run: PlayerRun = hero.run
+	_throws_left[hero.slot] = 0
+	if rules.has(VersusRules.HAMMER_TIME):
+		if run.weapon != Defs.Weapon.HAMMER or run.belt != Defs.Weapon.CLUB:
+			run.set_weapon(Defs.Weapon.HAMMER)
+			run.set_belt(Defs.Weapon.CLUB)
+		return
+	if run.weapon != Defs.Weapon.CLUB:
+		run.set_weapon(Defs.Weapon.CLUB)
+	if run.belt != PlayerRun.BELT_EMPTY:
+		run.set_belt(PlayerRun.BELT_EMPTY)
+
+
+## An out hero's Grudge Pterodactyl takes off over where he fell (Last Caveman Standing).
+func _launch_grudge(hero: PlayerBase) -> void:
+	var slot: int = hero.slot
+	_grudge_at[slot] = -1
+	var grudge: VersusGrudge = VersusGrudge.new().setup(slot, _death_pos[slot].x, self)
+	level.get_container("fx").add_child(grudge)
+	_spawned.append(grudge)
+
+
+## Free what the referee spawned in the round before (grudges, hazards, crates, rain): its own list and every node of
+## the group ROUND_GROUP under the level.
+func _clear_spawned() -> void:
+	var nodes: Array[Node] = _spawned.duplicate()
+	if level != null and level.is_inside_tree():
+		for node: Node in level.get_tree().get_nodes_in_group(ROUND_GROUP):
+			if level.is_ancestor_of(node):
+				nodes.append(node)
+	for node: Node in nodes:
+		if is_instance_valid(node) and not node.is_queued_for_deletion():
+			if node is SimEntity:
+				(node as SimEntity).sim_active = false
+			node.queue_free()
+	_spawned.clear()
 
 
 ## The referee's own counters, written to the hero every tick (whatever the hero side counts, the referee's value
@@ -1066,6 +1612,18 @@ func _count_down(hero: PlayerBase) -> void:
 		hero.hit_stop = _stop_left[slot]
 	if _stomp_immune[slot] > 0:
 		_stomp_immune[slot] -= 1
+	if _daze_left[slot] > 0:
+		_daze_left[slot] -= 1
+		if _daze_left[slot] == 0:
+			hero.hit_timer = 0   # a daze leaves no immunity
+		else:
+			hero.hit_timer = maxi(hero.hit_timer, VersusTuning.STUN_HIT_TIMER_MIN)
+	# The versus feast is the referee's clock (a feast the 1.0 kit item started on its own does not count).
+	if _feast_left[slot] > 0:
+		_feast_left[slot] -= 1
+		hero.feast = _feast_left[slot]
+	elif hero.feast > 0:
+		hero.feast = 0
 
 
 ## A hero died (a hazard, or a hit at 0 hearts): the knock-out credit, the currency, temporary specials lost.
@@ -1090,11 +1648,22 @@ func _knocked_out(hero: PlayerBase) -> void:
 				_spawn_food(_death_pos[slot], burst)
 				_emit_stack(slot)
 		Defs.VersusMode.LAST_CAVEMAN:
-			if knockouts_final or hero.run.hearts <= 0:
+			if rules.stock and not knockouts_final:
+				# Option Stock: a knock-out costs a life; the last one puts him out.
+				_stocks[slot] = maxi(_stocks[slot] - 1, 0)
+				if _stocks[slot] <= 0:
+					_out[slot] = 1
+			elif knockouts_final or hero.run.hearts <= 0:
 				_out[slot] = 1
-	if hero.run.special() != Defs.Weapon.CLUB:
-		hero.run.take_fresh_club()
-	_throws_left[slot] = 0
+			if _out[slot] != 0:
+				_grudge_at[slot] = round_ticks + VersusTuning.RESPAWN_TICKS
+		Defs.VersusMode.HOT_ROCK:
+			_out[slot] = 1
+	_lose_special(hero)
+	_drop_cutlery(hero)
+	_feast_left[slot] = 0
+	_daze_left[slot] = 0
+	_leaf[slot] = 0
 	Events.hero_ko.emit(hero, killer, cause)
 
 
@@ -1118,7 +1687,7 @@ func _respawn(hero: PlayerBase) -> void:
 			best_distance = nearest
 	level.respawn_hero(hero, best)
 	hero.facing = 1 if best.x < VersusArena.view_rect().get_center().x else -1
-	hero.run.hearts = Tuning.ENERGY_START if mode != Defs.VersusMode.LAST_CAVEMAN else maxi(hero.run.hearts, 1)
+	hero.run.hearts = Tuning.ENERGY_START if mode != Defs.VersusMode.LAST_CAVEMAN else start_hearts[slot]
 	hero.run.emit_energy()
 	_dead_tick[slot] = -1
 	_death_cause[slot] = &""
@@ -1195,6 +1764,16 @@ func _on_item_collected(item_id: StringName, index: int, points: int, pos: Vecto
 		_golden = null
 		_finish(PackedInt32Array([collector.slot]))
 		return
+	if item_id == &"items/feast_piece":
+		_collect_cutlery(collector, index)
+		return
+	if item_id == &"items/weapon":
+		var weapon: int = collector.run.special()
+		if weapon == Defs.Weapon.SPEAR and rules.has(VersusRules.SPEAR_PARTY):
+			_throws_left[collector.slot] = -1
+		elif weapon >= 0 and weapon < VersusTuning.SPECIAL_THROWS.size():
+			_throws_left[collector.slot] = VersusTuning.SPECIAL_THROWS[weapon]
+		return
 	if mode == Defs.VersusMode.GRUB_STACK and item_id == &"items/skull":
 		# Whoever picks up the skull spills everything (all of it bursts out).
 		spill(collector, _stack[collector.slot], true)
@@ -1214,6 +1793,38 @@ func _on_item_collected(item_id: StringName, index: int, points: int, pos: Vecto
 			level.spawn(item_id, pos, {"index": index, "dropped": true, "xvel": 0, "yvel": 0})
 		return
 	add_food(collector, units)
+
+
+## The versus feast (DESIGN.md E.3): each hero collects his own fork, knife and spoon (the 1.0 kit is the team's:
+## its mask is cleared here); his third piece starts his feast of VersusTuning.FEAST_TICKS.
+func _collect_cutlery(hero: PlayerBase, index: int) -> void:
+	var slot: int = hero.slot
+	_cutlery[slot] |= 1 << clampi(index, 0, Tuning.FEAST_PIECES - 1)
+	if Game.feast_kit != 0:
+		Game.feast_kit = 0
+		Game.feast_kit_changed.emit(0)
+	if _cutlery[slot] == (1 << Tuning.FEAST_PIECES) - 1:
+		_cutlery[slot] = 0
+		_feast_left[slot] = VersusTuning.FEAST_TICKS
+		hero.start_feast(VersusTuning.FEAST_TICKS)
+
+
+## A hit (or a knock-out) drops the cutlery a hero holds: the pieces hop out as dropped items.
+func _drop_cutlery(hero: PlayerBase) -> void:
+	var slot: int = hero.slot
+	if _cutlery[slot] == 0:
+		return
+	var mask: int = _cutlery[slot]
+	_cutlery[slot] = 0
+	if level == null or not Spawner.exists(&"items/feast_piece"):
+		return
+	var n: int = 0
+	for index: int in Tuning.FEAST_PIECES:
+		if mask & (1 << index):
+			var velocity: Vector2i = ObjTuning.fan_velocity(n, ObjTuning.BURST_XVEL, ObjTuning.BURST_YVEL)
+			level.spawn(&"items/feast_piece", Vector2i(hero.sim_pos.x, hero.sim_pos.y - hero.box_h),
+					{"index": index, "dropped": true, "xvel": velocity.x, "yvel": velocity.y})
+			n += 1
 
 
 func _on_hero_died(hero: PlayerBase, cause: StringName) -> void:
@@ -1244,10 +1855,12 @@ func _lose_hearts(victim: PlayerBase, count: int, attacker: PlayerBase, cause: S
 		victim.kill(&"enemy")
 
 
+## The slots still in the round: not out, and not dead in a mode where a knock-out is final (a Stock hero waiting
+## for his respawn still stands).
 func _standing_slots() -> PackedInt32Array:
 	var result: PackedInt32Array = PackedInt32Array()
 	for hero: PlayerBase in _heroes():
-		if _out[hero.slot] == 0 and not hero.dead:
+		if _out[hero.slot] == 0 and not (hero.dead and (knockouts_final or mode == Defs.VersusMode.HOT_ROCK)):
 			result.append(hero.slot)
 	return result
 

@@ -10,17 +10,23 @@ extends RefCounted
 ##
 ## Difficulty is reaction and decisions, never cheating (Defs.BotLevel): what the bot sees of the OTHER heroes is
 ## VersusTuning.bot_reaction_ticks(level) ticks old (Rookie 10, Hunter 6, Chief 3); its own hero it knows now.
-## Goals are re-chosen every VersusTuning.BOT_GOAL_PERIOD_TICKS (6) by the mode's [BotBrain]; [BotNavigator] walks
-## and jumps on the level's [NavGraph] (res://resources/bots/<level_id>.json, baked by tools/bots/bake_nav.gd).
+## Goals are re-chosen every VersusTuning.BOT_GOAL_PERIOD_TICKS (6) by the mode's [BotBrain] ([GrubStackBrain],
+## [LastCavemanBrain], [HotRockBrain], [ClubballBrain]; Party Mix swaps it per round); [BotNavigator] walks and jumps
+## on the level's [NavGraph] (res://resources/bots/<level_id>.json, baked by tools/bots/bake_nav.gd) with the links of
+## its weight class.
 ##
 ## Usage (Flow / VersusMatch, core-A):
 ##     var bot: HeroBot = HeroBot.new(slot, Defs.BotLevel.ROOKIE, match_seed, Defs.VersusMode.GRUB_STACK)
 ##     bot.install()      # GameInput.assign_slot(slot, InputSlot.bot(bot.produce)); keep the bot referenced
 ##     bot.uninstall()    # GameInput.assign_slot(slot, null)
 ## The bot follows Game.level: a new level (a new round) re-binds its graph and brain by itself.
+##
+## Boss use (the Rival Chieftains, GAMEPLAY.md 13.6, enemies-C): [method for_boss] makes a bot that drives a hero
+## body of a boss shell ([member body], not one of level.heroes) with a [ChieftainBrain]; every hero of the level is
+## its rival. The shell feeds the body from [method produce] (or [method install] on the slot the body reads).
 
 ## Seen-state layout: SEEN_FIELDS ints per player slot and tick.
-const SEEN_FIELDS: int = 8
+const SEEN_FIELDS: int = 9
 const SEEN_X: int = 0
 const SEEN_Y: int = 1
 const SEEN_XVEL: int = 2
@@ -29,6 +35,7 @@ const SEEN_BITS: int = 4
 const SEEN_STACK: int = 5
 const SEEN_FACING: int = 6
 const SEEN_HIT_TIMER: int = 7
+const SEEN_HEARTS: int = 8
 ## SEEN_BITS flags.
 const SEEN_PRESENT: int = 1
 const SEEN_GROUNDED: int = 2
@@ -36,9 +43,15 @@ const SEEN_CROUCHING: int = 4
 const SEEN_STRIKING: int = 8
 const SEEN_SAFE: int = 16       ## immune, shielded, dead or down: no point in hitting him
 const SEEN_BANKING: int = 32
-const SEEN_GONE: int = 64       ## dead or down
+const SEEN_GONE: int = 64       ## dead, down or out of the round
+const SEEN_CURLED: int = 128    ## curled or flying as a ball (a bat target)
+const SEEN_HOLDER: int = 256    ## holds the Hot Rock ember
+const SEEN_SQUASHED: int = 512  ## stomped: no jump, no strike for a few ticks
+## Flags that act in place (not idle): crouch, strike, jump.
+const ACTIVE_FLAGS: int = Defs.IN_DOWN | Defs.IN_FIRE | Defs.IN_UP
 
-## Player slot this bot plays (0..Defs.MAX_PLAYERS - 1).
+## Player slot this bot plays (0..Defs.MAX_PLAYERS - 1); for a boss bot the key of its stream (and the GameInput
+## slot [method install] feeds).
 var slot: int = 0
 ## Defs.BotLevel.
 var bot_level: int = Defs.BotLevel.HUNTER
@@ -52,13 +65,19 @@ var rng: SimRng = SimRng.new(1)
 var reaction: int = 6
 ## Walking and jumping.
 var nav: BotNavigator = BotNavigator.new()
+## The live movers of the level's graph.
+var movers: NavMoversLive = NavMoversLive.new()
 ## The mode's decisions.
 var brain: BotBrain = null
 ## The level it is bound to (null = none yet).
 var level: LevelBase = null
+## A boss body this bot drives instead of the hero of [member slot] (null = a versus bot).
+var body: PlayerBase = null
 ## Flags it produced last (tests, the HUD's bot debug).
 var last_flags: int = 0
-## Ticks since it last changed its flags or moved (V4.b: no bot idle more than 10 s).
+## Ticks its hero has stood still while it had control and pressed nothing that acts in place (V4.b: no bot idle
+## more than 10 s). Crouching (banking, charging), striking and jumping are not idle; pushing a direction without
+## moving is (stuck).
 var idle_ticks: int = 0
 
 # Ring of seen states: (reaction + 1) entries of SEEN_FIELDS * MAX_PLAYERS ints.
@@ -83,16 +102,30 @@ func _init(p_slot: int = 0, p_level: int = Defs.BotLevel.HUNTER, p_seed: int = 1
 	brain.bot = self
 
 
+## A bot that drives `p_body`, a hero body of a boss shell (the Rival Chieftains), with a [ChieftainBrain]; `key`
+## mixes into its stream (0 = Gorm, 1 = Gulla) and is the GameInput slot [method install] would feed.
+static func for_boss(p_body: PlayerBase, p_seed: int, p_level: int = Defs.BotLevel.HUNTER, key: int = 0) -> HeroBot:
+	var bot: HeroBot = HeroBot.new(key, p_level, p_seed, Defs.VersusMode.GRUB_STACK)
+	bot.body = p_body
+	bot.brain = ChieftainBrain.new()
+	bot.brain.bot = bot
+	return bot
+
+
 ## The seed of a bot's own stream: the match (or round) seed mixed with the slot.
 static func seed_for(p_seed: int, p_slot: int) -> int:
 	return (p_seed * 1103515245 + (p_slot + 1) * 12345 + 0x5BD1E995) & 0x7FFFFFFF
 
 
-## The brain of a versus mode (Grub Stack for the modes without one yet).
+## The brain of a versus mode (the second-wave modes have none yet: they get the Grub Stack brain).
 static func make_brain(mode: int) -> BotBrain:
 	match mode:
-		Defs.VersusMode.GRUB_STACK:
-			return GrubStackBrain.new()
+		Defs.VersusMode.LAST_CAVEMAN:
+			return LastCavemanBrain.new()
+		Defs.VersusMode.HOT_ROCK:
+			return HotRockBrain.new()
+		Defs.VersusMode.CLUBBALL:
+			return ClubballBrain.new()
 	return GrubStackBrain.new()
 
 
@@ -101,12 +134,10 @@ static func make_brain(mode: int) -> BotBrain:
 ## takes the brain of the new mode.
 func reset_round(p_seed: int) -> void:
 	var versus_match: Object = Game.get(&"versus_match") as Object
-	if versus_match != null and brain != null:
+	if versus_match != null and brain != null and body == null:
 		var round_mode: Variant = versus_match.get(&"round_mode")
-		if round_mode != null and int(round_mode) != versus_mode:
-			versus_mode = int(round_mode)
-			brain = make_brain(versus_mode)
-			brain.bot = self
+		if round_mode != null and int(round_mode) >= 0 and int(round_mode) != versus_mode:
+			set_mode(int(round_mode))
 	rng.reseed(seed_for(p_seed, slot))
 	_seen.clear()
 	_seen_ticks = PackedInt32Array()
@@ -116,9 +147,17 @@ func reset_round(p_seed: int) -> void:
 		_seen.append(entry)
 		_seen_ticks.append(-1)
 	_seen_count = 0
+	idle_ticks = 0
 	nav.reset()
 	if brain != null:
 		brain.reset()
+
+
+## Play another versus mode from now on (a new brain).
+func set_mode(mode: int) -> void:
+	versus_mode = mode
+	brain = make_brain(mode)
+	brain.bot = self
 
 
 ## Feed the slot from this bot (GameInput.assign_slot with InputSlot.bot).
@@ -134,6 +173,21 @@ func uninstall() -> void:
 	_installed = false
 
 
+## The hero this bot plays (its boss body, else the level's hero of its slot); null when none.
+func get_hero() -> PlayerBase:
+	if body != null:
+		return body if is_instance_valid(body) else null
+	return level.get_hero(slot) if level != null else null
+
+
+## True when the hero in `p_slot` is a rival (a boss bot: every hero but its own body; a versus bot:
+## BotSenses.are_rivals).
+func is_rival(p_slot: int) -> bool:
+	if body != null:
+		return level == null or level.get_hero(p_slot) != body
+	return BotSenses.are_rivals(level, slot, p_slot)
+
+
 ## The InputSlot source: the flags for tick `tick` (GameInput.sample(), before the tick runs).
 func produce(tick: int) -> int:
 	var current: LevelBase = Game.level
@@ -143,16 +197,22 @@ func produce(tick: int) -> int:
 	if current != level:
 		bind(current)
 	_record(tick)
-	var hero: PlayerBase = level.get_hero(slot)
-	if hero == null or hero.dead or hero.is_down() or not hero.control_enabled:
+	movers.update()
+	var hero: PlayerBase = get_hero()
+	if hero == null or hero.dead or hero.is_down() or (body == null and BotSenses.is_out(level, slot)):
+		nav.link = null
+		last_flags = brain.act_out(level, tick) if body == null else 0
+		return last_flags
+	if not hero.control_enabled:
 		nav.link = null
 		last_flags = 0
 		return 0
-	if hero.sim_pos != _last_pos:
+	if hero.sim_pos != _last_pos or (last_flags & ACTIVE_FLAGS) != 0:
 		idle_ticks = 0
 	else:
 		idle_ticks += 1
 	_last_pos = hero.sim_pos
+	nav.set_weight_class(brain.nav_class(hero, level))
 	if brain.needs_thinking(tick) or (tick + slot) % VersusTuning.BOT_GOAL_PERIOD_TICKS == 0:
 		brain.think(hero, level, tick)
 	var flags: int = brain.act(hero, level, tick)
@@ -169,6 +229,7 @@ func bind(p_level: LevelBase) -> void:
 		push_warning("HeroBot: %s has no nav graph (%s): the bots only walk. Bake it: bash .tools/gd.sh script "
 				% [level.level_id, NavGraph.path_for(level.level_id)] + "res://tools/bots/bake_nav.gd -- %s"
 				% level.level_id)
+	movers.bind(level, nav.graph)
 	nav.reset()
 	_seen_count = 0
 	brain.reset()
@@ -177,13 +238,13 @@ func bind(p_level: LevelBase) -> void:
 ## What this bot saw of the hero in `p_slot`, `reaction` ticks ago (the oldest it has when the match is younger):
 ## SEEN_FIELDS ints (SEEN_X ...). Its own slot reads the newest entry.
 func seen(p_slot: int) -> PackedInt32Array:
-	if _seen_count == 0:
+	if _seen_count == 0 or p_slot < 0 or p_slot >= Defs.MAX_PLAYERS:
 		var empty: PackedInt32Array = PackedInt32Array()
 		empty.resize(SEEN_FIELDS)
 		return empty
 	var size: int = _seen.size()
 	var newest: int = (_seen_count - 1) % size
-	var age: int = 0 if p_slot == slot else mini(reaction, _seen_count - 1)
+	var age: int = 0 if (p_slot == slot and body == null) else mini(reaction, _seen_count - 1)
 	var entry: PackedInt32Array = _seen[(newest - age + size) % size]
 	return entry.slice(p_slot * SEEN_FIELDS, (p_slot + 1) * SEEN_FIELDS)
 
@@ -194,11 +255,18 @@ func seen_pos(p_slot: int) -> Vector2i:
 	return Vector2i(s[SEEN_X], s[SEEN_Y])
 
 
+## True when the seen hero of `p_slot` is in play (present, not dead, down or out).
+func seen_alive(p_slot: int) -> bool:
+	var bits: int = seen(p_slot)[SEEN_BITS]
+	return (bits & SEEN_PRESENT) != 0 and (bits & SEEN_GONE) == 0
+
+
 func _record(tick: int) -> void:
 	var size: int = _seen.size()
 	var index: int = _seen_count % size
 	var entry: PackedInt32Array = _seen[index]
 	entry.fill(0)
+	var holder: int = BotSenses.ember_holder(level)
 	for p_slot: int in Defs.MAX_PLAYERS:
 		var hero: PlayerBase = level.get_hero(p_slot)
 		if hero == null:
@@ -213,8 +281,14 @@ func _record(tick: int) -> void:
 			bits |= SEEN_STRIKING
 		if hero.is_immune():
 			bits |= SEEN_SAFE
-		if hero.dead or hero.is_down():
+		if hero.dead or hero.is_down() or BotSenses.is_out(level, p_slot):
 			bits |= SEEN_GONE | SEEN_SAFE
+		if hero.is_curled():
+			bits |= SEEN_CURLED
+		if hero.squash > 0:
+			bits |= SEEN_SQUASHED
+		if p_slot == holder:
+			bits |= SEEN_HOLDER
 		if BotSenses.is_banking(level, p_slot):
 			bits |= SEEN_BANKING
 		entry[base + SEEN_X] = hero.sim_pos.x
@@ -225,6 +299,7 @@ func _record(tick: int) -> void:
 		entry[base + SEEN_STACK] = BotSenses.stack_of(level, p_slot)
 		entry[base + SEEN_FACING] = hero.facing
 		entry[base + SEEN_HIT_TIMER] = hero.hit_timer
+		entry[base + SEEN_HEARTS] = hero.run.hearts if hero.run != null else 0
 	_seen[index] = entry
 	_seen_ticks[index] = tick
 	_seen_count += 1

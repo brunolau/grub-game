@@ -17,15 +17,24 @@ extends HittableBase
 ## needs two inputs on the same tick).
 ##
 ## Enemies may share the `bond=` registry (LevelBase.get_tagged): only Drum members count here.
+##
+## `skin=drum|cap` [drum] (2.0, 6-2 Spore Hollow co-op: "twin drums made of glowing caps", DESIGN.md D.10; a picture
+## only): CAP_TEXTURE in the layout of drum.png (5 cells of 40 x 44 art px, pivot (20, 44), the same frames). Until
+## art-A delivers that file the drum is drawn.
 
 ## Sheet [M drum]: idle 0; hit 1, 2, 0 at 16 fps; lit 3; lit_hit 4, 3 at 16 fps.
 const HIT_FRAMES: Array[int] = [1, 2, 0]
 const LIT_HIT_FRAMES: Array[int] = [4, 3]
 const FRAME_IDLE: int = 0
 const FRAME_LIT: int = 3
+## `skin` values; the glowing cap's picture.
+const SKINS: Array[String] = ["drum", "cap"]
+const CAP_TEXTURE: String = "res://assets/sprites/objects/drum_cap.png"
 
 ## The bond this drum belongs to (`bond`).
 var bond: StringName = &""
+## Index into SKINS.
+var skin: int = 0
 ## Lit: struck in the open window (or the bond succeeded).
 var lit: bool = false
 ## True once the bond succeeded (until the level reset).
@@ -62,6 +71,12 @@ func _apply_params(params: Dictionary) -> void:
 	hits_left = 1
 	hits_total = 1
 	_sprite = get_node_or_null(^"Sprite") as Sprite2D
+	skin = SKINS.find(str(params.get("skin", SKINS[0])))
+	if skin < 0:
+		push_warning("objects/drum: unknown skin '%s'" % str(params.get("skin")))
+		skin = 0
+	if skin == 1 and _sprite != null:
+		_sprite.texture = ObjTuning.picture(CAP_TEXTURE, _sprite.texture)
 	_show()
 
 

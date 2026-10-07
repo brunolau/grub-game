@@ -69,9 +69,12 @@ func update(level: LevelBase) -> bool:
 		return false
 	if not _seated:
 		_seated = true
-		# Sitting down ends what his own handlers had running: no strike, no glide, no fall.
+		# Sitting down ends what his own handlers had running: no strike, no glide, no fall. The saddle is a landing:
+		# a hop from tar onto Chomper ends the tar rules (C.5, mounts ignore tar), so the dismount flies normally.
 		hero.attack_gate = false
 		hero.glide = 0
+		if hero.hero_climb.active:
+			hero.hero_climb.end_tar()
 	hero.state = Defs.HeroState.RIDING
 	hero.handler = Defs.HeroState.RIDING
 	hero.fall_ticks = 0

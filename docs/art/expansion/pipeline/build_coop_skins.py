@@ -40,8 +40,9 @@ def build_seesaw_skins():
                     "superpowers-prehistoric-platformer: items/15.png)",
              edits="exact colour swap of the wood plank (" + ", ".join("%s -> %s" % (k, v) for k, v in sk.items()) +
                    "); layout, pivots and rest angles unchanged",
-             note="`objects/seesaw` %s skin: exactly the layout of seesaw_plank.png (rows = len 3 / 4 / 5 / 6, columns "
-                  "= left end down ... right end down, pivot (104, 40) on the fulcrum). %s"
+             note="`objects/seesaw skin=%s` (objects-A's seesaw.gd draws it): exactly the layout of seesaw_plank.png "
+                  "(rows = len 3 / 4 / 5 / 6, columns = left end down ... right end down, pivot (104, 40) on the "
+                  "fulcrum). %s"
                   % (name, "6-2 Spore Hollow (swamp biome, mushroom cave)" if name == "mushroom" else
                      "Floe Rink arena (ice): the two see-saw floes"), section="objects")
         out[name] = im

@@ -85,9 +85,15 @@ const PLATE_BLINK_FPS: int = 8           ## ... at this rate
 const HERO_BODY_HALF_W_PX: int = 7
 const HERO_BODY_H_PX: int = 32
 ## Drums: the count-in (three blips 8 ticks apart, then "go") plays while a hatched hero stands within this many px
-## of every drum of the bond. [G 13.9.3] [own reach]
-const COUNT_IN_SPACING_TICKS: int = 8
+## of every drum of the bond. [G 13.9.3] [own reach] The spacing is core's, shared with the enemy bonds.
+const COUNT_IN_SPACING_TICKS: int = PartyTuning.COUNT_IN_SPACING_TICKS
 const COUNT_IN_REACH_PX: int = 40
+## Lightning (`zones/lightning`, world-A; PHYSICS.md C.16 lists it here): a darkening cloud marks a column this many
+## ticks before its bolt (the telegraph), the bolt lasts LIGHTNING_BOLT_TICKS, and a struck `skin=nest` one-way cell
+## of the Storm Roc's nest burns LIGHTNING_BURN_TICKS. [G 13.3 / 13.6] *(tune)*
+const LIGHTNING_MARK_TICKS: int = 22
+const LIGHTNING_BOLT_TICKS: int = 4
+const LIGHTNING_BURN_TICKS: int = 66
 const DRUM_HIT_FPS: int = 16             ## [M drum]
 ## See-saw [G 13.9.7]: its two end platforms are SEESAW_STEP_PX apart in height; the low end's top lies
 ## SEESAW_LOW_TOP_PX over the floor, so a hero standing on the floor there is inside its ride band (he rides it), and
@@ -105,7 +111,9 @@ const BOULDER_FALL_TICKS: int = 2
 const BOULDER_PUSH_REACH_PX: int = Tuning.WALL_PROBE + 3
 const BOULDER_CELLS: int = 2             ## 2 x 2 cells
 ## Flower pot [G 13.9.7]: a strike pushes it at this speed (v16) in the strike direction; it slides to the ledge's
-## edge (or a wall) and falls with the hero's gravity, keeping its speed, then becomes a spring where it lands.
+## edge (or a wall) and falls with the hero's gravity, keeping its speed, then becomes a spring where it lands
+## (SPRING_DEFAULT_POWER: a 105 px rise from the spring's top, so designers count on a ledge 6 rows above the floor
+## it took root on; 7 rows is 3 px under the apex - see FlowerPot).
 const FLOWER_POT_PUSH_XVEL: int = 32     ## [own]
 const FLOWER_POT_SMASH_TICKS: int = 4    ## smash frame, then the sprout [M flower_pot]
 const FLOWER_POT_ANIM_FPS: int = 12      ## [M flower_pot]
@@ -192,3 +200,13 @@ static func anim_frame(age: int, fps: int) -> int:
 ## Ticks a one-shot animation of `frames` frames at `fps` lasts (rounded up).
 static func anim_ticks(frames: int, fps: int) -> int:
 	return (frames * Tuning.ANIM_TICKS_PER_SECOND + fps - 1) / fps
+
+
+## 2.0 skins whose picture art-A has not delivered yet: the texture at `path` when the file exists, else `stand_in`
+## (a skin is a picture only, so a stand-in never changes a rule).
+static func picture(path: String, stand_in: Texture2D) -> Texture2D:
+	if ResourceLoader.exists(path):
+		var loaded: Texture2D = load(path) as Texture2D
+		if loaded != null:
+			return loaded
+	return stand_in

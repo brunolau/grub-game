@@ -28,10 +28,16 @@ var _timers: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 func _apply_params(params: Dictionary) -> void:
 	super._apply_params(params)
 	period = maxi(1, param_int("period", Tuning.DESIGNER_SECOND))
-	skin = param_str("skin", SKINS[0])
-	if not SKINS.has(skin):
-		push_warning("%s: unknown skin '%s'; using '%s'" % [name, skin, SKINS[0]])
-		skin = SKINS[0]
+	var skins: Array[String] = _skins()
+	skin = param_str("skin", skins[0])
+	if not skins.has(skin):
+		push_warning("%s: unknown skin '%s'; using '%s'" % [name, skin, skins[0]])
+		skin = skins[0]
+
+
+## The skins this rain knows, the default first (`zones/food_rain` has its own).
+func _skins() -> Array[String]:
+	return SKINS
 
 
 func _sim_tick(phase: int) -> void:
@@ -47,9 +53,17 @@ func _sim_tick(phase: int) -> void:
 		if _timers[slot] < period:
 			continue
 		_timers[slot] = 0
-		if Spawner.exists(EMBER_ID):
-			level.spawn(EMBER_ID, sim_pos, {"rain": true, "skin": skin, "rain_slot": hero.slot})
+		if _release(level, hero):
 			released += 1
+
+
+## One thing falls on `hero` (his stream's period is over). Returns true when something was spawned. The ember rain
+## spawns `projectiles/enemy_ember` with the `rain` flag (it places itself above him); `zones/food_rain` overrides it.
+func _release(level: LevelBase, hero: PlayerBase) -> bool:
+	if not Spawner.exists(EMBER_ID):
+		return false
+	level.spawn(EMBER_ID, sim_pos, {"rain": true, "skin": skin, "rain_slot": hero.slot})
+	return true
 
 
 func _on_level_reset() -> void:

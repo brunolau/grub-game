@@ -31,7 +31,8 @@ func _walk_to(x: int, y: int = 240) -> void:
 
 func test_every_zone_id_has_a_scene() -> void:
 	for id: StringName in [&"zones/secret", &"zones/arena", &"zones/camera_lock", &"zones/dark", &"zones/kill",
-			&"zones/autoscroll_stop", &"zones/message", &"zones/ember_rain", &"zones/flies"]:
+			&"zones/autoscroll_stop", &"zones/message", &"zones/ember_rain", &"zones/flies",
+			&"zones/current", &"zones/lightning", &"zones/food_rain"]:
 		assert_true(Spawner.exists(id), "%s exists" % id)
 		var zone: ZoneBase = _zone(id, {"rect": "1,1,2,2", "name": String(id).get_file()})
 		assert_eq(zone.get_kind(), Defs.Kind.ZONE)

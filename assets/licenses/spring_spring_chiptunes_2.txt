@@ -1,0 +1,87 @@
+Spring Spring chiptunes: Suez Crisis Remade, Typhoon's Theme, Egyptian Fortress Boss
+====================================================================================
+
+Author: Spring Spring (Julie Damsgaard)
+Source: https://opengameart.org/content/suez-crisis-remade
+Licence: CC0 1.0 (tier A)
+Used in Club & Grub for: 2.0 (The Far Shore): audio/music/boss_idols_a.ogg, audio/music/level_gulch_a.ogg, audio/music/level_storm_glide_a.ogg. Per-file sources and edits: docs/ASSET_MANIFEST.md section 17
+Staging folder: .tools/asset_candidates/expansion/audio/spring-spring_chiptunes-2
+Page: Suez Crisis Remade - https://opengameart.org/content/suez-crisis-remade
+Page: Typhoon's Theme - https://opengameart.org/content/typhoons-theme
+Page: Egyptian Fortress Boss - https://opengameart.org/content/egyptian-fortress-boss
+Note: Suez Crisis Remade and Egyptian Fortress Boss are offered under CC-BY 3.0, CC0 and CC-BY-SA 3.0: CC0 is the one taken (no attribution or share-alike duty)
+
+---- Licence evidence recorded when the pack was downloaded ----
+
+# LICENSE_INFO - Spring Spring - boss / battle / themed chiptunes
+
+- **Author:** Spring Spring (OpenGameArt)
+- **License:** CC0 1.0 (pages that list several licences offer CC0 among them; CC0 is the one chosen)  (tier A)
+- **Date checked / downloaded:** 2026-10-06
+- **Source page(s) (saved copies in `../_pages/oga_<slug>.html`):**
+  - https://opengameart.org/content/great-boss
+  - https://opengameart.org/content/egyptian-fortress-boss
+  - https://opengameart.org/content/suez-crisis-remade
+  - https://opengameart.org/content/battle-vs-minor-gyokaijuu
+  - https://opengameart.org/content/typhoons-theme
+  - https://opengameart.org/content/the-war-over-a-melon-field-themes-and-jingles
+- **Download URL(s)** (every file attached to the page; the ones fetched are marked):
+  - https://opengameart.org/sites/default/files/Great%20Boss_0.ogg (fetched)
+  - https://opengameart.org/sites/default/files/egyptian%20fortress%20boss_0.ogg (fetched)
+  - https://opengameart.org/sites/default/files/suez%20crisis%20remade_0.ogg (fetched)
+  - https://opengameart.org/sites/default/files/battle%20vs%20gyokaijuu.zip (not fetched)
+  - https://opengameart.org/sites/default/files/battle%20vs%20gyokaijuu%20NEW_0.ogg (fetched)
+  - https://opengameart.org/sites/default/files/hayden%20-%20Track%2005%20%28Typhoon%27s%20Theme%29_4.ogg (not fetched)
+  - https://opengameart.org/sites/default/files/hayden%20-%20Track%2005%20%28Typhoon%27s%20Theme%29new_0.ogg (not fetched)
+  - https://opengameart.org/sites/default/files/hayden%20-%20Track%2005%20%28Typhoon%27s%20Theme%20%28v3%29%29_0.ogg (fetched)
+  - https://opengameart.org/sites/default/files/hayden%20-%20Track%2005%20%28Typhoon%27s%20Theme%294_2.ogg (not fetched)
+  - https://opengameart.org/sites/default/files/laidback_0.ogg (not fetched)
+  - https://opengameart.org/sites/default/files/win_1.ogg (not fetched)
+  - https://opengameart.org/sites/default/files/lose_3.ogg (not fetched)
+  - https://opengameart.org/sites/default/files/short%20theme%20melon_4.ogg (fetched)
+  - https://opengameart.org/sites/default/files/short%20theme%20melon%20no%20pwm_0.ogg (fetched)
+  - https://opengameart.org/sites/default/files/short%20theme%20melon%20midi.mid (fetched)
+  - https://opengameart.org/sites/default/files/short%20theme%20melon%20it%20rock%20rhythm_4.ogg (fetched)
+  - https://opengameart.org/sites/default/files/charselect_2.ogg (not fetched)
+
+## Exact licence wording (quoted from the source)
+
+> https://opengameart.org/content/great-boss - page title "Great Boss", author "Spring Spring", posted Thursday, March 30, 2017 - 16:35
+>
+> License(s): CC0
+>
+> Description: "I mean, it's a theme for a great boss, the song itself obviously isn't great or anything. Why is it always that the most unimaginative and repetetive songs, are those that also sound the best?"
+
+> https://opengameart.org/content/egyptian-fortress-boss - page title "Egyptian Fortress Boss", author "Spring Spring", posted Wednesday, April 19, 2017 - 09:01
+>
+> License(s): CC-BY 3.0 CC0 CC-BY-SA 3.0
+>
+> Description: "Very short boss theme, with a sort-of egyptian feel."
+
+> https://opengameart.org/content/suez-crisis-remade - page title "Suez Crisis Remade", author "Spring Spring", posted Saturday, April 15, 2017 - 16:12
+>
+> License(s): CC-BY 3.0 CC0 CC-BY-SA 3.0
+>
+> Description: "A remake of my own previous chiptune song, Suez Crisis. Which one is better? You decide ;)"
+
+> https://opengameart.org/content/battle-vs-minor-gyokaijuu - page title "Battle! vs Minor Gyokaijuu", author "Spring Spring", posted Thursday, April 26, 2018 - 09:22
+>
+> License(s): CC0
+>
+> Description: "https://www.youtube.com/watch?v=FkvZIpabAp0&feature=youtu.be"
+
+> https://opengameart.org/content/typhoons-theme - page title "Typhoon's Theme", author "Spring Spring", posted Thursday, December 7, 2017 - 23:24
+>
+> License(s): CC0
+>
+> Description: "Another song from the hayden soundtrack, this one is a remake of this theme: https://opengameart.org/content/two-songs-for-an-upcoming-now-canceled-r... New version added which is in a much better key that is less grating."
+
+> https://opengameart.org/content/the-war-over-a-melon-field-themes-and-jingles - page title "The War Over A Melon Field - Themes and Jingles", author "Spring Spring", posted Monday, July 1, 2019 - 12:24
+>
+> License(s): CC0
+>
+> Description: "..."
+
+---- Licence ----
+
+CC0 1.0 Universal: the full legal code ships as cc0_1.0_legal_code.txt in this folder.

@@ -32,6 +32,7 @@ Both files are generated from the engine's own data (`Engine.get_license_text()`
 | `superpowers_prehistoric_platformer.txt` | Superpowers Asset Packs - Prehistoric Platformer | Pixel-boy (Sparklin Labs) | CC0 1.0 |
 | `superpowers_rpg_battle_system.txt` | Superpowers Asset Packs - RPG Battle System (2.0) | Pixel-boy (Sparklin Labs) | CC0 1.0 |
 | `superpowers_western_fps_2d.txt` | Superpowers Asset Packs - Western FPS 2D (2.0) | Pixel-boy (Sparklin Labs) | CC0 1.0 |
+| `superpowers_backgrounds.txt` | Superpowers Asset Packs - Backgrounds (2.0) | Pixel-boy (Sparklin Labs) | CC0 1.0 |
 | `superpowers_asset_packs_audio.txt` | Superpowers Asset Packs - prehistoric-platformer sound effects | Pixel-boy (Sparklin Labs) | CC0 1.0 |
 | `ansimuz_explosion_animations_pack.txt` | Explosion Animations Pack | ansimuz (Luis Zuno) | CC0 1.0 |
 | `ansimuz_sunny_land.txt` | SunnyLand | ansimuz (Luis Zuno) | CC0 1.0 |
@@ -54,9 +55,11 @@ Both files are generated from the engine's own data (`Engine.get_license_text()`
 | `rubberduck_40_cc0_water_splash_slime_sfx.txt` | 40 CC0 water / splash / slime SFX | rubberduck | CC0 1.0 |
 | `rubberduck_80_cc0_creature_sfx.txt` | 80 CC0 creature SFX | rubberduck | CC0 1.0 |
 | `pixelboy_ninja_adventure.txt` | Ninja Adventure - Asset Pack (2.0) | Pixel-boy and AAA | CC0 1.0 |
-| `wolfgang_8bit_themes.txt` | Desert Theme - 8bit Chiptune Theme (2.0) | Wolfgang_ (Ted Kerr) | CC0 1.0 |
+| `wolfgang_8bit_themes.txt` | Desert Theme - 8bit Chiptune Theme, 8-bit Haunted House Theme, 8bit theme - Upbeat Overworld (2.0) | Wolfgang_ (Ted Kerr) | CC0 1.0 |
 | `tallbeard_abstraction_chiptune_loops.txt` | Music Loop Bundle: Free Chiptune Loops, album 'Three Red Hearts' (2.0) | Abstraction (Benjamin Burnes, Tallbeard Studios) | CC0 1.0 |
-| `spring_spring_chiptunes.txt` | The War Over A Melon Field - Themes and Jingles (2.0) | Spring Spring (Julie Damsgaard) | CC0 1.0 |
+| `spring_spring_chiptunes.txt` | The War Over A Melon Field - Themes and Jingles, Sandy Seaside, Tropical Fantasy (2.0) | Spring Spring (Julie Damsgaard) | CC0 1.0 |
+| `spring_spring_chiptunes_2.txt` | Suez Crisis Remade, Typhoon's Theme, Egyptian Fortress Boss (2.0; multi-licensed, CC0 taken) | Spring Spring (Julie Damsgaard) | CC0 1.0 |
+| `nene_boss_battles_8bit.txt` | Boss Battle #1 - #6 [8-bit] (2.0) | nene | CC0 1.0 |
 | `celestialghost8_victory.txt` | Victory (2A03 fanfare) (2.0) | celestialghost8 | CC0 1.0 |
 | `spring_spring_various_sfx.txt` | Various Sound Effects (2.0) | Spring Spring | CC0 1.0 |
 | `ctske_8bit_sound_effects.txt` | 8-Bit Sound Effects (2.0) | ctske (Ctskelgysth Inauaruat) | CC0 1.0 |

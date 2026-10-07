@@ -8,6 +8,9 @@ extends SceneTree
 ##   --check           bake, do not write; exit 1 when a committed graph differs from the fresh bake (stale graph)
 ##   --verify          do not bake: re-simulate every link of the committed graph from every x of its window
 ##   --difficulty=<d>  beginner (default) or expert
+##   --classes=<list>  weight classes to bake, e.g. 0,1,2 (default: those the arena's modes need: 0 light; Grub Stack
+##                     1 = 10+ units, 2 = 20+; Hot Rock 3 = the ember holder; NavGraph.weight_classes_for)
+##   --clip=c,r,w,h    bake only the cells of this rectangle (a boss arena inside a bigger level, e.g. w9_l3)
 ##   --verbose         print the baker's progress every 1000 candidate runs
 ## Every link of a written graph was verified by simulating the real hero (NavBaker). Prints one line per level and
 ## the problems found; exit code 0 = all good, 1 = a problem (a level without a graph for --verify, a stale graph for

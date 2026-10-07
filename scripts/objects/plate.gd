@@ -48,6 +48,15 @@ var presses: int = 0
 var _sprite: Sprite2D = null
 var _sprite_rest: Vector2 = Vector2.ZERO
 var _anim: int = 0
+## Performance (player-A's two-hero pass, PLAN P2.12): the cells never move, so their edges are kept once; the frame
+## and the sink last written to the sprite (an engine write only when they change); the level's heave boulders,
+## found once on the first tick (they are level-file entities, all spawned before it).
+var _left: int = 0
+var _right: int = 0
+var _shown_frame: int = -1
+var _shown_sunk: int = -1
+var _boulders: Array[HeavyBoulder] = []
+var _boulders_found: bool = false
 
 
 func _init() -> void:
@@ -78,6 +87,8 @@ func _apply_params(params: Dictionary) -> void:
 		mode = Mode.HOLD
 	# The box covers the cells (for on_screen and the doze area): the anchor cell's centre is 8 px from its left edge.
 	set_box(Vector3i(width_cells * Tuning.TILE, ObjTuning.PLATE_SINK_PX * 3, Tuning.TILE / 2))
+	_left = (sim_pos.x >> 4) * Tuning.TILE
+	_right = _left + width_cells * Tuning.TILE
 	_sprite = get_node_or_null(^"Sprite") as Sprite2D
 	if _sprite != null:
 		# The picture is centred on the cells: shift it from the anchor cell's centre and stretch it to `w` cells.
@@ -89,12 +100,12 @@ func _apply_params(params: Dictionary) -> void:
 
 ## Left edge (px) of the plate's cells.
 func left_px() -> int:
-	return (sim_pos.x >> 4) * Tuning.TILE
+	return _left
 
 
 ## Right edge (px, exclusive).
 func right_px() -> int:
-	return left_px() + width_cells * Tuning.TILE
+	return _right
 
 
 ## The floor surface y the plate lies on (its feet point).
@@ -105,7 +116,7 @@ func floor_y() -> int:
 ## True when a feet point at (x, y) stands on the plate: over its cells, on its floor or at most
 ## ObjTuning.PLATE_FEET_SLACK_PX above it.
 func feet_on(x: int, y: int) -> bool:
-	return x >= left_px() and x < right_px() and y <= floor_y() and y >= floor_y() - ObjTuning.PLATE_FEET_SLACK_PX
+	return x >= _left and x < _right and y <= sim_pos.y and y >= sim_pos.y - ObjTuning.PLATE_FEET_SLACK_PX
 
 
 func _sim_tick(_phase: int) -> void:
@@ -158,9 +169,13 @@ func measure_weight(level: LevelBase) -> int:
 		if feet_on(hero.sim_pos.x, hero.sim_pos.y):
 			total += PartyTuning.PLATE_WEIGHT_HERO
 			holder_mask |= 1 << hero.slot
-	for entity: SimEntity in level.get_kind(Defs.Kind.OTHER):
-		var boulder: HeavyBoulder = entity as HeavyBoulder
-		if boulder != null and boulder.rests_on_plate(self):
+	if not _boulders_found:
+		_boulders_found = true
+		for entity: SimEntity in level.get_kind(Defs.Kind.OTHER):
+			if entity is HeavyBoulder:
+				_boulders.append(entity as HeavyBoulder)
+	for boulder: HeavyBoulder in _boulders:
+		if is_instance_valid(boulder) and boulder.rests_on_plate(self):
 			total += PartyTuning.PLATE_WEIGHT_BOULDER
 	return total
 
@@ -184,5 +199,10 @@ func _show() -> void:
 		frame = FRAME_LIT
 		if mode == Mode.TIMED and weight < count and hold_left <= ObjTuning.PLATE_BLINK_TICKS:
 			frame = FRAME_LIT + ObjTuning.anim_frame(_anim, ObjTuning.PLATE_BLINK_FPS) % 2
-	_sprite.frame = base + frame
-	_sprite.position = _sprite_rest + Vector2(0.0, float(ObjTuning.PLATE_SINK_PX * Tuning.ART_SCALE if pressed else 0))
+	if base + frame != _shown_frame:
+		_shown_frame = base + frame
+		_sprite.frame = _shown_frame
+	var sunk: int = ObjTuning.PLATE_SINK_PX * Tuning.ART_SCALE if pressed else 0
+	if sunk != _shown_sunk:
+		_shown_sunk = sunk
+		_sprite.position = _sprite_rest + Vector2(0.0, float(sunk))

@@ -73,7 +73,7 @@ const CATALOGUE: Dictionary = {
 	"items/glider": [],
 	"items/water_bucket": [],
 	"items/warp": [],
-	"items/trophy": [],
+	"items/trophy": ["skin"],
 	"items/code_stone": ["index"],
 	"items/random_bonus": ["tier"],
 	"objects/checkpoint": [],
@@ -86,7 +86,7 @@ const CATALOGUE: Dictionary = {
 	"objects/column": ["size", "rise", "trigger", "shake"],
 	"objects/gate": ["dest", "lock", "skin"],
 	"objects/marker": [],
-	"objects/spring": ["power"],
+	"objects/spring": ["power", "skin"],
 	"objects/sign": ["text"],
 	"objects/npc": ["kind", "turn"],
 	"objects/hero_start": ["slot"],
@@ -124,8 +124,8 @@ const CATALOGUE: Dictionary = {
 	"objects/mount": ["kind", "pen", "wild"],
 	"objects/rex_pen": [],
 	"objects/plate": ["count", "mode", "w"],
-	"objects/drum": ["bond"],
-	"objects/seesaw": ["len"],
+	"objects/drum": ["bond", "skin"],
+	"objects/seesaw": ["len", "skin"],
 	"objects/boulder_heavy": [],
 	"objects/pulley": ["a", "b", "range"],
 	"objects/flower_pot": [],
@@ -139,6 +139,10 @@ const CATALOGUE: Dictionary = {
 	"zones/food_rain": ["rect", "period", "skin"],
 	"zones/goal": ["rect", "team"],
 }
+## The sign board (objects-A) and the ui kit whose wrap measures a sign's lines (loaded by path: tools may run without).
+const SIGN_SCRIPT: String = "res://scripts/objects/sign_board.gd"
+const UI_KIT_SCRIPT: String = "res://scripts/ui/ui_kit.gd"
+const SIGN_MAX_LINES: int = 3
 ## Format 2 parameters of 1.0 ids (merged into CATALOGUE by [method _catalogue_params]): the column's plate and
 ## trigger rules, the gate's drum lock, the versus weapon pick-up.
 const CATALOGUE_2: Dictionary = {
@@ -158,10 +162,10 @@ const CHOICES: Dictionary = {
 	"objects/hidden_spot:kind": ["small", "big"],
 	"objects/hidden_spot:look": ["plain", "inset", "block"],
 	"objects/breakable_block:skin": ["auto", "dirt", "cave", "ice", "obsidian"],
-	"objects/container:skin": ["barrel", "crate", "pot"],
+	"objects/container:skin": ["barrel", "crate", "pot", "chest"],
 	"objects/platform:mode": ["always", "ride"],
-	"objects/platform:skin": ["wood", "ice", "stone", "small"],
-	"objects/drop_platform:skin": ["wood", "ice", "stone", "small"],
+	"objects/platform:skin": ["wood", "ice", "stone", "small", "cloud", "driftwood"],
+	"objects/drop_platform:skin": ["wood", "ice", "stone", "small", "cloud", "driftwood"],
 	"objects/gate:skin": ["arch", "hole", "none"],
 	"objects/npc:kind": ["elder", "kid", "warrior"],
 	"items/weapon:kind": ["club", "hammer", "axe", "boomerang", "spear"],
@@ -174,6 +178,10 @@ const CHOICES: Dictionary = {
 	"objects/raft:skin": ["log", "wafer"],
 	"objects/mount:kind": ["rex"],
 	"zones/current:dir": ["l", "r", "u", "d"],
+	"objects/seesaw:skin": ["wood", "mushroom", "floe"],
+	"objects/spring:skin": ["flower", "cap"],
+	"objects/drum:skin": ["drum", "cap"],
+	"items/trophy:skin": ["cup", "roast"],
 }
 ## Integer parameters with their inclusive range: "id:param" -> Vector2i(min, max).
 const RANGES: Dictionary = {
@@ -736,6 +744,30 @@ func _check_entity(data: LevelData, record: Dictionary, names: Dictionary) -> vo
 		_check_prop_name(path, line, "props/" + str(params["prop"]))
 	if id == "objects/hidden_spot" and params.has("prop"):
 		_check_prop_name(path, line, "props/" + str(params["prop"]))
+	if id == "objects/sign" and params.has("text"):
+		_check_sign_text(path, line, str(params["text"]))
+
+
+## A sign's text must fit its board: at most SignBoard.MAX_LINES lines as the board wraps it (objects-A's
+## SignBoard.text_lines on the translated text; about 60 characters). A WARNING. Skipped where the sign or the ui kit
+## cannot be loaded (tools that run without them).
+func _check_sign_text(path: String, line: int, key: String) -> void:
+	if not ResourceLoader.exists(SIGN_SCRIPT) or not ResourceLoader.exists(UI_KIT_SCRIPT):
+		return
+	var sign_board: Script = load(SIGN_SCRIPT) as Script
+	var ui_kit: Script = load(UI_KIT_SCRIPT) as Script
+	if sign_board == null or ui_kit == null or not sign_board.has_script_method(&"text_lines"):
+		return
+	if ui_kit.has_script_method(&"ensure_locale"):
+		ui_kit.call(&"ensure_locale")
+	var lines: int = int(sign_board.call(&"text_lines", TranslationServer.translate(key)))
+	var limit: int = SIGN_MAX_LINES
+	var constants: Dictionary = sign_board.get_script_constant_map()
+	if constants.get("MAX_LINES") is int:
+		limit = int(constants["MAX_LINES"])
+	if lines > limit:
+		_add(path, line, WARNING, "sign text '%s' takes %d board lines (at most %d, about 60 characters): shorten it"
+				% [key, lines, limit])
 
 
 func _check_prop(path: String, line: int, id: String, params: Dictionary) -> void:

@@ -125,10 +125,11 @@ func _sim_tick(phase: int) -> void:
 		# Every hero in contact order (2.0, TECH_AUDIT.md 3.11; 1.0: the one hero): the first one it is collected by
 		# wins. collect() refuses a dead hero and an item that stays (a heart at full energy), so the next may try.
 		var level: LevelBase = Game.level
-		if level == null:
+		if level == null or not can_be_collected():
 			return
+		# can_be_collected() changes only when collect() succeeds, which returns at once: it is asked once per tick.
 		for hero: PlayerBase in level.contact_order():
-			if can_be_collected() and Overlap.body(self, hero, hero) and collect(hero):
+			if Overlap.body(self, hero, hero) and collect(hero):
 				return
 
 
@@ -187,7 +188,8 @@ func collect(hero: PlayerBase) -> bool:
 	if counts_for_completion:
 		Game.count_item_collected()
 	if counts_for_completion or (counts_for_tally and points > 0):
-		Game.add_tally_item(item_id, index, points)
+		# 2.0: the collector's slot, for the co-op tally's piles (0 in single-player, as 1.0).
+		Game.add_tally_item(item_id, index, points, hero.slot)
 	Audio.play_sfx(pickup_sfx)
 	Events.item_collected.emit(item_id, index, points, sim_pos)
 	if Game.level != null:

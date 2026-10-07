@@ -43,6 +43,8 @@ const SCORE_CHARGER: int = 4
 const SCORE_SNAPPER: int = 1
 const SCORE_ROLLER: int = 3              ## 2.0 Book II archetypes [G 13.5]: "score [per type]" [own]
 const SCORE_GUARD: int = 4
+const SCORE_MIMIC: int = 5
+const SCORE_SHAMAN: int = 5              ## 2.0 co-op Shaman [G 13.9.6] (the presets keep their archetype's) [own]
 
 # =================================================================================================================
 # Archetype 0, sky dropper [G 5.2]
@@ -72,6 +74,10 @@ const THREAD_SEARCH_ROWS: int = 12       ## the thread hangs from a ceiling up t
 const THREAD_OVERLAP_ART: int = 2        ## the thread ends this far inside the body (no gap), art px
 const THREAD_WIDTH: float = 2.0          ## art px (cosmetic) [M 1]
 const THREAD_COLOR: Color = Color("272018")  ## outline colour of the art kit [M 1]
+## 2.0: a hanger with a sheet of this name (octopus, octopus_b) hangs on kelp: a thicker green thread. [own]
+const KELP_SKIN: String = "octopus"
+const KELP_COLOR: Color = Color("3d6b3a")
+const KELP_WIDTH: float = 3.0
 ## sin(i * 360 / 256 degrees) * 256 for i = 0..64 (integer pendulum, no floats in the simulation).
 const SINE_QUARTER: Array[int] = [
 	0, 6, 13, 19, 25, 31, 38, 44, 50, 56, 62, 68, 74, 80, 86, 92, 98, 104, 109, 115, 121, 126, 132, 137, 142, 147,
@@ -170,11 +176,53 @@ const ROLLER_BALL_BOX: Vector3i = Vector3i(29, 26, 14)
 const GUARD_TURN_TICKS: int = 33         ## default `turn`: its facing is re-decided on this clock
 const GUARD_SPEED: int = 24              ## v16, patrol (tune)
 const GUARD_SHIELD_POSE_TICKS: int = 8   ## the raised-shield pose after a glance [own]
+const GUARD_SWING_TICKS: int = 12        ## the club swing (attack frames 5-10) after its body hurt a hero [own]
 ## Front hits (Guard, `shell`, `heavy`, GAMEPLAY.md 13.9.5): a striker within this many px of the feet point counts
 ## as in front.
 const FRONT_DX: int = 4
 ## Least ticks between two glance clanks / sparks of one enemy (one per strike; as BossBase.GLANCE_TICKS). [own]
 const GLANCE_TICKS: int = 12
+
+# =================================================================================================================
+# 2.0 archetype 15, Mimic (`enemies/mimic`) [G 13.5] [D A.5]
+# =================================================================================================================
+const MIMIC_SENSE_PX: int = 32           ## a hero within 32 px horizontally ...
+const MIMIC_SENSE_DY: int = 16           ## ... on its floor (feet within this many px vertically) wakes it [own]
+const MIMIC_SHUDDER_TICKS: int = 10      ## the telegraph before the bite
+const MIMIC_DAZE_TICKS: int = 22         ## a head bounce dazes it this long: any hit counts (tune)
+const MIMIC_SHUDDER_ART_PX: int = 1      ## cosmetic rattle of the shudder, art px [own]
+## Contents thrown out when it dies: fan speeds like a small hidden spot's (ObjTuning.SPOT_THROW_*). [own]
+const MIMIC_DROP_XVEL: int = 48
+const MIMIC_DROP_YVEL: int = -112
+const MIMIC_DROP_FAN_STEP: int = 16
+## Body box: the chest container's (objects/container skin=chest, BonusContainer: 24 x 18 logical, x offset 12), so
+## a waiting Mimic is the same size as the chest it imitates [M chest].
+const MIMIC_BOX: Vector2i = Vector2i(24, 18)
+
+# =================================================================================================================
+# 2.0 co-op-only enemies (DESIGN.md D.7, GAMEPLAY.md 13.9.6): presets of an archetype and a trait
+# =================================================================================================================
+## `enemies/snatcher kind=stinger`: after letting a hero go it flies back to its anchor at this speed, px per tick per
+## axis, and hovers again (the 1.0 stinger never returns). [own]
+const SNATCHER_HOME_SPEED: int = 2
+## `enemies/bull_rex` (Charger + heavy): runs at its target at `speed` [CHARGER_SPEED]; it turns round when the target
+## is this far behind it (as the lurker's run) or a wall stops it. [own]
+const BULL_TURN_PX: int = 48
+## `enemies/shaman`: patrols his platform at `speed` v16 [48] (tune), flees from the nearer hero within 64 px ...
+const SHAMAN_SPEED: int = 48
+const SHAMAN_FLEE_PX: int = 64
+const SHAMAN_FLEE_DY: int = 32           ## ... at about his height [own]
+## ... and, cornered (a wall, a ledge or his patrol limit ahead), hops over that hero: 45 px up, 4 px per tick. [own]
+const SHAMAN_HOP_XVEL: int = 64
+const SHAMAN_HOP_YVEL: int = -144
+## Every other enemy within PartyTuning.SHAMAN_SHIELD_TILES (64 px, both axes) of a living, awake Shaman wears a bone
+## shield (all its hits glance); the bone floats this far above its body (art px, cosmetic). [own]
+const BONE_SHIELD_ABOVE_ART: int = 10
+const BONE_SHIELD_TEXTURE: String = "res://assets/sprites/items/bone.png"
+const BONE_SHIELD_FRAMES: int = 4        ## items/bone.png: 4 x 1 cells of 26 x 26 art px, pivot (13, 13) [M 7]
+const BONE_SHIELD_CELL: int = 26
+## `enemies/tar_splitter`: the half a split spawns wears the second palette of the record's skin (slime -> slime_b).
+const SPLIT_SQUASH_TICKS: int = 6        ## a freshly split half shows `squash` this long (when its sheet has it) [own]
 
 # =================================================================================================================
 # 2.0 co-op traits (scripts/enemies/coop_traits.gd) [G 13.9.4] [G 13.9.5]. The shared co-op numbers (windows, daze
@@ -193,6 +241,11 @@ const GRAB_RETURN_SPEED: int = 2         ## px per tick per axis: back to where 
 const LEECH_BACK_DX: int = 6             ## `leech`: it sits this far behind the host's feet point ... [own]
 const LEECH_BACK_DY: int = 10            ## ... and this far up his back [own]
 const LEECH_RELATCH_TICKS: int = 44      ## after falling off (or being clubbed off) it cannot latch on this long [own]
+## Window count-in (GAMEPLAY.md 13.9.3: "three blips 8 ticks apart while a hero stands at each target, then go"):
+## a `bond` group whose every member is alive, or the two halves of a `split`, plays it while each has a hatched hero
+## within this many px on both axes (not one hero for all); the beeps and their spacing are PartyTuning's
+## (COUNT_IN_BEEPS, COUNT_IN_SPACING_TICKS). [G 13.9.3] [own reach]
+const COUNT_IN_REACH_PX: int = 48
 
 # =================================================================================================================
 # Bosses, shared [G 6]

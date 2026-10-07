@@ -345,6 +345,286 @@ msgstr "Fewest hits dealt"
 msgid "UI_JOIN_KEY_TEST"
 msgstr "Key test"
 
+# --- 2.0 phase 2: Cave Paintings, Book II wall, co-op medals, versus rules / arena / teams (ui-A) ---
+msgid "UI_PAINTINGS"
+msgstr "Cave Paintings"
+
+msgid "UI_PAINTINGS_HEADING"
+msgstr "CAVE PAINTINGS"
+
+msgid "UI_PAINTINGS_FOUND"
+msgstr "{count} of {total} found"
+
+msgid "UI_PAINTINGS_NEXT"
+msgstr "{count} more: {reward}"
+
+msgid "UI_PAINTINGS_ALL"
+msgstr "Every painting found!"
+
+msgid "UI_PAINTINGS_INFO"
+msgstr "One painting hides in every Book II stage, ten more behind co-op secrets in Book I."
+
+msgid "UI_PAINTINGS_COOP"
+msgstr "Co-op: {level}"
+
+msgid "UI_PAINTINGS_MISSING"
+msgstr "Not found yet"
+
+msgid "UI_PAINTINGS_NEEDS"
+msgstr "{count} paintings"
+
+msgid "UI_PAINTINGS_OPEN"
+msgstr "Unlocked!"
+
+msgid "UI_PAINTINGS_EVERYTHING"
+msgstr "Unlock everything is on."
+
+msgid "UI_REWARD_MESA_RODEO"
+msgstr "Mesa Rodeo arena"
+
+msgid "UI_REWARD_LOINCLOTHS"
+msgstr "Eight new loincloths"
+
+msgid "UI_REWARD_VARIANTS"
+msgstr "Big Bounce, Lights Out, Giant Rain"
+
+msgid "UI_REWARD_CLOUD_TOP"
+msgstr "Cloud Top arena"
+
+msgid "UI_REWARD_SPEAR_PARTY"
+msgstr "Spear Party and gold"
+
+msgid "UI_REWARD_MURAL"
+msgstr "The cave mural"
+
+msgid "UI_WALL_B2_TEXT"
+msgstr "Only an expert eater may climb to the Roc! Start Book II in Expert mode to see what lies beyond."
+
+msgid "UI_MEDAL_MOST_FOOD"
+msgstr "Most Food"
+
+msgid "UI_MEDAL_MOST_FOOD_INFO"
+msgstr "Ate the most"
+
+msgid "UI_MEDAL_BEST_BOUNCE_CHAIN"
+msgstr "Best Bounce Chain"
+
+msgid "UI_MEDAL_BEST_BOUNCE_CHAIN_INFO"
+msgstr "Longest head-bounce chain"
+
+msgid "UI_MEDAL_HATCHLING"
+msgstr "Hatchling"
+
+msgid "UI_MEDAL_HATCHLING_INFO"
+msgstr "Hatched the most eggs"
+
+msgid "UI_MEDAL_SLUGGER"
+msgstr "Slugger"
+
+msgid "UI_MEDAL_SLUGGER_INFO"
+msgstr "Most Batter Up launches"
+
+msgid "UI_MEDAL_STRONGMAN"
+msgstr "Strongman"
+
+msgid "UI_MEDAL_STRONGMAN_INFO"
+msgstr "Held plates, pushed boulders"
+
+msgid "UI_MEDAL_CLUMSIEST"
+msgstr "Clumsiest"
+
+msgid "UI_MEDAL_CLUMSIEST_INFO"
+msgstr "Fell over the most"
+
+msgid "UI_VS_TEAMS"
+msgstr "Teams"
+
+msgid "UI_VS_TEAMS_FREE"
+msgstr "Free-for-all"
+
+msgid "UI_VS_TEAMS_2V2"
+msgstr "2 v 2"
+
+msgid "UI_VS_TEAM_1"
+msgstr "Sun"
+
+msgid "UI_VS_TEAM_2"
+msgstr "Moon"
+
+msgid "UI_VS_TEAMS_UNEVEN"
+msgstr "2 v 2 needs two players on each team."
+
+msgid "UI_VS_HANDICAP"
+msgstr "Handicap"
+
+msgid "UI_VS_HANDICAP_OFF"
+msgstr "None"
+
+msgid "UI_VS_HANDICAP_HEARTS"
+msgstr "{count} hearts"
+
+msgid "UI_VS_HANDICAP_GUARD"
+msgstr "Guard x{factor}"
+
+msgid "UI_VS_HANDICAP_AUTO"
+msgstr "Auto"
+
+msgid "UI_VS_RULES"
+msgstr "Rules"
+
+msgid "UI_VS_RULES_HEADING"
+msgstr "RULES"
+
+msgid "UI_VS_RULES_OWNER"
+msgstr "{player} sets the rules"
+
+msgid "UI_VS_PRESET"
+msgstr "Preset"
+
+msgid "UI_VS_PRESET_CLASSIC"
+msgstr "Classic"
+
+msgid "UI_VS_PRESET_FEAST"
+msgstr "Feast"
+
+msgid "UI_VS_PRESET_MAYHEM"
+msgstr "Mayhem"
+
+msgid "UI_VS_PRESET_CLASSIC_INFO"
+msgstr "Clubs only, no crates."
+
+msgid "UI_VS_PRESET_FEAST_INFO"
+msgstr "Crates every 20 seconds."
+
+msgid "UI_VS_PRESET_MAYHEM_INFO"
+msgstr "Crates every 8 seconds, skull spots and a surprise every round."
+
+msgid "UI_VS_ROUNDS"
+msgstr "Rounds to win"
+
+msgid "UI_VS_DEFAULT"
+msgstr "Default ({value})"
+
+msgid "UI_VS_ROUND_TIME"
+msgstr "Round time"
+
+msgid "UI_VS_SECONDS"
+msgstr "{seconds} s"
+
+msgid "UI_VS_NO_CLOCK"
+msgstr "No clock"
+
+msgid "UI_VS_CRATES"
+msgstr "Crates"
+
+msgid "UI_VS_WEAPONS"
+msgstr "Weapons"
+
+msgid "UI_VS_WEAPONS_ALL"
+msgstr "Specials"
+
+msgid "UI_VS_WEAPONS_CLUB"
+msgstr "Club only"
+
+msgid "UI_VS_SUDDEN"
+msgstr "Sudden death"
+
+msgid "UI_VS_SUDDEN_ALWAYS"
+msgstr "At 60 s"
+
+msgid "UI_VS_STOCK"
+msgstr "Stock lives"
+
+msgid "UI_VS_ONLY_LCS"
+msgstr "Last Caveman only"
+
+msgid "UI_VS_VARIANTS"
+msgstr "Variants"
+
+msgid "UI_VS_LOCKED"
+msgstr "{count} paintings"
+
+msgid "UI_VS_VAR_HAMMER_TIME"
+msgstr "Hammer Time"
+
+msgid "UI_VS_VAR_HAMMER_TIME_INFO"
+msgstr "Everyone swings the hammer."
+
+msgid "UI_VS_VAR_AXE_RAIN"
+msgstr "Axe Rain"
+
+msgid "UI_VS_VAR_AXE_RAIN_INFO"
+msgstr "Crates hold only axes."
+
+msgid "UI_VS_VAR_BIG_BOUNCE"
+msgstr "Big Bounce"
+
+msgid "UI_VS_VAR_BIG_BOUNCE_INFO"
+msgstr "Head bounces fly twice as high."
+
+msgid "UI_VS_VAR_ONE_BONK"
+msgstr "One-Bonk"
+
+msgid "UI_VS_VAR_ONE_BONK_INFO"
+msgstr "Every hit costs everything."
+
+msgid "UI_VS_VAR_SLIPPERY"
+msgstr "Slippery"
+
+msgid "UI_VS_VAR_SLIPPERY_INFO"
+msgstr "Every floor is ice."
+
+msgid "UI_VS_VAR_LIGHTS_OUT"
+msgstr "Lights Out"
+
+msgid "UI_VS_VAR_LIGHTS_OUT_INFO"
+msgstr "Night falls and the heroes glow."
+
+msgid "UI_VS_VAR_GUSTY"
+msgstr "Gusty"
+
+msgid "UI_VS_VAR_GUSTY_INFO"
+msgstr "The wind turns every few seconds."
+
+msgid "UI_VS_VAR_GIANT_RAIN"
+msgstr "Giant Rain"
+
+msgid "UI_VS_VAR_GIANT_RAIN_INFO"
+msgstr "Giant bonuses rain from the sky."
+
+msgid "UI_VS_VAR_SPEAR_PARTY"
+msgstr "Spear Party"
+
+msgid "UI_VS_VAR_SPEAR_PARTY_INFO"
+msgstr "Everyone carries spears that never run out."
+
+msgid "UI_VS_CHOOSE_ARENA"
+msgstr "Choose the arena"
+
+msgid "UI_VS_ARENA_HEADING"
+msgstr "ARENA"
+
+msgid "UI_VS_ARENA_RANDOM_INFO"
+msgstr "A different arena every round."
+
+msgid "UI_VS_ARENA_PARTY_MIX_INFO"
+msgstr "A new arena and a new mode every round."
+
+msgid "UI_VS_ARENA_LOCKED_INFO"
+msgstr "Find {count} Cave Paintings to open it."
+
+msgid "UI_VS_ARENA_PLAYERS"
+msgstr "Up to {count} players"
+
+msgid "UI_VS_ARENA_TEST"
+msgstr "Test arena"
+
+msgid "UI_VS_NEXT_ROUND"
+msgstr "Next: {arena}"
+
+msgid "UI_VS_MODE_ON_ARENA"
+msgstr "{mode} on {arena}"
+
 # --- Continue / level code ---
 msgid "UI_CONTINUE_HEADING"
 msgstr "CONTINUE"
@@ -402,6 +682,24 @@ msgstr "{players} win the round!"
 
 msgid "UI_VS_DRAW"
 msgstr "Draw!"
+
+# Versus HUD: the deciding moment Flow replays between the gong and the scoreboard (DESIGN.md E.8); any Jump / Strike
+# skips it, touch players get a button.
+msgid "UI_VS_REPLAY_STEAL"
+msgstr "The biggest steal!"
+
+msgid "UI_VS_REPLAY_MOMENT"
+msgstr "The deciding moment"
+
+msgid "UI_VS_REPLAY_SKIP"
+msgstr "Jump or Strike skips"
+
+msgid "UI_VS_REPLAY_SKIP_BUTTON"
+msgstr "Skip"
+
+# HUD: a found Cave Painting opened a reward ({reward} = a UI_REWARD_* text).
+msgid "UI_HUD_REWARD"
+msgstr "Unlocked: {reward}"
 
 # --- Tally ---
 msgid "UI_TALLY_HEADING"
@@ -672,6 +970,16 @@ msgstr "One hand"
 msgid "UI_OPT_KEY_TEST"
 msgstr "Keyboard test"
 
+# Options > Co-op (DESIGN.md D.3 / D.11): each player's own score; P2 safe from enemies.
+msgid "UI_OPT_COOP"
+msgstr "Co-op"
+
+msgid "UI_OPT_RIVAL_SCORE"
+msgstr "Rival score"
+
+msgid "UI_OPT_HELPER_MODE"
+msgstr "Helper mode (P2)"
+
 msgid "UI_KEYTEST_INTRO"
 msgstr "Both players: hold Left + Jump + Attack + Swap at the same time. All eight lights must stay lit."
 
@@ -741,7 +1049,7 @@ msgstr "Totem Ring"
 # --- Level texts: signs (objects/sign) and hints (zones/message) of the level files, in level order ---
 # Shown in the HUD face on a wooden board (signs) or on the hint panel (zones), wrapped to a few lines.
 msgid "SIGN_W1_CLUB"
-msgstr "Odd-looking ground? Give it a whack with your club - food hides everywhere!"
+msgstr "Odd-looking ground? Club it - food hides everywhere!"
 
 msgid "SIGN_W1_BOUNCE"
 msgstr "Hold Jump as you land on a head to bounce up high!"
@@ -759,7 +1067,7 @@ msgid "SIGN_W1_AXE"
 msgstr "Axes fly far: press Attack to throw one!"
 
 msgid "SIGN_W2_HATCH"
-msgstr "Crouch on a hatch to drop through it. Crouching also powers up your next blow - you glow while it lasts!"
+msgstr "Crouch on a hatch to drop through. Crouching charges your next blow!"
 
 msgid "SIGN_W2_DARK"
 msgstr "The deep caves are dark. Watch the threads!"
@@ -768,7 +1076,7 @@ msgid "SIGN_W2_GLIDER"
 msgstr "Run with the glider, then jump to take off. Up climbs, Down dives."
 
 msgid "SIGN_W2_BRUTE"
-msgstr "The Brute keeps the fire-starter. Only its head is soft - crouch until you glow, then strike for four times the damage!"
+msgstr "The Brute has the fire-starter. Charge a blow and club its head!"
 
 msgid "SIGN_W3_ICE"
 msgstr "Snow on ice is slippery! Let go early to stop in time."
@@ -789,16 +1097,16 @@ msgid "SIGN_W3_FLOES"
 msgstr "Hanging floes drop when you stand on them - keep moving!"
 
 msgid "SIGN_W4_SHAFT"
-msgstr "The shaft sinks as soon as you move. Keep heading down - the smoke above is deadly!"
+msgstr "The shaft sinks as you move. Keep going down - the smoke above kills!"
 
 msgid "SIGN_W4_EMBERS"
-msgstr "Embers rain from the vents here - keep moving and watch the sky!"
+msgstr "Embers rain from the vents - keep moving and watch the sky!"
 
 msgid "SIGN_W4_LAVA"
 msgstr "Lava glows in the pits ahead - jump over them!"
 
 msgid "SIGN_W4_COLOSSUS"
-msgstr "Clubs and hammers glance off the Colossus! Take the axe and throw it at its head from the black slab."
+msgstr "Clubs glance off the Colossus! Axe its head from the black slab."
 
 # --- Level texts of the development levels (levels/test_*.lvl, not shipped) ---
 msgid "SIGN_INTEGRATION_SPOTS"

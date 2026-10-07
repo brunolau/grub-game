@@ -27,9 +27,13 @@ class FakeReferee:
 	var wins: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 	var left: int = -1
 	var length: int = 2185
+	var leader: int = -1
 
 	func stack_of(slot: int) -> int:
 		return stacks[slot]
+
+	func leader_slot() -> int:
+		return leader
 
 	func banked_of(slot: int) -> int:
 		return banks[slot]
@@ -42,6 +46,23 @@ class FakeReferee:
 
 	func round_length() -> int:
 		return length
+
+
+## A level's party driver for the tags test: it only tells the stacks (VersusStackDisplay's towers).
+class FakeDriver:
+	extends SimEntity
+
+	var stacks: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
+
+	func stack_of(slot: int) -> int:
+		return stacks[slot]
+
+	func leader_slot() -> int:
+		return -1
+
+
+const LEVEL_SCENE: String = "res://scenes/world/level.tscn"
+const TOTEM_RING: StringName = &"arena_totem_ring"
 
 
 func test_hud_reflects_game_signals() -> void:
@@ -410,7 +431,7 @@ func test_hud_versus_corner_panels_sundial_and_banners() -> void:
 	assert_eq(versus.get_panel(3).belt, Defs.Weapon.HAMMER, "the held special")
 	assert_eq(versus.get_panel(0).belt, PlayerRun.BELT_EMPTY)
 	assert_almost_eq(dial.elapsed, 1.0 - 1000.0 / 2185.0, 0.001, "the shadow sweeps with the round")
-	assert_eq(dial.get_text(), "0:%02d" % ceili(Tuning.ticks_to_seconds(1000) - 0.0001))
+	assert_eq(dial.get_text(), str(ceili(Tuning.ticks_to_seconds(1000) - 0.0001)), "the seconds left")
 	Events.round_countdown.emit(0, 3)
 	assert_eq(versus.banner_text, "3", "3, 2, 1 ...")
 	Events.round_countdown.emit(0, 0)
@@ -436,6 +457,369 @@ func test_hud_versus_corner_panels_sundial_and_banners() -> void:
 	assert_eq(versus.ticks_left, VersusTuning.stack_round_ticks(4), "a whole round left")
 	assert_almost_eq(dial.elapsed, 0.0, 0.001)
 	assert_eq(versus.get_panel(1).get_stack_text(), "0", "no referee: nothing on the heads")
+
+
+## G1: the four corner panels cost 31 of the arena's 60 draw calls. The versus HUD has no child nodes and draws every
+## picture, plate, edge and pip from one texture (HudAtlas), then the text in one face: two batches, three while a
+## banner in the title face shows. The tags, edge arrows and stones of the party HUD come from the same texture.
+func test_hud_versus_draws_from_one_texture() -> void:
+	Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.VERSUS, 4)
+	var hud: Hud = await _overlay(Flow.HUD_SCENE) as Hud
+	var versus: HudVersus = hud.get_versus()
+	var referee: FakeReferee = FakeReferee.new()
+	referee.stacks = PackedInt32Array([3, 12, 0, 127])
+	referee.banks = PackedInt32Array([5, 0, 19, 1])
+	referee.wins = PackedInt32Array([1, 0, 2, 0])
+	referee.left = 900
+	referee.leader = 3
+	versus.source = referee
+	Game.runs[1].set_weapon(Defs.Weapon.AXE)
+	Game.runs[1].set_belt(Defs.Weapon.CLUB)
+	versus.refresh()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	assert_eq(versus.get_child_count(), 0, "no child nodes: the panels are drawn, not built of labels")
+	assert_eq(versus.draw_batches, 2, "every picture from the atlas, then all text in the HUD face")
+	versus.show_banner("3", UiKit.COL_CREAM, UiKit.Style.TITLE, 0.0)
+	await get_tree().process_frame
+	assert_eq(versus.draw_batches, 3, "a countdown banner adds the title face")
+	var atlas: Texture2D = HudAtlas.texture()
+	assert_true(atlas.get_width() <= 2048 and atlas.get_height() <= 2048, "one small texture")
+	for group: StringName in [&"food", &"crown", &"belt", &"heart", &"tag", &"arrow", &"stone", &"dial"]:
+		var cell: Rect2 = HudAtlas.region(group, 0)
+		assert_true(cell.has_area() and Rect2(Vector2.ZERO, atlas.get_size()).encloses(cell), "%s in the atlas" % group)
+	var image: Image = atlas.get_image()
+	var tag_cell: Rect2 = HudAtlas.region(&"tag", 0)
+	assert_true(image.get_region(Rect2i(tag_cell)).get_used_rect().has_area(), "the P1 tag was copied")
+	var empty: Rect2 = HudAtlas.dial_frame(0.0)
+	var full: Rect2 = HudAtlas.dial_frame(1.0)
+	assert_ne(empty, full, "the sundial has frames")
+	assert_ne(image.get_region(Rect2i(empty)).get_pixel(9, 6), image.get_region(Rect2i(full)).get_pixel(9, 6),
+			"its shadow sweeps over the face")
+
+
+## G1: the bottom panels sat on the arena floor and hid a hero walking there. On the real Totem Ring at 640 x 360 every
+## panel, the crown and the sundial keep clear of a hero standing on any surface of the arena: the top ones fill row 0,
+## the bottom ones the floor tiles under the floor line.
+func test_hud_versus_panels_never_hide_a_hero_standing_in_the_arena() -> void:
+	if not Levels.has_level(TOTEM_RING) or not ResourceLoader.exists(LEVEL_SCENE):
+		fail("DA's Totem Ring and the level scene are needed")
+		return
+	Game.versus_match = null
+	Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.VERSUS, 4)
+	Sim.manual = true
+	Flow.pending_level_id = TOTEM_RING
+	var level: LevelBase = (load(LEVEL_SCENE) as PackedScene).instantiate() as LevelBase
+	add_node(level)
+	await get_tree().process_frame
+	if level.has_method(&"set_view_size"):
+		level.call(&"set_view_size", Vector2i(Tuning.VIEW_W, Tuning.VIEW_H) * Tuning.ART_SCALE)
+	var hud: Hud = await _overlay(Flow.HUD_SCENE) as Hud
+	var versus: HudVersus = hud.get_versus()
+	versus.level_override = level
+	var referee: FakeReferee = FakeReferee.new()
+	# The widest panels: three-digit counts, a special on every belt; P1 leads (the crown).
+	referee.stacks = PackedInt32Array([123, 104, 99, 110])
+	referee.banks = PackedInt32Array([101, 0, 19, 100])
+	referee.leader = 0
+	referee.left = 600
+	versus.source = referee
+	for slot: int in 4:
+		Game.runs[slot].set_weapon(Defs.Weapon.SPEAR)
+		Game.runs[slot].set_belt(Defs.Weapon.CLUB)
+	await get_tree().process_frame
+	versus.refresh()
+	var view: Rect2 = hud.get_viewport_rect()
+	var floor_line: float = versus.floor_line_y()
+	assert_true(is_finite(floor_line), "an arena has a floor line")
+	var covers: Array[Rect2] = [versus.get_sundial().rect]
+	for slot: int in 4:
+		var panel: HudVersus.CornerPanel = versus.get_panel(slot)
+		covers.append(panel.get_cover_rect())
+		assert_true(view.encloses(panel.get_cover_rect()), "P%d's panel inside the view: %s" % [slot + 1, panel.rect])
+		if panel.bottom:
+			assert_true(panel.rect.position.y >= floor_line, "P%d under the floor line %.0f: %s" % [slot + 1,
+					floor_line, panel.rect])
+	for i: int in covers.size():
+		for j: int in range(i + 1, covers.size()):
+			assert_false(covers[i].intersects(covers[j]), "HUD parts apart: %s / %s" % [covers[i], covers[j]])
+	assert_true(versus.get_panel(0).get_crown_rect().has_area(), "the leader's crown")
+	var hero: PlayerBase = level.get_hero(0)
+	var grid: TileGrid = level.grid
+	var surfaces: int = 0
+	for row: int in range(1, grid.rows):
+		for col: int in grid.cols:
+			if not TileGrid.is_ground(grid.floor_at(col, row)) or TileGrid.is_ground(grid.floor_at(col, row - 1)):
+				continue
+			for dx: int in [2, 8, 14]:
+				hero.teleport(Vector2i(col * Tuning.TILE + dx, row * Tuning.TILE))
+				var feet: Vector2 = hero.get_global_transform_with_canvas().origin
+				var box: Vector2 = Vector2(float(hero.box_w), float(hero.box_h)) * float(Tuning.ART_SCALE)
+				var body: Rect2 = Rect2(feet.x - box.x * 0.5, feet.y - box.y, box.x, box.y)
+				surfaces += 1
+				for cover: Rect2 in covers:
+					assert_false(body.intersects(cover), "a hero standing at cell (%d, %d) is behind %s" % [col, row,
+							cover])
+	assert_true(surfaces > 40, "the arena's surfaces were walked (%d)" % surfaces)
+	Sim.manual = false
+	Flow.pending_level_id = &""
+
+
+## A hero who still comes behind a panel (a jump into a corner) sees it fade like the solo HUD row, and back.
+func test_hud_versus_panel_fades_while_a_hero_is_behind_it() -> void:
+	Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.VERSUS, 2)
+	var level: LevelBase = make_flat_level(80, 30, 20)
+	var p1: PlayerBase = PlayerBase.new()
+	place(level, p1, Vector2i(200, 160), {"slot": 0})
+	var p2: PlayerBase = PlayerBase.new()
+	place(level, p2, Vector2i(240, 160), {"slot": 1})
+	var hud: Hud = await _overlay(Flow.HUD_SCENE) as Hud
+	var versus: HudVersus = hud.get_versus()
+	versus.level_override = level
+	versus.refresh(1.0)
+	assert_almost_eq(versus.get_panel(0).alpha, 1.0, 0.001, "nobody behind P1's panel")
+	var rect: Rect2 = versus.get_panel_rect(0)
+	var feet: Vector2 = rect.get_center() / float(Tuning.ART_SCALE) + Vector2(0.0, 10.0)
+	p2.teleport(Vector2i(feet))
+	versus.refresh(1.0)
+	assert_almost_eq(versus.get_panel(0).alpha, HudVersus.UNDER_HERO_ALPHA, 0.001, "P2 jumped behind P1's panel")
+	assert_almost_eq(versus.get_panel(1).alpha, 1.0, 0.001, "the other panel stays")
+	await get_tree().process_frame
+	assert_eq(versus.draw_batches, 2, "a faded panel is drawn in the same batches")
+	p2.teleport(Vector2i(240, 160))
+	versus.refresh(0.05)
+	assert_true(versus.get_panel(0).alpha > HudVersus.UNDER_HERO_ALPHA and versus.get_panel(0).alpha < 1.0,
+			"it fades back in")
+	versus.refresh(1.0)
+	assert_almost_eq(versus.get_panel(0).alpha, 1.0, 0.001)
+	p1.dead = true
+	p1.teleport(Vector2i(feet))
+	versus.refresh(1.0)
+	assert_almost_eq(versus.get_panel(0).alpha, 1.0, 0.001, "a dead hero does not count")
+
+
+## The crown hangs beside the leader's panel (none on a tie); a hearts mode shows hearts instead of the stack.
+func test_hud_versus_crown_and_hearts() -> void:
+	Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.VERSUS, 4)
+	var hud: Hud = await _overlay(Flow.HUD_SCENE) as Hud
+	var versus: HudVersus = hud.get_versus()
+	var referee: FakeReferee = FakeReferee.new()
+	versus.source = referee
+	versus.refresh()
+	for slot: int in 4:
+		assert_false(versus.get_panel(slot).crowned, "a tie: no crown")
+	referee.leader = 1
+	versus.refresh()
+	var panel: HudVersus.CornerPanel = versus.get_panel(1)
+	assert_true(panel.crowned)
+	var crown: Rect2 = panel.get_crown_rect()
+	assert_true(crown.end.x <= panel.rect.position.x, "P2's crown on the inner side of his panel: %s" % crown)
+	assert_false(crown.intersects(versus.get_sundial().rect), "clear of the sundial")
+	assert_eq(panel.hearts, -1, "Grub Stack: the stack and the pot")
+	Game.versus_match = VersusMatch.new()
+	Game.versus_match.round_mode = Defs.VersusMode.LAST_CAVEMAN
+	Game.runs[2].lose_heart()
+	versus.refresh()
+	assert_eq(versus.get_panel(2).hearts, Tuning.ENERGY_START - 1, "Last Caveman Standing: his hearts")
+	assert_eq(versus.get_panel(0).wins_needed, Game.versus_match.round_wins_needed(), "pips to win the match")
+	await get_tree().process_frame
+	assert_eq(versus.draw_batches, 2)
+	Game.versus_match = null
+
+
+## Every panel shows the player's head in the colour he wears (ui/portrait_heads.png): cheering while he leads, "ouch"
+## while his hero is knocked out. Three-digit counts on a 640 px view: the panels drop the tag text instead of
+## running into the sundial.
+func test_hud_versus_heads_and_the_narrow_top_row() -> void:
+	Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.VERSUS, 2)
+	var level: LevelBase = make_flat_level(80, 30, 20)
+	var p1: PlayerBase = PlayerBase.new()
+	place(level, p1, Vector2i(100, 160), {"slot": 0})
+	var p2: PlayerBase = PlayerBase.new()
+	place(level, p2, Vector2i(200, 160), {"slot": 1})
+	var hud: Hud = await _overlay(Flow.HUD_SCENE) as Hud
+	var versus: HudVersus = hud.get_versus()
+	versus.level_override = level
+	var referee: FakeReferee = FakeReferee.new()
+	referee.leader = 1
+	versus.source = referee
+	versus.refresh()
+	assert_eq(versus.get_panel(0).face, UiPlayers.Face.NORMAL)
+	assert_eq(versus.get_panel(1).face, UiPlayers.Face.CHEER, "the leader cheers")
+	p1.dead = true
+	versus.refresh()
+	assert_eq(versus.get_panel(0).face, UiPlayers.Face.OUCH, "knocked out")
+	p1.dead = false
+	assert_eq(UiPlayers.head_cell(1, UiPlayers.Face.CHEER), 1 * 3 + 2, "P2 in blue: row 1, the cheer column")
+	Game.runs[1].palette = &"gold"
+	assert_eq(UiPlayers.head_cell(1), 5 * 3, "the colour he chose: the gold row")
+	assert_eq(UiPlayers.tag_cell(1), (1 + 5) * 4 + 1, "his tag in gold")
+	assert_eq(UiPlayers.arrow_cell(1, UiPlayers.Side.UP), 5 * 4 + UiPlayers.Side.UP, "his arrow in gold")
+	Game.runs[1].palette = &""
+	assert_eq(UiPlayers.tag_cell(0), 4, "P1's default tag: the yellow row")
+	var view: Rect2 = hud.get_viewport_rect()
+	assert_true(versus.get_panel(0).show_tag, "two-digit counts: the tag fits")
+	if view.size.x <= 680.0:
+		referee.stacks = PackedInt32Array([123, 456, 0, 0])
+		referee.banks = PackedInt32Array([789, 101, 0, 0])
+		referee.leader = 0
+		versus.refresh()
+		var dial: Rect2 = versus.get_sundial().rect
+		for slot: int in 2:
+			var panel: HudVersus.CornerPanel = versus.get_panel(slot)
+			assert_false(panel.get_cover_rect().intersects(dial), "P%d clear of the sundial: %s / %s" % [slot + 1,
+					panel.get_cover_rect(), dial])
+		assert_false(versus.get_panel(0).get_cover_rect().intersects(versus.get_panel(1).get_cover_rect()))
+	await get_tree().process_frame
+	assert_eq(versus.draw_batches, 2, "the heads come from the atlas too")
+
+
+## The deciding moment (DESIGN.md E.8, Flow.replay_started / replay_finished): its banner with the skip hint while it
+## plays - "the biggest steal" or "the deciding moment" - and a Skip button for a touch player that calls
+## Flow.skip_replay; all gone when it ends.
+func test_hud_versus_deciding_moment_banner_and_skip() -> void:
+	Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.VERSUS, 2)
+	var hud: Hud = await _overlay(Flow.HUD_SCENE) as Hud
+	var versus: HudVersus = hud.get_versus()
+	Flow.replay_started.emit(0, 100, 172, true)
+	assert_true(versus.replaying)
+	assert_eq(versus.banner_text, tr("UI_VS_REPLAY_STEAL"))
+	assert_eq(versus.banner_hint, tr("UI_VS_REPLAY_SKIP"), "how to skip it")
+	assert_true(versus.is_banner_visible())
+	if not HudVersus.touch_in_use():
+		assert_null(versus.get_skip_button(), "keyboard and pads: no button")
+	await get_tree().process_frame
+	assert_true(versus.draw_batches <= 3, "banner and hint in the HUD face")
+	Flow.replay_finished.emit(false)
+	assert_false(versus.replaying)
+	assert_false(versus.is_banner_visible(), "the scoreboard follows: banner gone")
+	var device: int = GameInput.device
+	GameInput.device = Defs.Device.TOUCH
+	Flow.replay_started.emit(1, 200, 272, false)
+	assert_eq(versus.banner_text, tr("UI_VS_REPLAY_MOMENT"), "no steal: the deciding moment")
+	var button: UiButton = versus.get_skip_button()
+	assert_not_null(button, "a touch player gets a Skip button")
+	if button != null:
+		assert_eq(button.text, "UI_VS_REPLAY_SKIP_BUTTON")
+		assert_true(button.pressed.is_connected(Flow.skip_replay), "it skips the replay")
+		await get_tree().process_frame
+		versus.refresh()
+		assert_true(hud.get_viewport_rect().encloses(button.get_global_rect()), "on the screen")
+		assert_false(button.get_global_rect().intersects(versus.get_banner_rect()), "under the banner")
+	Flow.replay_finished.emit(true)
+	await get_tree().process_frame
+	assert_null(versus.get_skip_button(), "removed when the replay ends")
+	GameInput.device = device
+
+
+## A found Cave Painting that opens a reward (Save.reward_unlocked): "Unlocked: <reward>" under the HUD row for a few
+## seconds, then it fades.
+func test_hud_shows_a_reward_notice() -> void:
+	var hud: Hud = await _overlay(Flow.HUD_SCENE) as Hud
+	assert_false(hud.is_reward_visible())
+	Save.reward_unlocked.emit(&"mesa_rodeo")
+	assert_true(hud.is_reward_visible())
+	assert_eq(hud.reward_text, tr("UI_HUD_REWARD").format({"reward": tr("UI_REWARD_MESA_RODEO")}))
+	assert_false(hud.reward_text.contains("{"), "the reward's own text: %s" % hud.reward_text)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var label: Label = _label_with_text(hud, hud.reward_text)
+	assert_not_null(label)
+	if label != null:
+		assert_true(label.get_global_rect().position.y >= hud.get_row_bottom(), "under the HUD row")
+	await get_tree().create_timer(Hud.REWARD_SECONDS + 0.3).timeout
+	assert_false(hud.is_reward_visible(), "gone after a few seconds")
+
+
+## The HUD row's bottom edge for world text (sign boards): under lives, hearts and letters; in versus under the row of
+## corner panels and the sundial.
+func test_hud_tells_where_its_row_ends() -> void:
+	var hud: Hud = await _overlay(Flow.HUD_SCENE) as Hud
+	var bottom: float = hud.get_row_bottom()
+	assert_true(bottom >= Hud.ROW_HEIGHT and bottom <= Hud.ROW_HEIGHT + float(UiKit.MARGIN_MOBILE), "%.0f" % bottom)
+	assert_true(hud.is_under_row(bottom - 1.0))
+	assert_false(hud.is_under_row(bottom + 1.0))
+	Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.VERSUS, 2)
+	await get_tree().process_frame
+	assert_eq(hud.get_row_bottom(), hud.get_versus().get_sundial().rect.end.y, "versus: the panel row")
+
+
+## Tags and colour arrows (DESIGN.md E.9): every hero's tag through the round's countdown and the start of the round,
+## and whenever heroes overlap; in Grub Stack the tag stands on top of the food tower over the head.
+func test_hud_tags_show_at_the_round_start_and_ride_on_the_tower() -> void:
+	Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.VERSUS, 2)
+	var level: LevelBase = make_flat_level(80, 30, 20)
+	var p1: PlayerBase = PlayerBase.new()
+	place(level, p1, Vector2i(100, 160), {"slot": 0})
+	var p2: PlayerBase = PlayerBase.new()
+	place(level, p2, Vector2i(200, 160), {"slot": 1})
+	var hud: Hud = await _overlay(Flow.HUD_SCENE) as Hud
+	var arrows: HudEdgeArrows = hud.get_edge_arrows()
+	arrows.level_override = level
+	assert_true(arrows.visible, "versus: tags and arrows")
+	arrows.show_tags(0.0)
+	arrows.update_markers()
+	assert_eq(arrows.tags.size(), 0, "apart, mid-round: no tags")
+	Events.round_countdown.emit(0, 3)
+	arrows.update_markers()
+	assert_eq(arrows.tags.size(), 2, "3, 2, 1: who is who")
+	arrows.show_tags(0.0)
+	Events.round_started.emit(0)
+	arrows.update_markers()
+	assert_eq(arrows.tags.size(), 2, "GRUB!: still shown")
+	var bare_y: float = _tag_y(arrows, 1)
+	var driver: FakeDriver = FakeDriver.new()
+	add_node(driver)
+	driver.stacks = PackedInt32Array([0, 6, 0, 0])
+	level.party_driver = driver
+	arrows.update_markers()
+	var tower: float = VersusStackDisplay.FIRST_FOOT_ART + 5.0 * VersusStackDisplay.STEP_ART \
+			+ float(VersusStackDisplay.CELL.y) - float(p2.box_h * Tuning.ART_SCALE)
+	assert_almost_eq(bare_y - _tag_y(arrows, 1), tower, 0.5, "P2's tag on top of his six pictures")
+	assert_almost_eq(_tag_y(arrows, 0), bare_y, 0.5, "P1 has no tower")
+	driver.stacks = PackedInt32Array([0, 400, 0, 0])
+	arrows.update_markers()
+	assert_true(_tag_y(arrows, 1) >= float(HudEdgeArrows.TAG_CELL.y), "a tall tower never pushes the tag off the view")
+	level.party_driver = null
+	arrows.show_tags(0.0)
+	p2.teleport(p1.sim_pos + Vector2i(6, 0))
+	arrows.update_markers()
+	assert_eq(arrows.tags.size(), 2, "overlapping heroes wear their tags")
+
+
+func _tag_y(arrows: HudEdgeArrows, slot: int) -> float:
+	for tag: Dictionary in arrows.tags:
+		if int(tag["slot"]) == slot:
+			return (tag["pos"] as Vector2).y
+	return NAN
+
+
+## Co-op with the Rival score option (DESIGN.md D.11): the score counter shows P1's own score in his colour, P2's panel
+## his own under his hearts; off, the tribe score as in 1.0.
+func test_hud_rival_score_shows_each_players_own_score() -> void:
+	Settings.set_value(OptionsPanel.KEY_RIVAL_SCORE, false)
+	Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.COOP, 2)
+	var hud: Hud = await _overlay(Flow.HUD_SCENE) as Hud
+	var panel: HudPlayerPanel = hud.get_p2_panel()
+	Game.runs[0].score = 300
+	Game.runs[1].score = 1200
+	Game.add_score(1500)
+	assert_false(hud.rival_score)
+	assert_eq(hud.get_score_text(), UiKit.score_text(1500), "off: the tribe score")
+	assert_eq(panel.get_score_text(), "", "off: no score in P2's panel")
+	var height: float = panel.size.y
+	Settings.set_value(OptionsPanel.KEY_RIVAL_SCORE, true)
+	assert_true(hud.rival_score)
+	assert_eq(hud.get_score_text(), UiKit.score_text(300), "P1's own score")
+	assert_eq(panel.get_score_text(), UiKit.score_text(1200), "P2's own score in his panel")
+	assert_almost_eq(panel.size.y, height + HudPlayerPanel.SCORE_H, 0.5, "the panel grows by the score line")
+	assert_true(hud.get_viewport_rect().encloses(panel.get_global_rect()), "inside the view")
+	Game.runs[1].score += 50
+	Game.add_score(50)
+	assert_eq(panel.get_score_text(), UiKit.score_text(1250), "it follows the score")
+	Game.new_game(Defs.Difficulty.BEGINNER)
+	assert_false(hud.rival_score, "single-player keeps the 1.0 counter")
+	Settings.set_value(OptionsPanel.KEY_RIVAL_SCORE, false)
 
 
 ## Two players: only their two panels.

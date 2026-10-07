@@ -2,7 +2,8 @@ class_name Geyser
 extends SimEntity
 ## `objects/geyser` (`period` ticks [88, at least 34], `delay` [0], `power` v16 [-224], `skin=mud|blowhole|steam|soda`,
 ## `deadly`): a spring with a timer (DESIGN.md C.4, PHYSICS.md C.6, GAMEPLAY.md 13.3). Placed in the air cell above
-## the vent's floor; its feet point is the floor surface. Cycle position `p = (Sim.tick - delay) mod period` (idle
+## the vent's floor; its feet point is the floor surface (on a tar floor `:` the lowered one, 6 px down: a hero wading
+## there is in the vent box). Cycle position `p = (Sim.tick - delay) mod period` (idle
 ## before `delay`): it **bubbles** (the telegraph, with the bubble cue) for p in [period - 34, period - 12) and
 ## **spouts** for p in [period - 12, period). Its state is a function of the tick, so dozing never changes it.
 ##
@@ -80,6 +81,25 @@ func _apply_params(params: Dictionary) -> void:
 	if deadly:
 		var liquid: String = str(Game.level.meta.get("liquid", "")) if Game.level != null else ""
 		_row = DEADLY_TAR_ROW if liquid == "tar" else DEADLY_LAVA_ROW
+	_settle_on_surface()
+
+
+## The vent sits on its floor's SURFACE: placed on the top edge of a floor cell whose surface lies lower (a tar floor
+## `:` 6 px down, PHYSICS.md C.5; a slope by its profile), its feet point moves down onto that surface, so a hero or a
+## ground enemy wading there stands in the vent box (LEVEL_DESIGN.md 15.3: "a tar pit ... is a trap unless a vine, a
+## geyser or a partner gets the hero out"; Feast Land D's soda geysers on honey). A geyser placed on the surface
+## itself, or over anything but ground, stays where it is.
+func _settle_on_surface() -> void:
+	var level: LevelBase = Game.level
+	if level == null:
+		return
+	var col: int = sim_pos.x >> 4
+	var row: int = sim_pos.y >> 4
+	if sim_pos.y != row * Tuning.TILE or not TileGrid.is_ground(level.grid.floor_at(col, row)):
+		return
+	var drop: int = level.grid.surface_offset(col, row, sim_pos.x)
+	if drop > 0:
+		teleport(Vector2i(sim_pos.x, sim_pos.y + drop))
 
 
 func _ready() -> void:

@@ -252,17 +252,21 @@ def build_spawn_point():
         r = ui_ramp(PALETTES[cname])
         frames.append(spawn_frame(r["fill"], r["shade"]))
     frames.append(spawn_frame(LIT_W, LIT))
+    for cname in ("white", "gold"):                                 # phase 2: the two other hero colours
+        r = ui_ramp(PALETTES[cname])
+        frames.append(spawn_frame(r["fill"], r["shade"]))
     sheet = strip(frames)
     save(sheet, "sprites/objects/spawn_point.png", kind="object", frame=[SW, SH], grid=[len(frames), 1],
          pivot=[SW // 2, SH],
          source="shipped sprites/objects/code_stone.png (colours) - the slab and the spiral drawn by the pipeline",
          edits="a flat 48 x 15 slab ellipse in the code stone's sandstone colours (2 px #272018 outline, lit upper "
                "left, shaded front) with a 12 x 7 cave-paint spiral in ochre; lit frames recolour the spiral to a "
-               "slot's loincloth fill / shadow (hero_palettes ui ramp) or to the anchor's light yellow",
+               "hero colour's loincloth fill / shadow (hero_palettes ui ramp) or to the anchor's light yellow",
          note="`objects/spawn_point index=2..4` (arenas; `@` is spawn 1): a floor marker drawn behind the heroes, 3 x 1 "
               "cells, pivot (24, 16) = floor, bottom-centre on the spawn cell. 0 idle (ochre), 1-4 = the spawn "
-              "about to be used by P1-P4 (the 48-tick respawn wait: show the respawning player's slot colour), 5 "
-              "neutral light (round start, every pad lit)", section="versus")
+              "about to be used by P1-P4 (the 48-tick respawn wait: show the respawning player's colour - 1 yellow, "
+              "2 blue, 3 pink, 4 green), 5 neutral light (round start, every pad lit), 6 white, 7 gold (the two "
+              "other hero colours, phase 2)", section="versus")
     return sheet
 
 

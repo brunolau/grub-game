@@ -4,11 +4,15 @@ extends VBoxContainer
 ## combination of held keys ("ghosting"), so both players hold Left + Jump + Strike + Swap at once and all eight
 ## lights must stay lit. Every other key of both halves lights too, so a player can check his whole cluster.
 ##
-## Owner: ui-B. Part of the options bindings page; ui-A's join panel / versus lobby may embed it as well. The keys are
-## the two keyboard halves of the binding profiles of P1 and P2 (Settings.get_slot_bindings, the layout of
-## "controls/party_keyboard"). Keys are read by physical position, so the numpad works whatever the NumLock state.
+## Owner: ui-B. Part of the options bindings page; ui-A's join panel / versus lobby embed it as well. On the options
+## page the keys are the two keyboard halves of the binding profiles of P1 and P2 (Settings.get_slot_bindings, the
+## layout of "controls/party_keyboard"). A host with seated players calls [method set_players]: the columns are then
+## those players in join order (the first to join is P1 whatever half he took), each lit by his own keys, and a half
+## nobody sits at follows as a "Free" column with the layout's keys for it, so the ghosting check works before the
+## second player joins. Keys are read by physical position, so the numpad works whatever the NumLock state.
 ## Windows quirk it detects: with NumLock ON, a numpad key pressed while Shift is held makes Windows lift Shift (and
-## press it again afterwards) - in the classic layout that drops P1's strike; the test then says "switch Num Lock off".
+## press it again afterwards) - that drops the action of a player who bound Shift (the classic preset keeps Shift free:
+## P1 strikes with Left Ctrl); the test then says "switch Num Lock off".
 ## While the test shows it swallows every key (Num Enter, Space ... must not press menu entries); "back" (Escape, a
 ## pad's B) still reaches the host.
 
@@ -31,6 +35,7 @@ const SMALL_H: float = 18.0
 class KeyLight:
 	extends Control
 
+	## Player slot of the column (its colour), -1 = a free keyboard half (cream).
 	var slot: int = 0
 	var action: StringName = &""
 	var key_text: String = ""
@@ -56,7 +61,8 @@ class KeyLight:
 		draw_rect(cap, UiKit.COL_INK)
 		var face: Rect2 = cap.grow(-2.0)
 		face.size.y -= 2.0
-		draw_rect(face, UiPlayers.colour(slot) if lit else Color(UiKit.COL_INK.lightened(0.18)))
+		var lit_colour: Color = UiPlayers.colour(slot) if slot >= 0 else UiKit.COL_CREAM
+		draw_rect(face, lit_colour if lit else Color(UiKit.COL_INK.lightened(0.18)))
 		var mono: Font = UiKit.font(UiKit.Style.MONO)
 		var font_size: int = UiKit.SIZE_MONO if small else UiKit.SIZE_MONO * 2
 		var text: String = key_text if key_text != "" else "-"
@@ -82,8 +88,13 @@ var numlock_warning: bool = false
 ## Physical keys held now, as the test saw them.
 var held: Dictionary = {}
 
+## The columns shown: [player slot (-1 = a free half), keyboard half (Defs.InputSlotKind; NONE = the slot's profile
+## as the options page reads it)] each.
+var columns: Array[Vector2i] = []
+
 var _lights: Array[KeyLight] = []
 var _keys: Dictionary = {}           # KeyLight -> PackedInt32Array of physical keycodes
+var _columns_box: HBoxContainer = null
 var _status: Label = null
 var _hint: Label = null
 var _shift_up_frame: int = -100
@@ -97,13 +108,15 @@ func _init() -> void:
 	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	intro.custom_minimum_size = Vector2(380.0, 0.0)
 	add_child(intro)
-	var columns: HBoxContainer = HBoxContainer.new()
-	columns.alignment = BoxContainer.ALIGNMENT_CENTER
-	columns.add_theme_constant_override(&"separation", 20)
-	columns.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(columns)
+	_columns_box = HBoxContainer.new()
+	_columns_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	_columns_box.add_theme_constant_override(&"separation", 20)
+	_columns_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_columns_box)
+	var profiles: Array[Vector2i] = []
 	for slot: int in PLAYERS:
-		columns.add_child(_player_column(slot))
+		profiles.append(Vector2i(slot, Defs.InputSlotKind.NONE))
+	_build_columns(profiles)
 	_status = UiKit.label("", UiKit.Style.SMALL, HORIZONTAL_ALIGNMENT_CENTER)
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_status.custom_minimum_size = Vector2(380.0, 0.0)
@@ -143,26 +156,54 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
-## Read the two halves of the current layout and clear the lights.
+## Read the keys of the columns again and clear the lights.
 func start() -> void:
 	held.clear()
 	has_passed = false
 	numlock_warning = false
 	_shift_up_frame = -100
-	for light: KeyLight in _lights:
-		var codes: PackedInt32Array = PackedInt32Array()
-		var names: PackedStringArray = PackedStringArray()
-		for event: InputEvent in Settings.get_slot_bindings(light.slot, light.action, Defs.Device.KEYBOARD):
-			var bound: InputEventKey = event as InputEventKey
-			if bound == null:
-				continue
-			codes.append(int(bound.physical_keycode if bound.physical_keycode != KEY_NONE else bound.keycode))
-			names.append(UiGlyphs.key_text(bound))
-		_keys[light] = codes
-		light.key_text = names[0] if not names.is_empty() else ""
-		light.queue_redraw()
+	for c: int in columns.size():
+		for light: KeyLight in _column_lights(c):
+			var codes: PackedInt32Array = PackedInt32Array()
+			var names: PackedStringArray = PackedStringArray()
+			for bound: InputEventKey in _column_keys(columns[c], light.action):
+				codes.append(int(bound.physical_keycode if bound.physical_keycode != KEY_NONE else bound.keycode))
+				names.append(UiGlyphs.key_text(bound))
+			_keys[light] = codes
+			light.key_text = names[0] if not names.is_empty() else ""
+			light.queue_redraw()
 	_hint.visible = _uses_numpad()
 	_update_lights()
+
+
+## Show the seated keyboard players `slots`, in this order (the hosts pass them in join = slot order): one column per
+## player whose input slot is a keyboard half, tagged and coloured for his slot and lit by his own keys (his generated
+## actions); then each keyboard half nobody sits at as a "Free" column with the layout's keys of that half. PLAYERS
+## columns at most. A player on a pad or touch gets no column.
+func set_players(slots: PackedInt32Array) -> void:
+	var wanted: Array[Vector2i] = []
+	var taken: Array[int] = []
+	for slot: int in slots:
+		if slot < 0 or slot >= Defs.MAX_PLAYERS:
+			continue
+		var half: int = GameInput.get_slot(slot).keyboard_half()
+		if (half == Defs.InputSlotKind.KEYBOARD_LEFT or half == Defs.InputSlotKind.KEYBOARD_RIGHT) \
+				and not taken.has(half):
+			wanted.append(Vector2i(slot, half))
+			taken.append(half)
+	for half: int in [Defs.InputSlotKind.KEYBOARD_LEFT, Defs.InputSlotKind.KEYBOARD_RIGHT]:
+		if not taken.has(half):
+			wanted.append(Vector2i(-1, half))
+	_build_columns(wanted.slice(0, PLAYERS))
+	start()
+
+
+## The tag shown on top of column `column` ("P1", "Free"; "" past the last column).
+func get_column_tag(column: int) -> String:
+	if column < 0 or column >= _columns_box.get_child_count():
+		return ""
+	var tag: Label = _columns_box.get_child(column).get_child(0) as Label
+	return tag.text if tag != null else ""
 
 
 ## True while the key of `action` of player `slot` (0 = P1, 1 = P2) is held.
@@ -186,11 +227,63 @@ func get_status_text() -> String:
 	return _status.text
 
 
+## Replace the columns by `wanted` ([slot, half] each, see [member columns]).
+func _build_columns(wanted: Array[Vector2i]) -> void:
+	for child: Node in _columns_box.get_children():
+		_columns_box.remove_child(child)
+		child.queue_free()
+	_lights.clear()
+	_keys.clear()
+	columns = wanted.duplicate()
+	for column: Vector2i in columns:
+		_columns_box.add_child(_player_column(column.x))
+
+
+## The lights of column `c` (COMBO first, then OTHERS).
+func _column_lights(c: int) -> Array[KeyLight]:
+	var per_column: int = COMBO.size() + OTHERS.size()
+	var result: Array[KeyLight] = []
+	for i: int in per_column:
+		if c * per_column + i < _lights.size():
+			result.append(_lights[c * per_column + i])
+	return result
+
+
+## The keys of `action` for a column: the options page reads the slot's binding profile as before; a seated player
+## his generated action (else his profile on his half); a free half the layout's keys of that half.
+func _column_keys(column: Vector2i, action: StringName) -> Array[InputEventKey]:
+	var result: Array[InputEventKey] = []
+	var slot: int = column.x
+	var half: int = column.y
+	if slot >= 0:
+		var generated: StringName = GameInput.slot_action(slot, action)
+		if half != Defs.InputSlotKind.NONE and InputMap.has_action(generated):
+			for event: InputEvent in InputMap.action_get_events(generated):
+				if event is InputEventKey:
+					result.append(event as InputEventKey)
+		if result.is_empty():
+			var bound: Array[InputEvent] = Settings.get_slot_bindings(slot, action, Defs.Device.KEYBOARD) \
+					if half == Defs.InputSlotKind.NONE else Settings.get_slot_bindings(slot, action, Defs.Device.KEYBOARD, half)
+			for event: InputEvent in bound:
+				if event is InputEventKey:
+					result.append(event as InputEventKey)
+		return result
+	for code: Key in InputSlot.default_keys(GameInput.keyboard_layout(), half, action):
+		var key: InputEventKey = InputEventKey.new()
+		key.physical_keycode = code
+		result.append(key)
+	return result
+
+
 func _player_column(slot: int) -> VBoxContainer:
 	var column: VBoxContainer = VBoxContainer.new()
 	column.add_theme_constant_override(&"separation", 3)
 	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var tag: Label = UiPlayers.tag_label(slot)
+	var tag: Label = UiPlayers.tag_label(slot) if slot >= 0 else UiKit.label(tr("UI_JOIN_FREE"), UiKit.Style.HUD)
+	if slot < 0:
+		tag.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+		tag.add_theme_color_override(&"font_color", UiKit.COL_CREAM)
+		tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	column.add_child(tag)
 	var grid: GridContainer = GridContainer.new()

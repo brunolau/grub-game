@@ -28,11 +28,18 @@ const ARENA_PARTY_MIX: StringName = &"party_mix"
 const LAUNCH_MODES: Array[int] = [
 	Defs.VersusMode.GRUB_STACK, Defs.VersusMode.LAST_CAVEMAN, Defs.VersusMode.HOT_ROCK, Defs.VersusMode.CLUBBALL,
 ]
-## Arenas that a painting reward unlocks (DESIGN.md C.9): arena id -> the Save.UNLOCK_* reward (Save.is_unlocked).
+## Arenas that a painting reward unlocks (DESIGN.md C.9): arena id -> the Save.UNLOCK_* reward (Save.is_unlocked). The
+## same as UnlockTable.REWARDS "arenas" (a test keeps them equal); UnlockTable is the table to ask.
 const LOCKED_ARENAS: Dictionary = {
 	&"arena_mesa_rodeo": &"mesa_rodeo",
 	&"arena_cloud_top": &"cloud_top",
 }
+## The variant names of DESIGN.md E.4 (the `variants` rule; world-B's VersusRules.VARIANTS applies them). Big Bounce,
+## Lights Out, Giant Rain and Spear Party open with paintings (UnlockTable.is_variant_open).
+const VARIANT_NAMES: Array[StringName] = [
+	&"hammer_time", &"axe_rain", &"big_bounce", &"one_bonk", &"slippery", &"lights_out", &"gusty", &"giant_rain",
+	&"spear_party",
+]
 ## Developer arenas (levels/test_world_arena_*.lvl ...) are never offered (available_arenas); chosen by id they play.
 const DEVELOPER_ARENA_PREFIX: String = "test_"
 ## Settings key of the last rules (DESIGN.md E.8: "the last rules are remembered"); see rules_to_dict.
@@ -135,6 +142,9 @@ var history: Array[Dictionary] = []
 ## The bot object of each slot (a HeroBot, created by Flow when the match starts; null for humans and empty seats).
 ## Untyped on purpose: core-B's class is loaded by path.
 var bots: Array = [null, null, null, null]
+## The recording of the current (or last) round: its input log and start snapshot, for the deciding-moment replay
+## (VersusReplay; Flow.start_round makes it, Flow.end_round finishes it, Flow.play_deciding_moment plays it).
+var replay: VersusReplay = null
 ## Per slot: the most round wins it trailed the leader by so far (for Comeback Caveman).
 var _deficits: PackedInt32Array = _zeros()
 
@@ -404,7 +414,41 @@ static func available_arenas(players: int, for_mode: int = -1) -> Array[StringNa
 			continue
 		if LOCKED_ARENAS.has(id) and not Save.is_unlocked(LOCKED_ARENAS[id]):
 			continue
+		if not UnlockTable.is_arena_open(id):
+			continue
 		result.append(id)
+	return result
+
+
+## The Cave Paintings arena `arena_id` still needs before it opens (0 = open) - the arena screen shows the count on a
+## locked arena (DESIGN.md E.8 step 3).
+static func arena_paintings_needed(arena_id: StringName) -> int:
+	var reward_id: StringName = UnlockTable.reward_of_arena(arena_id)
+	if reward_id == &"" or UnlockTable.is_open(reward_id):
+		return 0
+	return maxi(UnlockTable.paintings_needed(reward_id) - Save.painting_count(), 1)
+
+
+## The variants of the rules screen (DESIGN.md E.4) in their order: {"name": StringName, "open": bool, "paintings":
+## int (still needed while closed, else 0)}. A closed variant cannot be chosen; a remembered one is dropped when the
+## match starts (begin_match).
+static func variant_choices() -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	for variant: StringName in VARIANT_NAMES:
+		var open: bool = UnlockTable.is_variant_open(variant)
+		var needed: int = 0
+		if not open:
+			needed = maxi(UnlockTable.paintings_needed(UnlockTable.reward_of_variant(variant)) - Save.painting_count(), 1)
+		result.append({"name": variant, "open": open, "paintings": needed})
+	return result
+
+
+## `names` without the variants that are not open (UnlockTable.is_variant_open) and without unknown names.
+static func open_variants(names: PackedStringArray) -> PackedStringArray:
+	var result: PackedStringArray = PackedStringArray()
+	for name: String in names:
+		if VARIANT_NAMES.has(StringName(name)) and UnlockTable.is_variant_open(StringName(name)) and not result.has(name):
+			result.append(name)
 	return result
 
 
@@ -456,6 +500,9 @@ func begin_match(seed_value: int = -1) -> void:
 	_deficits = _zeros()
 	history.clear()
 	bots = [null, null, null, null]
+	replay = null
+	# Paintings may have been lost since the rules were remembered (a reset save, "Unlock everything" off).
+	variants = open_variants(variants)
 
 
 ## The next round starts on `arena_id` (round_index stays until record_round).

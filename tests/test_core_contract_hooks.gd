@@ -339,6 +339,9 @@ func test_components_run_in_their_order_only_while_active() -> void:
 	assert_eq(log, [], "inactive components are never called")
 	for part: Object in [party, mount, belt, climb]:
 		part.set(&"active", true)
+	# The party component has one timer, the Totem drop lock: player.gd calls its tick_timers only while it runs
+	# (player-A's A53 pass, PLAN.md P2.12).
+	hero.totem_drop_lock = 2
 	play(hold("F", 1))
 	assert_eq(log, [
 		"party.update", "mount.update", "belt.update", "climb.update",

@@ -20,6 +20,16 @@ extends BossBase
 ## is finished first - the roar (hurt pose, and the rage when one is due) comes after it.
 ##
 ## Parameters: `arena` zone name, `hp` [24], `drops` [trophy,trophy,trophy,trophy].
+##
+## 2.0 co-op form, the **visor** (DESIGN.md B.7, GAMEPLAY.md 13.6; enemies-C, PLAN.md P2.3) - only in a co-op game of two
+## heroes on a co-op file (`kind = coop`: w4_l2b_coop); everywhere else, a party of one included, the statue above
+## runs unchanged. Hit points x5/4 (24 -> 30). A stone visor covers its face; the two `objects/plate` of the hall (the
+## left-most and the right-most plate inside its room) hold its chains, and the visor is up only while a hatched hero
+## stands on the plate whose chain glows (Plate.holder_mask, its last weight test). Thrown weapons only, as in 1.0, and
+## a throw counts only while the visor is up and its thrower is not the one holding the plate: the holder dodges, the
+## other hero throws. Rocks are spat at the plate holder (the 1.0 speeds, aimed), the ceiling drops rattle over the
+## thrower. Each rage (the 1st hit and every 4th) moves the live chain to the other plate: the roles swap. A hall
+## without two plates is a content error (warned once): its visor then stays up and only the holder rule is lost.
 
 enum State { DORMANT, IDLE, SPIT, SLAM, HURT, RAGE, BROKEN }
 enum Attack { SPIT, SLAM }
@@ -41,6 +51,17 @@ var _hurt_due: bool = false
 ## A hit that starts a rage (the 1st and every 4th after it) landed: the rage follows its hurt pose.
 var _rage_due: bool = false
 
+# 2.0 co-op form (every field keeps its default in a party of one).
+## Co-op rock aim: a rock leaves the jaws flat and lands about this many ticks later.
+const COOP_ROCK_FALL_TICKS: int = 12
+var _coop: bool = false
+var _solo_hp: int = 0
+## The hall's two plates (left-most, right-most) and the index of the one whose chain glows.
+var _plates: Array[Plate] = []
+var _live: int = 0
+var _visor: Node2D = null
+static var _warned_plates: bool = false
+
 
 func _default_skin() -> String:
 	return "colossus"
@@ -53,6 +74,7 @@ func _apply_params(params: Dictionary) -> void:
 	music = Sfx.MUSIC_BOSS_FINAL
 	boss_drops = [&"trophy", &"trophy", &"trophy", &"trophy"]
 	super._apply_params(params)
+	_solo_hp = max_hp
 	facing = 1
 	_spawn_facing = 1
 	spawn_pos.x += (Tuning.TILE >> 1) + EnemyTuning.COLOSSUS_RIM_PX
@@ -86,6 +108,31 @@ func get_hits() -> int:
 	return _hits
 
 
+## 2.0: true in the co-op form (the visor).
+func is_coop_form() -> bool:
+	return _coop
+
+
+## 2.0 co-op: true while the visor is up (a hatched hero on the live plate; always false in the solo form).
+func is_visor_up() -> bool:
+	if not _coop:
+		return false
+	var plate: Plate = get_live_plate()
+	return plate == null or plate.holder_mask != 0
+
+
+## 2.0 co-op: the plate whose chain glows (null without plates).
+func get_live_plate() -> Plate:
+	if _plates.size() < 2:
+		return null
+	return _plates[_live]
+
+
+## 2.0 co-op: the hall's plates found for the visor (left-most first).
+func get_plates() -> Array[Plate]:
+	return _plates
+
+
 func _on_reset() -> void:
 	_state = State.DORMANT
 	_timer = 0
@@ -95,6 +142,12 @@ func _on_reset() -> void:
 	_hurt_due = false
 	_rage_due = false
 	set_box(EnemyTuning.COLOSSUS_BOX)
+	if _coop:
+		_coop = false
+		_live = 0
+		max_hp = _solo_hp
+		hp = max_hp
+		_show_visor()
 
 
 func _burst_origin() -> Vector2i:
@@ -121,7 +174,7 @@ func _ai_tick() -> void:
 			return
 	if _state == State.DORMANT:
 		_begin_idle()
-	var power: int = poll_weapon_hit(get_head_rect())
+	var power: int = _coop_poll() if _coop else poll_weapon_hit(get_head_rect())
 	if power > 0 and _state == State.RAGE:
 		# The red rage pose is armoured: the weapon glances off.
 		Audio.play_sfx(Sfx.CLUB_HIT_SCENERY)
@@ -133,7 +186,11 @@ func _ai_tick() -> void:
 		# Its own cooldown: the next hit counts once the roar (hurt pose) is over.
 		hit_cooldown = maxi(hit_cooldown, EnemyTuning.COLOSSUS_HURT_TICKS)
 		_hits += 1
-		_rage_due = _rage_due or (_hits - 1) % EnemyTuning.COLOSSUS_RAGE_EVERY == 0
+		var rage: bool = (_hits - 1) % EnemyTuning.COLOSSUS_RAGE_EVERY == 0
+		_rage_due = _rage_due or rage
+		if _coop and rage and _plates.size() >= 2:
+			# 2.0 co-op: every rage moves the live chain to the other plate (the roles swap).
+			_live = 1 - _live
 		Audio.play_sfx(Sfx.BOSS_ROAR)
 		if _state == State.IDLE:
 			_begin_hurt()
@@ -177,6 +234,8 @@ func _ai_tick() -> void:
 				_drop_stalactite()
 			if _timer >= EnemyTuning.COLOSSUS_RAGE_TICKS:
 				_end_attack(false)
+	if _coop:
+		_show_visor()
 
 
 # =================================================================================================================
@@ -248,10 +307,14 @@ func _idle_length() -> int:
 	return EnemyTuning.COLOSSUS_IDLE_TICKS[_step] * EnemyTuning.COLOSSUS_PHASE_PERCENT[phase] / 100
 
 
-## A rock from the open jaws, to the left with a random speed.
+## A rock from the open jaws, to the left with a random speed (2.0 co-op: a speed aimed at the plate holder).
 func _spit() -> void:
 	var speed: int = EnemyTuning.ROCK_XVEL_MIN \
 			+ Sim.rng.next_int(EnemyTuning.ROCK_XVEL_STEPS) * EnemyTuning.ROCK_XVEL_STEP
+	if _coop:
+		var holder: PlayerBase = _holder()
+		if holder != null:
+			speed = _aimed_speed(absi(sim_pos.x + EnemyTuning.COLOSSUS_MOUTH.x - holder.sim_pos.x))
 	_spawn_optional(ROCK_ID, sim_pos + EnemyTuning.COLOSSUS_MOUTH, {"xvel": -speed, "yvel": 0})
 	Audio.play_sfx(Sfx.BOSS_SPIT)
 
@@ -264,6 +327,10 @@ func _drop_stalactite() -> void:
 	if high < low:
 		return
 	var x: int = Sim.rng.range_int(low, high)
+	if _coop:
+		var thrower: PlayerBase = _thrower()
+		if thrower != null:
+			x = clampi(thrower.sim_pos.x, low, high)
 	var top: int = _ceiling_y(x, room.position.y)
 	_spawn_optional(STALACTITE_ID, Vector2i(x, top + EnemyTuning.STALACTITE_BOX.y))
 	Audio.play_sfx(Sfx.QUAKE)
@@ -295,3 +362,167 @@ func _ceiling_y(x: int, limit: int) -> int:
 		if grid.ceiling_at(col, row) != TileGrid.CEILING_NONE or grid.side_at(col, row) == TileGrid.SIDE_WALL:
 			return (row + 1) * Tuning.TILE
 	return maxi(limit, 0)
+
+
+# =================================================================================================================
+# 2.0 co-op form: the visor and the plates (DESIGN.md B.7)
+# =================================================================================================================
+
+## Start the fight (the arena zone or the wake rule): the form is fixed first, so the bar opens with its hit points.
+func start_fight() -> void:
+	if not fighting and not dead:
+		_configure_form()
+	super.start_fight()
+
+
+## The co-op form in a co-op game of two or more heroes on a co-op file: hit points x5/4, the plates of the hall.
+func _configure_form() -> void:
+	var level: LevelBase = Game.level
+	var want: bool = level != null and Game.mode == Defs.GameMode.COOP and level.hero_count() > 1 \
+			and str(level.meta.get("kind", "")) == "coop"
+	if want == _coop:
+		return
+	_coop = want
+	max_hp = _solo_hp * PartyTuning.BOSS_HP_MAX_NUM / PartyTuning.BOSS_HP_MAX_DEN if _coop else _solo_hp
+	hp = max_hp
+	_live = 0
+	_plates.clear()
+	if _coop:
+		_find_plates()
+	_show_visor()
+
+
+## The left-most and the right-most `objects/plate` inside the room.
+func _find_plates() -> void:
+	var level: LevelBase = Game.level
+	var room: Rect2i = _room()
+	var found: Array[Plate] = []
+	for entity: SimEntity in level.get_kind(Defs.Kind.OTHER):
+		var plate: Plate = entity as Plate
+		if plate != null and plate.sim_pos.x >= room.position.x and plate.sim_pos.x < room.end.x:
+			found.append(plate)
+	found.sort_custom(func(a: Plate, b: Plate) -> bool: return a.sim_pos.x < b.sim_pos.x)
+	if found.size() >= 2:
+		_plates = [found[0], found[found.size() - 1]]
+	elif not _warned_plates:
+		_warned_plates = true
+		push_warning("Colossus: the co-op visor needs two objects/plate in its hall (found %d)" % found.size())
+
+
+## The weapon test of the co-op form (BossBase.poll_weapon_hit's order and cooldown): thrown weapons only; one counts
+## while the visor is up and its thrower does not hold the live plate, else it glances off the stone. Returns 1 or 0.
+func _coop_poll() -> int:
+	if hit_cooldown > 0:
+		hit_cooldown -= 1
+	if _glance_ticks > 0:
+		_glance_ticks -= 1
+	var level: LevelBase = Game.level
+	if level == null or dead or not fighting:
+		return 0
+	var head: Rect2i = get_head_rect()
+	var plate: Plate = get_live_plate()
+	var projectiles: Array[SimEntity] = level.get_kind(Defs.Kind.HERO_PROJECTILE)
+	for i: int in range(projectiles.size() - 1, -1, -1):
+		var projectile: ProjectileBase = projectiles[i] as ProjectileBase
+		if projectile == null or projectile.spent or not Overlap.rects(projectile.get_box(), head):
+			continue
+		projectile.consume()
+		var held_by_thrower: bool = plate != null and (plate.holder_mask & (1 << projectile.owner_slot)) != 0
+		if not is_visor_up() or held_by_thrower:
+			_visor_glance(level, head.get_center())
+			return 0
+		if hit_cooldown > 0:
+			return 0
+		_note_hitter(level, projectile.owner_slot)
+		return 1
+	for hero: PlayerBase in level.contact_order():
+		_glance(level, hero, head)
+	return 0
+
+
+func _visor_glance(level: LevelBase, point: Vector2i) -> void:
+	if _glance_ticks > 0:
+		return
+	_glance_ticks = GLANCE_TICKS
+	Audio.play_sfx(Sfx.CLUB_HIT_SCENERY)
+	level.spawn_fx(&"fx/hit_stars", point)
+
+
+## The hero standing on the live plate (the rocks' target), or null.
+func _holder() -> PlayerBase:
+	var plate: Plate = get_live_plate()
+	var level: LevelBase = Game.level
+	if plate == null or level == null:
+		return null
+	for hero: PlayerBase in level.contact_order():
+		if hero.is_party_targetable() and (plate.holder_mask & (1 << hero.slot)) != 0:
+			return hero
+	return null
+
+
+## The hatched hero who does not hold the live plate (the drops' target), the nearer to the statue first; null when
+## nobody else is up.
+func _thrower() -> PlayerBase:
+	var level: LevelBase = Game.level
+	if level == null:
+		return null
+	var holder: PlayerBase = _holder()
+	var best: PlayerBase = null
+	for hero: PlayerBase in level.contact_order():
+		if hero == holder or not hero.is_party_targetable():
+			continue
+		if best == null or absi(hero.sim_pos.x - sim_pos.x) < absi(best.sim_pos.x - sim_pos.x):
+			best = hero
+	return best
+
+
+## The rock speed (a multiple of ROCK_XVEL_STEP within the 1.0 range) whose first landing is about `dx` px out.
+static func _aimed_speed(dx: int) -> int:
+	var speed: int = (dx * 16 / COOP_ROCK_FALL_TICKS / EnemyTuning.ROCK_XVEL_STEP) * EnemyTuning.ROCK_XVEL_STEP
+	var top: int = EnemyTuning.ROCK_XVEL_MIN + (EnemyTuning.ROCK_XVEL_STEPS - 1) * EnemyTuning.ROCK_XVEL_STEP
+	return clampi(speed, EnemyTuning.ROCK_XVEL_MIN, top)
+
+
+## The visor over the face and the two chains (the live one glowing): a drawing of its own until art-A's visor cut.
+func _show_visor() -> void:
+	if not _coop:
+		if _visor != null:
+			_visor.visible = false
+		return
+	if _visor == null:
+		_visor = VisorDrawing.new()
+		_visor.name = "Visor"
+		add_child(_visor)
+	_visor.visible = true
+	var drawing: VisorDrawing = _visor as VisorDrawing
+	drawing.head = Rect2(Vector2((get_head_rect().position - sim_pos) * Tuning.ART_SCALE),
+			Vector2(get_head_rect().size * Tuning.ART_SCALE))
+	drawing.up = is_visor_up()
+	drawing.anchors.clear()
+	for plate: Plate in _plates:
+		drawing.anchors.append(Vector2((Vector2i(plate.sim_pos.x + 16, plate.sim_pos.y) - sim_pos) * Tuning.ART_SCALE))
+	drawing.live = _live
+	drawing.queue_redraw()
+
+
+## The stone visor and its chains (cosmetic).
+class VisorDrawing:
+	extends Node2D
+
+	const VISOR_COLOR: Color = Color(0.42, 0.38, 0.36)
+	const CHAIN_COLOR: Color = Color(0.3, 0.28, 0.26)
+	const CHAIN_LIVE_COLOR: Color = Color(1.0, 0.82, 0.35)
+
+	var head: Rect2 = Rect2()
+	var up: bool = false
+	var anchors: Array[Vector2] = []
+	var live: int = 0
+
+	func _draw() -> void:
+		var plate: Rect2 = head
+		if up:
+			plate.position.y -= head.size.y * 0.8
+		draw_rect(plate.grow(4.0), VISOR_COLOR)
+		var hook: Vector2 = Vector2(plate.position.x + plate.size.x * 0.5, plate.position.y)
+		for i: int in anchors.size():
+			draw_line(hook, anchors[i], CHAIN_LIVE_COLOR if i == live else CHAIN_COLOR, 3.0)

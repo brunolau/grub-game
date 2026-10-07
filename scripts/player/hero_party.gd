@@ -52,6 +52,8 @@ const EGG_FLOAT_FPS: int = 4
 const EGG_CRACK_TICKS: int = 24   ## Expert: the crack frames show this long before the egg flies to the checkpoint
 ## The bubble's centre above the feet point, art px.
 const BUBBLE_Y: float = -100.0
+## The voluntary egg's keys, held together (PHYSICS.md C.12).
+const VOLUNTEER_KEYS: int = Defs.IN_DOWN | Defs.IN_LOOK
 
 ## The hero this component belongs to.
 var hero: Player = null
@@ -163,11 +165,17 @@ func hold_hit_stop() -> void:
 
 
 ## Right after 8b. True = this component ran the rest of the hero's PLAYER phase (egg, curl, ball).
+## (The two-hero performance pass, PLAN.md P2.12: the slot's previous flags are read once for the Swap edge and the
+## emote's Look edge, and the usual tick makes no further call before the egg / curl / ride tests.)
 func update(level: LevelBase) -> bool:
 	var flags: int = hero._raw_flags
+	var prev: int = GameInput.get_prev_flags(hero.slot)
+	# The emote reads his slot's own flags even while his controls are off (an egg, a cutscene).
+	var slot_flags: int = flags if hero.control_enabled else GameInput.get_flags(hero.slot)
+	if (slot_flags & Defs.IN_LOOK) != 0 and (prev & Defs.IN_LOOK) == 0:
+		_emote_tap(slot_flags)
 	# Swap is edge-triggered (PHYSICS.md C.1), read as the belt reads it (GameInput's flags of the previous tick).
-	var swap_pressed: bool = (flags & Defs.IN_SWAP) != 0 and (GameInput.get_prev_flags(hero.slot) & Defs.IN_SWAP) == 0
-	_watch_emote()
+	var swap_pressed: bool = (flags & Defs.IN_SWAP) != 0 and (prev & Defs.IN_SWAP) == 0
 	if hero.down:
 		_egg_input()
 		return true
@@ -189,8 +197,12 @@ func update(level: LevelBase) -> bool:
 		_start_curl()
 		_curl_tick(level)
 		return true
-	if coop and _volunteer(level, flags):
-		return true
+	if coop:
+		if (flags & VOLUNTEER_KEYS) == VOLUNTEER_KEYS:
+			if _volunteer(level, flags):
+				return true
+		else:
+			_volunteer_ticks = 0
 	if hero.totem_carrier != null:
 		if (flags & (Defs.IN_DOWN | Defs.IN_UP)) == (Defs.IN_DOWN | Defs.IN_UP):
 			hero.drop_from_totem()
@@ -398,11 +410,11 @@ func _egg_input() -> void:
 		_egg_nudge = PartyTuning.EGG_NUDGE_PX
 
 
-## Voluntary egg (PHYSICS.md C.12): Down + Look held together for PartyTuning.VOLUNTARY_EGG_HOLD_TICKS consecutive ticks
-## while grounded and a partner is hatched. True = he became an egg on this tick.
+## Voluntary egg (PHYSICS.md C.12): Down + Look ([const VOLUNTEER_KEYS]) held together for
+## PartyTuning.VOLUNTARY_EGG_HOLD_TICKS consecutive ticks while grounded and a partner is hatched. True = he became an
+## egg on this tick.
 func _volunteer(level: LevelBase, flags: int) -> bool:
-	var both: int = Defs.IN_DOWN | Defs.IN_LOOK
-	if (flags & both) != both or not hero.is_grounded() or partner(level) == null:
+	if (flags & VOLUNTEER_KEYS) != VOLUNTEER_KEYS or not hero.is_grounded() or partner(level) == null:
 		_volunteer_ticks = 0
 		return false
 	_volunteer_ticks += 1
@@ -502,7 +514,8 @@ func post_step(_level: LevelBase) -> void:
 		_rival_immune = false
 	if hero.down:
 		egg_ticks += 1
-	_refresh_party_visual()
+	if emote_ticks > 0 or _egg_sprite != null:
+		_refresh_party_visual()  # nothing to draw before the first emote or egg
 
 
 ## A strike starts (Player._handle_strike, the first tick of a swing or a throw): in versus the hurt immunity and the
@@ -617,12 +630,9 @@ func palette() -> Array:
 
 
 ## Emote: a double tap of Look (two presses at most EMOTE_DOUBLE_TAP_TICKS apart); the direction held on the second
-## press picks the bubble - none "!", Down "?", Up a heart, Left / Right angry.
-func _watch_emote() -> void:
-	var flags: int = GameInput.get_flags(hero.slot)
-	var pressed: bool = (flags & Defs.IN_LOOK) != 0 and (GameInput.get_prev_flags(hero.slot) & Defs.IN_LOOK) == 0
-	if not pressed:
-		return
+## press picks the bubble - none "!", Down "?", Up a heart, Left / Right angry. Called by [method update] on a tick
+## on which Look was pressed (`flags`: his slot's flags of this tick).
+func _emote_tap(flags: int) -> void:
 	if Sim.tick - _look_tap_tick <= EMOTE_DOUBLE_TAP_TICKS:
 		_look_tap_tick = -1000
 		var kind: int = Emote.EXCLAIM

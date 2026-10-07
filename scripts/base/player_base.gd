@@ -618,21 +618,32 @@ func x_commit_allows(x: int) -> bool:
 ## May this hero start a head contact this tick (PHYSICS.md C.10 step b)? yvel >= 0, alive and hatched, not gliding,
 ## climbing, curled or a ball, mounted, already riding, nor in a drop lock.
 func can_land_on_partner() -> bool:
-	return yvel >= 0 and not dead and not down and not is_gliding() and state != Defs.HeroState.CLIMB \
+	# (glide & 1) is is_gliding(), written out: the driver asks this for every hero on every co-op tick (P2.12).
+	return yvel >= 0 and not dead and not down and (glide & 1) == 0 and state != Defs.HeroState.CLIMB \
 			and curl == CURL_NONE and mount == null and totem_carrier == null and totem_drop_lock == 0
 
 
 ## The PartyDriver's step b for one pair (PHYSICS.md C.10, C.12 b), after every hero moved: this hero (A) against
 ## `partner` (B), another living hero. When A may land ([method can_land_on_partner]) and Overlap.body(A, B, A) finds a
 ## contact with the stomp flag (2.2: A's feet in the top half of B's box, or A falling at 8 px/tick or more):
-##  - B is an egg: A bounces as on an enemy (-224 with UP held, else -64) and hatches it ([method hatch] with
-##    PartyTuning.hatch_hearts) - HEAD_HATCH;
+##  - B is an egg: A bounces -64 (Tuning.BOUNCE_YVEL, the enemy bounce without UP: a 10 px rise) **whether UP is held
+##    or not** and hatches it ([method hatch] with PartyTuning.hatch_hearts) - HEAD_HATCH. An egg is no springboard
+##    (orchestrator resolution after G1, closing the G1 verifier's "egg pinned over the active hero" bounce): the full
+##    Shoulder Hop height needs an active partner's head, which world-A's PartyDriver decides (it never offers a hero
+##    holding UP an idle, just-hatched partner);
 ##  - A holds UP: the Shoulder Hop ([method shoulder_hop]; B in any state, airborne too) - HEAD_HOP;
 ##  - else the Totem Ride on B ([method start_totem_ride]; not on a curled partner) - HEAD_RIDE.
 ## Returns what happened (HEAD_NONE: nothing). At most one head contact per hero per tick: the driver stops testing A
 ## after a result other than HEAD_NONE. Co-op only (versus heads are the referee's stomps).
 func land_on_partner(partner: PlayerBase) -> int:
-	if partner == null or partner == self or partner.dead or not can_land_on_partner():
+	if partner == null or partner == self:
+		return HEAD_NONE
+	# Overlap.body's coarse reject first (the two-hero performance pass, PLAN.md P2.12): the driver asks every pair on
+	# every co-op tick and the two heroes are nearly always farther apart than any two boxes reach.
+	var apart: Vector2i = sim_pos - partner.sim_pos
+	if absi(apart.x) >= Tuning.OVERLAP_MAX_DX or absi(apart.y) >= Tuning.OVERLAP_MAX_DY:
+		return HEAD_NONE
+	if partner.dead or not can_land_on_partner():
 		return HEAD_NONE
 	if partner.mount != null or partner.totem_carrier == self:
 		return HEAD_NONE
@@ -640,7 +651,7 @@ func land_on_partner(partner: PlayerBase) -> int:
 		return HEAD_NONE
 	var depth: int = Overlap.depth
 	if partner.down:
-		bounce(Tuning.BOUNCE_YVEL_UP if holds_up() else Tuning.BOUNCE_YVEL, depth)
+		bounce(Tuning.BOUNCE_YVEL, depth)
 		partner.hatch(self, PartyTuning.hatch_hearts(Game.difficulty))
 		return HEAD_HATCH
 	if holds_up():

@@ -19,6 +19,18 @@ extends SimEntity
 ## Tuning.HARD_LANDING_MIN_FALL_TICKS_EXCL fall ticks before that move (PHYSICS.md 6.5).
 ##
 ## A team wipe (the level reset) puts the plank back in its level-file tilt. It never dozes.
+##
+## `skin=wood|mushroom|floe` [wood] (2.0, worlds 6-9 and the arenas; presentation only): the plank's picture - the
+## bone-ended wood plank, the mushroom-cap plank of 6-2 Spore Hollow's dark see-saw, the ice floe of the Floe Rink
+## arena. Same layout, pivot and rules in every skin.
+
+## Plank pictures of the `skin` values [M seesaw_plank, seesaw_plank_mushroom, seesaw_plank_floe].
+const SKINS: Array[String] = ["wood", "mushroom", "floe"]
+const SKIN_TEXTURES: Array[Texture2D] = [
+	preload("res://assets/sprites/objects/seesaw_plank.png"),
+	preload("res://assets/sprites/objects/seesaw_plank_mushroom.png"),
+	preload("res://assets/sprites/objects/seesaw_plank_floe.png"),
+]
 
 ## Sheet [M seesaw_plank]: one row per length 3 / 4 / 5 / 6 cells; columns left end down, left half down, level, right
 ## half down, right end down. The plank rests on the "half down" frames (16 px between the ends).
@@ -86,6 +98,8 @@ class End:
 
 ## Length in cells (`len`).
 var length_cells: int = ObjTuning.SEESAW_DEFAULT_LEN
+## Index into SKINS (`skin`).
+var skin: int = 0
 ## +1 while the right end is high, -1 while the left end is.
 var high_side: int = 1
 ## Ticks left of the current flip (0 = at rest).
@@ -119,7 +133,13 @@ func _apply_params(params: Dictionary) -> void:
 	left_end = _make_end(-1, half)
 	right_end = _make_end(1, half)
 	_place_ends(true)
+	skin = SKINS.find(str(params.get("skin", SKINS[0])))
+	if skin < 0:
+		push_warning("objects/seesaw: unknown skin '%s'" % str(params.get("skin")))
+		skin = 0
 	_plank = get_node_or_null(^"Plank") as Sprite2D
+	if _plank != null:
+		_plank.texture = SKIN_TEXTURES[skin]
 	_show()
 
 

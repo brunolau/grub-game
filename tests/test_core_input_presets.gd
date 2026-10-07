@@ -66,7 +66,7 @@ func test_classic_is_the_default_and_the_presets_are_data() -> void:
 	var left: Dictionary = classic["left"]
 	var right: Dictionary = classic["right"]
 	assert_eq(left[Defs.ACT_JUMP], [KEY_SPACE] as Array[Key])
-	assert_eq(left[Defs.ACT_ATTACK], [KEY_SHIFT] as Array[Key], "strike Left Shift")
+	assert_eq(left[Defs.ACT_ATTACK], [KEY_CTRL] as Array[Key], "strike Left Ctrl (no Shift: the Windows NumLock quirk)")
 	assert_eq(left[Defs.ACT_SWAP], [KEY_E] as Array[Key])
 	assert_eq(left[Defs.ACT_LOOK], [KEY_Q] as Array[Key])
 	assert_eq([right[Defs.ACT_UP], right[Defs.ACT_LEFT], right[Defs.ACT_DOWN], right[Defs.ACT_RIGHT]],
@@ -121,7 +121,7 @@ func test_two_players_on_one_keyboard_with_numlock_off() -> void:
 	_classic_party()
 	Sim.step(1)
 	_send(_key(KEY_D))
-	_send(_key(KEY_SHIFT))
+	_send(_key(KEY_CTRL))
 	_send(_key(KEY_KP_4, KEY_LEFT))
 	_send(_key(KEY_KP_0, KEY_INSERT))
 	_send(_key(KEY_KP_ADD))
@@ -133,6 +133,40 @@ func test_two_players_on_one_keyboard_with_numlock_off() -> void:
 	_send(_key(KEY_KP_ENTER))
 	Sim.step(1)
 	assert_eq(GameInput.get_flags(1), Defs.IN_UP | Defs.IN_FIRE | Defs.IN_SWAP, "Up + Strike: the high strike")
+
+
+## The orchestrator's resolution after G1: P1's classic strike is Left Ctrl. On Windows with NumLock on, a numpad key
+## pressed while Shift is held arrives wrapped in a synthetic Shift release and re-press (what ui-B's key test detects);
+## Godot reports them like real Shift events, so they cannot be filtered. With Ctrl as the strike they reach nobody:
+## P1 keeps charging while P2 moves, whatever the NumLock state; Shift belongs to no player of the classic layout.
+func test_the_classic_strike_is_left_ctrl_and_the_shift_quirk_reaches_nobody() -> void:
+	_classic_party()
+	var strike: StringName = GameInput.slot_action(0, Defs.ACT_ATTACK)
+	assert_true(_key(KEY_CTRL).is_action(strike, true), "Left Ctrl strikes for P1")
+	for action: StringName in Defs.GAME_ACTIONS:
+		for slot: int in 2:
+			assert_false(_key(KEY_SHIFT).is_action(GameInput.slot_action(slot, action), true),
+					"Shift is nobody's %s in the classic layout" % action)
+	Sim.step(1)
+	_send(_key(KEY_CTRL))
+	_send(_key(KEY_W))
+	Sim.step(1)
+	assert_eq(GameInput.get_flags(0), Defs.IN_FIRE | Defs.IN_UP, "Ctrl + W: P1's high strike")
+	_send(_key(KEY_W, KEY_NONE, false))
+	# What Windows sends while a player holds Shift (here: nobody's key) and P2 taps Num 8 with NumLock on.
+	for event: InputEventKey in [_key(KEY_SHIFT), _key(KEY_SHIFT, KEY_NONE, false), _key(KEY_KP_8, KEY_UP)]:
+		_send(event)
+	Sim.step(1)
+	assert_eq(GameInput.get_flags(0), Defs.IN_FIRE, "P1 keeps his strike held through the synthetic Shift release")
+	assert_eq(GameInput.get_flags(1), Defs.IN_UP, "P2 jumps")
+	for event: InputEventKey in [_key(KEY_KP_8, KEY_UP, false), _key(KEY_SHIFT), _key(KEY_SHIFT, KEY_NONE, false)]:
+		_send(event)
+	Sim.step(1)
+	assert_eq(GameInput.get_flags(0), Defs.IN_FIRE, "... and through the re-press")
+	assert_eq(GameInput.get_flags(1), 0)
+	_send(_key(KEY_CTRL, KEY_NONE, false))
+	Sim.step(1)
+	assert_eq(GameInput.get_flags(0), 0, "letting go of Ctrl releases the strike")
 
 
 func test_menu_clusters_come_and_go() -> void:

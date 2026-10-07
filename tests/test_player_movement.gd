@@ -221,3 +221,16 @@ func test_level_bounds_block_the_x_step() -> void:
 	hero.respawn_at(Vector2i(right_edge - 3, START.y))
 	play(hold("R", 6))
 	assert_true(hero.sim_pos.x < right_edge, "x stays below the level width - 8")
+	# The hero keeps the bound of the grid he last asked (performance pass, P2.12): a new grid is asked again.
+	var narrow: TileGrid = TileGrid.new(WORLD_COLS / 2, level.grid.rows)
+	for row: int in level.grid.rows:
+		for col: int in narrow.cols:
+			narrow.set_props(col, row, level.grid.floor_at(col, row), level.grid.side_at(col, row), 0,
+					TileGrid.PROFILE_NONE)
+	level.grid = narrow
+	var narrow_edge: int = narrow.x_max_excl()
+	assert_true(narrow_edge < right_edge)
+	hero.respawn_at(Vector2i(narrow_edge - 3, START.y))
+	play(hold("R", 6))
+	assert_true(hero.sim_pos.x >= narrow_edge - 3 and hero.sim_pos.x < narrow_edge,
+			"x stays below the NEW level width - 8: %d" % hero.sim_pos.x)

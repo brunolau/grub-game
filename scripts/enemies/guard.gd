@@ -15,10 +15,12 @@ extends Walker
 ## Ticks between two decisions of the shield's facing (level parameter `turn`).
 var turn: int = EnemyTuning.GUARD_TURN_TICKS
 
-## Side the shield faces (+1 right, -1 left) and the clock that turns it; ticks left of the raised-shield pose.
+## Side the shield faces (+1 right, -1 left) and the clock that turns it; ticks left of the raised-shield pose and of
+## the swing it shows after its contact hurt a hero (cosmetic).
 var _shield: int = 1
 var _turn_clock: int = 0
 var _pose: int = 0
+var _swing: int = 0
 
 
 func _default_skin() -> String:
@@ -45,11 +47,21 @@ func _on_wake() -> void:
 	facing = _shield
 	_turn_clock = 0
 	_pose = 0
+	_swing = 0
 
 
 func _on_reset() -> void:
 	_turn_clock = 0
 	_pose = 0
+	_swing = 0
+
+
+## Its body hurt a hero: it holds the stolen heart (EnemyBase) and swings its club at him (the sheet's attack frames).
+func on_hurt_hero(hero: PlayerBase) -> void:
+	super.on_hurt_hero(hero)
+	_swing = EnemyTuning.GUARD_SWING_TICKS
+	_pose = 0
+	_play(&"attack", true)
 
 
 ## Hits from the front glance (and whatever a co-op trait refuses).
@@ -78,9 +90,20 @@ func _ai_tick() -> void:
 			_shield = _dir_to(hero)
 	super._ai_tick()
 	facing = _shield
-	if _pose > 0:
+	if _swing > 0:
+		_swing -= 1
+	elif _pose > 0:
 		_pose -= 1
-		_play(&"guard")
+
+
+## The swing and the raised shield replace the walk while they last (the patrol plays this role every tick, so the
+## pose runs through its frames instead of restarting).
+func _move_role() -> StringName:
+	if _swing > 0:
+		return &"attack"
+	if _pose > 0:
+		return &"guard"
+	return super._move_role()
 
 
 func _shell_on() -> bool:

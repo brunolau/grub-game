@@ -3,9 +3,10 @@ extends HittableBase
 ## Shared look and juice of the hittables of this module (hidden spots, breakable blocks, containers): the
 ## biome-dependent debris, the wobble of a hit picture, and the point where thrown-out things appear.
 
-## Debris kind of fx/debris per level biome.
+## Debris kind of fx/debris per level biome (2.0: the Book II biomes - the fen sheds leaves, the rest stone).
 const BIOME_DEBRIS: Dictionary = {
 	"jungle": "leaf", "cave": "rock", "ice": "ice", "volcano": "rock", "feast": "wood", "village": "wood",
+	"canyon": "rock", "swamp": "leaf", "coast": "rock", "ruins": "rock", "sky": "rock",
 }
 ## Sideways wobble of a hit picture in art px, one entry per tick after the hit.
 const WOBBLE_ART: Array[int] = [3, -3, 2, -2, 1, -1]

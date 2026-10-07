@@ -350,6 +350,14 @@ func is_slot_scripted(slot: int) -> bool:
 	return slot >= 0 and slot < Defs.MAX_PLAYERS and _slot_scripted_active[slot] == 1
 
 
+## 2.0: the script that drives player slot `slot` (Callable() while none does). Flow keeps it while the deciding-moment
+## replay of a versus round feeds the slot and gives it back afterwards (a flow script or test keeps driving).
+func get_scripted_slot(slot: int) -> Callable:
+	if not is_slot_scripted(slot):
+		return Callable()
+	return _slot_scripted[slot]
+
+
 ## The player slot an input event belongs to: 0 for every event while slot 0 reads every device
 ## (single-player); otherwise the first slot whose generated actions hold the event (a pad event only for the slot
 ## of its pad); -1 when no slot reads it. For the pause owner and the join screen.

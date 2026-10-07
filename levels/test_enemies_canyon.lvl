@@ -1,9 +1,9 @@
 # Club & Grub level file - format 2 (docs/ARCHITECTURE.md 7.11). Canyon Critters: developer level of the enemies
 # module for the world 5 enemies pulled into phase 1 (docs/expansion/PLAN.md P1.8 / P2.1): a Roller on a mesa top
 # above a sand slope that ends at a wall (curl, roll, speed-up downhill, dizzy), a Guard in a 4-row hall (its art is
-# 54 logical px tall), a rattler in its hole (enemies/snapper skin=snake) and a Shellback (a plain Guard for one hero,
-# the shell trait in a co-op game). tests/test_enemies_book2.gd loads its records; visual QA in the windowed game.
-# Not part of any campaign (kind = test).
+# 54 logical px tall), a rattler in its hole (enemies/snapper skin=snake), a Shellback (a plain Guard for one hero,
+# the shell trait in a co-op game) and a Mimic beside the exit (PLAN.md P2.1). tests/test_enemies_book2.gd loads its
+# records; visual QA in the windowed game. Not part of any campaign (kind = test).
 
 [meta]
 format = 2
@@ -17,12 +17,13 @@ terrain_b = canyon/terrain_mesa
 background = canyon
 music = level_canyon
 author = enemies-A
-notes = "World 5 enemies on art-B's sheets: roller, guard, rattler (snapper skin=snake), shellback."
+notes = "World 5 enemies on art-B's sheets: roller, guard, rattler (snapper skin=snake), shellback; the mimic."
 
 [legend]
 R = enemies/roller
 G = enemies/guard left=-4 right=4
 N = enemies/snapper skin=snake
+M = enemies/mimic contents=treasure:3
 K = enemies/shellback left=-2 right=2
 E = objects/exit locked=false
 
@@ -38,7 +39,7 @@ E = objects/exit locked=false
 #.....############\............................................................#
 #.....#############\..............#............................................#
 #.....##############\.............#............................................#
-#..@..###############\............#.............G.............N.......K......E.#
+#..@..###############\............#.............G.............N.......K..M...E.#
 ################################################################################
 ################################################################################
 

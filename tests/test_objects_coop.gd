@@ -697,6 +697,65 @@ func test_a_flower_pot_lost_in_a_liquid_returns_and_a_wall_stops_it() -> void:
 	assert_true(pot.visible)
 
 
+## The pot's reach (orchestrator resolution after G1, the docs say 6 rows): its spring throws with -224, which raises
+## the feet 105 px (docs/spec/PARTY_REFERENCE.json) from the spring's top, 10 px over the floor, so designers place a
+## pot ledge at most 6 rows above the floor the pot takes root on (19 px to spare). A real hero thrown by a sprouted
+## pot's spring and holding Right lands on a 6-row ledge - and, 3 px under the apex, still on a 7-row one.
+func test_a_pot_spring_reaches_a_ledge_6_rows_above_its_root() -> void:
+	var json: JSON = JSON.new()
+	assert_eq(json.parse(FileAccess.get_file_as_string(PARTY_REFERENCE)), OK)
+	var rise: int = -1
+	for launch: Dictionary in (json.data as Dictionary)["launches"]:
+		if int(launch["yvel"]) == ObjTuning.SPRING_DEFAULT_POWER and int(launch.get("xvel", 0)) == 0:
+			rise = int(launch["rise_px"])
+	assert_eq(rise, 105, "the pot spring's -224 raises the feet 105 px")
+	assert_true(rise >= 6 * Tuning.TILE and rise < 7 * Tuning.TILE, "6 rows, short of 7")
+	Game.new_game(Defs.Difficulty.BEGINNER)
+	Game.begin_level(&"test_objects")
+	# Inside the bare level's 20 x 11 view: spring 1 at column 3 under a 6-row block (columns 5-8), spring 2 at
+	# column 11 under a 7-row block (columns 13-16).
+	make_ground_level(20, 16, 10)
+	fill(5, 4, 4, 6, TileGrid.CH_SOLID_A)
+	fill(13, 3, 4, 7, TileGrid.CH_SOLID_A)
+	var pot: FlowerPot = spawn(&"objects/flower_pot", feet(3, 9)) as FlowerPot
+	pot.state = FlowerPot.State.FALL
+	Sim.step(1)
+	assert_eq(pot.state, FlowerPot.State.SPRUNG, "the pot took root on the floor")
+	spawn(&"objects/spring", feet(11, 9))
+	var climber: Player = (load("res://scenes/player/player.tscn") as PackedScene).instantiate() as Player
+	climber.spawn_setup(Vector2i(56, 110), {})
+	level.add_child(climber)
+	climber.respawn_at(Vector2i(56, 110))
+	assert_true(pot_spring_climb(climber, 56, 5), "a hero lands on the 6-row ledge (feet %s)" % climber.sim_pos)
+	assert_eq(climber.sim_pos.y, 4 * Tuning.TILE, "on its top")
+	# 7 rows (112 px) lie 3 px under the apex of a throw from the spring's top: a hero pressed against the face still
+	# lands there, so a 7-row ledge is neither a way back to rely on nor a barrier.
+	assert_true(pot_spring_climb(climber, 11 * 16 + 8, 13), "7 rows: just within reach (feet %s)" % climber.sim_pos)
+	assert_eq(climber.sim_pos.y, 3 * Tuning.TILE)
+
+
+## A real hero dropped onto the spring at `spring_x` (on the floor) holds Right once it threw him: true when he ends
+## up standing on the wall whose face is at column `wall_col`.
+func pot_spring_climb(climber: Player, spring_x: int, wall_col: int) -> bool:
+	climber.teleport(Vector2i(spring_x, 110))
+	climber.xvel = 0
+	climber.yvel = 0
+	climber.grounded = false
+	for i: int in 40:
+		run_inputs([[1, ""]])
+		if climber.yvel < 0:
+			break
+	if climber.yvel >= 0:
+		return false
+	for i: int in 40:
+		run_inputs([[1, "R"]])
+		if climber.grounded and climber.sim_pos.x > wall_col * Tuning.TILE:
+			return true
+		if climber.grounded:
+			return false
+	return false
+
+
 # =================================================================================================================
 # Team exit, team gate, the checkpoint that hatches
 # =================================================================================================================

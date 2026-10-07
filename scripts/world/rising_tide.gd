@@ -13,6 +13,13 @@ extends Node2D
 ## The camera keeps the band in view (LevelCamera.apply_rising, Level). The node draws the band with the level's
 ## liquid strip from its top to the bottom of the view (presentation only; interpolated between ticks).
 
+## The splash of something sinking into a sticky band is the water splash in the liquid's colour (6-2b's tar).
+const STICKY_TINTS: Dictionary = {
+	"tar": Color(0.42, 0.32, 0.55), "honey": Color(1.0, 0.72, 0.25), "syrup": Color(0.9, 0.3, 0.42),
+}
+## Body cells with bubbles (LevelTiles cell 7 of the strip): one body cell in this many shows them.
+const BUBBLE_ONE_IN: int = 5
+
 ## The band's top (world y, logical px) at the end of this tick.
 var band_top: int = 0
 ## Where the band started at the last (re)start: `band_top = start_top - floor16(acc)`.
@@ -77,9 +84,7 @@ func tick(level: LevelBase, any_input: bool) -> void:
 	for i: int in range(enemies.size() - 1, -1, -1):
 		var enemy: EnemyBase = enemies[i] as EnemyBase
 		if enemy != null and enemy.awake and not enemy.dead and enemy.sim_pos.y > band_top:
-			if Spawner.exists(&"fx/splash"):
-				level.spawn_fx(&"fx/splash", Vector2i(enemy.sim_pos.x, band_top),
-						{"kind": "lava" if str(level.meta.get("liquid", "")) == "lava" else "water"})
+			_splash(level, Vector2i(enemy.sim_pos.x, band_top))
 			enemy.sleep()
 	var items: Array[SimEntity] = level.get_kind(Defs.Kind.COLLECTIBLE)
 	for i: int in range(items.size() - 1, -1, -1):
@@ -87,6 +92,18 @@ func tick(level: LevelBase, any_input: bool) -> void:
 		if item != null and item.dropped and not item.collected and item.sim_pos.y > band_top \
 				and not item.is_queued_for_deletion():
 			item.queue_free()
+
+
+## Something sank into the band at `at`: the splash of the level's liquid - lava's own, the water splash otherwise,
+## tinted and with the glug for the sticky liquids (tar in 6-2b, honey, syrup). Presentation and audio only.
+static func _splash(level: LevelBase, at: Vector2i) -> void:
+	var liquid: String = str(level.meta.get("liquid", ""))
+	if Spawner.exists(&"fx/splash"):
+		var fx: Node = level.spawn_fx(&"fx/splash", at, {"kind": "lava" if liquid == "lava" else "water"})
+		if fx is CanvasItem and STICKY_TINTS.has(liquid):
+			(fx as CanvasItem).modulate = STICKY_TINTS[liquid]
+	if STICKY_TINTS.has(liquid):
+		Audio.play_sfx(Sfx.TAR_GLUG)
 
 
 ## Presentation: the band from its interpolated top to the bottom of `view` (logical px).
@@ -114,7 +131,10 @@ func _draw() -> void:
 		draw_texture_rect_region(_texture, Rect2(x, top, tile, tile), surface)
 		var y: float = top + tile
 		while y < bottom:
-			draw_texture_rect_region(_texture, Rect2(x, y, tile, tile),
-					Rect2(float(LevelTiles.LIQUID_BODY) * tile, 0.0, tile, tile))
+			# Body cells, some with bubbles (fixed by their world cell, as the tile layer does for a pool).
+			var body: int = LevelTiles.LIQUID_BODY_BUBBLES \
+					if LevelTiles.cell_hash(int(x / tile), int(floorf(y / tile))) % BUBBLE_ONE_IN == 0 \
+					else LevelTiles.LIQUID_BODY
+			draw_texture_rect_region(_texture, Rect2(x, y, tile, tile), Rect2(float(body) * tile, 0.0, tile, tile))
 			y += tile
 		x += tile

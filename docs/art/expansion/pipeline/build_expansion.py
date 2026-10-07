@@ -5,23 +5,30 @@
 Order: the spear sheet first (the palette identity check covers every hero sheet), then the hero palettes, the co-op
 objects and egg, the multiplayer UI, the Book II liquids and tar floors, the Book II objects (vine, bark board, geyser,
 raft, rex pen, paintings), the versus art (cookpot, spawn pads, crown, stack pictures, Golden Drumstick), the co-op
-skins (see-saw skins, Chomper's saddle), then the art-B hand-over rows and staged files, the audio hand-over rows, the
-provenance / licence checks, the licence files of the 2.0 packs, the 2.0 section of docs/ASSET_MANIFEST.md, and the
-proof sheets in docs/art/expansion/. A PNG is written only when its bytes change (no needless Godot re-imports).
+skins (see-saw skins, Chomper's saddle); phase 2: the Far Shore map page, the painting slab / mural / pictures and
+unlock icons (build_far_shore.py), the versus screen and HUD art (build_versus_ui.py: portraits, heads, sundial, hit
+sparks, medals, scoreboard plate, results cave wall and painted heroes), the Feast Land D / E skins
+(build_feast_skins.py), the world 6-9 object skins (build_world_objects.py); then the art-B hand-over rows and staged
+files, the audio hand-over rows, the provenance / licence checks, the licence files of the 2.0 packs, the 2.0 section
+of docs/ASSET_MANIFEST.md, and the proof sheets in docs/art/expansion/. A PNG is written only when its bytes change
+(no needless Godot re-imports).
 
 Inputs : shipped assets/** (1.0), the staged CC0 packs under .tools/asset_candidates/ (not in git),
          .tools/asset_candidates/expansion/_handover/*registry*.json (art-B's rows for its files) and staged/ (files
          art-B made for art-A's folders), _handover/audio/*.json (the audio owner's rows)
 Outputs: art-A's files under assets/ (sprites/player/hero_spear.png, hero_egg.png, palettes/*, sprites/objects/*,
-         sprites/items/*, sprites/fx/projectile_spear.png, ui/*, tiles/common/*), registry_expansion.json,
+         sprites/items/*, sprites/fx/projectile_spear.png, hit_stars_players.png, ui/*, tiles/common/*,
+         tiles/feast/terrain_*.png, tiles/feast/props/*), registry_expansion.json,
          assets/licenses/<2.0 pack>.txt, the marked 2.0 block of docs/ASSET_MANIFEST.md, docs/art/expansion/*.png.
-Tests  : test_art_expansion.py next to this script (python -m unittest discover -s docs/art/expansion/pipeline).
+Tests  : test_art_expansion.py (phase 1) and test_art_phase2.py next to this script
+         (python -m unittest discover -s docs/art/expansion/pipeline -p "test_*.py").
 CREDITS.md, docs/THIRD_PARTY.md and assets/licenses/README.md are maintained by hand (as in 1.0): this script only
 checks that every pack a 2.0 file comes from is credited there, and exits with status 1 when one is missing.
 """
 import glob
 import json
 import os
+import re
 import sys
 
 import numpy as np
@@ -43,6 +50,10 @@ STAGED_IMPORTS = {
     "staged/arena/frame_jungle.png": "assets/ui/arena/frame_jungle.png",
     "staged/common/tar_floor.png": "assets/tiles/common/tar_floor.png",
 }
+# every arena side frame art-B stages (`staged/arena/frame_<biome>.png`) lives beside frame_jungle.png
+for _p in glob.glob(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "..", ".tools",
+                                 "asset_candidates", "expansion", "_handover", "staged", "arena", "frame_*.png")):
+    STAGED_IMPORTS.setdefault("staged/arena/" + os.path.basename(_p), "assets/ui/arena/" + os.path.basename(_p))
 # a staged file without a "staged/..." row of its own takes the row of the shipped file it copies
 STAGED_ROW_FROM = {"staged/common/tar_floor.png": "assets/tiles/swamp/tar_floor.png"}
 
@@ -77,7 +88,12 @@ PACKS = {
     "ansimuz-sunny-land-series": (
         "Sunny Land 2D Pixel Art Pack", "ansimuz (Luis Zuno)",
         "https://opengameart.org/content/sunny-land-2d-pixel-art-pack", "CC0 1.0", "ansimuz_sunny_land_series.txt"),
+    "ansimuz_sunny-land": (                       # the 1.0 itch.io release (sprites/fx/hit_stars.png)
+        "SunnyLand", "ansimuz (Luis Zuno)", "https://ansimuz.itch.io/sunny-land-pixel-game-art", "CC0 1.0",
+        "ansimuz_sunny_land.txt"),
 }
+# packs whose licence file 1.0 wrote (docs/art/pipeline/build_licenses.py): kept as they are
+PACKS_1_0 = {"superpowers-prehistoric-platformer", "ansimuz_sunny-land"}
 
 # how a source string may name a staged pack other than by its folder name
 PACK_ALIASES = {"sunny-land (ansimuz)": "ansimuz-sunny-land-series"}
@@ -92,13 +108,34 @@ GAPS = [
     "`hero_palettes.json` is reference data (shader contract, colour names, UI colours, pattern list). If "
     "`hero_palette.gd` (player-A) reads it at runtime, check that the export carries it (an `include_filter` entry "
     "by core-A); otherwise keep the few values it needs as constants. The LUT / atlas PNGs are ordinary textures.",
-    "No versus corner portraits, sundial or hit sparks per player yet (E.9; phase 2, P2.11); the emote bubbles, the "
-    "crown and the stack pictures exist (`ui/emotes.png`, `ui/crown.png`, `ui/stack_food.png`).",
+    "Arena thumbnails (`ui/arena/thumb_<arena id>.png`, 120 x 66) are not drawn: the arenas are DA's level files "
+    "(only the Totem Ring exists yet) and ui-A's arena select draws a mini map of each file in its biome's colours.",
+    "The versus corner panels are one arena row (32 px) tall: the 2x Ninja Adventure portrait (E.9) does not fit, so "
+    "they get `ui/portrait_heads.png` (28 px heads painted from the 1.0 HUD head's silhouette); the Ninja portrait "
+    "(`ui/portraits.png`) is for the lobby, the results and the join panel.",
+    "Feast Land D / E use the shipped feast parallax (`backgrounds/feast`, outside art-A's and art-B's globs) with "
+    "their own terrains and props (17.14).",
     "Belt icons crop the handle end of the longer weapons (club, spear) at the cell edge; the heads stay whole.",
     "The egg's hatch frames show the hero curled in the 1.0 spots (the pattern step is off for non-hero sheets).",
-    "The cave-painting fragment shows one of six glyphs (index % 6); the 30-piece mural and the map slab are P2.11.",
+    "The cave-painting item (`sprites/items/painting.png`) shows one of six glyphs (index % 6) on its fragment; the "
+    "painting's own picture is `ui/paintings.png` cell `index`, and its piece of the mural is the rect of "
+    "`ui/mural.png` given in 17.13.",
     "Chomper's saddle: `sprites/objects/rex_saddle.png` is an overlay on the shipped rex sheets (same grid); the "
     "riders themselves are the hero sheets drawn by code.",
+]
+
+
+# shipped 1.0 files that 2.0 code draws for a new purpose (manifest 17.15; objects-A wf8 #1)
+REUSE_1_0 = [
+    ("sprites/objects/chest.png", "`objects/container skin=chest` (objects-A): cell 0 closed, cells 1-3 opening once "
+                                  "at 10 fps; the Mimic's disguise (sprites/enemies/mimic.png `idle`, art-B, 17.6) is "
+                                  "built from the same cells, so a Mimic looks exactly like the chest (DESIGN A.5)"),
+    ("sprites/items/giant_bonus.png", "Book II's `items/trophy` - the Great Roast of 9-3 Chieftains' Pyre - draws "
+                                      "cell 0"),
+    ("sprites/objects/platform_wood.png", "the layout copied by the 2.0 skins platform_driftwood.png and "
+                                          "platform_cloud.png (17.3)"),
+    ("ui/hud_lives_icon.png", "the head of the versus corner-panel portraits ui/portrait_heads.png (17.11)"),
+    ("backgrounds/cave/layer0_wall.png", "recoloured into the versus results backdrop ui/cave_wall.png (17.11)"),
 ]
 
 
@@ -192,7 +229,7 @@ def import_staged():
         e = dict(row)
         with Image.open(dst) as im:
             e["size"] = list(im.size)
-        e["note"] = (e.get("note", "").replace("STAGED for art-A / world-B: ", "") +
+        e["note"] = (re.sub(r"^STAGED for [^:]+: ", "", e.get("note", "")) +
                      " (staged by art-B as `%s`, given this home by art-A)" % staged)
         e["owner"] = "art-B"
         e["section"] = "worlds"
@@ -262,6 +299,11 @@ def write_audio_licence(key, p, files):
              "sources and edits: docs/ASSET_MANIFEST.md section 17\nStaging folder: .tools/asset_candidates/%s\n"
              % (p["author"], p["url"], p.get("license", "CC0 1.0"),
                 ", ".join(sorted(f[len("assets/"):] for f in files)), p["folder"])]
+    pages = p.get("pages", [])
+    if len(pages) > 1 or p.get("note"):                 # a pack of several pages, or a licence choice to record
+        parts[-1] += "".join("Page: %s - %s\n" % (pg["title"], pg["url"]) for pg in pages)
+        if p.get("note"):
+            parts[-1] += "Note: %s\n" % p["note"]
     info = os.path.join(folder, "LICENSE_INFO.md")
     if os.path.exists(info):
         with open(info, encoding="utf-8") as f:
@@ -374,7 +416,7 @@ def staging_folder(pack):
 def write_licence(pack, use):
     title, author, url, lic, fname = PACKS[pack]
     dst = os.path.join(ASSETS, "licenses", fname)
-    if pack == "superpowers-prehistoric-platformer":
+    if pack in PACKS_1_0:
         return dst                                   # the 1.0 file already covers it
     folder = staging_folder(pack)
     parts = ["%s\n%s\n" % (title, "=" * len(title)),
@@ -468,6 +510,14 @@ def main(previews=True):
     build_book2_objects.build()
     build_versus.build()
     build_coop_skins.build()
+    import build_far_shore
+    import build_versus_ui
+    import build_feast_skins
+    import build_world_objects
+    build_far_shore.build()
+    build_versus_ui.build()
+    build_feast_skins.build()
+    build_world_objects.build()
     for k, e in REGISTRY.items():
         e.setdefault("owner", "art-A")
         if "/palettes/" in k:
@@ -505,6 +555,7 @@ def main(previews=True):
                             "new": not audio_packs[p].get("in_1_0")}
                         for p, f in sorted(audio_uses.items()) if p in audio_packs},
         "gaps": GAPS,
+        "reuse_1_0": REUSE_1_0,
         "handover_notes": handover_notes(),
     }
     # every PNG written by art-A: <= 2048 px a side
@@ -517,8 +568,10 @@ def main(previews=True):
     if previews:
         import build_previews
         import build_previews_b2
+        import build_previews_p2
         build_previews.build()
         build_previews_b2.build()
+        build_previews_p2.build()
     missing = check_credits(uses) + check_audio_credits(audio_packs, audio_uses)
     loose = unregistered_new_files()
     n_a = sum(1 for k, e in REGISTRY.items() if k.startswith("assets/") and e.get("owner") == "art-A")

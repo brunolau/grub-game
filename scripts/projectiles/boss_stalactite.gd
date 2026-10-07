@@ -5,11 +5,17 @@ extends ProjectileBase
 ## then falls with the enemy gravity and shatters on the floor. It lives EnemyTuning.STALACTITE_LIFE ticks at most.
 ## A touch costs the hero a heart and scatters bones (Defs.HurtKind.BOSS_PROJECTILE).
 ##
-## Parameters (set by the boss): `life` ticks [66].
+## Parameters (set by the boss): `life` ticks [66], `skin` [stalactite; `masonry`: the Twin Idols' sandstone block,
+## 2.0 - the same rules, recoloured until art-B's sheet exists].
 
 const FX_DEBRIS: StringName = &"fx/debris"
+## 2.0 (enemies-C): the masonry skin of the Twin Idols (DESIGN.md B.4); a tint of the stalactite picture for now.
+const SKIN_MASONRY: String = "masonry"
+const TINT_MASONRY: Color = Color(1.0, 0.82, 0.55)
 
 var _sprite: Sprite2D = null
+## Look of the block (`skin` parameter): "" = the 1.0 stalactite.
+var skin: String = ""
 
 
 func _apply_params(params: Dictionary) -> void:
@@ -19,10 +25,13 @@ func _apply_params(params: Dictionary) -> void:
 	hurt_kind = Defs.HurtKind.BOSS_PROJECTILE
 	xvel = 0
 	set_box(EnemyTuning.STALACTITE_BOX)
+	skin = str(params.get("skin", ""))
 
 
 func _ready() -> void:
 	_sprite = get_node_or_null(^"Sprite") as Sprite2D
+	if _sprite != null and skin == SKIN_MASONRY:
+		_sprite.self_modulate = TINT_MASONRY
 
 
 ## True while it still hangs and rattles (tests and tools).

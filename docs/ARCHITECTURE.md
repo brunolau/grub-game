@@ -267,6 +267,12 @@ P1.1 (core-A): `versus_match: VersusMatch` (the match being played or set up; `m
 Array[PlayerRun]` (slots 0..party - 1), `set_party(mode, party)` (a join or leave during a run: score, lives and kept
 runs stay, a joining slot starts like a new run's hero and reports through `run_*_changed`). `begin_level` zeroes the
 party's statistics when a co-op stage starts afresh (`carry_progress` false); single-player never.
+P2.6 (core-A): `tally_item_slots: PackedInt32Array` (who picked each tally item, parallel to the three tally arrays;
+`add_tally_item(id, index, points, slot = 0)`; saved in the level entry; always 0 in single-player) and `helper_mode:
+bool` (Options > Co-op Helper mode, DESIGN.md D.3: copied from Settings `coop/helper_mode` by Flow when a co-op run
+starts or a partner joins - the simulation reads this, never Settings; false in single-player, versus and every
+recorded route; `start_run` clears it; the rule is player-A's). Settings: `coop/rival_score`, `coop/helper_mode`
+(both false).
 `PlayerRun` (`scripts/core/player_run.gd`, `RefCounted`): `slot`, `hearts`, `bones`, `weapon` (the hand), `belt`
 (`BELT_EMPTY` = -1), `has_glider`, stats `score`, `kills`, `deaths`, `revives`, `picked`, `stocks`; the 1.0 bodies of
 `add_bones`, `add_heart`, `lose_heart`, `lose_bone`, `scatter_energy`, `is_full_energy`, `reset_energy`,
@@ -280,7 +286,9 @@ them, nothing in the simulation reads them): `food`, `best_chain`, `hurts`, `bat
 `get_stat(name)`), tables `COOP_MEDALS` (most_food, best_bounce_chain, hatchling, slugger, strongman, clumsiest) and
 `VERSUS_AWARDS` (leaning_tower ... pacifist, `fewest` = the lowest wins) of `{id, stats}`; `award_value(award)`,
 `static award_winners(runs, award) -> PackedInt32Array` (ties share; nobody wins with nothing done),
-`static medals(runs, table = COOP_MEDALS) -> {id: slots}`.
+`static medals(runs, table = COOP_MEDALS) -> {id: slots}`. P2.6: `to_dict() -> Dictionary` / `from_dict(data)` (every
+field - energy, hand, belt, glider, every `STATS` counter, the look - as plain data, no signal; the deciding-moment
+replay keeps a round's start and end with them).
 
 `VersusMatch` (`scripts/core/versus_match.gd`, RefCounted, P1.1; DESIGN.md E.3-E.8, TECH_AUDIT.md 4.9): seats
 (`seats[slot]: VersusMatch.Seat` with `kind` SeatKind EMPTY / HUMAN / BOT, `input`, `bot_level`, `team` 0 / 1 / 2,
@@ -298,6 +306,28 @@ Sim.rng); the match (`match_seed`, `round_index`, `round_open`, `round_arena`, `
 = VersusTuning.round_seed, `bot_seed(slot)`, `spawn_index(slot)` (1-based, rotates every round), `record_round(winners)
 -> bool`, `is_over`, `leaders`, `rematch`, `finish(runs)` (Comeback Caveman), `hand_out_awards(runs) -> {slot:
 Array[StringName]}` (1-3 each)); `static var bot_factory` (a test / tool flags source replacing HeroBot), `HERO_BOT_PATH`.
+P2.6 (core-A): `replay: VersusReplay` (the recording of the current / last round, made by `Flow.start_round`);
+`VARIANT_NAMES` (the E.4 variant names; world-B's `VersusRules.VARIANTS` applies them), `static variant_choices() ->
+[{name, open, paintings}]` (the rules screen: a closed variant shows the paintings it still needs), `static
+open_variants(names)`; `begin_match` drops closed, unknown and repeated variants from the remembered rules; `static
+arena_paintings_needed(id) -> int` (0 = open; the arena screen's count); `available_arenas` also asks
+`UnlockTable.is_arena_open`.
+`VersusReplay` (`scripts/core/versus_replay.gd`, RefCounted, P2.6; DESIGN.md E.8 step 5): the deciding moment of one
+round - the input log (`log_tick(tick, flags)`, `flags_at(tick, slot)`, `ticks`; bots are logged like humans), the
+start snapshot (`arena`, `seed_value`, `players`, `round_index`, `round_mode`, `round_wins`, `start_runs`;
+`apply_start_state(match)`), the end snapshot (`finish(tick, runs)`, `end_runs`), the biggest steal (`note_tick(tick,
+runs)` from `PlayerRun.stolen`: `steal_tick`, `steal_units`, ties = the later one) and the window (`window() ->
+Vector2i(first, last)`: the `DECIDING_TICKS` = 73 before the gong; Grub Stack: the 73 ending `STEAL_LEAD_OUT_TICKS` =
+24 after the biggest steal; `shows_steal()`, `can_replay()`); `REPLAY_SPEED` 0.5; `static begin(match, arena, seed,
+runs)`, `static snapshot_runs(runs, n)`, `static restore_runs(snapshots, runs)`. Never draws from Sim.rng.
+`UnlockTable` (`scripts/core/unlock_table.gd`, static data, P2.6; DESIGN.md C.9, GAMEPLAY.md 13.2 / 13.7): the Cave
+Painting table every module asks - `PAINTING_LEVELS` (index -> solo level: 0-19 Book II in A.2 order, 20-29 the Book I
+co-op secrets), `COOP_ONLY_FROM`, `painting_level(i)`, `is_coop_only(i)`, `painting_file(i, mode)` (`<id>_coop` in
+co-op; "" where a mode cannot find it), `paintings_of(level_id)`; `REWARDS` (the ladder 5 / 10 / 15 / 20 / 25 / 30:
+`id` = Save.UNLOCK_*, `paintings`, `text` key, and what it opens - `arenas`, `variants`, `patterns` (the `unlock` tags of
+hero_palettes.json), `palettes`, `mural`), `reward(id)`, `paintings_needed(id)`, `is_open(id)` (= Save.is_unlocked),
+`open_rewards()`, `rewards_between(before, after)`, `next_reward() -> {id, missing}`, `reward_of_arena / _variant /
+_palette / _pattern`, `is_arena_open`, `is_variant_open`, `is_palette_open`, `is_pattern_open`, `is_mural_open`.
 
 ### 3.6 `Settings` and `Save` autoloads - persistence (`user://`, versioned)
 
@@ -341,6 +371,8 @@ progress per namespace `Save.space(mode, book, difficulty)` (`"single/book1/begi
 belt}`, `set_belt_in(space, slot, hand, belt)`; profile-wide Cave Paintings `add_painting(index) -> bool`,
 `has_painting`, `painting_count`, `get_paintings()`; unlocks `is_unlocked(reward)`, `unlock(reward)`,
 `set_unlock_everything(on)`, `is_unlock_everything()` (`UNLOCK_*`, `UNLOCK_PAINTINGS`, `UNLOCK_EVERYTHING_REWARDS`).
+P2.6: signal `reward_unlocked(reward)` - `add_painting` announces each reward its painting opened (once, in ladder
+order; never one already open by `unlock()` or "Unlock everything"): the HUD / map "new reward" notice.
 save.json v2: `{version, high_score, code_stones, stats, paintings, unlocks{all, rewards}, spaces{<key>: {unlocked,
 results, completed, high_score, belt}}}`.
 
@@ -378,6 +410,16 @@ player's device as a party input). NumLock: Godot 4.7.2 on Windows reports the n
 from the scancode) with NumLock off too - only `keycode` becomes the navigation key - so the classic layout's physical
 bindings need no alias (verified with the NumLock-off WM_KEYDOWN messages posted into a running window,
 `scenes/core/dev/key_probe.tscn`, a dev probe that logs every key event; excluded from exports by `*/dev/*`).
+P2.6 (resolution after G1): the classic layout's P1 strike is **Left Ctrl** (was Left Shift; P1 W A S D, Space jump,
+E swap, Q look and P2's numpad are unchanged). Windows with NumLock on wraps a numpad key pressed while Shift is held
+in a synthetic Shift release and re-press, which cut P1's held strike whenever P2 moved; Godot reports the synthetic
+events exactly like real ones (physical `KEY_SHIFT`, left location - only the message timing and the NumLock state,
+which Godot does not expose, differ), and a real `SendInput` sequence could not be recorded on the build desktop (the
+probe never got the foreground), so no filter can be proven and Shift is not kept as an alias. Ctrl has no such
+quirk. Bindings keep no key side, so Right Ctrl also strikes for P1 in this layout (nobody else uses it there). Note
+for P4.3 (devices): on macOS with two input sources Ctrl + Space is the system's "previous input source" shortcut
+(P1's charged jump); the options rebind P1's strike if that bites. `GameInput.get_scripted_slot(slot) -> Callable`
+(P2.6: the script driving a slot, Callable() for none; Flow gives it back after a replay).
 
 ### 3.8 `Levels` autoload - level registry
 
@@ -430,6 +472,17 @@ contexts of `Sfx.EXPANSION_MUSIC`. AudioTable batch 1 (P1.1) gives every one of 
 for all effects and the G1 slice's music (canyon, co-op menu, lobby, battle A, round / match jingles, results); the
 other contexts play a 1.0 track of the same mood marked `"temp": true` (`AudioTable.is_temp(name)`, `temp_names()` =
 the work list of batch 2, P2.6) until their file lands. Callers never change when a row does.
+P2.6 (batch 2 plumbing): a music row may carry `"loop_start"` (seconds into the file where the loop restarts; the
+intro before it plays once, the loop runs to the end of the file - the audio owner cuts each file at its loop end,
+Ogg cannot end a loop early; missing = the whole file loops; a file keeps one loop flag and one loop start in every
+row): `AudioTable.loop_start(context)`, Audio sets the stream's `loop_offset` (WAV: `loop_begin`), resume points and
+the silent clock wrap into the region (`static Audio.loop_position(elapsed, length, loop_start)`).
+`Audio.set_effects_muted(on)` / `are_effects_muted()`: effects and loops are dropped (playing loops stop), music is
+untouched - Flow mutes them while it fast-forwards a replay. `MUSIC_VERSUS_SUDDEN_DEATH` is pushed by Flow on
+`Events.round_sudden_death_started` for the rest of the round. Batch 2 (the audio owner's files, P2.11): every 2.0 music
+context plays its own file (whole-file loops, the regions cut out of the renders; the sudden death is F.2's runner-up),
+`AudioTable.temp_names()` is empty; two more effect names: `Sfx.LIGHTNING_STRIKE` (zones/lightning's bolt) and
+`Sfx.ROUND_GONG` (E.8's gong, played by `Flow.end_round` once per round).
 
 ### 3.10 `Flow` autoload - scenes, transitions, pause
 
@@ -503,6 +556,29 @@ HeroBot - created once per match by path, `reset_round(round_seed)` each round),
 records the round, emits `Events.round_ended` once, then scoreboard / next round / results), `next_round()`,
 `rematch()`, `leave_versus(to_title = false)`. The countdown, round clock, sudden death and the gong are the referee's
 (world-B, `scripts/world/versus/referee.gd`).
+P2.6 (core-A). **Deciding moment** (DESIGN.md E.8 step 5): every round is recorded into `Game.versus_match.replay`
+(VersusReplay: after each tick's sampling the flags of every hero, after each tick the steals; the handlers are
+connected only while a round plays, never in single-player). `end_round` finishes the recording, records the round,
+emits `round_ended`, then - with `deciding_moment` on (default; off in headless runs, tests switch it on) - calls
+`play_deciding_moment() -> bool`: the round's level stops at once (`Sim.frozen`), behind the curtain the match's round
+state and every run go back to the round's start, every hero's slot is fed from the log (`GameInput.
+set_scripted_slot`; scripts that drove a slot before come back afterwards), the arena loads again with the round seed,
+the ticks before the window run at once with the effects muted, and the window plays at half speed (`Sim.time_scale`,
+a 2.0 member of Sim: only the pacing changes). Signals `replay_started(round_index, first, last, steal)` and
+`replay_finished(skipped)`; `is_replaying()`, `replay_window()`, `skip_replay()` (any Jump / Strike / accept / cancel /
+pause / tap skips; the pause key never pauses a replay). At the window's last tick or on a skip the round's end comes
+back (match state, the runs' statistics - not counted twice) and the scoreboard (or the results) follows; a title, a
+lobby, a rematch or a new round cancels a replay. The replay is the round tick for tick (`tests/test_core_replay.gd`).
+**Book II plumbing**: `stop_after_warp(level_id, difficulty)` - a bonus stage's warp ends its source stop and the
+campaign continues at the stop after it, passing over the stop's linked sub-stage (GAMEPLAY.md 1.1 "warping from 3a
+skips 3b"; Book II 5-2 -> Feast Land D -> 6-1; Book I's warp stops have no sub-stage: unchanged), `finish_tally` uses
+it after a warp; the expert wall gets args `{book, mode}`, THE END `ending_args()` = `{book, mode, mural}` (`mural`: Book
+II with every painting found, UnlockTable.is_mural_open); `level_select(mode, book, difficulty) -> [{level_id, code,
+unlocked, result}]` (the code entry's list per book, the co-op continue; co-op lists the stops with a co-op file and
+no codes). Codes of both books are found by `Levels.find_by_password` and started by `continue_game` (the level's
+book). Co-op endings: a co-op file plays the route of its solo level (trophy -> the co-op epilogue, ending -> THE END
+with the co-op namespace completed). **Sudden death**: `Events.round_sudden_death_started` pushes
+`Sfx.MUSIC_VERSUS_SUDDEN_DEATH` in a versus level.
 
 ### 3.11 `LevelBase` (`scripts/base/level_base.gd`) - what everybody may ask the running level
 
@@ -551,6 +627,16 @@ to)`, `hatch_all(by)`, `bones_to_partner(hero, n)`, `relay_bounce_count(enemy, h
 `static relay_multiplier(count)`, `carrier_of` / `rider_of` / `partner_of`. `CurrentZone` (`zones/current`):
 `find_at(level, pos)`, `drift_at(level, pos)`; `RisingTide` (`scroll = rising`). Flow (P1.1) restarts a stage for a
 join or leave and then puts every hero at `get_respawn_pos_for(slot)` with `respawn_hero` and `snap_camera()`.
+Phase 2 (world-A): `PartyDriver.is_active(hero)`, `PartyDriver.active_mask` (the ACTIVE partner of the G1 egg
+resolution: an egg is no springboard, PHYSICS.md C.12); `Level.get_egg_scout() -> EggScout`
+(`scripts/world/egg_scout.gd`, the egg scouts' glint, `EggScout.spots_near_eggs`), `Level.get_lights() -> LevelLights`
+(`scripts/world/level_lights.gd`, lights in the dark on Book II levels, arenas and in parties),
+`Level.attract_flies(amount, hero = null)` / `get_fly_count(slot = -1)` (one fly swarm per hero); `zones/lightning`
+(`LightningZone`: `rect`, `period` [66], `delay` [0], `mark` [22]; plays `Sfx.LIGHTNING_STRIKE`) and `zones/food_rain`
+(`FoodRainZone`: `rect`, `period`, `skin = food | fruit`) exist (`scenes/zones/lightning.tscn`, `food_rain.tscn`); meta
+`wind_loop` is live (the wind script restarts every `wind_loop` ticks; 0 = the 1.0 script); CurrentZone draws its
+streaks and WorldWeather gust streaks outside the ice biome (presentation only). The tribe camera keeps every grounded
+hero whole on the view while one view can hold them (`PartyTuning.CAM_KEEP_HEAD_PX`, PHYSICS.md C.13).
 
 ### 3.12 `PlayerBase` (`scripts/base/player_base.gd`)
 
@@ -638,6 +724,15 @@ hero for `PartyTuning.TARGET_HOLD_TICKS` (GAMEPLAY.md 13.9.4); a `lone` record o
 `dazed`, `held`, `host`, `split`, `mate`, `sealed`; it plays `Sfx.DAZE` and `Sfx.BRACE`. Keeper and Guard halls are
 `PartyTuning.KEEPER_HALL_ROWS` = 4 rows (64 px: the Guard and Shellback art is 54 px tall). The world-5 rattler is
 `enemies/snapper skin=snake` (no new id); `enemies/shellback` = a Guard with the shell preset.
+P2.1 (enemies-A, additive): `wear_bone_shield()` / `bone_shielded() -> bool` (the co-op Shaman's bone shield: every hit
+glances while a living, awake Shaman stands within `PartyTuning.SHAMAN_SHIELD_TILES` on both axes; only a co-op
+party's Shaman sets it; it holds through the tick he dies in; `accepts_hit_from` refuses every hit while it is on),
+`_on_coop_copy(source)` (hook on the half a `split` record spawns: a sky dropper keeps falling / walking),
+`_credit_points(source, points)` (the co-op "Rival score" share in `PlayerRun.score`, before `Game.add_score` in
+`kill()` and `on_glider_stomp()`; single-player untouched). `CoopTraits` adds `window_cap` (level parameter `window`),
+`group_window()`, `daze_window()`, static `capped_window(base, params)` (tools), `count_in` (the window count-in on the
+group's leader: `PartyTuning.COUNT_IN_BEEPS` x `Sfx.COUNT_IN`, `PartyTuning.COUNT_IN_SPACING_TICKS` apart, then
+`Sfx.DRUM`), `carries` (grab: the heroes seized).
 
 ### 3.14 `ProjectileBase`
 
@@ -973,7 +1068,7 @@ dies when hp drops **below** 0, so hp 0..24 = one hit, 25..49 = two):
 | `items/weapon` | `kind=club|hammer|axe|boomerang` | `Game.set_weapon`; reappears on respawn |
 | `items/glider` | - | `hero.set_glider(true)`; reappears on respawn |
 | `items/water_bucket` | - | food score, clears the flies |
-| `items/warp`, `items/trophy` | - | `Game.level.complete(&"warp")` / `complete(&"trophy")` |
+| `items/warp`, `items/trophy` | trophy: `skin=cup|roast` [roast in a `book = 2` file, else cup] (2.0: the Great Roast of 9-3) | `Game.level.complete(&"warp")` / `complete(&"trophy")` |
 | `items/code_stone` | `index` 0..3 | shows character `index` of the level's password; `Save.add_code_stone("<level>:<index>")` |
 | `items/random_bonus` | `tier` 0..2 [level `bonus_tier`] | becomes a random bonus item using `Sim.rng` |
 
@@ -988,14 +1083,14 @@ commas, e.g. `food:3,treasure:8,heart,weapon:axe`; `giant` = `giant_bonus`; `ran
 | `objects/exit` | `locked` [false], `kind=exit|warp|trophy` [exit] |
 | `objects/hidden_spot` | `kind=small|big` [small]; small: `count` 1..64 [3] items thrown, one per hit; big: `hits` 1..128 [3], then one giant bonus from 112 px above; `contents` [random]; `look=plain|inset|block` [plain] for solid cells; `prop=<biome>/<name>` look for air cells |
 | `objects/breakable_block` | `hits` 1..64 [2], `skin=auto|dirt|cave|ice|obsidian` [auto by biome], `contents` [none]; on the last hit calls `Game.level.set_cell(col, row, ".")` |
-| `objects/container` | `skin=barrel|crate|pot` [crate], `contents` [random], `hits` [1] |
-| `objects/platform` | `dir` 0..7 [2] (0 up, clockwise), `speed` px/tick [2], `travel` ticks [44], `mode=always|ride` [always], `skin=wood|ice|stone|small` [by biome] |
-| `objects/drop_platform` | `delay` ticks [0], `skin` |
+| `objects/container` | `skin=barrel|crate|pot|chest` [crate] (2.0 `chest`: the lid opens, the chest stays - the Mimic's look), `contents` [random], `hits` [1] |
+| `objects/platform` | `dir` 0..7 [2] (0 up, clockwise), `speed` px/tick [2], `travel` ticks [44], `mode=always|ride` [always], `skin=wood|ice|stone|small|cloud|driftwood` [by biome: ice -> ice, volcano / ruins -> stone, sky -> cloud, coast -> driftwood, else wood; 2.0 adds cloud and driftwood] |
+| `objects/drop_platform` | `delay` ticks [0], `skin` (as `objects/platform`) |
 | `objects/column` | `size=w,h` tiles (block whose bottom-left cell is the anchor), `rise` tiles, `trigger=c,r,w,h`, `shake` [7] |
 | `objects/gate` | `name`, `dest=<name of a gate or marker>`, `lock=c,r` (camera cell of a single-screen room, optional), `skin=arch|hole|none` [arch]; used with Down while standing on it; not with the glider |
 | `objects/marker` | `name` (invisible destination) |
-| `objects/spring` | `power` v16 [-224] (optional, not in the original) |
-| `objects/sign` | `text=<translation key>` |
+| `objects/spring` | `power` v16 [-224] (optional, not in the original), `skin=flower|cap` [flower] (2.0) |
+| `objects/sign` | `text=<translation key>` (2.0: at most `SignBoard.MAX_LINES` = 3 board lines; boards keep clear of every hero, the HUD row and the P2 panel, one at a time) |
 | `objects/npc` | `kind=elder\|kid\|warrior` [elder], `turn` [true] (cosmetic villager: idle loop, faces a hero standing near; never hurts, not hittable, counted nowhere) |
 
 **Zones** (world; all take `rect=c,r,w,h` in tiles): `zones/secret` (`name`), `zones/arena` (`name`, `music`
@@ -1027,14 +1122,15 @@ pit-side perch of a `grab` record).
 |---|---|---|
 | `enemies/roller` | walks; curls 14 ticks and rolls at a hero in range; dizzy after a wall | `range` tiles [6], `speed` v16 [64], `dizzy` ticks [33], `left` / `right` [-3 / 3] |
 | `enemies/guard` | patrols with a shield that turns only every `turn` ticks; front hits glance | `turn` [33], `left` / `right` [-3 / 3] |
-| `enemies/mimic` | a chest that bites within 2 cells; dies from behind or after a head bounce | `contents` [`treasure`], `range` px [42] |
+| `enemies/mimic` | a chest that bites within 2 cells; dies from behind or after a head bounce; drawn as the `objects/container skin=chest` closed chest (box 24 x 18) | `contents` [`treasure`], `range` px [42] |
 | `enemies/shellback` | co-op only: Guard + `shell` (Book I: `skin=turtle_b`, Walker + `shell`) | as `guard` (+ `speed`) |
 | `enemies/raptor` | co-op only: Hopper + `daze` | as `hopper` |
-| `enemies/snatcher` | co-op only: Dangler or Stinger + `grab` | `kind=dangler\|stinger`, `depth`, `speed`, `range` |
+| `enemies/snatcher` | co-op only: Dangler or Stinger + `grab` | `kind=dangler\|stinger` (dangler: `bat_b`; stinger: the gull once art-B's sheet lands, else `pterodactyl_b`), `depth`, `speed`, `range` |
 | `enemies/leech` | co-op only: Lurker + `leech` | as `lurker` |
 | `enemies/bull_rex` | co-op only: Charger + `heavy` | `speed` |
-| `enemies/tar_splitter` | co-op only: Dropper / Walker + `split` | `left`, `right`, `speed`, `zone`, `pause`, `max` |
-| `enemies/shaman` | co-op only: patroller that shields enemies within 64 px | `left`, `right`, `speed` [48] |
+| `enemies/tar_splitter` | co-op only: the Walker form + `split` (the falling blobs are `enemies/dropper coop=split skin=slime`) | `left`, `right`, `speed` |
+| `enemies/shaman` | co-op only: patroller that shields enemies within 64 px (a co-op party only: the bone shield) | `left`, `right`, `speed` [48] |
+| every `coop=bond\|split\|daze` record (`enemies/raptor`, `enemies/tar_splitter` ...) | the co-op window | `window` ticks: a cap - effective = min(the difficulty's value, `window`); a bond uses its smallest |
 
 **Bosses** (one fixed arena each, GAMEPLAY 13.6): `bosses/tusker`, `bosses/mangrove`, `bosses/squid`, `bosses/idols`,
 `bosses/roc` (`arena=<zone name>`, `hp`, `drops` [`fire_starter`]); `bosses/chieftain` (two records, `name=` and
@@ -1059,8 +1155,8 @@ the belt). Content tokens: `weapon:spear`, `painting:<index>`.
 | `objects/mount` | `kind=rex`, `pen=<name>`, `wild` |
 | `objects/rex_pen` | `name` |
 | `objects/plate` (co-op) | `name`, `count=1\|2` [1], `mode=hold\|timed:<ticks>\|latch` [hold], `w` cells [2] |
-| `objects/drum` (co-op) | `bond=<name>` |
-| `objects/seesaw` (co-op, arenas) | `len` cells [5] |
+| `objects/drum` (co-op) | `bond=<name>`, `skin=drum|cap` [drum] |
+| `objects/seesaw` (co-op, arenas) | `len` cells [5], `skin=wood|mushroom|floe` [wood] |
 | `objects/boulder_heavy` (co-op) | - (2 x 2 cells, anchored at its bottom-left cell) |
 | `objects/pulley` (co-op, arenas) | `a=<platform name>`, `b=<platform name>`, `range` rows [3] |
 | `objects/flower_pot` (co-op) | - (on a ledge's edge cell: the drop gift) |
@@ -1531,8 +1627,14 @@ touch controls, input-glyph switching, localisation-ready strings (`tr()`).
 Must provide: `scenes/ui/<screen>.tscn` for the ten screen names, `scenes/ui/hud.tscn`, `pause_menu.tscn`,
 `touch_controls.tscn`. 2.0 (P1.11, ui-A) adds `book_select`, `join` (the Tribe Gathering), `versus_lobby`,
 `versus_scoreboard` and `versus_results`; the title's Play > Solo / Co-op / Versus choice lives inside the title (no
-screen of its own). `versus_rules`, `versus_arena` and `unlocks` follow with P2.8 (Flow's `has_screen` checks skip
-them until then). Rules:
+screen of its own). P2.8 (ui-A) adds `versus_rules` (args `{"owner": slot}`, sets `Game.versus_match.rules_owner`),
+`versus_arena` (then `Flow.start_versus()`; "back" from either = `Flow.open_versus_lobby()`, seats kept) and `unlocks`
+(args `{"back": screen}`: the lobby or the title). P2.6 (core-A) gives the screens: `UnlockTable` (the painting homes and
+the reward ladder), `VersusMatch.variant_choices()` / `arena_paintings_needed(id)` (locked content shows its painting
+count), `Flow.level_select(mode, book, difficulty)` (the code entry per book, the co-op continue), the expert wall's
+args `{book, mode}` and THE END's `{book, mode, mural}`, the deciding-moment signals `Flow.replay_started` /
+`replay_finished` (HUD banner, `Flow.skip_replay()` for a touch button), `Save.reward_unlocked(reward)` (the "new
+reward" notice) and `Game.tally_item_slots` (the co-op tally's two piles). Rules:
 
 - UI reads state from `Game`, `Levels`, `Save`, `Settings`, `Flow.args` and reacts to `Game.*` / `Events.*`
   signals. It never reaches into the level, the hero or enemies (exception: the documented give-up call).
@@ -1583,10 +1685,15 @@ ints_eq`, `fail`, `expect_errors(n)`, `load_reference()` (PHYSICS_REFERENCE.json
 -> Array[PackedInt32Array]` (one key set per player slot, an empty part = idle; returns the streams played).
 `tests/test_core_level_base.gd` shows how to test entities in a bare `LevelBase` without the world module. Tests
 never write real user data (redirected to `build/test_user`). The runner prints the seconds of every file. **Slow
-modules** (PLAN.md 8 V7; `SLOW_FILES` in `tests/run_tests.gd`, at G1 `test_coop_gates.gd`) are skipped by a run
-without a filter, each with a `skip` line, and run with `-- --slow` (`GD_TIMEOUT=900 bash .tools/gd.sh test --slow`)
-or a filter that names them (`bash .tools/gd.sh test coop_gates`): at every gate and before every merge that touches
-co-op files or the solo search.
+modules** (PLAN.md 8 V7; `SLOW_FILES` in `tests/run_tests.gd`: `test_coop_gates.gd` since G1, core-B's
+`test_versus_bots.gd` since phase 2) are skipped, each with a
+`skip` line and a closing `SKIPPED:` line, unless the run has `-- --slow` (`GD_TIMEOUT=900 bash .tools/gd.sh test
+--slow`) or a filter that names the module - its whole name after `test_` (`bash .tools/gd.sh test coop_gates`); a
+filter that only touches it (`coop`, `gates`) runs the other matching files and skips the slow one, so a module's quick
+check never pays for the slow search (P2.6 sign-off; `run_tests.discover_files` is the rule, `tests/
+test_core_runner.gd` keeps it). They run at every gate and before every merge that touches co-op files or the solo
+search. The default run took about 4 minutes at G1 (1 135 tests); gd.sh's default `GD_TIMEOUT` of 300 s is close: a
+full run passes `GD_TIMEOUT=600`.
 
 **Permanent guards of 2.0** (PLAN.md 8 V1, core): `tests/test_core_players.gd` - on a single-player level the
 PlayerSet is the 1.0 hero, `GameInput.get_flags(0) == GameInput.flags` and the free slots read nothing on every

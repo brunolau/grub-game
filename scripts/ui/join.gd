@@ -53,6 +53,9 @@ const CARD_SIZE: Vector2 = Vector2(236.0, 142.0)
 const FEET_Y: float = 84.0
 ## Texts of the bot levels (Defs.BotLevel order).
 const BOT_KEYS: Array[String] = ["UI_VS_BOT_ROOKIE", "UI_VS_BOT_HUNTER", "UI_VS_BOT_CHIEF"]
+## Versus 2v2: the colours of the teams' pennants (index 1 Sun, 2 Moon; 0 unused) and their names.
+const TEAM_COLOURS: Array[Color] = [Color("8a8f99"), Color("e8862a"), Color("4a4ab8")]
+const TEAM_KEYS: Array[String] = ["UI_VS_TEAMS_FREE", "UI_VS_TEAM_1", "UI_VS_TEAM_2"]
 const LEGEND_WIDTH: float = 138.0
 ## The menu action that opens the keyboard test (Tab; a seated player's Swap opens it too).
 const KEY_TEST_ACTION: StringName = &"ui_focus_next"
@@ -70,7 +73,7 @@ var _picture: KeyboardPicture = null
 var _legends: Array[GridContainer] = []
 var _legend_heads: Array[Label] = []
 var _key_test_layer: Control = null
-var _key_test: UiKeyTest = null
+var _key_test: PartyKeyTest = null
 
 
 # =================================================================================================================
@@ -110,6 +113,14 @@ class SeatCard:
 	var free_action: String = ""
 	## A line under the state ("First to 3"), or "".
 	var note: String = ""
+	## Versus lobby (DESIGN.md E.8): the team pennant on the left (0 = free-for-all: none; 1 Sun, 2 Moon) and the key
+	## that switches it ("" = not shown); the handicap badge on the right (&"" = none; &"hearts", &"guard" or &"auto"
+	## with its value text, "3" / "x1.5") and the key that changes it.
+	var team: int = 0
+	var team_key: String = ""
+	var handicap_kind: StringName = &""
+	var handicap_value: String = ""
+	var handicap_key: String = ""
 
 	var _actor: UiActor = null
 	var _overlay: Control = null
@@ -252,6 +263,74 @@ class SeatCard:
 						_hint_cap(accept, tr("UI_HINT_CHANGE"), size.y - 20.0)
 		if note != "":
 			_centred(_small, UiKit.SIZE_SMALL, note, size.y - 10.0, UiKit.COL_CREAM)
+		if state != State.FREE:
+			if team > 0:
+				_draw_team(Vector2(8.0, 30.0))
+			if handicap_kind != &"":
+				_draw_handicap(Vector2(size.x - 32.0, 30.0))
+
+	## The team pennant: a cloth in the team's colour with a sun or a moon, the switch key under it.
+	func _draw_team(pos: Vector2) -> void:
+		var colour: Color = JoinScreen.TEAM_COLOURS[clampi(team, 1, 2)]
+		var cloth: PackedVector2Array = [pos, pos + Vector2(24.0, 0.0), pos + Vector2(24.0, 22.0),
+				pos + Vector2(12.0, 17.0), pos + Vector2(0.0, 22.0)]
+		var border: PackedVector2Array = [pos + Vector2(-1.0, -1.0), pos + Vector2(25.0, -1.0), pos + Vector2(25.0, 24.0),
+				pos + Vector2(12.0, 19.0), pos + Vector2(-1.0, 24.0)]
+		_overlay.draw_colored_polygon(border, UiKit.COL_INK)
+		_overlay.draw_colored_polygon(cloth, colour)
+		var centre: Vector2 = pos + Vector2(12.0, 9.0)
+		if team == 1:
+			for i: int in 8:
+				var angle: float = float(i) * PI / 4.0
+				_overlay.draw_line(centre + Vector2(cos(angle), sin(angle)) * 4.0,
+						centre + Vector2(cos(angle), sin(angle)) * 7.0, UiKit.COL_CREAM, 1.0)
+			_overlay.draw_circle(centre, 4.0, UiKit.COL_CREAM)
+		else:
+			_overlay.draw_circle(centre, 6.0, UiKit.COL_CREAM)
+			_overlay.draw_circle(centre + Vector2(3.0, -2.0), 5.0, colour)
+		if team_key != "":
+			var cap_w: float = JoinScreen.cap_width(_mono, team_key)
+			JoinScreen.draw_cap(_overlay, _mono, Vector2(roundf(pos.x + 12.0 - cap_w * 0.5), pos.y + 27.0), team_key,
+					UiKit.COL_CREAM)
+
+	## The handicap badge: a heart with the hearts of Last Caveman Standing, a shield with the stack guard of Grub
+	## Stack, or a leaf for Auto; the key that changes it under it.
+	func _draw_handicap(pos: Vector2) -> void:
+		var centre: Vector2 = pos + Vector2(12.0, 8.0)
+		match handicap_kind:
+			&"hearts":
+				_overlay.draw_circle(centre + Vector2(-3.0, -2.0), 5.0, UiKit.COL_INK)
+				_overlay.draw_circle(centre + Vector2(3.0, -2.0), 5.0, UiKit.COL_INK)
+				_overlay.draw_colored_polygon(PackedVector2Array([centre + Vector2(-8.0, -1.0), centre + Vector2(8.0, -1.0),
+						centre + Vector2(0.0, 9.0)]), UiKit.COL_INK)
+				_overlay.draw_circle(centre + Vector2(-3.0, -2.0), 4.0, Color("e8384a"))
+				_overlay.draw_circle(centre + Vector2(3.0, -2.0), 4.0, Color("e8384a"))
+				_overlay.draw_colored_polygon(PackedVector2Array([centre + Vector2(-7.0, -1.0), centre + Vector2(7.0, -1.0),
+						centre + Vector2(0.0, 7.0)]), Color("e8384a"))
+			&"guard":
+				var shield: PackedVector2Array = [centre + Vector2(-7.0, -7.0), centre + Vector2(7.0, -7.0),
+						centre + Vector2(7.0, 1.0), centre + Vector2(0.0, 9.0), centre + Vector2(-7.0, 1.0)]
+				var rim: PackedVector2Array = [centre + Vector2(-8.0, -8.0), centre + Vector2(8.0, -8.0),
+						centre + Vector2(8.0, 2.0), centre + Vector2(0.0, 11.0), centre + Vector2(-8.0, 2.0)]
+				_overlay.draw_colored_polygon(rim, UiKit.COL_INK)
+				_overlay.draw_colored_polygon(shield, Color("8fa6c9"))
+			&"auto":
+				var leaf: PackedVector2Array = [centre + Vector2(0.0, -8.0), centre + Vector2(7.0, 0.0),
+						centre + Vector2(0.0, 9.0), centre + Vector2(-7.0, 0.0)]
+				_overlay.draw_colored_polygon(leaf, UiKit.COL_INK)
+				_overlay.draw_colored_polygon(PackedVector2Array([centre + Vector2(0.0, -6.0), centre + Vector2(5.0, 0.0),
+						centre + Vector2(0.0, 7.0), centre + Vector2(-5.0, 0.0)]), Color("5fbf3a"))
+		if handicap_value != "":
+			var value_w: float = _mono.get_string_size(handicap_value, HORIZONTAL_ALIGNMENT_LEFT, -1.0, UiKit.SIZE_MONO).x
+			var at: Vector2 = Vector2(roundf(centre.x - value_w * 0.5), centre.y + 3.0)
+			_overlay.draw_string_outline(_mono, at, handicap_value, HORIZONTAL_ALIGNMENT_LEFT, -1.0, UiKit.SIZE_MONO, 3,
+					UiKit.COL_INK)
+			_overlay.draw_string(_mono, at, handicap_value, HORIZONTAL_ALIGNMENT_LEFT, -1.0, UiKit.SIZE_MONO,
+					UiKit.COL_CREAM)
+		if handicap_key != "":
+			var cap_w: float = JoinScreen.cap_width(_mono, handicap_key)
+			JoinScreen.draw_cap(_overlay, _mono, Vector2(roundf(centre.x - cap_w * 0.5), pos.y + 27.0), handicap_key,
+					UiKit.COL_CREAM)
 
 	func _text(font: Font, font_size: int, text: String, pos: Vector2, colour: Color, outline: bool) -> void:
 		if outline:
@@ -450,6 +529,31 @@ class KeyboardPicture:
 		draw_string(_mono, pos, shown, HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size, colour)
 
 
+## ui-B's two-player keyboard test showing the keyboard players **in join order** (PLAN.md P2.8): column 1 is the
+## first seated player who plays on a keyboard half (P1 when he joined first, whatever half he took), column 2 the next
+## one, each tagged and lit in his colour by his own keys; a half nobody sits at fills the remaining column as "Free"
+## with the layout's keys, so the ghosting check works before the second player joins (UiKeyTest.set_players, which
+## ui-B added for this; build/engine_requests/wf8_ui_a_to_ui_b.txt #2).
+class PartyKeyTest:
+	extends UiKeyTest
+
+	## The columns' players as shown: [slot, half] each (slot -1 = a free half).
+	var columns_shown: Array[Vector2i] = []
+
+	## Show the players of `slots` (in this order; empty = every player slot in slot order = join order).
+	func show_party(slots: PackedInt32Array = PackedInt32Array()) -> void:
+		var order: PackedInt32Array = slots.duplicate()
+		if order.is_empty():
+			for slot: int in Defs.MAX_PLAYERS:
+				order.append(slot)
+		set_players(order)
+		columns_shown = columns.duplicate()
+
+	## The tag of column `column` as the player reads it ("P1", "Free").
+	func column_tag(column: int) -> String:
+		return tr(get_column_tag(column))
+
+
 ## Width of a key cap with `text` in the mono face.
 static func cap_width(mono: Font, text: String) -> float:
 	return mono.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, UiKit.SIZE_MONO).x + 6.0
@@ -477,21 +581,20 @@ static func text_colour(colour: StringName) -> Color:
 	return fill
 
 
-## The colours a player can choose now (COLOURS, plus gold once the Spear Party reward is open).
+## The colours a player can choose now (COLOURS, plus gold once its reward is open: UnlockTable.is_palette_open).
 static func colour_choices() -> Array[StringName]:
 	var result: Array[StringName] = COLOURS.duplicate()
-	if Save.is_unlocked(Save.UNLOCK_SPEAR_PARTY) and HeroPalette.has_colour(COLOUR_GOLD):
+	if UnlockTable.is_palette_open(COLOUR_GOLD) and HeroPalette.has_colour(COLOUR_GOLD):
 		result.append(COLOUR_GOLD)
 	return result
 
 
-## The loincloth patterns a player can choose now (hero_palettes.json `patterns`: the default ones, all of them once
-## the loincloth reward is open).
+## The loincloth patterns a player can choose now (hero_palettes.json `patterns` whose `unlock` tag is open:
+## UnlockTable.is_pattern_open - the default ones, the eight more once the loincloth reward is open).
 static func pattern_choices() -> PackedInt32Array:
 	var result: PackedInt32Array = PackedInt32Array()
-	var all: bool = Save.is_unlocked(Save.UNLOCK_LOINCLOTHS)
 	for entry: Variant in HeroPalette.meta().get("patterns", []):
-		if entry is Dictionary and (all or str(entry.get("unlock", "default")) == "default"):
+		if entry is Dictionary and UnlockTable.is_pattern_open(str(entry.get("unlock", UnlockTable.PATTERN_DEFAULT))):
 			result.append(int(entry.get("index", 0)))
 	if result.is_empty():
 		result.append(0)
@@ -896,11 +999,12 @@ func get_layout_row() -> UiOptionRow:
 	return _layout_row
 
 
-## Show ui-B's two-player keyboard test over the panel.
+## Show ui-B's two-player keyboard test over the panel, the seated players in join order (PartyKeyTest).
 func open_key_test() -> void:
 	if is_key_test_open():
 		return
 	_key_test_layer.visible = true
+	_key_test.show_party()
 	Audio.play_sfx(Sfx.MENU_SELECT)
 
 
@@ -919,7 +1023,7 @@ func is_key_test_open() -> bool:
 
 
 ## The keyboard test (tests).
-func get_key_test() -> UiKeyTest:
+func get_key_test() -> PartyKeyTest:
 	return _key_test
 
 
@@ -1138,8 +1242,16 @@ func _legend(align: int) -> Control:
 	return box
 
 
-## ui-B's keyboard test on a panel over the screen (hidden until opened).
+## ui-B's keyboard test on a panel over the screen (hidden until opened); the versus lobby uses it too.
 func _key_test_overlay() -> Control:
+	var layer: Control = JoinScreen.key_test_layer(close_key_test)
+	_key_test = layer.get_meta(&"key_test") as PartyKeyTest
+	return layer
+
+
+## A hidden layer over a screen with the keyboard test on a panel ([PartyKeyTest], its node in the meta "key_test")
+## and a "back" hint that calls `close`.
+static func key_test_layer(close: Callable) -> Control:
 	var layer: Control = Control.new()
 	layer.set_anchors_preset(Control.PRESET_FULL_RECT)
 	layer.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -1157,10 +1269,11 @@ func _key_test_overlay() -> Control:
 	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	column.add_theme_constant_override(&"separation", 4)
 	column.add_child(UiKit.label("UI_OPT_KEY_TEST", UiKit.Style.HUD, HORIZONTAL_ALIGNMENT_CENTER))
-	_key_test = UiKeyTest.new()
-	column.add_child(_key_test)
+	var key_test: PartyKeyTest = PartyKeyTest.new()
+	column.add_child(key_test)
+	layer.set_meta(&"key_test", key_test)
 	var prompts: UiPrompts = UiPrompts.new()
-	prompts.add_hint(&"ui_cancel", "UI_HINT_BACK", close_key_test)
+	prompts.add_hint(&"ui_cancel", "UI_HINT_BACK", close)
 	column.add_child(prompts)
 	centre.add_child(UiKit.panel_box(column, 14))
 	return layer

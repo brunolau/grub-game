@@ -17,6 +17,9 @@ const DIR_RIGHT: int = 1
 const DIR_LEFT: int = 2
 ## Upper bound of the settle loop of [method snap] (a 256 x 192 map needs far fewer steps).
 const SNAP_GUARD: int = 1024
+## 2.0 tribe camera ([method _keep_grounded]): a grounded hero counts as on the view while his feet are no higher
+## than this under the view's top edge (his 32 px body whole) and no lower than its bottom edge.
+const KEEP_HEAD_PX: int = PartyTuning.CAM_KEEP_HEAD_PX
 
 ## Top-left corner of the view in logical px at the end of this tick.
 var pos: Vector2i = Vector2i.ZERO
@@ -210,7 +213,10 @@ func snap(hero: PlayerBase) -> void:
 ##    steps (12.3) are refused when they would put another hero of H at column < 1 or > 18;
 ##  - vertically 12.2 runs on the anchor ([member anchor_slot]): the hero of H who most recently had ground, a
 ##    platform or a partner under his feet (ties: the lower slot), or the hero in the look pose. A jumping or falling
-##    hero never drags the view while his partner stands.
+##    hero never drags the view while his partner stands. Then the view follows the GROUNDED heroes (DESIGN.md D.2,
+##    G1 follow-up "a hero standing on a high ledge is never off the view"): while two or more heroes of H stand and
+##    one view can hold them all whole ([method _keep_grounded]), the view never leaves that window and comes back
+##    into it at the 12.2 speed.
 ## Column thresholds are relative to this camera's columns, as in 12.1 (the party plays on the authentic 20 x 11 view).
 func tick_group(heroes: Array[PlayerBase]) -> void:
 	prev = pos
@@ -239,9 +245,11 @@ func tick_group(heroes: Array[PlayerBase]) -> void:
 	elif pos.y > _max.y:
 		pos.y = maxi(pos.y - step, _max.y)
 	elif _min.y < _max.y:
+		var before_y: int = pos.y
 		_clamp_curve = true
 		_follow_y(anchor, 0)
 		_clamp_curve = false
+		_keep_grounded(before_y)
 
 
 ## Place the tribe camera for a party that just appeared (level start, team-wipe respawn, gate): PHYSICS.md 12.5 on
@@ -305,6 +313,44 @@ func _group_looker() -> PlayerBase:
 		if hero.looking and hero.xvel == 0 and not hero.on_platform:
 			return hero
 	return null
+
+
+## The grounded heroes of H stay on the view (C.13 as of phase 2): with two or more heroes of H on the ground, a
+## platform, a carrier or a vine (a climber holds his place too), the view's top y must lie in the window
+## [lowest feet - rows * 16, highest feet -
+## KEEP_HEAD_PX] - every one of them whole on the view. When the window exists (they stand at most rows - 2 rows
+## apart) and the anchor's follow of this tick left it: a view that was inside before stops at the window's edge (the
+## anchor never pushes a standing partner off); one that was outside moves towards it by the 12.2 step of the
+## distance (at most 16 px per tick), or as far as the anchor's follow took it that way. Nothing on an auto-scrolling
+## level (the descent owns the view).
+func _keep_grounded(before_y: int) -> void:
+	if (scroll_flags & Defs.SCROLL_AUTO_DOWN) != 0:
+		return
+	var lo: int = -(1 << 30)
+	var hi: int = 1 << 30
+	var standing: int = 0
+	for hero: PlayerBase in _tribe:
+		if not hero.is_grounded() and hero.state != Defs.HeroState.CLIMB:
+			continue
+		standing += 1
+		lo = maxi(lo, hero.sim_pos.y - rows * Tuning.TILE)
+		hi = mini(hi, hero.sim_pos.y - KEEP_HEAD_PX)
+	if standing < 2 or lo > hi or (pos.y >= lo and pos.y <= hi):
+		return
+	var target: int = clampi(pos.y, lo, hi)
+	if before_y < lo or before_y > hi:
+		var toward: int = clampi(before_y, lo, hi)
+		var distance: int = absi(toward - before_y)
+		var reach: int = maxi(vertical_step(mini(distance, Tuning.CAM_V_MAX_DISTANCE * rows / Tuning.VIEW_ROWS)), 1)
+		var moved: int = before_y + signi(toward - before_y) * mini(reach, distance)
+		var followed_further: bool = signi(pos.y - before_y) == signi(toward - before_y) \
+				and absi(pos.y - before_y) > absi(moved - before_y)
+		target = moved
+		if followed_further:
+			# The anchor's follow went that way faster: keep it while it is short of the window, else stop it there.
+			var short: bool = (before_y < lo and pos.y < lo) or (before_y > hi and pos.y > hi)
+			target = pos.y if short else clampi(pos.y, lo, hi)
+	pos.y = clampi(target, _min.y, _max.y)
 
 
 ## The hero of H with the latest group step on which he had ground under his feet (ties: the lower slot).

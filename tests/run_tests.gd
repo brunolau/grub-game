@@ -12,8 +12,12 @@ extends SceneTree
 ##       GD_TIMEOUT=900 bash .tools/gd.sh test --slow)
 ##
 ## Slow modules (docs/expansion/PLAN.md 8 V7: the default run stays under about 5 minutes; a slow module runs at every
-## gate and before every merge that touches its area): SLOW_FILES are left out of a run without a filter - a line
-## names each one - and run with --slow or with a filter that names them (bash .tools/gd.sh test coop_gates).
+## gate and before every merge that touches its area): SLOW_FILES are left out of a run - a `skip` line names each one
+## - unless the run has --slow or a filter that names the module: the filter holds its whole name after "test_"
+## (bash .tools/gd.sh test coop_gates, --filter=test_coop_gates.gd). A filter that only touches it (`coop`, `gates`)
+## runs the other files it matches and skips the slow one, so a module's quick check never pays for the slow search.
+## The summary ends with a SKIPPED line when slow modules were left out ([method discover_files] is the rule; the
+## test tests/test_core_runner.gd keeps it).
 ##
 ## Discovers `res://tests/test_*.gd`, runs every `test_*` method of each file (see TestCase) and exits with
 ## code 0 when everything passed, 1 otherwise. Any engine error logged while a test runs fails that test.
@@ -26,8 +30,9 @@ const TEST_DIR: String = "res://tests"
 const TEST_PREFIX: String = "test_"
 const TEST_USER_DIR: String = "res://build/test_user"
 ## The slow modules (see the header): the solo-impossibility search of every co-op gate (about 70 s at G1, growing
-## with every co-op file of phase 3).
-const SLOW_FILES: PackedStringArray = ["test_coop_gates.gd"]
+## with every co-op file of phase 3) and the versus bot matches on every (arena, mode) (PLAN.md 8 V4.b, core-B; a
+## few minutes, growing with every arena).
+const SLOW_FILES: PackedStringArray = ["test_coop_gates.gd", "test_versus_bots.gd"]
 
 
 ## Counts engine errors (push_error, script errors, failed engine checks) while a test runs.
@@ -73,13 +78,15 @@ func _run() -> void:
 	OS.add_logger(_counter)
 	var skipped: PackedStringArray = PackedStringArray()
 	var files: PackedStringArray = _discover(filter, options.has("slow"), skipped)
+	var slow_skipped: PackedStringArray = skipped.duplicate()
 	var passed: int = 0
 	var failed: int = 0
 	var failures: PackedStringArray = PackedStringArray()
 	var started: int = Time.get_ticks_msec()
 	print("Running %d test file(s) from %s" % [files.size(), TEST_DIR])
 	for file: String in skipped:
-		print("  skip %s (slow module, PLAN.md 8 V7: run with --slow or a filter naming it)" % file)
+		print("  skip %s (slow module, PLAN.md 8 V7: run with --slow or a filter naming it, e.g. %s)" % [file,
+				file.get_basename().trim_prefix(TEST_PREFIX)])
 	for file: String in files:
 		var path: String = TEST_DIR + "/" + file
 		var script: GDScript = load(path) as GDScript
@@ -139,6 +146,8 @@ func _run() -> void:
 			print("  - " + failure)
 	print("")
 	print("TESTS: %d passed, %d failed, %d file(s), %.2f s" % [passed, failed, files.size(), seconds])
+	if not slow_skipped.is_empty():
+		print("SKIPPED: %s (slow modules)" % ", ".join(slow_skipped))
 	print("RESULT: %s" % ("PASS" if failed == 0 else "FAIL"))
 	# Let the audio server release its playbacks before the engine shuts down (no leak reports).
 	var audio: Node = root.get_node_or_null("Audio")
@@ -149,18 +158,30 @@ func _run() -> void:
 
 
 func _discover(filter: String, slow: bool, skipped: PackedStringArray) -> PackedStringArray:
-	var result: PackedStringArray = PackedStringArray()
 	var dir: DirAccess = DirAccess.open(TEST_DIR)
 	if dir == null:
-		return result
-	var names: PackedStringArray = dir.get_files()
-	names.sort()
-	for file: String in names:
-		if file.begins_with(TEST_PREFIX) and file.get_extension() == "gd" and file != "test_case.gd":
-			if filter.is_empty() and not slow and SLOW_FILES.has(file):
-				skipped.append(file)
-			elif filter.is_empty() or file.contains(filter):
-				result.append(file)
+		return PackedStringArray()
+	return discover_files(dir.get_files(), filter, slow, skipped, SLOW_FILES)
+
+
+## The test files a run executes, sorted, from the file names of the test folder: every `test_*.gd` except
+## test_case.gd whose name contains `filter` (all for ""). A file of `slow_files` runs only with `slow` or when the
+## filter names its module - holds its whole name after "test_" (coop_gates, test_coop_gates.gd); otherwise it is
+## appended to `skipped` (when the filter matched it, or without a filter).
+static func discover_files(names: PackedStringArray, filter: String, slow: bool, skipped: PackedStringArray,
+		slow_files: PackedStringArray) -> PackedStringArray:
+	var result: PackedStringArray = PackedStringArray()
+	var sorted: PackedStringArray = names.duplicate()
+	sorted.sort()
+	for file: String in sorted:
+		if not file.begins_with(TEST_PREFIX) or file.get_extension() != "gd" or file == "test_case.gd":
+			continue
+		if not filter.is_empty() and not file.contains(filter):
+			continue
+		if slow_files.has(file) and not slow and not filter.contains(file.get_basename().trim_prefix(TEST_PREFIX)):
+			skipped.append(file)
+			continue
+		result.append(file)
 	return result
 
 

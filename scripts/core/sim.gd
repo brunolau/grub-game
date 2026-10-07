@@ -30,6 +30,10 @@ var manual: bool = false
 var frozen: bool = false
 ## The single simulation RNG (PHYSICS.md 15.1 #7).
 var rng: SimRng = SimRng.new(1)
+## 2.0: pace of the real-time clock: 1 = Tuning.TICK_HZ ticks per second, 0.5 = half speed (the deciding-moment
+## replay of a versus round, docs/expansion/DESIGN.md E.8). It changes only when ticks run, never what a tick does;
+## [method step] ignores it.
+var time_scale: float = 1.0
 
 var _accumulator: float = 0.0
 ## Ticking entities of every phase, in registration (= spawn) order. Suspended entities are not in them.
@@ -80,7 +84,7 @@ func _process(delta: float) -> void:
 		# No catching up afterwards: the time spent frozen never existed for the simulation.
 		_accumulator = 0.0
 		return
-	_accumulator += delta
+	_accumulator += delta * time_scale
 	var steps: int = 0
 	while _accumulator >= Tuning.TICK_DT:
 		if steps >= Tuning.MAX_CATCHUP_TICKS or frozen:

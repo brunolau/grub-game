@@ -363,6 +363,41 @@ func test_spear_glances_off_a_board_with_a_step_and_flies_past_the_wrong_face() 
 	assert_false(HeroSpear.owned_by(level, 0).has(board.step))
 
 
+func test_a_spear_thrown_from_inside_the_boards_reach_sticks() -> void:
+	# D5's report (G1): a hero pressed against the board's wall, or standing on a spear step under a second board of the
+	# same face, throws from inside the board's reach - the spawn position (anchor + one tick of motion) overlaps the
+	# board's cell and the first move carries the box past it. The board is asked at the spawn position too.
+	fresh_flat()
+	spawn_hero()
+	var board: FakeBoard = _board(-1)
+	var cell_left: int = board.cell.x * Tuning.TILE
+	# Spawned at cell_left + 20: its box (x - 12 .. x + 11) overlaps the cell; after one move (+12) it no longer would.
+	var anchor: Vector2i = Vector2i(cell_left + 20 - Tuning.floor16(Tuning.SPEAR_XVEL), board.cell.y * Tuning.TILE + 8)
+	assert_true(HeroSpear.throw_from(hero, anchor, Tuning.SPEAR_POWER))
+	var spear: HeroSpear = _spears()[0]
+	assert_true(Overlap.rects(Rect2i(board.cell * Tuning.TILE, Vector2i(Tuning.TILE, Tuning.TILE)), spear.get_box()),
+			"the spawn box overlaps the board's cell")
+	play(hold("", 1))
+	assert_eq(board.asked, 1, "the board was asked on the first move, before moving")
+	assert_true(spear.spent, "it stuck")
+	assert_eq(HeroSpear.owned_by(level, 0), [board.step], "its step stands for it")
+
+
+func test_the_boards_are_kept_and_found_again_when_the_level_changes() -> void:
+	# The spear asks only the bark boards each tick (kept on the level, HeroSpear.BOARDS_META), not every OTHER entity;
+	# a board placed after the first throw is found because the OTHER list changed.
+	fresh_flat()
+	spawn_hero()
+	assert_true(HeroSpear.throw_from(hero, START + Vector2i(0, -16), 25))
+	play(hold("", 10))
+	assert_eq(HeroSpear.boards_of(level), [], "no board yet (the first spear flew past where it will stand)")
+	var board: FakeBoard = _board(-1)
+	assert_eq(HeroSpear.boards_of(level), [board], "the new board is found")
+	assert_true(HeroSpear.throw_from(hero, START + Vector2i(0, -16), 25))
+	play(hold("", 6))
+	assert_eq(board.asked, 1, "and asked by the next spear")
+
+
 func test_versus_spear_stops_in_a_wall_and_lies_there() -> void:
 	world_wall(66, 67)
 	Game.mode = Defs.GameMode.VERSUS

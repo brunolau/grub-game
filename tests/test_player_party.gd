@@ -197,6 +197,25 @@ func test_land_on_partner_rules() -> void:
 	assert_eq(p1.land_on_partner(p2), PlayerBase.HEAD_NONE, "no ride on a curled partner")
 	p2.curl = PlayerBase.CURL_NONE
 	assert_eq(p1.land_on_partner(p2), PlayerBase.HEAD_RIDE)
+	# On an egg, UP held: the hatch with the plain bounce, never the Shoulder Hop (G1 resolution).
+	party(Defs.GameMode.COOP)
+	p2.go_down(&"voluntary")
+	p1.teleport(p2.sim_pos - Vector2i(0, 20))
+	p1.yvel = 32
+	p1.set(&"_raw_flags", Defs.IN_UP)
+	assert_true(p1.holds_up())
+	assert_eq(p1.land_on_partner(p2), PlayerBase.HEAD_HATCH)
+	assert_eq(p1.yvel, Tuning.BOUNCE_YVEL, "-64 with UP held")
+	assert_false(p2.down)
+	# Far apart (the coarse reject that comes first): nothing, whatever else holds.
+	party(Defs.GameMode.COOP)
+	p1.teleport(p2.sim_pos - Vector2i(Tuning.OVERLAP_MAX_DX, 20))
+	p1.yvel = 32
+	assert_eq(p1.land_on_partner(p2), PlayerBase.HEAD_NONE)
+	p1.teleport(p2.sim_pos - Vector2i(0, Tuning.OVERLAP_MAX_DY))
+	assert_eq(p1.land_on_partner(p2), PlayerBase.HEAD_NONE)
+	p1.teleport(p2.sim_pos - Vector2i(0, 20))
+	assert_eq(p1.land_on_partner(p2), PlayerBase.HEAD_RIDE, "close enough: the ride")
 
 
 # =================================================================================================================
@@ -398,6 +417,13 @@ func test_voluntary_egg_after_24_ticks_of_down_and_look() -> void:
 	assert_not_null(egg)
 	assert_true(egg.visible)
 	assert_eq(p1.run.deaths, 1, "a down counts for the tally")
+	# Consecutive ticks: letting go of either key starts the count again.
+	party(Defs.GameMode.COOP)
+	play_party([[PartyTuning.VOLUNTARY_EGG_HOLD_TICKS - 4, "DK|"], [1, "D|"],
+			[PartyTuning.VOLUNTARY_EGG_HOLD_TICKS - 1, "DK|"]])
+	assert_false(p1.down, "Look let go for a tick: the 24 ticks start again")
+	play_party([[1, "DK|"]])
+	assert_true(p1.down, "24 consecutive ticks")
 	party(Defs.GameMode.COOP)
 	p2.go_down(&"voluntary")
 	play_party([[30, "DK|"]])
@@ -430,6 +456,50 @@ func test_an_egg_touches_nothing_and_hatches_with_the_shield() -> void:
 	assert_false(egg.visible)
 	play_party([[PartyTuning.HATCH_BLINK_TICKS, "|"]])
 	assert_eq(p2.shield, 0, "the shield runs out")
+
+
+## An egg is no springboard (orchestrator resolution after G1): a hero falling onto an egg hatches it with the plain
+## enemy bounce (Tuning.BOUNCE_YVEL, -64: a 10 px rise) whether he holds UP or not - never the Shoulder Hop's -224.
+func test_an_egg_is_no_springboard() -> void:
+	for up: bool in [true, false]:
+		party(Defs.GameMode.COOP, P2_START - Vector2i(0, 120), P2_START)
+		p2.go_down(&"voluntary")
+		var egg_at: Vector2i = P2_START - Vector2i(0, 48)
+		p2.teleport(egg_at)  # an egg floats where the driver puts it (no tile collision)
+		p1.yvel = Tuning.GRAVITY
+		p1.no_jump = Tuning.NO_JUMP_TICKS
+		p1.grounded = false
+		var hatched: Array[int] = [0]
+		var bounce_y: Array[int] = [0]
+		var top: Array[int] = [0]
+		var done: Array[bool] = [false]
+		play_party([[40, "U|" if up else "|"]], func(t: int) -> void:
+			if done[0]:
+				return
+			if hatched[0] == 0:
+				for contact: Vector3i in driver.contacts:
+					if contact == Vector3i(0, 1, PlayerBase.HEAD_HATCH):
+						hatched[0] = t
+						bounce_y[0] = p1.sim_pos.y
+						assert_eq(p1.yvel, Tuning.BOUNCE_YVEL, "UP held %s: the hatching stomp bounces -64" % up)
+						assert_false(p2.down, "the egg hatched")
+						# The body that pops out is no head for a hero holding UP until he is ACTIVE: world-A's
+						# PartyDriver rule (tests/test_world_party.gd); this stand-in driver has none, so move it away.
+						p2.teleport(p2.sim_pos + Vector2i(160, 0))
+				return
+			if not driver.contacts.is_empty() or p1.yvel > 0:
+				done[0] = true  # past the apex (a later contact with the hatched body is the driver's ACTIVE rule)
+				return
+			top[0] = maxi(top[0], bounce_y[0] - p1.sim_pos.y)
+		)
+		assert_true(hatched[0] > 0, "UP held %s: he fell onto the egg and hatched it" % up)
+		var rise: int = -1
+		for launch: Variant in party_reference()["launches"]:
+			if int(launch["yvel"]) == Tuning.BOUNCE_YVEL:
+				rise = int(launch["rise_px"])
+		assert_eq(rise, 10, "PARTY_REFERENCE.json: a -64 launch rises 10 px")
+		assert_eq(top[0], rise, "UP held %s: a 10 px rise, as on an enemy without UP" % up)
+		assert_eq(p2.run.hearts, PartyTuning.hatch_hearts(Game.difficulty))
 
 
 func test_a_death_toss_ends_where_it_started() -> void:

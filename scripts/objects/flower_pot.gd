@@ -7,6 +7,15 @@ extends HittableBase
 ## `objects/spring` (-224) where it lands - a way back up for the lower hero. A pot that falls into a liquid, onto
 ## spikes or out of the map is lost; a team wipe (the level reset) puts a lost or moving pot back on its ledge, while a
 ## landed spring stays for the rest of the stage. It never counts for the completion percentage.
+##
+## **Reach: 6 rows from its root.** The spring it sprouts throws a hero with -224 v16, which raises his feet 105 px
+## (docs/spec/PARTY_REFERENCE.json) from the spring's top, 10 px over the floor the pot took root on: a ledge 6 rows
+## (96 px) above that floor is in reach with 19 px to spare. Designers place a pot ledge (the ledge it is the way back
+## up to) at most 6 rows above the pot's landing floor; the pot lands 1-2 cells beyond the ledge's face (2 px/tick off
+## a 7-row ledge), so under a 7- or 8-row boost ledge it lands on a raised spot of 1-2 rows (1-1 co-op: a one-row root,
+## 5-1 co-op: a two-row rock). A 7-row ledge is only 3 px under the apex: a hero pressed against its face still lands
+## on it, so 7 rows is neither a way back to rely on nor a barrier. (Orchestrator resolution after G1: the spring stays
+## -224; the docs say 6 rows. Pinned by test_objects_coop test_a_pot_spring_reaches_a_ledge_6_rows_above_its_root.)
 
 enum State { IDLE, SLIDE, FALL, SPRUNG, LOST }
 

@@ -12,6 +12,14 @@ const B2_BONUS: StringName = &"zz_b2_bonus"
 const B2_BONUS_COOP: StringName = &"zz_b2_bonus_coop"
 const ARENA: StringName = &"zz_arena"
 const PARTY_LEVEL: StringName = &"test_core_party"
+# A Book II campaign with a warp out of a linked pair (5-2 -> Feast Land D, 5-2b after it), an Expert-only stop and
+# the ending (PLAN.md P2.6: Book II campaign plumbing).
+const W_A: StringName = &"zz_w_a"
+const W_A_BOSS: StringName = &"zz_w_a_boss"
+const W_BONUS: StringName = &"zz_w_bonus"
+const W_B: StringName = &"zz_w_b"
+const W_C: StringName = &"zz_w_c"
+const W_END: StringName = &"zz_w_end"
 
 var _metas_added: bool = false
 var _signals: Array = []
@@ -86,6 +94,28 @@ func _add_book_two() -> void:
 	meta[B2_BONUS_COOP] = {"id": String(B2_BONUS_COOP), "kind": "coop", "coop_of": String(B2_BONUS), "book": 2}
 	meta[ARENA] = {"id": String(ARENA), "kind": "arena", "players": 4, "modes": "grub_stack,hot_rock"}
 	for id: StringName in [B2_A, B2_B, B2_A_COOP, B2_B_COOP, B2_BONUS, B2_BONUS_COOP, ARENA]:
+		Levels._paths[id] = Levels.get_level_path(PARTY_LEVEL)
+	Levels._index_campaign()
+
+
+## A Book II campaign in memory: W_A (main, `tally = false`, `bonus = W_BONUS`, `next = W_A_BOSS`) -> W_B (main) ->
+## W_C (main, Expert only) and the ending W_END, with co-op files for W_A, W_BONUS and W_B.
+func _add_warp_book() -> void:
+	_metas_added = true
+	var meta: Dictionary = Levels._meta
+	meta[W_A] = {"id": String(W_A), "kind": "main", "order": 9200, "book": 2, "tally": false,
+			"bonus": String(W_BONUS), "next": String(W_A_BOSS), "password_beginner": "ZQW1"}
+	meta[W_A_BOSS] = {"id": String(W_A_BOSS), "kind": "sub", "book": 2}
+	meta[W_BONUS] = {"id": String(W_BONUS), "kind": "bonus", "book": 2}
+	meta[W_B] = {"id": String(W_B), "kind": "main", "order": 9210, "book": 2, "password_beginner": "ZQW2",
+			"password_expert": "ZQW3"}
+	meta[W_C] = {"id": String(W_C), "kind": "main", "order": 9220, "book": 2, "min_difficulty": "expert"}
+	meta[W_END] = {"id": String(W_END), "kind": "ending", "book": 2, "min_difficulty": "expert"}
+	for id: StringName in [W_A, W_BONUS, W_B]:
+		var coop: StringName = StringName(String(id) + "_coop")
+		meta[coop] = {"id": String(coop), "kind": "coop", "coop_of": String(id), "book": 2}
+		Levels._paths[coop] = Levels.get_level_path(PARTY_LEVEL)
+	for id: StringName in [W_A, W_A_BOSS, W_BONUS, W_B, W_C, W_END]:
 		Levels._paths[id] = Levels.get_level_path(PARTY_LEVEL)
 	Levels._index_campaign()
 
@@ -246,6 +276,113 @@ func test_the_front_end_path_through_the_books() -> void:
 	assert_eq(Game.party, 2)
 	assert_eq(Game.book, 2)
 	await _finish()
+
+
+## GAMEPLAY.md 1.1 / 13.1: "a warp item inside a bonus stage: tally, then the level after the source level (so warping
+## from 3a skips 3b)" - Book II's 5-2 has both a warp and a linked boss stage.
+func test_a_warp_ends_its_stop_and_passes_over_its_linked_sub_stage() -> void:
+	_add_warp_book()
+	assert_eq(Levels.next_level(W_A, Defs.Difficulty.BEGINNER), W_A_BOSS, "the exit of 5-2 leads to its boss")
+	assert_eq(Flow.stop_after_warp(W_A, Defs.Difficulty.BEGINNER), W_B, "a warp out of 5-2 passes 5-2b over")
+	assert_eq(Flow.stop_after_warp(W_B, Defs.Difficulty.BEGINNER), &"", "Beginner: no stop after it")
+	assert_eq(Flow.stop_after_warp(W_B, Defs.Difficulty.EXPERT), W_C)
+	for book_one: StringName in [&"w1_l2", &"w2_l1", &"w3_l2"]:
+		for difficulty: int in [Defs.Difficulty.BEGINNER, Defs.Difficulty.EXPERT]:
+			assert_eq(Flow.stop_after_warp(book_one, difficulty), Levels.next_level(book_one, difficulty),
+					"Book I warps continue exactly as in 1.0 (%s)" % book_one)
+	Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.SINGLE, 1, 2)
+	Game.begin_level(W_BONUS, true)
+	Game.warp_return_level = W_A
+	Game.add_score(4100)
+	Flow.finish_tally()
+	var space_key: String = "single/book2/beginner"
+	assert_eq(int(Save.get_level_result_in(space_key, W_A)["score"]), 4100, "the warp ended the stop of 5-2")
+	assert_eq(int(Save.get_level_result_in(space_key, W_A_BOSS)["clears"]), 0)
+	assert_true(Save.is_level_unlocked_in(space_key, W_B))
+	assert_false(Save.is_level_unlocked_in(space_key, W_A_BOSS), "a sub-stage is never a map stop")
+	assert_eq(Flow.args.get("level_id"), W_B, "the map shows the stop after it")
+	if Flow.busy:
+		await Flow.transition_finished
+	Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.COOP, 2, 2)
+	Game.begin_level(StringName(String(W_BONUS) + "_coop"), true)
+	Game.warp_return_level = StringName(String(W_A) + "_coop")
+	Flow.finish_tally()
+	assert_eq(Flow.args.get("level_id"), W_B, "co-op: the same stop")
+	assert_true(Save.is_level_unlocked_in("coop/book2/beginner", W_B))
+	assert_eq(Flow.stop_after_warp(StringName(String(W_A) + "_coop"), Defs.Difficulty.BEGINNER),
+			StringName(String(W_B) + "_coop"), "a co-op file continues with the co-op file of the next stop")
+	await _finish()
+
+
+func test_book_two_ends_at_the_expert_wall_or_with_the_end() -> void:
+	_add_warp_book()
+	Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.SINGLE, 1, 2)
+	Game.begin_level(W_B)
+	Flow.finish_tally()
+	if Flow.busy:
+		await Flow.transition_finished
+	assert_eq(Flow.current_screen, Flow.SCREEN_EXPERT_WALL, "Beginner: the expert wall after the last Beginner stop")
+	assert_eq(Flow.args, {"book": 2, "mode": Defs.GameMode.SINGLE}, "the wall knows its book (the Roc picture)")
+	assert_false(Save.is_game_completed_in("single/book2/beginner"))
+	Game.start_run(Defs.Difficulty.EXPERT, Defs.GameMode.SINGLE, 1, 2)
+	Game.begin_level(W_END)
+	Flow.finish_tally()
+	if Flow.busy:
+		await Flow.transition_finished
+	assert_eq(Flow.current_screen, Flow.SCREEN_THE_END)
+	assert_eq(Flow.args, {"book": 2, "mode": Defs.GameMode.SINGLE, "mural": false}, "not every painting found")
+	assert_true(Save.is_game_completed_in("single/book2/expert"))
+	assert_false(Save.is_game_completed(Defs.Difficulty.EXPERT), "Book I is not finished by it")
+	for index: int in Tuning.PAINTING_COUNT:
+		Save.add_painting(index)
+	assert_true(Flow.ending_args()["mural"], "all 30 paintings: the cave mural ends The Long Raft Home")
+	Game.start_run(Defs.Difficulty.EXPERT, Defs.GameMode.COOP, 2, 2)
+	Game.begin_level(StringName(String(W_B) + "_coop"))
+	Flow.finish_tally()
+	if Flow.busy:
+		await Flow.transition_finished
+	assert_eq(Flow.current_screen, Flow.SCREEN_THE_END, "co-op: a stop without a co-op file is passed over, the book ends")
+	assert_eq(Flow.args, {"book": 2, "mode": Defs.GameMode.COOP, "mural": true}, "every painting was found by now")
+	assert_true(Save.is_game_completed_in("coop/book2/expert"))
+	Game.start_run(Defs.Difficulty.EXPERT, Defs.GameMode.COOP, 2, 1)
+	assert_eq(Flow.ending_args(), {"book": 1, "mode": Defs.GameMode.COOP, "mural": false},
+			"THE END of Book I has no mural")
+	await _finish()
+
+
+func test_the_level_select_of_a_book_with_its_codes() -> void:
+	_add_warp_book()
+	var stops: Array[Dictionary] = Flow.level_select(Defs.GameMode.SINGLE, 2, Defs.Difficulty.BEGINNER)
+	var ids: Array = stops.map(func(entry: Dictionary) -> StringName: return entry["level_id"])
+	assert_true(ids.has(W_A) and ids.has(W_B), "the map stops of Book II")
+	assert_false(ids.has(W_C), "an Expert-only stop is not on the Beginner list")
+	assert_false(ids.has(W_A_BOSS), "nor a sub-stage")
+	var by_id: Dictionary = {}
+	for entry: Dictionary in stops:
+		by_id[entry["level_id"]] = entry
+	assert_eq(by_id[W_A]["code"], "ZQW1")
+	assert_eq(Levels.find_by_password("zqw2"), {"level_id": W_B, "difficulty": Defs.Difficulty.BEGINNER},
+			"a Book II code is found like a Book I one")
+	assert_true(bool(stops[0]["unlocked"]), "the first stop is always open")
+	assert_false(bool(by_id[W_B]["unlocked"]))
+	Save.unlock_level_in("single/book2/beginner", W_B)
+	Save.record_level_result_in("single/book2/beginner", W_B, 900, 40)
+	stops = Flow.level_select(Defs.GameMode.SINGLE, 2, Defs.Difficulty.BEGINNER)
+	for entry: Dictionary in stops:
+		if entry["level_id"] == W_B:
+			assert_true(bool(entry["unlocked"]))
+			assert_eq(int(entry["result"]["score"]), 900)
+	var expert: Array[Dictionary] = Flow.level_select(Defs.GameMode.SINGLE, 2, Defs.Difficulty.EXPERT)
+	assert_true(expert.any(func(entry: Dictionary) -> bool: return entry["level_id"] == W_C))
+	var coop: Array[Dictionary] = Flow.level_select(Defs.GameMode.COOP, 2, Defs.Difficulty.BEGINNER)
+	var coop_ids: Array = coop.map(func(entry: Dictionary) -> StringName: return entry["level_id"])
+	assert_true(coop_ids.has(W_A) and coop_ids.has(W_B), "co-op: the stops with a co-op file, by their solo id")
+	for entry: Dictionary in coop:
+		assert_eq(entry["code"], "", "co-op files have no codes")
+	var book_one: Array[Dictionary] = Flow.level_select(Defs.GameMode.SINGLE, 1, Defs.Difficulty.BEGINNER)
+	assert_eq(book_one[0]["level_id"], &"w1_l1")
+	assert_eq(book_one[0]["code"], "V1NE", "Book I keeps its 1.0 codes")
+	assert_eq(book_one.size(), Levels.get_campaign(Defs.Difficulty.BEGINNER).size())
 
 
 # =================================================================================================================

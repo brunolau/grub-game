@@ -1,0 +1,49 @@
+# World showcase of the Book II systems of world-A (phase 2): alternating gusts (wind_loop) shown as streaks, a
+# lightning zone over the middle mesa, a food rain zone of fruit, a pool with a current (streaks), and a dark cave
+# at the right end lit by glowing caps (zones/dark + props/swamp/glowcaps; every hero glows in the dark).
+# Developer level of world-A (PLAN.md P2); not part of any campaign.
+
+[meta]
+format = 2
+id = test_world_storm
+name = "World Showcase: Storm"
+kind = test
+book = 2
+biome = canyon
+terrain_a = canyon/terrain
+terrain_b = canyon/terrain_mesa
+liquid = water
+background = canyon
+music = level_jungle
+wind = 0:-24,66:0,110:24,176:0
+wind_loop = 220
+
+[legend]
+C = objects/checkpoint
+E = objects/exit
+
+[tiles]
+....................................................####################
+....................................................####################
+....................................................####################
+....................................................#...................
+....................................................#...................
+....................................................#...................
+....................................................#...................
+....................................................#...................
+......................%%%%%%%...........................................
+......................%%%%%%%...........................................
+.@.....C..............%%%%%%%.........................................E.
+##############.....#####################~~~~############################
+##############.....#####################~~~~############################
+########################################################################
+
+[entities]
+zones/lightning 26 10 rect=14,0,18,11 period=44
+zones/food_rain 8 10 rect=2,0,12,11 period=24 skin=fruit
+zones/current 41 11 rect=40,11,4,2 dir=r speed=1
+zones/dark 54 10 rect=54,8,2,3
+zones/dark 50 10 rect=49,8,2,3 on=false
+props/swamp/glowcaps 58 10
+props/swamp/glowcap_big 64 10
+props/swamp/glowcaps 68 10

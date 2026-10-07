@@ -4,7 +4,7 @@ Music Loop Bundle: Free Chiptune Loops (album 'Three Red Hearts')
 Author: Abstraction (Benjamin Burnes, Tallbeard Studios)
 Source: https://tallbeard.itch.io/music-loop-bundle
 Licence: CC0 1.0 (tier A)
-Used in Club & Grub for: 2.0 (The Far Shore): audio/music/coop_menu_a.ogg. Per-file sources and edits: docs/ASSET_MANIFEST.md section 17
+Used in Club & Grub for: 2.0 (The Far Shore): audio/music/bonus_lagoon_a.ogg, audio/music/coop_menu_a.ogg, audio/music/level_idol_hall_a.ogg, audio/music/level_mangrove_climb_a.ogg, audio/music/level_sea_caves_a.ogg, audio/music/versus_battle_b.ogg, audio/music/versus_battle_c.ogg. Per-file sources and edits: docs/ASSET_MANIFEST.md section 17
 Staging folder: .tools/asset_candidates/audio/tallbeard_abstraction-chiptune-loops
 
 ---- Licence evidence recorded when the pack was downloaded ----

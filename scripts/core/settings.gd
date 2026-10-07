@@ -82,6 +82,8 @@ const DEFAULTS: Dictionary = {
 	"game/last_difficulty": 0,      # Defs.Difficulty
 	"controls/party_keyboard": "classic", # 2.0: "classic" | "two_hands" | "one_hand" (DESIGN.md D.11, InputSlot)
 	"versus/last_rules": {},        # 2.0: the rules of the last versus match (VersusMatch.rules_to_dict, DESIGN.md E.8)
+	"coop/rival_score": false,      # 2.0: co-op HUD / tally show each player's own score (DESIGN.md D.11)
+	"coop/helper_mode": false,      # 2.0: P2 cannot be hurt by enemies (DESIGN.md D.3); a run copies it (Game.helper_mode)
 }
 
 ## Directory of the settings file. Tests point it at `res://build/...` so they never touch real user data.

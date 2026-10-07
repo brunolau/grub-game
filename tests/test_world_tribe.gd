@@ -181,6 +181,91 @@ func test_a_falling_hero_never_drags_the_view_while_his_partner_stands() -> void
 	assert_true(camera.pos.y > y, "the view went down to him")
 
 
+## Both stand: A on the floor, B on a ledge `rows_up` rows higher. Returns the camera after `ticks` group steps.
+func _ledge(rows_up: int, ticks: int) -> LevelCamera:
+	var camera: LevelCamera = _camera()
+	_at(camera, _a, 8)
+	_at(camera, _b, 10)
+	_b.sim_pos.y = FLOOR_Y - rows_up * Tuning.TILE
+	for i: int in ticks:
+		camera.tick_group(_party)
+	return camera
+
+
+func _whole_on_view(camera: LevelCamera, hero: PlayerBase) -> bool:
+	return hero.sim_pos.y - LevelCamera.KEEP_HEAD_PX >= camera.pos.y \
+			and hero.sim_pos.y <= camera.pos.y + camera.rows * Tuning.TILE
+
+
+func test_a_hero_standing_on_a_high_ledge_is_brought_onto_the_view() -> void:
+	var camera: LevelCamera = _camera()
+	_at(camera, _a, 8)
+	_at(camera, _b, 10)
+	_b.sim_pos.y = FLOOR_Y - 8 * Tuning.TILE  # an Expert boost ledge: his feet one row above the view's top
+	var start_y: int = camera.pos.y
+	assert_false(_whole_on_view(camera, _b), "the set-up: B is off the view")
+	camera.tick_group(_party)
+	assert_eq(camera.anchor_slot, 0, "both stand: the anchor is P1 (ties: the lower slot) ...")
+	assert_true(camera.pos.y < start_y, "... but the view rises towards the hero on the ledge")
+	assert_true(start_y - camera.pos.y <= 16, "at the 12.2 speed: %d px" % (start_y - camera.pos.y))
+	for i: int in 30:
+		camera.tick_group(_party)
+	assert_true(_whole_on_view(camera, _b), "B whole on the view")
+	assert_true(_whole_on_view(camera, _a), "and A too")
+	var settled: int = camera.pos.y
+	for i: int in 60:
+		camera.tick_group(_party)
+	assert_eq(camera.pos.y, settled, "it settles: P1's follow (his feet now in the bottom rows) never pushes B off again")
+
+
+func test_the_anchor_never_pushes_a_standing_partner_off_the_view() -> void:
+	# B 8 rows up, both whole on the view; A's own follow would lower the view (his feet in the bottom row, 12.2:
+	# grounded at row 10 or below -> row 9).
+	var camera: LevelCamera = _camera()
+	camera.pos.y = FLOOR_Y - 10 * Tuning.TILE - 8
+	camera.prev = camera.pos
+	_at(camera, _a, 8)
+	_at(camera, _b, 10)
+	_b.sim_pos.y = FLOOR_Y - 8 * Tuning.TILE
+	assert_true(_whole_on_view(camera, _a) and _whole_on_view(camera, _b))
+	for i: int in 40:
+		camera.tick_group(_party)
+		assert_true(_whole_on_view(camera, _b), "tick %d: B stays whole on the view" % i)
+	# B jumps (no ground under him): the 1.0 window on the anchor takes over again.
+	_b.grounded = false
+	_b.yvel = -100
+	var held: int = camera.pos.y
+	for i: int in 10:
+		camera.tick_group(_party)
+	assert_true(camera.pos.y > held, "with only P1 standing, his follow lowers the view")
+
+
+func test_a_hero_on_a_vine_is_kept_on_the_view_too() -> void:
+	var camera: LevelCamera = _camera()
+	_at(camera, _a, 8)
+	_at(camera, _b, 10)
+	_b.grounded = false
+	_b.state = Defs.HeroState.CLIMB
+	_b.sim_pos.y = FLOOR_Y - 8 * Tuning.TILE  # high up his vine
+	for i: int in 30:
+		camera.tick_group(_party)
+	assert_true(_whole_on_view(camera, _b), "the climber holds his place: the view comes up to him")
+	assert_true(_whole_on_view(camera, _a))
+	_b.state = Defs.HeroState.JUMP
+	_b.yvel = -60
+	_b.sim_pos.y -= 3 * Tuning.TILE
+	var held: int = camera.pos.y
+	camera.tick_group(_party)
+	assert_true(camera.pos.y >= held, "a leap off the vine is a jump: it never drags the view up")
+
+
+func test_heroes_too_far_apart_keep_the_anchor_rule() -> void:
+	var camera: LevelCamera = _ledge(10, 40)
+	assert_eq(camera.anchor_slot, 0)
+	assert_true(_whole_on_view(camera, _a), "no view holds both: the anchor's view, as before (the leash decides)")
+	assert_false(_whole_on_view(camera, _b))
+
+
 func test_look_claims_the_camera_but_keeps_the_partner_on_the_view() -> void:
 	var camera: LevelCamera = _camera()
 	var col: int = camera.get_cell().x

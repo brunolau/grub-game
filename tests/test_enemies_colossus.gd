@@ -9,6 +9,8 @@ extends TestCase
 ## walked away from long after it appeared, hits never stop the attacks, the red rage pose is armoured, and both
 ## thrown weapons reach the head from the slab.
 ##
+## 2.0 (enemies-C, PLAN.md P2.3): the co-op visor Colossus of w4_l2b_coop and its fairness per hero, at the end.
+##
 ## Route-building aids (no tests of their own; with one of them set only that aid runs, every other test is skipped):
 ##   ARMS_PROBE=<route file> ARMS_WEAPON=<n> [ARMS_LEVEL=<id>] [ARMS_EVERY=n] [ARMS_INPUTS=<res:// file>]
 ##       [ARMS_PROBE_FIT=1]   replay a route line by line with a weapon, print the hero and the events of every line
@@ -73,6 +75,8 @@ func after_each() -> void:
 		get_tree().current_scene = null
 	Flow.current_screen = Flow.SCREEN_BOOT
 	Flow.args = {}
+	if _hall != null:
+		_coop_teardown()
 
 
 ## Play a route in the running stage until it ends or the stage is left; the numbers of the stage.
@@ -1239,3 +1243,266 @@ func _hero_text() -> String:
 	return "x%5d y%5d c%3d r%3d st%d v(%d,%d) h%d w%d%s" % [hero.sim_pos.x, hero.sim_pos.y, hero.sim_pos.x >> 4,
 		(hero.sim_pos.y - 1) >> 4, hero.state, hero.xvel, hero.yvel, Game.hearts, Game.weapon,
 		" DEAD" if hero.dead else ""]
+
+
+# =================================================================================================================
+# 2.0: the co-op visor Colossus (enemies-C, PLAN.md P2.3; DESIGN.md B.7) - fairness per hero
+# =================================================================================================================
+# A hall of 20 air columns (floor row 10, feet y 160) with the statue's wall from column 20 and two plates: the left
+# one at columns 3-4, the right one at columns 12-13. P1 (slot 0) and P2 (slot 1) are bare heroes (they never move by
+# themselves); the game is a co-op game and the level a co-op file unless a test says otherwise.
+
+const COOP_PLAYER_SCENE: String = "res://scenes/player/player.tscn"
+const PLATE_LEFT_X: int = 3 * 16 + 8
+const PLATE_RIGHT_X: int = 12 * 16 + 8
+
+var _hall: LevelBase = null
+var _p1: PlayerBase = null
+var _p2: PlayerBase = null
+
+
+func test_coop_visor_only_in_a_coop_game_of_two_on_a_coop_file() -> void:
+	if _aid_running():
+		assert_true(true, "skipped while a route-building aid runs")
+		return
+	var colossus: Colossus = _visor_hall(true, true)
+	assert_true(colossus.is_coop_form())
+	assert_eq(colossus.max_hp, 30, "24 -> 30 (x5/4)")
+	assert_eq(colossus.get_plates().size(), 2, "the hall's two plates")
+	assert_eq(colossus.get_live_plate(), colossus.get_plates()[0], "the left chain glows first")
+	_coop_teardown()
+	var solo_file: Colossus = _visor_hall(true, false)
+	assert_false(solo_file.is_coop_form(), "a co-op game on a solo file: the 1.0 statue")
+	assert_eq(solo_file.max_hp, 24)
+	_coop_teardown()
+	var alone: Colossus = _visor_hall(false, true)
+	assert_false(alone.is_coop_form(), "a party of one: the 1.0 statue")
+	assert_false(alone.is_visor_up())
+	_coop_teardown()
+
+
+func test_coop_the_plate_holder_lifts_the_visor_and_only_the_other_hero_hurts_it() -> void:
+	if _aid_running():
+		assert_true(true, "skipped while a route-building aid runs")
+		return
+	var colossus: Colossus = _visor_hall(true, true)
+	_p1.teleport(Vector2i(160, 160))
+	_p2.teleport(Vector2i(100, 160))
+	Sim.step(2)
+	assert_false(colossus.is_visor_up(), "nobody on the glowing plate: the visor is down")
+	_head_shot(colossus, 1)
+	Sim.step(1)
+	assert_eq(colossus.hp, 30, "a throw glances off the visor")
+	_p1.teleport(Vector2i(PLATE_LEFT_X, 160))
+	Sim.step(2)
+	assert_true(colossus.is_visor_up(), "P1 on the glowing plate lifts it")
+	_head_shot(colossus, 0)
+	Sim.step(1)
+	assert_eq(colossus.hp, 30, "the holder's own throw does not count")
+	_head_shot(colossus, 1)
+	Sim.step(1)
+	assert_eq(colossus.hp, 29, "P2's throw counts one")
+	assert_eq(colossus.last_hitter, _p2)
+	_coop_teardown()
+
+
+func test_coop_every_rage_moves_the_live_chain_and_the_roles_swap() -> void:
+	if _aid_running():
+		assert_true(true, "skipped while a route-building aid runs")
+		return
+	var colossus: Colossus = _visor_hall(true, true)
+	_p1.teleport(Vector2i(PLATE_LEFT_X, 160))
+	_p2.teleport(Vector2i(160, 160))
+	Sim.step(2)
+	_head_shot(colossus, 1)
+	Sim.step(1)
+	assert_eq(colossus.get_hits(), 1)
+	assert_eq(colossus.get_live_plate(), colossus.get_plates()[1], "the 1st hit's rage: the right chain glows")
+	Sim.step(2)
+	assert_false(colossus.is_visor_up(), "P1 on the old plate holds nothing now")
+	_p2.teleport(Vector2i(PLATE_RIGHT_X, 160))
+	_p1.teleport(Vector2i(100, 160))
+	Sim.step(2)
+	assert_true(colossus.is_visor_up(), "P2 holds the new one: the roles swapped")
+	_coop_teardown()
+
+
+## Fairness per hero (test_colossus_rocks_can_be_jumped / _stalactites_can_be_escaped hold for the 1.0 rock speeds
+## and drops; the co-op form only aims them): whichever hero holds the plate, the open jaws show 10+ ticks before the
+## rock leaves, the rock's speed is one of the 1.0 speeds aimed at him, and the drop rattles 14 ticks over the other.
+func test_coop_rocks_go_for_the_holder_and_drops_for_the_thrower_whoever_they_are() -> void:
+	if _aid_running():
+		assert_true(true, "skipped while a route-building aid runs")
+		return
+	for holder_slot: int in 2:
+		var colossus: Colossus = _visor_hall(true, true)
+		var holder: PlayerBase = _p1 if holder_slot == 0 else _p2
+		var thrower: PlayerBase = _p2 if holder_slot == 0 else _p1
+		holder.teleport(Vector2i(PLATE_LEFT_X, 160))
+		thrower.teleport(Vector2i(150, 160))
+		var jaws: int = -1
+		var rock: SimEntity = null
+		var drop: SimEntity = null
+		var drop_seen: int = -1
+		var rock_speed: int = 0
+		for tick: int in 260:
+			Sim.step(1)
+			for hero: PlayerBase in [_p1, _p2]:
+				hero.hit_timer = 0
+				hero.run.hearts = Tuning.ENERGY_START
+			if jaws < 0 and colossus.get_state() == Colossus.State.SPIT:
+				jaws = tick
+			if rock == null:
+				for entity: SimEntity in _hall.get_kind(Defs.Kind.ENEMY_PROJECTILE):
+					if entity is BossRock:
+						rock = entity
+						rock_speed = -rock.xvel
+						assert_true(tick - jaws >= 10, "slot %d holds: the jaws open 10+ ticks ahead" % holder_slot)
+			if drop == null:
+				for entity: SimEntity in _hall.get_kind(Defs.Kind.ENEMY_PROJECTILE):
+					if entity is BossStalactite:
+						drop = entity
+						drop_seen = tick
+			if rock != null and drop != null:
+				break
+		assert_not_null(rock, "slot %d: a rock" % holder_slot)
+		assert_not_null(drop, "slot %d: a drop" % holder_slot)
+		if rock == null or drop == null:
+			_coop_teardown()
+			return
+		var mouth_x: int = colossus.sim_pos.x + EnemyTuning.COLOSSUS_MOUTH.x
+		assert_eq(rock_speed, Colossus._aimed_speed(mouth_x - holder.sim_pos.x), "aimed at the holder")
+		assert_true(rock_speed >= EnemyTuning.ROCK_XVEL_MIN and rock_speed <= 96, "a 1.0 rock speed")
+		assert_eq(drop.sim_pos.x, thrower.sim_pos.x, "the drop rattles over the thrower")
+		assert_true((drop as BossStalactite).is_warning(), "rattling first")
+		var fell: int = -1
+		for tick: int in 40:
+			Sim.step(1)
+			if not (drop as BossStalactite).is_warning():
+				fell = tick + 1
+				break
+		assert_true(fell + 1 >= EnemyTuning.STALACTITE_WARN_TICKS - 1, "slot %d: 14 ticks of rattle (%d)" % [
+			holder_slot, fell])
+		assert_true(drop_seen >= 0)
+		_coop_teardown()
+
+
+## V3.d: one hero cannot beat the visor. The real hero with two axes (the co-op checkpoint's), his partner an egg:
+## throwing from the glowing plate, from the floor right after stepping off it, and seeded random play - nothing counts.
+func test_coop_the_single_hero_search_cannot_hurt_the_visor_colossus() -> void:
+	if _aid_running():
+		assert_true(true, "skipped while a route-building aid runs")
+		return
+	var colossus: Colossus = _visor_hall(true, true, true)
+	_p2.down = true
+	var rng: SimRng = SimRng.new(5)
+	for weapon: int in [AXE, BOOMERANG, Defs.Weapon.SPEAR]:
+		for start: int in [PLATE_LEFT_X, PLATE_LEFT_X + 8, PLATE_RIGHT_X, 120, 170, 210]:
+			_coop_episode(_p1, weapon, Vector2i(start, 160), _throw_and_step(start))
+			_coop_episode(_p1, weapon, Vector2i(start, 160), _coop_random(rng, 120))
+			assert_eq(colossus.hp, 30, "weapon %d from x %d: nothing counts" % [weapon, start])
+	assert_false(colossus.dead)
+	_coop_teardown()
+
+
+## The hall of the section header with the Colossus; `coop_game`: a co-op game of two (else a party of one); `coop_file`:
+## the level is a co-op file; `real_p1`: P1 is the real hero.
+func _visor_hall(coop_game: bool, coop_file: bool, real_p1: bool = false) -> Colossus:
+	if coop_game:
+		Game.start_run(Defs.Difficulty.EXPERT, Defs.GameMode.COOP, 2)
+	else:
+		Game.new_game(Defs.Difficulty.EXPERT)
+	Game.begin_level(&"test")
+	Sim.rng.reseed(11)
+	var rows: PackedStringArray = PackedStringArray()
+	for row: int in 10:
+		rows.append(".".repeat(20) + "#".repeat(10))
+	rows.append("#".repeat(30))
+	rows.append("#".repeat(30))
+	_hall = make_level(rows)
+	if coop_file:
+		_hall.meta["kind"] = "coop"
+	for x: int in [PLATE_LEFT_X, PLATE_RIGHT_X]:
+		var plate: SimEntity = Spawner.instantiate(&"objects/plate") as SimEntity
+		place(_hall, plate, Vector2i(x, 160), {"w": 2})
+	if real_p1:
+		_p1 = (load(COOP_PLAYER_SCENE) as PackedScene).instantiate() as PlayerBase
+	else:
+		_p1 = PlayerBase.new()
+	place(_hall, _p1, Vector2i(100, 160), {"slot": 0})
+	_p1.respawn_at(Vector2i(100, 160))
+	_p2 = null
+	if coop_game:
+		_p2 = PlayerBase.new()
+		place(_hall, _p2, Vector2i(130, 160), {"slot": 1})
+		_p2.respawn_at(Vector2i(130, 160))
+	var colossus: Colossus = Spawner.instantiate(&"bosses/colossus") as Colossus
+	place(_hall, colossus, Vector2i(19 * Tuning.TILE + 8, 160))
+	colossus.start_fight()
+	Sim.step(1)
+	return colossus
+
+
+func _coop_teardown() -> void:
+	GameInput.clear_scripted()
+	if _hall != null and is_instance_valid(_hall):
+		_hall.free()
+	_hall = null
+	Game.new_game(Defs.Difficulty.BEGINNER)
+	Game.begin_level(&"")
+
+
+## A thrown weapon of the hero of `owner` on the Colossus' head.
+func _head_shot(colossus: Colossus, owner: int) -> void:
+	var head: Rect2i = colossus.get_head_rect()
+	var shot: ProjectileBase = ProjectileBase.new()
+	place(_hall, shot, Vector2i(head.get_center().x, head.end.y), {"from_hero": true, "power": 20, "owner": owner})
+
+
+## Face the statue and throw high (Up + Fire), then walk off toward it and throw again.
+func _throw_and_step(_start: int) -> PackedInt32Array:
+	var flags: PackedInt32Array = PackedInt32Array()
+	flags.append(Defs.IN_RIGHT)
+	for i: int in 3:
+		flags.append(Defs.IN_FIRE | Defs.IN_UP)
+	for i: int in 10:
+		flags.append(0)
+	for i: int in 6:
+		flags.append(Defs.IN_RIGHT)
+	for i: int in 3:
+		flags.append(Defs.IN_FIRE | Defs.IN_UP)
+	for i: int in 30:
+		flags.append(0)
+	return flags
+
+
+func _coop_random(rng: SimRng, ticks: int) -> PackedInt32Array:
+	var flags: PackedInt32Array = PackedInt32Array()
+	var keys: Array[int] = [0, Defs.IN_LEFT, Defs.IN_RIGHT, Defs.IN_UP, Defs.IN_FIRE, Defs.IN_UP | Defs.IN_FIRE,
+			Defs.IN_FIRE | Defs.IN_RIGHT, Defs.IN_UP | Defs.IN_RIGHT, Defs.IN_UP | Defs.IN_FIRE | Defs.IN_RIGHT]
+	var held: int = 0
+	var left: int = 0
+	for tick: int in ticks:
+		if left <= 0:
+			held = keys[rng.next_int(keys.size())]
+			left = rng.range_int(2, 12)
+		left -= 1
+		flags.append(held)
+	return flags
+
+
+func _coop_episode(hero: PlayerBase, weapon: int, pos: Vector2i, flags: PackedInt32Array) -> void:
+	hero.respawn_at(pos)
+	hero.run.set_weapon(weapon)
+	var first: int = Sim.tick + 1
+	GameInput.set_scripted_slot(0, func(tick: int) -> int:
+		var index: int = tick - first
+		return flags[index] if index >= 0 and index < flags.size() else 0
+	)
+	for tick: int in flags.size():
+		Sim.step(1)
+		hero.run.hearts = Tuning.ENERGY_START
+		hero.hit_timer = mini(hero.hit_timer, 1)
+		if hero.dead or hero.is_down():
+			hero.respawn_at(pos)
+	GameInput.clear_scripted()

@@ -116,6 +116,76 @@ const SETS: Dictionary = {
 			{"file": "swamp/trunk_layer2_ceiling_near", "scroll": 0.6, "anchor": Anchor.TOP},
 		],
 	},
+	# 2.0 (worlds 7-9; art-B's hand-over wf8_art-B_to_world-A.txt): Shell Beach's coast and the sea caves of 7-2 / 7-2b;
+	# the Idol Ruins outside (8-1) and the temple halls inside (8-2 / 8-2b); the Sky Spire by day (9-1), in the storm
+	# (9-1b, 9-2, 9-2b) and at the sunset pyre (9-3).
+	"coast": {
+		"fill": Color("77d9ff"),
+		"layers": [
+			{"file": "coast/layer0_sky", "scroll": 0.0, "anchor": Anchor.SKY},
+			{"file": "coast/layer1_far_isles", "scroll": 0.1, "anchor": Anchor.BOTTOM},
+			{"file": "coast/layer2_cliffs", "scroll": 0.25, "anchor": Anchor.BOTTOM},
+			{"file": "coast/layer3_dunes", "scroll": 0.5, "anchor": Anchor.BOTTOM},
+		],
+	},
+	"sea_cave": {
+		"fill": Color("0e1c22"),
+		"layers": [
+			{"file": "coast/cave_layer0_wall", "scroll": 0.1, "anchor": Anchor.TILE},
+			{
+				"file": "coast/cave_layer1_rocks_far", "scroll": 0.3, "anchor": Anchor.SPLIT,
+				"split_top": 113, "split_bottom": 267,
+			},
+			{"file": "coast/cave_layer2_ceiling_near", "scroll": 0.6, "anchor": Anchor.TOP},
+		],
+	},
+	"ruins": {
+		"fill": Color("feedc6"),
+		"layers": [
+			{"file": "ruins/layer0_sky", "scroll": 0.0, "anchor": Anchor.SKY},
+			{"file": "ruins/layer1_far_temples", "scroll": 0.1, "anchor": Anchor.BOTTOM},
+			{"file": "ruins/layer2_hills", "scroll": 0.25, "anchor": Anchor.BOTTOM},
+			{"file": "ruins/layer3_canopy", "scroll": 0.5, "anchor": Anchor.BOTTOM},
+		],
+	},
+	"temple": {
+		"fill": Color("1c1618"),
+		"layers": [
+			{"file": "ruins/temple_layer0_wall", "scroll": 0.1, "anchor": Anchor.TILE},
+			{
+				"file": "ruins/temple_layer1_pillars", "scroll": 0.3, "anchor": Anchor.SPLIT,
+				"split_top": 113, "split_bottom": 267,
+			},
+			{"file": "ruins/temple_layer2_ceiling_near", "scroll": 0.6, "anchor": Anchor.TOP},
+		],
+	},
+	"sky": {
+		"fill": Color("bedafb"),
+		"layers": [
+			{"file": "sky/layer0_sky", "scroll": 0.0, "anchor": Anchor.SKY},
+			{"file": "sky/layer1_far_isles", "scroll": 0.06, "anchor": Anchor.BOTTOM},
+			{"file": "sky/layer2_clouds", "scroll": 0.2, "anchor": Anchor.BOTTOM},
+			{"file": "sky/layer3_cloud_sea", "scroll": 0.45, "anchor": Anchor.BOTTOM},
+		],
+	},
+	"storm": {
+		"fill": Color("525470"),
+		"layers": [
+			{"file": "sky/storm_layer0_sky", "scroll": 0.0, "anchor": Anchor.SKY},
+			{"file": "sky/storm_layer1_far_isles", "scroll": 0.06, "anchor": Anchor.BOTTOM},
+			{"file": "sky/storm_layer2_clouds", "scroll": 0.2, "anchor": Anchor.BOTTOM},
+			{"file": "sky/storm_layer3_cloud_sea", "scroll": 0.45, "anchor": Anchor.BOTTOM},
+		],
+	},
+	"pyre": {
+		"fill": Color("fb8d31"),
+		"layers": [
+			{"file": "sky/pyre_layer0_sky", "scroll": 0.0, "anchor": Anchor.SKY},
+			{"file": "sky/pyre_layer1_far_isles", "scroll": 0.06, "anchor": Anchor.BOTTOM},
+			{"file": "sky/pyre_layer2_clouds", "scroll": 0.2, "anchor": Anchor.BOTTOM},
+			{"file": "sky/pyre_layer3_cloud_sea", "scroll": 0.45, "anchor": Anchor.BOTTOM},
+		],
+	},
 	"feast": {
 		"fill": Color("feb0d1"),
 		"layers": [

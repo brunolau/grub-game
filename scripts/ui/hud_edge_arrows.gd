@@ -6,7 +6,12 @@ extends Control
 ## (`ui/countdown_stones.png`: 5..1 on Beginner, 3..1 on Expert). On a view wider than the authentic one a hero can be
 ## on the screen and still off the authentic view: then the stone hangs over his head instead.
 ## The "P1".."P4" tags with their colour arrow (`ui/player_tags.png`, DESIGN.md D.1 / E.9) show over every hero for the
-## first seconds of a stage and whenever two heroes overlap.
+## first seconds of a stage, through a versus round's "3, 2, 1, GRUB!" and the first seconds of the round, and whenever
+## two heroes overlap. In Grub Stack a tag stands on top of the hero's food tower (VersusStackDisplay), not in it.
+## Tags and arrows wear the colour the player chose (UiPlayers.tag_cell / arrow_cell). A hero above the view without a
+## countdown (versus) gets his head in a bubble under the arrow (ui/portrait_heads.png; DESIGN.md E.9 "bubbles for
+## heroes above the view"). Every picture comes from [HudAtlas], the texture of the versus HUD, so the party HUD draws
+## in one batch.
 ##
 ## Owner: ui-B. Part of [Hud]; draws nothing for a party of one (single-player keeps the 1.0 HUD). It reads only the
 ## documented hero fields (`slot`, `leash`, `dead`, `down`, the canvas position, `box_h`) of `Game.level` - the
@@ -34,19 +39,14 @@ var tags: Array[Dictionary] = []
 ## Level to watch instead of Game.level (tests, previews).
 var level_override: LevelBase = null
 
-var _arrows: Dictionary = {}   # slot * 4 + side -> AtlasTexture (kept while drawn, UiKit.tex note)
-var _stones: Array[AtlasTexture] = []
-var _tag_cells: Array[AtlasTexture] = []
 var _tags_until: int = 0
+var _atlas: Texture2D = null
 
 
 func _init() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	for digit: int in range(1, UiPlayers.STONE_MAX + 1):
-		_stones.append(UiPlayers.stone(digit))
-	for slot: int in Defs.MAX_PLAYERS:
-		_tag_cells.append(UiKit.cell(TEX_TAGS, TAG_CELL, slot))
+	_atlas = HudAtlas.texture()
 	show_tags(TAG_SECONDS)
 
 
@@ -54,6 +54,8 @@ func _ready() -> void:
 	Events.level_started.connect(func(_level_id: StringName) -> void: show_tags(TAG_SECONDS))
 	Events.level_respawned.connect(func() -> void: show_tags(TAG_SECONDS))
 	Events.round_started.connect(func(_round_index: int) -> void: show_tags(TAG_SECONDS))
+	# The countdown counts 1 s steps: each count keeps the tags up until the round starts and adds its own time.
+	Events.round_countdown.connect(func(_round_index: int, _count: int) -> void: show_tags(TAG_SECONDS))
 
 
 ## Show every hero's tag for `seconds` from now (0 = only while heroes overlap).
@@ -115,30 +117,60 @@ func _tags_for(level: LevelBase, view: Rect2, shown: Array[Dictionary]) -> Array
 				overlap = true
 		if all or overlap:
 			var top: Rect2 = bodies[hero]
-			result.append({"slot": hero.slot, "pos": Vector2(top.get_center().x, top.position.y - TAG_GAP)})
+			var tip_y: float = top.position.y - TAG_GAP - _tower_height(level, hero)
+			# A tall tower must not push the tag off the top of the view.
+			tip_y = maxf(tip_y, view.position.y + float(TAG_CELL.y))
+			result.append({"slot": hero.slot, "pos": Vector2(top.get_center().x, tip_y)})
 	return result
+
+
+## Height (art px) of the Grub Stack food tower over `hero`'s head (VersusStackDisplay), 0 without one: the referee
+## (the level's party driver) tells his stack by `stack_of(slot)`.
+static func _tower_height(level: LevelBase, hero: PlayerBase) -> float:
+	var driver: Object = level.party_driver
+	if driver == null or not is_instance_valid(driver) or not driver.has_method(&"stack_of"):
+		return 0.0
+	var pictures: int = mini(VersusStackDisplay.tower_pictures(int(driver.call(&"stack_of", hero.slot))).size(),
+			VersusStackDisplay.TOWER_MAX)
+	if pictures <= 0:
+		return 0.0
+	var head: float = float(hero.box_h * Tuning.ART_SCALE)
+	var first_foot: float = VersusStackDisplay.FIRST_FOOT_ART
+	var top: float = first_foot + float(pictures - 1) * VersusStackDisplay.STEP_ART + float(VersusStackDisplay.CELL.y)
+	# The leader's tower wears the crown on top.
+	if driver.has_method(&"leader_slot") and int(driver.call(&"leader_slot")) == hero.slot:
+		top += VersusStackDisplay.CROWN_PIVOT.y
+	return maxf(top - head, 0.0)
 
 
 func _draw() -> void:
 	for tag: Dictionary in tags:
 		var slot: int = clampi(int(tag["slot"]), 0, Defs.MAX_PLAYERS - 1)
 		var tip: Vector2 = tag["pos"]
-		draw_texture(_tag_cells[slot], (tip - Vector2(float(TAG_CELL.x) * 0.5, float(TAG_CELL.y))).round())
+		_cell(&"tag", UiPlayers.tag_cell(slot), tip - Vector2(float(TAG_CELL.x) * 0.5, float(TAG_CELL.y)))
 	for marker: Dictionary in markers:
-		var slot: int = int(marker["slot"])
+		var slot: int = clampi(int(marker["slot"]), 0, Defs.MAX_PLAYERS - 1)
 		var side: int = int(marker["side"])
 		var pos: Vector2 = marker["pos"]
 		var digit: int = int(marker["digit"])
 		if side < 0:
 			if digit > 0:
-				var stone: Texture2D = _stones[digit - 1]
-				draw_texture(stone, (pos - Vector2(16.0, 32.0)).round())
+				_cell(&"stone", digit - 1, pos - Vector2(16.0, 32.0))
 			continue
-		var arrow: Texture2D = _arrow(slot, side)
-		draw_texture(arrow, (pos - Vector2(16.0, 16.0)).round())
+		_cell(&"arrow", UiPlayers.arrow_cell(slot, side), pos - Vector2(16.0, 16.0))
+		var inner: Vector2 = pos + _inward(side) * STONE_GAP
 		if digit > 0:
-			var stone_centre: Vector2 = pos + _inward(side) * STONE_GAP
-			draw_texture(_stones[digit - 1], (stone_centre - Vector2(16.0, 16.0)).round())
+			_cell(&"stone", digit - 1, inner - Vector2(16.0, 16.0))
+		elif side == UiPlayers.Side.UP:
+			# A hero above the view (a spring, a launch): his head in a bubble under the arrow.
+			var head: Vector2 = Vector2(UiPlayers.HEAD_CELL)
+			_cell(&"head", UiPlayers.head_cell(slot), inner - head * 0.5)
+
+
+## One cell of the HUD atlas at its own size, top-left at `at` (rounded to whole pixels).
+func _cell(group: StringName, index: int, at: Vector2) -> void:
+	var source: Rect2 = HudAtlas.region(group, index)
+	draw_texture_rect_region(_atlas, Rect2(at.round(), source.size), source)
 
 
 ## The marker of one hero, or {} when he needs none.
@@ -179,10 +211,3 @@ static func _inward(side: int) -> Vector2:
 		UiPlayers.Side.UP:
 			return Vector2.DOWN
 	return Vector2.UP
-
-
-func _arrow(slot: int, side: int) -> Texture2D:
-	var key: int = slot * 4 + side
-	if not _arrows.has(key):
-		_arrows[key] = UiPlayers.arrow(slot, side)
-	return _arrows[key]

@@ -4,8 +4,11 @@ Desert Theme - 8bit Chiptune Theme
 Author: Wolfgang_ (Ted Kerr)
 Source: https://opengameart.org/content/desert-theme-8bit-chiptune-theme
 Licence: CC0 1.0 (tier A)
-Used in Club & Grub for: 2.0 (The Far Shore): audio/music/level_canyon_a.ogg. Per-file sources and edits: docs/ASSET_MANIFEST.md section 17
+Used in Club & Grub for: 2.0 (The Far Shore): audio/music/level_canyon_a.ogg, audio/music/level_sky_climb_a.ogg, audio/music/level_spore_a.ogg. Per-file sources and edits: docs/ASSET_MANIFEST.md section 17
 Staging folder: .tools/asset_candidates/expansion/audio/wolfgang_8bit-themes
+Page: Desert Theme - 8bit Chiptune Theme - https://opengameart.org/content/desert-theme-8bit-chiptune-theme
+Page: 8-bit Haunted House Theme - https://opengameart.org/content/8-bit-haunted-house-theme
+Page: 8bit theme - Upbeat Overworld - https://opengameart.org/content/8bit-theme-upbeat-overworld
 
 ---- Licence evidence recorded when the pack was downloaded ----
 

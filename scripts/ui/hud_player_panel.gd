@@ -5,6 +5,9 @@ extends Control
 ## he owns a special). P1's hearts stay the 1.0 row of [Hud]; this panel is P2's, mirrored top-right: the tag on the
 ## outer side, the hearts filling from the outside in, the belt icon on the inner side.
 ##
+## With the "Rival score" option the panel also shows the player's own score under his hearts ([method show_score]; the
+## HUD writes it, [method set_score]).
+##
 ## Owner: ui-B. Reads PlayerRun through `Game.run_energy_changed` / `run_belt_changed` (a run is never replaced, so the
 ## panel connects once) and greys out while the player's hero is an egg (`Events.hero_down` / `hero_revived`).
 
@@ -17,6 +20,8 @@ const BONE_Y: float = 37.0
 ## Width and height of the panel (art px).
 const PANEL_W: float = TAG_W + HEART_SPACING * 2.0 + HEART_SIZE + BELT_GAP + 32.0
 const PANEL_H: float = 44.0
+## Room the score line takes under the hearts (Rival score).
+const SCORE_H: float = 22.0
 ## Look of the panel while its hero is an egg.
 const DOWN_TINT: Color = Color(0.55, 0.55, 0.6, 0.85)
 
@@ -32,11 +37,15 @@ var shown_bones: int = 0
 var shown_belt: int = PlayerRun.BELT_EMPTY
 ## True while the player's hero is an egg.
 var hero_down: bool = false
+## True while the score line shows (Rival score), and the score it shows.
+var score_shown: bool = false
+var shown_score: int = 0
 
 var _hearts: Array[TextureRect] = []
 var _bones: Control = null
 var _belt: TextureRect = null
 var _tag: Label = null
+var _score: Label = null
 var _heart_full: AtlasTexture = null
 var _heart_empty: AtlasTexture = null
 
@@ -80,6 +89,30 @@ func get_tag() -> Label:
 	return _tag
 
 
+## Show or hide the score line under the hearts (the HUD's Rival score); the panel grows by SCORE_H while it shows.
+func show_score(on: bool) -> void:
+	score_shown = on
+	_score.visible = on
+	custom_minimum_size = Vector2(PANEL_W, panel_height())
+	size = custom_minimum_size
+
+
+## The score the score line shows.
+func set_score(score: int) -> void:
+	shown_score = maxi(score, 0)
+	_score.text = UiKit.score_text(shown_score)
+
+
+## The score line's text ("" while hidden).
+func get_score_text() -> String:
+	return _score.text if score_shown else ""
+
+
+## Height of the panel now (art px).
+func panel_height() -> float:
+	return PANEL_H + (SCORE_H if score_shown else 0.0)
+
+
 func _build() -> void:
 	var hearts_x: float = BELT_GAP + 32.0 if mirrored else TAG_W
 	_tag = UiPlayers.tag_label(slot)
@@ -104,6 +137,16 @@ func _build() -> void:
 	_belt.position = Vector2(0.0 if mirrored else hearts_x + hearts_w + BELT_GAP, 2.0)
 	_belt.visible = false
 	add_child(_belt)
+	# The score line: under the hearts, flush with the outer edge (right-aligned on the mirrored panel).
+	_score = UiKit.label(UiKit.score_text(0), UiKit.Style.HUD,
+			HORIZONTAL_ALIGNMENT_RIGHT if mirrored else HORIZONTAL_ALIGNMENT_LEFT)
+	_score.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+	_score.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_score.add_theme_color_override(&"font_color", UiPlayers.text_colour(slot))
+	_score.position = Vector2(0.0, PANEL_H)
+	_score.size = Vector2(PANEL_W, SCORE_H)
+	_score.visible = false
+	add_child(_score)
 
 
 func _set_energy(hearts: int, bones: int, animate: bool) -> void:
@@ -157,6 +200,7 @@ func _on_run_belt_changed(p_slot: int, belt: int) -> void:
 
 func _on_run_started(_difficulty: int) -> void:
 	_set_down(false)
+	_score.add_theme_color_override(&"font_color", UiPlayers.text_colour(slot))
 	refresh()
 
 

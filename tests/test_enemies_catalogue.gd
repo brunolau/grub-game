@@ -11,6 +11,31 @@ const ENEMY_IDS: Dictionary[StringName, String] = {
 	&"enemies/snapper": "Snapper", &"enemies/decoration": "Decoration",
 	# 2.0 (DESIGN.md A.5 / D.7; PLAN.md P1.8 pulled forward from P2.1)
 	&"enemies/roller": "Roller", &"enemies/guard": "Guard", &"enemies/shellback": "Shellback",
+	# 2.0 phase 2 (PLAN.md P2.1): the Mimic and the co-op-only presets
+	&"enemies/mimic": "Mimic", &"enemies/raptor": "Raptor", &"enemies/snatcher": "Snatcher",
+	&"enemies/leech": "Leech", &"enemies/bull_rex": "BullRex", &"enemies/tar_splitter": "TarSplitter",
+	&"enemies/shaman": "Shaman",
+}
+## Every enemy id of the DESIGN.md appendix ("Enemies": the three Book II archetypes and the seven co-op-only ones).
+const DESIGN_ENEMY_IDS: Array[StringName] = [
+	&"enemies/roller", &"enemies/guard", &"enemies/mimic", &"enemies/shellback", &"enemies/raptor",
+	&"enemies/snatcher", &"enemies/leech", &"enemies/bull_rex", &"enemies/tar_splitter", &"enemies/shaman",
+]
+## The chest container's closed chest (objects-A's BonusContainer: sprites/objects/chest.png cell 0, pivot (24, 36)).
+const CHEST_TEXTURE: String = "res://assets/sprites/objects/chest.png"
+const CHEST_CELL: Vector2i = Vector2i(60, 36)
+const CHEST_PIVOT: Vector2i = Vector2i(24, 36)
+## The 15 Book I solo files (frozen: DESIGN.md A.5 "Book I never spawns them").
+const BOOK1_SOLO_LEVELS: PackedStringArray = [
+	"w1_l1", "w1_l2", "w2_l1", "w2_l2", "w2_l2b", "w3_l1", "w3_l1b", "w3_l2", "w4_l1", "w4_l2", "w4_l2b", "bonus_a",
+	"bonus_b", "bonus_c", "ending",
+]
+## Default sheet and preset trait of every co-op-only enemy (DESIGN.md D.7).
+const PRESETS: Dictionary[StringName, Array] = {
+	&"enemies/shellback": ["shellback", Defs.CoopTrait.SHELL], &"enemies/raptor": ["mini_rex_b", Defs.CoopTrait.DAZE],
+	&"enemies/snatcher": ["bat_b", Defs.CoopTrait.GRAB], &"enemies/leech": ["leech", Defs.CoopTrait.LEECH],
+	&"enemies/bull_rex": ["rex_b", Defs.CoopTrait.HEAVY], &"enemies/tar_splitter": ["slime", Defs.CoopTrait.SPLIT],
+	&"enemies/shaman": ["", Defs.CoopTrait.NONE],
 }
 const BOSS_IDS: Dictionary[StringName, String] = {&"bosses/brute": "Brute", &"bosses/colossus": "Colossus"}
 const PROJECTILE_IDS: Dictionary[StringName, String] = {
@@ -35,6 +60,11 @@ const ENEMY_SKINS: Dictionary[String, Vector2i] = {
 	"slime": Vector2i(36, 28), "slime_b": Vector2i(36, 28), "puffcap": Vector2i(51, 42),
 	"puffcap_b": Vector2i(51, 42), "frog": Vector2i(26, 19), "larva": Vector2i(15, 13), "larva_b": Vector2i(15, 13),
 	"leech": Vector2i(15, 13), "mosquito": Vector2i(35, 18),
+	# 2.0 worlds 7-9 and the phase-2 enemies (art-B, PLAN.md P2.1 / P2.10)
+	"gull": Vector2i(52, 22), "gull_b": Vector2i(52, 22), "storm_ptero": Vector2i(52, 22), "jelly": Vector2i(36, 28),
+	"sea_snail": Vector2i(26, 15), "rival_tar": Vector2i(22, 26), "ghost": Vector2i(39, 41), "ghost_b": Vector2i(39, 41),
+	"octopus": Vector2i(16, 15), "octopus_b": Vector2i(16, 15), "fish": Vector2i(15, 8), "fish_b": Vector2i(15, 8),
+	"mimic": Vector2i(24, 18), "shaman": Vector2i(24, 32),
 }
 const BOSS_SKINS: PackedStringArray = [
 	"brute", "brute_enraged", "colossus", "tusker", "tusker_rage", "mangrove", "mangrove_parts",
@@ -43,7 +73,7 @@ const MAX_TEXTURE_SIDE: int = 2048
 const ROLES: Array[StringName] = [
 	&"idle", &"walk", &"fly", &"air", &"hang", &"dive", &"leap", &"glide", &"roll", &"land", &"attack", &"windup",
 	&"bite", &"recover", &"screech", &"hurt", &"dead", &"taunt", &"pound", &"crouch", &"spit", &"slam", &"rage",
-	&"curl", &"uncurl", &"bump", &"dizzy", &"guard", &"rear",
+	&"curl", &"uncurl", &"bump", &"dizzy", &"guard", &"rear", &"shudder", &"front", &"squash",
 ]
 
 
@@ -108,6 +138,62 @@ func test_every_enemy_works_with_every_enemy_skin() -> void:
 			assert_eq(sprite.texture.resource_path, EnemySkin.ENEMY_DIR + skin_name + ".png")
 			Sim.step(30)
 			assert_true(sprite.frame < sprite.hframes * sprite.vframes)
+
+
+func test_every_design_enemy_id_exists_and_the_presets_carry_their_trait() -> void:
+	for id: StringName in DESIGN_ENEMY_IDS:
+		assert_true(ENEMY_IDS.has(id), "%s is catalogued" % id)
+		assert_true(Spawner.exists(id), "%s has a scene" % id)
+	for id: StringName in PRESETS:
+		_flat_level(60, 16, 10)
+		var enemy: EnemyBase = _enemy(id, Vector2i(160, 160))
+		var sheet: String = PRESETS[id][0]
+		if not sheet.is_empty():
+			assert_eq(enemy.skin, sheet, "%s wears its preset sheet" % id)
+		var expected: int = PRESETS[id][1]
+		if expected == Defs.CoopTrait.NONE:
+			assert_null(enemy.coop_traits(), "%s has no trait" % id)
+		else:
+			assert_eq(enemy.coop_traits().kind, expected, "%s carries its trait" % id)
+			var plain: EnemyBase = _enemy(id, Vector2i(300, 160), {"coop": "bond", "bond": "x"})
+			assert_eq(plain.coop_traits().kind, Defs.CoopTrait.BOND, "%s: the level's coop= wins" % id)
+
+
+func test_the_mimic_sheet_starts_with_the_chest_pixel_for_pixel() -> void:
+	var skin: EnemySkin = EnemySkin.find("mimic")
+	assert_not_null(skin)
+	assert_eq(skin.box, EnemyTuning.MIMIC_BOX, "the chest container's box")
+	assert_null(EnemySkin.find("mimic_b"), "one palette")
+	var sheet: Image = (load(skin.texture_path) as Texture2D).get_image()
+	var chest: Image = (load(CHEST_TEXTURE) as Texture2D).get_image()
+	sheet.decompress()
+	chest.decompress()
+	# Both drawn with their pivot on the same feet point: chest (x, y) <-> mimic frame 0 (x, y) + (pivot - CHEST_PIVOT).
+	var shift: Vector2i = skin.pivot - CHEST_PIVOT
+	var differing: int = 0
+	for y: int in skin.cell.y:
+		for x: int in skin.cell.x:
+			var c: Vector2i = Vector2i(x, y) - shift
+			var inside: bool = c.x >= 0 and c.y >= 0 and c.x < CHEST_CELL.x and c.y < CHEST_CELL.y
+			var want: Color = chest.get_pixel(c.x, c.y) if inside else Color(0, 0, 0, 0)
+			var got: Color = sheet.get_pixel(x, y)
+			if (want.a8 == 0 and got.a8 != 0) or (want.a8 != 0 and got.to_rgba32() != want.to_rgba32()):
+				differing += 1
+	assert_eq(differing, 0, "frame 0 is the closed chest container at the same feet point")
+
+
+func test_book_one_never_spawns_the_new_enemies() -> void:
+	var checked: int = 0
+	for level_id: String in BOOK1_SOLO_LEVELS:
+		var path: String = "res://levels/%s.lvl" % level_id
+		if not FileAccess.file_exists(path):
+			continue
+		checked += 1
+		var text: String = FileAccess.get_file_as_string(path)
+		for id: StringName in DESIGN_ENEMY_IDS:
+			assert_false(text.contains(String(id) + " ") or text.contains(String(id) + "\n"),
+					"%s names %s (Book I never spawns the new enemies)" % [level_id, id])
+	assert_eq(checked, BOOK1_SOLO_LEVELS.size(), "the 15 Book I solo files")
 
 
 func test_module_levels_name_existing_entities() -> void:

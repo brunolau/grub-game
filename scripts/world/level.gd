@@ -83,12 +83,20 @@ var _camera_logic: LevelCamera = LevelCamera.new()
 var _frame_logic: LevelCamera = null
 ## 2.0 `scroll = rising`: the deadly band (null on other levels).
 var _rising: RisingTide = null
+## 2.0 co-op: the glint of hidden spots near an egg (null outside a co-op party).
+var _egg_scout: EggScout = null
+## 2.0: lights in the dark - heroes and glowing props (null on a Book I level played solo).
+var _lights: LevelLights = null
+## Glowing props collected while they are placed: [centre (art px), light colour] each.
+var _glow_props: Array[Array] = []
 var _driver: LevelDriver = null
 var _base_scroll_flags: int = 0
 var _music: StringName = &""
 var _apron: Rect2i = Rect2i()          # tile rectangle painted so far, including the map
 var _wind_script: Array[Vector2i] = []
 var _wind_index: int = 0
+## Play tick at which the running round of a looping wind script (`wind_loop`) started (0 without a loop).
+var _wind_base: int = 0
 var _play_ticks: int = 0
 var _dark_ticks: int = 0
 var _dark_ticks_prev: int = 0
@@ -169,6 +177,8 @@ func _process(delta: float) -> void:
 		_top_smoke.advance(delta)
 	var fade: float = lerpf(float(_dark_ticks_prev), float(_dark_ticks), alpha) / float(Tuning.DARKNESS_FADE_TICKS)
 	_darkness.color = Color.WHITE.lerp(DARK_COLOR, clampf(fade, 0.0, 1.0))
+	if _lights != null:
+		_lights.update_lights(fade, heroes, Rect2(top_left, view_art))
 
 
 func _exit_tree() -> void:
@@ -380,6 +390,16 @@ func get_rising_tide() -> RisingTide:
 	return _rising
 
 
+## 2.0: the egg scouts' glint of a co-op party (DESIGN.md D.3); null outside one.
+func get_egg_scout() -> EggScout:
+	return _egg_scout
+
+
+## 2.0: the lights in the dark (LevelLights); null on a Book I level played solo.
+func get_lights() -> LevelLights:
+	return _lights
+
+
 ## 2.0 `zones/autoscroll_stop` on a rising level: the rise stops for the rest of the stage (the band stays deadly).
 func stop_rising() -> void:
 	scroll_flags &= ~Defs.SCROLL_RISING
@@ -387,14 +407,15 @@ func stop_rising() -> void:
 		_rising.stop()
 
 
-## Flies join the cosmetic swarm around the hero (`zones/flies`, GAMEPLAY.md 7.9).
-func attract_flies(amount: int) -> void:
-	_flies.attract(amount)
+## Flies join the cosmetic swarm around `hero` (`zones/flies`, GAMEPLAY.md 7.9; null = P1). 2.0: each hero of a
+## party has his own swarm.
+func attract_flies(amount: int, hero: PlayerBase = null) -> void:
+	_flies.attract(amount, hero.slot if hero != null else 0)
 
 
-## Flies around the hero now (0 = none).
-func get_fly_count() -> int:
-	return _flies.count
+## Flies around the hero of `slot` now (0 = none); `slot` < 0: every swarm together (one hero: his).
+func get_fly_count(slot: int = -1) -> int:
+	return _flies.count if slot < 0 else _flies.count_of(slot)
 
 
 ## True from a respawn request until the hero is back (the curtain is closing meanwhile).
@@ -452,6 +473,17 @@ func _load() -> void:
 	_find_lava_cells()
 	_setup_camera()
 	_setup_rising()
+	_setup_lights()
+
+
+## 2.0 lights in the dark (LevelLights): Book II levels, arenas and parties; never a Book I level played solo.
+func _setup_lights() -> void:
+	if not LevelLights.wanted(meta, hero_count()):
+		return
+	_lights = LevelLights.new()
+	add_child(_lights)
+	for glow: Array in _glow_props:
+		_lights.add_prop_light(glow[0], glow[1])
 
 
 ## 2.0 `scroll = rising` (PHYSICS.md C.8): the band starts Tuning.RISE_CHECKPOINT_ROWS rows under the start point.
@@ -693,6 +725,9 @@ func _setup_party() -> void:
 	if is_camera_locked():
 		_frame_logic.lock(get_camera_lock())
 	register_party_driver(PartyDriver.new())
+	# The egg scouts (DESIGN.md D.3): hidden spots near an egg glint (presentation only).
+	_egg_scout = EggScout.new()
+	add_child(_egg_scout)
 
 
 ## Music that starts in the middle of a tick (feast mode, a boss fight) is loaded with the level, not on its tick.
@@ -732,6 +767,9 @@ func _add_prop(id: StringName, col: float, row: float, params: Dictionary, line:
 		_props_front.add_child(sprite)
 	else:
 		_props_back.add_child(sprite)
+	if LevelLights.is_glow_prop(path):
+		_glow_props.append([sprite.position + sprite.offset + Vector2(texture.get_size()) * 0.5,
+				LevelLights.prop_color(path)])
 
 
 func _setup_world_state() -> void:
@@ -742,7 +780,9 @@ func _setup_world_state() -> void:
 		_report_key("wind", "wind entry '%s' is not tick:value" % entry)
 	_wind_script = _data.wind_script(Game.difficulty)
 	_wind_index = 0
+	_wind_base = 0
 	_play_ticks = 0
+	_weather.set_style(WorldWeather.style_for_biome(str(meta.get("biome", ""))))
 	_apply_wind_script()
 	_music = StringName(str(meta.get("music", "")))
 	if _music != &"" and not AudioTable.MUSIC.has(_music):
@@ -867,8 +907,15 @@ func _post_step() -> void:
 
 
 ## The wind script of PHYSICS.md 13.1: an entry `t:v` is the wind of tick t on (applied at the end of tick t - 1).
+## 2.0 alternating gusts (PHYSICS.md C.6 [R4]): meta `wind_loop = L` > 0 restarts the script every L ticks (the ticks
+## of an entry count from the start of its round); values may be negative (a rightward wind). `wind_loop = 0` (every
+## Book I level) is exactly the 1.0 script.
 func _apply_wind_script() -> void:
-	while _wind_index < _wind_script.size() and _wind_script[_wind_index].x <= _play_ticks + 1:
+	var loop: int = int(meta.get("wind_loop", 0))
+	if loop > 0 and not _wind_script.is_empty() and _play_ticks + 1 - _wind_base >= loop:
+		_wind_base += loop
+		_wind_index = 0
+	while _wind_index < _wind_script.size() and _wind_script[_wind_index].x <= _play_ticks + 1 - _wind_base:
 		set_wind(_wind_script[_wind_index].y)
 		_wind_index += 1
 

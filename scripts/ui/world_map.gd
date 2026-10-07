@@ -11,12 +11,15 @@ extends UiScreen
 ## grey rocks, the volcano on the right, which only Expert runs visit). A stage without a marker of its own stands at
 ## the marker of the map stop it belongs to: a linked sub-stage at its main level, a bonus stage at its source level,
 ## the ending at the last stop. Levels outside the campaign (test levels) show the hero in the middle of the map.
-## 2.0 (PLAN.md P1.11; the Far Shore map page of Book II is P2.8): the markers are the campaign of the running book
-## (Game.book; Book II's stops spread over the SLOTS until its map page exists), marker colours come from the save
-## namespace of the run (Flow.save_space: mode x book x difficulty), every hero of a co-op party walks the route in his
-## colour (P2 one step behind P1), and "back" ends the run through Flow.goto_title (the party's seats are freed). The
-## menu clusters are off here: a stray Look (Q / Num .) must not end a co-op run; Space and Num Enter still start the
-## stage (Godot's ui_accept), and the stage starts by itself anyway.
+## 2.0 (PLAN.md P1.11 / P2.8): the markers are the campaign of the running book (Game.book), marker colours come from
+## the save namespace of the run (Flow.save_space: mode x book x difficulty), every hero of a co-op party walks the
+## route in his colour (P2 one step behind P1), and "back" ends the run through Flow.goto_title (the party's seats are
+## freed). The menu clusters are off here: a stray Look (Q / Num .) must not end a co-op run; Space and Num Enter still
+## start the stage (Godot's ui_accept), and the stage starts by itself anyway.
+## Book II plays on the Far Shore page (DESIGN.md A.1, art-A's `ui/world_map_far_shore.png`: the red mesa, the tar
+## delta with the giant mangrove, the coral coast, the idol isle and the spire into the storm cloud; the 1.0 picture
+## while it is missing). Its stone slab in the lower-right corner ([PaintingSlab], screen UI over the open sea under
+## every stop) shows the Cave Paintings found as pieces of the mural, the count, the six rewards and the next one.
 
 ## Seconds the map waits on the marker before the level starts by itself.
 const AUTO_START: float = 4.0
@@ -42,6 +45,18 @@ const SLOTS: Array[Vector2] = [
 	Vector2(180, 206), Vector2(265, 198), Vector2(335, 186), Vector2(402, 208), Vector2(598, 184),
 	Vector2(680, 186), Vector2(740, 214), Vector2(985, 238), Vector2(1085, 224), Vector2(1195, 238),
 ]
+## Book II, the Far Shore page (1280 x 360): its picture, and the marker of each map stop by Vector2i(world, stage) -
+## two on each island of worlds 5-8 (red mesa, tar delta, coral coast, idol isle), three on the spire of world 9 (9-3
+## on its upper ledge under the storm). art-A's points on the sand and grass of the picture
+## (build/engine_requests/wf8_art_a_to_ui_a.txt #1: every y <= 238, so the sea under y 262 stays free for the slab).
+const MAP_TEXTURE_B2: String = "res://assets/ui/world_map_far_shore.png"
+const MARKERS_B2: Dictionary = {
+	Vector2i(5, 1): Vector2(58, 226), Vector2i(5, 2): Vector2(220, 218),
+	Vector2i(6, 1): Vector2(340, 226), Vector2i(6, 2): Vector2(468, 224),
+	Vector2i(7, 1): Vector2(600, 234), Vector2i(7, 2): Vector2(718, 228),
+	Vector2i(8, 1): Vector2(832, 232), Vector2i(8, 2): Vector2(962, 230),
+	Vector2i(9, 1): Vector2(1064, 214), Vector2i(9, 2): Vector2(1186, 216), Vector2i(9, 3): Vector2(1134, 104),
+}
 const MARKER_RADIUS: float = 8.0
 ## Number plate of a marker: its top edge below the marker centre and its height (map px).
 const PLATE_GAP: float = 12.0
@@ -68,10 +83,65 @@ var _target: Vector2 = Vector2.ZERO
 var _walk: Tween = null
 var _time: float = 0.0
 var _font: Font = UiKit.font(UiKit.Style.MONO)
+## The book whose page shows (1 = the home islands, 2 = the Far Shore).
+var _book: int = 1
+## The route, markers and plates, drawn over the page and under the heroes.
+var _marks: Control = null
+## Book II: the painting slab.
+var _slab: PaintingSlab = null
+
+
+## The stone slab of the Far Shore map (DESIGN.md A.1 / C.9), small enough for the open sea under the stops: the 30
+## paintings as the pieces of the mural they assemble (art-A's `ui/mural.png`, half size: a found painting shows its
+## piece, a missing one its empty socket), the count on a dark plate, the six rewards (`ui/unlock_icons.png`, half size,
+## lit once open) and the next one ("3 more: Mesa Rodeo arena").
+class PaintingSlab:
+	extends Control
+
+	const PAD: float = 4.0
+	## A mural piece at half size, and the mural of 6 x 5 pieces.
+	const PIECE: Vector2 = Vector2(12.0, 8.0)
+	const ICON: float = 12.0
+
+	var _mural: Texture2D = UiKit.tex(UnlocksScreen.TEX_MURAL)
+	var _icons: Texture2D = UiKit.tex(UnlocksScreen.TEX_UNLOCK_ICONS)
+	var _small: Font = UiKit.font(UiKit.Style.SMALL)
+	var _mono: Font = UiKit.font(UiKit.Style.MONO)
+
+	func _init() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var mural: Vector2 = PIECE * Vector2(UnlocksScreen.MURAL_COLUMNS, UnlocksScreen.MURAL_ROWS)
+		custom_minimum_size = Vector2(PAD * 3.0 + mural.x + 3.0 * (ICON + 2.0) + 4.0, PAD * 2.0 + mural.y + 13.0)
+
+	func _draw() -> void:
+		UnlocksScreen.draw_sand_slab(self, Rect2(Vector2.ZERO, size))
+		var origin: Vector2 = Vector2(PAD + 1.0, PAD + 1.0)
+		UnlocksScreen.draw_mural(self, Rect2(origin, PIECE * Vector2(UnlocksScreen.MURAL_COLUMNS,
+				UnlocksScreen.MURAL_ROWS)), _mural)
+		var side: float = origin.x + PIECE.x * float(UnlocksScreen.MURAL_COLUMNS) + PAD + 2.0
+		var count: String = "%d/%d" % [Save.painting_count(), Tuning.PAINTING_COUNT]
+		var plate: Rect2 = Rect2(side, origin.y, 3.0 * (ICON + 2.0) - 2.0, 12.0)
+		draw_rect(plate, Color("4a3a2a"))
+		var count_w: float = _mono.get_string_size(count, HORIZONTAL_ALIGNMENT_LEFT, -1.0, UiKit.SIZE_MONO).x
+		draw_string(_mono, Vector2(roundf(plate.get_center().x - count_w * 0.5), plate.position.y + 10.0), count,
+				HORIZONTAL_ALIGNMENT_LEFT, -1.0, UiKit.SIZE_MONO, UiKit.COL_FOCUS)
+		for i: int in UnlockTable.REWARDS.size():
+			var at: Vector2 = Vector2(side + float(i % 3) * (ICON + 2.0), plate.end.y + 3.0 + float(i / 3) * (ICON + 2.0))
+			if _icons != null:
+				draw_texture_rect_region(_icons, Rect2(at, Vector2(ICON, ICON)),
+						UnlocksScreen.reward_icon_region(i, UnlockTable.is_open(UnlockTable.REWARDS[i]["id"])))
+		var next: String = UnlocksScreen.next_text()
+		while next.length() > 4 and _small.get_string_size(next, HORIZONTAL_ALIGNMENT_LEFT, -1.0, UiKit.SIZE_SMALL).x 				> size.x - PAD * 2.0:
+			next = next.left(next.length() - 2) + "."
+		var baseline: Vector2 = Vector2(PAD + 1.0, size.y - PAD - 1.0)
+		draw_string_outline(_small, baseline, next, HORIZONTAL_ALIGNMENT_LEFT, -1.0, UiKit.SIZE_SMALL, 4,
+				Color("4a3a2a"))
+		draw_string(_small, baseline, next, HORIZONTAL_ALIGNMENT_LEFT, -1.0, UiKit.SIZE_SMALL, UiKit.COL_CREAM)
 
 
 func _build_screen() -> void:
 	_level_id = StringName(str(Flow.args.get("level_id", "")))
+	_book = clampi(int(Flow.args.get("book", maxi(Game.book, 1))), 1, Levels.BOOK_2)
 	_fill = Control.new()
 	_fill.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -79,10 +149,18 @@ func _build_screen() -> void:
 	add_child(_fill)
 	_map = Control.new()
 	_map.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_map_texture = UiKit.tex(MAP_TEXTURE)
+	if _book == Levels.BOOK_2 and ResourceLoader.exists(MAP_TEXTURE_B2):
+		_map_texture = UiKit.tex(MAP_TEXTURE_B2)
+	else:
+		_map_texture = UiKit.tex(MAP_TEXTURE)
 	_map.size = _map_texture.get_size() if _map_texture != null else Vector2(1280.0, 360.0)
 	_map.draw.connect(_draw_map)
 	add_child(_map)
+	_marks = Control.new()
+	_marks.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_marks.size = _map.size
+	_marks.draw.connect(_draw_marks)
+	_map.add_child(_marks)
 	_place_markers()
 	for slot: int in range(1, party_size()):
 		var partner: UiActor = UiActor.new(&"hero", &"idle")
@@ -118,6 +196,10 @@ func _build_screen() -> void:
 	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	column.add_child(spacer)
+	if _book == Levels.BOOK_2:
+		_slab = PaintingSlab.new()
+		_slab.size_flags_horizontal = Control.SIZE_SHRINK_END
+		column.add_child(_slab)
 	var footer: HBoxContainer = HBoxContainer.new()
 	footer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	column.add_child(footer)
@@ -197,7 +279,7 @@ func start_level() -> void:
 
 
 func _place_markers() -> void:
-	var campaign: Array[StringName] = Levels.get_campaign(Game.difficulty, maxi(Game.book, 1))
+	var campaign: Array[StringName] = Levels.get_campaign(Game.difficulty, _book)
 	if Flow.args.get("campaign") is Array:
 		campaign.clear()
 		for id: Variant in Flow.args["campaign"]:
@@ -218,9 +300,12 @@ func _place_markers() -> void:
 		_marker_ids.append(campaign[i])
 
 
-## The island place of a campaign stage (MARKERS by its world and stage), or Vector2.INF when it has none.
+## The island place of a campaign stage (MARKERS, Book II's MARKERS_B2, by its world and stage), or Vector2.INF when
+## it has none.
 static func marker_place(level_id: StringName) -> Vector2:
 	var key: Vector2i = Vector2i(int(Levels.get_value(level_id, "world", 0)), int(Levels.get_value(level_id, "stage", 0)))
+	if Levels.get_book(level_id) == Levels.BOOK_2:
+		return MARKERS_B2.get(key, Vector2.INF)
 	return MARKERS.get(key, Vector2.INF)
 
 
@@ -361,18 +446,22 @@ func _draw_fill() -> void:
 	_fill.draw_rect(Rect2(0.0, top + _map.size.y - 2.0, _fill.size.x, _fill.size.y), SEA_COLOR)
 
 
+## The page: the map picture.
 func _draw_map() -> void:
 	if _map_texture != null:
 		_map.draw_texture(_map_texture, Vector2.ZERO)
-	# Dotted route between the markers.
+
+
+## The dotted route between the markers, the markers and their number plates.
+func _draw_marks() -> void:
 	for i: int in range(1, _markers.size()):
 		var a: Vector2 = _markers[i - 1]
 		var b: Vector2 = _markers[i]
 		var steps: int = maxi(1, int(a.distance_to(b) / 9.0))
 		for s: int in range(1, steps):
 			var p: Vector2 = a.lerp(b, float(s) / float(steps)).round()
-			_map.draw_rect(Rect2(p - Vector2(2.0, 2.0), Vector2(4.0, 4.0)), UiKit.COL_INK)
-			_map.draw_rect(Rect2(p - Vector2(1.0, 1.0), Vector2(2.0, 2.0)), UiKit.COL_CREAM)
+			_marks.draw_rect(Rect2(p - Vector2(2.0, 2.0), Vector2(4.0, 4.0)), UiKit.COL_INK)
+			_marks.draw_rect(Rect2(p - Vector2(1.0, 1.0), Vector2(2.0, 2.0)), UiKit.COL_CREAM)
 	for i: int in _markers.size():
 		var level_id: StringName = _marker_ids[i]
 		var center: Vector2 = _markers[i]
@@ -382,13 +471,23 @@ func _draw_map() -> void:
 			fill_color = UiKit.COL_FOCUS
 		elif i == 0 or Save.is_level_unlocked_in(space_key, level_id) or level_id == map_stop(_level_id):
 			fill_color = UiKit.COL_CREAM
-		_map.draw_circle(center, MARKER_RADIUS + 2.0, UiKit.COL_INK)
-		_map.draw_circle(center, MARKER_RADIUS, fill_color)
-		_map.draw_circle(center + Vector2(-2.0, -3.0), 2.0, Color(1.0, 1.0, 1.0, 0.6))
+		_marks.draw_circle(center, MARKER_RADIUS + 2.0, UiKit.COL_INK)
+		_marks.draw_circle(center, MARKER_RADIUS, fill_color)
+		_marks.draw_circle(center + Vector2(-2.0, -3.0), 2.0, Color(1.0, 1.0, 1.0, 0.6))
 		var number: String = UiKit.level_number(level_id)
 		if number == "":
 			continue
 		var plate: Rect2 = number_plate(center, number)
-		_map.draw_rect(plate, Color(UiKit.COL_INK, 0.85))
-		_map.draw_string(_font, Vector2(plate.position.x + 3.0, plate.position.y + 10.0), number,
+		_marks.draw_rect(plate, Color(UiKit.COL_INK, 0.85))
+		_marks.draw_string(_font, Vector2(plate.position.x + 3.0, plate.position.y + 10.0), number,
 				HORIZONTAL_ALIGNMENT_LEFT, -1.0, UiKit.SIZE_MONO, UiKit.COL_CREAM)
+
+
+## The page that shows (1 = the home islands, 2 = the Far Shore) (tests).
+func get_book() -> int:
+	return _book
+
+
+## Book II's painting slab, else null (tests).
+func get_slab() -> PaintingSlab:
+	return _slab

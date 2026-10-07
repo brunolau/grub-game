@@ -32,9 +32,36 @@ biome = jungle
 [entities]
 """
 
+## A walled arena whose high ledge (6 rows up: out of every jump) only a geyser reaches: the geyser link.
+const GEYSER_ARENA: String = """[meta]
+format = 2
+id = test_core_bots_geyser
+kind = arena
+players = 2
+modes = last_caveman
+biome = jungle
+[legend]
+G = objects/geyser period=88
+[tiles]
+|..................|
+|..................|
+|..................|
+|..................|
+|......------......|
+|..................|
+|..................|
+|..................|
+|..................|
+|.@...G............|
+####################
+####################
+[entities]
+"""
+
 ## The tier arena's graph as JSON text, baked once for the whole file (a bake simulates thousands of hero runs; text,
 ## not the graph itself, so that nothing is left over at exit).
 static var _tier_json: String = ""
+static var _geyser_json: String = ""
 
 
 func before_each() -> void:
@@ -54,7 +81,8 @@ func after_each() -> void:
 ## The tier arena's graph, baked once for the whole file (a bake simulates thousands of hero runs).
 func _tier() -> NavGraph:
 	if _tier_json.is_empty():
-		var baked: NavGraph = NavBaker.new().bake_text(self, &"test_core_bots_tiers", TIER_ARENA)
+		var baked: NavGraph = NavBaker.new().bake_text(self, &"test_core_bots_tiers", TIER_ARENA,
+				Defs.Difficulty.BEGINNER, PackedInt32Array([NavGraph.WEIGHT_LIGHT, NavGraph.WEIGHT_HEAVIER]))
 		_tier_json = baked.to_json()
 	var json: JSON = JSON.new()
 	json.parse(_tier_json)
@@ -212,7 +240,8 @@ func test_every_baked_link_lands_from_every_x_of_its_window() -> void:
 
 func test_bake_is_deterministic() -> void:
 	var graph: NavGraph = _tier()
-	var again: NavGraph = NavBaker.new().bake_text(self, &"test_core_bots_tiers", TIER_ARENA)
+	var again: NavGraph = NavBaker.new().bake_text(self, &"test_core_bots_tiers", TIER_ARENA,
+			Defs.Difficulty.BEGINNER, PackedInt32Array([NavGraph.WEIGHT_LIGHT, NavGraph.WEIGHT_HEAVIER]))
 	assert_eq(again.to_json(), graph.to_json())
 
 
@@ -236,6 +265,181 @@ func test_sim_restores_the_game_state() -> void:
 	assert_false(GameInput.is_slot_scripted(0))
 	Game.mode = Defs.GameMode.SINGLE
 	Game.party = 1
+
+
+func test_format_1_graphs_still_load() -> void:
+	var data: Dictionary = _small_graph().to_dict()
+	data["format"] = 1
+	data.erase("weights")
+	data.erase("movers")
+	data.erase("clip")
+	for link: Dictionary in data["links"]:
+		link.erase("weight")
+	var graph: NavGraph = NavGraph.from_dict(data)
+	assert_not_null(graph)
+	assert_eq(graph.format, 1)
+	assert_eq(graph.weights, PackedInt32Array([NavGraph.WEIGHT_LIGHT]))
+	assert_eq(graph.links_from(0, NavGraph.WEIGHT_HEAVIER), PackedInt32Array([0]),
+			"an unbaked class falls back to the light links")
+	assert_eq(graph.usable_class(NavGraph.WEIGHT_HOLDER), NavGraph.WEIGHT_LIGHT)
+
+
+func test_format_2_round_trips_weights_cycles_and_movers() -> void:
+	var graph: NavGraph = _small_graph()
+	graph.weights = PackedInt32Array([0, 1, 2])
+	var key: String = NavGraph.mover_key(&"objects/platform", 3, 6)
+	var mover: int = graph.add_mover(key, "objects/platform", 3, 6, NavGraph.MOVER_PERIODIC)
+	assert_eq(graph.add_mover(key, "objects/platform", 3, 6, NavGraph.MOVER_PERIODIC), mover, "one mover per key")
+	var heavy: NavGraph.NavLink = NavGraph.NavLink.new()
+	heavy.from = 0
+	heavy.to = 1
+	heavy.x0 = 30
+	heavy.x1 = 36
+	heavy.keys = "3:RU,9:R"
+	heavy.ticks = 12
+	heavy.weight = NavGraph.WEIGHT_HEAVY
+	heavy.cycle = PackedInt32Array([88, 0, 76])
+	heavy.cond = PackedInt32Array([mover, 0, -16, 0, 2])
+	graph.add_link(heavy)
+	var json: JSON = JSON.new()
+	assert_eq(json.parse(graph.to_json()), OK)
+	var back: NavGraph = NavGraph.from_dict(json.data)
+	assert_eq(back.to_json(), graph.to_json(), "save -> load -> save is stable")
+	assert_eq(back.links[2].weight, NavGraph.WEIGHT_HEAVY)
+	assert_eq(back.links[2].cycle, PackedInt32Array([88, 0, 76]))
+	assert_eq(back.links[2].cond, PackedInt32Array([mover, 0, -16, 0, 2]))
+	assert_eq(back.links_from(0, NavGraph.WEIGHT_LIGHT), PackedInt32Array([0]), "the light class has its own links")
+	assert_eq(back.links_from(0, NavGraph.WEIGHT_HEAVY), PackedInt32Array([2]), "the heavy class its own")
+	assert_true(back.links[2].starts_on(76) and back.links[2].starts_on(164) and not back.links[2].starts_on(77))
+	assert_eq(back.link_cost_from(back.links[2], 30), NavGraph.SETTLE_TICKS + 44 + 12, "a timed link costs half a period")
+
+
+func test_weight_classes_follow_the_modes() -> void:
+	assert_eq(NavGraph.weight_classes_for({"kind": "arena", "modes": "grub_stack"}), PackedInt32Array([0, 1, 2]))
+	assert_eq(NavGraph.weight_classes_for({"kind": "arena", "modes": "hot_rock,last_caveman"}),
+			PackedInt32Array([0, 3]))
+	assert_eq(NavGraph.weight_classes_for({"kind": "arena", "modes": "clubball"}), PackedInt32Array([0]))
+	assert_eq(NavGraph.weight_classes_for({"modes": "grub_stack"}), PackedInt32Array([0]), "not an arena: light only")
+	assert_eq(NavGraph.class_walk_cap(NavGraph.WEIGHT_LIGHT), 0)
+	assert_eq(NavGraph.class_walk_cap(NavGraph.WEIGHT_HEAVY), VersusTuning.STACK_HEAVY_WALK_CAP)
+	assert_eq(NavGraph.class_walk_cap(NavGraph.WEIGHT_HEAVIER), VersusTuning.STACK_HEAVIER_WALK_CAP)
+	assert_eq(NavGraph.class_walk_cap(NavGraph.WEIGHT_HOLDER), VersusTuning.HOT_ROCK_HOLDER_WALK_CAP)
+	assert_true(NavGraph.class_jumps_short(NavGraph.WEIGHT_HEAVIER))
+	assert_false(NavGraph.class_jumps_short(NavGraph.WEIGHT_HEAVY))
+
+
+func test_heavier_class_cannot_jump_three_rows() -> void:
+	# 20+ units: impulses x3/4, apex 38 px - the 48 px bridge is out of reach; the light hero jumps it.
+	var graph: NavGraph = _tier()
+	assert_eq(graph.weights, PackedInt32Array([NavGraph.WEIGHT_LIGHT, NavGraph.WEIGHT_HEAVIER]))
+	var floor_node: int = graph.node_at(Vector2i(100, 160))
+	var bridge: int = graph.node_at(Vector2i(100, 112))
+	var up_light: bool = false
+	var up_heavy: bool = false
+	var down_heavy: bool = false
+	for link: NavGraph.NavLink in graph.links:
+		if link.from == floor_node and link.to == bridge:
+			up_light = up_light or link.weight == NavGraph.WEIGHT_LIGHT
+			up_heavy = up_heavy or link.weight == NavGraph.WEIGHT_HEAVIER
+		if link.from == bridge and link.to == floor_node and link.weight == NavGraph.WEIGHT_HEAVIER:
+			down_heavy = true
+	assert_true(up_light, "the light hero jumps onto the bridge")
+	assert_false(up_heavy, "the heavier one cannot")
+	assert_true(down_heavy, "but he drops down from it")
+	assert_eq(graph.path_cost(floor_node, 100, bridge, 100, {}, NavGraph.WEIGHT_HEAVIER), NavGraph.UNREACHABLE)
+	assert_true(graph.path_cost(floor_node, 100, bridge, 100, {}, NavGraph.WEIGHT_LIGHT) < NavGraph.UNREACHABLE)
+
+
+func test_heap_search_equals_a_brute_force_search() -> void:
+	# A random graph of 30 nodes and 120 links: every cheapest cost equals a Bellman-Ford relaxation of the same
+	# edge model, and the heap pops in (cost, id) order.
+	var rng: SimRng = SimRng.new(1234)
+	var graph: NavGraph = NavGraph.new()
+	for i: int in 30:
+		var node: NavGraph.NavNode = NavGraph.NavNode.new()
+		node.row = i
+		node.y = i * 16
+		node.x0 = 0
+		node.x1 = 300
+		graph.add_node(node)
+	for i: int in 120:
+		var link: NavGraph.NavLink = NavGraph.NavLink.new()
+		link.from = rng.next_int(30)
+		link.to = rng.next_int(30)
+		link.x0 = rng.range_int(0, 280)
+		link.x1 = link.x0 + rng.range_int(0, 20)
+		link.land_x0 = rng.range_int(0, 280)
+		link.land_x1 = link.land_x0 + rng.range_int(0, 20)
+		link.ticks = rng.range_int(5, 60)
+		link.keys = "1:"
+		graph.add_link(link)
+	for trial: int in 40:
+		var from: int = rng.next_int(30)
+		var to: int = rng.next_int(30)
+		var fx: int = rng.range_int(0, 300)
+		var tx: int = rng.range_int(0, 300)
+		assert_eq(graph.path_cost(from, fx, to, tx), _brute_cost(graph, from, fx, to, tx), "trial %d" % trial)
+	var heap: PackedInt64Array = PackedInt64Array()
+	for value: Vector2i in [Vector2i(9, 3), Vector2i(2, 7), Vector2i(9, 1), Vector2i(0, 5), Vector2i(2, 2)]:
+		NavGraph.heap_push(heap, value.x, value.y)
+	var popped: Array[Vector2i] = []
+	while not heap.is_empty():
+		var key: int = NavGraph.heap_pop(heap)
+		popped.append(Vector2i(key >> NavGraph.ID_BITS, key & NavGraph.ID_MASK))
+	assert_eq(popped, [Vector2i(0, 5), Vector2i(2, 2), Vector2i(2, 7), Vector2i(9, 1), Vector2i(9, 3)])
+
+
+func test_geyser_links_are_timed_and_verified() -> void:
+	var graph: NavGraph = _geyser_graph()
+	var ledge: int = graph.node_at(Vector2i(130, 64))
+	var floor_node: int = graph.node_at(Vector2i(130, 160))
+	assert_true(ledge >= 0 and floor_node >= 0, "both floors are nodes")
+	var found: NavGraph.NavLink = null
+	for link: NavGraph.NavLink in graph.links:
+		if link.to == ledge:
+			assert_eq(link.kind, NavGraph.KIND_GEYSER, "only the geyser reaches the 6-row ledge (link %d)" % link.id)
+			found = link
+	assert_not_null(found, "a geyser link floor -> ledge")
+	if found == null:
+		return
+	assert_eq(found.from, floor_node)
+	assert_eq(found.cycle, PackedInt32Array([88, 0, 88 - Tuning.GEYSER_SPOUT_TICKS]),
+			"it starts on the first spout tick of the level's cycle")
+	var vent_x: int = 6 * Tuning.TILE + Tuning.TILE / 2
+	assert_true(found.x0 >= vent_x - Tuning.GEYSER_VENT_W / 2 and found.x1 < vent_x + Tuning.GEYSER_VENT_W / 2,
+			"its window lies in the vent (%d..%d)" % [found.x0, found.x1])
+	var baker: NavBaker = NavBaker.new()
+	var data: LevelData = LevelData.parse(graph.level_id, GEYSER_ARENA)
+	assert_true(baker.sim.setup(self, graph.level_id, data.build_grid(0), data.resolved_meta(0), data.entity_records()))
+	var problems: PackedStringArray = baker.verify_graph(graph)
+	baker.sim.teardown()
+	assert_eq(problems.size(), 0, "; ".join(problems))
+
+
+func test_bot_rides_the_geyser_to_the_ledge() -> void:
+	var graph: NavGraph = _geyser_graph()
+	NavGraph.cache(graph)
+	var level: Level = _load_arena_text(2, &"test_core_bots_geyser", GEYSER_ARENA)
+	if level == null:
+		return
+	var bot: HeroBot = HeroBot.new(1, Defs.BotLevel.HUNTER, 5, Defs.VersusMode.LAST_CAVEMAN)
+	var steering: _Steer = _Steer.new()
+	steering.bot = bot
+	bot.brain = steering
+	bot.install()
+	GameInput.set_scripted_slot(0, func(_tick: int) -> int: return 0)
+	var hero: PlayerBase = level.get_hero(1)
+	steering.target = Vector2i(140, 64)
+	var reached: bool = false
+	for t: int in 400:
+		Sim.step(1)
+		if bot.nav.arrived(hero) and not bot.nav.is_busy():
+			reached = true
+			break
+	assert_true(reached, "the bot rode the geyser up (stands at %s)" % hero.sim_pos)
+	assert_true(bot.nav.links_landed >= 1)
+	assert_eq(bot.nav.links_failed, 0, "; ".join(bot.nav.failure_log))
+	bot.uninstall()
 
 
 # =================================================================================================================
@@ -382,6 +586,8 @@ func test_bake_tool_lists_arenas_and_verifies() -> void:
 	assert_true(levels.has(FLAT_ARENA))
 	var runner: Node = add_node(runner_script.new() as Node)
 	assert_eq(int(runner.call(&"run", PackedStringArray(["--bogus"]))), 2, "an unknown option")
+	assert_eq(int(runner.call(&"run", PackedStringArray(["--classes=7"]))), 2, "an unknown weight class")
+	assert_eq(int(runner.call(&"run", PackedStringArray(["--clip=1,2"]))), 2, "a clip needs four numbers")
 	assert_eq(int(runner.call(&"run", PackedStringArray(["--verify", "test_world_arena_flat"]))), 0,
 			"the committed flat-arena graph verifies")
 	assert_eq(int(runner.call(&"run", PackedStringArray(["--verify", "test_core_bots_no_such_level"]))), 1)
@@ -403,6 +609,62 @@ func test_bot_match_replays_tick_for_tick() -> void:
 # =================================================================================================================
 # Helpers
 # =================================================================================================================
+
+## Cheapest cost by relaxing every link until nothing changes (the reference for the heap search).
+func _brute_cost(graph: NavGraph, from: int, fx: int, to: int, tx: int) -> int:
+	var best: int = NavGraph.walk_ticks(tx - fx) if from == to else NavGraph.UNREACHABLE
+	var dist: PackedInt32Array = PackedInt32Array()
+	dist.resize(graph.links.size())
+	dist.fill(NavGraph.UNREACHABLE)
+	for id: int in graph.links_from(from):
+		dist[id] = graph.link_cost_from(graph.links[id], fx)
+	var changed: bool = true
+	while changed:
+		changed = false
+		for link: NavGraph.NavLink in graph.links:
+			if dist[link.id] >= NavGraph.UNREACHABLE:
+				continue
+			for next: int in graph.links_from(link.to):
+				var cost: int = dist[link.id] + graph.link_cost_from(graph.links[next], link.land_center())
+				if cost < dist[next]:
+					dist[next] = cost
+					changed = true
+	for link: NavGraph.NavLink in graph.links:
+		if link.to == to and dist[link.id] < NavGraph.UNREACHABLE:
+			best = mini(best, dist[link.id] + NavGraph.walk_ticks(tx - link.land_center()))
+	return best
+
+
+## The geyser arena's graph, baked once for the whole file.
+func _geyser_graph() -> NavGraph:
+	if _geyser_json.is_empty():
+		var baked: NavGraph = NavBaker.new().bake_text(self, &"test_core_bots_geyser", GEYSER_ARENA)
+		_geyser_json = baked.to_json()
+	var json: JSON = JSON.new()
+	json.parse(_geyser_json)
+	return NavGraph.from_dict(json.data)
+
+
+## An arena given as text through the real level loader as a versus round of `party` heroes; null (the test passes
+## with a note) while the referee does not compile.
+func _load_arena_text(party: int, level_id: StringName, text: String) -> Level:
+	var referee_script: Script = load("res://scripts/world/versus/referee.gd") as Script
+	if referee_script == null or not referee_script.can_instantiate():
+		assert_true(true, "the referee does not compile right now (world-B)")
+		return null
+	Sim.manual = true
+	Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.VERSUS, party, 1)
+	Game.begin_level(level_id)
+	var level: Level = (load(LEVEL_SCENE) as PackedScene).instantiate() as Level
+	level.setup_from_text(level_id, text)
+	add_node(level)
+	level.set_view_size(Vector2i(640, 360))
+	Sim.start(1)
+	var referee: Object = BotSenses.referee(level)
+	if referee != null and referee.has_method(&"start_round_now"):
+		referee.call(&"start_round_now")
+	return level
+
 
 ## A brain that only walks to `target` (the walk test gives the goals by hand).
 class _Steer:

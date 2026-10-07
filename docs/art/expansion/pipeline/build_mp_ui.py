@@ -74,46 +74,60 @@ def build_belt():
 
 
 # ---------------------------------------------------------------------------------------------------- tags + arrows
+ALL_COLOURS = ("yellow", "blue", "pink", "green", "white", "gold")       # UiPlayers.PALETTE_COLOURS order
+
+
+def tag_cell(palettes, k, cname):
+    ramp = ui_ramp(palettes[cname])
+    f = canvas(32, 48)
+    tag = canvas(40, 20)
+    font_text(tag, "P%d" % (k + 1), 0, 0)
+    tag = trim(tag)
+    f.alpha_composite(tag, ((32 - tag.width) // 2, 0))
+    arrow = trim(colour_arrow(2, ramp))
+    f.alpha_composite(arrow, ((32 - arrow.width) // 2, 48 - arrow.height))
+    return f
+
+
 def build_tags(palettes):
-    """ui/player_tags.png: 'P1'..'P4' (shipped HUD font, white) over a down arrow in the slot colour"""
-    frames = []
-    for k, cname in enumerate(SLOT_COLOURS):
-        ramp = ui_ramp(palettes[cname])
-        f = canvas(32, 48)
-        tag = canvas(40, 20)
-        font_text(tag, "P%d" % (k + 1), 0, 0)
-        tag = trim(tag)
-        f.alpha_composite(tag, ((32 - tag.width) // 2, 0))
-        arrow = trim(colour_arrow(2, ramp))
-        f.alpha_composite(arrow, ((32 - arrow.width) // 2, 48 - arrow.height))
-        frames.append(f)
-    s = strip(frames)
-    save(s, "ui/player_tags.png", kind="ui", frame=[32, 48], grid=[4, 1], pivot=[16, 48],
+    """ui/player_tags.png: 'P1'..'P4' (shipped HUD font, white) over a down arrow in the slot colour (row 0, the
+    1.0-phase layout), then one row per hero colour with all four tags in it (a lobby choice / arena swap)"""
+    frames = [tag_cell(palettes, k, c) for k, c in enumerate(SLOT_COLOURS)]
+    for c in ALL_COLOURS:
+        frames += [tag_cell(palettes, k, c) for k in range(4)]
+    s = strip(frames, cols=4)
+    save(s, "ui/player_tags.png", kind="ui", frame=[32, 48], grid=[4, 1 + len(ALL_COLOURS)], pivot=[16, 48],
+         rows=["slot defaults"] + list(ALL_COLOURS),
          source="shipped fonts/font_hud.png + ui/icons.png cell 2 (arrow_down)",
-         edits="'P1'..'P4' in the HUD font over the arrow recoloured to the slot's loincloth ramp (fill = cloth, "
+         edits="'P1'..'P4' in the HUD font over the arrow recoloured to a colour's loincloth ramp (fill = cloth, "
                "light = the lighter of cloth / ink, shade = cloth shadow, outline #272018)",
          note="P1-P4 tag + colour arrow over a hero (D.1: at stage start and whenever heroes overlap; E.9 versus round "
-              "start). Pivot = arrow tip: place it about 4 art px over the hero's head. Cells 0-3 = P1 yellow, P2 "
-              "blue, P3 pink, P4 green (the slot defaults; a lobby colour choice re-tints with "
-              "palettes/hero_palettes.json ui_colours)", section="ui")
+              "start). Pivot = arrow tip: place it about 4 art px over the hero's head. Row 0 (cells 0-3) = P1 "
+              "yellow, P2 blue, P3 pink, P4 green (the slot defaults, as in phase 1); rows 1-6 = the tags in each "
+              "hero colour (UiPlayers.PALETTE_COLOURS order: yellow, blue, pink, green, white, gold): the tag of "
+              "slot k wearing colour c is cell (1 + c) * 4 + k - use it when a player picked another colour in the "
+              "lobby or wears white on a green arena", section="ui")
     return s
 
 
 def build_edge_arrows(palettes):
-    """ui/player_arrows.png: per slot (rows) an arrow left / right / up / down for a hero off the view (D.2)"""
+    """ui/player_arrows.png: per hero colour (rows) an arrow left / right / up / down for a hero off the view (D.2);
+    rows 0-3 are the slot defaults P1-P4 (= the colours yellow, blue, pink, green), rows 4-5 white and gold"""
     order = [3, 1, 0, 2]                                           # icons.png: 0 up, 1 right, 2 down, 3 left
     frames = []
-    for cname in SLOT_COLOURS:
+    for cname in ALL_COLOURS:
         ramp = ui_ramp(palettes[cname])
         for i in order:
             frames.append(colour_arrow(i, ramp))
     s = strip(frames, cols=4)
-    save(s, "ui/player_arrows.png", kind="ui", frame=[32, 32], grid=[4, 4], pivot=[16, 16],
+    save(s, "ui/player_arrows.png", kind="ui", frame=[32, 32], grid=[4, len(ALL_COLOURS)], pivot=[16, 16],
+         rows=list(ALL_COLOURS),
          source="shipped ui/icons.png cells 0-3 (arrows)",
-         edits="recoloured per slot like player_tags.png; outline -> #272018",
-         note="edge arrows for a hero outside the view (D.2) and hit-direction cues: row = slot (P1-P4), column = "
-              "left, right, up, down (cell = row * 4 + column). Show the stone countdown (countdown_stones.png) "
-              "next to it", section="ui")
+         edits="recoloured per hero colour like player_tags.png; outline -> #272018",
+         note="edge arrows for a hero outside the view (D.2) and hit-direction cues: row = hero colour in "
+              "UiPlayers.PALETTE_COLOURS order (0 yellow = P1's default, 1 blue = P2, 2 pink = P3, 3 green = P4, 4 "
+              "white, 5 gold), column = left, right, up, down (cell = row * 4 + column; rows 0-3 are the phase-1 "
+              "slot rows unchanged). Show the stone countdown (countdown_stones.png) next to it", section="ui")
     return s
 
 

@@ -4,8 +4,12 @@ The War Over A Melon Field - Themes and Jingles
 Author: Spring Spring (Julie Damsgaard)
 Source: https://opengameart.org/content/the-war-over-a-melon-field-themes-and-jingles
 Licence: CC0 1.0 (tier A)
-Used in Club & Grub for: 2.0 (The Far Shore): audio/music/versus_lobby_a.ogg, audio/music/versus_results_a.ogg. Per-file sources and edits: docs/ASSET_MANIFEST.md section 17
+Used in Club & Grub for: 2.0 (The Far Shore): audio/music/ending_raft_a.ogg, audio/music/level_coast_a.ogg, audio/music/versus_lobby_a.ogg, audio/music/versus_results_a.ogg. Per-file sources and edits: docs/ASSET_MANIFEST.md section 17
 Staging folder: .tools/asset_candidates/audio/spring-spring_chiptunes
+Page: The War Over A Melon Field - Themes and Jingles - https://opengameart.org/content/the-war-over-a-melon-field-themes-and-jingles
+Page: Sandy Seaside - https://opengameart.org/content/sandy-seaside-2
+Page: Tropical Fantasy - https://opengameart.org/content/tropical-fantasy
+Note: the page's copyright notice: 'Composer: Spring, Bicycle horn sound by AntumDeluge' (inside the CC0 release)
 
 ---- Licence evidence recorded when the pack was downloaded ----
 

@@ -11,9 +11,13 @@ extends Control
 ## 2.0 (DESIGN.md C.1 / D.11 / E.9, GAMEPLAY.md 13.9.9): the belt icon right of P1's hearts shows what a Swap brings
 ## while he owns a special (never in Book I solo, whose belt stays empty, so the 1.0 HUD is unchanged there). In
 ## co-op P1's hearts get a "P1" tag and P2's panel ([HudPlayerPanel]: tag, hearts, bone fraction, belt icon) sits
-## mirrored top-right under the letters; tribe lives, score and letters stay where they are. In a party a hero off
-## the view gets an edge arrow with the stone countdown of the leash ([HudEdgeArrows]). In versus the campaign rows
-## give way to the corner panels, the sundial and the round banners of [HudVersus].
+## mirrored top-right under the letters; tribe lives, score and letters stay where they are. With the "Rival score"
+## option (DESIGN.md D.11, Options > Co-op) the score counter shows P1's own score in his colour and P2's panel shows
+## his under his hearts (PlayerRun.score: the share each hero earned). In a party a hero off the view gets an edge
+## arrow with the stone countdown of the leash ([HudEdgeArrows]). In versus the campaign rows give way to the corner
+## panels, the sundial and the round banners of [HudVersus]. World text that must not sit under a party panel (sign
+## boards) asks [method clear_of_panels]. A Cave Painting that opens a reward (Save.reward_unlocked) shows a notice
+## under the HUD row for a few seconds ("Unlocked: Mesa Rodeo arena"), below the hint panel while one shows.
 ##
 ## Owner: ui-B. Instantiated by Flow into the HUD CanvasLayer. It reacts to `Game` and `Events` signals; of the level it
 ## reads only the heroes' documented HUD fields (position, leash; ARCHITECTURE.md 3.12) and the versus numbers the
@@ -61,6 +65,11 @@ const BELT_GAP: float = 6.0
 const P2_TOP: float = 46.0
 const P1_TAG_W: float = 32.0
 const PARTY_GAP: float = 6.0
+## Least gap (art px) that [method clear_of_panels] keeps between a party panel and world text.
+const PANEL_CLEAR_GAP: float = 4.0
+## The reward notice: how long it stays (seconds, fades included) and its icon (ui/icons.png: the fruit).
+const REWARD_SECONDS: float = 3.5
+const REWARD_ICON: int = UiKit.ICON_FRUIT
 
 ## Hearts drawn (mirrors Game.hearts).
 var shown_hearts: int = 0
@@ -108,6 +117,13 @@ var hud_layout: int = Defs.GameMode.SINGLE
 var shown_belt: int = PlayerRun.BELT_EMPTY
 ## Alpha of P2's co-op panel (it fades like the row while a hero is behind it).
 var p2_alpha: float = 1.0
+## True while the score counter and P2's panel show the two players' own scores (co-op with the Rival score option).
+var rival_score: bool = false
+## Text of the reward notice on screen ("" = none).
+var reward_text: String = ""
+var _reward_holder: CenterContainer = null
+var _reward_label: Label = null
+var _reward_left: float = 0.0
 var _hearts_row: Control = null
 var _p1_belt: TextureRect = null
 var _p1_tag: Label = null
@@ -145,6 +161,7 @@ func _ready() -> void:
 		_campaign_nodes.append(child as CanvasItem)
 	_build_boss_bar(area)
 	_build_hint(area)
+	_build_reward(area)
 	_build_party(area)
 	_apply_margins()
 	get_viewport().size_changed.connect(_apply_margins)
@@ -162,6 +179,8 @@ func _ready() -> void:
 	Events.level_respawned.connect(_on_level_respawned)
 	Events.time_left_changed.connect(_on_time_left_changed)
 	Events.message_requested.connect(_on_message_requested)
+	Settings.changed.connect(_on_setting_changed)
+	Save.reward_unlocked.connect(show_reward)
 	refresh()
 	# The level armed its time limit before this overlay existed: show the current value.
 	_on_time_left_changed(Game.level.get_time_left_seconds() if Game.level != null else -1)
@@ -171,6 +190,7 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_fade_hint(delta)
+	_fade_reward(delta)
 	_fade_row(delta)
 	_fade_boss_bar(delta)
 	if _blink_left <= 0.0:
@@ -254,8 +274,16 @@ func get_boss_bar() -> HudBossBar:
 
 ## True when a screen y (viewport px) lies within the HUD row.
 func is_under_row(screen_y: float) -> bool:
+	return screen_y < get_row_bottom()
+
+
+## Viewport y of the HUD row's bottom edge (the safe area included): world text that must not sit under the row of
+## lives, hearts and letters (a sign board) keeps below it. In versus the row of corner panels and the sundial.
+func get_row_bottom() -> float:
+	if _versus != null and is_instance_valid(_versus):
+		return _versus.get_sundial().rect.end.y
 	var top: float = _row_area.get_global_rect().position.y if _row_area != null else 0.0
-	return screen_y < top + ROW_HEIGHT
+	return top + ROW_HEIGHT
 
 
 ## Show everything as it is in `Game` now.
@@ -455,7 +483,7 @@ func _build_boss_bar(area: Control) -> void:
 func _boss_drop() -> float:
 	var drop: float = 0.0
 	if _p2_panel != null and _p2_panel.visible:
-		drop = maxf(0.0, P2_TOP + HudPlayerPanel.PANEL_H + PARTY_GAP - HINT_TOP)
+		drop = maxf(0.0, P2_TOP + _p2_panel.panel_height() + PARTY_GAP - HINT_TOP)
 	if _boss_bar == null or not _boss_bar.visible:
 		return drop
 	return maxf(drop, BOSS_TOP + HudBossBar.FRAME_SIZE.y + BOSS_GAP - HINT_TOP)
@@ -496,6 +524,10 @@ func _apply_layout_mode() -> void:
 		_p2_panel.refresh()
 	_edge_arrows.visible = coop or versus
 	_edge_arrows.set_process(coop or versus)
+	rival_score = coop and Settings.get_bool(OptionsPanel.KEY_RIVAL_SCORE)
+	_p2_panel.show_score(rival_score)
+	_p2_panel.offset_bottom = P2_TOP + _p2_panel.panel_height()
+	_on_score_changed(Game.score)
 	for node: CanvasItem in _campaign_nodes:
 		node.visible = not versus
 	if versus and _versus == null:
@@ -517,6 +549,60 @@ func is_belt_visible() -> bool:
 ## P2's co-op panel (shown in co-op only).
 func get_p2_panel() -> HudPlayerPanel:
 	return _p2_panel
+
+
+## Screen rectangle (viewport px) of the HUD panel of player slot `slot` while it shows: P2's co-op panel, or a versus
+## corner panel; an empty Rect2 when that slot has none (P1's hearts are part of the HUD row, which ends at
+## [constant ROW_HEIGHT]). Presentation in the world that must stay clear of a panel - a sign board (objects-A) - asks
+## here instead of reading the HUD's nodes.
+func get_party_panel_rect(slot: int) -> Rect2:
+	if _versus != null and is_instance_valid(_versus):
+		return _versus.get_panel_rect(slot)
+	if slot == 1 and _p2_panel != null and _p2_panel.is_visible_in_tree():
+		return _p2_panel.get_global_rect()
+	return Rect2()
+
+
+## The screen rectangles of every party panel that shows now (see [method get_party_panel_rect]).
+func get_party_panel_rects() -> Array[Rect2]:
+	var result: Array[Rect2] = []
+	for slot: int in Defs.MAX_PLAYERS:
+		var rect: Rect2 = get_party_panel_rect(slot)
+		if rect.has_area():
+			result.append(rect)
+	return result
+
+
+## `rect` (viewport px: a sign board with its tail, any world text that must stay readable) moved the shortest way
+## clear of every party panel that shows, by at least `gap` px, and kept inside the view; the same rect when it covers
+## none. A board that would sit over P2's co-op panel slides below it (or beside it, when that is the shorter way).
+func clear_of_panels(rect: Rect2, gap: float = PANEL_CLEAR_GAP) -> Rect2:
+	return clear_of(rect, get_party_panel_rects(), get_viewport_rect(), gap)
+
+
+## [method clear_of_panels] for any list of panels and view (tests, previews).
+static func clear_of(rect: Rect2, panels: Array[Rect2], view: Rect2, gap: float) -> Rect2:
+	var result: Rect2 = rect
+	# A move off one panel may land on another: a few passes settle it (four corner panels at most).
+	for _pass: int in panels.size() + 1:
+		var moved: bool = false
+		for panel: Rect2 in panels:
+			var keep: Rect2 = panel.grow(gap)
+			if not result.intersects(keep):
+				continue
+			var best: Vector2 = Vector2.INF
+			var fallback: Vector2 = Vector2.INF
+			for shift: Vector2 in [Vector2(0.0, keep.end.y - result.position.y), Vector2(0.0, keep.position.y - result.end.y),
+					Vector2(keep.position.x - result.end.x, 0.0), Vector2(keep.end.x - result.position.x, 0.0)]:
+				if shift.length() < fallback.length():
+					fallback = shift
+				if view.encloses(Rect2(result.position + shift, result.size)) and shift.length() < best.length():
+					best = shift
+			result.position += best if best.is_finite() else fallback
+			moved = true
+		if not moved:
+			break
+	return result
 
 
 ## The edge arrows of a party.
@@ -585,6 +671,72 @@ func _build_hint(area: Control) -> void:
 	area.add_child(_hint_holder)
 
 
+## The reward notice: the fruit icon and "Unlocked: ..." in the focus colour on the hint panel's plate.
+func _build_reward(area: Control) -> void:
+	_reward_holder = CenterContainer.new()
+	_reward_holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_reward_holder.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	_reward_holder.visible = false
+	var panel: PanelContainer = PanelContainer.new()
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_theme_stylebox_override(&"panel", _text_plate(COL_HINT_BACK))
+	var row: HBoxContainer = HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_constant_override(&"separation", HINT_ICON_GAP)
+	var icon: TextureRect = UiKit.picture(UiKit.icon(REWARD_ICON))
+	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(icon)
+	_reward_label = UiKit.label("", UiKit.Style.HUD, HORIZONTAL_ALIGNMENT_CENTER)
+	_reward_label.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+	_reward_label.add_theme_color_override(&"font_color", UiKit.COL_FOCUS)
+	_reward_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(_reward_label)
+	panel.add_child(row)
+	_reward_holder.add_child(panel)
+	area.add_child(_reward_holder)
+
+
+## Show the notice of reward `reward` (UnlockTable.REWARDS id): "Unlocked: <its text>" for REWARD_SECONDS.
+func show_reward(reward: StringName) -> void:
+	var entry: Dictionary = UnlockTable.reward(reward)
+	var what: String = tr(str(entry.get("text", ""))) if not entry.is_empty() else String(reward)
+	reward_text = tr("UI_HUD_REWARD").format({"reward": what})
+	_reward_label.text = reward_text
+	_reward_left = REWARD_SECONDS
+	_reward_holder.visible = true
+	_reward_holder.modulate.a = 0.0
+	_place_reward()
+	Audio.play_sfx(Sfx.CODE_ACCEPT)
+
+
+## True while the reward notice is on screen.
+func is_reward_visible() -> bool:
+	return _reward_holder != null and _reward_holder.visible
+
+
+## Fade the reward notice in, hold it, fade it out.
+func _fade_reward(delta: float) -> void:
+	if not is_reward_visible():
+		return
+	_reward_left -= delta
+	if _reward_left <= 0.0:
+		_reward_holder.visible = false
+		reward_text = ""
+		return
+	var fade: float = HINT_FADE_SECONDS
+	_reward_holder.modulate.a = clampf(minf(_reward_left, REWARD_SECONDS - _reward_left) / fade, 0.0, 1.0)
+	_place_reward()
+
+
+## Under the HUD row (and the boss bar / P2's panel like the hint), below the hint panel while one shows.
+func _place_reward() -> void:
+	var top: float = HINT_TOP + _boss_drop()
+	if _hint_holder != null and _hint_holder.visible and _hint_holder.get_child_count() > 0:
+		top += (_hint_holder.get_child(0) as Control).size.y + BOSS_GAP
+	_reward_holder.offset_top = top
+	_reward_holder.offset_bottom = top
+
+
 ## The ink plate with a thin cream edge of the HUD's text panels (the level banner and the hint panel).
 func _text_plate(color: Color) -> StyleBoxFlat:
 	var plate: StyleBoxFlat = UiKit.plate(color, HINT_PAD_Y)
@@ -651,7 +803,21 @@ func _apply_margins() -> void:
 
 
 func _on_score_changed(score: int) -> void:
+	if rival_score:
+		# Rival score: P1's own share, in his colour; P2's share in his panel (collectibles credit PlayerRun.score
+		# before Game.add_score emits this signal).
+		_score_label.text = UiKit.score_text(Game.runs[0].score)
+		_score_label.add_theme_color_override(&"font_color", UiPlayers.text_colour(0))
+		if _p2_panel != null:
+			_p2_panel.set_score(Game.runs[1].score)
+		return
 	_score_label.text = UiKit.score_text(score)
+	_score_label.remove_theme_color_override(&"font_color")
+
+
+func _on_setting_changed(key: String, _value: Variant) -> void:
+	if key == OptionsPanel.KEY_RIVAL_SCORE:
+		_apply_layout_mode()
 
 
 func _on_lives_changed(lives: int) -> void:

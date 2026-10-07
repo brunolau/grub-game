@@ -197,3 +197,26 @@ func test_effects_do_not_touch_the_gameplay_random_sequence() -> void:
 	spawn(&"fx/dust", Vector2i(100, 100))
 	Sim.step(5)
 	assert_eq(Sim.rng.next_u32(), expected)
+
+
+## 2.0 versus (DESIGN.md E.9): `fx/hit_stars row=<n>` plays the hit stars in a player's colour (row n of
+## sprites/fx/hit_stars_players.png); without `row` it is the 1.0 sheet.
+func test_hit_stars_in_a_player_colour() -> void:
+	var plain: FxAnim = spawn(&"fx/hit_stars", Vector2i(100, 160)) as FxAnim
+	var plain_sprite: Sprite2D = plain.get_node("Sprite") as Sprite2D
+	assert_eq(plain_sprite.texture.resource_path, "res://assets/sprites/fx/hit_stars.png", "1.0: the plain sheet")
+	assert_eq([plain_sprite.hframes, plain_sprite.vframes, plain_sprite.frame], [6, 1, 0])
+	var blue: FxAnim = spawn(&"fx/hit_stars", Vector2i(200, 160), {"row": 1}) as FxAnim
+	var sprite: Sprite2D = blue.get_node("Sprite") as Sprite2D
+	assert_eq(sprite.texture.resource_path, "res://assets/sprites/fx/hit_stars_players.png")
+	assert_eq([sprite.hframes, sprite.vframes], [6, 6])
+	assert_eq(sprite.frame, 6, "row 1, frame 0")
+	assert_eq(sprite.offset, plain_sprite.offset, "the same pivot")
+	var frames: Dictionary = {}
+	for i: int in 6:
+		Sim.step(1)
+		if is_instance_valid(blue):
+			frames[sprite.frame] = true
+	for frame: int in frames:
+		assert_true(frame >= 6 and frame < 12, "every frame from row 1 (%d)" % frame)
+	assert_true(frames.size() >= 2, "it plays")

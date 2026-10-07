@@ -31,6 +31,18 @@ extends SimEntity
 ## - A level reset (death, team wipe) and the stage start put the mount in its pen (its spawn point when it has none),
 ##   tame if it ever was; a wild rex never tamed stays wild where the level placed it. It dozes only unridden, still
 ##   and tame at home.
+## - **Arena (Mesa Rodeo**, DESIGN.md E.5, GAMEPLAY.md 13.10.9; a `kind = arena` level): Chomper starts **penned** -
+##   standing in his pen, nobody can sit on him. He leaves it on every VersusTuning.RODEO_CHOMPER_PERIOD_TICKS of the
+##   round clock (the referee's `round_ticks` when the level's party driver has it, else his own tick count), after a
+##   RODEO_RUMBLE_TICKS rumble (his picture shakes, the quake cue; [method is_rumbling]; no screen shake, which would
+##   nudge the heroes) and a growl as he comes out; free, he waits at his pen for a
+##   rider. His rider's bite also bites rival heroes (no teammate): the referee's `bite_hit(driver, victim, mount)`
+##   when it has one, else the versus knock-back (Defs.HurtKind.RIVAL, the run's energy untouched) and, in Grub Stack,
+##   the referee's `spill(victim, RODEO_BITE_SPILL, true)`. A rival landing on the rider's head (the stomp test, the
+##   rider neither immune nor shielded) **unseats** him: he is thrown off (xvel +/-64 away, yvel -128, no stun) and
+##   Chomper stays out for the next rider; the referee's own stomp rules apply to the stomp as usual (without a referee
+##   the stomper bounces here). A hit on a rider (rider_hit) makes him bolt as everywhere; back home he is penned
+##   again until the next release. In an arena he never dozes.
 ##
 ## Owner: objects-B (docs/expansion/PLAN.md 4.1). The rider's side (no own handler for the driver, the gunner's strikes
 ## and swap, routing a rider's hurt to [method rider_hit]) is player-B's HeroMount (scripts/player/hero_mount.gd).
@@ -102,6 +114,19 @@ var tame_count: int = 0
 ## Enemies eaten / bitten (statistics, tests).
 var eaten: int = 0
 var bites_landed: int = 0
+## Arena (Mesa Rodeo): true in a `kind = arena` level; [member penned] while he waits shut in his pen.
+var arena: bool = false
+var penned: bool = false
+## Arena: rival heroes bitten, riders unseated by a stomp (statistics, tests).
+var bites_on_rivals: int = 0
+var stomp_unseats: int = 0
+
+## Arena: his own clock (ticks since the level started; used without a referee), the round clock of the last release
+## and of the last rumble cue, and the rumble of this tick.
+var _pen_ticks: int = 0
+var _release_clock: int = -1
+var _rumble_clock: int = -1
+var _rumbling: bool = false
 
 var _tamer: PlayerBase = null
 var _home: Vector2i = Vector2i.ZERO
@@ -127,7 +152,16 @@ func _ready() -> void:
 	_sprite = get_node_or_null(^"Sprite") as Sprite2D
 	_saddle = get_node_or_null(^"Saddle") as Sprite2D
 	_resolve_home()
+	arena = Mount.is_arena_level(Game.level)
+	penned = arena and tame
+	if penned:
+		teleport(_home)  # a round starts with Chomper shut in his pen
 	_refresh_visual()
+
+
+## True for a versus arena (`kind = arena`): Chomper keeps the pen timer of Mesa Rodeo there.
+static func is_arena_level(level: LevelBase) -> bool:
+	return level != null and str(level.meta.get("kind", "")) == LevelText.KIND_ARENA
 
 
 func _sim_phases() -> PackedInt32Array:
@@ -171,6 +205,46 @@ func is_remount_locked(hero: PlayerBase) -> bool:
 	return Sim.total_ticks < _remount_until[hero.slot]
 
 
+## Arena: true while he waits shut in his pen (nobody can sit on him).
+func is_penned() -> bool:
+	return penned
+
+
+## Arena: true during the RODEO_RUMBLE_TICKS before he leaves his pen (the telegraph).
+func is_rumbling() -> bool:
+	return _rumbling
+
+
+## Arena: ticks of the round clock until he leaves his pen (0 = free now; -1 outside an arena or while he is away).
+func ticks_to_release(level: LevelBase = Game.level) -> int:
+	if not arena or not present:
+		return -1
+	if not penned:
+		return 0
+	var period: int = VersusTuning.RODEO_CHOMPER_PERIOD_TICKS
+	return period - posmod(arena_clock(level), period)
+
+
+## Arena: the round clock of the pen: the referee's `round_ticks` (the level's party driver) when it has one, else
+## his own count of ticks since the level started.
+func arena_clock(level: LevelBase) -> int:
+	var referee: SimEntity = level.party_driver if level != null else null
+	if referee != null and &"round_ticks" in referee:
+		return int(referee.get(&"round_ticks"))
+	return _pen_ticks
+
+
+## Arena: out of the pen now (the referee may call it too).
+func release() -> void:
+	if not penned:
+		return
+	penned = false
+	_rumbling = false
+	_doze_wake_now()
+	ObjTuning.play_cue(Sfx.CHOMPER_BITE, Sfx.FEAST_CHOMP)
+	_refresh_visual()
+
+
 # --- Calls ------------------------------------------------------------------------------------------------------------
 
 ## A seated rider was hurt (HeroMount.on_hurt, PHYSICS.md C.9): every rider is thrown off away from `source`
@@ -207,9 +281,9 @@ func bolt() -> void:
 	set_box(BOX)
 
 
-## Seat `hero` (driver when free, else gunner when `allow_gunner`). False when no seat is free.
+## Seat `hero` (driver when free, else gunner when `allow_gunner`). False when no seat is free (or he is penned).
 func seat(hero: PlayerBase, allow_gunner: bool = true) -> bool:
-	if hero == null or hero.is_mounted():
+	if hero == null or hero.is_mounted() or penned:
 		return false
 	var seat_kind: int = PlayerBase.SEAT_DRIVER
 	if driver == null:
@@ -267,10 +341,16 @@ func _sim_tick(phase: int) -> void:
 
 
 func _update(level: LevelBase) -> void:
+	if arena:
+		_pen_step(level)
 	if not present:
 		bolt_left -= 1
 		if bolt_left <= 0:
 			_return_home()
+		return
+	if penned:
+		_anim_age += 1
+		_refresh_visual()
 		return
 	_check_seats()
 	_dismounts()
@@ -292,6 +372,24 @@ func _update(level: LevelBase) -> void:
 	_make_bite_box()
 	_anim_age += 1
 	_refresh_visual()
+
+
+## Arena: the pen clock - the rumble over the last RODEO_RUMBLE_TICKS of every period, the release on each multiple of
+## RODEO_CHOMPER_PERIOD_TICKS (once per clock value; only while he waits penned at home).
+func _pen_step(level: LevelBase) -> void:
+	_pen_ticks += 1
+	var clock: int = arena_clock(level)
+	var period: int = VersusTuning.RODEO_CHOMPER_PERIOD_TICKS
+	var into: int = posmod(clock, period)
+	var waiting: bool = penned and present and clock > 0
+	var was_rumbling: bool = _rumbling
+	_rumbling = waiting and into >= period - VersusTuning.RODEO_RUMBLE_TICKS
+	if _rumbling and not was_rumbling and clock != _rumble_clock:
+		_rumble_clock = clock
+		ObjTuning.play_cue(Sfx.QUAKE)
+	if waiting and into == 0 and clock != _release_clock:
+		_release_clock = clock
+		release()
 
 
 ## Seats whose hero left on his own (respawn, egg, death) are freed.
@@ -358,6 +456,14 @@ func _bite_pass(level: LevelBase) -> void:
 			_bite_spent = true
 			bites_landed += 1
 			return
+	if arena:
+		# Mesa Rodeo: the bite bites rival heroes (no teammate, not his own riders).
+		for hero: PlayerBase in level.contact_order():
+			if hero == driver or hero.mount == self or hero.dead or hero.is_down() or _teammates(level, driver, hero):
+				continue
+			if Overlap.weapon(box, box.size.x / 2, hero) and _bite_rival(level, hero):
+				_bite_spent = true
+				return
 	var origin: Vector2i = Vector2i(box.position.x + box.size.x / 2, box.end.y)
 	var hittables: Array[SimEntity] = level.get_kind(Defs.Kind.HITTABLE)
 	for i: int in hittables.size():
@@ -366,6 +472,49 @@ func _bite_pass(level: LevelBase) -> void:
 			_bite_spent = true
 			bites_landed += 1
 			return
+
+
+## Arena: the bite on a rival hero. The referee's `bite_hit(driver, victim, mount) -> bool` when the level's party
+## driver has it (its currency and knock-back rules); else the versus knock-back (Defs.HurtKind.RIVAL; the run's
+## hearts, bones and glider are put back: the currency is the referee's) and, in Grub Stack, the referee's
+## `spill(victim, RODEO_BITE_SPILL, true)`. False when the bite did not land (immune, shielded).
+func _bite_rival(level: LevelBase, victim: PlayerBase) -> bool:
+	var referee: SimEntity = level.party_driver
+	if referee != null and referee.has_method(&"bite_hit"):
+		if not bool(referee.call(&"bite_hit", driver, victim, self)):
+			return false
+		bites_on_rivals += 1
+		return true
+	if victim.is_immune() or victim.shield > 0:
+		return false
+	var run: PlayerRun = victim.run
+	var hearts: int = run.hearts
+	var bones: int = run.bones
+	var glider: bool = run.has_glider
+	if run.hearts < 2:
+		run.hearts = 2  # the 1.0 hurt path must never kill: the bite's currency is the referee's
+	var applied: bool = victim.hurt(self, Defs.HurtKind.RIVAL)
+	run.hearts = hearts
+	run.bones = bones
+	if run.has_glider != glider:
+		run.set_glider(glider)
+	run.emit_energy()
+	if not applied:
+		return false
+	if referee != null and referee.has_method(&"spill") and &"mode" in referee \
+			and int(referee.get(&"mode")) == Defs.VersusMode.GRUB_STACK:
+		referee.call(&"spill", victim, VersusTuning.RODEO_BITE_SPILL, true)
+	bites_on_rivals += 1
+	return true
+
+
+## Arena: true when `a` and `b` play in the same 2v2 team (the referee's team_of; free for all without one).
+static func _teammates(level: LevelBase, a: PlayerBase, b: PlayerBase) -> bool:
+	var referee: SimEntity = level.party_driver if level != null else null
+	if a == null or b == null or referee == null or not referee.has_method(&"team_of"):
+		return false
+	var team: int = int(referee.call(&"team_of", a.slot))
+	return team >= 0 and team == int(referee.call(&"team_of", b.slot))
 
 
 func _eat(level: LevelBase, enemy: EnemyBase) -> void:
@@ -519,15 +668,46 @@ func _hold_in_saddle(hero: PlayerBase) -> void:
 
 ## CONTACT_ENEMIES: seating, a wild rex's bounces and hurts, enemies against the ridden box.
 func _contacts(level: LevelBase) -> void:
-	if not present:
+	if not present or penned:
 		return
 	if wild and not tame:
 		_wild_contacts(level)
 		return
 	if driver == null or gunner == null:
 		_seating(level)
+	if arena and driver != null and _stomp_unseat(level):
+		return
 	if is_ridden():
 		_ridden_contacts(level)
+
+
+## Arena: a rival (no teammate) landing on the driver's head with the stomp flag throws him off (xvel +/-64 away from
+## the stomper, yvel -128, no stun; his remount lock runs); Chomper stays out for the next rider. An immune or
+## shielded rider is a free springboard (the referee's rule), so he stays seated. The stomp itself stays the
+## referee's (squash, steal, heart); without a referee the stomper bounces here. True when he was unseated.
+func _stomp_unseat(level: LevelBase) -> bool:
+	var rider: PlayerBase = driver
+	if rider.is_immune() or rider.shield > 0:
+		return false
+	for hero: PlayerBase in level.contact_order():
+		if hero == rider or hero.dead or hero.is_down() or hero.is_mounted() or hero.yvel < 0:
+			continue
+		if hero.is_curled() or hero.is_gliding() or _teammates(level, hero, rider):
+			continue
+		if not (Overlap.body(hero, rider, hero) and Overlap.stomp):
+			continue
+		var depth: int = Overlap.depth
+		var away: int = 1 if rider.sim_pos.x >= hero.sim_pos.x else -1
+		_unseat(rider)
+		rider.launch(RIDER_HIT_XVEL * away, RIDER_HIT_YVEL)
+		stomp_unseats += 1
+		var referee: SimEntity = level.party_driver
+		if referee == null or not (&"round_ticks" in referee):
+			var up: bool = hero.control_enabled and (GameInput.get_flags(hero.slot) & Defs.IN_UP) != 0
+			hero.bounce(Tuning.BOUNCE_YVEL_UP if up else Tuning.BOUNCE_YVEL, depth)
+			Audio.play_sfx(Sfx.BOUNCE)
+		return true
+	return false
 
 
 func _seating(level: LevelBase) -> void:
@@ -613,6 +793,9 @@ func _return_home() -> void:
 	else:
 		tame = true
 		teleport(_home)
+	# Arena: home again, he waits in his pen for the next release.
+	penned = arena and tame
+	_rumbling = false
 	set_box(BOX)
 	_refresh_visual()
 
@@ -636,6 +819,8 @@ func _doze_area() -> Rect2i:
 
 
 func _can_doze() -> bool:
+	if arena:
+		return false  # the pen clock runs every tick (an arena is one screen: nothing dozes there anyway)
 	return present and not is_ridden() and tame and grounded and xvel == 0 and yvel == 0 and sim_pos == _home
 
 
@@ -646,12 +831,16 @@ func _on_doze_wake() -> void:
 # --- Picture ----------------------------------------------------------------------------------------------------------
 
 ## The rex's frame (idle, walk, bite) and, on a tame rex, the saddle overlay of sprites/objects/rex_saddle.png on the
-## same cell (ASSET_MANIFEST 17.3). Cosmetic.
+## same cell (ASSET_MANIFEST 17.3); in an arena the rumble shakes him 1 art px side to side. Cosmetic.
 func _refresh_visual() -> void:
 	if _sprite == null:
 		return
 	visible = present
 	_sprite.flip_h = facing < 0
+	var shake_x: float = (1.0 if _anim_age % 2 == 0 else -1.0) if _rumbling else 0.0
+	_sprite.position.x = shake_x
+	if _saddle != null:
+		_saddle.position.x = shake_x
 	var anim: Vector2i = FRAME_IDLE
 	var fps: int = IDLE_FPS
 	if bite_tick > 0:

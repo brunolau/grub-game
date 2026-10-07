@@ -78,6 +78,19 @@ func _on_wake() -> void:
 	_play(&"roll")
 
 
+## 2.0 co-op (`coop=split`, the tar blobs of DESIGN.md D.6): the half a split spawns goes on from the source's state
+## (falling or walking) instead of waiting above the view again.
+func _on_coop_copy(source: EnemyBase) -> void:
+	var dropper: Dropper = source as Dropper
+	if dropper == null:
+		return
+	_state = dropper._state
+	_timer = 0
+	if _state == State.WAIT:
+		_state = State.FALL
+	_play(&"walk" if _state == State.WALK else &"roll", true)
+
+
 func _ai_tick() -> void:
 	match _state:
 		State.WAIT:

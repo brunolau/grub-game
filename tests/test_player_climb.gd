@@ -23,6 +23,17 @@ class FakeVine:
 		return not rolled
 
 
+## A sprite platform (PlatformBase: the 1.0 ride test) moving `step` px per tick sideways, standing still when 0 - a
+## raft, a lift, a drop cloud or a spear step beside a vine.
+class FakePlatform:
+	extends PlatformBase
+
+	var step: int = 0
+
+	func _move_tick() -> void:
+		dx = step
+
+
 static var _party_reference: Dictionary = {}
 
 
@@ -60,15 +71,20 @@ func add_vine(top: int, bottom: int, rolled: bool = false) -> FakeVine:
 	return vine
 
 
-## A world with tar from column `first_col` to `last_col` on the ground row, solid ground elsewhere.
-func tar_world(first_col: int, last_col: int) -> FollowLevel:
+## A world with tar from column `first_col` to `last_col` on the ground row, solid ground elsewhere; `wall_col` >= 0
+## stands a wall 3 rows high on the ground in that column; `drop_from_col` >= 0 lowers the ground by 3 rows from that
+## column on (a ledge to fall off).
+func tar_world(first_col: int, last_col: int, wall_col: int = -1, drop_from_col: int = -1) -> FollowLevel:
 	var rows: PackedStringArray = PackedStringArray()
 	for row: int in GROUND_ROW + WORLD_ROWS_BELOW:
 		var line: String = ""
 		for col: int in WORLD_COLS:
+			var ground_row: int = GROUND_ROW + 3 if drop_from_col >= 0 and col >= drop_from_col else GROUND_ROW
 			if row == GROUND_ROW and col >= first_col and col <= last_col:
 				line += TileGrid.CH_TAR
-			elif row >= GROUND_ROW:
+			elif row >= ground_row:
+				line += TileGrid.CH_SOLID_A
+			elif col == wall_col and row >= GROUND_ROW - 3:
 				line += TileGrid.CH_SOLID_A
 			else:
 				line += TileGrid.CH_AIR
@@ -164,6 +180,41 @@ func test_the_grab_test() -> void:
 		hero.hit_timer = 0
 		if blocker == "glider":
 			hero.run.set_glider(false)
+
+
+func test_down_and_up_never_grabs() -> void:
+	# DOWN + UP is the "let go / get off" chord (the vine drop, the mount's dismount, the Totem drop): a dismount beside
+	# a vine flies off instead of grabbing it for one tick and dropping on the next.
+	vine_world(false)
+	add_vine(192, 320)
+	spawn_hero(Vector2i(VINE_X, 300))
+	hero.grounded = false
+	play(hold("DU", 3))
+	assert_false(hero.hero_climb.climbing, "DOWN + UP does not grab")
+	play(hold("U", 1))
+	assert_true(hero.hero_climb.climbing, "UP alone does")
+
+
+func test_the_grab_test_reads_the_vines_kept_geometry_and_the_tar_scan_is_kept() -> void:
+	vine_world(false)
+	var vine: FakeVine = add_vine(192, 288)
+	spawn_hero(Vector2i(VINE_X, 320))
+	assert_eq(hero.hero_climb.find_vine(VINE_X + 6, 320), vine, "6 px away, hands at 288")
+	assert_null(hero.hero_climb.find_vine(VINE_X + 7, 320), "7 px")
+	assert_null(hero.hero_climb.find_vine(VINE_X, 321), "hands at 289")
+	assert_null(hero.hero_climb.find_vine(VINE_X, 192), "y must be below the top")
+	vine.rolled = true
+	assert_null(hero.hero_climb.find_vine(VINE_X, 320), "a rolled vine in reach is not climbable")
+	vine.rolled = false
+	hero.hero_climb.regrab_vine = vine
+	hero.hero_climb.regrab_lock = 3
+	assert_null(hero.hero_climb.find_vine(VINE_X, 320), "the re-grab lock")
+	# The tar scan: once per grid, kept on the level for every hero of the party; a new grid is scanned again.
+	tar_world(40, 41)
+	assert_true(HeroClimb.level_has_tar(level))
+	assert_true(level.has_meta(HeroClimb.TAR_META))
+	level.grid = TileGrid.new(8, 8)
+	assert_false(HeroClimb.level_has_tar(level), "another grid: scanned again")
 
 
 func test_holding_up_while_jumping_past_a_vine_grabs_it() -> void:
@@ -371,6 +422,82 @@ func test_climbing_objects_b_vine() -> void:
 	assert_not_null(rolled)
 
 
+## A stand-in platform whose ride surface is `surface` (y), centred on `x`, moving `step` px per tick.
+func add_platform(x: int, surface: int, step: int = 0) -> FakePlatform:
+	var platform: FakePlatform = FakePlatform.new()
+	platform.step = step
+	place(level, platform, Vector2i(x, surface + platform.box_h))
+	return platform
+
+
+func test_a_vine_is_climbed_from_a_sprite_platform() -> void:
+	# A raft, a lift, a drop cloud or a spear step beside a vine (worlds 6-9): the platform's ride test must not take the
+	# climber back on the tick after the grab, or he never climbs.
+	vine_world(false)
+	add_vine(64, 300)
+	add_platform(VINE_X, 260)
+	spawn_hero(Vector2i(VINE_X + 4, 250))
+	hero.grounded = false
+	play(hold("", 8))
+	assert_true(hero.on_platform, "standing on the platform")
+	assert_eq(hero.sim_pos.y, 261, "the 1.0 ride: top + 1")
+	play(hold("U", 1))
+	assert_true(hero.hero_climb.climbing, "grabbed from the platform")
+	var ys: Array[int] = []
+	play(hold("U", 5), func(_t: int) -> void:
+		ys.append(hero.sim_pos.y)
+		assert_true(hero.hero_climb.climbing, "the vine holds him")
+		assert_false(hero.on_platform, "no platform takes him back")
+	)
+	assert_ints_eq(ys, [259, 257, 255, 253, 251], "2 px per tick up from the platform")
+
+
+func test_a_platform_passing_a_climber_goes_by_and_climbing_down_lands_on_one() -> void:
+	vine_world(false)
+	add_vine(64, 300)
+	var platform: FakePlatform = add_platform(VINE_X - 60, 260, 3)
+	spawn_hero(Vector2i(VINE_X, 264))
+	hero.grounded = false
+	play(hold("U", 1))
+	assert_true(hero.hero_climb.climbing)
+	play(hold("", 40), func(_t: int) -> void:
+		assert_true(hero.hero_climb.climbing, "hanging in the platform's band: it does not take him")
+		assert_eq(hero.sim_pos, Vector2i(VINE_X, 264))
+	)
+	assert_true(platform.sim_pos.x > VINE_X + 40, "the platform went by under him")
+	# Climbing down into a platform lands on it like climbing down onto a floor.
+	vine_world(false)
+	add_vine(64, 300)
+	add_platform(VINE_X, 260)
+	spawn_hero(Vector2i(VINE_X, 250))
+	hero.grounded = false
+	play(hold("U", 1))
+	assert_true(hero.hero_climb.climbing)
+	play(hold("D", 8))
+	assert_false(hero.hero_climb.climbing, "down into the platform: off the vine")
+	assert_true(hero.on_platform, "standing on it")
+	assert_eq(hero.sim_pos.y, 261)
+	assert_eq(hero.state, Defs.HeroState.CROUCH, "DOWN still held: he crouches there")
+
+
+func test_climbing_from_objects_b_spear_step() -> void:
+	vine_world(false)
+	if not Spawner.exists(&"objects/spear_step"):
+		print("    PENDING objects-B objects/spear_step")
+		assert_true(true)
+		return
+	add_vine(64, 300)
+	var step: SimEntity = level.spawn(&"objects/spear_step", Vector2i(VINE_X + 4, 268), {"face": "r"})
+	assert_not_null(step)
+	spawn_hero(Vector2i(VINE_X + 4, 250))
+	hero.grounded = false
+	play(hold("", 8))
+	assert_true(hero.on_platform, "standing on the spear step")
+	play(hold("U", 1) + hold("U", 10))
+	assert_true(hero.hero_climb.climbing, "the vine beside a spear step is climbed")
+	assert_eq(hero.sim_pos.y, 261 - 20, "10 ticks of 2 px")
+
+
 func test_the_player_book2_level_is_valid() -> void:
 	var validator: LevelValidator = LevelValidator.new()
 	assert_true(validator.add_file("res://levels/test_player_book2.lvl"))
@@ -465,3 +592,128 @@ func test_a_hop_from_tar_onto_ground_ends_the_tar_rules() -> void:
 	play(hold("R", 6))
 	assert_false(hero.hero_climb.on_tar, "the landing ended it")
 	assert_eq(hero.xvel, Tuning.WALK_CAP)
+
+
+func test_tar_sets_the_heros_movement_limits_and_his_own_update_runs() -> void:
+	# No copy of the hero's steps 8d-8i lives in HeroClimb (P2.12): on tar it only writes player-A's hooks
+	# PlayerBase.walk_cap / air_cap / jump_impulse_ticks, and Player._hero_update runs his own handlers with them.
+	tar_world(40, 62)
+	spawn_hero(Vector2i(START_X, 326))
+	var limits: Callable = func() -> Array: return [hero.walk_cap, hero.air_cap, hero.jump_impulse_ticks]
+	play(hold("R", 2))
+	assert_true(hero.hero_climb.on_tar)
+	assert_eq(limits.call(), [Tuning.TAR_WALK_CAP, Tuning.TAR_AIR_CAP, Tuning.TAR_JUMP_IMPULSE_TICKS], "on tar")
+	assert_false(hero.hero_climb.update(level), "tar never takes the hero's update over")
+	assert_eq(hero.handler, Defs.HeroState.WALK, "his own walk handler ran")
+	play(hold("R", 12))
+	assert_false(hero.hero_climb.on_tar, "walked out")
+	assert_eq(limits.call(), [Tuning.WALK_CAP, Tuning.WALK_CAP, Tuning.JUMP_IMPULSE_TICKS], "the 1.0 limits again")
+	# Versus weight / ember caps (world-B's referee writes walk_cap_override): tar never raises a cap, and the cap is
+	# back after the tar.
+	for cap: int in [VersusTuning.STACK_HEAVY_WALK_CAP, VersusTuning.STACK_HEAVIER_WALK_CAP,
+			VersusTuning.HOT_ROCK_HOLDER_WALK_CAP]:
+		hero.respawn_at(Vector2i(START_X, 326))
+		hero.walk_cap_override = cap
+		play(hold("R", 2))
+		assert_true(hero.hero_climb.on_tar, "in the tar")
+		assert_eq(limits.call(), [Tuning.TAR_WALK_CAP, Tuning.TAR_AIR_CAP, Tuning.TAR_JUMP_IMPULSE_TICKS],
+				"cap %d on tar" % cap)
+		play(hold("R", 12))
+		assert_false(hero.hero_climb.on_tar)
+		assert_eq(limits.call(), [cap, cap, Tuning.JUMP_IMPULSE_TICKS], "cap %d after the tar" % cap)
+	hero.respawn_at(Vector2i(START_X, 326))
+	play(hold("R", 2))
+	assert_true(hero.hero_climb.on_tar)
+	hero.respawn_at(START)
+	assert_false(hero.hero_climb.on_tar)
+	assert_eq(limits.call(), [Tuning.WALK_CAP, Tuning.WALK_CAP, Tuning.JUMP_IMPULSE_TICKS], "a respawn restores them")
+
+
+func test_a_tar_hop_into_a_wall_is_pushed_back_at_the_tar_air_speed() -> void:
+	# The drift the old copy of 8d-8i had: it clamped the air speed only after the tile collision, so the wall probe
+	# (11.2 #7, after the airborne step) pushed the hero back by the unclamped ACCEL(80) speed, 4 px. The airborne step is
+	# ACCEL(32) (C.5): on a rising tick the jump handler's ACCEL(48) steps 3 px, the probe pushes back 2.
+	tar_world(40, 90, 70)
+	spawn_hero(Vector2i(1090, 326))
+	hero.xvel = Tuning.TAR_WALK_CAP
+	var rows: Array = []
+	play(hold("RU", 14), func(_t: int) -> void: rows.append([hero.sim_pos.x, hero.xvel, hero.grounded]))
+	var bumped: int = -1
+	for i: int in range(1, rows.size()):
+		if int(rows[i][1]) == 0 and not bool(rows[i][2]):
+			bumped = i
+			break
+	assert_true(bumped > 0, "the hop met the wall in the air")
+	if bumped > 0:
+		assert_eq(int(rows[bumped - 1][1]), Tuning.TAR_AIR_CAP, "the tar air speed before the wall")
+		var step: int = Tuning.floor16(Tuning.JUMP_HELD_CAP)
+		assert_eq(int(rows[bumped][0]) - int(rows[bumped - 1][0]), step - Tuning.floor16(Tuning.TAR_AIR_CAP),
+				"a %d px step, pushed back by the ACCEL(32) speed" % step)
+
+
+func test_something_else_throwing_him_up_ends_the_tar_rules() -> void:
+	# A launch (geyser, see-saw, dismount, Batter Up), a bounce or a hurt is no hop taken from tar (P2.12 resolution).
+	for push: String in ["launch", "bounce", "hurt"]:
+		tar_world(40, 90)
+		spawn_hero(Vector2i(START_X, 326))
+		play(hold("R", 4))
+		if push == "bounce":
+			play(hold("RU", 12))
+			assert_true(hero.hero_climb.on_tar and hero.yvel > 0, "a tar hop on its way down")
+		assert_true(hero.hero_climb.on_tar, push)
+		match push:
+			"launch":
+				hero.launch(PlayerBase.LAUNCH_KEEP, Tuning.GEYSER_POWER)
+			"bounce":
+				hero.bounce(Tuning.BOUNCE_YVEL_UP)
+			"hurt":
+				hero.hurt(null)
+		play(hold("R", 1))
+		assert_false(hero.hero_climb.on_tar, "%s: the tar rules end" % push)
+		assert_eq([hero.walk_cap, hero.air_cap, hero.jump_impulse_ticks],
+				[Tuning.WALK_CAP, Tuning.WALK_CAP, Tuning.JUMP_IMPULSE_TICKS], push)
+		if push != "hurt":
+			var fastest: Array[int] = [0]
+			play(hold("R", 6), func(_t: int) -> void: fastest[0] = maxi(fastest[0], hero.xvel))
+			assert_eq(fastest[0], Tuning.WALK_CAP, "%s: full air control" % push)
+	# A fall off a tar ledge is still a take-off from tar: capped until the landing.
+	tar_world(40, 62, -1, 63)
+	spawn_hero(Vector2i(62 * 16 + 4, 326))
+	var airborne: Array[int] = [0]
+	play(hold("R", 30), func(_t: int) -> void:
+		if not hero.grounded and hero.sim_pos.y < 368:
+			airborne[0] += 1
+			assert_true(hero.hero_climb.on_tar, "falling off the tar ledge")
+			assert_true(absi(hero.xvel) <= Tuning.TAR_AIR_CAP)
+	)
+	assert_true(airborne[0] > 3, "he fell")
+	assert_eq(hero.sim_pos.y, 368, "landed on the lower ground")
+	play(hold("R", 2))
+	assert_false(hero.hero_climb.on_tar)
+
+
+func test_objects_b_geyser_in_tar_is_an_escape_with_full_air_control() -> void:
+	tar_world(40, 90)
+	if not Spawner.exists(&"objects/geyser"):
+		print("    PENDING objects-B objects/geyser")
+		assert_true(true)
+		return
+	# Placed as a level file places it (LEVEL_DESIGN 15.4: in the air cell above its vent floor); objects-B's geyser
+	# settles onto the tar surface, 6 px under the cell top, where a wading hero's feet are.
+	var vent_col: int = Tuning.to_cell(START_X)
+	level.spawn(&"objects/geyser", LevelText.cell_to_feet(vent_col, GROUND_ROW - 1), {"period": 40})
+	spawn_hero(Vector2i(vent_col * Tuning.TILE + 8, 326))
+	var ticks: int = 0
+	while hero.yvel >= 0 and ticks < 45:
+		play(hold("", 1))
+		ticks += 1
+	assert_eq(hero.yvel, Tuning.GEYSER_POWER, "the spout launched him from the tar")
+	var fastest: Array[int] = [0]
+	var top: Array[int] = [326]
+	play(hold("R", 14), func(_t: int) -> void:
+		fastest[0] = maxi(fastest[0], hero.xvel)
+		top[0] = mini(top[0], hero.sim_pos.y)
+		assert_false(hero.hero_climb.on_tar, "no tar rules in a geyser's flight")
+	)
+	assert_eq(fastest[0], Tuning.WALK_CAP, "full air control")
+	assert_eq(326 - top[0], 105, "the 105 px of C.6")

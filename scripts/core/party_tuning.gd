@@ -32,6 +32,9 @@ const CAM_REAR_MARGIN_COL: int = 1
 const CAM_REAR_MARGIN_COL_LEFT: int = Tuning.VIEW_COLS - 1 - CAM_REAR_MARGIN_COL
 ## The view edges are walls: a hero's x commit is clamped to the view edges +/- this many px. [TA 4.5]
 const VIEW_EDGE_WALL_PX: int = 8
+## The tribe camera keeps every grounded hero whole on the view - his head this many px inside it - while one view can
+## hold them (PHYSICS.md C.13 as of phase 2: a hero standing on a high ledge is never off the view). [P C.13]
+const CAM_KEEP_HEAD_PX: int = 2 * Tuning.TILE
 ## A hero off the view becomes an egg after this long (an edge arrow with a stone countdown meanwhile). [D D.2]
 const LEASH_EGG_TICKS_BEGINNER: int = 121    ## 5 s
 const LEASH_EGG_TICKS_EXPERT: int = 73       ## 3 s
@@ -113,7 +116,8 @@ const BRACE_DAZE_TICKS: int = 44             ## a `heavy` enemy stopped dead is 
 const WINDOW_TICKS_BEGINNER: int = 24
 const WINDOW_TICKS_EXPERT: int = 12
 const WINDOW_SOLO_MARGIN_TICKS: int = 4
-const COUNT_IN_BEEPS: int = 3                ## every window has an audible count-in (Sfx.COUNT_IN x3)
+const COUNT_IN_BEEPS: int = 3                ## every window has an audible count-in (Sfx.COUNT_IN x3) ...
+const COUNT_IN_SPACING_TICKS: int = 8        ## ... its blips 8 ticks apart (GAMEPLAY.md 13.9.3; drums, bonds, splits)
 
 # =================================================================================================================
 # Co-op objects [D D.5]

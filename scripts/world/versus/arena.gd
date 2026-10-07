@@ -69,6 +69,36 @@ static func spawn_points(level: LevelBase) -> Array[Vector2i]:
 	return result
 
 
+## Parsed arena files by level id (file_records reads each file once per run).
+static var _file_cache: Dictionary = {}
+
+
+## The entity records with id `id` of the file behind `level` (its level_id through the Levels registry) that apply
+## to Game.difficulty: the arena's markers that are data for the referee rather than entities of their own
+## (`zones/goal`, `objects/crate_lane`). Empty for a level without a file (a test level) or without such records.
+static func file_records(level: LevelBase, id: StringName) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	if level == null or level.level_id == &"":
+		return result
+	var data: LevelData = null
+	if _file_cache.has(level.level_id):
+		data = _file_cache[level.level_id]
+	else:
+		var tree: SceneTree = Engine.get_main_loop() as SceneTree
+		var registry: Node = tree.root.get_node_or_null(^"Levels") if tree != null else null
+		var path: String = str(registry.call(&"get_level_path", level.level_id)) \
+				if registry != null and registry.has_method(&"get_level_path") else ""
+		if path != "" and FileAccess.file_exists(path):
+			data = LevelData.load_file(path)
+		_file_cache[level.level_id] = data
+	if data == null:
+		return result
+	for record: Dictionary in data.entity_records():
+		if StringName(str(record["id"])) == id and LevelText.applies_to(record["params"], Game.difficulty):
+			result.append(record)
+	return result
+
+
 ## The wrap step of an arena (DESIGN.md E.5) for one hero, made once per tick after the PLAYER phase of every hero
 ## (the referee runs it first thing in its own PLAYER step; the bot baker of core-B calls it the same way on a bare
 ## level): `wrap = lr` - a hero whose x step was refused at a side edge (x + xvel / 16 outside the commit range)

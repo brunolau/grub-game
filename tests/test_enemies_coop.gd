@@ -187,6 +187,150 @@ func test_a_bond_needs_the_party_and_a_team_wipe_clears_it() -> void:
 	assert_true(a.dead, "and nothing regrows")
 
 
+func test_a_bond_window_is_capped_by_its_smallest_window() -> void:
+	var a: EnemyBase = _enemy(&"enemies/walker", Vector2i(60, 160),
+			{"coop": "bond", "bond": "twins", "speed": 0, "window": 6})
+	var b: EnemyBase = _bonded(Vector2i(280, 160))
+	var c: EnemyBase = _enemy(&"enemies/walker", Vector2i(400, 160),
+			{"coop": "bond", "bond": "pair", "speed": 0, "window": 40})
+	var d: EnemyBase = _enemy(&"enemies/walker", Vector2i(500, 160), {"coop": "bond", "bond": "pair", "speed": 0})
+	assert_eq(a.coop_traits().window_cap, 6)
+	assert_eq(b.coop_traits().group_window(), 6, "the bond's smallest cap")
+	assert_eq(c.coop_traits().group_window(), PartyTuning.WINDOW_TICKS_BEGINNER, "a cap above 24 changes nothing")
+	assert_eq(d.coop_traits().group_window(), PartyTuning.WINDOW_TICKS_BEGINNER)
+	Sim.step(2)
+	a.kill(&"weapon", _hero)
+	Sim.step(5)
+	b.kill(&"weapon", _p2)
+	assert_true(a.coop_traits().sealed and b.coop_traits().sealed, "5 ticks apart: inside a 6-tick window")
+	_level.reset_entities()
+	Sim.step(2)
+	a.kill(&"weapon", _hero)
+	Sim.step(5)
+	assert_true(a.dead)
+	Sim.step(1)
+	assert_false(a.dead, "the 6-tick window closed with its mate alive: it regrows (not after the Beginner 24)")
+
+
+func test_a_bond_counts_in_while_a_hero_stands_at_each_member() -> void:
+	var a: EnemyBase = _bonded(Vector2i(60, 160))
+	var b: EnemyBase = _bonded(Vector2i(280, 160))
+	assert_true(AudioTable.SFX.has(Sfx.COUNT_IN) and AudioTable.SFX.has(Sfx.DRUM), "the cues have their rows")
+	_hero.teleport(Vector2i(80, 160))
+	_p2.teleport(Vector2i(160, 160))
+	Sim.step(3)
+	var leader: CoopTraits = a.coop_traits()
+	assert_eq(leader.count_in, -1, "P2 is not at the second member: no count-in")
+	_p2.teleport(Vector2i(280 - EnemyTuning.COUNT_IN_REACH_PX, 160))
+	Sim.step(1)
+	assert_eq(leader.count_in, 1, "a hero at each member: the first blip, on the leader (the first in the registry)")
+	assert_eq(b.coop_traits().count_in, -1, "only the leader counts")
+	Sim.step(PartyTuning.COUNT_IN_BEEPS * PartyTuning.COUNT_IN_SPACING_TICKS - 1)
+	assert_eq(leader.count_in, PartyTuning.COUNT_IN_BEEPS * PartyTuning.COUNT_IN_SPACING_TICKS,
+			"three blips 8 ticks apart ...")
+	Sim.step(1)
+	assert_eq(leader.count_in, -1, "... then go")
+	Sim.step(30)
+	assert_eq(leader.count_in, -1, "once per arrival: no second count-in while they stand there")
+	_p2.teleport(Vector2i(160, 160))
+	Sim.step(1)
+	_p2.teleport(Vector2i(260, 160))
+	Sim.step(1)
+	assert_eq(leader.count_in, 1, "they left and came back: it counts in again")
+	a.kill(&"weapon", _hero)
+	Sim.step(1)
+	assert_eq(b.coop_traits().count_in, -1, "the window is open: no count-in")
+
+
+func test_one_hero_between_both_members_is_no_count_in() -> void:
+	var a: EnemyBase = _bonded(Vector2i(200, 160))
+	var b: EnemyBase = _bonded(Vector2i(240, 160))
+	_hero.teleport(Vector2i(220, 160))
+	_p2.teleport(Vector2i(600, 160))
+	Sim.step(10)
+	assert_eq(a.coop_traits().count_in, -1, "one hero standing at both is not a pair")
+	assert_eq(b.coop_traits().count_in, -1)
+	_p2.teleport(Vector2i(230, 160))
+	Sim.step(1)
+	assert_eq(a.coop_traits().count_in, 1, "two heroes: it counts in")
+
+
+func test_split_halves_count_in_too() -> void:
+	var blob: EnemyBase = _splitter(Vector2i(200, 160))
+	_hero.teleport(Vector2i(150, 160))
+	_p2.teleport(Vector2i(250, 160))
+	Sim.step(2)
+	blob.take_hit(25, _hero)
+	var copy: EnemyBase = blob.coop_traits().mate
+	Sim.step(EnemyTuning.SPLIT_RUN_TICKS)
+	_hero.teleport(copy.sim_pos + Vector2i(-20, 0))
+	_p2.teleport(blob.sim_pos + Vector2i(20, 0))
+	Sim.step(2)
+	assert_true(blob.coop_traits().count_in > 0, "the record leads the two halves' count-in")
+	assert_eq(copy.coop_traits().count_in, -1)
+
+
+func test_zone_spawners_take_turns_between_the_heroes_and_allow_half_as_many_again() -> void:
+	var record: Dropper = _enemy(&"enemies/dropper", Vector2i(300, 160), {"zone": "0,0,60,16", "pause": 0, "max": 2}) \
+			as Dropper
+	_hero.teleport(Vector2i(100, 160))
+	_p2.teleport(Vector2i(500, 160))
+	assert_eq(record.max_alive_now(), 3, "max 2 x 1.5 in a co-op party")
+	Sim.step(6)
+	var copies: Array[SimEntity] = _of_scene(Defs.Kind.ENEMY, &"enemies/dropper")
+	copies.erase(record)
+	assert_eq(copies.size(), 3, "three alive at once")
+	assert_eq(record.alive_copies(), 3)
+	var around: Array[int] = []
+	for copy: SimEntity in copies:
+		around.append(0 if absi(copy.sim_pos.x - 100) == EnemyTuning.DROPPER_SIDE_PX else
+				(1 if absi(copy.sim_pos.x - 500) == EnemyTuning.DROPPER_SIDE_PX else -1))
+	assert_eq(around, [0, 1, 0] as Array[int], "beside P1, then P2, then P1 again")
+	_p2.free()
+	assert_eq(record.max_alive_now(), 2, "a party of one: the 1.0 max")
+
+
+func test_an_enemy_that_hurt_both_heroes_bursts_into_twelve_bones() -> void:
+	var both: EnemyBase = _enemy(&"enemies/walker", Vector2i(200, 160), {"speed": 0})
+	var one: EnemyBase = _enemy(&"enemies/walker", Vector2i(260, 160), {"speed": 0})
+	Sim.step(2)
+	both.on_hurt_hero(_hero)
+	both.on_hurt_hero(_p2)
+	one.on_hurt_hero(_hero)
+	one.on_hurt_hero(_hero)
+	both.kill(&"weapon", _hero)
+	assert_eq(_of_scene(Defs.Kind.COLLECTIBLE, &"items/bone").size(), 2 * Tuning.BONES_PER_HEART,
+			"each hero's stolen heart bursts as bones: 12")
+	one.kill(&"weapon", _hero)
+	assert_eq(_of_scene(Defs.Kind.COLLECTIBLE, &"items/bone").size(), 3 * Tuning.BONES_PER_HEART,
+			"one hero hurt twice: one heart, 6")
+	_level.reset_entities()
+	Sim.step(2)
+	both.on_hurt_hero(_p2)
+	assert_eq(both._hearts_held(), 1, "a team wipe gives the hearts back")
+
+
+func test_kill_points_are_shared_out_for_the_rival_score() -> void:
+	var a: EnemyBase = _enemy(&"enemies/walker", Vector2i(200, 160), {"speed": 0, "score": 3})
+	var b: EnemyBase = _enemy(&"enemies/walker", Vector2i(240, 160), {"speed": 0, "score": 1})
+	Sim.step(2)
+	var team: int = Game.score
+	a.kill(&"weapon", _p2)
+	assert_eq(Game.runs[1].score, Tuning.SCORE_LADDER[3], "P2's share of the tribe score")
+	assert_eq(Game.score, team + Tuning.SCORE_LADDER[3], "the tribe score as in 1.0")
+	assert_eq(Game.runs[0].score, 0)
+	b.on_glider_stomp(_hero)
+	assert_eq(Game.runs[0].score, Tuning.GLIDER_DIVE_SCORES[0], "a glider dive counts for the diver")
+	Game.new_game(Defs.Difficulty.BEGINNER)
+	Game.begin_level(&"test")
+	_flat_level(60, 16, 10)
+	var solo: EnemyBase = _enemy(&"enemies/walker", Vector2i(200, 160), {"speed": 0, "score": 3})
+	Sim.step(2)
+	solo.kill(&"weapon", _hero)
+	assert_eq(Game.runs[0].score, 0, "single-player: only Game.score, as in 1.0")
+	assert_eq(Game.score, Tuning.SCORE_LADDER[3])
+
+
 func test_keepers_and_drums_share_the_registry() -> void:
 	var guard_a: EnemyBase = _enemy(&"enemies/walker", Vector2i(120, 160), {"keeper": "gully"})
 	var guard_b: EnemyBase = _enemy(&"enemies/walker", Vector2i(200, 160), {"keeper": "gully"})

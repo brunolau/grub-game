@@ -1,0 +1,42 @@
+# Club & Grub level file - format 2 (docs/ARCHITECTURE.md 7.11). Chieftains' Pyre: developer level of enemies-C for the
+# Rival Chieftains (docs/expansion/PLAN.md P2.3; DESIGN.md B.6, GAMEPLAY.md 13.6): one screen around the pyre, the
+# altar of the Great Roast 6 tiles up in the middle (one-way), ledges 3 rows up on both sides, Gorm on the floor and
+# Gulla waiting on the pyre (solo: he tags in when Gorm falls; a co-op file would have both fight at once). The arena's
+# floor edges are the Roc perches of the roast thieves. tests/test_enemies_chieftain.gd builds its own room of these
+# cells; this file is for visual QA in the windowed game. Not part of any campaign (kind = test).
+
+[meta]
+format = 2
+id = test_enemies_chieftain
+name = "Chieftains' Pyre"
+kind = test
+book = 2
+biome = volcano
+terrain_a = volcano/terrain
+terrain_b = volcano/terrain_obsidian
+background = volcano
+music = level_volcano
+author = enemies-C
+notes = "PLAN.md P2.3: the Rival Chieftains (state-machine executor by default; Chieftain.hero_bot_enabled for HeroBot)."
+
+[legend]
+A = items/weapon kind=spear
+
+[tiles]
+####################
+#..................#
+#..................#
+#..................#
+#..................#
+#........--........#
+#..................#
+#..................#
+#.---.........---..#
+#..................#
+#.@A...............#
+####################
+
+[entities]
+zones/arena 9 10 name=pyre rect=0,0,20,12 music=boss_chieftains
+bosses/chieftain 6 10 name=gorm mate=gulla arena=pyre
+bosses/chieftain 9 4 name=gulla mate=gorm arena=pyre drops=trophy

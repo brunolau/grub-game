@@ -250,9 +250,9 @@ func test_party_profiles_default_to_the_keyboard_layouts() -> void:
 	assert_eq(Settings.slot_bindings_section(3), "bindings_p4")
 	assert_eq(Settings.party_keyboard_layout(), InputSlot.KeyboardLayout.CLASSIC, "classic is the default")
 	var kb: int = Defs.Device.KEYBOARD
-	# Classic: P1 on W A S D + Space / Left Shift, P2 on the numpad.
+	# Classic: P1 on W A S D + Space / Left Ctrl, P2 on the numpad.
 	assert_eq(_slot_tokens(0, Defs.ACT_JUMP, kb), _keys([KEY_SPACE]))
-	assert_eq(_slot_tokens(0, Defs.ACT_ATTACK, kb), _keys([KEY_SHIFT]))
+	assert_eq(_slot_tokens(0, Defs.ACT_ATTACK, kb), _keys([KEY_CTRL]))
 	assert_eq(_slot_tokens(0, Defs.ACT_SWAP, kb), _keys([KEY_E]))
 	assert_eq(_slot_tokens(0, Defs.ACT_LOOK, kb), _keys([KEY_Q]))
 	assert_eq(_slot_tokens(1, Defs.ACT_UP, kb), _keys([KEY_KP_8]))

@@ -29,6 +29,12 @@ extends RefCounted
 ## within the window: `last kill tick - first kill tick < window`. The window opens on the first death and is decided
 ## by the dead records themselves: on the first ENEMIES tick with `now - first >= window` the group regrows (bond) or
 ## merges (split). A group that died in time is sealed: dead until a team wipe resets the level.
+## Per-record caps (GAMEPLAY.md 13.9.3 / LEVEL_DESIGN.md 15.7.6: `window = min(24 B / 12 E, solo_min - 4)` per placed
+## record): level parameter `window=<ticks>` on a `bond`, `split` or `daze` record caps its window (a bond uses the
+## smallest cap of its members) or its daze time; [method capped_window] is the same rule for tools reading level files.
+## Count-in (GAMEPLAY.md 13.9.3): while every member of a bond (or both halves of a split) is alive and each has a
+## hatched hero within EnemyTuning.COUNT_IN_REACH_PX - not one hero for all - the group plays three blips
+## PartyTuning.COUNT_IN_SPACING_TICKS apart, then "go" (presentation only, like the twin drums' count-in).
 
 enum Split { WHOLE, HALF }
 
@@ -50,6 +56,8 @@ var sealed: bool = false
 var held: PlayerBase = null
 var perch: Vector2i = Vector2i.ZERO
 var has_perch: bool = false
+## `grab`: heroes seized since the level started (an archetype notices a carry by it: enemies/snatcher).
+var carries: int = 0
 ## `leech`: the hero on whose back it sits (null = none) and the ticks it has sat there.
 var host: PlayerBase = null
 var host_ticks: int = 0
@@ -57,6 +65,11 @@ var host_ticks: int = 0
 var split: int = Split.WHOLE
 var mate: EnemyBase = null
 var is_copy: bool = false
+## `bond` / `split` / `daze`: the record's cap on its window or daze time in ticks (level parameter `window`; -1 =
+## none: the difficulty's value).
+var window_cap: int = -1
+## `bond` / `split`: the group's count-in on its leader (the first awake, living member): ticks into it (-1 = none).
+var count_in: int = -1
 
 ## `daze`: hopping away (airborne until it lands); bit per player slot: that hero was striking on the last look.
 var _hop: bool = false
@@ -77,6 +90,10 @@ var _relatch_wait: int = 0
 var _run: int = 0
 var _run_dir: int = 1
 var _death_pos: Vector2i = Vector2i.ZERO
+## `split`: the archetype's own speed when it split, given back in the run's direction when the run ends.
+var _resume_speed: int = 0
+## `bond` / `split` count-in: every member had a hero beside it on the leader's last look.
+var _count_ready: bool = false
 ## Contact made harmless by the trait (holding a hero, riding a host, braced) and the value to give back; the
 ## tangibility the regrow took away.
 var _harmless: bool = false
@@ -108,6 +125,32 @@ static func party_on() -> bool:
 ## The window of the bond and split traits for the current difficulty (PartyTuning.window_ticks).
 static func window_ticks() -> int:
 	return PartyTuning.window_ticks(Game.difficulty)
+
+
+## A record's window or daze time from the difficulty's value `base` and its level parameters `params` (the
+## `window=<ticks>` cap of LEVEL_DESIGN.md 15.7.6: the smaller of the two). For tools reading level files (the solo
+## search, the validator); the game uses [method group_window] / [method daze_window].
+static func capped_window(base: int, params: Dictionary) -> int:
+	if params.has("window"):
+		return mini(base, maxi(int(params["window"]), 0))
+	return base
+
+
+## The window of this record's bond or split group: the difficulty's value, capped by the smallest `window` of the
+## group's members.
+func group_window() -> int:
+	var window: int = window_ticks()
+	for member: EnemyBase in _group():
+		var traits: CoopTraits = member.coop_traits()
+		if traits != null and traits.window_cap >= 0:
+			window = mini(window, traits.window_cap)
+	return window
+
+
+## The daze time of a `daze` record: PartyTuning.daze_ticks(difficulty), capped by its `window`.
+func daze_window() -> int:
+	var ticks: int = PartyTuning.daze_ticks(Game.difficulty)
+	return mini(ticks, window_cap) if window_cap >= 0 else ticks
 
 
 ## Bond registry: the enemy records of bond `bond_name` in registration order (drums of the same name left out).
@@ -206,7 +249,7 @@ func absorbs_hit(slot: int, source: SimEntity) -> bool:
 func on_bounced(_hero: PlayerBase) -> void:
 	if kind != Defs.CoopTrait.DAZE or not party_on():
 		return
-	dazed = PartyTuning.daze_ticks(Game.difficulty)
+	dazed = daze_window()
 	_hop = false
 	enemy.xvel = 0
 	enemy._play(&"dizzy", true)
@@ -232,7 +275,7 @@ func on_killed() -> void:
 		var traits: CoopTraits = member.coop_traits()
 		if traits != null and traits.died_tick >= 0:
 			first = mini(first, traits.died_tick)
-	if died_tick - first < window_ticks():
+	if died_tick - first < group_window():
 		for member: EnemyBase in _group():
 			var traits: CoopTraits = member.coop_traits()
 			if traits != null:
@@ -258,6 +301,8 @@ func on_reset() -> void:
 	_returning = false
 	_relatch_wait = 0
 	_run = 0
+	count_in = -1
+	_count_ready = false
 
 
 ## The record went to sleep (left behind, or killed): it lets go of a held hero or a host.
@@ -319,6 +364,8 @@ func post_ai() -> void:
 				enemy.facing = enemy._dir_to(hero)
 		Defs.CoopTrait.HEAVY:
 			_brace_test()
+		Defs.CoopTrait.BOND, Defs.CoopTrait.SPLIT:
+			_count_in_step()
 
 
 ## CONTACT_ENEMIES phase, awake and alive (heavy, grab, leech), after every hero moved and before their contact pass.
@@ -350,7 +397,7 @@ func dead_tick() -> void:
 		died_tick = -1
 		enemy._doze_note()
 		return
-	if Sim.total_ticks - _group_first() < window_ticks():
+	if Sim.total_ticks - _group_first() < group_window():
 		return
 	if kind == Defs.CoopTrait.SPLIT:
 		_merge()
@@ -560,6 +607,7 @@ func _try_seize() -> void:
 
 func _seize(hero: PlayerBase) -> void:
 	held = hero
+	carries += 1
 	_hold_ticks = 0
 	_home = enemy.sim_pos
 	_returning = false
@@ -626,7 +674,7 @@ func _leech_pre() -> bool:
 		_drop_host()
 		return true
 	_place_on_host()
-	enemy._play(&"idle")
+	enemy._play(&"front")  # the Leech sheet's latched pose (falls back to idle on other sheets)
 	return true
 
 
@@ -717,6 +765,7 @@ func _split_now(source: SimEntity) -> void:
 	var away: int = 1 if source == null or source.sim_pos.x <= enemy.sim_pos.x else -1
 	_run_dir = away
 	_run = EnemyTuning.SPLIT_RUN_TICKS
+	_resume_speed = absi(enemy.xvel)
 	enemy.flash = EnemyTuning.FLASH_TICKS
 	Audio.play_sfx(Sfx.ENEMY_HURT)
 	var copy: EnemyBase = enemy._coop_spawn_copy({"split_half": true, "hp": 0})
@@ -728,6 +777,8 @@ func _split_now(source: SimEntity) -> void:
 	other.mate = enemy
 	other._run_dir = -away
 	other._run = EnemyTuning.SPLIT_RUN_TICKS
+	other._resume_speed = _resume_speed
+	other.window_cap = window_cap
 	mate = copy
 
 
@@ -739,15 +790,19 @@ func _split_pre() -> bool:
 		_become_whole()
 	if _run <= 0:
 		return false
+	var age: int = EnemyTuning.SPLIT_RUN_TICKS - _run
 	_run -= 1
 	enemy.xvel = EnemyTuning.SPLIT_RUN_XVEL * _run_dir
 	enemy.facing = _run_dir
 	enemy._ground_step(false, false)
 	if enemy.xvel != 0:
 		_run_dir = signi(enemy.xvel)
-	enemy._play(&"walk")
+	var squash: bool = age < EnemyTuning.SPLIT_SQUASH_TICKS and enemy._skin != null \
+			and enemy._skin.has_anim(&"squash")
+	enemy._play(&"squash" if squash else &"walk")
 	if _run == 0:
-		enemy.xvel = 0
+		# The run is over: the archetype goes on with its own speed, now in the run's direction.
+		enemy.xvel = _resume_speed * _run_dir
 	return true
 
 
@@ -787,6 +842,76 @@ func _become_whole() -> void:
 
 
 # =================================================================================================================
+# bond and split: the count-in (presentation)
+# =================================================================================================================
+
+## The leader's count-in, once per tick (post_ai of every member; only the leader acts): three blips while every
+## member is alive and has a hatched hero beside it (at least two different heroes), then "go"; it starts again only
+## after the heroes left and came back.
+func _count_in_step() -> void:
+	var members: Array[EnemyBase] = _count_group()
+	if members.size() < 2 or _count_leader(members) != enemy:
+		return
+	var ready: bool = not sealed and _count_ready_now(members)
+	if not ready:
+		count_in = -1
+		_count_ready = false
+		return
+	if not _count_ready:
+		_count_ready = true
+		count_in = 0
+	if count_in < 0:
+		return
+	if count_in % PartyTuning.COUNT_IN_SPACING_TICKS == 0:
+		if count_in / PartyTuning.COUNT_IN_SPACING_TICKS < PartyTuning.COUNT_IN_BEEPS:
+			_sfx(Sfx.COUNT_IN)
+		else:
+			_sfx(Sfx.DRUM)  # "go": the beat the twin drums use for it
+			count_in = -1
+			return
+	count_in += 1
+
+
+## The group in a fixed order for every member: a bond's registry, or a split's record before its spawned half.
+func _count_group() -> Array[EnemyBase]:
+	if kind == Defs.CoopTrait.BOND:
+		return bond_members(Game.level, enemy.bond)
+	var halves: Array[EnemyBase] = []
+	if split == Split.HALF and mate != null and is_instance_valid(mate):
+		halves.append(mate if is_copy else enemy)
+		halves.append(enemy if is_copy else mate)
+	return halves
+
+
+## The member that runs the group's count-in: the first awake, living one.
+static func _count_leader(members: Array[EnemyBase]) -> EnemyBase:
+	for member: EnemyBase in members:
+		if member.awake and not member.dead:
+			return member
+	return null
+
+
+## True when every member is alive and awake with a hatched hero within EnemyTuning.COUNT_IN_REACH_PX, and those
+## heroes are not all the same one.
+static func _count_ready_now(members: Array[EnemyBase]) -> bool:
+	var used: int = 0
+	var heroes: Array[PlayerBase] = Game.level.contact_order()
+	for member: EnemyBase in members:
+		if member.dead or not member.awake:
+			return false
+		var near: int = 0
+		for hero: PlayerBase in heroes:
+			if hero.is_party_targetable() \
+					and absi(hero.sim_pos.x - member.sim_pos.x) <= EnemyTuning.COUNT_IN_REACH_PX \
+					and absi(hero.sim_pos.y - member.sim_pos.y) <= EnemyTuning.COUNT_IN_REACH_PX:
+				near |= 1 << hero.slot
+		if near == 0:
+			return false
+		used |= near
+	return (used & (used - 1)) != 0
+
+
+# =================================================================================================================
 # Internals
 # =================================================================================================================
 
@@ -799,6 +924,8 @@ func _read_params(params: Dictionary) -> void:
 	if params.has("split_half"):
 		split = Split.HALF
 		is_copy = true
+	if params.has("window"):
+		window_cap = maxi(int(params["window"]), 0)
 
 
 ## Let go of a held hero or a host (no shield).

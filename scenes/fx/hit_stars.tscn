@@ -1,12 +1,15 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/fx/fx_anim.gd" id="1_fx_anim"]
 [ext_resource type="Texture2D" path="res://assets/sprites/fx/hit_stars.png" id="2_hit_stars"]
+[ext_resource type="Texture2D" path="res://assets/sprites/fx/hit_stars_players.png" id="3_hit_stars_players"]
 
 [node name="HitStars" type="Node2D"]
 script = ExtResource("1_fx_anim")
 frame_count = 6
 fps = 16
+row_texture = ExtResource("3_hit_stars_players")
+rows = 6
 
 [node name="Sprite" type="Sprite2D" parent="."]
 texture = ExtResource("2_hit_stars")

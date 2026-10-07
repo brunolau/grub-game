@@ -6,6 +6,7 @@ Source: https://opengameart.org/content/race-start-countdown
 Licence: CC0 1.0 (tier A)
 Used in Club & Grub for: 2.0 (The Far Shore): audio/sfx/countdown_beep_a.wav. Per-file sources and edits: docs/ASSET_MANIFEST.md section 17
 Staging folder: .tools/asset_candidates/expansion/audio/kheetor_race-start-countdown
+Note: the page offers nine licences; CC0 is the one taken
 
 ---- Licence evidence recorded when the pack was downloaded ----
 

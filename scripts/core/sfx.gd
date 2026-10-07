@@ -130,6 +130,8 @@ const COUNTDOWN_BEEP: StringName = &"countdown_beep"    ## round intro "3, 2, 1"
 const COUNTDOWN_GO: StringName = &"countdown_go"        ## round intro "GRUB!" (Junkala fanfare2)
 const SUDDEN_DEATH: StringName = &"sudden_death"        ## sudden death starts (Junkala alarm_loop1 + refereewhistle)
 const CLANG: StringName = &"clang"                      ## versus: two front boxes meet (the Colossus clank, D E.2)
+const LIGHTNING_STRIKE: StringName = &"lightning_strike" ## a bolt of zones/lightning (9-1b, Cloud Top, the Roc) - P2.6
+const ROUND_GONG: StringName = &"round_gong"            ## versus: the gong that ends a round (Junkala fanfare1) [D E.8]
 
 # --- Book II level music (Audio.play_music) ---------------------------------------------------------------------------
 const MUSIC_CANYON: StringName = &"level_canyon"        ## 5-1 Red Mesa Trail (Wolfgang_ "Desert Theme")
@@ -171,7 +173,7 @@ const EXPANSION_SFX: Array[StringName] = [
 	SWAP, SPEAR_STICK, VINE_CLIMB, RAFT_SPLASH, SPLASH_HEAVY, GEYSER_BUBBLE, GEYSER_SPOUT, TAR_GLUG, EGG_DOWN,
 	EGG_HATCH, DUO_HOP, CURL, BAT_HIT, BRACE, PLATE, DRUM, COUNT_IN, SEESAW, BOULDER_PUSH, PULLEY, DAZE,
 	CHOMPER_BITE, COOKPOT_BANK, CRATE_DROP, HOT_ROCK_FUSE, LOOP_HOT_ROCK_HURRY, CROWD_APPLAUSE, CROWD_CHEER,
-	PARTY_JOIN, COUNTDOWN_BEEP, COUNTDOWN_GO, SUDDEN_DEATH, CLANG,
+	PARTY_JOIN, COUNTDOWN_BEEP, COUNTDOWN_GO, SUDDEN_DEATH, CLANG, LIGHTNING_STRIKE, ROUND_GONG,
 ]
 ## Every 2.0 music context above.
 const EXPANSION_MUSIC: Array[StringName] = [

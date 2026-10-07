@@ -13,6 +13,11 @@ extends VBoxContainer
 ## party_keyboard": classic WASD + numpad - the versus default -, two hands, one hand); choosing one puts both halves
 ## back on the preset's keys (their pad buttons are kept). Swap is a row like the others. The keyboard test checks
 ## that a keyboard reports both players' keys at once ([UiKeyTest]).
+##
+## Co-op options of 2.0 (DESIGN.md D.3 / D.11, GAMEPLAY.md 13.9): "Rival score" - the HUD (and the tally) shows each
+## player's own score instead of the tribe score - and "Helper mode" - P2 cannot be hurt by enemies (pits and liquids
+## still egg him; gates are unchanged). Both are settings ([constant KEY_RIVAL_SCORE], [constant KEY_HELPER_MODE]);
+## the rule of Helper mode is the hero's (player-A), read at the start of a co-op run (core-A).
 
 ## The player left the panel (settings are saved).
 signal closed
@@ -41,6 +46,9 @@ const LAYOUT_KEYS: PackedStringArray = ["UI_OPT_KEYS_CLASSIC", "UI_OPT_KEYS_TWO_
 ## Pseudo settings keys of the rows of the bindings page (get_row()).
 const ROW_PROFILE: String = "bindings/profile"
 const ROW_LAYOUT: String = "controls/party_keyboard"
+## Settings keys of the co-op options (off by default; Settings.get_bool answers false while a key is unset).
+const KEY_RIVAL_SCORE: String = "coop/rival_score"
+const KEY_HELPER_MODE: String = "coop/helper_mode"
 
 ## Action being rebound (empty when not listening).
 var listening_action: StringName = &""
@@ -343,6 +351,9 @@ func _build_main(list: VBoxContainer) -> void:
 				maxi(0, TOUCH_LAYOUTS.find(str(Settings.get_value(KEY_TOUCH_LAYOUT, TOUCH_LAYOUTS[0])))))
 		layout_row.changed.connect(func(index: int) -> void: Settings.set_value(KEY_TOUCH_LAYOUT, TOUCH_LAYOUTS[index]))
 		_add_row(list, KEY_TOUCH_LAYOUT, layout_row)
+	_heading(list, "UI_OPT_COOP")
+	_toggle(list, KEY_RIVAL_SCORE, "UI_OPT_RIVAL_SCORE")
+	_toggle(list, KEY_HELPER_MODE, "UI_OPT_HELPER_MODE")
 	_heading(list, "UI_OPT_GAME")
 	_locales = PackedStringArray([""])
 	_locales.append_array(UiKit.available_locales())

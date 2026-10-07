@@ -102,6 +102,10 @@ var _stun_min: int = Tuning.HIT_STUN_MIN
 var _facing_at_tick_start: int = 1
 ## True when this tick's tile collision met a wall in the wall probe (11.2 #7): a batted ball uncurls there.
 var wall_bumped: bool = false
+## The grid whose TileGrid.x_max_excl() [member _x_max] holds (step 8e asks it every tick; a grid's width never
+## changes).
+var _x_max_grid: TileGrid = null
+var _x_max: int = 0
 
 ## What _refresh_visual() last wrote to the sprites (the performance pass: no engine property is read or written on a
 ## tick on which the picture did not change).
@@ -110,6 +114,8 @@ var _shown_flip: bool = false
 var _shown_visible: bool = true
 var _shown_alpha: float = 1.0
 var _shown_tint: Color = Color.WHITE
+## True while [member _shown_tint] is not white.
+var _tinted: bool = false
 var _glider_shown: bool = false
 var _glider_flip: bool = false
 var _glider_y: int = GLIDER_CARRY_Y
@@ -124,6 +130,7 @@ func _ready() -> void:
 		_shown_visible = _sprite.visible
 		_shown_alpha = _sprite.modulate.a
 		_shown_tint = _sprite.self_modulate
+		_tinted = _shown_tint != Color.WHITE
 	if _glider_sprite != null:
 		_glider_shown = _glider_sprite.visible
 		_glider_flip = _glider_sprite.flip_h
@@ -533,13 +540,20 @@ func _hero_update() -> void:
 	else:
 		_run_handler(selected)
 	# 8e: x step, committed only inside the level bounds (2.0: and inside this tick's fence - edge walls, raft rails;
-	# never fenced in single-player); 8f: y step, unconditional.
-	var next_x: int = sim_pos.x + Tuning.floor16(xvel)
-	if next_x >= Tuning.X_MIN and next_x < level.grid.x_max_excl() and (not _fenced or fence_allows(next_x)):
-		sim_pos.x = next_x
-	if _fenced:
-		clear_fence()
-	sim_pos.y += Tuning.floor16(yvel)
+	# never fenced in single-player); 8f: y step, unconditional. (`v >> 4` is Tuning.floor16(v), written out on the
+	# hero's per-tick path - the two-hero performance pass, PLAN.md P2.12; the same integer arithmetic.)
+	var next_x: int = sim_pos.x + (xvel >> 4)
+	var grid: TileGrid = level.grid
+	if grid != _x_max_grid:
+		_x_max_grid = grid  # TileGrid.x_max_excl() depends on the grid's width only: asked once per grid
+		_x_max = grid.x_max_excl()
+	if next_x >= Tuning.X_MIN and next_x < _x_max:
+		if not _fenced:
+			sim_pos.x = next_x
+		elif next_x >= _fence_left and next_x < _fence_right:  # fence_allows(next_x)
+			sim_pos.x = next_x
+	_fenced = false  # clear_fence(): a fence lasts for this tick's x step
+	sim_pos.y += yvel >> 4
 	# 8g: tile collision.
 	var low: bool = selected == Defs.HeroState.CRAWL or selected == Defs.HeroState.CROUCH
 	_collide(level, Tuning.HERO_PROBE_H_CROUCH if low else Tuning.HERO_PROBE_H_STAND)
@@ -574,24 +588,26 @@ func _run_handler(selected: int) -> void:
 # --- Primitives (PHYSICS.md 5.1, 6.2) ---------------------------------------------------------------------------------
 
 ## ACCEL(limit): one acceleration step in the facing direction while LEFT or RIGHT is held, then the clamp.
+## (`ACCEL >> ice` is Tuning.accel_step(ice), written out: these primitives run several times per hero and tick.)
 func _accel(limit: int) -> void:
 	var value: int = xvel
 	if _lr_held:
-		value += facing * Tuning.accel_step(ice)
+		value += facing * (Tuning.ACCEL >> ice)
 	xvel = clampi(value, -limit, limit)
 
 
-## FRICTION: |xvel| shrinks by one braking step, not below zero.
+## FRICTION: |xvel| shrinks by one braking step (Tuning.friction_step(ice) = FRICTION >> ice), not below zero.
 func _friction() -> void:
-	var magnitude: int = maxi(absi(xvel) - Tuning.friction_step(ice), 0)
+	var magnitude: int = maxi(absi(xvel) - (Tuning.FRICTION >> ice), 0)
 	xvel = -magnitude if xvel < 0 else magnitude
 
 
-## WIND: the level's wind pushes left; without wind this is only the floor on leftward speed.
+## WIND: the level's wind pushes left (wind >> WIND_SHIFT, Tuning.shr); without wind this is only the floor on
+## leftward speed.
 func _wind() -> void:
 	var level: LevelBase = Game.level
 	if level != null:
-		xvel -= Tuning.shr(level.wind, Tuning.WIND_SHIFT)
+		xvel -= level.wind >> Tuning.WIND_SHIFT
 	if xvel < Tuning.LEFT_FLOOR:
 		xvel = Tuning.LEFT_FLOOR
 
@@ -695,10 +711,10 @@ func _jump_body(halved: bool) -> void:
 		var impulse: int = Tuning.JUMP_IMPULSES[n] if n < jump_impulse_ticks else 0
 		if jump_impulse_quarters != 4:
 			impulse = (impulse * jump_impulse_quarters) >> 2
-		yvel += Tuning.shr(impulse, 1) if halved else impulse
+		yvel += (impulse >> 1) if halved else impulse
 	else:
 		_gravity()
-	if Tuning.unsigned_below(xvel, Tuning.JUMP_HELD_CAP):
+	if (xvel & 0xFFFF) < Tuning.JUMP_HELD_CAP:  # Tuning.unsigned_below(xvel, JUMP_HELD_CAP)
 		_accel(Tuning.JUMP_HELD_CAP)
 	else:
 		_friction()
@@ -812,8 +828,8 @@ func _create_club_box(frame: int, weapon: int) -> void:
 	if weapon == Defs.Weapon.HAMMER and frame == Tuning.ClubFrame.FWD_FRONT:
 		rect = Tuning.HAMMER_FRONT_BOX
 		origin = Tuning.HAMMER_FRONT_ORIGIN
-	var base_x: int = sim_pos.x + Tuning.floor16(xvel)
-	var base_y: int = sim_pos.y + Tuning.floor16(yvel)
+	var base_x: int = sim_pos.x + (xvel >> 4)  # Tuning.floor16
+	var base_y: int = sim_pos.y + (yvel >> 4)
 	club_box_xo = origin.x - rect.position.x
 	club_origin = Vector2i(base_x + facing * origin.x, base_y + origin.y)
 	club_box = Rect2i(club_origin.x - club_box_xo, base_y + rect.position.y, rect.size.x, rect.size.y)
@@ -934,8 +950,9 @@ func _close_glider() -> void:
 
 func _collide(level: LevelBase, body_height: int) -> void:
 	var grid: TileGrid = level.grid
-	var col: int = Tuning.to_cell(sim_pos.x)
-	var row: int = Tuning.to_cell(sim_pos.y)
+	# `v >> 4` is Tuning.to_cell(v) / floor16(v) throughout the collision (the same floor; P2.12 performance pass).
+	var col: int = sim_pos.x >> 4
+	var row: int = sim_pos.y >> 4
 	var edge: int = 0
 	if xvel > 0:
 		edge = Tuning.WALL_PROBE
@@ -992,10 +1009,10 @@ func _collide(level: LevelBase, body_height: int) -> void:
 	if sim_pos.y <= 0:
 		return
 	# 7. Wall probe: 9 px ahead, in the row above the feet row only.
-	var probe_col: int = Tuning.to_cell(sim_pos.x + edge)
+	var probe_col: int = (sim_pos.x + edge) >> 4
 	var side: int = grid.side_at(probe_col, row - 1)
 	if side == TileGrid.SIDE_WALL:
-		sim_pos.x -= Tuning.floor16(xvel)
+		sim_pos.x -= xvel >> 4
 		xvel = 0
 		wall_bumped = true
 	elif side == TileGrid.SIDE_DEADLY:
@@ -1016,16 +1033,18 @@ func _collide(level: LevelBase, body_height: int) -> void:
 func _left_the_playfield(level: LevelBase, col: int, row: int) -> bool:
 	# 2.0: a party measures against the tribe camera's authentic frame (identical on every device, PHYSICS.md C.13) and
 	# its cell, so a co-op or versus route replays the same on any screen; one hero keeps the 1.0 view and camera cell.
-	var view: Rect2i = level.get_view_rect()
-	var cell: Vector2i = Vector2i.ZERO
+	var view: Rect2i
+	var cell: Vector2i
 	if level.hero_count() <= 1:
+		view = level.get_view_rect()
 		cell = level.get_camera_cell()
 	else:
 		view = level.get_party_frame()
 		cell = Vector2i(view.position.x >> 4, view.position.y >> 4)
 	# The original limits are one screen (20 x 11 tiles); a larger view keeps "one screen" (ARCHITECTURE 2).
-	var max_rows: int = maxi(Tuning.DEATH_ROWS_FROM_CAMERA, Tuning.to_cell(view.size.y))
-	var max_cols: int = maxi(Tuning.DEATH_COLS_FROM_CAMERA, Tuning.to_cell(view.size.x + Tuning.TILE - 1))
+	# (`>> 4` is Tuning.to_cell, written out: this runs for every hero on every tick.)
+	var max_rows: int = maxi(Tuning.DEATH_ROWS_FROM_CAMERA, view.size.y >> 4)
+	var max_cols: int = maxi(Tuning.DEATH_COLS_FROM_CAMERA, (view.size.x + Tuning.TILE - 1) >> 4)
 	# 2.0 co-op: a hero above or below the tribe camera's frame while a partner of the tribe holds the view (a
 	# partner's jump scrolled it up, or he dropped below a partner who stands) is the leash's case (C.13: an egg after
 	# 121 / 73 ticks outside the view, the edge arrow counts down), not an instant down. The pit rule below still takes
@@ -1037,7 +1056,7 @@ func _left_the_playfield(level: LevelBase, col: int, row: int) -> bool:
 	if (level.scroll_flags & Defs.SCROLL_AUTO_DOWN) != 0 and sim_pos.y < view.position.y:
 		kill(&"off_screen")
 		return true
-	if sim_pos.y > level.grid.height_px() + Tuning.PIT_DEPTH_PX:
+	if sim_pos.y > level.grid.rows * Tuning.TILE + Tuning.PIT_DEPTH_PX:  # TileGrid.height_px()
 		kill(&"pit")
 		return true
 	return false
@@ -1069,19 +1088,24 @@ func _land(level: LevelBase, col: int, row: int, was_grounded: bool) -> bool:
 	ice = 0
 	if yvel < 0:
 		return true  # floors are one-way
-	_close_glider()
-	sim_pos.y = Tuning.tile_top(sim_pos.y)
-	if grid.has_profile(col, row):
-		var offset: int = grid.surface_offset(col, row, sim_pos.x)
-		var descent: int = Tuning.floor16(yvel)
+	if glide != 0:
+		_close_glider()
+	sim_pos.y = sim_pos.y & ~15  # Tuning.tile_top
+	# The surface profiles read once each (grid.has_profile / surface_offset, written out: every grounded tick).
+	var profile: int = grid.profile_at(col, row)
+	if profile != TileGrid.PROFILE_NONE:
+		var offset: int = TileGrid.profile_offset(profile, sim_pos.x)
+		var descent: int = yvel >> 4
 		if descent > 0 and offset >= descent:
 			offset = descent
 		sim_pos.y += offset
-	elif grid.has_profile(col, row - 1):
-		# Walk up onto a slope that starts in the tile above.
-		var above: int = grid.surface_offset(col, row - 1, sim_pos.x)
-		if above < Tuning.TILE:
-			sim_pos.y += above - Tuning.TILE
+	else:
+		var above_profile: int = grid.profile_at(col, row - 1)
+		if above_profile != TileGrid.PROFILE_NONE:
+			# Walk up onto a slope that starts in the tile above.
+			var above: int = TileGrid.profile_offset(above_profile, sim_pos.x)
+			if above < Tuning.TILE:
+				sim_pos.y += above - Tuning.TILE
 	if curl == CURL_BALL:
 		# 2.0: a batted ball lands softly (PHYSICS.md C.11); a line drive or a lob uncurls here.
 		hero_party.ball_landed()
@@ -1121,12 +1145,12 @@ func _land(level: LevelBase, col: int, row: int, was_grounded: bool) -> bool:
 
 
 func _ceiling_block(grid: TileGrid, col: int, row: int) -> void:
-	var ceiling: int = grid.ceiling_at(col, row - Tuning.HEAD_PROBE_ROWS)
+	var ceiling: int = grid.flags_at(col, row - Tuning.HEAD_PROBE_ROWS) & TileGrid.FLAG_CEILING_MASK  # ceiling_at
 	if ceiling == TileGrid.CEILING_SOLID:
 		if yvel != 0:
 			# Head bump: stopped and pushed down to the next row boundary.
 			yvel = 0
-			sim_pos.y = Tuning.tile_top(sim_pos.y) + Tuning.TILE
+			sim_pos.y = (sim_pos.y & ~15) + Tuning.TILE  # the next row boundary (Tuning.tile_top + 16)
 			bumped_head = true
 	elif ceiling == TileGrid.CEILING_DEADLY:
 		kill(&"spikes")
@@ -1183,8 +1207,8 @@ func _tick_timers(level: LevelBase) -> void:
 		hero_climb.tick_timers()
 	if hero_mount.active:
 		hero_mount.tick_timers()
-	if hero_party.active:
-		hero_party.tick_timers()
+	if hero_party.active and totem_drop_lock > 0:
+		hero_party.tick_timers()  # its only timer: the Totem drop lock
 
 
 ## Sprite box of the pose of this tick, used by every sprite contact (PHYSICS.md 2.1).
@@ -1198,7 +1222,7 @@ func _update_box() -> void:
 		set_box(Tuning.HERO_BOX_FALL_LONG if long_fall else Tuning.HERO_BOX_FALL)
 	elif handler == Defs.HeroState.JUMP:
 		set_box(Tuning.HERO_BOX_JUMP_UP if jump_ticks <= Tuning.HERO_JUMP_TALL_BOX_TICKS else Tuning.HERO_BOX_JUMP_TOP)
-	elif is_low():
+	elif state == Defs.HeroState.CROUCH or state == Defs.HeroState.CRAWL:  # is_low()
 		set_box(Tuning.HERO_BOX_CROUCH)
 	elif grounded:
 		set_box(Tuning.HERO_BOX_STAND)
@@ -1219,11 +1243,18 @@ func _contact_pass() -> void:
 		hero_party.ball_contacts(level)  # 2.0: a batted ball knocks small enemies (PHYSICS.md C.11)
 		return
 	var enemies: Array[SimEntity] = level.get_kind(Defs.Kind.ENEMY)
+	var x: int = sim_pos.x
+	var y: int = sim_pos.y
 	for i: int in enemies.size():
 		var enemy: EnemyBase = enemies[i] as EnemyBase
-		if enemy == null or not enemy.awake or not enemy.contact_hurts or not enemy.is_targetable():
+		if enemy == null or not enemy.awake or not enemy.contact_hurts:
 			continue
-		if not Overlap.body(self, enemy, self):
+		# Overlap.body's coarse reject before any call (the performance pass, PLAN.md P2.12: most awake enemies are far
+		# from each hero); the outcome is the same, since a pair this far apart never overlaps.
+		var at: Vector2i = enemy.sim_pos
+		if absi(at.x - x) >= Tuning.OVERLAP_MAX_DX or absi(at.y - y) >= Tuning.OVERLAP_MAX_DY:
+			continue
+		if not enemy.is_targetable() or not Overlap.body(self, enemy, self):
 			continue
 		var stomp: bool = Overlap.stomp
 		var depth: int = Overlap.depth
@@ -1392,22 +1423,30 @@ func _refresh_visual() -> void:
 		if _shown_visible != shown:
 			_shown_visible = shown
 			_sprite.visible = shown
-		var ghost: bool = (hit_timer > 0 or shield > 0) and not dead and Sim.tick % Tuning.BLINK_PERIOD != 0
+		var ghost: bool = false
+		if (hit_timer > 0 or shield > 0) and not dead:
+			ghost = Sim.tick % Tuning.BLINK_PERIOD != 0
 		var alpha: float = BLINK_ALPHA if ghost else 1.0
 		if _shown_alpha != alpha:
 			_shown_alpha = alpha
 			var modulation: Color = _sprite.modulate
 			modulation.a = alpha
 			_sprite.modulate = modulation
-		var tint: Color = Color.WHITE
+		# The tint is white unless a charge glows: the usual tick only tests two fields ([member _tinted]).
 		if charge > 0 and not dead:
+			var tint: Color = Color.WHITE
 			if _charge_chimed:
 				tint = CHARGE_FULL_TINT if (Sim.tick >> 1) & 1 == 0 else CHARGE_TINT
 			else:
 				tint = Color.WHITE.lerp(CHARGE_TINT, minf(float(charge) / float(Tuning.CHARGE_STEP_MAX_AT), 1.0))
-		if _shown_tint != tint:
-			_shown_tint = tint
-			_sprite.self_modulate = tint
+			if _shown_tint != tint:
+				_shown_tint = tint
+				_tinted = tint != Color.WHITE
+				_sprite.self_modulate = tint
+		elif _tinted:
+			_shown_tint = Color.WHITE
+			_tinted = false
+			_sprite.self_modulate = Color.WHITE
 	if _glider_sprite != null:
 		var carried: bool = run.has_glider and not dead and not down
 		if _glider_shown != carried:
