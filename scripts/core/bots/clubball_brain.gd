@@ -243,11 +243,14 @@ func _out_from_under(hero: PlayerBase) -> int:
 	var above: int = hero.sim_pos.y - Tuning.HERO_BOX_STAND.y - ball.sim_pos.y
 	if absi(dx) > UNDER_PX or above < -4 or above > UNDER_ABOVE_PX:
 		return -1
-	# A ball lying on a floor over him (a bridge, a ledge) does not come down on his head.
+	# A ball lying on a floor over him (a bridge, a ledge) does not come down on his head. The row of his head counts:
+	# on a ledge exactly 3 rows under a bridge his head (35 px up) is in the bridge's own row, and a keeper who took
+	# the ball lying up there for one over his head shuffled under it for ever (Coconut Cove, seed 53 round 3:
+	# wf10_content_to_core-B.txt #7).
 	var grid: TileGrid = bot.level.grid if bot.level != null else null
 	if grid != null:
 		var col: int = ball.sim_pos.x >> 4
-		for row: int in range(ball.sim_pos.y >> 4, (hero.sim_pos.y - Tuning.HERO_BOX_STAND.y) >> 4):
+		for row: int in range(ball.sim_pos.y >> 4, ((hero.sim_pos.y - Tuning.HERO_BOX_STAND.y) >> 4) + 1):
 			if grid.in_bounds(col, row) and grid.floor_at(col, row) != TileGrid.FLOOR_EMPTY:
 				return -1
 	var step: int = -attack_dir

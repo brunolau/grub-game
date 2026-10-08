@@ -22,8 +22,12 @@ extends TestCase
 ## default every mode) ships human-only - it prints a skip line "human-only (cut 4)" and is not played. Every round
 ## awaits a frame (the freed levels' queued callbacks are flushed; one frame for all sets overflowed Godot's message
 ## queue, wf9_integration_to_core-B.txt #1). VERSUS_BOTS_SHARD=<i>/<n> plays every n-th (arena, mode) set from the
-## i-th (tools/g3_versus_bots.sh runs the shards side by side; the mover bake runs in shard 0). Also here (too slow for the quick tests): the rider movers of the arena kit - a see-saw's two ends and a
-## pulley's two lifts - bake as mover nodes whose every link verifies.
+## i-th (tools/g3_versus_bots.sh runs the shards side by side; the mover bake runs in shard 0). Also here (too slow
+## for the quick tests): the rider movers of the arena kit - a see-saw's two ends and a pulley's two lifts - bake as
+## mover nodes whose every link verifies, the lifts with links at every still state of their pulley (core-B wf10); a
+## bot gets off and on lifts that a rival holds between their stops; every committed graph with pulley lifts is
+## verified in full (the last shard; the quick tests check a sample). Bakes and long verifications run in frames
+## (NavBaker's header: one go overflows the engine's callback queue).
 
 const LEVEL_SCENE: String = "res://scenes/world/level.tscn"
 const LEVEL_DIR: String = "res://levels"
@@ -100,6 +104,8 @@ W = objects/pulley a=pa b=pb range=3
 [entities]
 """
 
+const MOVERS_ID: StringName = &"test_core_bots_seesaw"
+
 ## Graphs baked in this run (level id -> JSON text), so that each arena is baked at most once.
 static var _baked: Dictionary = {}
 
@@ -155,31 +161,235 @@ func test_see_saw_and_pulley_lifts_bake_as_verified_rider_movers() -> void:
 	if _shard().x != 0:
 		assert_true(true, "the mover bake runs in shard 0")
 		return
-	var graph: NavGraph = NavBaker.new().bake_text(self, &"test_core_bots_seesaw", MOVERS_ROOM)
+	var graph: NavGraph = await _movers_graph()
 	assert_not_null(graph)
 	if graph == null:
 		return
 	var parts: Dictionary = {}
-	for mover: Dictionary in graph.movers:
+	var lifts: Dictionary = {}  # mover index -> node id
+	for index: int in graph.movers.size():
+		var mover: Dictionary = graph.movers[index]
 		assert_eq(StringName(str(mover["kind"])), NavGraph.MOVER_RIDER, "%s moves under its riders" % mover["key"])
 		parts[str(mover["id"])] = int(parts.get(str(mover["id"]), 0)) + 1
+		if graph.is_pulley_lift(index):
+			assert_eq(int(mover["limit"]), 48, "%s: its pulley's travel (range 3)" % mover["key"])
+			for node: NavGraph.NavNode in graph.nodes:
+				if node.mover == index:
+					lifts[index] = node.id
 	assert_eq(int(parts.get("objects/seesaw", 0)), 2, "both plank ends of the see-saw (%s)" % [parts])
 	assert_eq(int(parts.get("objects/platform", 0)), 2, "both pulley lifts (%s)" % [parts])
+	assert_eq(lifts.size(), 2, "both lifts know their pulley")
 	var onto: int = 0
 	var off: int = 0
+	# Per lift: the pulley offsets (px) that have a link off it / onto it.
+	var off_states: Dictionary = {}
+	var onto_states: Dictionary = {}
 	for link: NavGraph.NavLink in graph.links:
-		if not link.cond.is_empty():
-			if graph.nodes[link.to].mover >= 0 and graph.nodes[link.from].mover < 0:
-				onto += 1
-			elif graph.nodes[link.from].mover >= 0:
-				off += 1
+		if link.cond.is_empty():
+			continue
+		if graph.nodes[link.to].mover >= 0 and graph.nodes[link.from].mover < 0:
+			onto += 1
+		elif graph.nodes[link.from].mover >= 0:
+			off += 1
+		var mover: int = link.cond[0]
+		if not lifts.has(mover):
+			continue
+		assert_eq(Vector2i(link.cond[3], link.cond[4]), Vector2i.ZERO, "link %d: the lift stands still" % link.id)
+		assert_eq(link.cond[1], 0, "link %d: a lift only moves up and down" % link.id)
+		var p: int = graph.link_pulley_offset(link)
+		var states: Dictionary = off_states if graph.nodes[link.from].mover == mover else onto_states
+		var seen: Dictionary = states.get(mover, {})
+		seen[p] = true
+		states[mover] = seen
 	assert_true(onto >= 2 and off >= 4, "links onto (%d) and off (%d) the movers" % [onto, off])
+	# A pulley never returns to its level start, so a rider needs a way off at EVERY still state of it (2 px apart) -
+	# a lift held between its stops by an equal weight on the other one stranded the bots of Tar Pulleys at G3.
+	var offsets: PackedInt32Array = NavMovers.pulley_offsets(48)
+	for mover: int in lifts:
+		var missing: PackedInt32Array = PackedInt32Array()
+		for p: int in offsets:
+			if not (off_states.get(mover, {}) as Dictionary).has(p):
+				missing.append(p)
+		assert_eq(Array(missing), [], "%s: a link off it at every pulley state" % graph.movers[mover]["key"])
+		var boards: Dictionary = onto_states.get(mover, {})
+		assert_true(boards.has(0) and (boards.has(48) or boards.has(-48)) and boards.size() >= 12,
+				"%s: links onto it at rest, at a stop and between (%d states)" % [graph.movers[mover]["key"], boards.size()])
 	var baker: NavBaker = NavBaker.new()
 	var data: LevelData = LevelData.parse(graph.level_id, MOVERS_ROOM)
 	assert_true(baker.sim.setup(self, graph.level_id, data.build_grid(0), data.resolved_meta(0), data.entity_records()))
-	var problems: PackedStringArray = baker.verify_graph(graph)
+	var problems: PackedStringArray = await baker.verify_graph_in_frames(graph, self)
 	baker.sim.teardown()
 	assert_eq(problems.size(), 0, "; ".join(problems))
+	print("    %s: %d links (%d onto, %d off the movers), all verified" % [graph.level_id, graph.links.size(), onto, off])
+
+
+## A brain that only walks to `target`.
+class _Steer:
+	extends BotBrain
+
+	var target: Vector2i = Vector2i.ZERO
+
+	func think(_hero: PlayerBase, _level: LevelBase, _tick: int) -> void:
+		pass
+
+	func act(hero: PlayerBase, _level: LevelBase, tick: int) -> int:
+		bot.nav.set_target(target, 4)
+		return bot.nav.step(hero, tick)
+
+
+func test_a_bot_gets_off_and_on_lifts_a_rival_holds_between_their_stops() -> void:
+	# wf9_da_to_core_b.txt #1: two heroes, one on each lift, weigh the same, so the pulley stands wherever it was -
+	# the bots had links for its level-start state only and stood there for good. Here a rival camps on the right
+	# lift; the bot on the left one must leave it at a state between two stops, board it again where it then rests
+	# (risen to its top stop) and leave it there too.
+	if _shard().x != 0:
+		assert_true(true, "the lift ride runs in shard 0")
+		return
+	var graph: NavGraph = await _movers_graph()
+	assert_not_null(graph)
+	if graph == null:
+		return
+	var arena: Dictionary = _arena_entry(MOVERS_ID, MOVERS_ROOM)
+	var referee: VersusReferee = _load_round(arena, Defs.VersusMode.LAST_CAVEMAN, 2, 0, 7)
+	assert_not_null(referee)
+	if referee == null:
+		return
+	var left: MovingPlatform = _level.find_named(&"pa") as MovingPlatform
+	var right: MovingPlatform = _level.find_named(&"pb") as MovingPlatform
+	assert_true(left != null and right != null, "both lifts")
+	var hero: PlayerBase = _level.get_hero(0)
+	var rival: PlayerBase = _level.get_hero(1)
+	GameInput.set_scripted_slot(0, func(_tick: int) -> int: return 0)
+	GameInput.set_scripted_slot(1, func(_tick: int) -> int: return 0)
+	# The hero alone on the left lift: it sinks 2 px a tick; the rival steps onto the right one on the way.
+	hero.respawn_at(Vector2i(left.get_box().get_center().x, left.get_box().position.y + NavMovers.RIDE_SINK_PX))
+	Sim.step(7)
+	rival.respawn_at(Vector2i(right.get_box().get_center().x, right.get_box().position.y + NavMovers.RIDE_SINK_PX))
+	Sim.step(6)
+	var pulley: Pulley = left.pulley as Pulley
+	assert_not_null(pulley, "the pulley drives the lifts")
+	if pulley == null:
+		return
+	var held: int = pulley.offset
+	assert_true(held > 0 and held < 48 and not NavMovers.is_grid_offset(held, 48),
+			"the pulley is held between two stops and off the searched grid (offset %d)" % held)
+	Sim.step(8)
+	assert_eq(pulley.offset, held, "equal weights: it stands")
+	GameInput.clear_scripted_slot(0)
+	var bot: HeroBot = HeroBot.new(0, Defs.BotLevel.HUNTER, 5, Defs.VersusMode.LAST_CAVEMAN)
+	var steering: _Steer = _Steer.new()
+	steering.bot = bot
+	bot.brain = steering
+	bot.install()
+	var lift_node: int = -1
+	var ledge: int = graph.node_at(Vector2i(32, 96))
+	for node: NavGraph.NavNode in graph.nodes:
+		if node.mover >= 0 and graph.movers[node.mover].get("side", 0) == 1:
+			lift_node = node.id
+	assert_true(lift_node >= 0 and ledge >= 0, "the left lift and the left ledge are nodes")
+	# 1. Off the held lift, to the ledge beside it.
+	steering.target = Vector2i(32, 96)
+	var left_at: int = -1
+	var worst_idle: int = 0
+	var reached: bool = false
+	for t: int in 300:
+		Sim.step(1)
+		worst_idle = maxi(worst_idle, bot.idle_ticks)
+		if left_at < 0 and not hero.on_platform:
+			left_at = pulley.offset if absi(pulley.offset - held) <= PartyTuning.PULLEY_SPEED_PX else -999
+		if bot.nav.arrived(hero) and not bot.nav.is_busy():
+			reached = true
+			break
+	assert_true(reached, "the bot left the held lift for the ledge (stands at %s, offset %d)" % [hero.sim_pos,
+			pulley.offset])
+	assert_true(left_at != -999 and left_at >= 0, "he took off while the pulley was held at %d (it was at %d)" % [held,
+			left_at])
+	# 2. The rival's side sinks to its stop, the left lift rises to its top: board it there.
+	for t: int in 80:
+		Sim.step(1)
+		if pulley.offset == -48 and pulley.step == 0:
+			break
+	assert_eq(pulley.offset, -48, "the rival's lift sank to its stop")
+	reached = false
+	for t: int in 500:
+		steering.target = Vector2i(left.get_box().get_center().x, left.get_box().position.y)
+		Sim.step(1)
+		worst_idle = maxi(worst_idle, bot.idle_ticks)
+		if hero.on_platform and bot.nav.node_of(hero) == lift_node and not bot.nav.is_busy():
+			reached = true
+			break
+	assert_true(reached, "the bot boarded the risen lift (stands at %s, lift top %s)" % [hero.sim_pos,
+			left.get_box().position])
+	Sim.step(4)
+	assert_eq(pulley.offset, -48, "both ride again: it stands at its stop")
+	# 3. And off it again, down to the floor.
+	steering.target = Vector2i(40, 160)
+	reached = false
+	for t: int in 400:
+		Sim.step(1)
+		worst_idle = maxi(worst_idle, bot.idle_ticks)
+		if bot.nav.arrived(hero) and not bot.nav.is_busy():
+			reached = true
+			break
+	assert_true(reached, "the bot left the risen lift for the floor (stands at %s)" % hero.sim_pos)
+	assert_true(worst_idle <= 60, "he never stood idle for long (%d ticks)" % worst_idle)
+	assert_eq(bot.nav.links_failed, 0, "; ".join(bot.nav.failure_log))
+	print("    lift ride: held at %d, %d links played, worst idle %d" % [held, bot.nav.links_played, worst_idle])
+	bot.uninstall()
+	GameInput.clear_scripted()
+	_free_level()
+
+
+func test_committed_graphs_with_pulley_lifts_hold_in_every_state() -> void:
+	# tests/test_core_bots.gd checks a sample of a committed pulley sweep in the quick run; here every link of every
+	# committed graph that has pulley lifts is re-simulated from every x of its window (the last shard).
+	var shard: Vector2i = _shard()
+	if shard.x != shard.y - 1:
+		assert_true(true, "the pulley graphs are verified in the last shard")
+		return
+	var checked: int = 0
+	for file: String in DirAccess.get_files_at(NavGraph.DIR):
+		if file.get_extension() != "json":
+			continue
+		var graph: NavGraph = NavGraph.load_file("%s/%s" % [NavGraph.DIR, file])
+		if graph == null:
+			continue
+		var swept: bool = false
+		for index: int in graph.movers.size():
+			swept = swept or graph.is_pulley_lift(index)
+		var level_path: String = "%s/%s.lvl" % [LEVEL_DIR, graph.level_id]
+		if not swept or not FileAccess.file_exists(level_path):
+			continue
+		var text: String = FileAccess.get_file_as_string(level_path)
+		if NavGraph.text_sha256(text) != graph.source_sha256:
+			continue  # stale: test_core_bots.test_committed_graphs_hold fails on it
+		var data: LevelData = LevelData.parse(graph.level_id, text, level_path)
+		var baker: NavBaker = NavBaker.new()
+		assert_true(baker.sim.setup(self, graph.level_id, data.build_grid(0), data.resolved_meta(0),
+				data.entity_records()))
+		var started: int = Time.get_ticks_msec()
+		var problems: PackedStringArray = await baker.verify_graph_in_frames(graph, self)
+		baker.sim.teardown()
+		assert_eq(problems.size(), 0, "%s: %s" % [file, "; ".join(problems)])
+		print("    %s: %d links verified in every pulley state (%d ms)" % [file, graph.links.size(),
+				Time.get_ticks_msec() - started])
+		checked += 1
+	assert_true(true, "%d graph(s) with pulley lifts" % checked)
+
+
+## The graph of MOVERS_ROOM, baked once per run (in frames: its pulley sweep is a long bake).
+func _movers_graph() -> NavGraph:
+	if not _baked.has(MOVERS_ID):
+		var started: int = Time.get_ticks_msec()
+		var baked: NavGraph = await NavBaker.new().bake_text_in_frames(self, MOVERS_ID, MOVERS_ROOM)
+		_baked[MOVERS_ID] = baked.to_json() if baked != null else ""
+		if baked != null:
+			print("    %s: baked in %d ms (%d candidate runs)" % [MOVERS_ID, Time.get_ticks_msec() - started,
+					int(baked.baker.get("candidates", 0))])
+	var json: JSON = JSON.new()
+	if str(_baked[MOVERS_ID]).is_empty() or json.parse(str(_baked[MOVERS_ID])) != OK:
+		return null
+	return NavGraph.from_dict(json.data)
 
 
 # =================================================================================================================
@@ -188,6 +398,7 @@ func test_see_saw_and_pulley_lifts_bake_as_verified_rider_movers() -> void:
 
 func _play_set(arena: Dictionary, mode: int) -> void:
 	var name: String = "%s/%s" % [arena["id"], Defs.VERSUS_MODE_NAMES[mode]]
+	await _bake_missing(arena)
 	var players: int = int(arena["players"])
 	var spawn_count: int = 0
 	var wins: PackedFloat32Array = PackedFloat32Array()
@@ -456,21 +667,34 @@ func _arena_entry(id: StringName, text: String) -> Dictionary:
 			"meta": meta, "shipped": String(id).begins_with("arena_"), "bots": bots}
 
 
-## The arena's graph: the committed one when it was baked from this text, else a bake of this run.
+## The arena's graph: the committed one when it was baked from this text, else the bake of this run
+## ([method _bake_missing], before the set's first round); null when there is neither.
 func _graph_for(arena: Dictionary) -> NavGraph:
 	var id: StringName = arena["id"]
 	var text: String = arena["text"]
 	var graph: NavGraph = NavGraph.load_file(NavGraph.path_for(id))
 	if graph != null and graph.source_sha256 == NavGraph.text_sha256(text):
 		return graph
-	if not _baked.has(id):
-		var baked: NavGraph = NavBaker.new().bake_text(self, id, text, Defs.Difficulty.BEGINNER,
-				NavGraph.weight_classes_for(arena["meta"]))
-		_baked[id] = baked.to_json() if baked != null else ""
 	var json: JSON = JSON.new()
-	if str(_baked[id]).is_empty() or json.parse(str(_baked[id])) != OK:
+	if str(_baked.get(id, "")).is_empty() or json.parse(str(_baked[id])) != OK:
 		return null
 	return NavGraph.from_dict(json.data)
+
+
+## Bake the arena's graph when no committed one was baked from its text (once per run; in frames - await it - and never
+## while a level runs: the bake has a sim world of its own).
+func _bake_missing(arena: Dictionary) -> void:
+	var id: StringName = arena["id"]
+	var text: String = arena["text"]
+	if _baked.has(id):
+		return
+	var graph: NavGraph = NavGraph.load_file(NavGraph.path_for(id))
+	if graph != null and graph.source_sha256 == NavGraph.text_sha256(text):
+		return
+	_free_level()
+	var baked: NavGraph = await NavBaker.new().bake_text_in_frames(self, id, text, Defs.Difficulty.BEGINNER,
+			NavGraph.weight_classes_for(arena["meta"]))
+	_baked[id] = baked.to_json() if baked != null else ""
 
 
 ## A fresh copy of the arena as round `round_index` of `mode` with `players` heroes, the intro skipped; its referee.

@@ -8,7 +8,7 @@
   "wrap": "none",
   "weights": [0,1,2],
   "clip": [],
-  "baker": {"candidates":20740,"rejected":0,"simulated_ticks":476183,"verified_starts":1026,"version":3},
+  "baker": {"candidates":20740,"rejected":0,"simulated_ticks":476176,"verified_starts":1026,"version":3},
   "movers": [
   ],
   "nodes": [

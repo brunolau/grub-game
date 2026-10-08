@@ -40,7 +40,7 @@ msgid "SIGN_W9_COOP_SEESAW"
 msgstr "One waits on the low end. One drops on the high end!"
 
 msgid "SIGN_W9_COOP_PULLEY"
-msgstr "Step on both lifts. One weighs his down, one hops his up!"
+msgstr "Crouch on one lift to weigh it down. Your partner hops his up!"
 
 msgid "SIGN_W9_COOP_STORM"
 msgstr "Two storm birds keep the wall. Strike both at once!"

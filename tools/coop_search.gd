@@ -16,6 +16,14 @@ extends SceneTree
 ##                              gate one player opens through his idle partner from one he opens alone
 ##   ... -- --stats             runs, ticks and new resting points per macro group (what the search spends its time on)
 ##   ... -- --no-cache          no result cache (neither the in-process nor the file cache of CoopSearch)
+##   ... -- --fresh             search every chosen gate again (no cache READ) and store the result: the uncached
+##                              proof run of G59 (tools/world_coop_gates.sh --fresh)
+##   ... -- --table             print only the G59 verdict line of every gate (`GATE <level> <difficulty> <gate>:
+##                              <verdict> (<evidence>)`, CoopSearch.verdict_line) and the summary
+##   ... -- --nodes=<n>         the resting-point bound (CoopSearch.node_limit; default MAX_NODES)
+##   ... -- --ticks=<n>         the tick budget (CoopSearch.tick_limit; default MAX_TICKS)
+##   ... -- --no-probes         no continuous-play probes (every bounded result is then UNPROVEN)
+##   ... -- --max-gates=<n>     stop after n searches (a queue worker that makes room for an import between gates)
 ##   ... -- --queue=<dir>       a WORKER of a shared queue: take the gates dearest first (CoopSearch.order_by_cost) and
 ##                              search only those this process claims in <dir> (CoopSearch.claim_gate) - N workers
 ##                              started on the same <dir> share the table without a fixed split (tools/world_coop_gates.sh)
@@ -23,8 +31,11 @@ extends SceneTree
 ##                              afresh - no cache read or write), so a table of 45 gates times 3 costs what about 70 gates x
 ##                              2 difficulties will (tools/world_coop_gates.sh --bench <k>); with --queue each copy is claimed
 ##                              on its own
-## Prints one line per gate (refused / REACHED, seconds, resting points, runs, ticks simulated) and a summary. Exit
-## code 0 = every gate refused and every window below its solo minimum - 4, 1 = not, 2 = bad arguments.
+## Prints per gate: one line (refused / REACHED / UNPROVEN, seconds, resting points, runs, ticks simulated), its G59
+## verdict line (`GATE ...`: refused (exhaustive) | refused (bounded) | open | unproven, with the evidence) and the
+## report of the search and of every probe family (CoopSearch.report_lines); then a summary with the verdict counts.
+## Exit code 0 = every gate refused (exhaustively, or bounded with every probe of its kind) and every window below its
+## solo minimum - 4; 1 = a gate is open or unproven or a window too wide; 2 = bad arguments.
 ##
 ## Autoloads are reached through the tree and the search is loaded by path: this script is compiled before they exist.
 
@@ -78,6 +89,9 @@ func _run() -> void:
 	var node_limit: int = -1
 	var tick_limit: int = -1
 	var no_probes: bool = false
+	var fresh: bool = false
+	var table_only: bool = false
+	var max_gates: int = -1
 	for argument: String in OS.get_cmdline_user_args():
 		if argument == "--list":
 			listing = true
@@ -104,6 +118,17 @@ func _run() -> void:
 			cache = false
 		elif argument == "--no-probes":
 			no_probes = true
+		elif argument == "--fresh":
+			fresh = true
+		elif argument == "--table":
+			table_only = true
+		elif argument.begins_with("--max-gates="):
+			var most: String = argument.get_slice("=", 1)
+			if not most.is_valid_int() or most.to_int() < 1:
+				print("coop_search: bad --max-gates (want a count of 1 or more)")
+				_finish(2)
+				return
+			max_gates = most.to_int()
 		elif argument.begins_with("--ticks="):
 			var budget: String = argument.get_slice("=", 1)
 			if not budget.is_valid_int() or budget.to_int() < 1:
@@ -182,6 +207,8 @@ func _run() -> void:
 	var gate_seconds: float = 0.0
 	var started: int = Time.get_ticks_msec()
 	for entry: Dictionary in chosen:
+		if max_gates > 0 and searched >= max_gates:
+			break
 		var copy: int = int(entry.get("copy", 0))
 		var claim_gate: String = str(entry["gate"]) if copy == 0 else "%s#%d" % [entry["gate"], copy]
 		if queue != "" and not bool(search.call(&"claim_gate", queue, entry["level"], int(entry["difficulty"]),
@@ -191,13 +218,18 @@ func _run() -> void:
 		search.call(&"profile_reset")
 		search.set(&"use_cache", cache and copy == 0)
 		search.set(&"use_file_cache", cache and copy == 0)
+		search.set(&"refresh_cache", fresh)
 		var clock: int = Time.get_ticks_msec()
 		var result: Dictionary = search.call(&"search_gate", entry["level"], entry["difficulty"], entry["gate"])
 		var seconds: float = (Time.get_ticks_msec() - clock) / 1000.0
 		gate_seconds += seconds
+		var verdict: Dictionary = search.call(&"gate_verdict", result)
+		var verdict_name: String = str(verdict["verdict"])
+		verdicts[verdict_name] = int(verdicts.get(verdict_name, 0)) + 1
 		var label: String = "%s (%s) gate %s%s" % [entry["level"], _difficulty_name(int(entry["difficulty"])),
 			entry["gate"], "" if copy == 0 else " (bench copy %d)" % copy]
 		var reached: bool = bool(result.get("reached", true))
+		var unproven: bool = verdict_name == "unproven"
 		var bad_windows: PackedStringArray = PackedStringArray()
 		for window: Dictionary in result.get("windows", []):
 			if bool(window.get("slot_bound", false)):
@@ -206,14 +238,16 @@ func _run() -> void:
 				bad_windows.append("%s window %d solo_min %d" % [window["what"], window["window"], window["solo_min"]])
 		if reached or not bad_windows.is_empty():
 			failures += 1
-		print("%s: %s in %.1f s (%d resting points, %d runs, %d ticks, %d replayed%s)" % [label,
-			"REACHED" if reached else "refused", seconds, int(result.get("explored", 0)), int(result.get("runs", 0)),
-			int(result.get("simulated", 0)), int(result.get("replayed", 0)),
-			", cached" if bool(result.get("cached", false)) else ""])
-		for line: String in search.call(&"report_lines", result):
-			print("    %s" % line)
-		if reached:
-			print("    %s" % result.get("detail", ""))
+		if not table_only:
+			print("%s: %s in %.1f s (%d resting points, %d runs, %d ticks, %d replayed%s)" % [label,
+				"UNPROVEN" if unproven else ("REACHED" if reached else "refused"), seconds,
+				int(result.get("explored", 0)), int(result.get("runs", 0)), int(result.get("simulated", 0)),
+				int(result.get("replayed", 0)), ", cached" if bool(result.get("cached", false)) else ""])
+		print("%s%s" % ["" if table_only else "    ", search.call(&"verdict_line", entry["level"],
+			int(entry["difficulty"]), str(entry["gate"]), result)])
+		if not table_only:
+			for line: String in search.call(&"report_lines", result):
+				print("    %s" % line)
 		for line: String in bad_windows:
 			print("    window too wide: %s" % line)
 		if profiling:
@@ -231,8 +265,11 @@ func _run() -> void:
 			sim_profile.parts.clear()
 		# Let the main loop turn: the freed search world's canvas callbacks are flushed (wf8_D5_to_integration #1).
 		await process_frame
-	print("coop_search: %d gate(s) in %.1f s (%.1f s searching), %d failing; verdicts %s" % [searched,
-		(Time.get_ticks_msec() - started) / 1000.0, gate_seconds, failures, str(verdicts)])
+	var counts: PackedStringArray = PackedStringArray()
+	for name: String in ["refused (exhaustive)", "refused (bounded)", "open", "unproven"]:
+		counts.append("%d %s" % [int(verdicts.get(name, 0)), name])
+	print("coop_search: %d gate(s) in %.1f s (%.1f s searching), %d failing; verdicts: %s" % [searched,
+		(Time.get_ticks_msec() - started) / 1000.0, gate_seconds, failures, ", ".join(counts)])
 	_finish(1 if failures > 0 else 0)
 
 

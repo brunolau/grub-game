@@ -32,7 +32,10 @@ extends RefCounted
 ## equal weight on the other side; at the lift's bottom his own weight holds it there); a link between two other nodes
 ## that touched a lift on the way (a hop off its top) carries the state it was verified in. `cond` = [mover, 0, side * p,
 ## 0, 0]. A bot plans only with the pulley links of the state the pulley will rest in (BotNavigator, [method
-## pulley_rest]).
+## pulley_rest]). A link between two other nodes whose flight passes a lift's column holds only while that lift is
+## out of its way: `clear` = [pulley, lo, hi, lo, hi ...] lists the ranges of pulley offsets (px, inclusive) in which
+## every start of its window was verified to land (it is left out when the link holds in every state); a bot uses
+## the link only while the pulley is, and will rest, inside one of them ([method link_clear]).
 ##
 ## JSON format (FORMAT 2; FORMAT 1 = the G1 graphs: no weights, timing or movers, still read):
 ##   {"format": 2, "level": id, "source_sha256": sha256 of the level text (CRLF read as LF), "difficulty": name,
@@ -42,6 +45,7 @@ extends RefCounted
 ##    "baker": {"version", "candidates", "simulated_ticks", "verified_starts", "rejected"},
 ##    "nodes": [{"id", "row", "y", "x0", "x1", "ice"[, "mover"]}],
 ##    "links": [{"id", "from", "to", "kind", "x0", "x1", "dir", "keys", "ticks", "land_x0", "land_x1", "weight"
+##               [, "clear": [pulley, lo, hi, ...]]
 ##               [, "cycle"][, "cond"]}]}
 ## `kind`: walk, drop, jump, spring (launched by an objects/spring on the way), geyser (launched by a geyser), wrap,
 ## ride (onto, off or with a mover); `ticks` = the slowest start of the window until landing; `land_x0` / `land_x1` =
@@ -138,6 +142,9 @@ class NavLink:
 	var cycle: PackedInt32Array = PackedInt32Array()
 	## Mover condition: [mover, dx, dy, mx, my] (empty = none).
 	var cond: PackedInt32Array = PackedInt32Array()
+	## Pulley states a link past a lift's column holds in: [pulley, lo, hi, lo, hi ...] (ranges of pulley offsets, px,
+	## inclusive; empty = every state). See the header.
+	var clear_at: PackedInt32Array = PackedInt32Array()
 
 	func window_center() -> int:
 		return (x0 + x1) / 2
@@ -160,6 +167,8 @@ class NavLink:
 			data["cycle"] = Array(cycle)
 		if not cond.is_empty():
 			data["cond"] = Array(cond)
+		if not clear_at.is_empty():
+			data["clear"] = Array(clear_at)
 		return data
 
 
@@ -298,6 +307,7 @@ static func from_dict(data: Dictionary) -> NavGraph:
 		link.weight = clampi(int(entry.get("weight", WEIGHT_LIGHT)), 0, WEIGHT_CLASSES - 1)
 		link.cycle = _ints(entry.get("cycle", []))
 		link.cond = _ints(entry.get("cond", []))
+		link.clear_at = _ints(entry.get("clear", []))
 		graph.links.append(link)
 	graph.rebuild()
 	return graph
@@ -497,6 +507,19 @@ static func pulley_rest(p: int, weight_a: int, weight_b: int, limit: int) -> int
 	if weight_b > weight_a:
 		return -limit
 	return p
+
+
+## True when `link` holds while its pulley moves from offset `now` to offset `rest` (both and everything between lie
+## in one of its `clear_at` ranges); always true for a link without them.
+static func link_clear(link: NavLink, now: int, rest: int) -> bool:
+	if link.clear_at.size() < 3:
+		return true
+	var lo: int = mini(now, rest)
+	var hi: int = maxi(now, rest)
+	for i: int in range(1, link.clear_at.size() - 1, 2):
+		if link.clear_at[i] <= lo and hi <= link.clear_at[i + 1]:
+			return true
+	return false
 
 
 ## The pulley offset a pulley-lift link `link` was verified at (its cond's dy times the lift's side).

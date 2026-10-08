@@ -105,16 +105,28 @@ func test_a_hero_landing_on_a_body_one_row_under_a_ceiling_slides_off_and_never_
 		var label: String = "UP held" if up else "UP released"
 		var worst: Array[int] = [0]
 		var first: Array[Vector2i] = [Vector2i.ZERO]
-		play(hold("U" if up else "", 60), func(t: int) -> void:
+		var first_yvel: Array[int] = [0]
+		var peak: Array[int] = [1 << 20]
+		# UP is held through the contact and the cut bounce (it picks the bounce height), then let go: held to the last
+		# tick he would jump again from the floor and the run would end in mid-air.
+		var keys: PackedInt32Array = hold("U" if up else "", 8)
+		keys.append_array(hold("", 52))
+		play(keys, func(t: int) -> void:
 			if hero.body_in_rock(hero.sim_pos.x, hero.sim_pos.y):
 				worst[0] += 1
 			if t == 1:
 				first[0] = hero.sim_pos
+				first_yvel[0] = hero.yvel
+			peak[0] = mini(peak[0], hero.sim_pos.y)
 		)
 		Events.hero_bounced.disconnect(_on_bounced)
 		assert_eq(_bounces, 1, label + ": one stomp, no juggle between the head and the ceiling")
 		assert_eq(worst[0], 0, label + ": never in the rock")
 		assert_true(first[0].y >= START.y - 8, label + ": not lifted onto the head (feet %d)" % first[0].y)
+		# The bounce is cut to the free room: from feet 8 px over the floor the crown leaves 8 px (-48 rises 6 px); the
+		# full bounces would rise 10 px (-64) and 105 px (-224).
+		assert_eq(first_yvel[0], -48, label + ": the bounce cut to the free room under the crown")
+		assert_true(peak[0] >= START.y - 16, label + ": he never rises past the room he has (peak feet %d)" % peak[0])
 		var off: bool = not Overlap.test(first[0].x, first[0].y, Tuning.HERO_BOX_HURT.x, Tuning.HERO_BOX_HURT.y,
 				Tuning.HERO_BOX_HURT.z, enemy.sim_pos.x, enemy.sim_pos.y, enemy.box_w, enemy.box_h, enemy.box_xo)
 		assert_true(off, label + ": slid off the head on the contact tick (x %d, the body at %d)" % [first[0].x, body_x])
@@ -158,7 +170,9 @@ func test_no_totem_ride_and_no_shoulder_hop_whose_place_is_in_the_rock() -> void
 		_falling(p1, Vector2i(START_X + 4, START.y - 18), Tuning.STOMP_MIN_YVEL)
 		var in_rock: Array[int] = [0]
 		var contacts: Array[int] = [0]
-		play_party([[30, "U|" if up else "|"]], func(_t: int) -> void:
+		# UP held while he passes through his partner (the Shoulder Hop's key), then let go: held on, he would jump
+		# again from the floor and end the run in mid-air.
+		play_party([[4, "U|" if up else "|"], [26, "|"]], func(_t: int) -> void:
 			if p1.body_in_rock(p1.sim_pos.x, p1.sim_pos.y):
 				in_rock[0] += 1
 			contacts[0] += driver.contacts.size()
@@ -175,25 +189,43 @@ func test_no_totem_ride_and_no_shoulder_hop_whose_place_is_in_the_rock() -> void
 
 
 func test_a_carrier_jumping_under_rock_sheds_his_rider_without_lifting_him_into_it() -> void:
-	# Two rows more of air: a rider fits on P2's head (feet 34 px over P2's, 11 px of room over his own head), but the
-	# carrier's halved hop (15 px) would carry him into the crown.
+	# Two rows more of air: a rider fits on P2's head (feet 34 px over P2's: the crown's underside leaves his tile
+	# collision 14 px of room), but the carrier's halved hop (15 px) would carry him one px into the crown.
 	party(Defs.GameMode.COOP, P1_START + Vector2i(-160, 0), Vector2i(START_X, START.y), true,
 			_crown_rows(52, 72, CROWN_ROW - 2))
 	_falling(p1, Vector2i(START_X, START.y - PartyTuning.TOTEM_REST_PX - 4), 64)
 	play_party([[3, "|"]])
+	var rest_y: int = START.y - PartyTuning.TOTEM_REST_PX
 	assert_eq(p1.totem_carrier, p2, "riding: there is room for him on the head")
+	assert_eq(p1.sim_pos.y, rest_y)
 	assert_false(p1.body_in_rock(p1.sim_pos.x, p1.sim_pos.y))
+	var room: int = p1.free_room(p1.sim_pos.x, p1.sim_pos.y)
+	assert_eq(room, 14, "14 px of room over the riding place")
+	assert_true(PlayerBase.grid_rock_at(Game.level.grid, START_X, rest_y - 15), "the hop's apex (15 px) is in the crown")
 	var in_rock: Array[int] = [0]
 	var peak: Array[int] = [p1.sim_pos.y]
-	play_party([[40, "|U"]], func(_t: int) -> void:
+	var shed_at: Array[int] = [0]
+	var shed_y: Array[int] = [0]
+	var shed_yvel: Array[int] = [0]
+	# P2 holds Up for the hop's rise, then lets go (held on, he would hop again as soon as he lands).
+	play_party([[8, "|U"], [32, "|"]], func(t: int) -> void:
 		if p1.body_in_rock(p1.sim_pos.x, p1.sim_pos.y):
 			in_rock[0] += 1
 		peak[0] = mini(peak[0], p1.sim_pos.y)
+		if shed_at[0] == 0 and p1.totem_carrier == null:
+			shed_at[0] = t
+			shed_y[0] = p1.sim_pos.y
+			shed_yvel[0] = p1.yvel
 	)
-	assert_null(p1.totem_carrier, "scraped off his carrier's head at the rock")
 	assert_eq(in_rock[0], 0, "never carried into the rock")
-	assert_eq(peak[0], START.y - PartyTuning.TOTEM_REST_PX, "never lifted over the place he rode at")
-	assert_eq(p1.sim_pos.y, START.y, "fell to the floor")
+	assert_true(shed_at[0] > 0, "scraped off his carrier's head at the rock (the ride ended)")
+	assert_eq(shed_y[0], rest_y - room, "he is shed at the height the rock leaves him, not lifted past it")
+	assert_eq(shed_yvel[0], 0, "his rise is cut there: no room is left")
+	assert_eq(peak[0], rest_y - room, "carried up exactly as far as the free room, never over it")
+	# What follows is the 1.0 scrape: he falls back onto the head of the carrier who landed under him.
+	assert_eq(p1.totem_carrier, p2, "he lands on his partner's head again")
+	assert_eq(p1.sim_pos.y, rest_y)
+	assert_eq(p2.sim_pos.y, START.y, "the carrier is back on the floor")
 
 
 # =================================================================================================================

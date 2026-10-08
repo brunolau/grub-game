@@ -4,7 +4,7 @@ extends Node
 const LEVEL_DIR: String = "res://levels"
 
 
-## Run the tool with its user arguments; returns the exit code.
+## Run the tool with its user arguments; returns the exit code (await it: the bakes run in frames).
 func run(arguments: PackedStringArray) -> int:
 	var out_dir: String = NavGraph.DIR
 	var check: bool = false
@@ -61,11 +61,12 @@ func run(arguments: PackedStringArray) -> int:
 		var level_id: StringName = StringName(path.get_file().get_basename())
 		var target: String = "%s/%s.json" % [out_dir, level_id]
 		if verify:
-			failed += 0 if _verify(path, target, difficulty) else 1
+			failed += 0 if await _verify(path, target, difficulty) else 1
 			continue
 		var baker: NavBaker = NavBaker.new()
 		baker.progress_every = 1000 if verbose else 0
-		var graph: NavGraph = baker.bake_file(self, path, difficulty, classes, _clip_of(target, clip))
+		# In frames: a long bake (pulley lifts) overflows the engine's callback queue in one go (NavBaker's header).
+		var graph: NavGraph = await baker.bake_file_in_frames(self, path, difficulty, classes, _clip_of(target, clip))
 		for line: String in baker.report:
 			print("bake_nav: " + line)
 		if graph == null:
@@ -125,7 +126,7 @@ func _verify(path: String, target: String, difficulty: int) -> bool:
 	if not baker.sim.setup(self, graph.level_id, data.build_grid(difficulty), data.resolved_meta(difficulty),
 			data.entity_records()):
 		return false
-	var problems: PackedStringArray = baker.verify_graph(graph)
+	var problems: PackedStringArray = await baker.verify_graph_in_frames(graph, self)
 	baker.sim.teardown()
 	for problem: String in problems:
 		print("bake_nav: %s: %s" % [graph.level_id, problem])

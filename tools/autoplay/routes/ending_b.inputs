@@ -4,7 +4,8 @@
 # hatch planks to drop onto the docked raft, three strikes towards the shore push it into the current, the credits
 # drift past; in the calm pool under the arch three high strikes open the big spot (Cave Painting 19), six strokes
 # paddle on; the raft docks at the home beach, its rails open over the sand (G45) and Grub walks off to the welcome
-# totem.
+# totem. (Walk-off re-recorded after party's raft.gd of wf10 - a railed rider is carried over the whole deck, to the
+# bank's first pixel - which lands him on the sand one tick later: 11 ticks of R instead of 10.)
 16:R,4:,1:R,4:,11:D,4:,1:L,8:F,6:,8:F,6:,8:F,6:,1:R,149:,1:D,149:,1:D,149:,1:D,149:,1:D,149:,1:D,149:,1:D,149:
 1:D,149:,1:D,149:,1:D,149:,1:D,149:,1:D,149:,1:D,149:,1:D,149:,1:D,68:,4:R,1:UF,13:,1:UF,13:,1:UF,205:,1:L,8:F
-6:,8:F,6:,8:F,6:,8:F,6:,8:F,6:,8:F,6:,1:R,149:,1:D,149:,1:D,5:,10:R
+6:,8:F,6:,8:F,6:,8:F,6:,8:F,6:,8:F,6:,1:R,149:,1:D,149:,1:D,5:,11:R

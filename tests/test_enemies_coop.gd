@@ -8,6 +8,7 @@ extends "res://tests/test_enemies_case.gd"
 ## (slot 1). A party of one, or any other mode, collapses every trait to its archetype (PHYSICS.md C.0 #2).
 
 const COOP_LEVEL: String = "res://levels/test_enemies_coop.lvl"
+const PLAYER_SCENE: String = "res://scenes/player/player.tscn"
 
 var _p2: PlayerBase = null
 
@@ -440,6 +441,121 @@ func test_keepers_and_drums_share_the_registry() -> void:
 	assert_true(CoopTraits.keepers_done(_level, &"gully"), "every keeper dead: the door may rise")
 
 
+## G66 - a flying keeper holds its perch (world-B's hop-over probe on w9_l1b_coop 'stormwall': the woken keeper
+## Harrier followed a lone hero 14 columns to its mate): a Harrier record with `keeper=` never takes off. A hero right
+## under it wakes it - it turns to him and screeches - and when he walks 14 columns away it is still on its anchor
+## after 300 ticks, struck where it sits. The plain Harrier beside it follows him as in 1.0.
+func test_a_keeper_harrier_holds_its_perch_and_a_plain_one_follows() -> void:
+	_level.view = Rect2i(0, 0, 960, Tuning.VIEW_H)
+	_p2.down = true
+	var perch: Vector2i = Vector2i(200, 128)
+	var keeper: Harrier = _enemy(&"enemies/harrier", perch, {"skin": "storm_ptero", "range": 0, "hp": 10,
+			"coop": "bond", "bond": "storm", "keeper": "storm"}) as Harrier
+	var plain: Harrier = _enemy(&"enemies/harrier", Vector2i(248, 128), {"skin": "storm_ptero", "range": 0,
+			"hp": 10}) as Harrier
+	_hero.teleport(Vector2i(160, 160))
+	Sim.step(3)
+	assert_true(keeper.awake and plain.awake)
+	assert_eq([keeper._circling, plain._circling], [false, false], "range 0: nobody is right under them yet")
+	_hero.teleport(Vector2i(204, 160))
+	Sim.step(1)
+	assert_true(keeper._circling, "a hero right under it: it wakes ...")
+	assert_eq(keeper._anim_role, &"screech", "... and screeches")
+	assert_eq(keeper.facing, 1, "turned to him")
+	_hero.teleport(Vector2i(250, 160))
+	Sim.step(1)
+	assert_true(plain._circling, "the plain one wakes too")
+	# He walks on, 14 columns in 75 ticks, and waits there: 300 ticks in all.
+	var moved: int = 0
+	for tick: int in 300:
+		if tick < 75:
+			_hero.teleport(_hero.sim_pos + Vector2i(3, 0))
+		Sim.step(1)
+		if keeper.sim_pos != perch or keeper.xvel != 0 or keeper.yvel != 0:
+			moved += 1
+	assert_eq(moved, 0, "the keeper never left its anchor")
+	assert_eq(_hero.sim_pos.x - perch.x, 14 * Tuning.TILE + 50 + 1)
+	assert_eq(keeper.facing, 1, "it watches him go")
+	assert_eq(keeper._anim_role, &"fly", "the screech is over")
+	assert_eq(keeper.get_waypoint(), 0, "no way-points")
+	assert_true(absi(plain.sim_pos.x - _hero.sim_pos.x) <= 96 and absi(plain.sim_pos.x - 248) > 10 * Tuning.TILE,
+			"the plain Harrier came along and circles him (1.0): %s" % plain.sim_pos)
+	assert_true(keeper.contact_hurts and keeper.is_targetable(), "its body hurts, a club reaches it")
+	assert_true(keeper.take_hit(25, _hero))
+	assert_true(keeper.dead, "struck where it sits")
+
+
+## G66, the gate as a regression (a copy of 'stormwall': two bonded keeper Harriers perched 14 columns apart, Expert,
+## window 12; the partner an egg the whole time): the lone REAL hero wakes the first by walking under it, walks to the
+## second and high-strikes it dead - the first has not come along. He runs back and high-strikes the first: far too
+## late for the window, the second has regrown, so the keepers are never all dead and the door stays shut. (Before G66
+## the first followed him and both fell 8 ticks apart.) A pair that strikes one each on the same tick opens it.
+## The perches are 4 px higher than the file's two rows, so that his head passes under them without a touch.
+func test_one_hero_cannot_club_both_stormwall_keepers_within_the_window() -> void:
+	Game.difficulty = Defs.Difficulty.EXPERT
+	_level.view = Rect2i(0, 0, 960, Tuning.VIEW_H)
+	_p2.down = true
+	var storm: Dictionary = {"skin": "storm_ptero", "range": 0, "hp": 10, "coop": "bond", "bond": "storm",
+			"keeper": "storm"}
+	var perches: Array[Vector2i] = [Vector2i(200, 124), Vector2i(200 + 14 * Tuning.TILE, 124)]
+	var first: Harrier = _enemy(&"enemies/harrier", perches[0], storm) as Harrier
+	var second: Harrier = _enemy(&"enemies/harrier", perches[1], storm) as Harrier
+	var hero: PlayerBase = _real_hero(Vector2i(150, 160), 0)
+	var keys: Array[int] = [0]
+	GameInput.set_scripted_slot(0, func(_tick: int) -> int: return keys[0])
+	var opened: Array[int] = [0]
+	var step: Callable = func() -> void:
+		Sim.step(1)
+		hero.run.hearts = Tuning.ENERGY_START
+		if CoopTraits.keepers_done(_level, &"storm"):
+			opened[0] += 1
+	# Under the first (it wakes), on to the second, into his high strike's reach.
+	keys[0] = Defs.IN_RIGHT
+	for tick: int in 200:
+		if hero.sim_pos.x >= perches[1].x - 40:
+			break
+		step.call()
+	assert_true(first._circling, "walking under the first woke it")
+	assert_eq(first.sim_pos, perches[0], "... and it stays perched 14 columns behind him")
+	keys[0] = 0
+	for tick: int in 12:
+		step.call()
+	keys[0] = Defs.IN_UP | Defs.IN_FIRE
+	for tick: int in Tuning.STRIKE_SCRIPT_HIGH.size() + 2:
+		step.call()
+	assert_true(second.dead, "his high strike kills the second (hero %s)" % hero.sim_pos)
+	assert_false(first.dead)
+	var second_died: int = Sim.total_ticks
+	# Back to the first as fast as he runs.
+	keys[0] = Defs.IN_LEFT
+	for tick: int in 200:
+		if hero.sim_pos.x <= perches[0].x + 40:
+			break
+		step.call()
+	keys[0] = 0
+	for tick: int in 12:
+		step.call()
+	keys[0] = Defs.IN_UP | Defs.IN_FIRE
+	for tick: int in Tuning.STRIKE_SCRIPT_HIGH.size() + 2:
+		step.call()
+	keys[0] = 0
+	assert_true(first.dead, "... and the first, where it sat (hero %s)" % hero.sim_pos)
+	assert_true(Sim.total_ticks - second_died > 3 * CoopTraits.window_ticks(), "%d ticks after the second: the window is %d"
+			% [Sim.total_ticks - second_died, CoopTraits.window_ticks()])
+	assert_false(second.dead, "the second has regrown meanwhile (a late bond)")
+	for tick: int in 60:
+		step.call()
+	GameInput.clear_scripted()
+	assert_eq(opened[0], 0, "the keepers were never all dead: the door stays shut for one hero")
+	assert_false(first.dead or second.dead, "both are back on their perches")
+	assert_eq([first.sim_pos, second.sim_pos], perches)
+	# The pair: one each, on the same tick.
+	_p2.down = false
+	first.take_hit(25, hero)
+	second.take_hit(25, _p2)
+	assert_true(CoopTraits.keepers_done(_level, &"storm"), "two heroes on the count-in open it")
+
+
 # =================================================================================================================
 # daze
 # =================================================================================================================
@@ -775,6 +891,99 @@ func test_every_coop_enemy_takes_one_hit_per_strike_and_solo_keeps_the_tick_hit(
 	assert_true(solo._strike_keys.is_empty(), "no strike memory outside a co-op party")
 	p1.free()
 	p2.free()
+
+
+## End to end with the real hero (scenes/player/player.tscn: his strike script, his club boxes, his weapon pass) - the
+## G3 verifier's solo attacks on a keeper end with one hero behind the Bull Rex (it charged under his jump, or it runs
+## at his dozing partner - the idle bait) clubbing its BACK. Here it runs at the dozing P2 with P1 right behind its
+## tail: every box tick of his swings reaches it and glances (G57: no Brace Wall, no damage). Alone in the level (a
+## party of one: the plain charger, hit anywhere on every tick) the same swing kills it - so the glances were real hits.
+func test_the_real_heros_swings_at_a_bull_rexs_back_glance_and_alone_they_kill() -> void:
+	for party: bool in [true, false]:
+		_party_flat()
+		var hero: PlayerBase = _real_hero(Vector2i(200, 160), 0)
+		var rex: EnemyBase = _enemy(&"enemies/bull_rex", Vector2i(260, 160), {"speed": 16})
+		# Its tail 3 px in front of P1's body, inside his forward club box ...
+		rex.sim_pos.x = hero.sim_pos.x - hero.box_xo + hero.box_w + 3 + rex.box_xo
+		if party:
+			# ... and the dozing partner before its nose, a little nearer to it than P1: it wakes and runs at him.
+			_p2.teleport(Vector2i(2 * rex.sim_pos.x - hero.sim_pos.x - 2, 160))
+			_p2.idle = true
+		else:
+			_p2.free()
+		var hearts: int = hero.run.hearts
+		var sparks: int = _count_fx(&"fx/hit_stars")
+		var hits: int = 0
+		var last_hit: int = rex.last_hit_tick
+		GameInput.set_scripted_slot(0, func(_tick: int) -> int: return Defs.IN_FIRE)
+		for tick: int in 12:
+			Sim.step(1)
+			assert_eq(CoopTraits.party_on(), party)
+			if rex.dead:
+				break
+			if party:
+				assert_eq(rex.facing, 1, "tick %d: it runs at the dozing partner, its back to P1" % tick)
+				assert_false(rex._hit_from_front(hero), "P1 stands behind it")
+				assert_eq(rex.coop_traits().dazed, 0, "a dozing partner braces nothing")
+			if rex.last_hit_tick != last_hit:
+				last_hit = rex.last_hit_tick
+				hits += 1
+		GameInput.clear_scripted()
+		if party:
+			assert_eq(hero.run.hearts, hearts, "it never touched P1")
+			assert_true(hits >= 3, "a swing and a half held on its back: %d box ticks reached it" % hits)
+			assert_eq(rex.last_hit_slot, 0)
+			assert_eq(rex.hp, rex.max_hp, "a lone player's blows at a heavy's back glance: no Brace Wall, no damage")
+			assert_false(rex.dead)
+			assert_true(_count_fx(&"fx/hit_stars") > sparks, "with the glance's spark")
+		else:
+			assert_true(rex.dead, "a party of one: the plain charger falls to that swing (%d box ticks)" % hits)
+
+
+## End to end, the pair's side (w3_l1_coop 'lake', hp 100): two real heroes crouch side by side in the keeper's path,
+## the Brace Wall stops and dazes it, neither is touched; P1 rises and swings while P2 keeps crouching. Each swing
+## lands ONCE (the 1.0 test landed it on every tick its box overlapped: the first swing alone took 100 hp below zero) -
+## the crouch-charged first swing takes its 100 hp to 0 and the next one kills it, inside the 44-tick daze.
+func test_the_real_pair_braces_the_keeper_and_each_swing_counts_once() -> void:
+	var p1: PlayerBase = _real_hero(Vector2i(200, 160), 0)
+	_p2.free()
+	_p2 = _real_hero(Vector2i(200 + PartyTuning.BRACE_GAP_PX - 4, 160), 1)
+	var rex: EnemyBase = _enemy(&"enemies/bull_rex", Vector2i(310, 160), {"hp": 100})
+	var hearts: Array[int] = [p1.run.hearts, _p2.run.hearts]
+	var keys: Array[int] = [Defs.IN_DOWN, Defs.IN_DOWN]
+	GameInput.set_scripted_slot(0, func(_tick: int) -> int: return keys[0])
+	GameInput.set_scripted_slot(1, func(_tick: int) -> int: return keys[1])
+	assert_true(_step_until(func() -> bool: return rex.coop_traits().dazed > 0, 120) > 0, "the Brace Wall stops it")
+	assert_eq([p1.run.hearts, _p2.run.hearts], hearts, "neither hero is touched")
+	assert_false(p1.is_idle() or _p2.is_idle(), "held keys are input: both count")
+	var daze_left: int = rex.coop_traits().dazed
+	# P1 rises into a forward swing (FIRE held for the 7 ticks of the strike script), P2 holds the crouch.
+	keys[0] = Defs.IN_FIRE
+	Sim.step(Tuning.STRIKE_SCRIPT_FORWARD.size())
+	keys[0] = 0
+	Sim.step(3)
+	assert_eq(rex.hp, 0, "the charged swing (x4) took 100 - once, although its box stayed on the keeper for ticks")
+	assert_false(rex.dead, "0 hp is not below zero")
+	keys[0] = Defs.IN_FIRE
+	Sim.step(Tuning.STRIKE_SCRIPT_FORWARD.size())
+	keys[0] = 0
+	Sim.step(2)
+	GameInput.clear_scripted()
+	assert_true(rex.dead, "the second swing kills it")
+	assert_true(2 * Tuning.STRIKE_SCRIPT_FORWARD.size() + 5 < daze_left, "both swings fit one %d-tick daze" % daze_left)
+	assert_eq([p1.run.hearts, _p2.run.hearts], hearts)
+
+
+## The real hero (scenes/player/player.tscn) of `slot` at `pos`; for slot 0 it replaces the bare P1 of the fixture.
+func _real_hero(pos: Vector2i, slot: int) -> PlayerBase:
+	if slot == 0 and _hero != null and is_instance_valid(_hero):
+		_hero.free()
+	var hero: PlayerBase = (load(PLAYER_SCENE) as PackedScene).instantiate() as PlayerBase
+	place(_level, hero, pos, {"slot": slot})
+	hero.respawn_at(pos)
+	if slot == 0:
+		_hero = hero
+	return hero
 
 
 # =================================================================================================================

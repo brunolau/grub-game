@@ -53,10 +53,10 @@ func after_each() -> void:
 
 
 func test_both_levels_are_valid() -> void:
-	var validator: LevelValidator = LevelValidator.new()
-	assert_true(validator.add_folder(Levels.LEVEL_DIR) > 0)
-	validator.run()
+	# The folder's one validator run of this process (RouteTestCase.folder_validator).
+	var validator: LevelValidator = RouteTestCase.folder_validator()
 	for level_id: StringName in [LEVEL_ONE, LEVEL_TWO]:
+		assert_true(FileAccess.file_exists(Levels.get_level_path(level_id)), "%s is a file of the folder" % level_id)
 		var problems: Array[Dictionary] = validator.problems_of(Levels.get_level_path(level_id))
 		var lines: PackedStringArray = PackedStringArray()
 		for problem: Dictionary in problems:

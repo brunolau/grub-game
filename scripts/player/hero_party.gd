@@ -52,6 +52,12 @@ const EGG_FLOAT_FPS: int = 4
 const EGG_CRACK_TICKS: int = 24   ## Expert: the crack frames show this long before the egg flies to the checkpoint
 ## The bubble's centre above the feet point, art px.
 const BUBBLE_Y: float = -100.0
+## G58 (DESIGN.md D.3, PHYSICS.md C.10 "Idle"; the orchestrator's IDLE UX decision of wf10): from this many ticks without
+## input of his own a hatched, living co-op hero shows the "Zzz soon" warning bubble, until he is IDLE at
+## PlayerBase.IDLE_TICKS (243) and the Zzz takes over: 73 ticks = 3 s of warning. Drawing only - no rule reads it.
+## The value is PartyTuning.IDLE_WARN_TICKS's (core-A's table; asked in wf10_lead_design_to_core_a.txt #2): a private
+## constant here until it lands there, tests/test_player_idle.gd pins it.
+const IDLE_WARN_TICKS: int = 170
 ## The voluntary egg's keys, held together (PHYSICS.md C.12).
 const VOLUNTEER_KEYS: int = Defs.IN_DOWN | Defs.IN_LOOK
 
@@ -84,7 +90,8 @@ var _shell_ticks: int = 0
 var _shell_pos: Vector2i = Vector2i.ZERO
 var _egg_sprite: Sprite2D = null
 var _bubble: EmoteBubble = null
-## The dozing look of an IDLE co-op hero (PlayerBase.is_idle; made on first need).
+## The dozing look of an IDLE co-op hero (PlayerBase.is_idle; made on first need) and, before it, the "Zzz soon"
+## warning bubble (G58, IDLE_WARN_TICKS).
 var _idle_mark: IdleMark = null
 ## The level's PartyDriver last seen by [method weapon_pass] and whether it has `weapon_pass`.
 var _wp_driver: SimEntity = null
@@ -529,8 +536,8 @@ func post_step(_level: LevelBase) -> void:
 		egg_ticks += 1
 	if emote_ticks > 0 or _egg_sprite != null:
 		_refresh_party_visual()  # nothing to draw before the first emote or egg
-	if coop and (_idle_mark != null or hero.input_idle_ticks >= PlayerBase.IDLE_TICKS):
-		_refresh_idle_mark()
+	if coop and (_idle_mark != null or hero.input_idle_ticks >= IDLE_WARN_TICKS):
+		_refresh_idle_mark()  # G58: the "Zzz soon" bubble from the 170th quiet tick, the Zzz from the 243rd
 
 
 ## A strike starts (Player._handle_strike, the first tick of a swing or a throw): in versus the hurt immunity and the
@@ -731,12 +738,24 @@ func _refresh_party_visual() -> void:
 ## for PlayerBase.IDLE_TICKS (10 s) shows a "Zzz" over his head until his next input. Cosmetic: the simulation never
 ## reads it.
 func is_dozing_shown() -> bool:
-	return _idle_mark != null and _idle_mark.visible
+	return _idle_mark != null and _idle_mark.visible and _idle_mark.mode == IdleMark.Mode.DOZE
+
+
+## G58: true while the "Zzz soon" warning bubble shows - a hatched, living co-op hero with IDLE_WARN_TICKS (170) to
+## PlayerBase.IDLE_TICKS - 1 (242) ticks without input of his own (a held key is input on every tick it is held, so
+## a partner who crouches on a plate never shows it). Cosmetic, as the Zzz.
+func is_idle_warning_shown() -> bool:
+	return _idle_mark != null and _idle_mark.visible and _idle_mark.mode == IdleMark.Mode.WARNING
 
 
 func _refresh_idle_mark() -> void:
-	var dozing: bool = hero.input_idle_ticks >= PlayerBase.IDLE_TICKS and not hero.down and not hero.dead
-	if dozing and _idle_mark == null and is_instance_valid(hero):
+	var there: bool = not hero.down and not hero.dead
+	var mode: int = IdleMark.Mode.HIDDEN
+	if there and hero.input_idle_ticks >= PlayerBase.IDLE_TICKS:
+		mode = IdleMark.Mode.DOZE
+	elif there and hero.input_idle_ticks >= IDLE_WARN_TICKS:
+		mode = IdleMark.Mode.WARNING
+	if mode != IdleMark.Mode.HIDDEN and _idle_mark == null and is_instance_valid(hero):
 		_idle_mark = IdleMark.new()
 		_idle_mark.name = "IdleMark"
 		_idle_mark.position = Vector2(IdleMark.OFFSET_X, IdleMark.OFFSET_Y)
@@ -745,19 +764,25 @@ func _refresh_idle_mark() -> void:
 		hero.add_child(_idle_mark)
 	if _idle_mark == null:
 		return
-	if dozing != _idle_mark.visible:
-		_idle_mark.visible = dozing
-		_idle_mark.step = 0
-		_idle_mark.queue_redraw()
-	if dozing:
+	if mode != _idle_mark.mode:
+		_idle_mark.show_mode(mode)
+	if mode == IdleMark.Mode.WARNING:
+		_idle_mark.ticks_left = PlayerBase.IDLE_TICKS - hero.input_idle_ticks
+	if mode != IdleMark.Mode.HIDDEN:
 		_idle_mark.advance()
 
 
-## The "Zzz" of a dozing hero, drawn with primitives (no sheet): three Z letters of 6, 8 and 10 art px rising to the
-## upper right of his head one after the other, white with a dark outline, the cycle repeating every CYCLE_TICKS.
-## Art px, origin at the first letter's bottom-left corner.
+## The idle pictures over a co-op hero's head, drawn with primitives (no sheet). Art px, origin at the first letter's
+## bottom-left corner.
+##  - DOZE: the "Zzz" of a dozing hero - three Z letters of 6, 8 and 10 art px rising to the upper right of his head
+##    one after the other, white with a dark outline, the cycle repeating every CYCLE_TICKS.
+##  - WARNING (G58, "Zzz soon"): one small "z" in a thought bubble with two trail dots, pulsing between full and dim
+##    every WARN_PULSE_TICKS, twice as fast in its last WARN_HURRY_TICKS (one second): it reads as "about to doze", not
+##    as the doze itself (no rising letters, a bubble around it, and it blinks).
 class IdleMark:
 	extends Node2D
+
+	enum Mode { HIDDEN, WARNING, DOZE }
 
 	## Where the letters start (art px from the feet point): beside the head (the hero is about 70 art px tall).
 	const OFFSET_X: float = 10.0
@@ -767,17 +792,48 @@ class IdleMark:
 	const SIZES: Array[int] = [6, 8, 10]
 	const OUTLINE: Color = Color("#272018")
 	const PAPER: Color = Color("#fff8e8")
+	## The warning bubble: its pulse (ticks per half), the quicker pulse of its last second, the dim half's alpha.
+	const WARN_PULSE_TICKS: int = 8
+	const WARN_HURRY_PULSE_TICKS: int = 4
+	const WARN_HURRY_TICKS: int = 24
+	const WARN_DIM_ALPHA: float = 0.4
+	## The bubble's body (art px, this node's origin) and the "z" in it.
+	const WARN_BODY: Rect2 = Rect2(2.0, -22.0, 16.0, 14.0)
+	const WARN_Z_SIZE: float = 6.0
 
-	## Ticks into the cycle.
+	## What is drawn (Mode).
+	var mode: int = Mode.HIDDEN
+	## Ticks into the cycle (DOZE) or of the warning (WARNING).
 	var step: int = 0
+	## WARNING: ticks until the hero dozes off (the pulse quickens in the last WARN_HURRY_TICKS).
+	var ticks_left: int = 0
 
-	## One tick of the cycle (redrawn only when a letter appears or the cycle restarts).
+	## Switch the picture (HIDDEN hides the node).
+	func show_mode(new_mode: int) -> void:
+		mode = new_mode
+		step = 0
+		visible = mode != Mode.HIDDEN
+		modulate.a = 1.0
+		queue_redraw()
+
+	## One tick of the picture: the doze cycle (redrawn only when a letter appears or the cycle restarts), or the
+	## warning's pulse (the node's alpha only: no redraw).
 	func advance() -> void:
+		if mode == Mode.WARNING:
+			var half: int = WARN_HURRY_PULSE_TICKS if ticks_left <= WARN_HURRY_TICKS else WARN_PULSE_TICKS
+			var alpha: float = WARN_DIM_ALPHA if (step / half) % 2 == 1 else 1.0
+			step += 1
+			if not is_equal_approx(modulate.a, alpha):
+				modulate.a = alpha
+			return
 		step = (step + 1) % CYCLE_TICKS
 		if step % LETTER_TICKS == 0:
 			queue_redraw()
 
 	func _draw() -> void:
+		if mode == Mode.WARNING:
+			_draw_warning()
+			return
 		var shown: int = step / LETTER_TICKS + 1
 		var x: float = 0.0
 		var y: float = 0.0
@@ -787,6 +843,22 @@ class IdleMark:
 			_draw_z(Vector2(x, y - size), size, PAPER, 0.0)
 			x += size * 0.7
 			y -= size + 3.0
+
+	## The "Zzz soon" thought bubble: two trail dots rising from the head, a paper bubble with a dark outline and one
+	## small dark "z" in it.
+	func _draw_warning() -> void:
+		draw_rect(Rect2(-3.0, -4.0, 4.0, 4.0), OUTLINE)
+		draw_rect(Rect2(-2.0, -3.0, 2.0, 2.0), PAPER)
+		draw_rect(Rect2(0.0, -9.0, 5.0, 5.0), OUTLINE)
+		draw_rect(Rect2(1.0, -8.0, 3.0, 3.0), PAPER)
+		draw_rect(WARN_BODY.grow(1.0), OUTLINE)
+		draw_rect(Rect2(WARN_BODY.position.x - 2.0, WARN_BODY.position.y + 2.0, WARN_BODY.size.x + 4.0,
+				WARN_BODY.size.y - 4.0), OUTLINE)
+		draw_rect(WARN_BODY, PAPER)
+		draw_rect(Rect2(WARN_BODY.position.x - 1.0, WARN_BODY.position.y + 2.0, WARN_BODY.size.x + 2.0,
+				WARN_BODY.size.y - 4.0), PAPER)
+		var at: Vector2 = WARN_BODY.position + (WARN_BODY.size - Vector2(WARN_Z_SIZE, WARN_Z_SIZE)) / 2.0
+		_draw_z(at, WARN_Z_SIZE, OUTLINE, 0.0)
 
 	## A "Z" of `size` art px with its top-left corner at `at`; `grow` px of outline around the strokes.
 	func _draw_z(at: Vector2, size: float, colour: Color, grow: float) -> void:

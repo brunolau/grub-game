@@ -45,6 +45,9 @@ var _counts: Dictionary = {}
 var _lives_pending: bool = false
 ## PLAN.md 8 V3.e on a party route: the first entity found dozing inside a view or within reach of a hero ("" = none).
 var _doze_problem: String = ""
+## docs/LEVEL_DESIGN.md 15.7.9 on a party route: the first hero found IDLE in the middle of the stage - a hatched hero
+## whose own slot gave no input for PlayerBase.IDLE_TICKS ticks ("" = none; [method _check_party_idle]).
+var _idle_problem: String = ""
 var _letters: Dictionary = {}
 var _paintings: Dictionary = {}
 var _jackpots: int = 0
@@ -84,8 +87,32 @@ var _hud: GDScript = null
 const HUD_SCRIPT: String = "res://scripts/ui/hud.gd"
 
 
+## The validator's run over the levels folder, shared by every test of the process ([method folder_validator]), and
+## the state of the folder it was made for.
+static var _folder_validator: LevelValidator = null
+static var _folder_stamp: String = ""
+
+
 func after_each() -> void:
 	clean_up_route()
+
+
+## The level validator after its run over the whole levels folder (LevelValidator.add_folder + run; read its
+## `problems` / problems_of). One run serves every test of the process: validating the 80 files takes a second or two,
+## and four tests of the default suite asked for the same answer. Run again when a level file was added, removed or
+## written since (the file names and their modification times), so a test that writes a level never reads a stale
+## verdict.
+static func folder_validator() -> LevelValidator:
+	var stamp: PackedStringArray = PackedStringArray()
+	for file: String in DirAccess.get_files_at(Levels.LEVEL_DIR):
+		stamp.append("%s:%d" % [file, FileAccess.get_modified_time(Levels.LEVEL_DIR + "/" + file)])
+	var key: String = ",".join(stamp)
+	if _folder_validator == null or key != _folder_stamp:
+		_folder_validator = LevelValidator.new()
+		_folder_validator.add_folder(Levels.LEVEL_DIR)
+		_folder_validator.run()
+		_folder_stamp = key
+	return _folder_validator
 
 
 # =================================================================================================================
@@ -290,6 +317,7 @@ func check_expectations(label: String, spec: Dictionary, played: int, before: in
 			label, _count(&"hero_revived")])
 	if party:
 		assert_eq(_doze_problem, "", "%s: no entity dozes inside a view or within reach of a hero (V3.e)" % label)
+		assert_eq(_idle_problem, "", "%s: no hero stands idle (LEVEL_DESIGN 15.7.9)" % label)
 	assert_eq(weak_point_verdict(), "", "%s: every boss weak point stays in the view and clear of the fight HUD (G35)" % label)
 	if expect.has("x2_gates"):
 		assert_true(_gates_reached.size() >= int(expect["x2_gates"]), "%s: x2 gates crossed %d of %d (%s)" % [
@@ -568,6 +596,7 @@ func _play_campaign_stage(run_name: String, file: String, mode: String, table: D
 	if party:
 		assert_eq(_count(&"party_wiped"), 0, "%s: no team wipe" % label)
 		assert_eq(_doze_problem, "", "%s: no entity dozes inside a view or within reach of a hero (V3.e)" % label)
+		assert_eq(_idle_problem, "", "%s: no hero stands idle (LEVEL_DESIGN 15.7.9)" % label)
 	assert_eq(weak_point_verdict(), "", "%s: every boss weak point stays in the view and clear of the fight HUD (G35)" % label)
 	assert_true(Game.lives >= lives, "%s: no life lost (%d -> %d)" % [label, lives, Game.lives])
 	assert_eq(_problems.count, 0, "%s: no engine warning or error (first: %s)" % [label, _problems.first])
@@ -597,6 +626,7 @@ func _reset_watch(level_id: StringName, mode: String) -> void:
 	# an earlier test file left in Game.lives must not become the baseline (a co-op run starts with 2 tribe lives).
 	_lives_pending = true
 	_doze_problem = ""
+	_idle_problem = ""
 	_letters.clear()
 	_paintings.clear()
 	_jackpots = 0
@@ -650,6 +680,8 @@ func _on_tick(level: LevelBase, stage_tick: int) -> void:
 		_counts[&"_lives"] = Game.lives
 	if level.hero_count() > 1 and _doze_problem == "":
 		_check_party_doze(level, stage_tick)
+	if level.hero_count() > 1 and _idle_problem == "":
+		_check_party_idle(level, stage_tick)
 	_max_wind = maxi(_max_wind, level.wind)
 	var view_y: int = level.get_view_rect().position.y
 	if _start_view_y < 0:
@@ -770,6 +802,32 @@ func _check_party_doze(level: LevelBase, stage_tick: int) -> void:
 					_doze_problem = "%s at %s dozes on tick %d (area %s, near %s)" % [entity.name, str(entity.sim_pos),
 						stage_tick, str(area), str(rect)]
 					return
+
+
+## docs/LEVEL_DESIGN.md 15.7.9 ("no role waits 243+ ticks without input"; D9b's finding, wf9_d9b_to_integration.txt
+## #3): on a party route no hero is IDLE in the middle of the stage. PlayerBase.is_idle() itself cannot be the check:
+## every hero is idle by definition from the level's first tick until his own first input. So it takes the 'since
+## first input' form - a hero's quiet ticks (PlayerBase.input_idle_ticks: counted from his entry into the level and
+## again from each input of his own slot; a held key is input on every tick it is held, G58) never reach
+## PlayerBase.IDLE_TICKS. That is the hero who played and then stood still for 243 ticks (the engine draws him dozing
+## and counts him for no plate, hop, brace or tablet - the replay only still works by luck), and also the one who never
+## touched a key in the stage's first 243 ticks. A dead hero and an egg are not asked (nobody plays them; the count
+## goes on, so a hero who hatches after a long silence is idle - and reported - until his player presses a key). Keeps
+## the first problem ([method idle_verdict]).
+func _check_party_idle(level: LevelBase, stage_tick: int) -> void:
+	for hero: PlayerBase in level.heroes:
+		if hero == null or hero.dead or hero.is_down():
+			continue
+		if hero.input_idle_ticks >= PlayerBase.IDLE_TICKS:
+			_idle_problem = "P%d is idle on tick %d: %d ticks without input of his own %s (at %s) - hold Down or tap a key on such a stretch" % [
+				hero.slot + 1, stage_tick, hero.input_idle_ticks,
+				"since his last one" if hero.gave_input else "since the stage began", str(hero.sim_pos)]
+			return
+
+
+## The idle check's verdict for the stage just played: "" or the first hero found idle (tests).
+func idle_verdict() -> String:
+	return _idle_problem
 
 
 func _watch_events() -> void:

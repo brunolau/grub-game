@@ -70,9 +70,7 @@ func after_each() -> void:
 ## Every arena file is valid (no validator error; world-B's arena rules, LEVEL_DESIGN.md 15.8) and never part of a
 ## solo or co-op campaign.
 func test_every_arena_is_valid() -> void:
-	var validator: LevelValidator = LevelValidator.new()
-	validator.add_folder(Levels.LEVEL_DIR)
-	validator.run()
+	var validator: LevelValidator = RouteTestCase.folder_validator()
 	var errors: PackedStringArray = PackedStringArray()
 	var arenas: int = 0
 	for level_id: StringName in Levels.all_ids():

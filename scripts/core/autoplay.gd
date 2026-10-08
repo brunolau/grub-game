@@ -64,9 +64,6 @@ const DEFAULT_SHOT_PERIOD: int = 24
 const TRACE_COLUMNS: int = 6
 const DEFAULT_HOLD_TICKS: int = 12
 const SETTLE_FRAMES: int = 4
-## Most frames a run waits after another stage took over for Flow to finish that stage's transition before it quits
-## ([method _finish_after_takeover]; an instant transition takes two or three, a timed one about a second).
-const TAKEOVER_SETTLE_FRAMES: int = 240
 ## The switches a release build honours; every other one needs a debug build.
 const RELEASE_SWITCHES: PackedStringArray = ["smoke"]
 const SMOKE_MIN_SECONDS: float = 0.1
@@ -166,6 +163,11 @@ var _can_capture: bool = true
 ## Instance id of the stage the script plays in (the run ends when another one takes over; an id, because a freed
 ## level compares equal to null).
 var _stage: int = 0
+## Every script a node of this harness run was made of ([method keep_script]), kept until the engine shuts down. A
+## static variable on purpose: it is released by the script language's own shutdown, and only scripts that live until
+## then left nothing behind (the same scripts held in a member of a node, released a moment earlier with the scene
+## tree, leaked as before).
+static var _session_scripts: Dictionary = {}
 
 
 func _ready() -> void:
@@ -188,6 +190,8 @@ func _ready() -> void:
 	flow_mode = options.has("flow")
 	# The harness window rarely has the focus (several runs share one desktop): never pause for that.
 	Flow.pause_on_focus_loss = false
+	# No entity script of the run may be unloaded before the engine shuts down (keep_script).
+	get_tree().node_added.connect(keep_script)
 	_configure(options)
 	_redirect_user_data(str(options.get("user-dir", DEFAULT_USER_DIR)), options.has("fresh-user"))
 	if options.has("perf"):
@@ -197,6 +201,31 @@ func _ready() -> void:
 		return
 	# Start after the main scene finished its own _ready.
 	_run.call_deferred()
+
+
+## Keep the script of `node` - and the scripts it extends - loaded until the engine shuts down (a harness run
+## connects it to SceneTree.node_added). Why: a level start drops the cached scenes the new level does not use
+## (Spawner.retain_only), so the scripts only the old level used lose their last reference in the middle of the run -
+## and for some sets of scripts this engine version then reports, at exit, every resource the script world reaches as
+## leaked. Seen at G3 when a harness run that had gone from w4_l2_coop into w4_l2b_coop quit: 42 textures, 118 text
+## and font RIDs, 340 objects, 167 resources "still in use", with or without a window, whether the run stopped at the
+## takeover or played on. Narrowed down (G3 follow-up round): a stage with rising columns (or gates and drums), a
+## Walker and a Shaman followed by ANY stage that uses neither a Walker nor a Shaman - an empty one too; with one of
+## the three kinds missing, or a Walker or a Shaman in the next stage (its scene stays cached), the exit is clean.
+## Keeping the scripts until the script language shuts down is clean in every case. A script is a few kilobytes; the
+## scenes and their textures are dropped as before. Not part of the simulation: nothing reads the registry. (The game
+## itself drops scripts as it always did: its exit after such a session still reports the leak - the fix belongs in
+## Spawner, asked of core-A in build/engine_requests/wf10_integration_to_core-A.txt.)
+func keep_script(node: Node) -> void:
+	var script: Script = node.get_script() as Script
+	while script != null and not _session_scripts.has(script):
+		_session_scripts[script] = true
+		script = script.get_base_script()
+
+
+## The scripts [method keep_script] holds (tests).
+func kept_scripts() -> Array:
+	return _session_scripts.keys()
 
 
 ## The options this build may act on: all of them in a debug build, only RELEASE_SWITCHES in a release build,
@@ -723,7 +752,7 @@ func _on_tick_finished(tick: int) -> void:
 				_level_id])
 		_write_trace()
 		print("Autoplay: %d ticks played, %d screenshots saved" % [_trace_rows(), _shots_saved])
-		_finish_after_takeover()
+		_finish(0)
 		return
 	var level: LevelBase = Game.level
 	if level != null and level.player != null:
@@ -807,132 +836,7 @@ func _write_trace() -> void:
 	file.close()
 
 
-## Quit after another stage took over. In a fast run the harness steps the clock every frame, also while Flow is still
-## putting the new stage together (Sim.step ignores Sim.frozen), so the takeover is seen on a tick of the new stage
-## before Flow's scene change has finished (overlays, level extras, the opening cover). Quitting from inside that tick
-## left the scene change suspended, and the engine reported leaked textures, fonts, scenes and scripts at exit
-## (w4_l2_coop -> w4_l2b_coop, G3). So the run waits - at most TAKEOVER_SETTLE_FRAMES frames - until the transition
-## has finished, lets one more frame pass and only then quits.
-func _finish_after_takeover() -> void:
-	print("Autoplay: takeover diag: Flow.busy=%s in_tick=%s" % [Flow.busy, Sim.is_in_tick()])
-	for i: int in TAKEOVER_SETTLE_FRAMES:
-		if not Flow.busy:
-			break
-		await get_tree().process_frame
-	if Flow.busy:
-		push_warning("Autoplay: the stage that took over did not finish its transition in %d frames" %
-				TAKEOVER_SETTLE_FRAMES)
-	await get_tree().process_frame
-	_finish(0)
-
-
-func _exit_tree() -> void:
-	if OS.get_environment("AUTOPLAY_REFDUMP") == "":
-		return
-	var probe: RefCounted = RefCounted.new()
-	var now: int = (probe.get_instance_id() & 0x7FFFFFFFFFFFFFFF) >> 24
-	print("REFPROBE now validator %d slot %d" % [now, probe.get_instance_id() & 0xFFFFFF])
-	for v: int in range(maxi(now - 12000, 1), now + 1):
-		for slot: int in range(1900, 2100):
-			var id: int = (v << 24) | slot | (1 << 63)
-			var obj: Object = instance_from_id(id)
-			if obj == null or not (obj is RefCounted) or obj.get_class() != "RefCounted":
-				continue
-			var scr: Script = obj.get_script() as Script
-			var text: String = "REFPROBE found v=%d slot=%d script=%s" % [v, slot, scr.resource_path if scr != null else "-"]
-			if scr != null:
-				for prop: Dictionary in obj.get_property_list():
-					if int(prop["usage"]) & PROPERTY_USAGE_SCRIPT_VARIABLE != 0:
-						text += " %s=%s" % [prop["name"], str(obj.get(prop["name"])).left(80)]
-			print(text)
-
-
-func _diag_dump() -> void:
-	if OS.get_environment("AUTOPLAY_REFDUMP") == "":
-		return
-	var seen: Dictionary = {}
-	for node: Node in get_tree().root.get_children():
-		_diag_walk(node, node.name, 0, seen)
-	var stack: Array[Node] = [get_tree().root]
-	while not stack.is_empty():
-		var n: Node = stack.pop_back()
-		seen.erase(n.get_instance_id())
-		_diag_walk(n, str(n.get_path()), 0, seen)
-		for c: Node in n.get_children(true):
-			stack.append(c)
-	var statics: Dictionary = {
-		"res://scripts/core/bots/bot_brain.gd": ["_stand_cache"], "res://scripts/core/bots/bot_senses.gd": ["test_referee"],
-		"res://scripts/core/bots/hero_bot.gd": ["_warned"], "res://scripts/core/bots/nav_graph.gd": ["_cache"],
-		"res://scripts/core/spawner.gd": ["_cache", "_missing"], "res://scripts/core/versus_match.gd": ["bot_factory"],
-		"res://scripts/enemies/enemy_skin.gd": ["_cache"], "res://scripts/fx/fx_font.gd": ["_font"],
-		"res://scripts/objects/sign_board.gd": ["_front"],
-		"res://scripts/player/hero_palette.gd": ["_meta", "_shader", "_materials", "_luts", "_key_lut", "_cloth"],
-		"res://scripts/player/player.gd": ["_spear"], "res://scripts/ui/hud_atlas.gd": ["_texture", "_groups"],
-		"res://scripts/ui/ui_kit.gd": ["_fonts", "_textures", "_theme"], "res://scripts/world/level_lights.gd": ["_textures"],
-		"res://scripts/world/versus/arena.gd": ["_file_cache"], "res://scripts/world/versus/referee.gd": ["_current"],
-		"res://scripts/world/coop_search.gd": ["_explore_cache", "_daze_cache", "_daze_probe"],
-	}
-	for path: String in statics:
-		var scr: Script = load(path) as Script
-		for member: String in statics[path]:
-			var value: Variant = scr.get(member)
-			print("REFSTATIC %s.%s = %s" % [path.get_file(), member, type_string(typeof(value))])
-			_diag_walk(value, path.get_file() + "::" + member, 1, seen)
-
-
-func _diag_walk(value: Variant, path: String, depth: int, seen: Dictionary) -> void:
-	if depth > 4:
-		return
-	if value is Object:
-		var obj: Object = value
-		if not is_instance_valid(obj):
-			return
-		var id: int = obj.get_instance_id()
-		if seen.has(id):
-			return
-		seen[id] = true
-		if obj is RefCounted:
-			var scr: Script = obj.get_script() as Script
-			print("REFDUMP %d %s %s %s" % [id, obj.get_class(), scr.resource_path if scr != null else "-", path])
-		if obj is Node and depth > 0:
-			return
-		for prop: Dictionary in obj.get_property_list():
-			if int(prop["usage"]) & PROPERTY_USAGE_SCRIPT_VARIABLE == 0:
-				continue
-			_diag_walk(obj.get(prop["name"]), path + "." + str(prop["name"]), depth + 1, seen)
-	elif value is Array:
-		var i: int = 0
-		for item: Variant in value:
-			_diag_walk(item, "%s[%d]" % [path, i], depth + 1, seen)
-			i += 1
-	elif value is Dictionary:
-		for key: Variant in value:
-			_diag_walk(value[key], "%s{%s}" % [path, str(key)], depth + 1, seen)
-
-
 func _finish(exit_code: int) -> void:
-	_diag_dump()
-	if OS.get_environment("AUTOPLAY_CLEAR") != "":
-		print("Autoplay: diag clear %s" % OS.get_environment("AUTOPLAY_CLEAR"))
-		if OS.get_environment("AUTOPLAY_CLEAR").contains("spawner"):
-			Spawner.clear_cache()
-		if OS.get_environment("AUTOPLAY_CLEAR").contains("skin"):
-			(load("res://scripts/enemies/enemy_skin.gd") as Script).get("_cache").clear()
-		if OS.get_environment("AUTOPLAY_CLEAR").contains("all"):
-			var statics: Dictionary = {
-				"res://scripts/enemies/enemy_skin.gd": ["_cache"], "res://scripts/fx/fx_font.gd": ["_font"],
-				"res://scripts/ui/hud_atlas.gd": ["_texture", "_groups"],
-				"res://scripts/ui/ui_kit.gd": ["_fonts", "_textures", "_theme"],
-				"res://scripts/world/level_lights.gd": ["_textures"],
-			}
-			for path: String in statics:
-				var scr: Script = load(path) as Script
-				for member: String in statics[path]:
-					var value: Variant = scr.get(member)
-					if value is Dictionary:
-						(value as Dictionary).clear()
-					else:
-						scr.set(member, null)
 	_done = true
 	GameInput.clear_scripted()
 	finished.emit(exit_code)

@@ -142,6 +142,18 @@ func test_the_hut_giant_lands_before_the_exit() -> void:
 	assert_true(not is_instance_valid(giant) or giant.collected, "walking to the exit collects it")
 	assert_true(Game.score >= score + points, "its points are paid")
 	assert_eq(_exits, [&"exit"] as Array[StringName], "and the hero leaves through the exit (%d ticks)" % played)
+	# The exit started Flow's transition to the tally. Let it finish here: a test that returns under a closing iris
+	# hands it to whatever file runs next (tests/test_objects_flow.gd's gate then met an iris instead of its curtain
+	# - seen the day tests/test_levels_w4.gd, whose start had waited for Flow, stopped running between the two).
+	await _settle_flow()
+
+
+## Wait until Flow has finished the transition it is in (a few frames at least).
+func _settle_flow() -> void:
+	for i: int in 3:
+		await get_tree().process_frame
+	while Flow.busy:
+		await get_tree().process_frame
 
 
 ## Play input flags one tick after the other until they end or the level is left; returns the ticks played.

@@ -38,7 +38,7 @@ msgstr "The exit is up on the cliff: hop off your partner's head!"
 
 # --- w4_l2_coop Obsidian Keep (co-op) ---
 msgid "SIGN_COOP_W4_PLATES"
-msgstr "One holds the plate, the other goes through - then swap!"
+msgstr "One crouches on the plate, the other goes through - swap!"
 
 msgid "SIGN_COOP_W4_DRUMS"
 msgstr "Two drums, far apart: strike them together to lift the gate."
@@ -48,4 +48,4 @@ msgstr "The keep tower: a hop off your partner's head gets you up."
 
 # --- w4_l2b_coop Colossus Hall (co-op) ---
 msgid "SIGN_COOP_W4_VISOR"
-msgstr "One stands on the glowing plate, the other throws the axe!"
+msgstr "Crouch on the glowing plate - your partner throws the axe!"

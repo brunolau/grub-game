@@ -38,6 +38,32 @@ B = objects/spawn_point index=2
 [entities]
 """
 const PITCH_ID: StringName = &"test_core_bots_pitch"
+## The pitch with Coconut Cove's lob bridge (row 4) and a low ledge exactly 3 rows under it (row 7).
+const BRIDGE_PITCH: String = """[meta]
+format = 2
+id = test_core_bots_bridge
+kind = arena
+players = 4
+modes = clubball
+biome = coast
+[legend]
+B = objects/spawn_point index=2
+[tiles]
+|..................|
+|..................|
+|..................|
+|..................|
+|.....--------.....|
+|..................|
+|..................|
+|.....--....--.....|
+|..................|
+|.@..............B.|
+####################
+####################
+[entities]
+"""
+const BRIDGE_PITCH_ID: StringName = &"test_core_bots_bridge"
 
 var _level: Level = null
 var _bots: Array[HeroBot] = []
@@ -592,6 +618,41 @@ func test_clubball_keeper_and_attacker_split() -> void:
 		goals.append((bot.brain as ClubballBrain).goal)
 	assert_true(goals.has(ClubballBrain.Goal.CHASE) and goals.has(ClubballBrain.Goal.KEEP),
 			"one teammate chases, the other keeps (%s)" % [goals])
+
+
+func test_clubball_bot_does_not_dodge_a_ball_lying_on_the_bridge_over_him() -> void:
+	# wf10_content_to_core-B.txt #7 (Coconut Cove, seed 53 round 3): the coconut rests on the lob bridge, the keeper
+	# stands on the low ledge 3 rows under it - his head (35 px up) is in the bridge's own row, which the floor scan
+	# of _out_from_under left out, so he stepped "out from under it" every tick and the round never ended.
+	if not _start(2, {1: Defs.BotLevel.HUNTER}, 3, "", Defs.VersusMode.CLUBBALL, BRIDGE_PITCH, BRIDGE_PITCH_ID):
+		return
+	var stub: StubReferee = StubReferee.new()
+	stub.mode = Defs.VersusMode.CLUBBALL
+	stub.teams = {0: 1, 1: 2}
+	stub.goals = {1: Rect2i(0, 112, 24, 48), 2: Rect2i(296, 112, 24, 48)}
+	var ball: StubBall = StubBall.new()
+	ball.spawn_setup(Vector2i(114, 64), {})
+	_level.add_child(ball)
+	stub.ball_entity = ball
+	BotSenses.test_referee = stub
+	GameInput.set_scripted_slot(0, func(_tick: int) -> int: return 0)
+	Sim.step(2)
+	var brain: ClubballBrain = _bots[0].brain as ClubballBrain
+	_bots[0].uninstall()
+	GameInput.set_scripted_slot(1, func(_tick: int) -> int: return 0)
+	var hero: PlayerBase = _level.get_hero(1)
+	hero.respawn_at(Vector2i(112, 112))
+	Sim.step(4)
+	assert_true(hero.is_grounded() and hero.sim_pos.y == 112, "he stands on the low ledge (%s)" % [hero.sim_pos])
+	ball.teleport(Vector2i(114, 64))
+	assert_eq((hero.sim_pos.y - Tuning.HERO_BOX_STAND.y) >> 4, 4, "his head is in the bridge's row")
+	assert_eq(brain._out_from_under(hero), -1, "the coconut lies on the bridge: nothing comes down on his head")
+	# The same coconut in the air right over him, no floor between: he steps out from under it.
+	ball.teleport(Vector2i(114, 70))
+	hero.respawn_at(Vector2i(160, 160))
+	Sim.step(4)
+	ball.teleport(Vector2i(hero.sim_pos.x + 2, 100))
+	assert_true(brain._out_from_under(hero) >= 0, "a coconut over his head with nothing between: he moves")
 
 
 # =================================================================================================================

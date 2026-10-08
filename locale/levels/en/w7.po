@@ -43,14 +43,14 @@ msgstr "Inkjaw lurks below! Strike the top of its head."
 
 # --- w7_l1_coop Shell Beach (co-op) ---
 msgid "SIGN_W7_COOP_PLATES"
-msgstr "Hold the stone plate: it opens a door for your partner."
+msgstr "Crouch on the stone plate to open a door for your partner."
 
 msgid "SIGN_W7_COOP_LOB"
 msgstr "Down + Swap curls you up. A high strike lobs your partner!"
 
 # --- w7_l2_coop Sea Caves (co-op) ---
 msgid "SIGN_W7_COOP_SEAGATE"
-msgstr "Hold the plate: it opens the lower tunnel for your partner."
+msgstr "Crouch on the plate to open the lower tunnel."
 
 msgid "SIGN_W7_COOP_DRIVE"
 msgstr "Curl up at the edge: a forward strike drives you across!"

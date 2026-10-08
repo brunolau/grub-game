@@ -140,6 +140,45 @@ func test_a_belt_that_reaches_the_simulation_is_caught() -> void:
 	assert_true(differences.size() == 1 and differences[0].begins_with("spear: line 101:"), str(differences))
 
 
+## The idle check of the route proofs (RouteTestCase._check_party_idle; docs/LEVEL_DESIGN.md 15.7.9, the 'since first
+## input' form): a hero of a two-stream route whose own slot gives no input for PlayerBase.IDLE_TICKS ticks is reported
+## - the one who played and then stood still, and the one who never touched a key - with the tick it happens on; a hero
+## who holds Down (a held key is input on every tick, G58) or taps a key in time is not. P1 walks into the left wall
+## all the while; the stage keeps running.
+func test_a_hero_who_stands_idle_on_a_coop_route_is_caught() -> void:
+	var limit: int = PlayerBase.IDLE_TICKS
+	assert_eq(limit, PartyTuning.IDLE_TICKS, "the rule's 243 ticks")
+	var cases: Array[Array] = [
+		["idle_after_input", "1:L|L,%d:L|" % (limit + 40), "P2 is idle on tick %d: %d ticks without input of his own since his last one" % [limit + 1, limit]],
+		["idle_from_the_start", "%d:L|" % (limit + 40), "P2 is idle on tick %d: %d ticks without input of his own since the stage began" % [limit, limit]],
+		["crouching", "1:L|L,%d:L|D" % (limit + 40), ""],
+		["tapping", "1:L|L,%d:L|,1:L|D,%d:L|" % [limit - 1, limit - 1], ""],
+	]
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(SCRATCH))
+	for case: Array in cases:
+		var out: FileAccess = FileAccess.open(SCRATCH + "%s.inputs" % case[0], FileAccess.WRITE)
+		out.store_string("# route: level=%s difficulty=beginner players=2 ends=none\n%s\n" % [COOP_LEVEL, case[1]])
+		out.close()
+	var table: Dictionary = header_table(SCRATCH, func(file: String, _spec: Dictionary) -> bool:
+		return cases.any(func(case: Array) -> bool: return file == "%s.inputs" % case[0]))
+	assert_eq(table.size(), cases.size())
+	assert_eq(header_problems(table), PackedStringArray())
+	for case: Array in cases:
+		var file: String = "%s.inputs" % case[0]
+		_watch_events()
+		_reset_watch(COOP_LEVEL, BEGINNER)
+		var result: Dictionary = await runner().replay(file, BEGINNER, {"routes": table, "on_tick": _on_tick,
+				"keep": true, "chain": false})
+		assert_true(stage_ticks(result.get("lines", PackedStringArray())) >= limit, "%s played" % file)
+		assert_eq(Flow.current_screen, Flow.SCREEN_LEVEL, "%s: the stage still runs" % file)
+		assert_eq(_count(&"hero_hurt") + _count(&"hero_down"), 0, "%s: nobody is hurt meanwhile" % file)
+		if str(case[2]) == "":
+			assert_eq(idle_verdict(), "", "%s: nobody is idle" % file)
+		else:
+			assert_true(idle_verdict().begins_with(str(case[2])), "%s: %s" % [file, idle_verdict()])
+		clean_up_route()
+
+
 # The first `ticks` ticks of every route of `table` as header routes that end nowhere (`part_<file>`, written under
 # SCRATCH): the stage still runs after them.
 func _partial_routes(table: Dictionary, ticks: int) -> Dictionary:
@@ -158,9 +197,7 @@ func _partial_routes(table: Dictionary, ticks: int) -> Dictionary:
 
 # The validator's problems (errors and warnings) of one level, checked with the whole folder.
 func _validator_problems(level_id: StringName) -> PackedStringArray:
-	var validator: LevelValidator = LevelValidator.new()
-	validator.add_folder(Levels.LEVEL_DIR)
-	validator.run()
+	var validator: LevelValidator = folder_validator()
 	var lines: PackedStringArray = PackedStringArray()
 	for problem: Dictionary in validator.problems_of(Levels.get_level_path(level_id)):
 		lines.append(LevelValidator.format_problem(problem))

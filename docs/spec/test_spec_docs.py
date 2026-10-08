@@ -523,13 +523,47 @@ class RisingCameraAndLee(unittest.TestCase):
         self.assertRegex(_read("scripts/world/level.gd"), r"footing_mode = rising")
         self.assertRegex(_read("tests/test_world_book2.gd"), r"func test_the_rising_view_follows_the_footing_not_a_jump")
         c8 = _section(APPENDIX_C, "### C.8")
-        self.assertIn("built in phase 3 by world-A: `LevelCamera.footing_mode`", c8)
+        self.assertIn("- **Footing follow** [G42] (world-A: `LevelCamera.footing_mode`", c8)
         self.assertNotIn("Until it is built", c8)
-        self.assertIn("never ask a hero to step down more than 2 rows", _section(LEVEL_DESIGN_15, "### 15.5"))
+        # [G65] the footing room leaves 6.5 rows under the footing: G42's 2-row step-down rule became 6 rows.
+        self.assertIn("never ask a hero to step down more than **6 rows**", _section(LEVEL_DESIGN_15, "### 15.5"))
         self.assertNotIn("until the footing follow is built", LEVEL_DESIGN_15)
         self.assertIn("**engine change, built in phase 3 by world-A**", DESIGN)
         self.assertNotIn("Until world-A confirms it, G32 stays", DESIGN)
         self.assertIn("never a jump's apex, so a jump in place lands in view [G42]", GAMEPLAY_13.replace("\n  ", " "))
+
+    # The numbers of [G65] as the documents record them (the tree at the lead designer's close of the G3 follow-up
+    # round; party was still tuning the rule then).
+    FOOTING = {"FOOTING_ROOM_PX": 72, "HEAD_ROOM_PX": 33, "HEAD_PEEK_MAX_PX": 64}
+
+    def test_the_footing_room_in_the_documents(self):
+        """[G65] the highest footing 72 px under the rising view's top; the drawn view looks up for a jumper's head."""
+        c8 = _section(APPENDIX_C, "### C.8")
+        self.assertIn("- **Footing room** [G65] (`LevelCamera._follow_footing`", c8)
+        self.assertIn("- **Head peek** [G65] (`LevelCamera.head_peek`, **drawing only**", c8)
+        flat = c8.replace("\n  ", " ")
+        for name, value in self.FOOTING.items():
+            self.assertIn("`%s` = **%d px**" % (name, value), flat)
+        self.assertIn("a step down of **6 rows** still lands in view", flat)
+        self.assertIn("[G65]", _section(LEVEL_DESIGN_15, "### 15.5"))
+        self.assertIn("[G65]", _section(DESIGN, "### C.6"))
+        self.assertIn("the drawn view looks up (at most 4 rows, drawing only)", GAMEPLAY_13.replace("\n  ", " "))
+        row = [line for line in DESIGN.splitlines() if line.startswith("| G65 |")][0]
+        self.assertIn("**Footing room** (simulation)", row)
+        self.assertIn("**Head peek** (drawing only; no rule reads it)", row)
+
+    def test_the_footing_room_in_code(self):
+        cam = _read("scripts/world/level_camera.gd")
+        _pending(self, "FOOTING_ROOM_PX" in cam, "party: the footing room of the rising view "
+                 "(wf10_lead_design_to_party.txt #2 A)")
+        self.assertRegex(cam, r"func _follow_footing\(\) -> void:")
+        consts = _gd_consts("scripts/world/level_camera.gd")
+        built = {name: consts.get(name) for name in self.FOOTING}
+        # The builder was still tuning at the lead designer's close: a later value is open work for the documents
+        # (DESIGN G65, PHYSICS C.8, GAMEPLAY 13.4, LEVEL_DESIGN 15.5), listed by the G3 table - not a broken rule.
+        _pending(self, built == self.FOOTING, "lead designer: party changed the rising view's footing room after the "
+                 "documents' record of G65 (code %s, documents %s) - record party's final values" % (built, self.FOOTING))
+        self.assertIn("static func head_peek(", cam)
 
 
 def _meta(level_id):
@@ -779,6 +813,255 @@ class HeavyKeepersAndOneHitPerStrike(unittest.TestCase):
         _pending(self, "G57" in sources, "enemies-A: a heavy glances unless brace-dazed; one hit per strike in co-op "
                  "files (wf10_lead_design_to_enemies_a.txt #1)")
         self.assertRegex(sources, r"(?i)brace")
+        # Built in the follow-up round: a heavy accepts a hit only while the Brace Wall's daze lasts.
+        traits = _read("scripts/enemies/coop_traits.gd")
+        accepts = traits[traits.index("func accepts_hit("):]
+        self.assertRegex(accepts[:accepts.index("\nfunc ")] if "\nfunc " in accepts else accepts,
+                         r"Defs\.CoopTrait\.HEAVY:\s*\n(?:\s*#.*\n)*\s*return dazed > 0")
+
+    # The heavies of the content (levels/*_coop.lvl) and the two-stream routes that brace them.
+    HEAVIES = {"w2_l2_coop": ("w2_l2_coop.inputs", "w2_l2_coop.expert.inputs"),
+               "w3_l1_coop": ("w3_l1_coop.inputs", "w3_l1_coop.expert.inputs"),
+               "w9_l2_coop": ("w9_l2_coop.inputs",)}
+
+    def test_every_heavy_of_the_content_has_a_route_recorded_on_the_rule(self):
+        found = set()
+        for path in glob.glob(os.path.join(ROOT, "levels", "*_coop.lvl")):
+            with open(path, encoding="utf-8") as f:
+                if re.search(r"(?m)^enemies/(?:bull_rex\b|\S+ .*\bcoop=heavy\b)", f.read()):
+                    found.add(os.path.basename(path)[:-4])
+        self.assertEqual(found, set(self.HEAVIES), "a heavy was added or removed: check its braceable floor "
+                         "(LEVEL_DESIGN 15.7.5), its route, and this table")
+        for routes in self.HEAVIES.values():
+            for name in routes:
+                notes = [line for line in _read("tools/autoplay/routes/" + name).splitlines() if line.startswith("#")]
+                self.assertTrue(any("G57" in line or "heavy-keeper ruling" in line for line in notes),
+                                "%s: not re-recorded on the heavy rule" % name)
+
+
+class OneHitPerStrikeAsBuilt(unittest.TestCase):
+    """[G63] the 1.0 death rule (below zero) gives hp / 25 + 1 club strikes; a repeat tick of a swing is used up; a
+    heavy that no Brace Wall dazed dies of nothing; the splitting swing never hurts the record's half again."""
+
+    # hp -> club strikes (power 25) and crouch-charged strikes (x4), as every document states them.
+    STRIKES = {10: (1, 1), 20: (1, 1), 25: (2, 1), 60: (3, 1), 100: (5, 2)}
+
+    @staticmethod
+    def _strikes(hp, power):
+        """Strikes until hp drops BELOW zero (EnemyBase.take_hit: `hp -= power`, then `if hp < 0`)."""
+        n = 0
+        while hp >= 0:
+            hp -= power
+            n += 1
+        return n
+
+    def test_the_numbers_follow_the_code(self):
+        tuning = _read("scripts/core/tuning.gd")
+        club = int(re.search(r"const WEAPON_POWER: Array\[int\] = \[(\d+),", tuning).group(1))
+        charge = _gd_consts("scripts/core/tuning.gd")["CHARGE_MULTIPLIER"]
+        self.assertEqual((club, charge), (25, 4))
+        for hp, (plain, charged) in self.STRIKES.items():
+            self.assertEqual(self._strikes(hp, club), plain, hp)
+            self.assertEqual(self._strikes(hp, club), hp // 25 + 1, hp)
+            self.assertEqual(self._strikes(hp, club * charge), charged, hp)
+        # A record without `hp=` has 25: two club strikes in a co-op file.
+        self.assertRegex(_read("scripts/base/enemy_base.gd"), r"(?m)^var max_hp: int = 25$")
+
+    def test_the_code_is_the_rule(self):
+        src = _read("scripts/base/enemy_base.gd")
+        hit = src[src.index("func take_hit("):]
+        hit = hit[:hit.index("\nfunc ")]
+        # A repeat tick is consumed (true) before any damage; the death test is the 1.0 "below zero".
+        self.assertRegex(hit, r"if slot >= 0 and _repeats_strike\(slot, source\):\s*\n\s*return true")
+        self.assertLess(hit.index("_repeats_strike"), hit.index("hp -= power"))
+        self.assertLess(hit.index("_repeats_strike"), hit.index("absorbs_hit"), "the splitting hit is the swing's hit")
+        self.assertRegex(hit, r"hp -= power\s*\n(?:.*\n)?\s*if hp < 0:\s*\n\s*kill\(")
+        traits = _read("scripts/enemies/coop_traits.gd")
+        self.assertRegex(traits, r"func refuses_death\(\) -> bool:\s*\n\s*return kind == Defs\.CoopTrait\.HEAVY and "
+                                 r"dazed <= 0 and party_on\(\)")
+        repeats = src[src.index("func _repeats_strike("):]
+        self.assertRegex(repeats[:repeats.index("\nfunc ")], r"if not CoopTraits\.party_on\(\):\s*\n\s*return false")
+
+    def test_the_documents(self):
+        d6 = _section(DESIGN, "### D.6")
+        self.assertIn("a 100-hp keeper **five**; a crouch-charged strike counts as four [G63]", d6)
+        self.assertIn("is **used up** without damage", d6.replace("\n", " "))
+        self.assertIn("it dies of nothing else meanwhile", d6)
+        self.assertIn("The swing that split it never hurts the record's own half again", d6)
+        g94 = _section(GAMEPLAY_13, "#### 13.9.4").replace("\n  ", " ")
+        self.assertIn("hp 10 or 20 one, hp 25 two, hp 60 three, hp 100 **five**", g94)
+        self.assertIn("is **used up** without damage", g94)
+        g95 = _section(GAMEPLAY_13, "#### 13.9.5")
+        self.assertIn("it dies of nothing else either", g95)
+        self.assertIn("never hurts that record's half again", g95)
+        c10 = _section(APPENDIX_C, "### C.10").replace("\n  ", " ")
+        self.assertIn("**consumed without effect**", c10)
+        self.assertIn("`hp / 25 + 1` strikes (integer division; hp 100: five)", c10)
+        ld = _section(LEVEL_DESIGN_15, "#### 15.7.5").replace("\n  ", " ")
+        self.assertIn("**25 - also every record without `hp=` - two**", ld)
+        self.assertIn("a keeper with `hp=100` five", ld)
+        self.assertIn("- **`split`** under one hit per strike [G63]", ld)
+        self.assertIn("`hp` / 25 + 1 club strikes in braced dazes", _section(LEVEL_DESIGN_15, "#### 15.7.3"))
+        row = [line for line in DESIGN.splitlines() if line.startswith("| G63 |")][0]
+        for ruling in ("**the 1.0 death rule stays**", "**(a) stays**", "**accepted**",
+                       "**accepted as the trait's meaning**"):
+            self.assertIn(ruling, row)
+        for name, text in (("DESIGN", DESIGN), ("GAMEPLAY 13", GAMEPLAY_13), ("LEVEL_DESIGN 15", LEVEL_DESIGN_15),
+                           ("PHYSICS C", APPENDIX_C)):
+            flat = re.sub(r"\s+", " ", text)
+            self.assertNotIn("takes four club strikes", flat, name)
+            self.assertNotIn("`hp=100` takes four", flat, name)
+
+    def test_a_fifth_of_the_coop_enemies_take_two_strikes(self):
+        # "hp 25 (also every record without hp=: about a fifth of the co-op enemy records)" - DESIGN G63.
+        records = []
+        for path in glob.glob(os.path.join(ROOT, "levels", "*_coop.lvl")):
+            with open(path, encoding="utf-8") as f:
+                records += [line for line in f.read().splitlines() if line.startswith("enemies/")]
+        two = [r for r in records if not re.search(r"\bhp=", r) or re.search(r"\bhp=25\b", r)]
+        self.assertTrue(records)
+        self.assertTrue(0.15 <= len(two) / len(records) <= 0.30, "%d of %d" % (len(two), len(records)))
+
+    def test_the_splitter_route_keeps_its_proof(self):
+        # G63: w6_l1_coop.expert may carry eggs:1 after its re-recording, never less than wipes / gates / checkpoints.
+        head = _read("tools/autoplay/routes/w6_l1_coop.expert.inputs").splitlines()[0]
+        for key in ("wipes:0", "x2_gates:2", "min_checkpoints:5"):
+            self.assertIn(key, head)
+        self.assertRegex(head, r"\beggs:[01]\b")
+
+
+class TheCrowIsShown(unittest.TestCase):
+    """[G64] the co-op Rival Chieftains' crow (330 harmless ticks after a blow of theirs) carries a picture."""
+
+    def test_the_documents(self):
+        b6 = _section(DESIGN, "### B.6")
+        self.assertIn("The crow must be **seen** [G64]", b6)
+        self.assertIn("drawing only\n  [G64]", _section(GAMEPLAY_13, "### 13.6", r"\n### "))
+        row = [line for line in DESIGN.splitlines() if line.startswith("| G64 |")][0]
+        self.assertIn("**Drawing only**", row)
+        self.assertIn("**Built in the follow-up round**", row)
+        self.assertIn("\"HA!\" in block letters, its tail 24 px over the head", b6)
+
+    def test_the_crow_in_code(self):
+        consts = _gd_consts("scripts/bosses/chieftain.gd")
+        self.assertEqual(consts["COOP_CROW_TICKS"], 330)
+        self.assertEqual(consts["COOP_REEL_TICKS"], 110)
+        self.assertEqual(consts["COOP_PIPS"], 5)
+        src = _read("scripts/bosses/chieftain.gd")
+        _pending(self, "G64" in src, "bosses: a gloating bubble over each chieftain while the co-op crow runs, "
+                 "drawing only (wf10_lead_design_to_bosses.txt #2); open for P4.5 if not built this round")
+        # Built in the resumed follow-up round: the numbers DESIGN B.6 / G64 state.
+        self.assertEqual(consts["CROW_BLINK_TICKS"], 22)
+        self.assertEqual(consts["CROW_MARK_RISE"], 26)   # the bubble's bottom; its tail's tip is 24 px over the head
+        self.assertIn("class CrowMark:", src)
+        self.assertRegex(src, r"func is_crowing\(\) -> bool:\s*\n\s*return _coop and _crow > 0 and fighting and not "
+                              r"dead and life == Life\.FIGHT")
+        tests = _read("tests/test_enemies_chieftain.gd")
+        for name in ("test_coop_the_crow_shows_a_gloating_bubble", "test_the_solo_pair_never_shows_the_crow_bubble"):
+            self.assertIn("func %s(" % name, tests)
+
+
+class FlyingKeepersHoldTheirPerch(unittest.TestCase):
+    """[G66] a keeper Harrier never takes off; keepers and gate bond members are enemies that cannot be led."""
+
+    # Archetypes that follow their target: never a keeper (a keeper Harrier is pinned by the engine, a Bull Rex is a
+    # brace gate, G57).
+    FOLLOWERS = ("stinger", "hopper", "raptor", "charger", "leaper", "lurker", "leech", "digger")
+    GROUND = ("walker", "shellback", "guard", "shaman", "snapper")
+
+    def test_the_documents(self):
+        row = [line for line in DESIGN.splitlines() if line.startswith("| G66 |")][0]
+        self.assertIn("**a flying keeper holds its perch**", row)
+        self.assertIn("must not be **led**", row)
+        self.assertIn("**A flying keeper holds its perch** [G66]", _section(GAMEPLAY_13, "#### 13.9.5"))
+        self.assertIn("- **A keeper Harrier is perch-bound** (co-op files only) [G66]", _section(APPENDIX_C, "### C.10"))
+        self.assertIn("**Keepers must not be led** [G66]", _section(LEVEL_DESIGN_15, "#### 15.7.3"))
+        self.assertIn("keeper Harriers hold their perch [G66]", _section(DESIGN, "### D.10"))
+
+    def test_every_keeper_of_the_content_stays_where_it_is_put(self):
+        flying = []
+        for path in sorted(glob.glob(os.path.join(ROOT, "levels", "w*_coop.lvl"))):
+            with open(path, encoding="utf-8") as f:
+                for line in f.read().splitlines():
+                    m = re.match(r"enemies/(\w+) .*\bkeeper=(\w+)", line)
+                    if not m:
+                        continue
+                    kind = m.group(1)
+                    where = "%s: %s" % (os.path.basename(path), line)
+                    self.assertNotIn(kind, self.FOLLOWERS, "a keeper that can be led - " + where)
+                    if kind == "harrier":
+                        flying.append(os.path.basename(path)[:-4])
+                    elif kind != "bull_rex":
+                        self.assertIn(kind, self.GROUND, "an unknown keeper archetype - " + where)
+                        if kind in ("walker", "shellback", "guard"):
+                            self.assertRegex(line, r"\bspeed=0\b", "a ground keeper that walks - " + where)
+        # The one gate with flying keepers: 9-1b 'stormwall' (two perched storm pterodactyls).
+        self.assertEqual(sorted(set(flying)), ["w9_l1b_coop"])
+
+    def test_the_perch_in_code(self):
+        src = _read("scripts/enemies/harrier.gd")
+        _pending(self, "G66" in src, "enemies-A: a keeper Harrier never takes off - 'stormwall' of w9_l1b_coop is OPEN "
+                 "until then (wf10_lead_design_to_enemies_a.txt #3)")
+        self.assertRegex(src, r"(?i)keeper")
+
+
+class LoneHeroReachAndTheCoilRule(unittest.TestCase):
+    """[G67] the hop jump, the pogo jump and the 123 px strike reach; in co-op files a coil unrolls from its level."""
+
+    def test_the_documents(self):
+        row = [line for line in DESIGN.splitlines() if line.startswith("| G67 |")][0]
+        for text in ("**hop jump**", "**pogo jump**", "**123 px**", "**The coil rule**", "**Building rules**",
+                     "**The search**"):
+            self.assertIn(text, row)
+        c4 = _section(APPENDIX_C, "### C.4")
+        self.assertIn("**Co-op files: from its own level only** [G67]", c4)
+        self.assertIn("`<= top + 16`", c4)
+        self.assertIn("[G67]", _section(GAMEPLAY_13, "### 13.3", r"\n### "))
+        self.assertIn("| **A lone hero** (what every height gate must refuse) [G67] |",
+                      _section(LEVEL_DESIGN_15, "#### 15.7.2"))
+        boost = [line for line in LEVEL_DESIGN_15.splitlines() if line.startswith("| **Boost ledge** |")][0]
+        self.assertIn("**The clean foot** [G67]", boost)
+        self.assertIn("**The coil** [G67]", boost)
+        self.assertIn("a **pogo-jump** probe", _section(LEVEL_DESIGN_15, "#### 15.7.6"))
+
+    def test_the_solo_rolled_vine_is_the_only_one(self):
+        # The coil rule is for co-op files; the one solo file with a rolled vine keeps "any hit unrolls".
+        solo = []
+        for path in sorted(glob.glob(os.path.join(ROOT, "levels", "*.lvl"))):
+            name = os.path.basename(path)[:-4]
+            if name.endswith("_coop") or name.startswith(("test_", "arena_")):
+                continue
+            with open(path, encoding="utf-8") as f:
+                if re.search(r"(?m)^objects/vine .*\brolled\b", f.read()):
+                    solo.append(name)
+        self.assertEqual(solo, ["w5_l2"])
+
+    def test_the_coil_rule_in_code(self):
+        src = _read("scripts/objects/vine.gd")
+        _pending(self, "G67" in src, "the vine's owner (objects-B; party asked): in a co-op file a rolled vine unrolls "
+                 "only for a hit from its own level - every rolled-vine drop gift is open to a lone hero's hop jump "
+                 "until then (wf10_lead_design_to_party.txt #4)")
+        self.assertRegex(src, r"(?i)top \+ ")
+
+
+class BookOneCoopSecondPart(unittest.TestCase):
+    """[G68] DB1's 1-2 'shaft' (a boost ledge with a plate-driven lift stone), plain leapers, 2-1's Expert records."""
+
+    def test_the_documents(self):
+        row = [line for line in DESIGN.splitlines() if line.startswith("| G68 |")][0]
+        self.assertIn("**all accepted**", row)
+        self.assertIn("**no bond on a zone-spawner archetype**", row)
+        d9 = _section(DESIGN, "### D.9")
+        self.assertIn("as built (DB1 [G68]): 'shaft'", d9)
+        self.assertIn("- **No bond on a zone spawner** [G68]", _section(LEVEL_DESIGN_15, "#### 15.7.5"))
+
+    def test_the_files(self):
+        w12 = _read("levels/w1_l2_coop.lvl")
+        self.assertRegex(w12, r"(?m)^objects/x2_tablet .*\bgate=shaft\b")
+        self.assertRegex(w12, r"(?m)^objects/column .*\brise_while=shaft\b")
+        self.assertNotRegex(w12, r"(?m)^objects/pulley\b")
+        self.assertNotRegex(w12, r"(?m)^enemies/harrier\b")
+        self.assertNotRegex(w12, r"(?m)^enemies/leaper .*\bcoop=bond\b")
 
 
 class IdleWarningAndPlateSigns(unittest.TestCase):
@@ -821,6 +1104,16 @@ class IdleWarningAndPlateSigns(unittest.TestCase):
         if "IDLE_WARN_TICKS" in party:
             self.assertEqual(party["IDLE_WARN_TICKS"], 170)
         self.assertEqual(party.get("IDLE_TICKS", 243), 243)
+        # Built in the resumed follow-up round (party): the constant (private until core-A's table has it) and the
+        # rows of tests/test_player_idle.gd that DESIGN G58 names.
+        self.assertEqual(_gd_consts("scripts/player/hero_party.gd")["IDLE_WARN_TICKS"], 170)
+        tests = _read("tests/test_player_idle.gd")
+        for name in ("test_a_held_key_is_input_on_every_tick_it_is_held",
+                     "test_a_partner_crouching_on_a_plate_holds_it_and_one_who_just_stands_lets_go_at_243",
+                     "test_the_zzz_soon_bubble_shows_from_the_170th_quiet_tick_and_the_zzz_from_the_243rd",
+                     "test_an_untouched_partner_shows_the_same_bubble_from_his_170th_tick",
+                     "test_the_warning_bubble_is_a_picture_only_an_egg_shows_none"):
+            self.assertIn("func %s(" % name, tests)
 
     def test_plate_signs_say_crouch(self):
         stale = []
@@ -847,6 +1140,17 @@ class RefusalsNameTheirEvidence(unittest.TestCase):
         self.assertIn("**\"Refused\" names its evidence** [G59]", _section(DESIGN, "### D.8"))
         self.assertIn("**A refusal names its evidence**", PLAN)
         self.assertIn("at least **660 resting points, uncached**", ld)
+
+    def test_the_verdicts_in_code(self):
+        src = _read("scripts/world/coop_search.gd")
+        _pending(self, "BOUNDED_MIN_NODES" in src, "world-B: the G59 verdict per gate (wf10_lead_design_to_world_b.txt)")
+        self.assertEqual(_gd_consts("scripts/world/coop_search.gd")["BOUNDED_MIN_NODES"], 660)
+        verdicts = dict(re.findall(r'^const VERDICT_(\w+): String = "([^"]+)"', src, re.M))
+        self.assertEqual(verdicts, {"OPEN": "open", "EXHAUSTIVE": "refused (exhaustive)",
+                                    "BOUNDED": "refused (bounded)", "UNPROVEN": "unproven"})
+        ld = _section(LEVEL_DESIGN_15, "#### 15.7.6")
+        for verdict in verdicts.values():
+            self.assertIn("| **%s** |" % verdict, ld)
 
 
 class CutThreeApplied(unittest.TestCase):
@@ -880,6 +1184,9 @@ class CutThreeApplied(unittest.TestCase):
             # Bots only on green pulley links (core-B): the modes it names must be a subset of its modes.
             modes = set(tar.get("modes", "").split(","))
             self.assertEqual(set(tar.get("bots", tar.get("modes", "")).split(",")) - modes, set())
+        # DESIGN E.5 states the file's own `bots` key (content landed `grub_stack,hot_rock` in the follow-up round:
+        # Last Caveman Standing is human-only on Tar Pulleys).
+        self.assertIn("`bots = %s`" % tar.get("bots", ""), _section(DESIGN, "### E.5"))
 
     def test_the_reward_table_in_code(self):
         table = _read("scripts/core/unlock_table.gd")
@@ -949,6 +1256,22 @@ class DeviationsReviewed(unittest.TestCase):
             self.assertRegex(_read("levels/%s.lvl" % level_id), r"(?m)^objects/x2_tablet .*\bgate=%s\b" % gate)
         self.assertNotRegex(_read("levels/w7_l1_coop.lvl"), r"(?m)^objects/(mount|rex_pen)\b")
         self.assertRegex(_read("levels/w6_l1_coop.lvl"), r"(?m)^objects/mount .*\bwild\b")
+
+
+class SuiteBudget(unittest.TestCase):
+    """PLAN 8 V7 names every slow module of tests/run_tests.gd and the rule of the single slow tests."""
+
+    def test_every_slow_module_is_named_in_the_plan(self):
+        v7 = PLAN[PLAN.index("**V7 - Suite budget**"):PLAN.index("## 9. Cut list")]
+        runner = _read("tests/run_tests.gd")
+        block = runner[runner.index("const SLOW_FILES"):]
+        files = re.findall(r'"(test_\w+)\.gd"', block[:block.index("]")])
+        self.assertGreaterEqual(len(files), 5)
+        for name in files:
+            self.assertIn("`%s`" % name, v7, "PLAN 8 V7 does not name the slow module %s" % name)
+        if "const SLOW_TESTS" in runner:
+            self.assertIn("`SLOW_TESTS` of `tests/run_tests.gd`", v7.replace("\n", " "))
+            self.assertIn("--slow-tests", v7)
 
 
 class Hygiene(unittest.TestCase):

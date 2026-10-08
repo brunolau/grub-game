@@ -707,8 +707,8 @@ every hero glows warm and every prop whose name holds "glow" (`swamp/props/glowc
 | Vine | grabbed with Up (not Down + Up) when the hands (32 px over the feet) reach it; climb 2 px/tick up, 3 down; leap off 36 px up and 47-83 px out; climbable from a raft, spear step or lift | a vine whose bottom hangs up to 2 rows over a floor is grabbed standing, up to 5 rows with a jump |
 | Tar | wade 2 px/tick; hop 33 px | 15.3 |
 | Geyser | -224: 105 px, the same as a spring or an Up bounce | a geyser lifts to a ledge up to 6 tiles above its vent, also from a tar floor (the way out of a tar pit) |
-| Raft | current 1-3 px/tick; paddle up to 3 px/tick of its own; banks stop it | keep a raft's path free of cells at its surface row except the banks you want. Known engine bug (phase 3, objects-B unowned): a raft that dozes at rest keeps its paddle-drag clock still, so a co-op route that paddles it after it dozed differs with and without dozing (V3.b); until the drag clock is restored on wake, put a paddled raft's home in a one-cell eddy (`zones/current` of 1 x 2 cells against its way, speed 1: a raft in a current never dozes), as D6's w6_l1_coop does. A railed raft's fence opens towards a bank only while the raft rests against it [G45]: end the last current one cell short of the bank, so the raft drifts its last pixel and stops (`ending_b`) |
-| Rising tide | 1 px/tick = one row per 16 ticks; the view follows each hero's footing, never a jump's apex, and never sinks (P-C.8 "footing follow" [G42], built in phase 3; at G2 the view chased the apex and a jump that did not land higher killed - G32's building rule [G32], now retired) | a Beginner stopping 73 ticks (3 s) loses 4.5 rows: give every climb that much spare; a jump in place on a climb ledge (to strike a bat) is fair now; never ask a hero to step down more than 2 rows under the highest footing he reached (the follow puts a climbing hero on view row 8 of 11 and the view does not come down) |
+| Raft | current 1-3 px/tick; paddle up to 3 px/tick of its own; banks stop it | keep a raft's path free of cells at its surface row except the banks you want. A raft that dozed at rest used to keep its paddle-drag clock still, so a route that paddled it afterwards differed with and without dozing (V3.b); since the G3 follow-up round the clock gets its slept ticks back when the raft wakes (party, `raft.gd` [G45]), so a paddled raft's home no longer needs the one-cell eddy that D6's w6_l1_coop and D7's w7_l1_coop put there (`zones/current` of 1 x 2 cells against its way, speed 1: a raft in a current never dozes) - it stays legal. A route recorded before that change on a raft that had dozed must be re-recorded. A railed raft's fence opens towards a bank only while the raft rests against it [G45]: end the last current one cell short of the bank, so the raft drifts its last pixel and stops (`ending_b`) |
+| Rising tide | 1 px/tick = one row per 16 ticks; the view follows each hero's footing, never a jump's apex, and never sinks (P-C.8 "footing follow" [G42], built in phase 3; at G2 the view chased the apex and a jump that did not land higher killed - G32's building rule [G32], now retired) | a Beginner stopping 73 ticks (3 s) loses 4.5 rows: give every climb that much spare; a jump in place on a climb ledge (to strike a bat) is fair now; never ask a hero to step down more than **6 rows** under the highest footing he reached (the follow keeps the highest footing 4.5 rows under the view's top and 6.5 rows over its bottom, and the view does not come down [G65]; the 2 rows of [G42] are superseded - 6-2b's painting nook lies six rows over the ledge the hero returns to). The picture looks up by itself for a jumping hero's head (drawing only), so nothing has to be built for the HUD band. Co-op: a partner more than 6 rows under the leader's footing is out of the view and left to the band - keep the two climbing lines of a rising stage within a few rows of each other and give drop clouds a twin beside each step |
 | Chomper | 4 px/tick; hop 55 px, 84 px far at full speed | mounted gaps <= 4 tiles, steps <= 3 rows, 4 rows of air in mounted corridors, no sprite platforms on mounted stretches |
 | Gusts | negative `wind` pushes right; crouching braces; co-op: a hero up to 64 px downwind of a crouching (so active) partner (16 px up or down) feels no wind, and a jump taken there stays sheltered until he lands (the lee) [G41] | alternate with `wind_loop`; give a crouching spot before every gap; a co-op lee is a comfort, not a gate [G55]: give a crouching spot within 64 px downwind of the far edge of gaps of up to 3 tiles |
 | Lightning | the column is marked 22 ticks before the bolt; `period` [66]; it alternates between the heroes inside | never two bolts on the only safe cell in a row |
@@ -772,6 +772,7 @@ every hero glows warm and every prop whose name holds "glow" (`swamp/props/glowc
 | Grounder | 192 px (12 tiles) along the floor in 32 ticks | rolls under low gaps, breaks `$` in its path |
 | See-saw | launch 153 px (a 4-tile drop onto the high end) to 171 px (5+ tiles) | target ledges up to 9 rows over the low end |
 | Duo reach in general | chained moves (a hop off a jumping partner, see-saw plus hop) reach 12-13 tiles | contain co-op paths with walls and roofs of 13+ rows where skipping would break the stage |
+| **A lone hero** (what every height gate must refuse) [G67] | standing jump 60-64 px; **hop jump** (Up held from the 8th tick of a low strike) 73 px, 77-80 with a high strike on the way, whose box then reaches **123 px**; **pogo jump** (that strike on one hittable at his feet) **114 px** - over the 112 px corner catch of an 8-row ledge; a bounce with Up on any enemy he can lead under the ledge 105 px from its head (a Harrier in the air: 220 px over the floor) | 8 rows hold only over a clean foot: nothing to club and nothing to bounce on within 7 cells of the ledge's foot, no follower within two views (15.7.3) |
 
 #### 15.7.3 Gates
 
@@ -784,7 +785,7 @@ and keepers).
 
 | Kind | Recipe |
 |---|---|
-| **Boost ledge** | a ledge **8 rows over every floor within reach on both difficulties** [G28] - a flat floor at least 3 cells wide under its face, no step, root or rock nearer the top within 10 cells (the corner catch lands feet that enter a ledge's top cell from the side, so a 98-105 px rise climbs a 7-row ledge; G28 measured it with an idle carrier, which no longer carries since G33 - the 8 rows stay [G39]); 11 rows of air over the hop cells; a drop gift on top: a **rolled vine** at the edge, its coil 11+ cells from the gate's `far` cell (the validator counts a coil as a booster; 1-1 and 5-1 co-op). A flower pot reaches 6 rows from the floor it takes root on [G6], so it is no way back from an 8-row ledge (a raised root within reach is a step for a lone hero: a 98-105 px rise plus the corner catch) |
+| **Boost ledge** | a ledge **8 rows over every floor within reach on both difficulties** [G28] - a flat floor at least 3 cells wide under its face, no step, root or rock nearer the top within 10 cells (the corner catch lands feet that enter a ledge's top cell from the side, so a 98-105 px rise climbs a 7-row ledge; G28 measured it with an idle carrier, which no longer carries since G33 - the 8 rows stay [G39]); 11 rows of air over the hop cells; a drop gift on top: a **rolled vine** at the edge, its coil 11+ cells from the gate's `far` cell (the validator counts a coil as a booster; 1-1 and 5-1 co-op). A flower pot reaches 6 rows from the floor it takes root on [G6], so it is no way back from an 8-row ledge (a raised root within reach is a step for a lone hero: a 98-105 px rise plus the corner catch) **The clean foot** [G67]: no hittable (a hidden or inset spot, a breakable block) and no enemy record on the floor within 7 cells of the ledge's foot - ONE is enough for a lone hero's pogo jump (114 px); no Harrier, nor any flyer that follows its target through scenery, within two views (a bounce on it carries a lone hero anywhere). **The coil** [G67]: in a co-op file a rolled vine unrolls only for a hit from its own level (the striker's feet at most one row under its ledge), so put the coil where the upper hero strikes it standing on the ledge; until that rule is built a hop jump with a high strike (123 px) reaches the coil of an 8-row ledge from below |
 | **Totem ledge** | a ledge 5 rows up (Totem jump or hop, both difficulties); a gate only because a Totem Ride needs an active carrier [G33]: keep every other booster out of its static reach |
 | **Batter Up gap** | 8 (Beginner) / 9 (Expert) cells of `~` between two floors at the same height; or a 7-row lob ledge (15.7.2) |
 | **Plate door** | `objects/plate` (`count=1 mode=hold`) at least **8 tiles** from its door (`objects/column rise_while=<plate>`); a plate weighs only active heroes (a parked idle partner or a riderless mount holds nothing [G33]); the holder must reach the far side another way: a second plate beyond the door for him (**leapfrog**: A holds for B, B holds for A - with **two doors in two corridors**, because a column rises only while all its plates are pressed: plate A opens the lower corridor for B, plate B beyond opens the upper corridor for A; 1-1 and 5-1 co-op [G9]), or a `timed:` plate |
@@ -792,8 +793,8 @@ and keepers).
 | **See-saw** | `objects/seesaw` with its high end 1 row over the floor, a ledge 4+ rows above the high end within 3 cells to drop from, the target up to 9 rows over the low end; no enemy may fall onto it |
 | **Heave boulder** | `objects/boulder_heavy` with 3+ cells of floor behind the pushed side and 2+ rows of air; it fills a 2-cell gap, plugs a vent (`objects/geyser deadly`) or presses a plate |
 | **Pulley** | `objects/pulley` with two `objects/platform mode=ride` 4+ cells apart; the rider's target `range` rows above his platform's start. Keep rider and counterweight within about 7 rows of each other (`range` 3 at most): while the rider is in the air the view is anchored on the standing counterweight (rows 4-9 of the view), and a lift off the view carries nobody - a range-6 pulley drops its rider through his own lift (D9a, 9-1). Reach a higher target from a co-op ledge over the risen lift. The same holds for a vertical co-op climb: give drop clouds a twin beside each step so both climb side by side |
-| **Keeper door** | `objects/column trigger=keepers:<name>` behind a hall **exactly 4 rows high** (the Guard and Shellback art is 54 px tall); its keepers (`keeper=<name>`) carry `shell`, `bond` or `daze`. Keepers meant for a pincer stand still (`speed=0`: a walker with left = right = 0 still sways about 30 px); bait about 30 px in front, the striker's way in about 40 px behind [G5] |
-| **Brace corridor** | a `heavy` (Bull Rex) in a 4-row-high hall between walls. **The brace is the only way to hurt it** [G57]: every hit glances unless a Brace Wall has it dazed (44 ticks), and a co-op strike hurts it once, so `hp` / 25 is the number of club strikes two heroes must land in braced dazes (it wakes, turns and charges again for the next brace). The 4-row hall does not stop it running under a jumping hero (G3 verifier) - the damage rule is the gate, not the hall. A heavy presses against the wall nearest its target, so the heroes must step into the corridor while it is NOT pressing at their way in (asleep out of view at the far end, or far away): a corridor whose entrance is where the heavy stops makes every entry a trample; a brace across a step is impossible (the body overlap lends the leftmost box half its width) - keep the braced floor flat (DB2, 3-1) [G55] |
+| **Keeper door** | `objects/column trigger=keepers:<name>` behind a hall **exactly 4 rows high** (the Guard and Shellback art is 54 px tall); its keepers (`keeper=<name>`) carry `shell`, `bond` or `daze`. Keepers meant for a pincer stand still (`speed=0`: a walker with left = right = 0 still sways about 30 px); bait about 30 px in front, the striker's way in about 40 px behind [G5] **Keepers must not be led** [G66]: a keeper (and every bond member of a gate) is an enemy that stays where you put it - a walker, Guard or Shellback with `speed=0`, or a perched Harrier (with `keeper=` it never takes off; 3 rows up it is high-struck from below). Never an archetype that follows its target - stinger, hopper, charger, leaper, lurker, digger, or a Harrier without `keeper=`: one hero leads it to its mate and kills both inside the window ('stormwall' of 9-1b fell that way). A Bull Rex keeper is the exception: it charges, and only a brace hurts it [G57] |
+| **Brace corridor** | a `heavy` (Bull Rex) in a 4-row-high hall between walls. **The brace is the only way to hurt it** [G57]: every hit glances unless a Brace Wall has it dazed (44 ticks), and a co-op strike hurts it once, so two heroes must land `hp` / 25 + 1 club strikes in braced dazes (a default Bull Rex, hp 25: two, or one crouch-charged; the hp-100 keeper of 3-1: five, which a pair lands inside one daze [G63]); if a daze runs out it wakes, turns and charges again for the next brace. Unbraced it dies of nothing at all - no grenade, kill-all, feast or mount bite [G63]. The 4-row hall does not stop it running under a jumping hero (G3 verifier) - the damage rule is the gate, not the hall. A heavy presses against the wall nearest its target, so the heroes must step into the corridor while it is NOT pressing at their way in (asleep out of view at the far end, or far away): a corridor whose entrance is where the heavy stops makes every entry a trample; a brace across a step is impossible (the body overlap lends the leftmost box half its width) - keep the braced floor flat (DB2, 3-1) [G55] |
 | ~~Chomper two seats~~ | **retired as a gate kind** [G62]: a mount crosses a 6-cell spike bed with one rider in about 24 ticks and the Leeches only drain bones (D6), so whatever the gunner clears, a lone rider outruns. The two seats stay a co-op set piece (6-1); 6-1 and 7-1 built A.6's fallbacks (a boost ledge, leapfrog plate doors) |
 | ~~Lee gap~~ | **retired as a gate kind** [G55]: the lee shelters only the second hero (the croucher already stands past the gap), so whatever carries the first hero over a gust gap carries a lone hero too - it can never be solo-impossible (DB2). The lee stays a co-op comfort taught by a sign; build a Brace corridor, a line drive or a keeper hall where a gate is needed (the search ran the wind - world-B's `SearchWind` - so this is a rule of the move, not of the proof [G41]) |
 
@@ -821,9 +822,24 @@ gate (D.8 #1).
   `grab` needs a `perch=c,r` next to a pit. `lone` is off on Beginner: do not make a gate out of it. Snappers have no
   co-op rule of their own (bait-and-bite was dropped [G10] [G40]): pair them with `bond`. Every trait rule that asks
   for "the nearer hero" (a shield, a keeper's bait, `lone`'s pair) counts only active heroes [G33].
-- **`hp` counts strikes in co-op files** [G57]: one strike (a swing, a throw, a ball flight, a bounce) hurts a given
-  enemy once, so a keeper with `hp=100` takes four club strikes - set keeper `hp` for the time the hall should take,
-  not for safety (the 1.0 test hit on every tick a box overlapped and made `hp` meaningless).
+- **`hp` counts strikes in co-op files** [G57] [G63]: one strike (a swing, a throw, a ball flight) hurts a given
+  enemy once, and an enemy dies when its hp drops below zero, so it takes `hp` / 25 (rounded down) + 1 club strikes:
+  `hp=10` (most records) or 20 one, **25 - also every record without `hp=` - two**, 60 three, a keeper with `hp=100`
+  five; a crouch-charged strike counts as four. Set keeper `hp` for the time the hall should take, not for safety (the
+  1.0 test hit on every tick a box overlapped: one swing emptied 100 hp). The rest of a swing is used up on
+  the enemy it already hurt: a living enemy shields the one behind it, a hidden spot and its own split half - do not
+  build a spot or a second target that a hero must reach **through** a tough enemy with one swing.
+- **No bond on a zone spawner** [G68]: a leaper, dropper, digger or charger record is a spawner whose record never
+  dies - a `bond` on it never seals and its copies regrow for ever (1-2's "bonded leapers"). Bond enemies that die
+  for good: walkers, flyers, guards, snappers, a perched keeper Harrier [G66].
+- **`split`** under one hit per strike [G63]: the swing that splits a Tar Splitter never hurts the record's half
+  again, so one swing no longer clears both halves - the pair takes a half each inside the window (24 B / 12 E).
+  How a pair does it (enemies-A's re-recording of 6-1 Expert): side by side (within a few px) both strike on the same
+  tick - the first box splits the record, the partner's box kills the record's half on that tick, the first hero's
+  box takes the spawned half on the next. Strike when it is well inside the club's reach, not at its tip (a split on
+  the box's last tick leaves the spawned half alive and it runs into both). A lone striker did not finish an Expert
+  splitter in the builder's runs: the record's half runs 66 px away and the window closes. Give a splitter fight a flat floor of 4+ cells
+  where two can stand together, and keep route bots together at splitters.
 - **`heavy`** (Bull Rex) [G57]: hurt only while a Brace Wall has it dazed - wherever a heavy stands it is a brace
   gate. Give it a flat floor of 3+ cells in its charge path where two heroes can crouch side by side, and keep it off
   the only path of a stretch that is not meant to be one.
@@ -881,10 +897,13 @@ difficulty one verdict:
 | Brace corridor (`heavy`) | **hop-over**, **charge-under** (the heavy woken and baited to run under a jumping hero, who lands behind it and strikes - the 'brace' finding), **idle-bait** (the idle partner as the second croucher, as bait) |
 | Plate door, leapfrog, pulley, see-saw, heave boulder | **idle-bait** (the idle partner on every plate, lift and see-saw end and in every door's and boulder's way: the doorstop [G53]), **plates** (race every door from its plate - off the plate and through before the column closes - and every `timed:` clock), **thrown-special** (specials through every door gap) |
 | Twin drums | **thrown-special** (every special from every reachable spot at every drum; a `pair_solo_min` of 0 is a build error [G36]) |
-| Boost, Totem and lob ledge, Batter Up gap | **hop-over** (bounces off every enemy that can wander into the static reach, the idle partner's head, a corner catch), **idle-bait** (the idle partner placed under the ledge or at the gap's lip) |
+| Boost, Totem and lob ledge, Batter Up gap | **hop-over** (bounces off every enemy that can wander into the static reach, the idle partner's head, a corner catch), **idle-bait** (the idle partner placed under the ledge or at the gap's lip); since [G67] also the lone hero's **hop jump** and its strikes as search moves, a **pogo-jump** probe at every hittable and enemy within reach of the ledge's foot, the gate's **rolled-vine coil** as a probe target (hop-jump strikes, every thrown special from every floor spot of the view) and a **lure** probe for every follower within two views - without them a bounded refusal of a height gate is unproven |
 
-world-B builds the probes and prints the verdict per gate (`tests/test_coop_gates.gd`, `tools/world_coop_gates.sh`);
-a designer whose gate is "unproven" asks world-B for its probes rather than raising the bound again.
+world-B builds the probes and prints the verdict per gate (`tests/test_coop_gates.gd`, `tools/world_coop_gates.sh`:
+one line `GATE <level> <difficulty> <gate>: <verdict> (<evidence>)`, `CoopSearch.gate_verdict`); the gate table of
+`tools/g3.sh` counts "n/N gates refused: e exhaustive, b bounded + probes", is green only when every gate is one of
+the two, lists unproven gates by name (the row stays open: G3 is not reached) and is red on an open gate. A designer
+whose gate is "unproven" asks world-B for its probes rather than raising the bound again.
 
 #### 15.7.7 Two heroes on one camera
 
@@ -964,7 +983,12 @@ team wipe does not. What it means for a level:
 - **Plate signs say "crouch"** [G58]: every co-op sign that teaches a hold plate says "Crouch on a plate to hold it"
   (15.6); the plate signs of phase 3 said "Stand on a plate" and are reworded by their locale files' owners.
 - **Two-stream routes**: a stream that stands still for 243+ ticks on a plate, under a rider or at a see-saw breaks
-  the replay. Hold Down (crouch) on such stretches when recording; `test_coop_routes` tells.
+  the replay. Hold Down (crouch) on such stretches when recording; `test_coop_routes` tells
+  (`RouteTestCase._check_party_idle`, on every tick of every two-stream route and in the co-op campaign runs): a
+  living, hatched hero's quiet ticks (`input_idle_ticks`, counted from his entry into the level and from each input
+  of his own slot) never reach 243 - so it catches the hero who played and then stood still and the one who never
+  touched a key in a stage's first 243 ticks; an egg and a dead hero are not asked. Stay under 170 where you can:
+  from there the replay shows the "Zzz soon" bubble [G58].
 - **Teach it once**: the egg and tablet signs at the first checkpoint of 1-1 and 5-1 co-op may add "Asleep? Press
   any key!" (one idea per sign [G27]).
 - **The team exit** counts an idle hero on the view as present (an absent partner never blocks the end of a stage).
@@ -1015,9 +1039,9 @@ team wipe does not. What it means for a level:
 - **Movers and bots** (DA, phase 3 [G51]): the bots' links of a see-saw or a pulley lift are baked for its level-start
   state only, so a bot left on a flipped plank or a moved lift stands there; and a see-saw end over a liquid cell kills
   its rider (and tips a lander into it within 2 ticks - no telegraph). Keep both ends of an arena see-saw over
-  standable ground; until the baker covers every state, build Floe Rink with fixed floes; Tar Pulleys ships with
-  `bots = none` (human-only) unless core-B's pulley links - a lift's links baked for every state it can stand in -
-  make its bot tests green in its modes [G60].
+  standable ground; until the baker covers a see-saw's every state, build Floe Rink with fixed floes. Pulley lifts
+  are covered since the G3 follow-up round (core-B: links at every still state of the pulley): Tar Pulleys ships
+  `bots = grub_stack,hot_rock`, its Last Caveman Standing human-only (spawn fairness, not navigation) [G60].
 - **The 8 arenas of 2.0** [G37] [G60]: cut 3 is applied - Mesa Rodeo and Cloud Top are not in 2.0. Floe Rink plays
   **Grub Stack only** (`modes = grub_stack`); Echo Hollow's signature is the darkness pulse alone (its regrowing `$`
   walls and dangler springboard broke spawn fairness in every placement and are dropped: no `regrow`, no enemy record);
@@ -1058,6 +1082,14 @@ New routes describe themselves in a header instead of a `ROUTES` entry. The head
 - Counts at G3: 31 solo club routes (11 Beginner + 20 Expert cells), about 6 featured routes, 57 co-op routes.
   A co-op boss route also measures its fight: 45-90 s from the boss bar to the lethal blow, at most 6 hurts on
   Expert (DESIGN.md B.0 [G61]); re-record it when the co-op form is retuned.
+- **What a co-op route proves** [G63]: the team exit (or the boss trophy), no team wipe (`wipes:0`), every main-path
+  gate (`x2_gates:<n>`) and the checkpoints - never weaken those when a rule change breaks a route; re-record it.
+  `eggs:0` is the recorder's own pin, not a rule (a third of the co-op routes carry none): a recording in which one
+  hero is egged once and hatched by his partner is still a proof - the Egg Hatch is the co-op rule working - so a
+  re-recording after a rule change may carry `eggs:1` with a note line that names the ruling; never more than one.
+- **Whoever changes behaviour re-records** (the G3 follow-up round): an enemy or boss change that breaks a recorded
+  route is finished only when that route is re-recorded and green; the header keeps the designer's lines and gains
+  a note line naming the change ("Re-recorded by ... for G57").
 
 ### 15.10 Checklist additions
 
@@ -1070,7 +1102,7 @@ New routes describe themselves in a header instead of a `ROUTES` entry. The head
       probe of its kind [G59]; co-op routes for both difficulties.
 - [ ] Co-op (phase 3): no bond that one thrown special hits twice in one throw [G36]; no role in a two-stream route
       standing 243+ ticks without input [G33]; a boss arena's weak points 55 px under the view's top (72 px in the boss bar's columns) [G35].
-- [ ] Co-op (G3 follow-up): every heavy on a flat floor a pair can brace on, keeper `hp` set as strikes [G57]; plate
+- [ ] Co-op (G3 follow-up): every heavy on a flat floor a pair can brace on, keeper `hp` set as strikes (`hp` / 25 + 1 [G63]) [G57]; plate
       signs say "crouch" [G58].
 - [ ] Signs: every text at most 3 board lines (about 60 characters); the music context of the 15.2 table.
 - [ ] Arena: 20 x 12, row 0 empty, spawns for `players`, cookpots, bot graph baked and its bot test green per mode.

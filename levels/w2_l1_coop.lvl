@@ -5,9 +5,11 @@
 # pb and trapdoor 2 rises for A (a leapfrog of two doors, LEVEL_DESIGN 15.7.3). Gate 2 "den": the low passage from the
 # fourth chamber into the Dark Deep is a keeper hall, 4 rows high, held by two Shellback turtles (one hero hops over a
 # turtle and baits its shell, the partner clubs its back); their door opens when both are dead. Leeches lurk in the
-# dark beyond; the Expert stinger of the shaft is a loner; the other turtles are Shellbacks too (not the Expert one on the
-# plateau), and every special lies in pairs. x2 secret: at the foot of the Echo Shaft a channel of black water runs
-# under the rock - only a Batter Up line drive crosses it, to a cracked wall and the Deep Pantry with Cave Painting 22 (a gate brings the batter back).
+# dark beyond; the Expert stinger of the shaft is a loner; the other turtles are Shellbacks too (not the Expert one on
+# the plateau); the Expert bat on its thread over plate pa is left out (it hung over the plate holder's head, G22); and
+# every special lies in pairs. x2 secret: at the foot of the Echo Shaft a channel of black water runs under the rock -
+# only a Batter Up line drive crosses it, to a cracked wall and the Deep Pantry with Cave Painting 22 (a gate brings
+# the batter back).
 
 [meta]
 format = 2
@@ -135,7 +137,9 @@ zones/secret 40 6 rect=33,4,19,3 name=upper_vein
 objects/gate 47 14 name=cache_in dest=cache_out skin=hole
 objects/sign 63 17 text=SIGN_W2_HATCH
 objects/checkpoint 53 17
-enemies/dangler 49 9 skin=bat depth=72 speed=2 expert
+# wf10: the solo file's Expert bat on its thread at 49,9 is left out - it hung over plate pa, where the holder of
+# gate 'hatches' crouches (LEVEL_DESIGN 15.7.1 #4 / G22: no solo record that hits a role holder); without it 9 of
+# the 27 Expert enemy records carry a trait (the third the validator asks for).
 enemies/lurker 50 20 skin=insect_b range=4 hp=10
 enemies/lurker 63 20 skin=insect_b range=3 hp=10 expert
 enemies/walker 57 34 skin=turtle_b left=-2 right=4 coop=shell

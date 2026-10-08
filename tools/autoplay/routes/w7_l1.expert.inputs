@@ -1,14 +1,16 @@
 # route: level=w7_l1 difficulty=expert ends=exit after=tally expect=min_checkpoints:4,letters:3
 # The Expert club route of Shell Beach (designer D7; the same macros as the Beginner route, build/d7/bot_w7_l1.gd):
 # the red fish and the extra gulls are fought from the rafts and the bars. Never presses S (belt invariance).
+# Re-recorded in wf10 by party with the same bot: raft.gd's drag clock now counts the ticks a raft dozed (it dragged on
+# other ticks with dozing on than off - wf9_d6_to_objects-B.txt); the raft's speed steps moved by a few ticks.
 12:R,6:F,4:,6:R,6:F,4:,4:R,6:F,4:,25:R,4:,1:R,4:,3:R,8:,2:R,1:,1:R,1:,1:R,4:,1:L,1:F,6:,1:F,1:,1:F,6:,1:F,1:
 1:F,6:,1:F,1:R,94:,5:UF,9:R,2:,1:UF,93:,8:RU,8:R,2:,4:L,1:,30:R,2:,1:R,6:,3:R,8:,2:R,1:,1:R,3:,1:R,2:,1:R,2:
-1:R,2:,1:L,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:R,28:,6:UF,2:,7:R,2:,2:L,2:,1:R,63:,5:UF,2:L,6:
-2:R,1:,1:UF,21:,1:L,1:R,1:L,1:R,21:,1:L,6:UF,6:,7:R,65:,8:RU,8:R,1:,5:L,1:,54:R,1:,1:L,5:R,2:,6:L,51:,15:R,2:
-2:L,6:UF,42:,3:L,4:,2:R,3:,4:RU,7:R,2:,4:L,1:,5:R,1:,5:L,1:,6:R,1:,4:L,6:F,4:,31:R,6:F,4:,10:R,6:UF,20:,15:R,3:
-1:R,5:,3:R,8:,2:R,1:,1:R,1:,1:R,7:,6:R,1:,11:R,2:,1:R,3:,1:R,1:,1:R,4:,1:R,2:,1:L,1:F,6:,1:F,1:,1:F,6:,1:F,6:UF
-4:,6:UF,3:,5:R,4:,2:L,1:,1:R,323:,8:RU,7:R,2:,4:L,2:,1:R,6:F,4:,16:R,2:,6:UF,4:,6:F,4:,4:R,6:,1:R,10:,8:RU,13:R
-1:,2:L,3:R,57:,6:UF,4:,8:RU,12:R,2:,2:L,4:R,7:,6:UF,12:,8:RU,12:R,2:,2:L,30:R,7:,5:L,7:,2:R,3:,9:R,9:RU,10:R,2:
-3:L,2:,9:R,9:RU,14:R,1:,1:R,4:,6:UF,50:,5:UF,14:R,9:RU,10:R,2:,3:L,40:R,4:,3:L,4:,8:RU,1:R,2:,4:L,2:,2:R,3:
-5:RU,7:R,2:,4:L,2:,9:R,1:,8:L,2:,6:R,49:,15:R,2:,4:L,1:,10:R,6:F,4:,6:R,6:F,4:,2:R,6:F,4:,1:R,1:,6:UF,4:,6:UF
-4:,37:R
+1:R,2:,1:L,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:R,21:,6:UF,2:,6:R,4:,1:L,2:
+1:R,67:,5:UF,2:L,5:,2:R,2:,1:UF,19:,1:L,6:UF,7:,2:R,36:,12:R,54:,8:RU,6:R,2:,4:L,1:,35:R,2:,6:L,65:,18:R,1:,6:R
+2:,6:L,55:,15:R,2:,2:L,6:F,62:,3:L,4:,2:R,3:,4:RU,7:R,2:,4:L,1:,5:R,1:,5:L,1:,6:R,1:,4:L,6:F,4:,25:R,6:F,4:,9:R
+1:,6:UF,7:,6:UF,4:,36:R,2:,1:R,6:,3:R,8:,2:R,1:,1:R,3:,1:R,2:,1:R,2:,1:R,2:,1:L,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F
+6:,1:F,1:,1:F,6:,1:R,35:,5:UF,10:R,1:,1:UF,3:,2:L,3:,1:R,147:,1:L,6:UF,2:,3:L,1:,5:R,6:,1:L,1:R,121:,8:RU,5:R
+2:,4:L,2:,2:R,1:L,6:,11:R,6:F,4:,9:R,3:,1:R,17:,1:L,6:F,5:,1:R,185:,1:L,6:UF,4:,6:F,5:,1:R,26:,8:RU,13:R,1:,2:L
+3:R,57:,6:UF,4:,8:RU,12:R,2:,2:L,3:R,25:,2:R,31:,1:L,6:F,5:,1:R,53:,1:L,6:F,5:,8:RU,17:R,1:,29:R,7:,5:L,7:,1:R
+2:,9:R,9:RU,11:R,1:,4:L,3:,9:R,9:RU,14:R,1:,1:R,4:,6:UF,50:,5:UF,14:R,9:RU,10:R,2:,3:L,40:R,4:,3:L,4:,8:RU,1:R
+2:,4:L,2:,2:R,3:,5:RU,7:R,2:,4:L,2:,9:R,1:,8:L,2:,6:R,36:,15:R,2:,4:L,1:,4:R,6:F,4:,21:R,6:UF,4:,30:R

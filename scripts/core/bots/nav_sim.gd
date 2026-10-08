@@ -13,7 +13,24 @@ extends RefCounted
 ##
 ## While a NavSim is set up it owns the simulation: Sim.manual is on, GameInput slot 0 is scripted, Game.level is the
 ## sim level, Game.mode / Game.party read SINGLE / 1 (the hero's party components stay off: walking and jumping are the
-## 1.0 physics in every mode). [method teardown] restores all of it. Never set one up during a running match.
+## 1.0 physics in every mode), and Sim.tick starts at 0 (what a level does by the clock - a liquid's surface - is the
+## same in every bake of that level, whatever ran before it in the process: a second bake of one `bake_nav --check`
+## run counted other `simulated_ticks` than the committed graph, baked alone, and was called stale).
+## [method teardown] restores all of it. Never set one up during a running match.
+##
+## The shake (core-B wf10): a heavy landing shakes the level, and the shake lifts the hero 3 px at the end of every ODD
+## tick of the level's clock (PHYSICS.md 13.3, LevelBase._on_tick_finished) - so what follows a heavy landing depends
+## on whether it falls on an odd tick, i.e. on everything that ran before. On a level with a pulley (its lifts' links
+## are verified in thousands of runs, and `--verify` runs them in another order than the bake did: a link lift -> far
+## bank of Tar Pulleys was kept by the bake and called broken by the check) every run therefore starts on an even
+## tick, and a run that shook the level is played again from an odd one: it counts as a landing only when both end
+## alike ([member both_parities]). The other levels keep the running clock their committed graphs were baked and are
+## verified with (the two-parity rule would change those graphs; their links hold in the order the checks run them).
+##
+## Frames: a run frees and spawns the movers and the effects of the last run, and every canvas node that enters the
+## tree queues a redraw callback the engine flushes only between frames (a 32 MB queue). FRAME_RUNS_WARN runs without
+## a frame print one warning - the queue overflows a little later and the engine crashes; NavBaker's
+## bake_text_in_frames / verify_graph_in_frames are the cure.
 
 const PLAYER_SCENE: String = "res://scenes/player/player.tscn"
 ## Entities that move a hero, spawned once into the sim level from the level file.
@@ -33,6 +50,13 @@ const SETTLE_MAX_TICKS: int = 14
 const SETTLE_WALK_MAX_TICKS: int = 96
 ## Where the hero waits (suspended) while the movers are rolled forward without him.
 const PARK: Vector2i = Vector2i(-4096, -4096)
+## Runs in one frame of the engine after which [method run] warns once (the callback queue held about 130 000 runs of
+## a level with three movers when it overflowed, wf10_content_to_core-B.txt #3).
+const FRAME_RUNS_WARN: int = 90000
+
+## Runs of every NavSim since the engine last finished a frame, and that frame.
+static var _frame: int = -1
+static var _frame_runs: int = 0
 ## The arena wrap of world-B (`static func wrap_hero(level, hero) -> bool`), looked up by class name so that this file
 ## compiles without it.
 const WRAP_CLASS: StringName = &"VersusArena"
@@ -74,6 +98,11 @@ class Outcome:
 	## those he rode after he had left the ground (a bounce on a lift, a landing on a platform).
 	var rode: PackedInt32Array = PackedInt32Array()
 	var rode_after_air: PackedInt32Array = PackedInt32Array()
+	## The leftmost and rightmost feet x of the run (the start included).
+	var min_x: int = 0
+	var max_x: int = 0
+	## True when the level shook during the run (a heavy landing: Tuning.SHAKE_LANDING).
+	var shook: bool = false
 
 
 ## The level used by the sim: one fixed view over the whole grid (an arena is one screen).
@@ -143,6 +172,8 @@ var pulley_limits: PackedInt32Array = PackedInt32Array()
 ## weight on the other lift, the state of a rider who waits on a displaced lift).
 var pulley_preset: Dictionary = {}
 var pulley_frozen: bool = false
+## The two-parity rule of the header: on (set by [method setup]) when the level has a pulley.
+var both_parities: bool = false
 var _wrap_driver: WrapDriver = null
 var _detached: Array[Node] = []
 
@@ -154,6 +185,7 @@ var _prev_manual: bool = false
 var _prev_mode: int = Defs.GameMode.SINGLE
 var _prev_party: int = 1
 var _prev_glider: bool = false
+var _prev_tick: int = 0
 
 
 ## Build the sim world under `parent` from a level's grid, meta and entity records (LevelData.entity_records()).
@@ -167,7 +199,9 @@ func setup(parent: Node, level_id: StringName, grid: TileGrid, meta: Dictionary,
 	_prev_mode = Game.mode
 	_prev_party = Game.party
 	_prev_glider = Game.runs[0].has_glider
+	_prev_tick = Sim.tick
 	Sim.manual = true
+	Sim.tick = 0
 	Game.mode = Defs.GameMode.SINGLE
 	Game.party = 1
 	Game.runs[0].has_glider = false
@@ -213,6 +247,7 @@ func setup(parent: Node, level_id: StringName, grid: TileGrid, meta: Dictionary,
 	for part: Dictionary in mover_parts:
 		part_homes.append((part["entity"] as SimEntity).get_box().position)
 	_map_pulleys()
+	both_parities = not pulleys.is_empty()
 	return true
 
 
@@ -275,7 +310,9 @@ func teardown() -> void:
 	pulleys.clear()
 	pulley_preset = {}
 	pulley_frozen = false
+	both_parities = false
 	Sim.manual = _prev_manual
+	Sim.tick = _prev_tick
 	Game.mode = _prev_mode
 	Game.party = _prev_party
 	Game.runs[0].has_glider = _prev_glider
@@ -294,7 +331,34 @@ func teardown() -> void:
 ## taken after it.
 func run(start: Vector2i, flags: PackedInt32Array, max_ticks: int, geyser: int = -1, preroll: int = 0,
 		stand: int = 0) -> Outcome:
+	if not both_parities:
+		return _run_once(start, flags, max_ticks, geyser, preroll, stand, -1)
+	var even: Outcome = _run_once(start, flags, max_ticks, geyser, preroll, stand, 0)
+	if not even.shook:
+		return even
+	# The level shook: the same run from an odd tick must end alike (the header). The second run's outcome is
+	# returned - its platforms are the ones alive now - with the handback of the tick the shake did not lift him on.
+	var even_platform: bool = even.platform != null
+	var even_handback_platform: bool = even.handback_platform != null
+	var odd: Outcome = _run_once(start, flags, max_ticks, geyser, preroll, stand, 1)
+	var alike: bool = odd.died == even.died and odd.landed == even.landed and odd.walked == even.walked 			and odd.stayed == even.stayed and odd.pos == even.pos and odd.landing_tick == even.landing_tick 			and odd.handback_pos.x == even.handback_pos.x and odd.sprung == even.sprung 			and (odd.platform != null) == even_platform and (odd.handback_platform != null) == even_handback_platform 			and odd.rode == even.rode and odd.rode_after_air == even.rode_after_air
+	if not alike:
+		odd.landed = false
+		odd.walked = false
+	odd.handback_pos.y = maxi(odd.handback_pos.y, even.handback_pos.y)
+	odd.min_x = mini(odd.min_x, even.min_x)
+	odd.max_x = maxi(odd.max_x, even.max_x)
+	return odd
+
+
+## One run of [method run]. `parity` 0 / 1: it starts on an even / odd tick of the clock (Sim.tick is moved on by one
+## when it is not there); -1: on whatever tick the clock is at.
+func _run_once(start: Vector2i, flags: PackedInt32Array, max_ticks: int, geyser: int, preroll: int, stand: int,
+		parity: int) -> Outcome:
 	var outcome: Outcome = Outcome.new()
+	_count_frame_run()
+	if parity >= 0 and (Sim.tick & 1) != parity:
+		Sim.tick += 1
 	_reset_world()
 	_arm_geysers(geyser)
 	if not pulley_preset.is_empty() or pulley_frozen:
@@ -313,6 +377,8 @@ func run(start: Vector2i, flags: PackedInt32Array, max_ticks: int, geyser: int =
 		if geyser >= 0:
 			_arm_geysers(geyser)
 	outcome.mover_states = mover_states()
+	outcome.min_x = hero.sim_pos.x
+	outcome.max_x = hero.sim_pos.x
 	_flags = flags
 	_first_tick = Sim.tick + 1
 	GameInput.set_scripted_slot(0, _script_flags)
@@ -326,6 +392,9 @@ func run(start: Vector2i, flags: PackedInt32Array, max_ticks: int, geyser: int =
 		Sim.step(1)
 		ticks_simulated += 1
 		outcome.ticks = t
+		outcome.min_x = mini(outcome.min_x, hero.sim_pos.x)
+		outcome.max_x = maxi(outcome.max_x, hero.sim_pos.x)
+		outcome.shook = outcome.shook or level.shake > 0
 		if hero.dead:
 			outcome.died = true
 			break
@@ -371,6 +440,18 @@ func run(start: Vector2i, flags: PackedInt32Array, max_ticks: int, geyser: int =
 	outcome.geysered = _geyser_launches() != spouts
 	GameInput.clear_scripted_slot(0)
 	return outcome
+
+
+## Count a run of this frame; one warning when a frame holds FRAME_RUNS_WARN of them (see the header).
+static func _count_frame_run() -> void:
+	var frame: int = Engine.get_process_frames()
+	if frame != _frame:
+		_frame = frame
+		_frame_runs = 0
+	_frame_runs += 1
+	if _frame_runs == FRAME_RUNS_WARN:
+		push_warning("NavSim: %d runs without a frame of the engine - its callback queue overflows soon (a crash). " \
+				% FRAME_RUNS_WARN + "Bake or verify in frames: NavBaker.bake_text_in_frames / verify_graph_in_frames.")
 
 
 ## Put every pulley of [member pulley_preset] at its offset (no hero on the lifts; the lifts move by the pulley's

@@ -11,6 +11,9 @@ extends Node
 ##                                    failed check and ends the run)
 ##   press <action> [frames]          press an input action (ui_accept, ui_down, pause, ...) and release it after
 ##                                    `frames` frames (default 2), as a keyboard or pad would
+##   press_if <action> <expr>         press the action only when the condition holds (an expression as in `expect`):
+##                                    for a menu whose focus depends on what ran before, so a part of a flow plays the
+##                                    same after a part that was cut short (`press_if ui_right flow.play_book != 2`)
 ##   key <name> [<name> ...]          press and release keys by name (`key B R U T`, `key Enter`), for typing; a
 ##                                    name with a space is written with `_` (`key Kp_0`, Num 0)
 ##   hold <name> [<name> ...]         press keys by physical position and keep them down (`hold D Space` for P1,
@@ -229,7 +232,7 @@ func _init() -> void:
 ## The commands of a flow script and how many arguments each takes ([min, max]; -1 = any number).
 const COMMAND_ARGS: Dictionary = {
 	"wait": [1, 1], "wait_until": [1, -1], "press": [1, 2], "key": [1, -1], "hold": [1, -1], "release": [1, -1],
-	"pad": [1, 2], "play": [1, -1],
+	"press_if": [2, 4], "pad": [1, 2], "play": [1, -1],
 	"play_file": [1, 1], "input": [1, 2], "weapon": [1, 2], "shot": [1, -1], "every": [1, 2], "expect": [1, -1],
 	"log": [1, -1], "reset_events": [0, 0], "start_level": [1, 3], "window": [2, 2], "focus": [1, 1],
 	"wait_ms": [1, 1], "expect_errors": [1, 1], "section": [1, -1], "need": [1, -1], "quit": [0, 0],
@@ -278,6 +281,15 @@ static func lint(script_text: String) -> Dictionary:
 			"press":
 				if not InputMap.has_action(StringName(command[1])):
 					errors.append(at + "unknown action '%s'" % command[1])
+			"press_if":
+				if not InputMap.has_action(StringName(command[1])):
+					errors.append(at + "unknown action '%s'" % command[1])
+				var condition: PackedStringArray = command.slice(2)
+				if condition.size() != 1 and (condition.size() != 3 or not OPERATORS.has(condition[1])):
+					errors.append(at + "'%s' needs '<path> <op> <value>' or '<path>'" % " ".join(condition))
+				var condition_root: String = condition[0].get_slice(".", 0).get_slice(":", 0).get_slice("(", 0)
+				if not ROOTS.has(condition_root):
+					errors.append(at + "unknown root '%s' (%s)" % [condition_root, ", ".join(ROOTS)])
 			"key", "hold", "release":
 				for key_name: String in command.slice(1):
 					if key_code(key_name) == KEY_NONE and not (op == "release" and key_name == "all"):
@@ -524,6 +536,12 @@ func _execute(command: PackedStringArray) -> bool:
 			return await _wait_until(command)
 		"press":
 			await _press(StringName(_arg(command, 1)), maxi(_int_arg(command, 2, DEFAULT_PRESS_FRAMES), 1))
+		"press_if":
+			var condition: String = " ".join(command.slice(2))
+			var holds: bool = _check(condition, false)
+			print("Autoplay flow: press_if %s: %s" % [condition, "pressed %s" % command[1] if holds else "not pressed"])
+			if holds:
+				await _press(StringName(_arg(command, 1)), DEFAULT_PRESS_FRAMES)
 		"key":
 			for i: int in range(1, command.size()):
 				await _key(command[i])

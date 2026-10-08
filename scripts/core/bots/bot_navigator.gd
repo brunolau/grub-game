@@ -10,6 +10,17 @@ extends RefCounted
 ## the mover's take-off state, then plays the link's script until he lands. A link that does not land where it should
 ## (and was not disturbed by a hit, a body, a head under his feet or a geyser) is retried once, then blocked for this
 ## bot and class until the level changes, and the path is planned again. Everything is integer and deterministic.
+##
+## In the air without a link (knocked back, falling) it steers toward the target's column; a versus bot
+## ([member safe_falls]) lets go or steers back when that push would leave him with nothing to land on under the
+## point his drift ends at - a rival's column across a tar pit is no place to fall to (core-B wf10). On the ground
+## such a bot never walks past an end of his node beyond which there is nothing to land on ([method _walk_on]:
+## walk_to lets go when the slide ends within the tolerance of the goal, which at the last px of a node is up to 2 px
+## beyond it), and with no route to his target he waits FALL_MARGIN_PX inside such an end. Where every fall ends on
+## a node - a floor from wall to wall, a ledge over a floor, a level that wraps top to bottom - nothing changes.
+## Such a bot left with no route on a node whose links he blocked after misses gives them one more try every
+## RETRY_BLOCKED_TICKS (Floe Rink: the wind makes the one jump off a floe miss twice, and he stood there to the gong
+## - before the edge rule he walked off the floe's end into the water instead).
 
 ## Re-plan the path at most this often while walking (ticks).
 const REPLAN_TICKS: int = 12
@@ -21,6 +32,15 @@ const STUCK_TICKS: int = 24
 const LINK_MAX_TICKS: int = 120
 ## Ticks a bot waits in a take-off window for a timed or mover link before it plans around it.
 const WAIT_MAX_TICKS: int = 200
+## [member safe_falls]: one tick of a direction key in the air changes the speed by at most this (v16), and the ground
+## under the point his drift ends at must reach this far (px) on to the side he drifts to.
+const AIR_PUSH_V16: int = 32
+const FALL_MARGIN_PX: int = 6
+## [member safe_falls]: a node that ends at a wall face counts as ground this far (px) into the wall (the longest
+## drift a push can add is shorter).
+const WALL_REACH_PX: int = 48
+## [member safe_falls]: ticks without a route after which the blocked links of the node he stands on get one more try.
+const RETRY_BLOCKED_TICKS: int = 72
 
 var graph: NavGraph = null
 ## Link ids not to use (id -> true), of the current weight class.
@@ -49,6 +69,15 @@ var links_disturbed: int = 0
 var waited_ticks: int = 0
 ## The last undisturbed misses (at most 8): "link <id> (<from> -> <to>, <keys>) from x <x> ended on node <n> at <pos>".
 var failure_log: PackedStringArray = PackedStringArray()
+## Never steer a fall to where there is no node to land on ([method _air_flags]) and never walk past the end of a node
+## ([method _walk_on]). HeroBot turns it on for the versus bots; a boss body (the Rival Chieftains, whose recorded
+## routes replay the navigator) keeps the plain rules.
+var safe_falls: bool = false
+## Statistics: ticks on which [member safe_falls] changed the air steering / the walk, and blocked links tried again.
+var falls_steered: int = 0
+var edges_held: int = 0
+var links_retried: int = 0
+var _stranded: int = 0
 var _link_start_x: int = 0
 
 var _path: PackedInt32Array = PackedInt32Array()
@@ -61,6 +90,7 @@ var _failures: Dictionary = {}
 var _avoid: Dictionary = {}
 var _avoid_key: String = ""
 var _pulley_links: PackedInt32Array = PackedInt32Array()
+var _clear_links: PackedInt32Array = PackedInt32Array()
 var _pulley_graph: NavGraph = null
 var _last_x: int = -(1 << 30)
 var _still: int = 0
@@ -92,12 +122,15 @@ func reset() -> void:
 	_last_x = -(1 << 30)
 	_avoid = {}
 	_avoid_key = ""
+	_stranded = 0
 
 
 ## Pulley lifts (core-B wf10, wf9_da_to_core_b.txt #1): plan only with the pulley links of the state the pulley will
 ## rest in - links onto a lift (and moves that hop off one) at the offset it rests at with this hero off it, links off
-## a lift at the offset it rests at with him on that lift (NavMoversLive.pulley_plan). Call once per tick after
-## `live.update()` and [method set_weight_class]; a level without pulley lifts costs nothing.
+## a lift at the offset it rests at with him on that lift (NavMoversLive.pulley_plan). A link past a lift's column
+## (NavLink.clear_at) is planned with only while the pulley is, and will rest, where that lift is out of its way
+## (NavMoversLive.pulley_states). Call once per tick after `live.update()` and [method set_weight_class]; a level
+## without pulley lifts costs nothing.
 func update_movers(hero: PlayerBase, live: NavMoversLive) -> void:
 	if graph == null or live == null or not live.has_pulleys():
 		_avoid_key = ""
@@ -105,11 +138,15 @@ func update_movers(hero: PlayerBase, live: NavMoversLive) -> void:
 	if _pulley_graph != graph:
 		_pulley_graph = graph
 		_pulley_links = PackedInt32Array()
+		_clear_links = PackedInt32Array()
 		for candidate: NavGraph.NavLink in graph.links:
 			if candidate.cond.size() >= 5 and graph.is_pulley_lift(candidate.cond[0]):
 				_pulley_links.append(candidate.id)
+			elif candidate.clear_at.size() >= 3:
+				_clear_links.append(candidate.id)
 	var plan: Dictionary = live.pulley_plan(hero)
-	var key: String = "%s|%d|%d" % [plan, weight_class, blocked.size()]
+	var states: Dictionary = live.pulley_states() if not _clear_links.is_empty() else {}
+	var key: String = "%s|%s|%d|%d" % [plan, states, weight_class, blocked.size()]
 	if key == _avoid_key:
 		return
 	_avoid_key = key
@@ -123,6 +160,12 @@ func update_movers(hero: PlayerBase, live: NavMoversLive) -> void:
 		var p: int = want.y if graph.nodes[candidate.from].mover == mover else want.x
 		if graph.link_pulley_offset(candidate) != p or candidate.cond[3] != 0 or candidate.cond[4] != 0:
 			_avoid[id] = true
+	for id: int in _clear_links:
+		var candidate: NavGraph.NavLink = graph.links[id]
+		if states.has(candidate.clear_at[0]):
+			var state: Vector2i = states[candidate.clear_at[0]]
+			if not NavGraph.link_clear(candidate, state.x, state.y):
+				_avoid[id] = true
 	# The planned path may use a pulley link of the old state: plan again.
 	_path = PackedInt32Array()
 
@@ -218,7 +261,7 @@ func step(hero: PlayerBase, tick: int) -> int:
 	if not hero.is_grounded():
 		# In the air (knocked back, falling): steer toward the target column.
 		_wait = 0
-		return _toward(target.x - hero.sim_pos.x, 0)
+		return _air_flags(hero)
 	if graph == null or target_node < 0:
 		return walk_to(hero, target.x, tolerance)
 	var here: int = graph.node_at(hero.sim_pos, hero.on_platform)
@@ -228,17 +271,25 @@ func step(hero: PlayerBase, tick: int) -> int:
 	if here == target_node:
 		_path = PackedInt32Array()
 		_wait = 0
+		_stranded = 0
 		var node: NavGraph.NavNode = graph.nodes[here]
-		return walk_to(hero, clampi(target.x, graph.node_x0(node), graph.node_x1(node)), tolerance)
+		return _walk_on(hero, clampi(target.x, graph.node_x0(node), graph.node_x1(node)), tolerance, node)
 	_path_age += 1
 	if _path.is_empty() or _path_from != here or _path_age >= REPLAN_TICKS:
 		_path = graph.find_path(here, hero.sim_pos.x, target_node, target.x, search_blocked(), search_class())
 		_path_from = here
 		_path_age = 0
 	if _path.is_empty():
-		# No route: get as close as this node allows.
+		# No route: get as close as this node allows (a versus bot: not onto the very end of it; and the links he
+		# blocked from this node get another try after a while).
 		var node: NavGraph.NavNode = graph.nodes[here]
-		return walk_to(hero, clampi(target.x, graph.node_x0(node), graph.node_x1(node)), tolerance)
+		if safe_falls:
+			_retry_blocked(here)
+		var inside: int = mini(FALL_MARGIN_PX, (graph.node_x1(node) - graph.node_x0(node)) / 2) if safe_falls else 0
+		var lo: int = graph.node_x0(node) + (inside if inside > 0 and _end_drops(node, true) else 0)
+		var hi: int = graph.node_x1(node) - (inside if inside > 0 and _end_drops(node, false) else 0)
+		return _walk_on(hero, clampi(target.x, lo, hi), tolerance, node)
+	_stranded = 0
 	var next: NavGraph.NavLink = graph.links[_path[0]]
 	var offset: Vector2i = graph.node_offset(graph.nodes[next.from])
 	var x0: int = next.x0 + offset.x
@@ -257,8 +308,136 @@ func step(hero: PlayerBase, tick: int) -> int:
 			_path = PackedInt32Array()
 		return 0
 	var half: int = maxi((x1 - x0) / 2, 0)
-	var flags: int = walk_to(hero, (x0 + x1) / 2, half)
+	var flags: int = _walk_on(hero, (x0 + x1) / 2, half, graph.nodes[here])
 	return _unstick(hero, flags)
+
+
+## A tick without a route on node `here`: after RETRY_BLOCKED_TICKS of them the links from this node that were blocked
+## after misses are open again, one miss from being blocked once more (the path is planned again on the next tick).
+func _retry_blocked(here: int) -> void:
+	_stranded += 1
+	if _stranded < RETRY_BLOCKED_TICKS:
+		return
+	_stranded = 0
+	for id: int in graph.links_from(here, search_class()):
+		if blocked.has(id):
+			blocked.erase(id)
+			_failures[id] = LINK_FAILURES_TO_BLOCK - 1
+			links_retried += 1
+			if _avoid_key != "":
+				# The pulley list holds a copy of the blocked links: build it again.
+				_avoid_key = "retry"
+
+
+## [method walk_to] for a hero standing on node `node`. With [member safe_falls] the push is taken only while the
+## slide it leads to ends on the node; when even letting go would carry him past an end he brakes against it.
+func _walk_on(hero: PlayerBase, x: int, tol: int, node: NavGraph.NavNode) -> int:
+	var flags: int = walk_to(hero, x, tol)
+	if not safe_falls or node == null:
+		return flags
+	var lo: int = graph.node_x0(node)
+	var hi: int = graph.node_x1(node)
+	var accel: int = Tuning.ACCEL >> clampi(hero.ice, 0, Tuning.ICE_MAX)
+	var push: int = 0
+	if (flags & Defs.IN_RIGHT) != 0:
+		push = accel
+	elif (flags & Defs.IN_LEFT) != 0:
+		push = -accel
+	var stop: int = hero.sim_pos.x + stop_distance(hero.xvel + push, hero.ice)
+	if (stop >= lo or not _end_drops(node, true)) and (stop <= hi or not _end_drops(node, false)):
+		return flags
+	var coast: int = hero.sim_pos.x + stop_distance(hero.xvel, hero.ice)
+	var held: int = 0
+	if coast < lo and _end_drops(node, true):
+		held = Defs.IN_RIGHT
+	elif coast > hi and _end_drops(node, false):
+		held = Defs.IN_LEFT
+	if held != flags:
+		edges_held += 1
+	return held
+
+
+## True when a hero falling from feet point (x, y) has a node to land on: one at or below y whose x range holds x.
+## x is brought inside the level first, and a static node reaches WALL_REACH_PX farther at an end that stops at a wall
+## (NavBaker.span_nodes keeps a node WALL_PROBE px from a wall face; a drift that would end inside the wall ends at
+## its face, over that node). A level that wraps top to bottom always has one; one that wraps left to right is asked
+## at the x he comes out at.
+func _ground_below(x: int, y: int) -> bool:
+	if graph.wrap == "tb":
+		return true
+	var cx: int = clampi(x, Tuning.X_MIN, graph.cols * Tuning.TILE - Tuning.WALL_PROBE)
+	if graph.wrap == "lr":
+		cx = posmod(x, maxi(graph.cols * Tuning.TILE, 1))
+	for node: NavGraph.NavNode in graph.nodes:
+		if graph.node_y(node) < y:
+			continue
+		var lo: int = graph.node_x0(node)
+		var hi: int = graph.node_x1(node)
+		if node.mover < 0:
+			if _at_wall(lo, true):
+				lo -= WALL_REACH_PX
+			if _at_wall(hi, false):
+				hi += WALL_REACH_PX
+		if cx >= lo and cx <= hi:
+			return true
+	return false
+
+
+## True when the left / right end x of a static node stops at a wall face or at the level's edge.
+func _at_wall(x: int, left: bool) -> bool:
+	if left:
+		return posmod(x, Tuning.TILE) == Tuning.WALL_PROBE or x <= Tuning.X_MIN
+	return posmod(x, Tuning.TILE) == Tuning.TILE - Tuning.WALL_PROBE - 1 or x >= graph.cols * Tuning.TILE - Tuning.WALL_PROBE
+
+
+## True when nothing is to land on beyond the left / right end of `node` (a pit, a liquid): the end a versus bot
+## keeps away from.
+func _end_drops(node: NavGraph.NavNode, left: bool) -> bool:
+	var x: int = graph.node_x0(node) if left else graph.node_x1(node)
+	if node.mover < 0 and _at_wall(x, left):
+		return false
+	var beyond: int = x - FALL_MARGIN_PX - 2 if left else x + FALL_MARGIN_PX + 2
+	return not _ground_below(beyond, graph.node_y(node))
+
+
+## The steering of a hero in the air without a link: toward the target's column. With [member safe_falls] that push
+## is taken only when a node lies under the point his drift would end at if he let go after it (PlayerBase's air
+## drag is the ground friction: [method stop_distance]) and FALL_MARGIN_PX farther; else he steers to the nearest
+## point that has one - over a pit or a liquid the target's column is where a rival stands on the other side.
+func _air_flags(hero: PlayerBase) -> int:
+	var flags: int = _toward(target.x - hero.sim_pos.x, 0)
+	if not safe_falls or graph == null:
+		return flags
+	var push: int = 0
+	if (flags & Defs.IN_RIGHT) != 0:
+		push = AIR_PUSH_V16
+	elif (flags & Defs.IN_LEFT) != 0:
+		push = -AIR_PUSH_V16
+	var feet: Vector2i = hero.sim_pos
+	var stop: int = feet.x + stop_distance(hero.xvel + push, 0)
+	var ahead: int = stop + FALL_MARGIN_PX * signi(hero.xvel + push)
+	if _ground_below(stop, feet.y) and _ground_below(ahead, feet.y):
+		return flags
+	# Nothing to land on there: the nearest point over a node at or below his feet (a little inside its ends).
+	var coast: int = feet.x + stop_distance(hero.xvel, 0)
+	var best: int = coast
+	var best_distance: int = NavGraph.UNREACHABLE
+	for node: NavGraph.NavNode in graph.nodes:
+		if graph.node_y(node) < feet.y:
+			continue
+		var lo: int = graph.node_x0(node)
+		var hi: int = graph.node_x1(node)
+		var inside: int = mini(FALL_MARGIN_PX, (hi - lo) / 2)
+		var x: int = clampi(coast, lo + inside, hi - inside)
+		if absi(x - coast) < best_distance:
+			best_distance = absi(x - coast)
+			best = x
+	if best_distance == NavGraph.UNREACHABLE:
+		return flags
+	var safe: int = _toward(best - coast, 0)
+	if safe != flags:
+		falls_steered += 1
+	return safe
 
 
 ## Off the graph on the ground: walk toward the target; when that asks for nothing (the target straight above him) and

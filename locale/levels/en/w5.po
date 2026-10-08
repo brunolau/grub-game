@@ -45,7 +45,7 @@ msgid "SIGN_W5_COOP_HOP"
 msgstr "One stands still, the other jumps on his head holding Jump!"
 
 msgid "SIGN_W5_COOP_PLATES"
-msgstr "Hold a plate down to open a door for your partner."
+msgstr "Crouch on a plate to hold a door open for your partner."
 
 msgid "SIGN_W5_COOP_GULLY"
 msgstr "Shellbacks face the nearer caveman - one baits, one clubs!"
@@ -59,7 +59,7 @@ msgstr "A rolled vine? Strike it and it drops down."
 
 # --- w5_l2_coop Rattlesnake Gulch (co-op) ---
 msgid "SIGN_W5_COOP_SANDGATE"
-msgstr "One holds the plate - the sand gate opens for the climber."
+msgstr "Crouch on the plate: the sand gate opens for the climber."
 
 msgid "SIGN_W5_COOP_RATTLERS"
 msgstr "Twin rattlers: club both quickly, or one grows back!"

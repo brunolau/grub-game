@@ -283,6 +283,13 @@ const COOP_ONLY_ENEMIES: Array[String] = [
 ]
 ## Enemies that patrol a hall with a shield (their hall is a keeper hall): the Guard and its co-op preset.
 const GUARD_IDS: Array[String] = ["enemies/guard", "enemies/shellback"]
+## Archetypes that FOLLOW their target (DESIGN.md G66, LEVEL_DESIGN.md 15.7.3 / 15.7.5): a keeper of one of these can
+## be LED - to its bond mate, off its post - by one hero (world-B's hop-over probe on w9_l1b_coop 'stormwall': a woken
+## Harrier keeper came along to the other perch and both died inside the window). Not listed: the Harrier itself (a
+## keeper Harrier holds its perch, G66) and the Bull Rex (a heavy keeper is a brace gate, G57).
+const LED_KEEPER_IDS: Array[String] = [
+	"enemies/stinger", "enemies/hopper", "enemies/charger", "enemies/leaper", "enemies/lurker", "enemies/digger",
+]
 ## Co-op objects (DESIGN.md D.5) other than columns: never in a solo campaign file.
 const COOP_OBJECTS: Array[String] = [
 	"objects/plate", "objects/drum", "objects/boulder_heavy", "objects/pulley", "objects/flower_pot",
@@ -1098,6 +1105,7 @@ func _check_content(data: LevelData, grid: TileGrid) -> void:
 			_check_ledge_reach(data, records, tablets, difficulty)
 			_check_bonded_pairs(data, records, difficulty)
 		_check_halls(data, grid, records)
+		_check_led_keepers(data, records)
 		_check_lee_gaps(data, grid)
 		_check_colossus_chains(data, records)
 	elif kind == LevelText.KIND_ARENA:
@@ -1709,6 +1717,19 @@ func _check_halls(data: LevelData, grid: TileGrid, records: Array[Dictionary]) -
 			_add(data.path, int(record["line"]), ERROR,
 					"the %s hall of '%s' is %s at column %d: exactly %d rows of air under a ceiling (nobody bounces over it)" % [
 					what, id, shown, worst_col, HALL_ROWS])
+
+
+## G66: a keeper (`keeper=`: its death opens a door) of an archetype that follows its target can be led by one hero
+## (LED_KEEPER_IDS) - a warning: keepers stand still (speed=0 walkers, Guards, Shellbacks) or are pinned by the engine
+## (a keeper Harrier, a Bull Rex).
+func _check_led_keepers(data: LevelData, records: Array[Dictionary]) -> void:
+	for record: Dictionary in records:
+		var id: String = String(record["id"])
+		var params: Dictionary = record["params"]
+		if params.has("keeper") and LED_KEEPER_IDS.has(id):
+			_add(data.path, int(record["line"]), WARNING,
+					"'%s' is a keeper ('%s') that can be led: it follows its target, so one hero takes it to its bond mate or off its door - a keeper stands still or is pinned [G66]" % [
+					id, str(params["keeper"])])
 
 
 ## Rows of air from the cell (col, row) up to the first wall cell (grid.rows + 1 when there is none: open sky).

@@ -15,6 +15,10 @@ extends SceneTree
 ## Every link of a written graph was verified by simulating the real hero (NavBaker). Prints one line per level and
 ## the problems found; exit code 0 = all good, 1 = a problem (a level without a graph for --verify, a stale graph for
 ## --check, a link that fails), 2 = bad arguments.
+## Bakes and verifications run in frames (NavBaker's header), and every bake starts from Sim.tick 0, so a graph is the
+## same whether its level is baked alone or after others. A level with pulley lifts takes minutes (its lifts get
+## links at every still state of the pulley, the links past a lift's column are swept over those states: Tar Pulleys
+## about 215 000 runs, 8 minutes) - give the runner the time:  GD_TIMEOUT=1800 bash .tools/gd.sh script ...
 ## It is compiled before the autoloads exist, so the work happens in bake_nav_runner.gd.
 
 const RUNNER: String = "res://tools/bots/bake_nav_runner.gd"
@@ -29,7 +33,7 @@ func _run() -> void:
 	var runner: Node = (load(RUNNER) as GDScript).new() as Node
 	runner.name = "BakeNav"
 	root.add_child(runner)
-	var code: int = runner.call(&"run", OS.get_cmdline_user_args())
+	var code: int = await runner.call(&"run", OS.get_cmdline_user_args())
 	runner.queue_free()
 	var audio: Node = root.get_node_or_null("Audio")
 	if audio != null and audio.has_method("shutdown"):

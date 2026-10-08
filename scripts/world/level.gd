@@ -83,6 +83,10 @@ var _camera_logic: LevelCamera = LevelCamera.new()
 var _frame_logic: LevelCamera = null
 ## 2.0 `scroll = rising`: the deadly band (null on other levels).
 var _rising: RisingTide = null
+## Draw-only (never read by the simulation): how far the drawn view looks up over the camera's own position while a
+## hero of a rising climb jumps towards the HUD band ([method _head_peek]; logical px), and how fast it comes back.
+var _peek: float = 0.0
+const PEEK_BACK_PX_PER_S: float = 240.0
 ## 2.0 co-op: the glint of hidden spots near an egg (null outside a co-op party).
 var _egg_scout: EggScout = null
 ## 2.0: lights in the dark - heroes and glowing props (null on a Book I level played solo).
@@ -155,6 +159,8 @@ func _process(delta: float) -> void:
 	var y: float = lerpf(float(_camera_logic.prev.y), float(_camera_logic.pos.y), alpha) * Tuning.ART_SCALE
 	if Settings.get_bool("video/screen_shake"):
 		y += float(shake_offset * Tuning.ART_SCALE)
+	if _rising != null:
+		y -= _head_peek(y / float(Tuning.ART_SCALE), alpha, delta) * float(Tuning.ART_SCALE)
 	var top_left: Vector2 = Vector2(roundf(x), roundf(y))
 	_camera.position = top_left
 	_camera.force_update_scroll()
@@ -843,17 +849,51 @@ func _world_step() -> void:
 		_dark_ticks -= 1
 
 
+## Draw-only, a `scroll = rising` level (the wf10 follow-up of G42: "the hero must not climb under the HUD band or leave
+## the top of the view"): how far (logical px) this frame's picture looks UP over the camera's position `top` (the drawn
+## top, logical px). The footing follow (LevelCamera._follow_footing) keeps a STANDING hero's head under the HUD band
+## with a view that never comes down, so it cannot also rise for a jump (G42: the landing must stay in view; the 6-2b
+## painting nook needs six rows under its footing). So while the band rises and the highest head of the tribe would
+## pass the band's bottom, the drawn view follows that head up - LevelCamera.head_peek: at most HEAD_PEEK_MAX_PX, never
+## above the level's top nor so far that the lowest hero's feet leave the bottom - and comes back as he falls
+## (PEEK_BACK_PX_PER_S when its reason ends at once). The simulation's view - wake-ups, the off-screen rule, edge
+## walls, the leash - is the camera's own position: no route, digest or outcome depends on this.
+func _head_peek(top: float, alpha: float, delta: float) -> float:
+	var target: float = 0.0
+	if _rising_camera():
+		var head: float = INF
+		var feet: float = -INF
+		for hero: PlayerBase in heroes:
+			if hero == null or hero.dead or hero.down:
+				continue
+			var y: float = lerpf(float(hero.sim_prev.y), float(hero.sim_pos.y), alpha)
+			head = minf(head, y - float(Tuning.HERO_BOX_STAND.y))
+			feet = maxf(feet, y)
+		if head != INF:
+			target = LevelCamera.head_peek(top, head, feet, float(_camera_logic.view.y), float(_camera_logic.get_min().y))
+	_peek = target if target >= _peek else maxf(target, _peek - PEEK_BACK_PX_PER_S * delta)
+	return _peek
+
+
+## The drawn view's look-up over the camera's position this frame (logical px; 0 outside a rising climb). Tests.
+func get_head_peek() -> float:
+	return _peek
+
+
 ## Phase CAMERA: PHYSICS.md 12 on P1; a co-op party: the tribe camera (PHYSICS.md C.13) and the visible camera
 ## centred on it. On a rising level the band is kept in view once it rises (C.8).
 func _camera_step() -> void:
 	if _camera_logic.autoscroll_held and _any_hero_input():
 		_camera_logic.autoscroll_held = false
 	_camera_logic.scroll_flags = scroll_flags
-	# G42: while the band rises the view follows the heroes' footing, never a jump's apex (LevelCamera.footing_mode).
+	# G42: while the band rises the view follows the heroes' footing, never a jump's apex (LevelCamera.footing_mode);
+	# the footings are kept from the level's first tick on (footing_watch), the waiting band included.
 	var rising: bool = _rising != null and _rising_camera()
 	_camera_logic.footing_mode = rising
+	_camera_logic.footing_watch = _rising != null
 	if _tribe_on():
 		_frame_logic.footing_mode = rising
+		_frame_logic.footing_watch = _rising != null
 		_frame_logic.autoscroll_held = _camera_logic.autoscroll_held
 		_frame_logic.scroll_flags = scroll_flags
 		_frame_logic.tick_group(heroes)

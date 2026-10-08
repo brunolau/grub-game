@@ -180,6 +180,162 @@ func test_an_eggs_nudge_is_his_own_input() -> void:
 
 
 # =================================================================================================================
+# G58 (the IDLE UX decision of wf10): a held key is input on every tick; the "Zzz soon" bubble from the 170th tick
+# =================================================================================================================
+
+func test_a_held_key_is_input_on_every_tick_it_is_held() -> void:
+	var level: Level = _load(2)
+	var p2: PlayerBase = level.get_hero(1)
+	_hold(0, Defs.IN_SWAP)
+	# P2 crouches (Down held, nothing pressed anew) for 600 ticks - two and a half idle spans.
+	_hold(1, Defs.IN_DOWN)
+	var quiet: int = 0
+	var uncounted: int = 0
+	var marked: int = 0
+	for t: int in 600:
+		Sim.step(1)
+		quiet = maxi(quiet, p2.input_idle_ticks)
+		if not p2.counts_for_coop():
+			uncounted += 1
+		if _party(p2).is_idle_warning_shown() or _party(p2).is_dozing_shown():
+			marked += 1
+	assert_eq(quiet, 0, "a held Down restarts the count on every tick it is held")
+	assert_eq(uncounted, 0, "the croucher counts for the co-op rules on all 600 ticks")
+	assert_eq(marked, 0, "no warning bubble and no Zzz over a hero who holds a key")
+	assert_true(p2.is_crouching(), "he is crouching all the while")
+	# Released: the same hero goes idle after 243 quiet ticks, as anyone.
+	_hold(1, 0)
+	Sim.step(IDLE - 1)
+	assert_true(p2.counts_for_coop(), "242 ticks after letting go: still counted")
+	Sim.step(1)
+	assert_true(p2.is_idle(), "the 243rd quiet tick: idle")
+	assert_false(p2.counts_for_coop())
+
+
+func test_a_partner_crouching_on_a_plate_holds_it_and_one_who_just_stands_lets_go_at_243() -> void:
+	var level: Level = _load(2)
+	var p2: PlayerBase = level.get_hero(1)
+	# A hold plate on the floor (two cells from column 12, inside the tribe's view: no leash); P2 stands on it.
+	var plate: Plate = level.spawn(&"objects/plate", LevelText.cell_to_feet(12.0, 11.0), {"name": "p"}) as Plate
+	assert_not_null(plate, "the plate spawned")
+	if plate == null:
+		return
+	p2.teleport(Vector2i(12 * 16 + 16, FLOOR_Y))
+	_hold(0, Defs.IN_SWAP)
+	_hold(1, Defs.IN_DOWN)
+	var released: int = 0
+	for t: int in 600:
+		Sim.step(1)
+		if t >= 1 and not plate.pressed:
+			released += 1
+	assert_eq(released, 0, "Down held: the plate stays pressed for all 600 ticks (10 s is 243)")
+	assert_eq(plate.holder_mask, 1 << 1, "held by P2")
+	# The same holder standing still without a key: the warning from his 170th quiet tick, the plate lets go at 243.
+	_hold(1, 0)
+	Sim.step(HeroParty.IDLE_WARN_TICKS - 1)
+	assert_true(plate.pressed, "169 quiet ticks: held")
+	assert_false(_party(p2).is_idle_warning_shown())
+	Sim.step(1)
+	assert_true(plate.pressed, "170: still held ...")
+	assert_true(_party(p2).is_idle_warning_shown(), "... and the Zzz soon bubble warns the pair")
+	Sim.step(IDLE - HeroParty.IDLE_WARN_TICKS - 1)
+	assert_true(plate.pressed, "242: the last held tick")
+	Sim.step(1)
+	assert_false(plate.pressed, "243: the dozing holder weighs nothing - the plate lets go")
+	assert_true(_party(p2).is_dozing_shown())
+	# One tap of Down and he holds it again.
+	_hold(1, Defs.IN_DOWN)
+	Sim.step(1)
+	assert_true(plate.pressed, "any input of his own wakes him: the plate is held again")
+
+
+func test_the_zzz_soon_bubble_shows_from_the_170th_quiet_tick_and_the_zzz_from_the_243rd() -> void:
+	assert_eq(HeroParty.IDLE_WARN_TICKS, 170, "G58: the warning starts 73 ticks (3 s) before the doze")
+	assert_true(HeroParty.IDLE_WARN_TICKS < IDLE)
+	var level: Level = _load(2)
+	var p1: PlayerBase = level.player
+	var p2: PlayerBase = level.get_hero(1)
+	_hold(0, Defs.IN_RIGHT)
+	_tap(1)
+	var first_warning: int = -1
+	var first_zzz: int = -1
+	var both: int = 0
+	var warning_ticks: int = 0
+	for t: int in range(1, IDLE + 40):
+		Sim.step(1)
+		var warning: bool = _party(p2).is_idle_warning_shown()
+		var zzz: bool = _party(p2).is_dozing_shown()
+		if warning and first_warning < 0:
+			first_warning = t
+		if zzz and first_zzz < 0:
+			first_zzz = t
+		if warning and zzz:
+			both += 1
+		if warning:
+			warning_ticks += 1
+		if t == HeroParty.IDLE_WARN_TICKS:
+			assert_false(p2.is_idle(), "warned, not idle: he still counts for every rule")
+			assert_true(p2.counts_for_coop())
+	assert_eq(first_warning, HeroParty.IDLE_WARN_TICKS, "the bubble appears on the 170th quiet tick, not before")
+	assert_eq(first_zzz, IDLE, "the Zzz on the 243rd, not before")
+	assert_eq(warning_ticks, IDLE - HeroParty.IDLE_WARN_TICKS, "73 ticks of warning, then the Zzz replaces it")
+	assert_eq(both, 0, "never both at once")
+	assert_false(_party(p1).is_idle_warning_shown(), "P1 walks the whole time: no bubble")
+	# His next input clears whichever shows; the warning comes back 170 ticks later.
+	_tap(1)
+	Sim.step(1)
+	assert_false(_party(p2).is_dozing_shown())
+	assert_false(_party(p2).is_idle_warning_shown())
+	Sim.step(HeroParty.IDLE_WARN_TICKS - 2)
+	assert_false(_party(p2).is_idle_warning_shown(), "169 quiet ticks after the tap")
+	Sim.step(1)
+	assert_true(_party(p2).is_idle_warning_shown(), "170 again")
+	_hold(1, Defs.IN_LOOK)
+	Sim.step(1)
+	assert_false(_party(p2).is_idle_warning_shown(), "an input during the warning ends it: he never dozed")
+	assert_false(p2.is_idle())
+
+
+func test_an_untouched_partner_shows_the_same_bubble_from_his_170th_tick() -> void:
+	var level: Level = _load(2)
+	var p2: PlayerBase = level.get_hero(1)
+	_hold(0, Defs.IN_RIGHT)
+	_hold(1, 0)
+	Sim.step(HeroParty.IDLE_WARN_TICKS - 1)
+	assert_true(p2.is_idle(), "never pressed anything: counted by no rule from the start (G33)")
+	assert_false(_party(p2).is_idle_warning_shown(), "but no picture before his 170th tick")
+	assert_false(_party(p2).is_dozing_shown())
+	Sim.step(1)
+	assert_true(_party(p2).is_idle_warning_shown(), "the 170th: Zzz soon")
+	Sim.step(IDLE - HeroParty.IDLE_WARN_TICKS)
+	assert_true(_party(p2).is_dozing_shown(), "the 243rd: Zzz")
+	assert_false(_party(p2).is_idle_warning_shown())
+
+
+func test_the_warning_bubble_is_a_picture_only_an_egg_shows_none() -> void:
+	var level: Level = _load(2)
+	var p2: PlayerBase = level.get_hero(1)
+	_hold(0, Defs.IN_SWAP)
+	_tap(1)
+	Sim.step(HeroParty.IDLE_WARN_TICKS)
+	assert_true(_party(p2).is_idle_warning_shown())
+	var mark: HeroParty.IdleMark = _party(p2)._idle_mark
+	assert_eq(mark.mode, HeroParty.IdleMark.Mode.WARNING)
+	assert_eq(mark.ticks_left, IDLE - HeroParty.IDLE_WARN_TICKS, "73 ticks to the doze")
+	# The pulse: full and dim halves, quicker in the last second (the alpha only - nothing else moves).
+	var alphas: Dictionary = {}
+	for t: int in 40:
+		Sim.step(1)
+		alphas[snappedf(mark.modulate.a, 0.01)] = true
+	assert_eq(alphas.size(), 2, "it blinks between two alphas (%s)" % [alphas.keys()])
+	# An egg shows neither picture.
+	p2.go_down(&"voluntary")
+	Sim.step(1)
+	assert_false(_party(p2).is_idle_warning_shown(), "an egg shows no bubble")
+	assert_false(_party(p2).is_dozing_shown())
+
+
+# =================================================================================================================
 # Single-player and versus: never idle
 # =================================================================================================================
 
@@ -191,6 +347,8 @@ func test_single_player_never_counts_idle_ticks() -> void:
 	assert_eq(hero.input_idle_ticks, 0, "nothing is counted")
 	assert_true(hero.counts_for_coop(), "counts_for_coop is is_party_targetable for a party of one")
 	assert_false(_party(hero).is_dozing_shown())
+	assert_false(_party(hero).is_idle_warning_shown(), "G58: single-player never shows the warning bubble")
+	assert_null(_party(hero)._idle_mark, "no idle picture is ever made for a party of one")
 
 
 func test_versus_heroes_are_never_idle() -> void:
@@ -199,6 +357,7 @@ func test_versus_heroes_are_never_idle() -> void:
 	for hero: PlayerBase in level.contact_order():
 		assert_false(hero.is_idle(), "versus: P%d is never idle" % (hero.slot + 1))
 		assert_false(_party(hero).is_dozing_shown())
+		assert_false(_party(hero).is_idle_warning_shown(), "G58: versus never shows the warning bubble")
 
 
 # =================================================================================================================

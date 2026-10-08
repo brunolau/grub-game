@@ -53,7 +53,12 @@ var paddles: int = 0
 
 var _home: Vector2i = Vector2i.ZERO
 var _home_row: int = 0
+## The drag clock of step 2: the ticks it has floated (not flying, not beached) since the level placed it. A dozing
+## raft does not tick, so [method _on_doze_wake] adds the ticks it slept (see there).
 var _moves: int = 0
+## How often the PLATFORMS phase had started when it dozed off (or was reset while dozing): the drag clock's slept
+## ticks are counted from it.
+var _doze_platform_runs: int = 0
 ## Bit per slot: the hero's last floor contact was this raft (rails).
 var _railed_mask: int = 0
 ## G45: how far (tiles) the fence opens over a bank that stopped the raft.
@@ -136,6 +141,8 @@ func _on_level_reset() -> void:
 	ridden = false
 	rider_mask = 0
 	_reset_state()
+	# A raft reset while it dozes stays asleep: its drag clock starts again from this tick (see _on_doze_wake).
+	_doze_platform_runs = Sim.get_phase_runs(Defs.Phase.PLATFORMS)
 
 
 # --- Calls ------------------------------------------------------------------------------------------------------------
@@ -362,11 +369,17 @@ func _docked_at(level: LevelBase, side: int) -> bool:
 	return not flying and not beached and rx == 0 and cd == 0 and _bank_ahead(level.grid, side)
 
 
-## A railed raft carries a rider anywhere over his fence (the bow strip bug of the 1.0 halved-width overlap, G45).
+## A railed raft carries a railed rider anywhere over its WHOLE deck (the bow strip bug of the 1.0 halved-width
+## overlap, G45): x in [centre - 8 * width, centre + 8 * width). While the fence is closed he cannot leave
+## rail_left() .. rail_right_excl() anyway; docked, the fence opens over the bank and he walks the deck's last 7 px
+## carried - up to the bank's first pixel, where his floor contact unrails him - instead of standing over them carried
+## by nobody and dropping into the last water column (wf10_content_to_objects-B.txt #1: the Long Raft Home has no
+## failure state).
 func _carries_fenced(hero: PlayerBase) -> bool:
 	if not rails or (_railed_mask & (1 << hero.slot)) == 0:
 		return false
-	return hero.sim_pos.x >= rail_left() and hero.sim_pos.x < rail_right_excl()
+	var half: int = Tuning.TILE / 2 * width
+	return hero.sim_pos.x >= sim_pos.x - half and hero.sim_pos.x < sim_pos.x + half
 
 
 ## A hero's own move carried his feet past a raft's deck into the liquid cell under it (the deck sits only
@@ -411,9 +424,24 @@ static func _stands_on_floor(level: LevelBase, hero: PlayerBase) -> bool:
 			and TileGrid.is_ground(level.grid.floor_at(hero.sim_pos.x >> 4, hero.sim_pos.y >> 4))
 
 
-## Dozing: a raft at rest outside every current changes nothing per tick.
+## Dozing: a raft at rest outside every current changes nothing per tick - but its drag clock ([member _moves],
+## step 2 of the header) counts every tick it floats, and the phase of that clock decides on which ticks a paddled raft
+## loses speed. So the slept ticks are put back on waking ([method _on_doze] / [method _on_doze_wake], the SimEntity
+## doze contract: "nothing but counters that _on_doze_wake() restores"): a raft that dozed at its home before the
+## heroes came drags on the same ticks as one that never dozed (D6's wf9 report: the digests of a paddled raft parted
+## with dozing off; the one-cell eddies the co-op files put at a raft's home are no longer needed).
 func _doze_area() -> Rect2i:
 	return _doze_box()
+
+
+func _on_doze() -> void:
+	_doze_platform_runs = Sim.get_phase_runs(Defs.Phase.PLATFORMS)
+
+
+func _on_doze_wake() -> void:
+	# It dozes only at rest and never in flight; a beached raft's clock stands still awake too (_move_tick).
+	if not beached and not flying:
+		_moves += Sim.get_phase_runs(Defs.Phase.PLATFORMS) - _doze_platform_runs
 
 
 func _can_doze() -> bool:

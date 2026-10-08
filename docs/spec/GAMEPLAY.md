@@ -899,7 +899,9 @@ ever needed** on a main path; specials open shortcuts, secrets and paintings (13
 - **Vines** (P-C.4): Up (without Down) grabs a vine within 6 px; climb up 2 px/tick, down 3; Up at the top steps onto
   the ledge (a landing); a direction + Jump leaps off; Down + Jump drops; no strikes on a vine; a hit knocks the hero
   off. A climber is held by his vine, so vines are climbed from rafts, spear steps and lifts [G8]. **Rolled vines** lie
-  coiled on a ledge until one strike unrolls them (they stay unrolled).
+  coiled on a ledge until one strike unrolls them (they stay unrolled); in a co-op file only a strike from the
+  coil's own level counts - a hero whose feet are at most one row under its ledge - so the drop gift of a boost
+  ledge cannot be struck down from the floor below [G67].
 - **Tar** `:` (P-C.5): the hero sinks 6 px, wades at 2 px/tick and only hops (33 px; on the tar itself the hop lands
   on tick 16, 32 px out); ground enemies are slowed the same way; dropped items stop dead. The tar rules end at his next
   landing or when anything but his own hop throws him up (a geyser, a bounce, a launch, a hurt) [G8]. `~` of
@@ -913,8 +915,10 @@ ever needed** on a main path; specials open shortcuts, secrets and paintings (13
   Water stays deadly (no swimming).
 - **Rising tide** (P-C.8): on `scroll = rising` stages a band of the level's liquid rises from 6 rows under the start
   (or the checkpoint) at `rise_speed` (default 1 px/tick) once the player moves; it kills on touch; the view never
-  scrolls down and follows each hero's footing, never a jump's apex, so a jump in place lands in view [G42];
-  `zones/autoscroll_stop` ends it.
+  scrolls down and follows each hero's footing, never a jump's apex, so a jump in place lands in view [G42]; the
+  highest footing is kept 72 px (4.5 rows) under the view's top, so a hero who stands, walks or climbs has his whole
+  body under the HUD band, and while he jumps the drawn view looks up (at most 4 rows, drawing only) to keep his head
+  under the band too [G65]; `zones/autoscroll_stop` ends it.
 - **Alternating gusts** (P-C.6): negative wind pushes right; `wind_loop` repeats a wind script (9-2, Floe Rink, the
   Roc's gale); crouching braces as in 1.0; outside the ice biome the wind shows as gust streaks. **Co-op lee** [G23]: a hero
   up to 64 px downwind of a crouching partner feels no wind, and a jump taken in the lee stays sheltered until he
@@ -986,7 +990,9 @@ each declares its doze rule; Book I never spawns them). Defaults `hp` [25], `sco
   its co-op Expert form has 225 hp; the Twin Idols shut both jaws after a twin crack until they spat again and rage
   after every 2nd crack for 88 ticks; the Roc's co-op gusts drop a third as many feathers; the Rival Chieftains have 5
   pips each, both reel 110 ticks after a counted hit on either and crow 330 ticks (harmless) after a blow of theirs
-  lands. Tusker is unchanged.
+  lands - shown by a gloating "HA!" bubble over each fighting chieftain (its tail 24 px over his head, over the
+  "HUP!" line) that blinks over the crow's last 22 ticks (drawing only
+  [G64]). Tusker is unchanged.
 - **Weak points clear of the HUD** [G35]: the HUD band of a boss fight is the top row - 31 px deep on a phone or
   tablet, 27 on a computer; in co-op the letters give way and P2's panel moves up into it while a boss bar shows - and,
   in the boss bar's columns (53 px left to 38 px right of the view's centre), down to 48 px (`Hud.band_rects`). Every
@@ -1273,9 +1279,13 @@ sub-stage keeps its first half's music, a co-op file its solo file's.
   alternate between the heroes inside their zone (slot order); their `max` is x1.5 (rounded down). The active cap stays 12. Each
   hero's stolen heart bursts as 6 bones for the team (an enemy that hurt both releases 12). Enemies reset only on a
   team wipe. Hit points are unchanged (two heroes already deal double damage). **One hit per strike** [G57] (P-C.10):
-  one strike - a club swing for every tick its boxes stay out, a thrown special for its whole flight, a ball flight, a
-  head bounce - damages a given enemy at most once, so `hp` counts strikes (a 100-hp keeper takes four club strikes);
-  bosses keep their hit cooldown; solo files keep the 1.0 per-tick hit.
+  one strike - a club swing for every tick its boxes stay out, a thrown special for its whole flight, a ball flight -
+  damages a given enemy at most once (a head bounce never damages), so `hp` counts strikes. The death rule is 5.1's -
+  an enemy dies when its hp drops **below** zero - so it takes `hp` / 25 (rounded down) + 1 club strikes: hp 10 or 20
+  one, hp 25 two, hp 60 three, hp 100 **five**; a crouch-charged strike counts as four [G63]. A later tick of a swing
+  on an enemy that swing already hurt is **used up** without damage - the hero's side is the 1.0 side on every tick
+  (his pogo off it, the clank, one target per box per tick), so a living enemy shields what stands behind it until it
+  is dead [G63]. Bosses keep their hit cooldown; solo files keep the 1.0 per-tick hit.
 - Per archetype:
 
 | Archetype | Co-op base behaviour | Traits used in layouts |
@@ -1309,14 +1319,17 @@ of the enemy records carry a trait, and every enemy guarding a main-path chokepo
 | `shell` | the shield faces the nearer active hero **every tick** (no active hero near: the nearest hatched one); a hit from that side (striker's x, or a projectile flying into the shield; `abs(dx) < 4` counts as front) glances with a clank and a spark; back hits count | one hero is always in front |
 | `bond` | records with the same `bond=<name>`: when one dies a window opens; every other record of the bond must die before it closes, or the dead ones **regrow** at their anchors with full hp (a 22-tick regrow, harmless) | targets are out of one hero's reach within the window, and no thrown special hits two members in one throw [G36] |
 | `daze` | when any active hero within 48 px (and 32 px vertically) starts a strike, it hops away from him (`xvel` +/-64, `yvel` -96 *(tune)*); it hops over a thrown weapon coming at it within 48 px (`yvel` -128); a head bounce **dazes** it 14 ticks (Beginner) / 12 (Expert); only a dazed one can be hurt, and only by a hero of another slot than the one whose bounce dazed it (his hits glance; slot-bound, so not capped by the solo minimum [G47]); other hits glance | the bouncer cannot hurt his own daze |
-| `heavy` | it is stopped only by a **Brace Wall** (P-C.10), which dazes it 44 ticks with its head open; it is **damaged only while so dazed** (then hits from any side count) - every other hit glances: front, back, from above, thrown, a ball, a bounce [G57] | needs two braced bodies (it runs under a jumping hero, so a lone hero who lands behind it gains nothing) |
+| `heavy` | it is stopped only by a **Brace Wall** (P-C.10), which dazes it 44 ticks with its head open; it is **damaged only while so dazed** (then hits from any side count) - every other hit glances: front, back, from above, thrown, a ball, a bounce [G57]; while it is not so dazed it dies of nothing else either - no kill-all, grenade, feast or mount bite, glider dive [G63] | needs two braced bodies (it runs under a jumping hero, so a lone hero who lands behind it gains nothing) |
 | `lone` | while the two active heroes are within 64 px of each other on both axes it keeps away (it does not dive, charge or rise; flyers circle 32 px wider); otherwise it targets the hero farther from the view centre (ties -> the higher slot) [R9]. Off on Beginner (plain targeting) | staying together is the defence |
 | `grab` | a hero who touches it from below (his feet below its feet point) or whom it dives onto is **seized** instead of hurt: he cannot move or strike, and it carries him towards its perch (`perch=c,r`, a pit-side cell) at 1 px/tick, dropping him there; the partner frees him with any hit on it (the hit counts; the freed hero falls with 44 ticks of immunity) | a grabbed hero cannot strike |
 | `leech` | it lands on a hero's back (instead of hurting) and drains one bone per 44 ticks; only the partner's weapon reaches it (the host's own boxes skip it); alone it falls off after 220 ticks | a hero cannot hit his own back |
-| `split` | the first hit splits it (no damage) into two halves of `hp` 0 that run apart at 48 v16 for 22 ticks *(tune)*, then go on at their archetype's own speed in the run's direction (the spawned half wears the other palette and shows `squash`); both must die within the window, or the dead half regrows next to the living one and they merge back into the whole. The falling tar blobs of 6-1 are `enemies/dropper coop=split skin=slime` | the halves run in opposite directions |
+| `split` | the first hit splits it (no damage) into two halves of `hp` 0 that run apart at 48 v16 for 22 ticks *(tune)*, then go on at their archetype's own speed in the run's direction (the spawned half wears the other palette and shows `squash`); both must die within the window, or the dead half regrows next to the living one and they merge back into the whole. Under one hit per strike (13.9.4) the swing whose hit split the record never hurts that record's half again - it may still hit the spawned half once - so the record's half takes a new strike [G63]. The falling tar blobs of 6-1 are `enemies/dropper coop=split skin=slime` | the halves run in opposite directions, and one swing no longer clears both |
 
 - Keeper groups: enemies may carry `keeper=<name>` (a group tag; a door `objects/column trigger=keepers:<name>` opens
-  when every enemy of the group is dead) [R10].
+  when every enemy of the group is dead) [R10]. **A flying keeper holds its perch** [G66]: a Harrier with `keeper=`
+  never takes off - a hero within its `range` makes it turn and screech (drawing and sound only), and it stays on its
+  anchor, struck where it sits (its body hurts on touch); without `keeper=` it is the 1.0 Harrier. A keeper must not
+  be led to its mate: no other archetype that follows its target is a keeper or a gate's bond member.
 
 #### 13.9.6 Co-op-only enemies
 
@@ -1353,7 +1366,7 @@ one-shot; hurt only while a Brace Wall has it dazed [G57]. **Snatcher**: `kind=s
 |---|---|
 | `objects/plate name= count=1\|2 mode=hold\|timed:<ticks>\|latch w=<cells>` | `w` [2] cells of floor, anchored at its **left** cell and covering `w` cells to the right; **weight** = active heroes whose feet are over its cells, on its floor or up to 8 px above it and not rising (a screen shake does not release it) + 2 for a mount driven by an active hero + 2 for a heave boulder resting on it; enemies, eggs, idle heroes and a riderless mount weigh 0 [G33]. Pressed while weight >= `count`; `timed:T` stays pressed T ticks after the weight leaves (a stone clock shows it); `latch` stays pressed for good. It sinks 2 px (drawing) and clicks |
 | `objects/column ... rise_while=<plate>[,...]` / `sink_while=` | the 1.0 column driven by plates: while **all** listed plates are pressed it rises (sinks) 1 tile per 4 ticks up to `rise`, and returns at the same rate when released; `shake` defaults to 0 for plate columns. A plate stands **8+ tiles** from its door. One door cannot be opened from both sides: a leapfrog uses two doors in two corridors [G9]. **Door rule**: a driven block (plates, keepers, drums) whose next cell in its direction of travel is solid is a door - the cells it leaves become air (a portcullis rising into a ceiling slot, a slab sinking into the floor); a block moving into air keeps the 1.0 pillar rule. A returning door never moves into an active hero: it waits; an idle hero is pushed out of its way, unharmed - an idle body is no doorstop [G53] |
-| `objects/column trigger=keepers:<name>` | the **keeper door**: rises once when every enemy with `keeper=<name>` is dead. Keepers carry `shell`, `bond` or `daze` and stand in a hall **4 rows high** (the Guard and Shellback art is 54 px tall) [G4]; a keeper door is the bottom cells of a wall that continues above the hall, `rise` = 4 |
+| `objects/column trigger=keepers:<name>` | the **keeper door**: rises once when every enemy with `keeper=<name>` is dead. Keepers carry `shell`, `bond` or `daze` (or are a `heavy` [G57]), stay where they are put - ground keepers with `speed=0`, a keeper Harrier on its perch [G66] - and stand in a hall **4 rows high** (the Guard and Shellback art is 54 px tall) [G4]; a keeper door is the bottom cells of a wall that continues above the hall, `rise` = 4 |
 | `objects/column trigger=drums:<bond>`, `objects/gate needs=<bond>` | opened by a drum bond [R10] |
 | `objects/drum bond=<name>` | a hittable (every weapon box, thrown weapon or ball, at most one hit per 6 ticks): the first hit lights it and opens the window; when every drum of the bond is lit within it, the bond succeeds for good (its column rises, its gate unlocks); otherwise all go dark and can be tried again |
 | `objects/seesaw len=<cells> [facing]` | [5]; two end platforms 16 px apart in height around the pivot (the fulcrum at the anchor's feet point, the plank `len * 8` px each side, `facing` names the high end [r]; the low end lies 1 px over the floor, the high end one row higher). Two heroes on one see-saw play ping-pong (the launched hero's landing flips it back); an idle hero's landing flips it and launches nobody [G33]. A body landing on the **high end** (`yvel >= 16` at contact) flips it within 2 ticks and launches whoever stands on the low end with `max(-(yvel + 32) - (64 if hard landing), -288)` (6.5 hard landing; P-C.17 table: 1 tile -128, 4 tiles -272, 5+ tiles -288 = 171 px); a weaker result than -64 only lifts him. Enemies on the low end are thrown off the same way |
@@ -1532,8 +1545,8 @@ who holds it 194 ticks).
 Eight single-screen arenas (DESIGN.md E.5; building rules LEVEL_DESIGN 15.8; cut 3 applied [G60]): Totem Ring
 (jungle, wrap left-right, Grub Stack), Echo Hollow (cave, wrap top-bottom, Hot Rock; the darkness pulse is its
 signature - the regrowing walls and the dangler springboard are dropped), Floe Rink (ice, open sides, **Grub Stack
-only**), Cinder Pit (volcano, LCS), Tar Pulleys (swamp, Grub Stack; human-only unless core-B's pulley links make its
-bot tests green), Coconut Cove (coast, Clubball), Sky Picnic (Feast Land, wrap top-bottom, **no deaths**, Hot Rock /
+only**), Cinder Pit (volcano, LCS), Tar Pulleys (swamp, Grub Stack; bots in Grub Stack and Hot Rock since core-B's pulley links, Last
+Caveman Standing human-only there [G60]), Coconut Cove (coast, Clubball), Sky Picnic (Feast Land, wrap top-bottom, **no deaths**, Hot Rock /
 Grub Stack), Colossus Hall (keep, Grub Stack and LCS only; the neutral Colossus takes no hits and spits at the crowned
 leader every 243 ticks with its jaws open 10 ticks ahead - in LCS at the hero with the most hearts, no spit on a tie
 [G43]). Mesa Rodeo and Cloud Top are **not in 2.0** [G37] [G60]; Chomper's arena rules stay in the code, unused

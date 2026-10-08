@@ -2,10 +2,12 @@
 # Featured route of Bubbling Fen (designer D6): the club route to checkpoint 1, up the vine to the root deck, the
 # hammer from the jetty, the side raft paddled into its current and carried to the stump, the block wall broken
 # from the raft, the Cave Painting (index 3) in the stump's nook.
+# Re-recorded in wf10 by party with the same bot: raft.gd's drag clock now counts the ticks a raft dozed (it dragged on
+# other ticks with dozing on than off - wf9_d6_to_objects-B.txt); the raft's speed steps moved by a few ticks.
 80:R,8:RU,7:R,6:UF,4:,14:R,6:F,4:,1:R,6:F,4:,24:R,6:F,4:,1:R,6:UF,4:,59:R,2:,1:R,2:,28:U,32:R,7:,1:L,1:F,6:,1:F
-1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,219:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:
+1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,220:,1:F,6:,1:F,1:,1:F,6:,1:F,1:
 1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:
 1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:
 1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:
-1:F,1:,45:R,4:,1:R,4:,65:U,20:R,7:,1:L,1:F,6:,1:F,1:,1:F,1:,1:F,1:,1:F,6:,1:F,1:,1:F,1:,1:F,1:,1:F,6:,1:F,1:
-1:F,1:,1:F,1:,1:F,6:,1:F,1:,1:F,1:,1:F,1:,1:F,152:,2:R,3:,8:F,2:,8:F,2:,8:F,2:,16:R,20:
+1:F,6:,1:F,1:,1:F,3:,43:R,2:,1:R,6:,1:L,2:,65:U,20:R,7:,1:L,1:F,6:,1:F,1:,1:F,1:,1:F,1:,1:F,6:,1:F,1:,1:F,1:
+1:F,1:,1:F,6:,1:F,1:,1:F,1:,1:F,1:,1:F,156:,2:R,3:,8:F,2:,8:F,2:,8:F,2:,16:R,20:

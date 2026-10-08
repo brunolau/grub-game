@@ -146,6 +146,32 @@ B = objects/spawn_point index=2
 [entities]
 """
 
+## Two floors with a pit between them (cols 9-12: nothing to land on; he falls out of the level) inside walls.
+const PIT_ARENA: String = """[meta]
+format = 2
+id = test_core_bots_pit
+kind = arena
+players = 2
+modes = last_caveman
+biome = jungle
+[legend]
+B = objects/spawn_point index=2
+[tiles]
+|..................|
+|..................|
+|..................|
+|..................|
+|..................|
+|..................|
+|..................|
+|..................|
+|..................|
+|.@..............B.|
+#########....#######
+#########....#######
+[entities]
+"""
+
 ## A block standing on the floor (cols 8-11, rows 6-9): the floor node left of it ends 9 px short of its face (the
 ## wall probe), and a hero knocked into that sliver stands off the graph under the block's top (wf9_da_to_core_b #2).
 const SLIVER_ARENA: String = """[meta]
@@ -172,6 +198,9 @@ B = objects/spawn_point index=2
 ####################
 [entities]
 """
+
+## test_committed_graphs_hold checks every this-many-th link of a committed pulley sweep (all the other links always).
+const COMMITTED_PULLEY_EVERY: int = 24
 
 ## The tier arena's graph as JSON text, baked once for the whole file (a bake simulates thousands of hero runs; text,
 ## not the graph itself, so that nothing is left over at exit).
@@ -623,6 +652,26 @@ func test_drop_platform_is_a_rider_mover_with_verified_links() -> void:
 	assert_eq(problems.size(), 0, "; ".join(problems))
 
 
+func test_a_bake_in_frames_gives_the_same_graph() -> void:
+	# The drop-platform room in one go, in slices of 150 candidate runs with a frame between them, and through
+	# bake_text_in_frames: the same JSON, statistics included (core-B wf10: a long bake must run in frames).
+	var whole: NavGraph = NavBaker.new().bake_text(self, &"test_core_bots_drop", DROP_ARENA)
+	var sliced: NavBaker = NavBaker.new()
+	assert_true(sliced.begin_bake(self, &"test_core_bots_drop", DROP_ARENA))
+	var slices: int = 1
+	while sliced.step_bake(150):
+		slices += 1
+		await get_tree().process_frame
+	var by_slices: NavGraph = sliced.end_bake()
+	assert_true(slices >= 3, "the bake ran in slices (%d)" % slices)
+	var by_frames: NavGraph = await NavBaker.new().bake_text_in_frames(self, &"test_core_bots_drop", DROP_ARENA)
+	assert_eq(by_slices.to_json(), whole.to_json(), "the sliced bake")
+	assert_eq(by_frames.to_json(), whole.to_json(), "bake_text_in_frames")
+	assert_true(whole.links.size() >= 4 and int(whole.baker["candidates"]) > 1000,
+			"a real bake (%d links, %d runs)" % [whole.links.size(), int(whole.baker["candidates"])])
+	assert_true(Game.level == null or not (Game.level is NavSim.SimLevel), "the sim world is gone")
+
+
 func test_bot_rides_the_moving_platform_across() -> void:
 	var graph: NavGraph = _lift_graph()
 	NavGraph.cache(graph)
@@ -708,7 +757,43 @@ func test_sim_presets_and_holds_a_pulley() -> void:
 	# Without a preset the run starts at the level start, as before.
 	var start: NavSim.Outcome = sim.run(NavSim.PARK, PackedInt32Array(), 0)
 	assert_eq(start.mover_states[0], PackedInt32Array([0, 0, 0, 0]))
+	# The two-parity rule of a level with a pulley (NavSim's header). A running jump off the risen lift down to the
+	# floor is a heavy landing: the level shakes, and the shake lifts him 3 px on the odd ticks of the level's clock -
+	# so the run from an even tick and from an odd one differ. With the rule a run is the same whenever it is played.
+	assert_true(sim.both_parities, "a level with a pulley")
+	sim.pulley_preset = {0: -34}
+	sim.pulley_frozen = true
+	var top: Vector2i = Vector2i(home.x + 24, home.y - 34 + NavMovers.RIDE_SINK_PX)
+	var jump: PackedInt32Array = NavGraph.expand_keys("5:R,8:RU,24:R")
+	sim.both_parities = false
+	Sim.tick += Sim.tick & 1
+	var on_even: NavSim.Outcome = sim.run(top, jump, 90)
+	Sim.tick += 1 - (Sim.tick & 1)
+	var on_odd: NavSim.Outcome = sim.run(top, jump, 90)
+	assert_true(on_even.shook and on_odd.shook and on_even.landed, "a heavy landing on the floor (%s)" % [on_even.pos])
+	assert_true(on_even.handback_pos != on_odd.handback_pos or on_even.pos != on_odd.pos,
+			"without the rule the clock's parity shows in the run (handback %s / %s, end %s / %s)" % [
+			on_even.handback_pos, on_odd.handback_pos, on_even.pos, on_odd.pos])
+	sim.both_parities = true
+	var first: NavSim.Outcome = sim.run(top, jump, 90)
+	Sim.tick += 1
+	var second: NavSim.Outcome = sim.run(top, jump, 90)
+	Sim.tick += 4
+	var third: NavSim.Outcome = sim.run(top, jump, 90)
+	for other: NavSim.Outcome in [second, third]:
+		assert_eq([other.landed, other.pos, other.handback_pos, other.landing_tick],
+				[first.landed, first.pos, first.handback_pos, first.landing_tick], "the same run whatever ran before it")
+	assert_true(first.shook, "the heavy landing was seen")
+	sim.pulley_preset = {}
+	sim.pulley_frozen = false
 	sim.teardown()
+	# A level without a pulley keeps the running clock (its committed graph was baked and is verified with it).
+	var plain: LevelData = LevelData.parse(&"test_core_bots_drop", DROP_ARENA)
+	var plain_sim: NavSim = NavSim.new()
+	assert_true(plain_sim.setup(self, &"test_core_bots_drop", plain.build_grid(0), plain.resolved_meta(0),
+			plain.entity_records()))
+	assert_false(plain_sim.both_parities, "no pulley: the plain rule")
+	plain_sim.teardown()
 
 
 ## A NavMoversLive whose pulley plan is given (the navigator's side of the pulley rule).
@@ -716,12 +801,16 @@ class _FixedPulleys:
 	extends NavMoversLive
 
 	var plan: Dictionary = {}
+	var states: Dictionary = {}
 
 	func has_pulleys() -> bool:
 		return true
 
 	func pulley_plan(_hero: PlayerBase) -> Dictionary:
 		return plan
+
+	func pulley_states() -> Dictionary:
+		return states
 
 
 func test_navigator_plans_with_the_resting_pulley_state() -> void:
@@ -781,6 +870,131 @@ func test_navigator_plans_with_the_resting_pulley_state() -> void:
 	assert_true(nav.search_blocked().has(5))
 	nav.update_movers(null, NavMoversLive.new())
 	assert_true(nav.search_blocked() == nav.blocked, "no pulleys: the blocked links alone")
+
+
+func test_links_past_a_lift_hold_only_in_their_pulley_states() -> void:
+	# NavLink.clear_at: [pulley, lo, hi, lo, hi ...] - the ranges of pulley offsets a link past a lift's column lands in.
+	var link: NavGraph.NavLink = NavGraph.NavLink.new()
+	assert_true(NavGraph.link_clear(link, 30, -48), "a link without ranges holds in every state")
+	link.clear_at = PackedInt32Array([0, -48, -10, 20, 48])
+	assert_true(NavGraph.link_clear(link, -20, -20), "inside the first range")
+	assert_true(NavGraph.link_clear(link, 48, 20), "the ends count")
+	assert_false(NavGraph.link_clear(link, 0, 0), "between the ranges the lift is in the way")
+	assert_false(NavGraph.link_clear(link, 30, -48), "a pulley on its way out of the range")
+	assert_false(NavGraph.link_clear(link, -12, 24), "from one range into the other: it passes the blocked states")
+	# The navigator plans with such a link only while the pulley is, and will rest, inside one range.
+	var graph: NavGraph = NavGraph.new()
+	graph.level_id = &"test_core_bots_clear"
+	for entry: Array in [[10, 8, 100, -1], [10, 200, 311, -1], [6, 120, 160, 0]]:
+		var node: NavGraph.NavNode = NavGraph.NavNode.new()
+		node.row = int(entry[0])
+		node.y = node.row * 16
+		node.x0 = int(entry[1])
+		node.x1 = int(entry[2])
+		if int(entry[3]) >= 0:
+			var mover: int = graph.add_mover("objects/platform@8,6", "objects/platform", 8, 6, NavGraph.MOVER_RIDER)
+			graph.movers[mover]["pulley"] = 0
+			graph.movers[mover]["side"] = 1
+			graph.movers[mover]["limit"] = 48
+			node.mover = mover
+		graph.add_node(node)
+	for ranges: Array in [[0, -48, -10, 20, 48], []]:
+		var jump: NavGraph.NavLink = NavGraph.NavLink.new()
+		jump.from = 0
+		jump.to = 1
+		jump.x0 = 80
+		jump.x1 = 95
+		jump.keys = "5:R,14:RU,20:R"
+		jump.ticks = 39
+		jump.clear_at = PackedInt32Array(ranges)
+		graph.add_link(jump)
+	graph.rebuild()
+	var json: JSON = JSON.new()
+	assert_eq(json.parse(graph.to_json()), OK)
+	var loaded: NavGraph = NavGraph.from_dict(json.data)
+	assert_eq(loaded.links[0].clear_at, PackedInt32Array([0, -48, -10, 20, 48]), "the ranges round-trip through JSON")
+	assert_true(loaded.links[1].clear_at.is_empty() and loaded.to_json().count("\"clear\":") == 1,
+			"a link without ranges writes none")
+	var nav: BotNavigator = BotNavigator.new(graph)
+	var live: _FixedPulleys = _FixedPulleys.new()
+	live.states = {0: Vector2i(0, 0)}
+	nav.update_movers(null, live)
+	assert_true(nav.search_blocked().has(0), "the lift stands in the jump's way: planned around")
+	assert_false(nav.search_blocked().has(1), "a link without ranges stays")
+	assert_true(graph.path_cost(0, 90, 1, 250, nav.search_blocked(), nav.search_class()) < NavGraph.UNREACHABLE,
+			"the other link still leads there")
+	live.states = {0: Vector2i(30, 48)}
+	nav.update_movers(null, live)
+	assert_false(nav.search_blocked().has(0), "the lift sinks out of the way and rests there: the jump is back")
+	live.states = {0: Vector2i(10, 48)}
+	nav.update_movers(null, live)
+	assert_true(nav.search_blocked().has(0), "it has not left the blocked states yet")
+
+
+func test_a_versus_bot_keeps_away_from_a_pit() -> void:
+	# core-B wf10: on Tar Pulleys a bot knocked into the air beside the tar steered at his rival's column across it and
+	# drowned (31 of 48 Last Caveman rounds for one spawn), and one with no route walked to the last px of his bank.
+	var graph: NavGraph = NavGraph.new()
+	graph.level_id = &"test_core_bots_pit"
+	graph.cols = 20
+	graph.rows = 12
+	for entry: Array in [[10, 25, 143], [10, 208, 294]]:
+		var node: NavGraph.NavNode = NavGraph.NavNode.new()
+		node.row = int(entry[0])
+		node.y = node.row * 16
+		node.x0 = int(entry[1])
+		node.x1 = int(entry[2])
+		graph.add_node(node)
+	graph.rebuild()
+	NavGraph.cache(graph)
+	var level: Level = _load_arena_text(2, &"test_core_bots_pit", PIT_ARENA)
+	if level == null:
+		return
+	var hero: PlayerBase = level.get_hero(0)
+	GameInput.set_scripted_slot(0, func(_tick: int) -> int: return 0)
+	GameInput.set_scripted_slot(1, func(_tick: int) -> int: return 0)
+	var nav: BotNavigator = BotNavigator.new(graph)
+	# 1. In the air over the left floor's end, flying at the pit, the target across it.
+	nav.set_target(Vector2i(250, 160), 4)
+	hero.respawn_at(Vector2i(126, 110))
+	Sim.step(2)
+	hero.xvel = 80
+	assert_false(hero.is_grounded(), "he is in the air (%s)" % [hero.sim_pos])
+	nav.safe_falls = false
+	assert_eq(nav.step(hero, Sim.tick + 1) & (Defs.IN_LEFT | Defs.IN_RIGHT), Defs.IN_RIGHT,
+			"the plain rule steers at the target's column")
+	nav.safe_falls = true
+	assert_eq(nav.step(hero, Sim.tick + 1) & (Defs.IN_LEFT | Defs.IN_RIGHT), Defs.IN_LEFT,
+			"a versus bot steers back over his floor")
+	GameInput.set_scripted_slot(0, func(tick: int) -> int: return nav.step(hero, tick))
+	var landed: bool = false
+	for t: int in 60:
+		Sim.step(1)
+		if hero.is_grounded():
+			landed = true
+			break
+	assert_true(landed and not hero.dead and graph.node_at(hero.sim_pos) == 0,
+			"he lands on the left floor (at %s)" % [hero.sim_pos])
+	assert_true(nav.falls_steered > 0, "the fall was steered (%d ticks)" % nav.falls_steered)
+	# 2. No route (the graph has no link over the pit): he stops inside the end, not on its last px.
+	var worst: int = 0
+	for t: int in 150:
+		Sim.step(1)
+		worst = maxi(worst, hero.sim_pos.x)
+	assert_true(not hero.dead and hero.is_grounded() and worst <= 143 - BotNavigator.FALL_MARGIN_PX + 4,
+			"he waits a little inside the pit's edge (rightmost x %d, at %s)" % [worst, hero.sim_pos])
+	assert_true(hero.sim_pos.x >= 120, "as near his target as the floor allows (%s)" % [hero.sim_pos])
+	# 3. Where a wall ends the floor the steering is the plain rule (nothing changes on a closed arena).
+	GameInput.set_scripted_slot(0, func(_tick: int) -> int: return 0)
+	nav.set_target(Vector2i(12, 160), 4)
+	hero.respawn_at(Vector2i(40, 110))
+	Sim.step(2)
+	hero.xvel = -80
+	var steered: int = nav.falls_steered
+	assert_eq(nav.step(hero, Sim.tick + 1) & (Defs.IN_LEFT | Defs.IN_RIGHT), Defs.IN_LEFT,
+			"toward the wall he steers as ever")
+	assert_eq(nav.falls_steered, steered)
+	GameInput.clear_scripted()
 
 
 func test_bot_walks_out_of_a_sliver_under_a_block() -> void:
@@ -919,7 +1133,8 @@ func test_bot_climbs_the_totem_and_crosses_the_wrap_seam() -> void:
 func test_committed_graphs_hold() -> void:
 	# Every graph under resources/bots: its level exists, it was baked from that level text (an arena_* graph must
 	# be re-baked when its arena changes; a stale test_* graph is only skipped), and every link still lands from
-	# every x of its window.
+	# every x of its window. Of a pulley sweep (thousands of links: the lifts' links at every pulley state) every
+	# COMMITTED_PULLEY_EVERY-th link is checked here; tests/test_versus_bots.gd (the slow module) checks them all.
 	var files: PackedStringArray = PackedStringArray()
 	if DirAccess.dir_exists_absolute(NavGraph.DIR):
 		for file: String in DirAccess.get_files_at(NavGraph.DIR):
@@ -948,7 +1163,7 @@ func test_committed_graphs_hold() -> void:
 		var baker: NavBaker = NavBaker.new()
 		assert_true(baker.sim.setup(self, graph.level_id, data.build_grid(0), data.resolved_meta(0),
 				data.entity_records()))
-		var problems: PackedStringArray = baker.verify_graph(graph)
+		var problems: PackedStringArray = await baker.verify_graph_in_frames(graph, self, COMMITTED_PULLEY_EVERY)
 		baker.sim.teardown()
 		assert_eq(problems.size(), 0, "%s: %s" % [file, "; ".join(problems)])
 
@@ -964,12 +1179,13 @@ func test_bake_tool_lists_arenas_and_verifies() -> void:
 		return
 	assert_true(levels.has(FLAT_ARENA))
 	var runner: Node = add_node(runner_script.new() as Node)
-	assert_eq(int(runner.call(&"run", PackedStringArray(["--bogus"]))), 2, "an unknown option")
-	assert_eq(int(runner.call(&"run", PackedStringArray(["--classes=7"]))), 2, "an unknown weight class")
-	assert_eq(int(runner.call(&"run", PackedStringArray(["--clip=1,2"]))), 2, "a clip needs four numbers")
-	assert_eq(int(runner.call(&"run", PackedStringArray(["--verify", "test_world_arena_flat"]))), 0,
+	# The tool bakes and verifies in frames (NavBaker's header), so its run() is awaited.
+	assert_eq(int(await runner.call(&"run", PackedStringArray(["--bogus"]))), 2, "an unknown option")
+	assert_eq(int(await runner.call(&"run", PackedStringArray(["--classes=7"]))), 2, "an unknown weight class")
+	assert_eq(int(await runner.call(&"run", PackedStringArray(["--clip=1,2"]))), 2, "a clip needs four numbers")
+	assert_eq(int(await runner.call(&"run", PackedStringArray(["--verify", "test_world_arena_flat"]))), 0,
 			"the committed flat-arena graph verifies")
-	assert_eq(int(runner.call(&"run", PackedStringArray(["--verify", "test_core_bots_no_such_level"]))), 1)
+	assert_eq(int(await runner.call(&"run", PackedStringArray(["--verify", "test_core_bots_no_such_level"]))), 1)
 
 
 func test_bot_match_replays_tick_for_tick() -> void:

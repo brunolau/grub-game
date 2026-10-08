@@ -21,6 +21,9 @@
 # Co-op, Book I, Beginner
 ########################################################################################################################
 section coop_book1_beginner
+# Every part counts its own events: a stage that fails in one part (a wipe, a death) must not fail the
+# `== 0` checks of the parts after it.
+reset_events
 
 # --- Title, Play > Co-op > Book I > Beginner --------------------------------------------------------------------------
 wait_until flow.current_screen == title 900
@@ -305,6 +308,9 @@ wait_until flow.busy == false 600
 # Co-op, Book I, Expert
 ########################################################################################################################
 section coop_book1_expert
+# Every part counts its own events: a stage that fails in one part (a wipe, a death) must not fail the
+# `== 0` checks of the parts after it.
+reset_events
 
 # --- Title, Play > Co-op > Book I > Expert ----------------------------------------------------------------------------
 wait_until flow.current_screen == title 900
@@ -683,6 +689,9 @@ shot the_end_coop_book1_expert
 # Co-op, Book II, Beginner
 ########################################################################################################################
 section coop_book2_beginner
+# Every part counts its own events: a stage that fails in one part (a wipe, a death) must not fail the
+# `== 0` checks of the parts after it.
+reset_events
 
 # --- Title, Play > Co-op > Book II > Beginner -------------------------------------------------------------------------
 wait_until flow.current_screen == title 900
@@ -985,6 +994,9 @@ wait_until flow.busy == false 600
 # Co-op, Book II, Expert
 ########################################################################################################################
 section coop_book2_expert
+# Every part counts its own events: a stage that fails in one part (a wipe, a death) must not fail the
+# `== 0` checks of the parts after it.
+reset_events
 
 # --- Title, Play > Co-op > Book II > Expert ---------------------------------------------------------------------------
 wait_until flow.current_screen == title 900
@@ -1008,8 +1020,11 @@ hold Ctrl Kp_Enter
 wait_until flow.current_screen == book_select 600
 release all
 wait_until flow.busy == false 600
-# The book select focuses the book of the last run (Flow.play_book): Book II, played by the part before - the
-# cards wrap, so a Right here would go back to Book I (G3 integration: the first run that got this far).
+# The book select focuses the book of the last run (Flow.play_book): Book II when the part before played to its end
+# (the cards wrap, so a Right would then go back to Book I), Book I when that part was cut short and the runner went
+# back to the title itself. So Right is pressed only while Book II is not the focused book: the part plays the same
+# either way, and a stage that fails in the part before does not fail this one.
+press_if ui_right flow.play_book != 2
 wait 10
 shot book_select_coop_book2_expert
 press ui_accept

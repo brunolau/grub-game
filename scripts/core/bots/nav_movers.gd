@@ -18,9 +18,17 @@ extends RefCounted
 ##    off links with the hero standing on the lift at p and the pulley held there (NavSim.pulley_frozen: an equal
 ##    weight on the other lift; at the lift's bottom his own weight holds it), to static nodes only and without
 ##    touching a lift after take-off (the other lift moves once he has left). `cond` = [mover, 0, side * p, 0, 0].
-##    Search cost: every pulley state of a COARSE_PX grid is searched in full; the states between try the scripts and
-##    sources that worked at their two grid neighbours first (a full search when those miss) - every kept window is
-##    simulated at every x all the same.
+##    Search cost: every pulley state of a COARSE_PX grid is searched in full; a state between two grid states looks
+##    only at the sources and targets its two grid neighbours have links with, and tries their scripts first, then the
+##    scripts kept for that pair at any grid state (no full search there: a link that needs yet another script in the
+##    few px between two grid states is left out; a lift without any off link gets the full search all the same).
+##    Every kept window is simulated at every x in every state. An off search widens a take-off only when it can
+##    beat the fastest window found for its target (the same links as without that shortcut).
+##  - links past a lift's column (wf9_da_to_core_b.txt #1, "the failing spring / jump links that pass a displaced
+##    lift"): a link between two other nodes was verified with the lifts at their level start; when its flight comes
+##    within CLEAR_REACH_PX of a lift's column, every start of its window is run again at every still pulley state
+##    and the link gets the ranges of pulley offsets it lands in (NavLink.clear_at) - a lift risen or sunk into its
+##    way makes the bot take another link instead of bumping into it.
 ## Links: **board** (a static node -> a mover node: a jump or walk-off that ends with him riding the part, already on
 ## the tick the bot takes over) and **off** (a mover node -> any other node, from the middle OFF_MIDDLE_PX of the part
 ## only, the rider standing RIDE_SINK_PX into its top as a real rider does). Every start x of a window was simulated;
@@ -51,12 +59,17 @@ const RIDE_SINK_PX: int = 1
 const PULLEY_NONE: int = 1 << 24
 ## Pulley states searched in full lie this far apart (px of pulley offset); the ones between are seeded from them.
 const COARSE_PX: int = 8
+## A link between two other nodes is swept over the pulley states when his feet come this near (px) a lift's column
+## on the way (half his body and a margin).
+const CLEAR_REACH_PX: int = 14
 
 var baker: NavBaker = null
 ## Mover nodes found.
 var node_count: int = 0
 ## Mover links added.
 var link_count: int = 0
+## Links past the lifts that got `clear_at` ranges (statistics).
+var clear_count: int = 0
 # Per mover node id: the part index in NavSim.mover_parts; per part: the period (0 = not periodic / none found).
 var _node_part: Dictionary = {}
 var _periods: PackedInt32Array = PackedInt32Array()
@@ -66,8 +79,11 @@ var _memo: Dictionary = {}
 var _phase_states: Dictionary = {}
 var _probes: Dictionary = {}
 # Pulley sweep of the class being baked: "board:<to>:<p>" -> {from node id: script id} and "off:<from>:<p>" -> {to
-# node id: script id} of the links kept (the seeds of the states between the grid states).
+# node id: script id} of the links kept (the seeds of the states between the grid states), and per lift node every
+# script kept at any of its grid states: "board:<to>" -> {from node id: script ids}, "off:<from>" -> {to node id:
+# script ids}.
 var _sweep: Dictionary = {}
+var _grid_scripts: Dictionary = {}
 
 
 func _init(p_baker: NavBaker) -> void:
@@ -170,10 +186,28 @@ func mover_of_part(part: int) -> int:
 	return -1
 
 
-## Find and verify the links to, from and between mover nodes for one weight class.
+## Find and verify the links to, from and between mover nodes for one weight class, in one go (the jobs of
+## [method add_jobs] one after the other).
 func find_links(_weight_class: int) -> void:
+	begin_class()
+	var jobs: Array[Callable] = []
+	add_jobs(jobs)
+	for job: Callable in jobs:
+		job.call()
+
+
+## A weight class starts: forget the runs and the pulley sweep of the last one.
+func begin_class() -> void:
 	_memo.clear()
 	_sweep.clear()
+	_grid_scripts.clear()
+
+
+## Append the mover work of one weight class to `jobs`, in the order it must run (NavBaker runs the jobs; a bake in
+## frames lets the engine finish a frame between them): per mover node the board links of every phase, then its off
+## links; then, per pulley lift, one job per pulley state - the COARSE_PX grid states first, then the states between
+## them (they are seeded from the grid states).
+func add_jobs(jobs: Array[Callable]) -> void:
 	var graph: NavGraph = baker.graph
 	var sim: NavSim = baker.sim
 	var lifts: Array[int] = []
@@ -192,24 +226,40 @@ func find_links(_weight_class: int) -> void:
 				phases.append(phase)
 				phase += PHASE_STEP
 		for phase: int in phases:
-			_board_links(node_id, part, mover, phase, PULLEY_NONE)
+			jobs.append(_board_links.bind(node_id, part, mover, phase, PULLEY_NONE))
 		if periodic:
 			for phase: int in phases:
-				_off_links(node_id, part, mover, phase, 0, PULLEY_NONE)
+				jobs.append(_off_links.bind(node_id, part, mover, phase, 0, PULLEY_NONE))
 		else:
-			# A rider mover may look the same after different standing times (a drop platform waits its `delay` at
-			# rest): only the first standing time of each look is baked - the one a verification finds again
-			# ([method _recipe_for]); a bot that stood longer and sees the same look may still miss, and its navigator
-			# blocks that link after two misses.
-			var looks: Array[PackedInt32Array] = []
-			for stand: int in STAND_TICKS:
-				var probe: NavSim.Outcome = _probe(part, 0, stand, graph.nodes[node_id], PULLEY_NONE)
-				if probe == null or probe.mover_states.size() <= part or looks.has(probe.mover_states[part]):
-					continue
-				looks.append(probe.mover_states[part])
-				_off_links(node_id, part, mover, 0, stand, PULLEY_NONE)
+			jobs.append(_rider_off_links.bind(node_id, part, mover))
 	for node_id: int in lifts:
-		_pulley_links(node_id)
+		var limit: int = sim.pulley_limits[sim.part_pulley[int(_node_part[node_id])]]
+		var offsets: PackedInt32Array = pulley_offsets(limit)
+		for p: int in offsets:
+			if is_grid_offset(p, limit):
+				jobs.append(_pulley_state_links.bind(node_id, p))
+		for p: int in offsets:
+			if not is_grid_offset(p, limit):
+				jobs.append(_pulley_state_links.bind(node_id, p))
+	# The links between other nodes that pass a lift's column: one job per source node (they exist by then).
+	if not lifts.is_empty():
+		for node: NavGraph.NavNode in graph.nodes:
+			if node.mover < 0:
+				jobs.append(_clear_links_from.bind(node.id))
+
+
+## Job: the off links of rider mover node `node_id` after every standing time of STAND_TICKS.
+func _rider_off_links(node_id: int, part: int, mover: int) -> void:
+	# A rider mover may look the same after different standing times (a drop platform waits its `delay` at rest): only
+	# the first standing time of each look is baked - the one a verification finds again ([method _recipe_for]); a bot
+	# that stood longer and sees the same look may still miss, and its navigator blocks that link after two misses.
+	var looks: Array[PackedInt32Array] = []
+	for stand: int in STAND_TICKS:
+		var probe: NavSim.Outcome = _probe(part, 0, stand, baker.graph.nodes[node_id], PULLEY_NONE)
+		if probe == null or probe.mover_states.size() <= part or looks.has(probe.mover_states[part]):
+			continue
+		looks.append(probe.mover_states[part])
+		_off_links(node_id, part, mover, 0, stand, PULLEY_NONE)
 
 
 ## The still offsets of a pulley whose lifts travel `limit` px: every PartyTuning.PULLEY_SPEED_PX step from the
@@ -226,50 +276,135 @@ static func pulley_offsets(limit: int) -> PackedInt32Array:
 	return result
 
 
-## The links onto and off pulley lift node `node_id` at every still state of its pulley: the COARSE_PX grid in full,
-## then the states between seeded from their grid neighbours.
-func _pulley_links(node_id: int) -> void:
-	var graph: NavGraph = baker.graph
+## True when pulley offset `p` is searched in full (a COARSE_PX grid state or a limit); the others are seeded.
+static func is_grid_offset(p: int, limit: int) -> bool:
+	return p == -limit or p == limit or posmod(p, COARSE_PX) == 0
+
+
+## Job: the links onto and off pulley lift node `node_id` with its pulley still at offset `p` - a grid state in full, a
+## state between two grid states seeded from them (their jobs ran before).
+func _pulley_state_links(node_id: int, p: int) -> void:
 	var part: int = int(_node_part[node_id])
-	var mover: int = graph.nodes[node_id].mover
+	var mover: int = baker.graph.nodes[node_id].mover
 	var pulley: int = baker.sim.part_pulley[part]
 	var limit: int = baker.sim.pulley_limits[pulley]
-	var offsets: PackedInt32Array = pulley_offsets(limit)
-	var grid: PackedInt32Array = PackedInt32Array()
-	for p: int in offsets:
-		if p == -limit or p == limit or posmod(p, COARSE_PX) == 0:
-			grid.append(p)
-	for p: int in grid:
-		var preset: int = encode_preset(pulley, p)
-		_sweep["board:%d:%d" % [node_id, p]] = _board_links(node_id, part, mover, 0, preset)
-		_sweep["off:%d:%d" % [node_id, p]] = _off_links(node_id, part, mover, 0, 0, preset)
-	for p: int in offsets:
-		if grid.has(p):
+	var preset: int = encode_preset(pulley, p)
+	if is_grid_offset(p, limit):
+		for kind: String in ["board", "off"]:
+			var kept: Dictionary = _board_links(node_id, part, mover, 0, preset) if kind == "board" \
+					else _off_links(node_id, part, mover, 0, 0, preset)
+			_sweep["%s:%d:%d" % [kind, node_id, p]] = kept
+			_grid_scripts["%s:%d" % [kind, node_id]] = _merge_seeds(_grid_scripts.get("%s:%d" % [kind, node_id], {}),
+					kept)
+		return
+	var below: int = p - posmod(p, COARSE_PX)
+	var above: int = mini(below + COARSE_PX, limit)
+	below = maxi(below, -limit)
+	var board_seed: Dictionary = _seeds_between("board", node_id, below, above)
+	var off_seed: Dictionary = _seeds_between("off", node_id, below, above)
+	_sweep["board:%d:%d" % [node_id, p]] = _board_links(node_id, part, mover, 0, preset, board_seed)
+	_sweep["off:%d:%d" % [node_id, p]] = _off_links(node_id, part, mover, 0, 0, preset, off_seed)
+
+
+## Job: the pulley states in which the links of the class being baked from static node `from` to another static node
+## hold (NavLink.clear_at). A link whose feet stay CLEAR_REACH_PX clear of every lift's column needs none. The others
+## are run from every x of their window at every still state of that lift's pulley (nobody on the lifts); a link that
+## lands everywhere keeps no ranges either.
+func _clear_links_from(from: int) -> void:
+	var graph: NavGraph = baker.graph
+	var sim: NavSim = baker.sim
+	var node: NavGraph.NavNode = graph.nodes[from]
+	for link: NavGraph.NavLink in graph.links:
+		if link.from != from or link.weight != baker.weight_class() or not link.cond.is_empty() \
+				or graph.nodes[link.to].mover >= 0 or link.kind == NavGraph.KIND_GEYSER:
 			continue
-		var below: int = -limit
-		var above: int = limit
-		for g: int in grid:
-			if g < p:
-				below = g
-			elif g > p and above == limit:
-				above = g
-		var preset: int = encode_preset(pulley, p)
-		var board_seed: Dictionary = _merge_seeds(_sweep.get("board:%d:%d" % [node_id, below], {}),
-				_sweep.get("board:%d:%d" % [node_id, above], {}))
-		var off_seed: Dictionary = _merge_seeds(_sweep.get("off:%d:%d" % [node_id, below], {}),
-				_sweep.get("off:%d:%d" % [node_id, above], {}))
-		_sweep["board:%d:%d" % [node_id, p]] = _board_links(node_id, part, mover, 0, preset, board_seed)
-		_sweep["off:%d:%d" % [node_id, p]] = _off_links(node_id, part, mover, 0, 0, preset, off_seed)
+		# Where his feet go at the level start: the pulley whose lift's column they come near.
+		var reach: Vector2i = Vector2i(1 << 30, -(1 << 30))
+		for x: int in [link.x0, link.window_center(), link.x1]:
+			var outcome: NavSim.Outcome = sim.run(Vector2i(x, node.y), link.flags, NavBaker.MAX_TICKS)
+			baker.count_candidate()
+			reach = Vector2i(mini(reach.x, outcome.min_x), maxi(reach.y, outcome.max_x))
+		var pulley: int = -1
+		for lift_id: int in _node_part:
+			var part: int = int(_node_part[lift_id])
+			if part >= sim.part_pulley.size() or sim.part_pulley[part] < 0:
+				continue
+			var lift: NavGraph.NavNode = graph.nodes[lift_id]
+			if reach.y >= lift.x0 - 4 - CLEAR_REACH_PX and reach.x <= lift.x1 + 5 + CLEAR_REACH_PX:
+				pulley = sim.part_pulley[part]
+				break
+		if pulley < 0:
+			continue
+		var ranges: PackedInt32Array = PackedInt32Array([pulley])
+		var open: bool = false
+		var last: int = 0
+		var everywhere: bool = true
+		for p: int in pulley_offsets(sim.pulley_limits[pulley]):
+			var lands: bool = true
+			for x: int in range(link.x0, link.x1 + 1):
+				if run_past_lifts(link, x, encode_preset(pulley, p)) != link.to:
+					lands = false
+					break
+			if lands and not open:
+				ranges.append(p)
+				open = true
+			elif not lands and open:
+				ranges.append(last)
+				open = false
+			everywhere = everywhere and lands
+			last = p
+		if open:
+			ranges.append(last)
+		if not everywhere:
+			link.clear_at = ranges
+			clear_count += 1
 
 
-## Node id -> scripts (PackedInt32Array) of two sweeps ({node id: script id}).
+## Run link `link` (between two static nodes) from x with the pulley of `preset` still at its offset and nobody on the
+## lifts: the node he settles on, -1 when he does not, or rode a lift on the way.
+func run_past_lifts(link: NavGraph.NavLink, x: int, preset: int) -> int:
+	var sim: NavSim = baker.sim
+	var graph: NavGraph = baker.graph
+	_set_preset(preset, false)
+	var outcome: NavSim.Outcome = sim.run(Vector2i(x, graph.nodes[link.from].y), link.flags, NavBaker.MAX_TICKS)
+	_set_preset(PULLEY_NONE, false)
+	baker.count_candidate()
+	if outcome.platform != null or outcome.handback_platform != null:
+		return -1
+	for part: int in outcome.rode:
+		if part < sim.part_pulley.size() and sim.part_pulley[part] >= 0:
+			return -1
+	var landed: int = NavBaker.settled_node(graph, outcome)
+	return landed if landed >= 0 and graph.nodes[landed].mover < 0 else -1
+
+
+## The seeds of a pulley state between the grid states `below` and `above` of lift node `node_id` (`kind` "board" or
+## "off"): per source / target node of those two states' links its scripts - theirs first, then the ones kept for
+## that node at any other grid state.
+func _seeds_between(kind: String, node_id: int, below: int, above: int) -> Dictionary:
+	var seeds: Dictionary = _merge_seeds(_sweep.get("%s:%d:%d" % [kind, node_id, below], {}),
+			_sweep.get("%s:%d:%d" % [kind, node_id, above], {}))
+	var all: Dictionary = _grid_scripts.get("%s:%d" % [kind, node_id], {})
+	for other: Variant in seeds:
+		var scripts: PackedInt32Array = seeds[other]
+		for s: int in all.get(other, PackedInt32Array()):
+			if not scripts.has(s):
+				scripts.append(s)
+		seeds[other] = scripts
+	return seeds
+
+
+## Node id -> scripts (PackedInt32Array) of two sweeps ({node id: script id, or script ids}).
 static func _merge_seeds(a: Dictionary, b: Dictionary) -> Dictionary:
 	var result: Dictionary = {}
 	for source: Dictionary in [a, b]:
 		for node_id: Variant in source:
 			var scripts: PackedInt32Array = result.get(node_id, PackedInt32Array())
-			if not scripts.has(int(source[node_id])):
-				scripts.append(int(source[node_id]))
+			var more: PackedInt32Array = source[node_id] if source[node_id] is PackedInt32Array \
+					else PackedInt32Array([int(source[node_id])])
+			for s: int in more:
+				if not scripts.has(s):
+					scripts.append(s)
 			result[node_id] = scripts
 	return result
 
@@ -288,8 +423,8 @@ static func preset_offset(preset: int) -> int:
 
 
 ## Board links onto mover node `to` (part `part`) at phase `phase` (and pulley preset `preset`) from every static
-## node near the part. `seeds` (a pulley state between the grid states): only the source nodes it names, their
-## scripts first (all scripts when those find no window). Returns {source node id: script id} of the links added.
+## node near the part. `seeds` (a pulley state between the grid states): only the source nodes it names, with their
+## scripts. Returns {source node id: script id} of the links added.
 func _board_links(to: int, part: int, mover: int, phase: int, preset: int, seeds: Dictionary = {}) -> Dictionary:
 	var added: Dictionary = {}
 	var graph: NavGraph = baker.graph
@@ -322,11 +457,8 @@ func _board_links(to: int, part: int, mover: int, phase: int, preset: int, seeds
 			x += NavBaker.SAMPLE_STEP
 		if xs.is_empty():
 			continue
-		var best: Dictionary = {}
-		if seeded:
-			best = _board_search(from, to, xs, seeds[from], top_x0, top_x1, phase, preset, node)
-		if best.is_empty():
-			best = _board_search(from, to, xs, baker.ground_scripts(), top_x0, top_x1, phase, preset, node)
+		var best: Dictionary = _board_search(from, to, xs, seeds[from] if seeded else baker.ground_scripts(), top_x0,
+				top_x1, phase, preset, node)
 		if not best.is_empty():
 			_add(from, to, best, PackedInt32Array([mover, state[0], state[1], state[2], state[3]]), phase, 0)
 			added[from] = int(best["script"])
@@ -338,7 +470,7 @@ func _is_seeded_state(preset: int) -> bool:
 	var p: int = preset_offset(preset)
 	var pulley: int = preset_pulley(preset)
 	var limit: int = baker.sim.pulley_limits[pulley] if pulley < baker.sim.pulley_limits.size() else 0
-	return p != limit and p != -limit and posmod(p, COARSE_PX) != 0
+	return not is_grid_offset(p, limit)
 
 
 ## The best boarding window from node `from` onto `to` with the scripts `scripts` (in that order) at take-off points
@@ -366,8 +498,8 @@ func _board_search(from: int, to: int, xs: PackedInt32Array, scripts: PackedInt3
 
 
 ## Off links from mover node `from` (part `part`) at phase `phase` after standing `stand` ticks on it (and pulley
-## preset `preset`, the pulley held still). `seeds` (a pulley state between the grid states): their scripts first,
-## all scripts when a target node they name was not reached. Returns {target node id: script id} of the links added.
+## preset `preset`, the pulley held still). `seeds` (a pulley state between the grid states): their scripts only -
+## all scripts when those find no way off at all. Returns {target node id: script id} of the links added.
 func _off_links(from: int, part: int, mover: int, phase: int, stand: int, preset: int,
 		seeds: Dictionary = {}) -> Dictionary:
 	var graph: NavGraph = baker.graph
@@ -398,11 +530,7 @@ func _off_links(from: int, part: int, mover: int, phase: int, stand: int, preset
 				if not hinted.has(s):
 					hinted.append(s)
 		_off_search(from, xs, hinted, middle, phase, stand, preset, state, by_target)
-		var missing: bool = false
-		for target: Variant in seeds:
-			if not by_target.has(int(target)):
-				missing = true
-		if missing:
+		if by_target.is_empty():
 			_off_search(from, xs, baker.ground_scripts(), middle, phase, stand, preset, state, by_target)
 	else:
 		_off_search(from, xs, baker.ground_scripts(), middle, phase, stand, preset, state, by_target)
@@ -416,12 +544,17 @@ func _off_links(from: int, part: int, mover: int, phase: int, stand: int, preset
 
 
 ## The fastest off window per target node (into `by_target`) with scripts `scripts` from the take-off points `xs`.
+## In a pulley sweep a take-off that is not faster than the window kept for its target is not widened (its window
+## could not replace that one: a window is as slow as its slowest start).
 func _off_search(from: int, xs: PackedInt32Array, scripts: PackedInt32Array, middle: Vector2i, phase: int, stand: int,
 		preset: int, state: PackedInt32Array, by_target: Dictionary) -> void:
 	for s: int in scripts:
 		for seed_x: int in xs:
 			var to: int = _land(from, s, seed_x, phase, stand, -1, preset)
 			if to < 0 or to == from:
+				continue
+			if preset != PULLEY_NONE and by_target.has(to) and int((_memo["%d:%d:%d:%d:%d:%d" % [from, s, seed_x, phase,
+					stand, preset]] as Dictionary)["ticks"]) >= int(by_target[to]["ticks"]):
 				continue
 			var window: Dictionary = _widen(from, to, s, seed_x, phase, stand, -1, middle, preset)
 			var width: int = int(window["x1"]) - int(window["x0"]) + 1
@@ -507,7 +640,7 @@ func _simulate(from: int, flags: PackedInt32Array, x: int, phase: int, stand: in
 	_set_preset(preset, node.mover >= 0)
 	var outcome: NavSim.Outcome = sim.run(start, flags, NavBaker.MAX_TICKS, -1, phase, stand)
 	_set_preset(PULLEY_NONE, false)
-	baker.candidates += 1
+	baker.count_candidate()
 	var to: int = -1
 	if not outcome.died and (outcome.landed or outcome.walked):
 		# Where the bot takes over (the handback) and where he settles must be the same node (NavBaker.settled_node).

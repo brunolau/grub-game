@@ -96,6 +96,30 @@ func pulley_plan(hero: PlayerBase) -> Dictionary:
 	return plan
 
 
+## Per pulley id of the graph: Vector2i(its offset now, the offset it will rest at with the riders its lifts have
+## now) - what a link past a lift's column needs to know (NavGraph.link_clear).
+func pulley_states() -> Dictionary:
+	var states: Dictionary = {}
+	if _graph == null:
+		return states
+	for id: Variant in _pulleys:
+		var group: Dictionary = _pulleys[id]
+		var a: int = int(group["a"])
+		var b: int = int(group["b"])
+		var lift_a: PlatformBase = _lift(a)
+		var lift_b: PlatformBase = _lift(b)
+		var p: int = _graph.mover_offset(a).y if a >= 0 else -_graph.mover_offset(b).y
+		for lift: PlatformBase in [lift_a, lift_b]:
+			var pulley: Object = lift.get(&"pulley") as Object if lift != null else null
+			if pulley != null and is_instance_valid(pulley) and pulley.get(&"offset") != null:
+				p = int(pulley.get(&"offset"))
+				break
+		var weight_a: int = lift_a.rider_weight() if lift_a != null else 0
+		var weight_b: int = lift_b.rider_weight() if lift_b != null else 0
+		states[int(id)] = Vector2i(p, NavGraph.pulley_rest(p, weight_a, weight_b, int(group["limit"])))
+	return states
+
+
 func _lift(index: int) -> PlatformBase:
 	if index < 0 or index >= entities.size():
 		return null

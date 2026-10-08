@@ -34,6 +34,9 @@ msgstr "Ride your partner's head. Jump just after he jumps!"
 msgid "SIGN_COOP_W1_SHAFT"
 msgstr "Too high to jump: land on your partner's head holding Up!"
 
+msgid "SIGN_COOP_W1_LIFT"
+msgstr "Crouch on the plate up there: the stone lifts your partner!"
+
 msgid "SIGN_COOP_W1_DRUMS"
 msgstr "Two drums, one beat: strike both at the same moment!"
 

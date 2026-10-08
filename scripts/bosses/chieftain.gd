@@ -7,7 +7,8 @@ extends BossBase
 ## **The phase machine** (one per pair, in the lead). Energy: PIPS (4) each, one pip per counted hit of any weapon (the
 ## body is the weak point; BOSS_HIT_COOLDOWN per chieftain); the co-op pair COOP_PIPS (5) each, both REEL for
 ## COOP_REEL_TICKS after a counted hit on either (blows on them glance) and CROW for COOP_CROW_TICKS after a blow of
-## theirs lands (nothing of theirs hurts) - wf10 boss balance. Every attack is announced by a "HUP!" and a
+## theirs lands (nothing of theirs hurts; a gloating "HA!" bubble over each crowing chieftain shows it, blinking over
+## its last CROW_BLINK_TICKS - DESIGN.md G64, drawing only) - wf10 boss balance. Every attack is announced by a "HUP!" and a
 ## TELEGRAPH_TICKS (14) crouch. A chieftain's phase is his own pips:
 ##  - **P1 Raiders** (4-3 pips): flank and strike, jump on a crouching hero's head; the target is the hero farther from
 ##    the view centre (the `lone` rule of 13.9.5; one hero: him).
@@ -87,6 +88,13 @@ const PIPS: int = 4                        ## [G 13.6]
 const COOP_PIPS: int = 5
 const COOP_REEL_TICKS: int = 110
 const COOP_CROW_TICKS: int = 330
+## The crow's picture (DESIGN.md G64; drawing only - the simulation never reads it): while he crows a gloating "HA!"
+## bubble stands over his head, over the line of the "HUP!" pop-up, and it blinks (CROW_BLINK_ALPHA every other
+## CROW_BLINK_HALF_TICKS) over the crow's last CROW_BLINK_TICKS so the pair sees the window close.
+const CROW_BLINK_TICKS: int = 22
+const CROW_BLINK_HALF_TICKS: int = 2
+const CROW_BLINK_ALPHA: float = 0.25
+const CROW_MARK_RISE: int = 26             ## the bubble's origin over his head, logical px (the HUP! line under it)
 const TELEGRAPH_TICKS: int = 14            ## the HUP! crouch [G 13.6]
 const DAZE_TICKS: int = 30                 ## a batted chief lies dazed [G 13.6]
 const EGG_TICKS_SOLO: int = 132            ## [G 13.6]
@@ -152,6 +160,8 @@ var _egg_hits: int = 0
 var _egg_gap: int = 0
 ## Co-op (wf10): ticks left of the pair's crowing after one of their blows landed (nothing of theirs hurts).
 var _crow: int = 0
+## The crow's gloating bubble (G64; built the first time he crows - never in the solo form).
+var _crow_mark: CrowMark = null
 var _done: bool = false
 var _hup: Label = null
 var _hup_ticks: int = 0
@@ -198,6 +208,7 @@ func _ready() -> void:
 ## The picture: the body's pose, or the rocking egg (its own sheet) while he is an egg (cosmetic).
 func _refresh_visual() -> void:
 	super._refresh_visual()
+	_refresh_crow_mark()
 	var egg: bool = life == Life.EGG and visible
 	if egg and _egg_sprite == null:
 		_build_egg_sprite()
@@ -229,6 +240,29 @@ func _build_egg_sprite() -> void:
 	add_child(_egg_sprite)
 
 
+## The crow's picture (DESIGN.md G64): the gloating bubble is up exactly while [method is_crowing] holds and blinks over
+## the crow's last CROW_BLINK_TICKS. Cosmetic: nothing reads it back, and only changes are written.
+func _refresh_crow_mark() -> void:
+	var crowing: bool = is_crowing() and visible
+	if _crow_mark == null:
+		if not crowing:
+			return
+		_crow_mark = CrowMark.new()
+		_crow_mark.name = "CrowMark"
+		_crow_mark.position = Vector2(0.0, -float(BOX.y + CROW_MARK_RISE) * Tuning.ART_SCALE)
+		_crow_mark.z_index = 1
+		_crow_mark.visible = false
+		add_child(_crow_mark)
+	if _crow_mark.visible != crowing:
+		_crow_mark.visible = crowing
+	if not crowing:
+		return
+	var dim: bool = _crow <= CROW_BLINK_TICKS and (_crow / CROW_BLINK_HALF_TICKS) % 2 == 1
+	var alpha: float = CROW_BLINK_ALPHA if dim else 1.0
+	if _crow_mark.modulate.a != alpha:
+		_crow_mark.modulate.a = alpha
+
+
 func _exit_tree() -> void:
 	_stop_bot()
 
@@ -245,6 +279,28 @@ func is_lead() -> bool:
 
 func is_coop_form() -> bool:
 	return _coop
+
+
+## True while this chieftain crows (co-op only, wf10): a blow of the pair landed and nothing of his hurts for the ticks
+## [method get_crow_ticks] counts down on his fighting ticks (an egg's crow waits until he is hatched).
+func is_crowing() -> bool:
+	return _coop and _crow > 0 and fighting and not dead and life == Life.FIGHT
+
+
+## Ticks left of his crow (0 = none).
+func get_crow_ticks() -> int:
+	return _crow
+
+
+## True while the gloating bubble is drawn over his head (DESIGN.md G64): exactly while [method is_crowing] holds and he
+## is on show. Cosmetic.
+func is_crow_shown() -> bool:
+	return _crow_mark != null and _crow_mark.visible
+
+
+## The opacity of the gloating bubble: 1 while he crows, CROW_BLINK_ALPHA on its blinks over the last CROW_BLINK_TICKS.
+func get_crow_mark_alpha() -> float:
+	return _crow_mark.modulate.a if _crow_mark != null else 0.0
 
 
 ## Pips left (= hit points).
@@ -1533,6 +1589,42 @@ class RoastDrawing:
 		draw_circle(Vector2(0.0, -10.0), 10.0, Color(0.6, 0.32, 0.14))
 		draw_circle(Vector2(-4.0, -14.0), 4.0, Color(0.85, 0.55, 0.3))
 		draw_line(Vector2(8.0, -14.0), Vector2(16.0, -22.0), Color(0.95, 0.92, 0.85), 3.0)
+
+
+## The gloating bubble of a crowing chieftain (DESIGN.md G64), drawn with primitives like the heroes' emote bubble and
+## their Zzz (no sheet, no text resource): a pale speech bubble with a dark outline and a tail, holding "HA!" in block
+## letters - a laugh, never the anger mark (they ease off). Art px; the origin lies under the bubble's middle, 4 px
+## below its body and 4 px over its tail's tip.
+class CrowMark:
+	extends Node2D
+
+	const OUTLINE: Color = Color("#272018")
+	const PAPER: Color = Color("#fff8e8")
+	## The letters' top and height, and their stroke.
+	const TOP: float = -21.0
+	const TALL: float = 12.0
+	const STROKE: float = 3.0
+
+	func _draw() -> void:
+		var body: Rect2 = Rect2(-17.0, -26.0, 34.0, 22.0)
+		draw_rect(body.grow(2.0), OUTLINE)
+		draw_rect(body, PAPER)
+		draw_colored_polygon(PackedVector2Array([Vector2(-6.0, -5.0), Vector2(4.0, -5.0), Vector2(-4.0, 4.0)]),
+				OUTLINE)
+		draw_colored_polygon(PackedVector2Array([Vector2(-4.0, -5.0), Vector2(1.0, -5.0), Vector2(-3.0, 0.0)]),
+				PAPER)
+		# H
+		draw_rect(Rect2(-13.0, TOP, STROKE, TALL), OUTLINE)
+		draw_rect(Rect2(-7.0, TOP, STROKE, TALL), OUTLINE)
+		draw_rect(Rect2(-13.0, TOP + 4.0, 9.0, STROKE), OUTLINE)
+		# A
+		draw_rect(Rect2(-2.0, TOP, STROKE, TALL), OUTLINE)
+		draw_rect(Rect2(4.0, TOP, STROKE, TALL), OUTLINE)
+		draw_rect(Rect2(-2.0, TOP, 9.0, STROKE), OUTLINE)
+		draw_rect(Rect2(-2.0, TOP + 5.0, 9.0, STROKE), OUTLINE)
+		# !
+		draw_rect(Rect2(10.0, TOP, STROKE, TALL - 5.0), OUTLINE)
+		draw_rect(Rect2(10.0, TOP + TALL - STROKE, STROKE, STROKE), OUTLINE)
 
 
 

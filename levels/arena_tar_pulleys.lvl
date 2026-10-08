@@ -18,12 +18,18 @@
 #   each bank under the side ledge (cols 2 / 17), and the big spot.
 # - Spawns (rotate every round; 2 players use 1 and 2): 1 and 2 on the side ledges (cols 18 / 1), 3 and 4 on the banks
 #   (cols 1 / 18).
-# - Modes: Grub Stack (default), Last Caveman Standing, Hot Rock. HUMANS ONLY (PLAN.md cut 4, DESIGN.md G50:
-#   `bots = none`): the bots' graph has no links for a pulley lift away from its rest state, so a lift that moved
-#   strands them (worst idle 404-611 ticks in DA's Grub Stack set, wf9_da_to_core_b.txt #1). Shipped human-only by
-#   integration at G3; CPUs return when core-B's baker / navigator handle displaced lifts and the set is green.
+# - Modes: Grub Stack (default), Last Caveman Standing, Hot Rock. CPUs play Grub Stack and Hot Rock (`bots =
+#   grub_stack,hot_rock`: DESIGN.md G50, per mode; G60). At G3 the arena shipped human-only: the bots' graph had no
+#   links for a pulley lift away from its rest state, so a lift that moved stranded them (worst idle 404-611 ticks).
+#   Since wf10 core-B's baker gives the lifts links at every still state of the pulley and the bots plan with the
+#   state it rests in; sets of 48 rounds, four Hunters (core-B's tests/test_versus_bots.gd): Grub Stack 19 / 38 / 23 /
+#   21 % of the wins per spawn, worst idle 59 ticks; Hot Rock 21 / 33 / 23 / 23 %, worst idle 101. Last Caveman
+#   Standing stays HUMAN-ONLY (PLAN.md cut 4): its set is outside +/-15 points (6 / 29 / 48 / 15 % - the right ledge's
+#   quickest way down is a walk-off beside the right bank's spawn, the left ledge's a hop, so the right pair of spawns
+#   fights first and the left pair picks off the winner); it is offered only while every seat is human.
 # - Bot graph: resources/bots/arena_tar_pulleys.json, baked with core-B's tool after every edit of this file (the lifts
-#   are rider movers):  bash .tools/gd.sh script res://tools/bots/bake_nav.gd -- arena_tar_pulleys
+#   are rider movers with a link set per pulley state: about 215 000 runs, 8 minutes or more):
+#   GD_TIMEOUT=1800 bash .tools/gd.sh script res://tools/bots/bake_nav.gd -- arena_tar_pulleys
 
 [meta]
 format = 2
@@ -38,7 +44,7 @@ liquid = tar
 music = versus_battle_b
 players = 4
 modes = grub_stack,last_caveman,hot_rock
-bots = none
+bots = grub_stack,hot_rock
 round_time = 90
 wrap = none
 sudden = tar_rise

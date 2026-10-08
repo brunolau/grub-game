@@ -16,6 +16,18 @@ extends TestCase
 ##     "windows": Array    [{"what": String, "window": int, "solo_min": int, "slot_bound": bool}] for every twin
 ##                         window / daze record; "slot_bound" (G34 / G47) exempts it from the solo_min - 4 cap
 ##     "detail": String    how the hero got there (when reached), for the failure message
+## and, since the orchestrator's SEARCH decision after G3 (DESIGN.md G59, PLAN.md 8 V3.c: "a refusal names its
+## evidence"), the verdict of every result:
+##   coop_search.gd: static func gate_verdict(result: Dictionary) -> Dictionary
+##     "verdict": String   "refused (exhaustive)" - the frontier emptied below the bound, or the static reach rule;
+##                         "refused (bounded)" - at least 660 resting points AND every continuous-play probe of the
+##                         gate's kind failed; "open" - reached (red); "unproven" - stopped at its bound without its
+##                         probes: never "refused"
+##     "evidence": String  resting points, bound, probe counts / what is missing
+## Every gate prints two lines: `<level> (<difficulty>) gate <name>: refused|REACHED in <s> s[ cached]` (the line
+## tools/world_coop_gates.sh reads) and `GATE <level> <difficulty> <name>: <verdict> (<evidence>)` (the line the G3
+## table of tools/g3.sh is made of). An OPEN gate and an UNPROVEN gate both fail the test - no co-op file ships
+## unproven - with different words: the G3 table shows an unproven gate as open work, not as a red proof.
 
 ## Running it: `GD_TIMEOUT=3600 bash .tools/gd.sh test coop_gates` (a slow module, PLAN.md V7; about 1.5 min per gate
 ## and difficulty). The environment variable COOP_GATES_SHARD=<i>/<n> runs only every n-th gate starting at i
@@ -27,6 +39,10 @@ extends TestCase
 const SEARCH: String = "res://scripts/world/coop_search.gd"
 const TABLET_ID: StringName = &"objects/x2_tablet"
 const WINDOW_MARGIN: int = 4
+## The G59 verdicts (CoopSearch.VERDICT_*; spelled out here so a search without them still reads as before).
+const VERDICT_OPEN: String = "open"
+const VERDICT_UNPROVEN: String = "unproven"
+const VERDICT_REFUSED: String = "refused"
 
 
 ## Every co-op gate: [level id, difficulty, gate name, far cell (Vector2i), tablet cell (Vector2i)] - the search's own
@@ -84,10 +100,17 @@ func test_every_coop_gate_is_refused_by_the_solo_search() -> void:
 		var result: Dictionary = search.call("search_gate", gate[0], gate[1], gate[2])
 		print("    %s: %s in %.1f s%s" % [label, "REACHED" if bool(result.get("reached", true)) else "refused",
 				(Time.get_ticks_msec() - started) / 1000.0, " cached" if bool(result.get("cached", false)) else ""])
+		var verdict: Dictionary = gate_verdict(search, result)
+		print("    GATE %s %s %s: %s (%s)%s" % [gate[0], Defs.difficulty_name(int(gate[1])).to_lower(), gate[2],
+				verdict["verdict"], verdict["evidence"], " [cached]" if bool(result.get("cached", false)) else ""])
 		# Let the main loop turn: the freed search world's canvas callbacks are flushed (see the header).
 		await Engine.get_main_loop().process_frame
-		assert_false(bool(result.get("reached", true)), "%s: a single hero must not reach %s (%s)" % [label,
-				str(gate[3]), str(result.get("detail", ""))])
+		if str(verdict["verdict"]) == VERDICT_UNPROVEN:
+			# G59: stopped at its bound without its evidence - not refused, not reached either.
+			fail("%s: UNPROVEN (G59) - %s" % [label, verdict["evidence"]])
+		else:
+			assert_false(bool(result.get("reached", true)), "%s: a single hero must not reach %s (%s)" % [label,
+					str(gate[3]), str(result.get("detail", ""))])
 		for window: Dictionary in result.get("windows", []):
 			# G34 / G47: a slot-bound rule (two heroes' own hits: the Mangrove twin, Inkjaw's flinch, the Idols' twin,
 			# the daze - only a hero of another slot than the bouncer hurts a dazed enemy) cannot be met by one player,
@@ -99,6 +122,18 @@ func test_every_coop_gate_is_refused_by_the_solo_search() -> void:
 			assert_true(int(window["window"]) <= int(window["solo_min"]) - WINDOW_MARGIN,
 					"%s: %s window %d below the solo minimum %d - %d" % [label, window.get("what", "?"),
 					window["window"], window["solo_min"], WINDOW_MARGIN])
+
+
+## The G59 verdict of a search result: {"verdict", "evidence"} - the search's own (CoopSearch.gate_verdict) when it has
+## one; a search without verdicts reads as before G59: reached = open, anything else "refused" with no evidence named.
+static func gate_verdict(search: GDScript, result: Dictionary) -> Dictionary:
+	if search != null and search.get_script_method_list().any(func(method: Dictionary) -> bool:
+			return str(method["name"]) == "gate_verdict"):
+		var verdict: Dictionary = search.call("gate_verdict", result)
+		return {"verdict": str(verdict.get("verdict", VERDICT_UNPROVEN)), "evidence": str(verdict.get("evidence", ""))}
+	if bool(result.get("reached", true)):
+		return {"verdict": VERDICT_OPEN, "evidence": str(result.get("detail", ""))}
+	return {"verdict": VERDICT_REFUSED, "evidence": "the search names no evidence"}
 
 
 ## The shard of the gate table this process runs: (index, count) from COOP_GATES_SHARD=<i>/<n>; (0, 1) = all gates.

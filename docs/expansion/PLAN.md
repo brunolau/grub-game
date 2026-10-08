@@ -233,9 +233,14 @@ The Book I solo files `levels/{w1_l1,...,ending}.lvl` and their 72 routes belong
 3. Record featured routes for special-only secrets and the painting where it needs a special.
 4. Copy to `<id>_coop.lvl` (`kind = coop`, `coop_of`, `coop_base_hash`), add P2's start, co-op gates with x2 tablets,
    traits (>= 1/3 of records, every chokepoint guard), paired specials; validator `--coop` clean;
-   `test_coop_gates` green (every gate refused by the solo search).
+   `test_coop_gates` green (every gate refused by the solo search - exhaustively, or bounded with every probe of its
+   kind; a bound alone is "unproven", V3.c / DESIGN.md G59). Since the G3 follow-up round: every `heavy` stands on
+   a flat floor a pair can brace on (it is hurt only in a braced daze), and enemy `hp` is set as strikes - `hp` / 25 +
+   1 club strikes in a co-op file (DESIGN.md G57 / G63, LEVEL_DESIGN 15.7.5).
 5. Record the two-stream co-op routes (two people with pads through `--record`, or duo macros) per difficulty;
-   `test_coop_routes` green.
+   `test_coop_routes` green. A plate holder crouches (a hero 243 ticks without input is idle and holds nothing; plate
+   signs say "crouch", G58); the pair stays together at heavies and Tar Splitters (G57 / G63); a co-op boss route
+   carries `fight_ticks:1093..2185` and, on Expert, `max_hurts:6` in its header (G61).
 6. Signs: keys `SIGN_W5_*` in the designer's locale file.
 
 Order: worlds 5-7 and both Feast Lands first (Beginner content and the first three bosses), then worlds 8-9 and the
@@ -287,6 +292,38 @@ fights of 45-90 s with at most 6 hurts on Expert (G61, baseline in DESIGN B.0: o
 the lead designer's review of the designers' deviations is G62 (all four accepted; Chomper two seats is no gate kind).
 The rulings went to the owners as `build/engine_requests/wf10_lead_design_to_*.txt`.
 
+**The follow-up round as the lead designer left it (2026-10-08; a power cut at about 19:40 stopped the round, which
+resumed from commit 22db9d8)**. Built and proven: G57 (enemies-A: a heavy takes damage only in a braced daze and dies
+of nothing else, one hit per strike in co-op files; `test_enemies_coop` 44 / 44 in the lead designer's run, 46 rows since; the G3
+verifier's solo attacks on 'brace' and 'lake' fail; the co-op routes it broke are re-recorded, `w6_l1_coop.expert`
+with its header unchanged); G58 (party's "Zzz soon" bubble from the 170th quiet tick, `test_player_idle` 21 / 21;
+every plate sign of the list says "crouch"; integration's route proofs check the idle rule on every tick); G59's
+verdict lines (world-B, `CoopSearch.gate_verdict`) and their table (integration, `tools/g3.sh`); cut 3 in the arena
+files and the table (8 / 8), and Tar Pulleys with bots in Grub Stack and Hot Rock on core-B's pulley links (Last
+Caveman Standing human-only there); G61 (bosses: every co-op fight 47-83 s on its recorded route, the Expert stages 0-6
+hurts, re-measured unchanged by the lead designer after the resume; the route headers pin the band); G54's hero-side
+guards (`test_player_g54` 9 / 9 in the lead designer's run) and the docked raft's 7 px strip (party). Rulings of the resumed run, DESIGN.md G63-G68: the 1.0 death rule
+stays, so an enemy takes `hp` / 25 + 1 club strikes (a 100-hp keeper five, not four), a repeat tick of a swing is
+used up, the splitting swing never hurts the record's half again (G63); the Rival Chieftains' crow carries a "HA!"
+bubble, built by bosses, `test_enemies_chieftain` 27 / 27 (G64); the rising view keeps the highest footing 72 px
+under its top and the drawn view looks up for a jumper's head, so 6-2b's climber is never behind the HUD band (G65,
+party's rule on the lead designer's requirements; LD 15.5's step-down rule becomes 6 rows); a flying keeper holds its
+perch (G66); the lone hero's real reach - the hop jump, the pogo jump, a 123 px strike reach - and the coil rule: in
+a co-op file a rolled vine unrolls only for a hit from its own level (G67, on DB1's one-player probes); DB1's 1-2
+'shaft' (an 8-row boost ledge with a plate-driven lift stone, no pulley) and his other deviations accepted (G68).
+**Open when the lead designer closed** (each named in its DESIGN row): **the coil rule of G67 is not built** (the
+vine has no owner in the round; party, asked, declined: not its file) - until it is, the rolled-vine drop gift of eleven co-op files can
+be struck down from the floor below by a player who knows the hop jump, and the search does not play that move yet,
+so the verdicts of those height gates say less than they read; world-B's G59 probes found
+`w9_l1b_coop` 'stormwall' **open** (one hero leads the first keeper Harrier to the second and kills both inside the
+bond window) - G66 asks enemies-A for the perch rule, which was not in the tree and not answered when the lead
+designer closed; world-B's full verdict table (exhaustive
+/ bounded + probes / open / unproven per gate) had not been posted, so G62's 'root', 'dune' and 'seagate' are still
+"unproven"; the painting ladder of G60 is not built (no core-A, art-A or ui agent ran: the game still names the two
+cut arenas as rewards); `w3_l2_coop.inputs` (Beginner), which [G54]'s guard moved, was still being re-recorded by
+party; `PartyTuning.IDLE_WARN_TICKS` waits for a core-A owner (a private constant of `hero_party.gd` meanwhile). Gate G3 is therefore **not reached** by the lead designer's record; the verdict is the
+G3b integrator's and verifier's.
+
 ---
 
 ## 7. Phase 4 - QA and release 2.0
@@ -337,7 +374,11 @@ c. Requiredness: `tests/test_coop_gates.gd` runs the solo-impossibility search o
    (bounded)** - the raised bound of at least 660 resting points, uncached, AND every continuous-play probe of the
    gate's kind failed (hop-over, charge-under, idle-bait, thrown-special and plates; LEVEL_DESIGN 15.7.6) - or
    **open** (reached by a search, probe or replay; red). A search that stopped at its bound without its probes is
-   **unproven**, never "refused".
+   **unproven**, never "refused". In the gate table (`tools/g3.sh`, integration, the follow-up round) the test prints
+   the search's own line per gate - `GATE <level> <difficulty> <gate>: <verdict> (<evidence>)` - and the coop_gates
+   row counts the gates once by name: "n/N gates refused: e exhaustive, b bounded + probes", green only when e + b =
+   N; unproven gates leave the row **open** (named; neither green nor red, but G3 is not reached), an open gate, a
+   crashed shard or a shifted gate table is red; every verdict is kept in `<run dir>/coop_gates_verdicts.txt`.
 d. Bosses: each `test_enemies_<boss>.gd` asserts the co-op form is not beatable by the single-hero search - one hero
    plus an idle hatched partner placed anywhere he could be hatched (G33) - runs the fairness checks per hero, and pins
    every weak point at least 72 px under the locked view's top (DESIGN.md B.0 [G35]).
@@ -367,6 +408,18 @@ difficulty - 18 at G2 - so `COOP_GATES_SHARD=<i>/<n>` splits it over n processes
 12 minutes at G2) and, since the G2 integration, the route replays `test_campaign_routes`, `test_book2_routes` and
 `test_coop_routes` (V7's `campaign_routes`, `book2` and `coop`; together about 3.5 minutes at G2 and growing with every
 phase-3 route). The default run keeps the Book I guards (V1.c, V1.d); `tools/sp_identity.sh` replays every Book I route.
+Since the G3 follow-up round (integration; the default run had grown to about 410 s): `test_core_bots` (every test of
+it bakes a nav graph or needs one baked; `test_core_bots_modes` stays in the default run), `test_integration_totem_ring`
+and `test_levels_w4` are slow modules too, and **single slow tests** of files that stay in the default run are listed
+in `SLOW_TESTS` of `tests/run_tests.gd` (the real solo searches of `test_world_validator`, the single-hero searches
+of the co-op bosses, every campaign code through a level start, a stage played in real time): skipped with a skip
+line each under the rule of the slow modules, run by `--slow`, by a filter naming their file's module, or alone by
+`GD_TIMEOUT=1200 bash .tools/gd.sh test --slow-tests` (a job of `tools/g3.sh` at every gate); a listed name its file
+no longer has fails the run. A test goes on that list only if it shares no costly fixture with the quick tests of its
+file - otherwise the whole file is a slow module. `tools/g3.sh` also runs the lead designer's
+`docs/spec/test_spec_docs.py` (job `spec_docs`: a failure is red; every test skipped as "pending owner change: ..."
+is listed as "not built: ..." - open work, so those texts stay one line) and `tools/autoplay/harness_exit.flow` (a
+harness run must leave the engine without leak reports).
 
 ---
 
@@ -425,7 +478,7 @@ Rookie and Hunter bots; CC0-only assets.
 | Risk | Mitigation |
 |---|---|
 | Silent single-player drift during phase 0 (shake counter, static carry guard, event-driven respawn, feast music) | one owner, small steps, empty digest diff after each, permanent guards V1.c-d |
-| Co-op gates one hero can cheese (head bounces, spears, vines, axes thrown across twin targets) | keeper halls 3 rows high, static validator rules, the single-hero search including belt specials and Chomper, windows below the measured solo minimum, an expert told to cheat in playtests |
+| Co-op gates one hero can cheese (head bounces, spears, vines, axes thrown across twin targets) | keeper halls 4 rows high (G4), heavies hurt only in a braced daze and one hit per strike (G57), refusals that name their evidence (G59), static validator rules, the single-hero search including belt specials and Chomper, windows below the measured solo minimum, an expert told to cheat in playtests |
 | Co-op gates a weak partner cannot do | an easy role at every gate, Beginner windows, eggs instead of lives, Helper mode, pair playtests at G1 before content |
 | Tribe camera on vertical and scrolling stages (5-2, 6-2b, 9-1, Book I 1-2 and 4-1) | vertical follow on grounded heroes only, leash -> egg (free), slice tests on 6-2b's rising scroll early |
 | Cortex-A53 budget (+1-1.5 ms per extra hero on a tick 1.0 already misses) | hero performance pass in phase 1, 2-player co-op as the mobile target, small arenas, 4 heroes on mobile only past the device check |

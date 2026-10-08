@@ -1,0 +1,25 @@
+# The harness leaves the engine clean (owner: integration; the G3 follow-up round, Autoplay.keep_script).
+# At G3 every harness run that had gone from Obsidian Keep's co-op file into Colossus Hall quit with leak reports
+# (42 textures, 118 text and font RIDs, 340 objects, 167 resources "still in use"), with or without a window. The
+# cause is not the takeover: a level start drops the cached scenes the new level does not use, the scripts only the
+# old level used (rising columns, a Walker, a Shaman) lose their last reference in the middle of the run, and this
+# engine version does not take such scripts apart cleanly - everything they reach is reported at exit. The harness
+# now keeps every script of its run until the engine shuts down.
+# This flow is the shortest run that showed it: two stage starts and a quit. It passes its checks either way - the
+# proof is the END of its log: no "leaked at exit", no "resources still in use at exit" (tools/g3.sh reads every flow
+# log for those lines and shows a flow that leaves them as red).
+#   bash .tools/gd.sh script res://scripts/core/dev/headless_flow.gd -- --flow=tools/autoplay/harness_exit.flow \
+#       --fast --fresh-user --user-dir=res://build/flow_user_harness_exit
+#   bash .tools/gd.sh play --flow=tools/autoplay/harness_exit.flow --fast --fresh-user     (the same with a window)
+need w4_l2_coop w4_l2b_coop w1_l1
+start_level w4_l2_coop expert players=2
+expect level.level_id == w4_l2_coop
+play 30:|
+start_level w4_l2b_coop expert players=2
+expect level.level_id == w4_l2b_coop
+play 30:|
+# Once more through a level change, back into a solo run (the scripts of both co-op stages are dropped here).
+start_level w1_l1
+expect level.level_id == w1_l1
+play 30:
+quit

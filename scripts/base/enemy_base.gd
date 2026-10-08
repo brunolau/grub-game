@@ -352,10 +352,10 @@ func brace_stop(_hero: PlayerBase, _partner: PlayerBase) -> bool:
 
 ## 2.0 (TECH_AUDIT.md 4.8): may a weapon hit from `source` (a hero, or his thrown weapon: Defs.hitter_slot names the
 ## hero) hurt it now? False = the hit glances ([method take_hit] consumes it without damage; [method _on_hit_refused]
-## shows it). Override for "shielded from the front", heavy enemies only a braced or charged hit breaks, the Shaman's
-## bone shields (DESIGN.md D.6). Default true: every 1.0 hit counts; a record with a co-op trait asks its rules
-## (CoopTraits.accepts_hit: the front of `shell` / `heavy`, an undazed `daze`); a record under a Shaman's bone shield
-## refuses every hit ([method bone_shielded]). Overrides call super.
+## shows it). Override for "shielded from the front" (the Guard), the Shaman's bone shields (DESIGN.md D.6). Default
+## true: every 1.0 hit counts; a record with a co-op trait asks its rules (CoopTraits.accepts_hit: the front of a
+## `shell`, an undazed `daze`, and - G57 - every side of a `heavy` that no Brace Wall has dazed); a record under a
+## Shaman's bone shield refuses every hit ([method bone_shielded]). Overrides call super.
 func accepts_hit_from(source: SimEntity) -> bool:
 	if _bone_shield_tick >= Sim.total_ticks - 1:
 		return false
@@ -656,9 +656,10 @@ func coop_traits() -> CoopTraits:
 	return _traits
 
 
-## 2.0: true when a weapon hit from `source` comes from the side this enemy faces (the Guard's shield, `shell`,
-## `heavy`; GAMEPLAY.md 13.9.5): a thrown weapon flying into its face, else the striker's x on the facing side or
-## within EnemyTuning.FRONT_DX of the feet point. No source: not from the front.
+## 2.0: true when a weapon hit from `source` comes from the side this enemy faces (the Guard's shield, `shell`;
+## GAMEPLAY.md 13.9.5 - a `heavy` no longer asks: since G57 it glances on every side until a Brace Wall dazes it): a
+## thrown weapon flying into its face, else the striker's x on the facing side or within EnemyTuning.FRONT_DX of the
+## feet point. No source: not from the front.
 func _hit_from_front(source: SimEntity) -> bool:
 	if source == null or not is_instance_valid(source):
 		return false

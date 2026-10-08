@@ -1,0 +1,42 @@
+# route: level=w1_l2_coop difficulty=expert players=2 ends=exit after=tally expect=wipes:0,eggs:0,x2_gates:2,min_checkpoints:6,min_kills:20,max_hurts:2
+# w1_l2_coop "Canopy Village" for two - Expert two-stream route proof (designer DB1, wf10; ticks:P1|P2, keys L R U D F K S;
+# recorded from closed-loop duo bots, build/db1/p5/bot_w1_l2.gd). The forest floor: P1 opens the inset spot, the pot
+# and the crate; the Shellback by the hut by a pincer (P2 baits, P1 jumps over it and clubs its back). Gate
+# 'treehouse': P2 stands on the root mound, P1 lands on his head holding Up (the Shoulder Hop), steers onto the tree
+# house deck and clubs the coiled vine down; P2 climbs it. Over the bat gaps and up the branches, P2 a hop behind;
+# both ride the diagonal lift and the trunk lift together (the same keys on the same tick). Gate 'shaft': P1 breaks
+# the cracked bark, P2 stands under the ledge 8 rows up, P1 shoulder-hops onto it and clubs the coiled vine down; P2
+# climbs it and both climb the hanging vine to the trunk top. Down the big branch (P1 clubs the Snatcher bat), the
+# village deck (the stinger, a Shellback pincer from the right), the down lift together, the leaper pits crossed in
+# their pauses, the snapper and the bats of the row-84 deck, the lowest deck's hopper, and both into the exit totem.
+# A waiting hero taps Down now and then (no role is idle 243 ticks). Club only, no S.
+# Expert: the loner stingers of the row-82 deck are clubbed high with the partner within 64 px.
+13:R|R,4:R|,3:|,1:R|,5:|,8:DF|,18:|,8:DF|,18:|,8:DF|,7:|,25:R|R,2:|,1:|R,1:|,1:R|,4:|,8:F|,16:|,8:F|,16:|,8:F|
+3:|,5:R|R,3:|R,2:|,1:|R,1:|,1:L|,87:|,11:RU|,11:R|,1:|R,5:L|R,6:L|,1:F|,2:|L,3:|,1:|R,12:R|R,2:|R,1:|,1:R|,1:|
+1:|R,3:|,8:F|,3:|,20:R|R,11:|R,7:|,8:|RU,2:|R,2:|,4:|L,1:|,4:|R,5:|,8:|RU,3:|R,1:|,5:|L,1:|,3:|R,5:|,8:|RU,4:|R
+2:|,4:|L,2:|,1:|R,3:|,5:|R,7:|,1:|L,3:|,8:RU|,7:R|,1:|,5:L|,5:|,8:RU|,5:R|,2:|,4:L|,7:|,8:RU|,1:R|,2:|,4:L|,2:|
+4:R|,6:|,2:L|,3:|,9:RU|,1:U|,8:LU|,6:U|,10:LU|,1:LU|D,7:LU|,6:|,1:R|,2:|,8:DF|,5:L|L,6:L|,1:|,1:|R,2:|,1:|L
+49:|U,6:|L,7:|,1:|L,21:L|L,3:|L,4:|,10:LU|,10:L|,1:|,2:R|,2:|,1:L|L,3:|L,6:|,7:|LU,3:UF|LU,3:UF|L,4:|L,3:LU|L
+4:LU|,1:LU|R,4:LU|,8:L|,1:|,1:L|,7:|,2:R|,3:|,1:L|,6:UF|,4:|,1:LU|,11:LU|LU,1:L|LU,8:L|L,1:L|,1:L|R,9:L|,5:L|LU
+7:|LU,1:R|L,2:|L,13:U|L,7:U|,1:|,1:U|,9:U|L,7:U|,1:U|R,2:U|,20:|U,1:|,1:U|,19:U|U,1:|U,1:|,6:R|,4:|,1:R|,2:|
+2:|U,16:RU|U,2:U|U,1:U|R,1:LU|R,4:R|R,4:|,1:|R,4:|,16:|RU,3:|U,1:|LU,2:|,1:|R,7:R|R,2:R|,1:R|R,6:UF|,4:|,17:|R
+3:|,1:|R,5:|,1:|F,5:R|F,4:|,1:|R,7:R|R,3:R|,1:R|R,5:R|,1:R|L,3:R|,2:|,1:|R,3:|,1:R|,2:|,1:R|,5:|,1:R|,3:|
+2:RU|RU,6:R|R,106:|,20:LU|LU,2:|,15:L|,10:|,6:UF|,5:|,7:L|L,7:|L,5:LU|L,7:LU|,8:LU|LU,11:L|LU,1:|LU,2:|L,4:|
+1:R|,2:|,20:LU|,4:L|,2:|,1:|R,4:|F,2:R|F,3:|,1:U|,7:U|L,7:U|,5:U|LU,15:|LU,1:|,1:U|,5:U|L,7:U|,7:U|U,13:|U,1:|
+10:R|,2:|U,1:R|U,6:|U,11:RU|U,5:RU|R,2:RU|,2:U|,3:R|,1:|L,2:|,3:|R,1:R|R,1:|R,1:|,1:UF|,1:UF|R,4:UF|,31:|
+13:|RU,2:|U,5:|LU,4:|L,6:|,2:|R,3:|,1:|L,6:|UF,4:|,1:|R,8:R|R,2:|R,1:|,1:R|,1:|,1:|R,18:|,6:UF|,5:|,25:R|R,2:|R
+1:R|,6:|,1:L|R,5:|,1:|R,3:|,2:RU|RU,6:R|R,90:|,13:R|R,1:|,9:R|R,10:R|,7:|,1:R|,2:|,8:F|,16:|,8:F|,3:|,13:R|,2:|
+1:R|,6:|,18:|R,2:|,1:|R,6:|,1:|L,2:|,1:|R,1:|D,2:R|D,6:|D,1:R|D,2:|D,12:LU|D,1:U|D,6:RU|D,13:|D,4:R|D,2:|D
+1:R|D,3:|D,1:R|D,5:|D,8:DF|D,3:L|R,3:|R,1:L|R,3:|R,1:R|,5:|,1:R|R,2:|,1:|R,2:|,1:|L,65:|U,1:|,65:U|,4:R|L,3:R|
+3:|,1:|R,2:|,1:R|U,64:|U,3:|R,3:|,1:|R,3:|,1:|L,13:R|,3:R|R,5:|R,7:R|R,3:|R,1:R|,8:|,4:|R,2:|,1:|R,7:|,8:R|,6:|
+1:R|,29:|,6:UF|,4:|,55:R|R,6:R|,1:L|,7:|,6:UF|,7:|,1:L|,3:|,1:L|L,3:|,1:L|L,2:|,4:L|L,22:L|,58:|,11:LU|,11:L|
+1:|L,1:R|L,1:|L,4:R|L,4:R|,1:F|,4:|R,1:|,1:|L,38:L|L,7:|L,6:R|L,4:|L,1:R|L,9:|L,18:|R,3:|,1:|R,5:|,1:|R,22:R|R
+14:R|,6:UF|,4:|,1:R|,6:UF|,4:|,1:R|,6:UF|,4:|,6:F|,4:|,1:R|,6:UF|,4:|,6:UF|,4:|,3:R|,1:|,1:R|,6:|,35:R|R,2:|R
+1:R|R,1:|R,3:|,1:|R,1:|,1:L|,3:|,1:|L,5:|,1:|R,3:|,2:RU|RU,6:R|R,104:|,20:LU|LU,7:L|,9:|,6:F|F,70:|,6:F|,1:|
+6:|F,14:|,1:|D,5:|,6:UF|UF,4:|,6:F|F,5:|,6:|F,75:|,6:UF|,1:|,3:|UF,3:UF|UF,3:UF|,10:|,1:D|,60:|,5:UF|,1:UF|UF
+4:|UF,1:UF|UF,4:UF|,1:UF|UF,5:|UF,7:|,6:F|,1:|,6:|F,7:|,1:R|,5:|,1:|R,4:|,1:D|,23:|,8:LU|,12:L|,2:|,2:R|,5:|
+10:LU|,12:L|,1:|,1:R|L,3:F|L,3:F|,4:|,1:L|,1:R|,6:UF|,4:|,8:L|,2:UF|,1:UF|R,3:UF|,4:|,6:UF|,17:|,8:|LU,12:|L
+2:|,2:|R,5:|,10:|LU,23:|L,7:|,1:|L,1:L|L,1:R|L,6:UF|L,4:|,6:F|,4:|,8:L|,2:L|L,6:L|,2:L|R,19:L|,2:|,3:R|,7:|
+5:R|R,4:R|,1:R|R,11:R|,6:|,1:R|,26:|,5:R|,7:|,6:R|,8:F|,11:|,8:F|,3:|,7:R|,9:|,6:UF|,4:|,5:R|R,6:R|UF,4:R|
+23:R|R,4:|R,1:R|R,4:|R,8:F|R,7:|R,3:|,1:|R,5:|,1:|R,28:R|R,9:R|,7:|,9:L|,9:|,3:L|L,7:L|,3:L|R,4:L|,1:|L,10:|
+6:UF|,1:|,6:|F,6:|,20:L|,6:F|,4:|,1:L|,6:UF|,4:|,6:F|,4:|,30:L|,12:L|L,71:|L,1:|,5:L|,12:L|L

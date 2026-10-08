@@ -271,6 +271,77 @@ func test_coop_the_pair_reels_together_and_crows_after_a_blow() -> void:
 	assert_eq(_p2.run.hearts, hearts, "a crowing chieftain hurts nobody")
 
 
+## DESIGN.md G64 (drawing only): the crow shows. While a co-op chieftain crows a gloating bubble stands over his head -
+## up from the tick the pair's blow lands, there on every tick of the crow (the bubble is drawn exactly while
+## Chieftain.is_crowing holds), dim on its blinks over the crow's last CROW_BLINK_TICKS and gone when the crow is over.
+## A chieftain who is an egg shows none (his crow waits for his hatching).
+func test_coop_the_crow_shows_a_gloating_bubble() -> void:
+	_pyre(true)
+	_start()
+	assert_false(_gorm.is_crow_shown() or _gulla.is_crow_shown(), "no bubble before a blow of theirs lands")
+	_keep_alive()
+	_hero.hit_timer = 0
+	assert_true(_gorm._touch(_hero), "Gorm's blow lands")
+	var shown: int = 0
+	var mismatches: int = 0
+	var early_dims: int = 0
+	var dims: int = 0
+	var egg_tick: int = 150
+	var egg_hidden: bool = false
+	var mate_shown_meanwhile: bool = false
+	for tick: int in Chieftain.COOP_CROW_TICKS + 20:
+		if tick == egg_tick:
+			# Gulla is knocked into an egg in the middle of the crow.
+			_gulla.hp = 1
+			_gulla.hit_cooldown = 0
+			_gulla.teleport(Vector2i(200, FLOOR_Y))
+			_gorm.teleport(Vector2i(120, FLOOR_Y))
+			_club(_gulla.get_weak_rect())
+		Sim.step(1)
+		_hero.club_box_active = false
+		_keep_alive()
+		if tick == egg_tick:
+			assert_eq(_gulla.life, Chieftain.Life.EGG, "Gulla is an egg")
+			egg_hidden = _gulla.get_crow_ticks() > 0 and not _gulla.is_crow_shown() and not _gulla.is_crowing()
+			mate_shown_meanwhile = _gorm.is_crow_shown()
+		for chief: Chieftain in [_gorm, _gulla]:
+			if chief.is_crow_shown() != chief.is_crowing():
+				mismatches += 1
+		if not _gorm.is_crowing():
+			break
+		shown += 1
+		if _gorm.get_crow_mark_alpha() < 1.0:
+			dims += 1
+			if _gorm.get_crow_ticks() > Chieftain.CROW_BLINK_TICKS:
+				early_dims += 1
+	assert_eq(mismatches, 0, "the bubble is drawn exactly while a chieftain crows")
+	assert_eq(shown, Chieftain.COOP_CROW_TICKS - 1, "Gorm's bubble stood through his whole crow (%d ticks)" % shown)
+	assert_true(egg_hidden, "an egg shows no bubble (its crow waits)")
+	assert_true(mate_shown_meanwhile, "his mate's bubble stays")
+	assert_eq(early_dims, 0, "it is steady until the crow's last %d ticks" % Chieftain.CROW_BLINK_TICKS)
+	assert_true(dims >= Chieftain.CROW_BLINK_TICKS / 2 - 1 and dims <= Chieftain.CROW_BLINK_TICKS / 2 + 1,
+			"then it blinks so the pair sees the window close (%d dim ticks)" % dims)
+	assert_eq(_gorm.get_crow_ticks(), 0, "the crow is over")
+	assert_false(_gorm.is_crow_shown(), "and the bubble is gone")
+
+
+## G64: the solo pair never crows, so it never shows (nor even builds) the bubble - the solo form is untouched.
+func test_the_solo_pair_never_shows_the_crow_bubble() -> void:
+	_pyre(false)
+	_start()
+	assert_false(_gorm.is_coop_form())
+	_hero.run.hearts = Tuning.ENERGY_START
+	_hero.hit_timer = 0
+	assert_true(_gorm._touch(_hero), "Gorm's blow lands")
+	assert_eq([_gorm.get_crow_ticks(), _gulla.get_crow_ticks()], [0, 0], "no crow in the solo form")
+	for tick: int in 30:
+		Sim.step(1)
+		_keep_alive()
+		assert_false(_gorm.is_crowing() or _gulla.is_crowing())
+		assert_false(_gorm.is_crow_shown() or _gulla.is_crow_shown(), "no bubble (tick %d)" % tick)
+	assert_true(_gorm._crow_mark == null and _gulla._crow_mark == null, "the bubble is never built in the solo form")
+
+
 func test_coop_an_egg_hatches_by_itself_after_66_ticks() -> void:
 	_pyre(true)
 	_start()

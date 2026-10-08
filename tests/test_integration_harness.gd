@@ -391,3 +391,42 @@ func test_the_weak_point_check_reads_the_settled_locked_view() -> void:
 	_weak_problem = ""
 	_weak_problem_free = ""
 	_weak_locked_ticks = 0
+
+
+# =================================================================================================================
+# A clean exit
+# =================================================================================================================
+
+## A harness run keeps the script of every node it sees - and every script that one extends - until the engine shuts
+## down (Autoplay.keep_script, connected to SceneTree.node_added by a harness run only): the scripts of a stage the
+## run has left are then never unloaded in the middle of the run, which this engine version does not do cleanly (at
+## G3 a run that went from w4_l2_coop into w4_l2b_coop quit with 167 resources "still in use"). The process-level
+## proof is tools/autoplay/harness_exit.flow under tools/g3.sh (the end of its log); here: what is kept.
+func test_the_harness_keeps_the_scripts_of_its_run() -> void:
+	assert_false(Autoplay.active, "a test run is no harness run")
+	assert_false(get_tree().node_added.is_connected(Autoplay.keep_script),
+			"only a harness run keeps scripts: the game and the test runner unload as before")
+	var shaman: Node = Spawner.instantiate(&"enemies/shaman")
+	assert_not_null(shaman, "the co-op Shaman (a script four classes deep)")
+	if shaman == null:
+		return
+	Autoplay.keep_script(shaman)
+	var kept: Array = Autoplay.kept_scripts()
+	var chain: PackedStringArray = PackedStringArray()
+	var script: Script = shaman.get_script() as Script
+	while script != null:
+		chain.append(script.resource_path.get_file())
+		assert_true(kept.has(script), "%s is kept" % script.resource_path)
+		script = script.get_base_script()
+	assert_eq(chain, PackedStringArray(["shaman.gd", "walker.gd", "patroller.gd", "enemy_base.gd", "sim_entity.gd"]),
+			"the script and everything it extends")
+	Autoplay.keep_script(shaman)
+	assert_eq(Autoplay.kept_scripts().size(), kept.size(), "a script is kept once")
+	var plain: Node = Node.new()
+	Autoplay.keep_script(plain)
+	assert_eq(Autoplay.kept_scripts().size(), kept.size(), "a node without a script adds nothing")
+	plain.free()
+	shaman.free()
+	assert_true(FileAccess.file_exists("res://tools/autoplay/harness_exit.flow"), "the exit proof's flow")
+	assert_true(FileAccess.get_file_as_string("res://tools/g3.sh").contains("harness_exit"),
+			"tools/g3.sh plays it and reads the end of its log")

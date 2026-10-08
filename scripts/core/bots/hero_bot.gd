@@ -229,6 +229,9 @@ func produce(tick: int) -> int:
 	_last_pos = hero.sim_pos
 	nav.set_weight_class(brain.nav_class(hero, level))
 	nav.update_movers(hero, movers)
+	# A versus bot never steers a fall to where nothing is to land on; a boss body keeps the plain rule (its recorded
+	# routes replay the navigator tick for tick).
+	nav.safe_falls = body == null
 	if brain.needs_thinking(tick) or (tick + slot) % VersusTuning.BOT_GOAL_PERIOD_TICKS == 0:
 		brain.think(hero, level, tick)
 	var flags: int = brain.act(hero, level, tick)

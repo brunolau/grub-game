@@ -16,7 +16,7 @@ msgid "SIGN_COOP_W2_SEESAW"
 msgstr "One waits on the see-saw. The other drops on its high end!"
 
 msgid "SIGN_COOP_W2_LIFT"
-msgstr "Hold the plate and the pillar lifts your partner up."
+msgstr "Crouch on the plate: the pillar lifts your partner up."
 
 msgid "SIGN_COOP_W2_BRACE"
 msgstr "Bull Rex! Crouch side by side and it stops dead."
@@ -33,7 +33,7 @@ msgid "SIGN_COOP_W3_HOP"
 msgstr "Too high? Hop off your partner's head, then drop the vine."
 
 msgid "SIGN_COOP_W3_CAVE"
-msgstr "One holds the plate, the other runs through the door."
+msgstr "One crouches on the plate, the other runs through."
 
 # --- w3_l1b_coop Blizzard Pass (co-op) ---
 msgid "SIGN_COOP_W3_LEE"

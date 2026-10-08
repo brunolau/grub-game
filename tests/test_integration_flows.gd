@@ -89,6 +89,49 @@ func test_the_lint_knows_need_and_section() -> void:
 		assert_true(errors[1].begins_with("line 7:"), errors[1])
 
 
+## Counts the presses of one action that reach the tree (test_press_if_presses_only_when_its_condition_holds).
+class PressCounter:
+	extends Node
+
+	var action: StringName = &""
+	var presses: int = 0
+
+	func _input(event: InputEvent) -> void:
+		if event.is_action_pressed(action):
+			presses += 1
+
+
+## `press_if <action> <expr>` presses only while its condition holds: the book select of the Book II parts focuses
+## Book II after a part that played to its end and Book I after one that was cut short (the runner went back to the
+## title itself), and its cards wrap - `press_if ui_right flow.play_book != 2` makes the part play the same either way
+## (campaign_b2.flow, campaign_coop.flow), so a stage that fails in one part does not fail the part after it. Not a
+## check: it counts for nothing in the result. The lint knows it.
+func test_press_if_presses_only_when_its_condition_holds() -> void:
+	var counter: PressCounter = PressCounter.new()
+	counter.action = &"ui_page_down"
+	add_child(counter)
+	var result: Dictionary = await _run_flow("\n".join([
+		"press_if ui_page_down game.lives < 0", "wait 2", "press_if ui_page_down game.lives >= 0", "wait 2",
+		"press_if ui_page_down game.lives == -5", "wait 2", "quit",
+	]), true)
+	assert_eq(counter.presses, 1, "only the press whose condition held reached the tree")
+	assert_eq(int(result["exit_code"]), 0, str(result["failures"]))
+	assert_eq(int(result["checks"]), 0, "a press_if is no check")
+	counter.free()
+	var report: Dictionary = (load(FLOW_RUNNER) as GDScript).call("lint", "\n".join([
+		"press_if ui_right flow.play_book != 2", "press_if ui_right flow.busy", "press_if ui_nowhere flow.busy",
+		"press_if ui_right nowhere.x == 1", "press_if ui_right flow.play_book 2", "press_if ui_right",
+	]))
+	var errors: PackedStringArray = report["errors"]
+	assert_eq(errors.size(), 4, "\n".join(errors))
+	if errors.size() == 4:
+		for i: int in 4:
+			assert_true(errors[i].begins_with("line %d:" % (i + 3)), errors[i])
+	for flow: String in ["campaign_b2.flow", "campaign_coop.flow"]:
+		assert_true(FileAccess.get_file_as_string(FLOW_DIR + flow).contains("press_if ui_right flow.play_book != 2"),
+				"%s: the Book II Expert part picks its book whatever the part before left" % flow)
+
+
 ## wf8_g2_verify #3: a `play` in a real-time flow starts on the stage's first tick, however long the commands before
 ## it took - the runner holds the new stage's clock until the `play` - so a route replays tick for tick as with
 ## --fast. 400 ms on a fresh stage would be about ten ticks of its own clock without the hold.

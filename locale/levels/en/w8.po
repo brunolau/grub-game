@@ -42,10 +42,10 @@ msgid "SIGN_W8_COOP_HALL"
 msgstr "Shells face the nearer hero. One baits, one drops in behind."
 
 msgid "SIGN_W8_COOP_STAIRS"
-msgstr "Heave the boulder onto a plate. Hold the other one!"
+msgstr "Heave the boulder onto a plate. Crouch on the other one!"
 
 msgid "SIGN_W8_COOP_ROOMS"
-msgstr "A plate holds a door in the other room. Take turns."
+msgstr "Crouch on a plate to hold the other room's door. Take turns."
 
 msgid "SIGN_W8_COOP_SHAMAN"
 msgstr "Pin the Shaman between you. Then one baits, one strikes."

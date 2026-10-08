@@ -19,12 +19,15 @@ const SLICE_STAGES: Array[StringName] = [&"w5_l1"]
 ## G3: the campaign runs must play the whole book (no stage without its route); until then they stopped, PENDING,
 ## where the content ended. ON since the G3 integration (Beginner: 10 stages to the expert wall; Expert: 18 to The End).
 const REQUIRE_COMPLETE_CAMPAIGN: bool = true
-## The side routes the campaign runs take instead of a stage's club route (V2.c). Beginner: Shell Beach's warp into
-## Feast Land E (w7_l1.warp.inputs, then bonus_e.inputs as Flow starts it; the run goes on with 7-2). Not yet: the warp
-## of Rattlesnake Gulch into Feast Land D needs the spear on the belt, and no route that ends 5-1 picks it up (asked
-## of D5, wf9_integration_to_D5.txt #1; no D5 in phase 3) - Feast Land D is proven by its own route, bonus_d.inputs.
+## The side routes the campaign runs take instead of a stage's club route (V2.c). Beginner visits both Feast Lands
+## with what the run carries: Red Mesa Trail by its painting route, which ends 5-1 with the spear in hand
+## (w5_l1.painting.inputs, weapon_end:spear; content, wf10_content_to_integration.txt #1), so the fresh-club rule puts
+## the spear on the belt for Rattlesnake Gulch and its warp into Feast Land D (w5_l2.warp.inputs, two spear steps;
+## then bonus_d.inputs as Flow starts it - the warp passes the linked Tusker stage 5-2b, which the Expert run and the
+## stage's own routes fight); and Shell Beach's warp into Feast Land E (w7_l1.warp.inputs, then bonus_e.inputs; the
+## run goes on with 7-2).
 const CAMPAIGN_SIDES: Dictionary = {
-	BEGINNER: {"w7_l1": "w7_l1.warp.inputs"},
+	BEGINNER: {"w5_l1": "w5_l1.painting.inputs", "w5_l2": "w5_l2.warp.inputs", "w7_l1": "w7_l1.warp.inputs"},
 	EXPERT: {},
 }
 

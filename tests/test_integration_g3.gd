@@ -1,7 +1,8 @@
 extends RouteTestCase
 ## Gate G3 bookkeeping (owner: integration; docs/expansion/PLAN.md 6.2 "Gate G3": 20 Book II files + 35 co-op files +
-## 10 arenas; 31 solo club routes, about 6 featured routes, 57 two-stream co-op routes, belt invariance on all, every x2
-## gate refused by the search, every (arena, mode) bot test green).
+## 8 arenas (cut 3 applied, DESIGN.md G60); 31 solo club routes, about 6 featured routes, 57 two-stream co-op routes,
+## belt invariance on all, every x2 gate refused by the search - with its evidence, G59 - every (arena, mode) bot test
+## green).
 ##
 ## The content half of the G3 table, read from the tree: which files of the design exist, which (stage, difficulty)
 ## cells have their route, the featured routes, the paintings with a route (V2.c), the x2 gates of every co-op file
@@ -11,12 +12,12 @@ extends RouteTestCase
 ## The proofs themselves are the slow modules: test_book2_routes (V2.a-c), test_coop_routes (V3.a-b), test_coop_gates
 ## (V3.c), test_versus_bots (V4.b), test_campaign_routes (Book I) - tools/g3.sh runs them all.
 
-## The arenas of DESIGN.md E.5 in table order: the first eight ship at launch, Mesa Rodeo and Cloud Top are the
-## painting unlocks (cut 3 of PLAN.md 9: built only after the eight are green).
+## The arenas of DESIGN.md E.5 in table order: the eight of 2.0. Cut 3 of PLAN.md 9 is applied (the orchestrator after
+## G3, DESIGN.md G60): Mesa Rodeo and Cloud Top, the two painting unlocks of the first design, are not in 2.0.
 const ARENAS: Array[StringName] = [&"arena_totem_ring", &"arena_echo_hollow", &"arena_floe_rink", &"arena_cinder_pit",
-	&"arena_tar_pulleys", &"arena_coconut_cove", &"arena_sky_picnic", &"arena_colossus_hall", &"arena_mesa_rodeo",
-	&"arena_cloud_top"]
-const LAUNCH_ARENAS: int = 8
+	&"arena_tar_pulleys", &"arena_coconut_cove", &"arena_sky_picnic", &"arena_colossus_hall"]
+## The arenas cut 3 took out: none of them may come back as a file without the design saying so.
+const CUT_ARENAS: Array[StringName] = [&"arena_mesa_rodeo", &"arena_cloud_top"]
 const BOT_GRAPH_DIR: String = "res://resources/bots/"
 ## About six featured routes at G3 (PLAN.md 6.2): routes of Book II stages that are not club routes.
 const FEATURED_WANTED: int = 6
@@ -148,23 +149,27 @@ func _gates_row() -> Array:
 	return ["x2_gates", gates, gates, complete, detail]
 
 
-## The arenas of DESIGN.md E.5 that exist, each with its bot graph (resources/bots/<id>.json); complete with the eight
-## launch arenas (the two unlockables follow only after them, cut 3).
+## The eight arenas of DESIGN.md E.5 (cut 3 applied, G60) that exist, each with its bot graph
+## (resources/bots/<id>.json) where bots play a mode of it - a human-only arena (G50: `bots = none`) needs none.
+## Complete with all eight, their graphs, and no arena file beyond the design (a cut arena that came back).
 func _arenas_row() -> Array:
 	var have: int = 0
 	var notes: PackedStringArray = PackedStringArray()
-	var launch_ok: bool = true
-	for i: int in ARENAS.size():
-		var arena: StringName = ARENAS[i]
+	for arena: StringName in ARENAS:
 		var exists: bool = Levels.is_arena(arena)
 		var graph: bool = FileAccess.file_exists(BOT_GRAPH_DIR + String(arena) + ".json")
-		if exists:
+		if exists and (graph or arena_bot_modes(arena).is_empty()):
 			have += 1
-		if not exists or not graph:
-			notes.append("%s%s" % [arena, " (no bot graph)" if exists else (" (unlockable)" if i >= LAUNCH_ARENAS else "")])
-			launch_ok = launch_ok and i >= LAUNCH_ARENAS
-	return ["arenas", have, ARENAS.size(), launch_ok, "launch %d; missing: %s" % [LAUNCH_ARENAS,
-		", ".join(notes) if not notes.is_empty() else "none"]]
+		else:
+			notes.append("%s%s" % [arena, " (no bot graph)" if exists else " (no file)"])
+	var extra: PackedStringArray = PackedStringArray()
+	for arena: StringName in Levels.get_arenas():
+		if not ARENAS.has(arena) and not String(arena).begins_with("test_"):
+			extra.append("%s%s" % [arena, " (cut 3)" if CUT_ARENAS.has(arena) else ""])
+	var detail: String = "cut 3 applied (no %s); missing: %s; beyond the design: %s" % [
+		" / ".join(PackedStringArray(CUT_ARENAS)), ", ".join(notes) if not notes.is_empty() else "none",
+		", ".join(extra) if not extra.is_empty() else "none"]
+	return ["arenas", have, ARENAS.size(), notes.is_empty() and extra.is_empty(), detail]
 
 
 ## The (arena, mode) cells of the arenas in levels/ (meta `modes`), and the human-only ones of cut 4 (G50: meta
@@ -269,8 +274,12 @@ func test_the_g3_command_runs_every_slow_module() -> void:
 		# versus_bots runs in shards through tools/g3_versus_bots.sh (each shard: `gd.sh test versus_bots`).
 		var wrapped: bool = module == "versus_bots" and text.contains("tools/g3_versus_bots.sh") \
 				and FileAccess.get_file_as_string("res://tools/g3_versus_bots.sh").contains("test versus_bots")
-		assert_true(wrapped or text.contains("test %s\"" % module) or text.contains("test %s " % module) \
+		# The slow modules that left the default suite for its budget run in a loop over the MORE_SLOW list.
+		var listed: bool = text.contains("bash $GD test $module\"") and _more_slow(text).has(module)
+		assert_true(wrapped or listed or text.contains("test %s\"" % module) or text.contains("test %s " % module) \
 				or text.contains("test %s\n" % module), "tools/g3.sh runs the slow module %s" % module)
+	# The slow TESTS of files that stay in the default run (SLOW_TESTS) have their own job.
+	assert_true(text.contains("bash $GD test --slow-tests\""), "tools/g3.sh runs the slow tests")
 	assert_true(text.contains("COOP_GATES_SHARD=$i/$SHARDS"), "coop_gates runs sharded")
 	# A co-op file landing mid-run shifts the shard partition (seen 03:42-04:10: shards on 28 and 29 gates, 26 searched,
 	# yet 29 "refused" lines): gates are counted once by name, and shards on different tables are no proof.
@@ -280,6 +289,64 @@ func test_the_g3_command_runs_every_slow_module() -> void:
 	assert_true(text.contains("human-only (cut 4)"), "the G3 table lists human-only cells")
 	assert_true(text.contains("tools/sp_identity.sh"), "the single-player identity check (V1)")
 	assert_true(text.contains("test integration_g3"), "the content inventory")
-	for flow: String in ["campaign", "campaign_beginner", "campaign_b2", "campaign_coop"]:
+	for flow: String in ["campaign", "campaign_beginner", "campaign_b2", "campaign_coop", "harness_exit"]:
 		assert_true(FileAccess.file_exists("res://tools/autoplay/%s.flow" % flow), "%s.flow exists" % flow)
 		assert_true(text.contains(flow), "tools/g3.sh plays %s.flow headless" % flow)
+	# G59: the table is made of the verdict lines of tests/test_coop_gates.gd, and an unproven gate is never "refused".
+	assert_true(text.contains("coop_gates_verdicts.txt"), "the G3 table keeps every gate's verdict")
+	for verdict: String in ["refused (exhaustive)", "refused (bounded)", ": unproven ", ": open "]:
+		assert_true(text.contains(verdict), "tools/g3.sh reads the G59 verdict '%s'" % verdict.strip_edges())
+	# A flow run that passes its checks and leaves the engine with leak reports is red (Autoplay.keep_script).
+	assert_true(text.contains("were leaked at exit|resources still in use at exit"), "a flow must exit clean")
+
+
+# The modules of the MORE_SLOW=( ... ) list of tools/g3.sh.
+func _more_slow(text: String) -> PackedStringArray:
+	var start: int = text.find("\nMORE_SLOW=(")
+	if start < 0:
+		return PackedStringArray()
+	var end: int = text.find(")", start)
+	return text.substr(start + 12, end - start - 12).split(" ", false)
+
+
+## The slow tests (tests/run_tests.gd SLOW_TESTS, PLAN.md 8 V7): single tests of files that stay in the default run.
+## The rule is the slow modules' rule - skipped unless the run has --slow or a filter naming the file's module - and
+## the list is kept honest here: every entry is a file of the default run and a test that file really has (the runner
+## fails a run on a stale name too), so a slow test is always in exactly one of the gate's jobs: `default` or
+## `slow_tests`.
+func test_the_slow_tests_follow_the_slow_module_rule() -> void:
+	var runner: GDScript = load("res://tests/run_tests.gd") as GDScript
+	assert_not_null(runner)
+	if runner == null:
+		return
+	var slow_files: PackedStringArray = runner.get_script_constant_map()["SLOW_FILES"]
+	var slow_tests: Dictionary = runner.get_script_constant_map()["SLOW_TESTS"]
+	assert_false(slow_tests.is_empty(), "the runner lists its slow tests")
+	var count: int = 0
+	for file: String in slow_tests:
+		assert_true(FileAccess.file_exists("res://tests/" + file), "%s exists" % file)
+		assert_false(slow_files.has(file), "%s: a slow module has no slow tests of its own" % file)
+		var script: GDScript = load("res://tests/" + file) as GDScript
+		assert_true(script != null and script.can_instantiate(), "%s compiles" % file)
+		if script == null or not script.can_instantiate():
+			continue
+		var methods: PackedStringArray = PackedStringArray()
+		for method: Dictionary in script.get_script_method_list():
+			methods.append(str(method["name"]))
+		var quick: int = 0
+		for method_name: String in methods:
+			if method_name.begins_with("test_") and not (slow_tests[file] as Array).has(method_name):
+				quick += 1
+		assert_true(quick > 0, "%s keeps quick tests in the default run (else it is a slow module)" % file)
+		for method_name: String in slow_tests[file]:
+			count += 1
+			assert_true(method_name.begins_with("test_") and methods.has(method_name), "%s has the test %s" % [file,
+					method_name])
+	assert_true(count >= 5 and count <= 20, "a handful of slow tests, not a second suite (%d)" % count)
+	# The rule: a plain run and a filter that only touches the file skip them; --slow and the module's name run them.
+	for case: Array in [["", false, true], ["ui", false, true], ["screens", false, true], ["ui_screens", false, false],
+			["test_ui_screens.gd", false, false], ["", true, false], ["ui", true, false]]:
+		assert_eq(bool(runner.call("skips_slow_tests", "test_ui_screens.gd", case[0], case[1])), bool(case[2]),
+				"filter '%s'%s" % [case[0], " with --slow" if case[1] else ""])
+	assert_true(bool(runner.call("skips_slow_tests", "test_ui_screens.gd", "world_validator", false)),
+			"another module's name does not run them")

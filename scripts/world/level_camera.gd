@@ -57,9 +57,33 @@ var v_target: int = 0
 var _tribe: Array[PlayerBase] = []
 ## 2.0 G42 (`scroll = rising`, PHYSICS.md C.8): true while the rising band pulls the view (the level sets it before
 ## every follow step). The vertical follow then reads a hero's FOOTING - his feet y on the last tick he had ground, a
-## platform, a carrier or a vine (CLIMB) under his feet - as a standing hero, never the height of his jump: a jump in
-## place on a rising climb does not drag the view up (it never sinks back there). Always false outside a rising level.
+## platform, a carrier or a vine (CLIMB) under his feet - never the height of his jump: a jump in place on a rising
+## climb does not drag the view up (it never sinks back there). Always false outside a rising level.
+## The follow itself is the FOOTING ROOM rule ([method _follow_footing], the wf10 follow-up of G42): the highest footing
+## of the tribe is kept FOOTING_ROOM_PX under the view's top, so that a hero who stands, walks or climbs has his whole
+## body under the HUD band; what a jump needs above that is the DRAWN view's business ([method head_peek]).
 var footing_mode: bool = false
+## True in a `scroll = rising` level from its first tick (the level sets it): every hero's footing is kept even while
+## the band still waits for the first input, so the follow knows it on the first rising tick - a hero whose first input
+## is a jump is followed by the ground he left, never by that jump.
+var footing_watch: bool = false
+## The footing room (logical px): every footing less than this far under the view's top raises the view until it is
+## (G42 as built moved only for a footing on view row 3 or higher and stopped a row later: a hero stood on rows 3-4
+## with his head 13-28 px under the top - in the HUD band - and his jump left the view). 72 px = 4.5 rows:
+##  - the HUD band on any device is 31 px (Hud.band_rects with the touch margin, 14 + 48 art px) and the standing hero
+##    35 (Tuning.HERO_BOX_STAND): standing, walking and climbing leave 6 px of air between his head and the band;
+##  - the feet of a standing jump (apex 60 px with UP held, 64 at most - PHYSICS.md 6.3) stay 8 px inside the view;
+##  - under the footing 104 px of view are left: a step down of SIX rows still lands in view (8 px over its bottom
+##    edge). The climb of 6-2b needs exactly that: its Cave Painting nook is six rows over the ledge the hero returns
+##    to, and the view never comes down - a bigger room (8 rows would also keep a jumper's head under the band) puts
+##    that ledge 3 rows under the view, where the 1.0 off-screen rule kills (PHYSICS.md 10.3).
+## The head of a JUMPING hero is kept under the band by the drawn view instead ([method head_peek]): no rule reads it.
+const FOOTING_ROOM_PX: int = 72
+## Draw-only (never read by the simulation): the room the drawn view keeps over a hero's head in a rising climb - the
+## HUD band's 31 px and 2 px of air - and how far it may look up over the simulated view for it (4 rows: a standing
+## jump from the footing room needs 52 px, a 105 px launch gets its feet 4 px inside).
+const HEAD_ROOM_PX: int = 33
+const HEAD_PEEK_MAX_PX: int = 64
 ## The footing y per slot ([method _note_footing]) and the slots that have one since the last snap.
 var _footing: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 var _footing_known: int = 0
@@ -159,6 +183,8 @@ func tick(hero: PlayerBase) -> void:
 	prev = pos
 	if hero == null or hero.dead:
 		return
+	if footing_watch or footing_mode:
+		_note_footing(hero)
 	var step: int = Tuning.CAM_STEP_PX
 	if pos.x < _min.x:
 		pos.x = mini(pos.x + step, _min.x)
@@ -175,8 +201,11 @@ func tick(hero: PlayerBase) -> void:
 		pos.y = maxi(pos.y - step, _max.y)
 	elif _min.y < _max.y:
 		if footing_mode:
-			_note_footing(hero)
-		_follow_y(hero, 0)
+			_tribe.clear()
+			_tribe.append(hero)
+			_follow_footing()
+		else:
+			_follow_y(hero, 0)
 
 
 ## Place the camera for a hero who just appeared (level start, respawn, gate): PHYSICS.md 12.5. Starts at the
@@ -256,11 +285,15 @@ func tick_group(heroes: Array[PlayerBase]) -> void:
 	elif pos.y > _max.y:
 		pos.y = maxi(pos.y - step, _max.y)
 	elif _min.y < _max.y:
-		var before_y: int = pos.y
-		_clamp_curve = true
-		_follow_y(anchor, 0)
-		_clamp_curve = false
-		_keep_grounded(before_y)
+		if footing_mode:
+			# The rising climb: every hero's footing counts, not one anchor's ([method _follow_footing]).
+			_follow_footing()
+		else:
+			var before_y: int = pos.y
+			_clamp_curve = true
+			_follow_y(anchor, 0)
+			_clamp_curve = false
+			_keep_grounded(before_y)
 
 
 ## Place the tribe camera for a party that just appeared (level start, team-wipe respawn, gate): PHYSICS.md 12.5 on
@@ -318,7 +351,7 @@ func _collect_tribe(heroes: Array[PlayerBase]) -> void:
 		_tribe.append(hero)
 		if hero.grounded or hero.on_platform:
 			_ground_step[clampi(hero.slot, 0, _ground_step.size() - 1)] = _group_ticks
-		if footing_mode:
+		if footing_watch or footing_mode:
 			_note_footing(hero)
 
 
@@ -614,15 +647,9 @@ func _follow_y(hero: PlayerBase, fixed_step: int) -> void:
 		if not autoscroll_held:
 			pos.y = mini(pos.y + Tuning.CAM_AUTOSCROLL_PX, _max.y)
 		return
-	# The hero's feet and speed as the follow reads them: his own (1.0), or his footing as a standing hero while the
-	# rising band pulls the view (G42, [member footing_mode]).
+	# (While the rising band pulls the view, [method _follow_footing] replaces this follow: G42.)
 	var feet_y: int = hero.sim_pos.y
 	var yvel: int = hero.yvel
-	if footing_mode and fixed_step == 0:
-		var bit: int = 1 << clampi(hero.slot, 0, _footing.size() - 1)
-		if (_footing_known & bit) != 0:
-			feet_y = _footing[clampi(hero.slot, 0, _footing.size() - 1)]
-		yvel = 0
 	if yvel == 0:
 		v_active = 0
 	var cam_row: int = Tuning.to_cell(pos.y)
@@ -673,6 +700,50 @@ func _note_footing(hero: PlayerBase) -> void:
 		var slot: int = clampi(hero.slot, 0, _footing.size() - 1)
 		_footing[slot] = hero.sim_pos.y
 		_footing_known |= 1 << slot
+
+
+## The footing the rising follow reads for `hero` ([method _note_footing]); his current feet y before his first
+## footing after a snap.
+func footing_of(hero: PlayerBase) -> int:
+	var slot: int = clampi(hero.slot, 0, _footing.size() - 1)
+	return _footing[slot] if (_footing_known & (1 << slot)) != 0 else hero.sim_pos.y
+
+
+## The vertical follow of a rising climb (`scroll = rising` while the band pulls the view: [member footing_mode];
+## PHYSICS.md C.8 "Footing follow"), for the heroes in [member _tribe] (one hero: he alone). It only ever moves the
+## view UP (the band's rule, [method apply_rising], keeps it from sinking and makes it rise at least with the band):
+##  - the view's top wants to be FOOTING_ROOM_PX above the HIGHEST footing of the tribe - whichever hero that is, not
+##    one anchor's: every hero then has his whole body under the HUD band while he stands, walks or climbs, and the
+##    feet of a standing jump stay in view. A partner up to six rows lower is on the view too (104 px are left under
+##    the leader's footing); one who falls farther behind drops out of it - the leash's and the band's case (C.13, C.8:
+##    an egg while his partner plays on), never the leader's;
+##  - it rises by the speed of 12.2's fast curve for the distance left (1 to 16 px per tick, Tuning.cam_v_speed): a
+##    hero who lands on a ledge three rows up has his head under the band after 2 ticks and the view at rest after 9.
+## A footing is never a jump's apex, so a jump in place raises nothing and lands in view (G42).
+func _follow_footing() -> void:
+	if _tribe.is_empty():
+		return
+	var high: int = 1 << 30
+	for hero: PlayerBase in _tribe:
+		high = mini(high, footing_of(hero))
+	var want: int = maxi(high - FOOTING_ROOM_PX, _min.y)
+	if pos.y <= want:
+		return
+	var distance: int = pos.y - want
+	var step: int = maxi(Tuning.cam_v_speed(mini(distance, Tuning.CAM_V_MAX_DISTANCE), true), 1)
+	pos.y -= mini(step, distance)
+
+
+## Draw-only: how far (logical px) the DRAWN view should look up over a view whose top is `top`, so that the highest
+## head of a rising climb - `head_y`, the top of the highest hero's body - stays HEAD_ROOM_PX under the drawn top: the
+## footing follow gives a standing hero that room, a jump or a launch borrows the rest from the bottom rows for as
+## long as it lasts. At most HEAD_PEEK_MAX_PX, never above `top_limit` (the level's top), and never so far that the
+## LOWEST feet of the tribe (`feet_y`) would leave the bottom of a view `view_h` high. The simulation never reads it
+## (the view of record - wake-ups, the off-screen rule, edge walls, the leash - is the camera's own position).
+static func head_peek(top: float, head_y: float, feet_y: float, view_h: float, top_limit: float) -> float:
+	var want: float = float(HEAD_ROOM_PX) - (head_y - top)
+	var under: float = view_h - (feet_y - top)
+	return clampf(minf(minf(want, under), top - top_limit), 0.0, float(HEAD_PEEK_MAX_PX))
 
 
 func _move_y(direction: int, distance: int, fixed_step: int) -> void:

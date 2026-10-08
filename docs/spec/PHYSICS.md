@@ -1387,7 +1387,12 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
   is back at the grab height after 17 ticks, 47 px out; with UP released, 83 px out.
 - **Rolled vine**: lies coiled on its ledge; its coil box (16 x 16 at the anchor) is a hittable: any weapon box, thrown
   weapon or batted ball unrolls it (8-tick animation). It stays unrolled for the rest of the stage, through deaths
-  and team wipes (like an opened spot).
+  and team wipes (like an opened spot). **Co-op files: from its own level only** [G67]: the hit unrolls it only when
+  the hitting hero's feet y (the thrower's at the moment a thrown weapon hits; the ball's for a batted hero) is
+  `<= top + 16`, `top` being the top of the vine's anchor cell (a hero standing on its ledge has feet y = `top`);
+  any other hit is not consumed and changes nothing. (A lone hero's hop jump - UP held from the 8th tick of a low
+  strike, 8.2 - lifts his feet 73-80 px and his high strike reaches 123 px: the coil of an 8-row ledge, 112-128 px
+  up.) Solo files: any hit, as above.
 
 ### C.5 Tar floor and sticky liquids
 
@@ -1505,16 +1510,34 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
   row; the camera's top y (px) is then `min(candidate, band_top + 16 - 176, previous)`: the view never moves down,
   rises at least with the band (whose top row is then the view's bottom row), and rises faster when a hero climbs
   ahead (the band may then be below the view). Horizontal follow is unchanged.
-- **Footing follow** [G42] (built in phase 3 by world-A: `LevelCamera.footing_mode`, set by the level on every tick
-  the band pulls the view): while the band rises, the candidate row of the vertical follow is computed from the hero's
-  **footing** - his feet y on the last tick he had ground, a platform, a carrier or a vine (CLIMB) under his feet -
-  and he is followed as a standing hero (the ground thresholds of 12.2, `yvel` read as 0), not from his current y
-  (co-op: each hero's footing feeds the tribe camera, C.13). A jump's apex never raises the view and a jump in place
-  lands in view; landing on a higher footing raises it by the ground rule of 12.2 (a footing on view row 3 or higher
-  is brought to row 8). Before a hero's first footing after a snap his current y is used. After an
-  `autoscroll_stop` the normal follow returns. G32's building rule ("every jump of a rising climb lands higher") is
-  retired; the view still never sinks, so a climb never asks a hero to step down more than 2 rows under the highest
-  footing he reached (the follow puts a climbing hero on view row 8 of 11 and never brings the view down).
+- **Footing follow** [G42] (world-A: `LevelCamera.footing_mode`, set by the level on every tick the band pulls the
+  view; `footing_watch` keeps every hero's footing from the stage's first tick): while the band rises, the vertical
+  follow reads each hero's **footing** - his feet y on the last tick he had ground, a platform, a carrier or a vine
+  (CLIMB) under his feet; before his first footing after a snap his current y - never his current y (co-op: each
+  hero's footing feeds the tribe camera, C.13). A jump's apex never raises the view and a jump in place lands in
+  view. After an `autoscroll_stop` the normal follow returns. G32's building rule ("every jump of a rising climb
+  lands higher") is retired; the view still never sinks.
+- **Footing room** [G65] (`LevelCamera._follow_footing`; it replaces 12.2's ground rule while the band pulls the
+  view - that rule moved only for a footing on view row 3 or higher and stopped a row later, so a hero stood on
+  rows 3-4 with his head in the HUD band and jumped out of the view): the view's top wants to be `FOOTING_ROOM_PX` =
+  **72 px** (4.5 rows) above the **highest** footing of the tribe - whichever hero's that is; every footing less than
+  72 px under the top raises the view until it is. The view only moves **up** towards that point, by 12.2's fast
+  curve for the distance left (1-16 px per tick, `Tuning.cam_v_speed`): after a landing 3 rows up the head is under
+  the band after 2 ticks and the view rests after 9. What 72 px buy (HUD band 31 px on a touch device, standing box
+  35 px): a hero who stands, walks or climbs has 6 px of air between his head and the band; the feet of a standing
+  jump (apex 60-64 px) stay 8 px inside the view; 104 px of view stay under the footing, so a step down of **6 rows**
+  still lands in view (8 px over its bottom edge; a bigger room would put the ledge under 6-2b's painting nook, six
+  rows down, out of the view that never sinks - the off-screen rule of 10.3 kills there) and a partner up to 6 rows
+  lower is on the view too (farther behind he is the leash's and the band's case: an egg, C.13).
+- **Head peek** [G65] (`LevelCamera.head_peek`, **drawing only** - the simulation never reads it; wake-ups, the
+  off-screen rule, edge walls and the leash use the camera's own position): in a rising climb the **drawn** view
+  looks up over the simulated one so that the highest head of the tribe stays `HEAD_ROOM_PX` = **33 px** (the band's
+  31 and 2 of air) under the drawn top - by at most `HEAD_PEEK_MAX_PX` = **64 px**, never above the level's top and
+  never so far that the lowest feet of the tribe leave the bottom of the drawn view; it follows the head up at
+  once and comes back at 240 px per second (`Level.PEEK_BACK_PX_PER_S`). A standing jump from the footing room
+  needs 52 px of it; a 105 px launch (spring, geyser, Up bounce) keeps its feet in the picture. In co-op the
+  look-up stops at the lower partner's feet, so a leader's apex can still pass the band while his partner stands
+  low in the view.
 - `zones/autoscroll_stop`: the first hero to enter it stops the rise for the rest of the stage (the band stays and
   stays deadly) and the camera returns to the normal follow.
 - 16 v16 is 1 px/tick; a hero climbs a vine at 2 px/tick and walks at 5.
@@ -1645,11 +1668,22 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
   would hurt a `heavy` enemy while it is not brace-dazed glances (clank and spark, no damage, no knock-back; a bounce
   still bounces the hero, a glancing club still gives its pogo); while it is brace-dazed every side counts. Nor does
   it die of anything else while not brace-dazed: a kill-all, a grenade, a feast or mount bite, a glider dive.
+- **A keeper Harrier is perch-bound** (co-op files only) [G66]: a Harrier record (GAMEPLAY 5.2, archetype 6) that
+  carries `keeper=<name>` never starts its way-point loop: when its target is within `range` tiles it faces him and
+  plays its wake cue once, and its position stays its anchor (`xvel = yvel = 0`) for good. Its box, its contact
+  damage and every hit rule are unchanged. Without `keeper=` nothing changes (the 1.0 loop relative to the hero).
 - **One hit per strike** (co-op files only) [G57]: an enemy (not a boss: bosses keep `BOSS_HIT_COOLDOWN`) takes at
   most one hit from one **strike instance** - a hero's melee strike from its first damaging box to its last (the 1.0
   test hit on every tick a box overlapped: 100 hp fell in 4-5 ticks), one projectile for its whole flight, one ball
-  flight (C.11, as before), one head bounce. A new strike (a new attack start, a new throw) is a new instance, so `hp`
-  counts strikes. In single-player and in versus the 1.0 per-tick test is unchanged.
+  flight (C.11, as before); a head bounce never damages. A new strike (a new attack start, a new throw) is a new
+  instance, so `hp` counts strikes. As built [G63] (`EnemyBase._repeats_strike`): per enemy and player slot the
+  instance of a melee box is the tick its strike script started (`CoopTraits.strike_key` = `Sim.total_ticks -
+  strike_tick`; a held FIRE that swings again starts a new one); a hit of the instance that already hurt the enemy is
+  **consumed without effect** - no damage, flash or knock-back, and the box reaches nothing behind that enemy on that
+  tick - so the hero's side (8.3: one target per box per tick, the pogo, the clank) is the 1.0 side. The hit that
+  splits a whole `split` record counts as that swing's hit on the record. The death test is 8.3's (`hp < 0` after the
+  subtraction): with power 25 an enemy takes `hp / 25 + 1` strikes (integer division; hp 100: five), a charged strike
+  subtracts 100. In single-player, in a party of one and in versus the 1.0 per-tick test is unchanged.
 
 ### C.11 Curl and Batter Up
 
@@ -1813,7 +1847,7 @@ Owner of each table: `Tuning` (core: hero and world rules), `PartyTuning` (core,
 | Mount | C.9 table | | C.9 | MountTuning |
 | Totem | head 35 / rest 34 px; foot reach 16 px; jump-off 16 over the carry; impulses `>> 1`; drop lock 12 *(tune)* | | C.10 | PartyTuning |
 | Shoulder Hop | -224 (= `Tuning.BOUNCE_YVEL_UP`), active partner only | v16 | C.10 | PartyTuning |
-| Idle | 243 ticks without input of his own (or none since entering the level; a held flag is input every tick); "Zzz soon" bubble from 170, Zzz from 243 [G58] | ticks | C.10 | PartyTuning (`IDLE_TICKS`; `IDLE_WARN_TICKS` asked of core-A) |
+| Idle | 243 ticks without input of his own (or none since entering the level; a held flag is input every tick); "Zzz soon" bubble from 170, Zzz from 243 [G58] | ticks | C.10 | PartyTuning (`IDLE_TICKS`; `IDLE_WARN_TICKS` asked of core-A - a private constant of `hero_party.gd` until then) |
 | Lee | 64 px downwind, 16 px vertical *(tune)* | px | C.6 | PartyDriver (PartyTuning asked) |
 | Brace | 16 px apart, heavy dazed 44 (hurt only then [G57]) | | C.10 | PartyTuning |
 | One hit per strike | co-op files: one hit per enemy per strike instance [G57] | | C.10 | enemies (`EnemyBase`) |

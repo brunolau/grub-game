@@ -4,8 +4,8 @@ extends RefCounted
 ## PLAN.md 8 V3.c). Owner: world-B (PLAN.md P1.7 v1, P2.4 v2). Called by tests/test_coop_gates.gd for every
 ## `objects/x2_tablet gate=<name> far=c,r` of every co-op file and by `tools/validate_levels.gd -- --coop`.
 ##
-## [method search_gate] proves (as far as a bounded search can) that ONE player cannot get from the gate's tablet (and
-## from the last checkpoint before it) to the tablet's `far` cell:
+## [method search_gate] proves (as far as a search can, and it says how far: the G59 verdict below) that ONE player
+## cannot get from the gate's tablet (and from the last checkpoint before it) to the tablet's `far` cell:
 ##  1. Static rules first (LevelValidator, the content rules of co-op files): nothing to climb on within reach of a
 ##     ledge gate (enemies, springs, geysers, vines, bark boards, gliders, platforms, mounts, pogo ladders), no bark
 ##     board near any gate, keeper and Guard halls 4 rows high, plates 8+ tiles from their doors. A broken static rule
@@ -29,10 +29,33 @@ extends RefCounted
 ##     the player could use (a dead keeper, trait or bond enemy, a pushed pot or boulder, a sprung pot, a pressed
 ##     plate or a door still open, a see-saw tipped, a spear step or spring standing, Chomper ridden or moved, the
 ##     glider taken, changed cells - not a plain enemy's death, which a strike-walk repeats on its way, nor spots and
-##     dropped items). A changed node replays its path from the last unchanged one (same seed, same inputs: the same
-##     world; at most MAX_PREFIX_TICKS), so changes carry from move to move exactly. Where the partner stands is not
-##     part of it: a `partner` move places him afresh where the hero stands (the player can walk his egg anywhere and
-##     hatch it), a changed node made by one keeps him there for its replay.
+##     dropped items; since wf10 a WOUNDED role enemy too: one strike damages once in a co-op file [G57], so its hit
+##     points carry like every other change - and not what only the clock moves: a geyser's cycle, a wild rex's
+##     pacing). A node of a changed world replays the shortest run known that MAKES that world (same seed, same
+##     inputs: the same world) and is then put at its own resting point ([method Searcher._world_of]) - so a change
+##     carries from move to move, at the cost of its making, not of the whole walk since. A rest is taken with the
+##     world SETTLED ([method Searcher._settled]): the hero waits until a door has finished moving, so a node is a
+##     state that lasts (what he does while it moves is played inside one move and by the probes). The idle partner's
+##     place is part of a node (PARK_KEY_PX wide): a `place partner` step parks him where the hero stands (the player
+##     can walk his egg anywhere and hatch it), and every later move starts with him there.
+##  2b. The CONTINUOUS-PLAY PROBES (wf10, the orchestrator's SEARCH decision; LEVEL_DESIGN 15.7.6): what moves that
+##     each start from rest in a reset world cannot express. One run each, the inputs decided tick by tick from what
+##     the world shows, no reset in between, momentum carried, swept over timings ([method Searcher.probe_battery]):
+##     HOP-OVER (jump on over every role enemy and strike its back, again and again; run-up leaps at a ledge or gap),
+##     CHARGE-UNDER (jump straight up as a heavy charges, land behind it and strike - the G3 verifier's 'brace'),
+##     IDLE-BAIT (the idle partner parked in front of and behind every keeper, on every plate, in every door's way,
+##     under the ledge), THROWN-SPECIAL (every special, standing and jumping, at every role enemy, plate, door, drum
+##     and mechanism), PLATES (every door raced from its plate: straight, jumping, crawling under), EGG PLACEMENT (the
+##     real egg walked over a spot and clubbed open there). They run from up to PROBE_SITES resting points per target;
+##     a probe that enters the far cell opens the gate, and its end at rest is a node the search goes on from.
+##  2c. THE VERDICT (DESIGN.md G59: "refused" never means "stopped at the bound"; [method judge]): REFUSED
+##     (EXHAUSTIVE) - the queue ran dry in both passes of [method Searcher.explore]: every resting point the moves and
+##     the probe ends reach inside the gate's area on a path of at most BOUND_TICKS was expanded; REFUSED (BOUNDED) -
+##     stopped at MAX_NODES or the tick budget after at least BOUNDED_MIN_NODES (660) resting points AND every probe
+##     the gate's kind needs ran at every target of the gate ([method Searcher.probe_requirements]) and none reached
+##     the far cell; OPEN - reached (the cause in the detail); UNPROVEN - anything less: [method search_gate] then
+##     says "reached": true with the detail "unproven: ..." (no co-op file ships unproven). [method verdict_line] is
+##     the line of the G3 table, [method report_lines] the per-gate report (search and every probe family).
 ##  3. Windows (D.8 #4): every twin window and daze near the gate with the solo minimum the search measures on the
 ##     bare grid (nothing in the way: the least a hero needs) - drum bonds and enemy bonds (the ticks one hero needs
 ##     from striking one member to the other: running between their strike spots, or 0 when a thrown special from
@@ -49,15 +72,19 @@ extends RefCounted
 ##  [method idle_partner_carries] finds the engine still giving a ride on an idle head (since G33 it does not).
 ## The cheap flood of [method flood_reaches] (no chain of feet cells on the grid at rest) is kept as a diagnostic
 ## (result "flood"); it never decides a gate: the search runs on every gate.
-## Limits (v2): the moving things (walking enemies, platforms, geysers) start every macro in their level-file phase,
-## so a timing that needs a walker or a lift somewhere else than its post at the start of a move is only found when
-## the path got there through changed nodes; macros start from rest (momentum between macros is not carried); the
-## bound is per resting point, not a full input-space search; the hero holds one special per move (each special is
-## tried), not two.
+## Limits (what "exhaustive" is exhaustive OVER): the search's moves from its resting points - not the full input
+## space. The moving things (walking enemies, platforms, geysers) start every move in their level-file phase, so a
+## timing that needs a walker or a lift somewhere else than its post at the start of a move is only found by a move
+## that runs through it, by a probe, or through a changed world; moves start from rest (momentum between moves is not
+## carried - the probes carry it); the hero holds one special per move (each special is tried), not two; nodes outside
+## the gate's area (one view around tablet and far cell) are not expanded; the parked partner's places are
+## PARK_KEY_PX apart (the exact bait spots besides). A replay that cannot bring its world back is counted ("misses" in
+## the result) - never silently a refusal's reason.
 
 ## Game ticks a single hero is allowed per path (LEVEL_DESIGN.md 15.7.6: 1 457 ticks *(tune)*).
 const BOUND_TICKS: int = 1457
-## Resting points explored at most per search (a compute bound; with MAX_TICKS, see there).
+## Resting points expanded at most per search (a compute bound; with MAX_TICKS, see there). Raised from 220 after G3
+## (the verifier's 660 is BOUNDED_MIN_NODES, the least a bounded refusal counts from).
 const MAX_NODES: int = 1500
 ## Resting points of a window's travel search on the bare grid ([method travel_ticks]: the least ticks between two
 ## spots; it stops at the first arrival, so the bound only matters for a spot it cannot reach).
@@ -66,6 +93,17 @@ const WINDOW_NODES: int = 220
 const SETTLE_TICKS: int = 48
 ## Resting points closer than this (px, on the same y) are one node.
 const KEY_PX: int = 8
+## Places of the parked idle partner closer than this (px, on the same y) are one place. He counts for no co-op rule
+## (G33) and stops no mover (G53): he is a body enemies may go for, so three cells tell his places apart - the exact
+## spots that matter (in front of and behind every keeper and shell enemy, [method Searcher.bait_spots]) are parked at
+## from every start and keep their own key (they are queued first), and the idle-bait probes park him at the exact
+## lure spots, on the plates and in the doors. (At KEY_PX every resting point near a role enemy was a place of its own:
+## w3_l1_coop 'lake' 1 981 of 2 037 nodes, w9_l2_coop 'brace' 2 868 of 2 943 were parked copies of the same 60 points.)
+const PARK_KEY_PX: int = 48
+## [method Searcher._settled]: the world's signature has held this long (ticks; a door moves a tile every 4), and the
+## longest wait for it.
+const WORLD_STABLE_TICKS: int = 6
+const WORLD_SETTLE_MAX: int = 96
 ## A ledge gate's area and the windows' reach: the tablet and far cell grown by one view (LEVEL_DESIGN.md 15.7.7).
 const AREA_COLS: int = Tuning.VIEW_COLS
 const AREA_ROWS: int = Tuning.VIEW_ROWS
@@ -139,12 +177,24 @@ const PROBE_RACE_PX: Array[int] = [16, 48]
 const PROBE_TICKS: int = 420
 ## A probe's end (a changed world) replays this long a prefix at most, and so may its descendants.
 const PROBE_PREFIX_TICKS: int = 1100
-## Nodes per probe target that run its battery (the partner still an egg; the starts first).
-const PROBE_SITES: int = 2
+## Nodes per probe target that run its battery at most (the partner still an egg): the first node in reach of it (the
+## starts come first: where the lone player arrives from), then the first NEAR node on each side of it
+## ([method Searcher._probe_site]).
+const PROBE_SITES: int = 3
 ## Changed worlds a site's probes hand to the BFS at most (each costs a replay per later move).
 const PROBE_SEEDS_PER_SITE: int = 6
-## A probe target is in reach of a node within this many cells (x, y).
-const PROBE_REACH_CELLS: Vector2i = Vector2i(20, 6)
+## A probe target is in reach of a node within this many cells (x, y: 11 rows, the static rules' reach under a ledge).
+const PROBE_REACH_CELLS: Vector2i = Vector2i(20, 11)
+## ... and NEAR it within these (a second and third site: on its floor, a short walk away; the far cell: under it).
+const PROBE_NEAR_CELLS: Vector2i = Vector2i(10, 3)
+## Two sites of one target lie at least this far apart (px, x or y).
+const PROBE_SITE_GAP_PX: int = 48
+## The GATE BOX: the tablet's and the far cell's rectangle grown by this many cells (x, y). The role enemies, plates,
+## doors, drums and mechanisms inside it - and whatever a name links to one of them (a door's plates, a keeper door's
+## keepers, a drum door's drums, a pulley's lifts) - are the gate's own: a bounded refusal needs every probe of their
+## kind ([method Searcher.probe_requirements]). The other targets of the gate's area (one view around: a neighbouring
+## gate's hall) are probed as well wherever the search comes in reach of them, but the verdict does not wait for them.
+const GATE_BOX_MARGIN: Vector2i = Vector2i(10, 6)
 ## Duels: the gap (px, hero feet to the enemy's box) at which he jumps, and the UP holds.
 const PROBE_TRIGGERS_PX: Array[int] = [4, 24, 44, 72]
 const PROBE_HOLDS: Array[int] = [4, 9, 12]
@@ -158,8 +208,15 @@ const PROBE_THROW_PX: Array[int] = [24, 64, 128]
 const PROBE_LEAP_RUNUPS: Array[int] = [0, 24]
 const PROBE_LEAP_PX: Array[int] = [16, 48, 80]
 ## The search's default compute bounds (wf10: raised from 220 resting points): resting points expanded and ticks
-## simulated per gate, whichever comes first; a search whose queue runs dry first is EXHAUSTIVE.
+## simulated per gate, whichever comes first; a search whose queue runs dry first is EXHAUSTIVE. The tick budget stops
+## a search only once BOUNDED_MIN_NODES resting points were expanded (G59: a bounded refusal counts from there) - or at
+## TICK_HARD_FACTOR budgets, whatever it expanded (then the gate is UNPROVEN, not refused).
 const MAX_TICKS: int = 1500000
+const TICK_HARD_FACTOR: int = 3
+## Nodes one gate's search level may spawn (entities respawned at a reset, shots, dropped items) before the search
+## stops as bounded ([method SearchLevel.spawn]: Godot's message queue holds about 1.4 million deferred calls and a
+## search passes no frame; a node leaves a few).
+const SPAWN_LIMIT: int = 250000
 ## Properties of a record entity that the world signature reads (when it has them).
 const PROBE_PROPS: Array[StringName] = [
 	&"dead", &"collected", &"opened", &"state", &"pressed", &"risen", &"triggered", &"high_side", &"succeeded",
@@ -178,6 +235,23 @@ class SearchLevel:
 	## A search world: the view is one screen around P1 (as the camera shows him: what lies off it dozes and wakes
 	## as in the game); a bare search: the whole map.
 	var follow: bool = false
+
+	## Nodes spawned into this level so far (entities, shots, dropped items; [method spawn]).
+	var spawned: int = 0
+
+	## A search plays tens of thousands of moves without a frame in between, and every node that enters the tree
+	## leaves deferred calls (a canvas item's redraw) in Godot's message queue until the next frame - also after the
+	## search freed it at the next reset. The queue is finite (32 MB: about 1.4 million calls); full, the engine
+	## crashes inside add_child (content's wf10 #1: `validate_levels --coop` on w5_l1_coop; world-B's unbounded sizing
+	## run of w1_l2_coop). So a search level spawns NO cosmetic effect (`fx/...`: dust, stars, splashes, sprays - by
+	## far the most nodes, and nothing the simulation reads: spawn() may return null by its contract), counts what it
+	## does spawn, and the search stops at SPAWN_LIMIT ([method Searcher.explore]); every caller lets a frame pass
+	## between two gates (tools/coop_search.gd, tools/validate_levels.gd, tests/test_coop_gates.gd).
+	func spawn(id: StringName, pos: Vector2i, params: Dictionary = {}) -> Node:
+		if Spawner.category(id) == "fx" and not CoopSearch.search_fx:
+			return null
+		spawned += 1
+		return super.spawn(id, pos, params)
 
 	func whole_rect() -> Rect2i:
 		return Rect2i(0, 0, maxi(grid.width_px(), Tuning.VIEW_W), maxi(grid.height_px(), Tuning.VIEW_H))
@@ -672,6 +746,13 @@ class Searcher:
 	var runs: int = 0
 	## Ticks replayed to bring a changed node back (part of [member simulated]).
 	var replayed: int = 0
+	## Replays that did not bring the hero back to where their world's prefix ended (the run is dropped; a world that a
+	## reset does not restore exactly - reported, so a refusal never hides them).
+	var misses: int = 0
+	## The CHANGED WORLDS met so far ([method _world_of]): world key (signature and the parked partner's place) ->
+	## {"config", "events", "prefix", "end"}: the shortest run known that makes it from a reset world, and where the
+	## hero stands when it ends.
+	var _worlds: Dictionary = {}
 	## Nodes of the last [method explore] that parked the idle partner (G33's "placed anywhere").
 	var placements: int = 0
 	## True when the level holds the file's entities ([method build_world]).
@@ -720,8 +801,17 @@ class Searcher:
 	var _probe_mechs: Array[int] = []
 	## The probes of the last [method explore] per family (PROBE_FAMILIES): {"runs", "sites", "kills" (runs in which a
 	## role enemy died), "seeds" (their end states handed to the BFS), "dead" (runs in which the hero died or went
-	## down), "reached"}.
+	## down), "reached", "targets" ({target: runs})}.
 	var probe_stats: Dictionary = {}
+	## The gate box in cells ([method CoopSearch.gate_box]; no area = every target of the gate's area is the gate's own).
+	var gate_box: Rect2i = Rect2i()
+	## Changed-world children of the first pass whose replay would be longer than MAX_PREFIX_TICKS, by node key: put
+	## aside, and searched in the second pass once the queue ran dry ([method explore]).
+	var _cut: Dictionary = {}
+	## The least replay cap of the pass (MAX_PREFIX_TICKS; the path bound in the second pass: nothing is cut there).
+	var _cap_floor: int = MAX_PREFIX_TICKS
+	## The link names (CoopSearch._link_names) of the records inside the gate box ([method set_gate_box]).
+	var _box_names: Dictionary = {}
 
 	## The world entity at `index` (null when there is none any more).
 	func entity_at(index: int) -> SimEntity:
@@ -968,20 +1058,72 @@ class Searcher:
 	## A run's outcome at rest completed: its world signature (a search world); {} when he rests where a fresh run
 	## cannot put him back (on the idle partner's head); a rest on a platform is a changed node.
 	func _at_rest(outcome: Dictionary) -> Dictionary:
-		if outcome.has("pos") and world:
-			var clock: int = Time.get_ticks_usec()
-			outcome["sig"] = signature()
-			CoopSearch.profile_add(&"sig", clock)
-		if outcome.has("pos") and hero.is_riding_totem():
+		if not outcome.has("pos"):
+			return outcome
+		if bool(outcome.get("totem", false)):
 			# At rest on the idle partner's head: no node. A fresh run cannot put him back there (respawn_at would
 			# stand him on the air - the search's own bug before phase 3), and the ride macros already play the ride
 			# and the jump off it in one move (since G33 an idle head carries no ride at all: a regression check).
 			return {}
-		if outcome.has("pos") and hero.on_platform:
+		if bool(outcome.get("support", false)):
 			# He rests on something that moves or is reset (a lift, a raft), not on the grid: a fresh run cannot put
 			# him back there, so the node is a changed one - its replay brings back exactly that platform and him on it.
-			outcome["sig"] = "%s|support@%d,%d" % [str(outcome["sig"]), hero.sim_pos.x, hero.sim_pos.y]
+			var rest: Vector2i = outcome["pos"]
+			outcome["sig"] = "%s|support@%d,%d" % [str(outcome["sig"]), rest.x, rest.y]
 		return outcome
+
+	## The hero's rest at the end of a run (`played`: every flag of the run so far; `skip`: its replayed ticks), with
+	## the WORLD SETTLED: when the world differs from the level file's, he waits on (no input, the ticks count) until
+	## its signature held for WORLD_STABLE_TICKS - a door has finished rising or closing, a pulley has come to rest - or
+	## is the level file's again, at most WORLD_SETTLE_MAX ticks. So a node is a state that lasts: the level-file world,
+	## a held change (he stands on a plate, a lift), a lasting one (a dead keeper, a pushed pot, a broken block) - not
+	## every phase of a moving door (each was a world of its own before wf10: the node count of a plate gate times the
+	## door's phases). What a player does WHILE a door moves is played inside one move (a macro runs on from the plate
+	## for 48 ticks) and by the continuous-play probes (the plate races). When he dies or is moved while waiting, the
+	## rest as it first was is the node. {"goal": ...} when his feet entered a cell of `goals` meanwhile.
+	func _settled(played: PackedInt32Array, goals: Dictionary, skip: int) -> Dictionary:
+		var first: Dictionary = _rest_now(played, skip, "")
+		if not world:
+			return first
+		var clock: int = Time.get_ticks_usec()
+		var sig: String = signature()
+		first["sig"] = sig
+		if sig == _baseline or not CoopSearch.settle_world:
+			CoopSearch.profile_add(&"sig", clock)
+			return first
+		var t: int = played.size()
+		var stable: int = 0
+		var still: int = 2
+		for wait: int in WORLD_SETTLE_MAX:
+			Sim.step(1)
+			t += 1
+			simulated += 1
+			if hero.dead or hero.is_down():
+				break
+			var cell: Vector2i = Vector2i(Tuning.to_cell(hero.sim_pos.x), Tuning.to_cell(hero.sim_pos.y - 1))
+			if goals.has(cell):
+				CoopSearch.profile_add(&"sig", clock)
+				var through: PackedInt32Array = played.duplicate()
+				through.resize(t)
+				return {"goal": true, "ticks": t - skip, "cell": cell, "played": through}
+			still = still + 1 if hero.is_grounded() and hero.yvel == 0 and hero.xvel == 0 else 0
+			var now: String = signature()
+			stable = stable + 1 if now == sig else 0
+			sig = now
+			if still >= 2 and (sig == _baseline or stable >= WORLD_STABLE_TICKS):
+				var longer: PackedInt32Array = played.duplicate()
+				longer.resize(t)
+				CoopSearch.profile_add(&"sig", clock)
+				return _rest_now(longer, skip, sig)
+		CoopSearch.profile_add(&"sig", clock)
+		return first
+
+	## The rest outcome of this tick: where the hero stands, the flags played, what carries him, where the partner is
+	## (NOWHERE: an egg).
+	func _rest_now(played: PackedInt32Array, skip: int, sig: String) -> Dictionary:
+		return {"pos": hero.sim_pos, "ticks": played.size() - skip, "played": played, "sig": sig,
+			"support": hero.on_platform, "totem": hero.is_riding_totem(),
+			"partner_now": partner.sim_pos if partner != null and not partner.is_down() else NOWHERE}
 
 	## The tick loop of [method run].
 	func _play(flags: PackedInt32Array, goals: Dictionary, skip: int, expect: Vector2i, events: Array) -> Dictionary:
@@ -1001,6 +1143,7 @@ class Searcher:
 				replayed += 1
 				continue
 			if t == skip and expect != NOWHERE and hero.sim_pos != expect:
+				misses += 1
 				return {}  # the replay did not come back to its node (a world that is not reset exactly): dropped
 			if t == skip:
 				continue
@@ -1013,7 +1156,7 @@ class Searcher:
 					if still >= 2:
 						var played: PackedInt32Array = flags.duplicate()
 						played.resize(t)
-						return {"pos": hero.sim_pos, "ticks": t - skip, "played": played, "sig": ""}
+						return _settled(played, goals, skip)
 				else:
 					still = 0
 		return {}
@@ -1060,16 +1203,12 @@ class Searcher:
 				if hero.is_grounded() and hero.yvel == 0 and hero.xvel == 0:
 					still += 1
 					if still >= 2:
-						outcome = {"pos": hero.sim_pos, "ticks": t, "played": _flags.duplicate(), "sig": ""}
+						outcome = _at_rest(_settled(_flags.duplicate(), goals, 0))
 						break
 				else:
 					still = 0
 		CoopSearch.profile_add(&"probe", clock)
 		outcome["kills"] = maxi(alive_before - _role_enemies_alive(), 0)
-		if outcome.has("pos"):
-			outcome = _at_rest(outcome)
-			if not outcome.is_empty():
-				outcome["kills"] = maxi(alive_before - _role_enemies_alive(), 0)
 		return outcome
 
 	## The role enemies of the world that are dead now ("<id> at c,r" each; for the probe report).
@@ -1097,6 +1236,18 @@ class Searcher:
 				_set_hand(int(event[2]))
 			"place":
 				_place_idle(hero.sim_pos, hero.facing)
+			"move":
+				# The hero at a resting point of the world the replay has just made ([method _world_of]): as a run's
+				# start puts him at a node of the level-file world. The egg comes along; a hatched partner stays.
+				var at: Vector2i = event[2]
+				var facing: int = hero.facing
+				hero.run.reset_energy()
+				hero.respawn_at(at)
+				hero.facing = facing
+				_mark_active(hero)
+				if partner != null and partner.is_down():
+					partner.teleport(at + Vector2i(PartyTuning.EGG_OFFSET_X * facing, PartyTuning.EGG_OFFSET_Y))
+				level.refresh_doze()
 
 	## The weapon in his hand (-1: the club); a special in the hand puts the club on the belt (the reference hero).
 	func _set_hand(hand: int) -> void:
@@ -1205,21 +1356,33 @@ class Searcher:
 	## open where he stands - so a `place partner` step parks him at the node, and every later move starts with him
 	## there). From every start the partner is also parked at each bait spot inside the area ([method bait_spots]: in
 	## front of and behind every keeper and shell enemy, within club reach) before the hero moves.
-	## With `probes` (the gate search) the CONTINUOUS-PLAY PROBES run too ([method _run_probes]): from the first
-	## PROBE_SITES nodes (with the partner still an egg, the starts first) within reach of each role enemy, plate and the
-	## far cell, every policy of its families; a probe that enters the far cell reaches it, and its end at rest joins the
-	## queue as a node (a changed world right after the node being expanded, so a dead keeper's open door is searched on
-	## at once). The search stops at `max_nodes` expanded nodes or `tick_budget` simulated ticks; "exhausted" says the
-	## queue ran dry first: every resting point the macros and probes reach inside the area within `bound` ticks was
-	## expanded - the refusal is exhaustive over the search's moves, not bounded.
+	## With `probes` (the gate search) the CONTINUOUS-PLAY PROBES run too ([method _run_probes]): from up to PROBE_SITES
+	## nodes (with the partner still an egg, the starts first) within reach of each role enemy, plate, door, drum,
+	## mechanism and the far cell, every policy of its families; a probe that enters the far cell reaches it, and its end
+	## at rest joins the queue as a node (a changed world right after the node being expanded, so a dead keeper's open
+	## door is searched on at once).
+	## TWO PASSES. The first keeps a changed world's replay to MAX_PREFIX_TICKS (a longer one is put aside: breadth
+	## first, cheap); when its queue runs dry the second pass takes up everything put aside with the replay bound at
+	## `bound` itself - nothing is cut any more. So "exhausted" (the queue ran dry in both passes) means: EVERY resting
+	## point the macros and the probe ends reach inside the area on a path of at most `bound` ticks was expanded - the
+	## refusal is exhaustive over the search's moves, not bounded.
+	## The search stops at `max_nodes` expanded nodes, or at `tick_budget` simulated ticks once `min_nodes` nodes were
+	## expanded (a bounded refusal counts only from there, G59) - at the latest at TICK_HARD_FACTOR budgets.
 	## Returns {"reached", "ticks", "detail", "nodes", "runs", "simulated", "replayed", "placements", "queued",
-	## "exhausted", "stopped" ("" / "nodes" / "ticks"), "parked", "changed"}.
+	## "exhausted", "stopped" ("" / "nodes" / "ticks"), "parked", "changed", "passes" (1 / 2), "cut" (children put
+	## aside in the first pass), "late" (paths dropped past `bound` ticks: the documented bound of the search)}.
 	func explore(starts: Array[Vector2i], goals: Dictionary, area: Rect2i, bound: int, max_nodes: int,
-			tick_budget: int = 1 << 40, probes: bool = false) -> Dictionary:
+			tick_budget: int = 1 << 40, probes: bool = false, min_nodes: int = 0) -> Dictionary:
 		var queue: Array[Dictionary] = []
 		var seen: Dictionary = {}
 		var sites: Dictionary = {}
 		var simulated_start: int = simulated
+		var late: int = 0
+		var cut_total: int = 0
+		var passes: int = 1
+		_cut = {}
+		_cap_floor = MAX_PREFIX_TICKS
+		_worlds = {}
 		placements = 0
 		probe_stats = {}
 		if probes:
@@ -1243,12 +1406,32 @@ class Searcher:
 						placements += 1
 		var head: int = 0
 		var stopped: String = ""
-		while head < queue.size():
+		while true:
+			if head >= queue.size():
+				# The queue ran dry. First pass: take up what its replay cap put aside (the states nothing else reached),
+				# and search on without the cap; second pass: done - exhausted.
+				cut_total += _cut.size()
+				var taken: int = 0
+				for key: String in _cut:
+					if not seen.has(key):
+						seen[key] = int((_cut[key] as Dictionary)["ticks"])
+						queue.append(_cut[key])
+						taken += 1
+				_cut = {}
+				_cap_floor = bound
+				if taken == 0:
+					break
+				passes = 2
+				continue
 			if head >= max_nodes:
 				stopped = "nodes"
 				break
-			if simulated - simulated_start >= tick_budget:
+			var spent: int = simulated - simulated_start
+			if spent >= tick_budget and (head >= min_nodes or spent >= tick_budget * TICK_HARD_FACTOR):
 				stopped = "ticks"
+				break
+			if level.spawned >= SPAWN_LIMIT:
+				stopped = "spawns"   # (the engine's message queue, [method SearchLevel.spawn])
 				break
 			var node: Dictionary = queue[head]
 			head += 1
@@ -1265,13 +1448,14 @@ class Searcher:
 			if CoopSearch.debug_nodes:
 				print("  node %d at %s t%d prefix %d partner %s: %s%s" % [head - 1, str(pos), int(node["ticks"]),
 					prefix.size(), str(node["partner_at"]), str(node["path"]).right(90), "" if not changed else " | "
-					+ CoopSearch.sig_diff(_baseline, str(node["sig"]))])
+					+ sig_changes(str(node["sig"]))])
 			# Park the idle partner here (G33): a node of its own, no move played - so it costs no depth either: it is
 			# expanded right after this node (its moves join this node's at the same breadth-first level), not after
 			# every node already queued (w2_l1_coop 'hatches': a 3-move route through a parked partner fell behind
 			# the node bound on Beginner).
 			if CoopSearch.idle_partner and placement_useful(pos) \
-					and CoopSearch.node_key(node["partner_at"]) != CoopSearch.node_key(pos):
+					and (node["partner_at"] == NOWHERE
+					or CoopSearch.park_key(node["partner_at"]) != CoopSearch.park_key(pos)):
 				var parked: Dictionary = node.duplicate()
 				parked["partner_at"] = pos
 				parked["path"] = "%s > place partner" % node["path"]
@@ -1301,58 +1485,73 @@ class Searcher:
 						NOWHERE if ride else node["partner_at"])
 				var simulated_before: int = simulated
 				var outcome: Dictionary = run(config, prefix + (macro["flags"] as PackedInt32Array), goals, prefix.size(),
-						pos if changed else NOWHERE, events)
+						node.get("expect", pos) if changed else NOWHERE, events)
 				if CoopSearch.collect_stats:
 					CoopSearch.stat_run(macro, simulated - simulated_before, changed, outcome.is_empty())
 				if outcome.is_empty():
 					continue
 				var ticks: int = int(node["ticks"]) + int(outcome["ticks"])
 				if ticks > bound:
+					late += 1
 					continue
 				var path: String = "%s > %s" % [node["path"], macro["name"]]
 				if outcome.has("goal"):
 					return _found(ticks, path, head)
 				if _offer(queue, seen, area, node, outcome, ticks, path, config, events,
-						node["partner_at"] if str(outcome["sig"]) == _baseline else _partner_spot(config, events),
+						outcome.get("partner_now", node["partner_at"]),
 						int(node.get("cap", MAX_PREFIX_TICKS)), -1) and CoopSearch.collect_stats:
 					CoopSearch.stat_new(macro)
+		var waiting: int = queue.size() - head + _cut.size()
 		return {"reached": false, "ticks": -1, "detail": "", "nodes": head, "runs": runs, "simulated": simulated,
-			"replayed": replayed, "placements": placements, "queued": queue.size() - head,
-			"exhausted": head >= queue.size(), "stopped": stopped, "parked": _count_parked(queue, head),
-			"changed": _count_changed(queue, head)}
+			"replayed": replayed, "placements": placements, "queued": waiting,
+			"exhausted": stopped == "" and waiting == 0, "stopped": stopped, "parked": _count_parked(queue, head),
+			"changed": _count_changed(queue, head), "passes": passes, "cut": cut_total + _cut.size(), "late": late,
+			"worlds": _worlds.size(), "misses": misses, "spawned": level.spawned}
 
 	## A child of `node` from a run's `outcome` at rest (`ticks` on the path so far, `path` its text, played with
 	## `config` and `events`; `partner_at` where the idle partner stands for its later moves): queued when its key is
 	## new and it rests inside `area`. An unchanged world (the level file's) makes a plain node; a changed one replays
-	## the run as its prefix - at most `cap` ticks of it (MAX_PREFIX_TICKS; a probe's end and its descendants
-	## PROBE_PREFIX_TICKS). `at` >= 0 inserts it there in the queue (a probe's changed world: searched on at once),
-	## else it is appended. True when it was queued.
+	## the run as its prefix - at most `cap` ticks of it in the first pass (MAX_PREFIX_TICKS; a probe's end and its
+	## descendants PROBE_PREFIX_TICKS): a longer one is put aside in [member _cut] (the first, shortest path to its key)
+	## for the second pass, where the cap is the path bound ([member _cap_floor]) and nothing is cut. `at` >= 0 inserts
+	## it there in the queue (a probe's changed world: searched on at once), else it is appended. True when it was
+	## queued.
 	func _offer(queue: Array[Dictionary], seen: Dictionary, area: Rect2i, node: Dictionary, outcome: Dictionary,
 			ticks: int, path: String, config: Dictionary, events: Array, partner_at: Vector2i, cap: int,
 			at: int) -> bool:
 		var rest: Vector2i = outcome["pos"]
 		var sig: String = outcome["sig"]
+		var cell: Vector2i = Vector2i(Tuning.to_cell(rest.x), Tuning.to_cell(rest.y - 1))
 		var child: Dictionary
 		if sig == _baseline:
 			# Back in the level-file world: the next moves start from a reset world (the partner stays parked).
 			child = _node(rest, ticks, path, sig, partner_at)
 		else:
-			# The world changed for good: the child replays the run from its last unchanged ancestor.
-			var played: PackedInt32Array = outcome["played"]
-			if played.size() > cap:
-				return false
+			# A changed world: the child replays the shortest run known that makes this world from a reset one, then
+			# stands where he came to rest ([method _world_of]).
+			cap = maxi(cap, _cap_floor)
+			var made: Dictionary = _world_of(sig, partner_at, config, events, outcome["played"], rest)
+			var played: PackedInt32Array = made["prefix"]
 			child = _node(rest, ticks, path, sig, partner_at)
-			child["config"] = config
-			child["events"] = events
+			child["config"] = made["config"]
+			child["events"] = made["events"] if made["end"] == rest \
+					else (made["events"] as Array) + [[played.size(), "move", rest]]
 			child["prefix"] = played
-			child["hand_now"] = _hand_after(config, events)
+			child["expect"] = made["end"]
+			child["hand_now"] = _hand_after(made["config"], made["events"])
 			child["cap"] = cap
+			if played.size() > cap:
+				# Too long a replay for this pass: put aside, unless a shorter path already brought (or brings) its key.
+				var cut_key: String = _key_of(child)
+				if not seen.has(cut_key) and area.has_point(cell) and (not _cut.has(cut_key)
+						or int((_cut[cut_key] as Dictionary)["ticks"]) > ticks):
+					_cut[cut_key] = child
+				return false
 		var key: String = _key_of(child)
 		if seen.has(key) and int(seen[key]) <= ticks:
 			return false
 		var fresh: bool = not seen.has(key)
 		seen[key] = ticks
-		var cell: Vector2i = Vector2i(Tuning.to_cell(rest.x), Tuning.to_cell(rest.y - 1))
 		if not fresh or not area.has_point(cell):
 			return false
 		if at >= 0 and at <= queue.size():
@@ -1360,6 +1559,23 @@ class Searcher:
 		else:
 			queue.append(child)
 		return true
+
+	## The CHANGED WORLD of signature `sig` with the idle partner at `partner_at`, as the run (`config`, `events`,
+	## `played`: every flag of it) that just ended with the hero at rest at `rest` made it: {"config", "events",
+	## "prefix", "end"} - the shortest such run met so far (this one when it is the first or shorter). A node of a
+	## changed world replays THAT run and is then put at its own resting point (a "move" event), instead of replaying
+	## its whole path from the last level-file node: the same world (the signature is what the search tells worlds
+	## apart by), a replay as long as the world's making - not as the walk since. (wf10: the replays were 60-87 % of
+	## the ticks of the gates that stopped at the bound.) A rest on a platform ("support@" in the signature) is a world
+	## of its own per place, so its node replays its own run as before.
+	func _world_of(sig: String, partner_at: Vector2i, config: Dictionary, events: Array, played: PackedInt32Array,
+			rest: Vector2i) -> Dictionary:
+		var key: String = _world_key(sig, partner_at)
+		if not CoopSearch.share_worlds:
+			return {"config": config, "events": events, "prefix": played, "end": rest}
+		if not _worlds.has(key) or played.size() < ((_worlds[key] as Dictionary)["prefix"] as PackedInt32Array).size():
+			_worlds[key] = {"config": config, "events": events, "prefix": played, "end": rest}
+		return _worlds[key]
 
 	## The continuous-play probes from `node` (an unchanged node, the partner still an egg): for every probe target in
 	## reach of it ([method probe_targets] inside `area`, within PROBE_REACH_CELLS) that has had fewer than PROBE_SITES
@@ -1374,12 +1590,8 @@ class Searcher:
 		var far: Vector2i = goals.keys()[0] if goals.size() == 1 else NOWHERE
 		for target: String in probe_targets(area, far):
 			var at: Vector2i = probe_target_point(target, far)
-			if at == NOWHERE or absi(at.x - pos.x) > PROBE_REACH_CELLS.x * Tuning.TILE \
-					or absi(at.y - pos.y) > PROBE_REACH_CELLS.y * Tuning.TILE:
+			if at == NOWHERE or not _probe_site(sites, target, at, pos):
 				continue
-			if int(sites.get(target, 0)) >= PROBE_SITES:
-				continue
-			sites[target] = int(sites.get(target, 0)) + 1
 			var seeds: int = 0
 			var counted: Dictionary = {}
 			for item: Array in probe_battery(target, pos, far):
@@ -1421,11 +1633,82 @@ class Searcher:
 				if not changed_world and _partner_spot(config, []) != NOWHERE:
 					continue   # a plain resting point with the partner parked: the bait starts' copies cover those
 				var path: String = "%s > probe %s (%s)" % [node["path"], policy.family, policy.label]
-				if _offer(queue, seen, area, node, outcome, ticks, path, config, [], _partner_spot(config, []),
-						PROBE_PREFIX_TICKS, head if changed_world else -1):
+				if _offer(queue, seen, area, node, outcome, ticks, path, config, [],
+						outcome.get("partner_now", NOWHERE), PROBE_PREFIX_TICKS, head if changed_world else -1):
 					stats["seeds"] = int(stats["seeds"]) + 1
 					seeds += 1 if changed_world else 0
 		return {}
+
+	## True when the node at `pos` becomes a probe site of `target` (whose point is `at`), noted in `sites` ({target:
+	## [[pos, near, side] ...]}): the FIRST node within PROBE_REACH_CELLS of it (the starts come first: where the lone
+	## player arrives from), then the first node NEAR it (PROBE_NEAR_CELLS - on its floor, a short walk away; for the
+	## far cell any row of the reach: under its ledge, at its gap's lip) on each side of it, PROBE_SITE_GAP_PX from every
+	## earlier site - PROBE_SITES at most.
+	func _probe_site(sites: Dictionary, target: String, at: Vector2i, pos: Vector2i) -> bool:
+		var dx: int = pos.x - at.x
+		var dy: int = pos.y - at.y
+		if absi(dx) > PROBE_REACH_CELLS.x * Tuning.TILE or absi(dy) > PROBE_REACH_CELLS.y * Tuning.TILE:
+			return false
+		var known: Array = sites.get(target, [])
+		if known.size() >= PROBE_SITES:
+			return false
+		var near: bool = absi(dx) <= PROBE_NEAR_CELLS.x * Tuning.TILE \
+				and (target == "f" or absi(dy) <= PROBE_NEAR_CELLS.y * Tuning.TILE)
+		var side: int = 1 if dx >= 0 else -1
+		if not known.is_empty():
+			if not near:
+				return false
+			for site: Array in known:
+				var other: Vector2i = site[0]
+				if absi(other.x - pos.x) < PROBE_SITE_GAP_PX and absi(other.y - pos.y) < PROBE_SITE_GAP_PX:
+					return false
+				if bool(site[1]) and int(site[2]) == side:
+					return false
+		known.append([pos, near, side])
+		sites[target] = known
+		return true
+
+	## What signature `sig` changed against the level-file world, with the records named ("<id> c,r: <its part>"; for
+	## [member CoopSearch.debug_nodes] and the reports).
+	func sig_changes(sig: String) -> String:
+		var base: PackedStringArray = _baseline.split("|")
+		var parts: PackedStringArray = PackedStringArray()
+		for part: String in sig.split("|"):
+			if base.has(part):
+				continue
+			var index_text: String = part.get_slice(":", 0)
+			if index_text.is_valid_int() and index_text.to_int() < _records.size():
+				parts.append("%s: %s" % [_target_name(index_text.to_int()), part.substr(index_text.length() + 1)])
+			else:
+				parts.append(part)
+		return "; ".join(parts)
+
+	## Set the gate box (cells) and note the link names of the records inside it ([method own_target]).
+	func set_gate_box(box: Rect2i) -> void:
+		gate_box = box
+		_box_names = {}
+		for record: Dictionary in _records:
+			if box.has_point(Vector2i(int(record["col"]), int(record["row"]))):
+				for name: String in CoopSearch._link_names(record):
+					_box_names[name] = true
+
+	## True when probe target `target` is the GATE'S OWN (GATE_BOX_MARGIN): the far cell; a target whose record lies in
+	## the gate box; one a name links to a record in the box (the plates of a door there, the keepers of its keeper
+	## door, the drums of its drum door, the other members of a bond, a pulley's lifts). Without a gate box: every
+	## target.
+	func own_target(target: String) -> bool:
+		if target == "f" or gate_box.size == Vector2i.ZERO:
+			return true
+		var index: int = target.substr(1).to_int()
+		if index < 0 or index >= _records.size():
+			return false
+		var record: Dictionary = _records[index]
+		if gate_box.has_point(Vector2i(int(record["col"]), int(record["row"]))):
+			return true
+		for name: String in CoopSearch._link_names(record):
+			if _box_names.has(name):
+				return true
+		return false
 
 	## The probe targets of the world inside `area` (by the cell of their feet point): "e<index>" every role enemy,
 	## "p<index>" every plate, "o<index>" every door column, "d<index>" every drum, "m<index>" every other co-op
@@ -1454,21 +1737,30 @@ class Searcher:
 			return Vector2i((plate.left_px() + plate.right_px()) / 2, plate.floor_y())
 		return entity.sim_pos if entity != null else NOWHERE
 
-	## The gate kinds of the G59 table (LEVEL_DESIGN 15.7.6) that the targets in `area` make, and per probe family the
-	## targets a bounded refusal needs it to have run at: {"kinds": PackedStringArray, "required": {family:
-	## PackedStringArray of targets}}. A role enemy makes a keeper door (hop-over, idle-bait, thrown-special at it) or,
-	## a `heavy`, a Brace corridor (hop-over, charge-under, idle-bait); a plate, see-saw, heave boulder or pulley a
-	## plate-door kind (idle-bait and thrown-special at it, plates races from every plate, thrown-special through every
-	## door); a drum twin drums (thrown-special); nothing of these a ledge or gap (hop-over and idle-bait leaps at the far
-	## cell).
+	## The gate kinds of the G59 table (LEVEL_DESIGN 15.7.6) that the gate's OWN targets in `area` make
+	## ([method own_target]: those of the gate box and what a name links to them), and per probe family the targets a
+	## bounded refusal needs it to have run at: {"kinds": PackedStringArray, "required": {family: Array of targets},
+	## "names": {target: "<id> c,r"}, "others": the targets of the area that are not the gate's own (probed where the
+	## search comes in reach of them, never waited for)}. A role enemy makes a keeper door (hop-over, idle-bait,
+	## thrown-special at it) or, a `heavy`, a Brace corridor (hop-over, charge-under, idle-bait); a plate, see-saw,
+	## heave boulder or pulley a plate-door kind (idle-bait and thrown-special at it, plates races from every plate,
+	## thrown-special through every door); a drum twin drums (thrown-special); nothing of these a ledge or gap (hop-over
+	## and idle-bait leaps at the far cell).
 	func probe_requirements(area: Rect2i, far: Vector2i) -> Dictionary:
 		var kinds: PackedStringArray = PackedStringArray()
 		var required: Dictionary = {}
+		var names: Dictionary = {"f": "the far cell %d,%d" % [far.x, far.y]}
+		var others: int = 0
 		for family: String in PROBE_FAMILIES:
 			required[family] = []
 		var targets: PackedStringArray = probe_targets(area, far)
 		var mechanism: bool = false
 		for target: String in targets:
+			if target != "f":
+				names[target] = _target_name(target.substr(1).to_int())
+			if not own_target(target):
+				others += 1
+				continue
 			var kind: String = target.substr(0, 1)
 			var entity: SimEntity = entity_at(target.substr(1).to_int()) if target != "f" else null
 			match kind:
@@ -1501,7 +1793,7 @@ class Searcher:
 			kinds.append("ledge or gap")
 			(required[PROBE_HOP_OVER] as Array).append("f")
 			(required[PROBE_IDLE_BAIT] as Array).append("f")
-		return {"kinds": kinds, "required": required}
+		return {"kinds": kinds, "required": required, "names": names, "others": others}
 
 	## The door columns (feet points) a plate at entity `index` drives (rise_while= / sink_while= name it).
 	func plate_doors(index: int) -> Array[Vector2i]:
@@ -1549,9 +1841,11 @@ class Searcher:
 							_leap(PROBE_HOP_OVER, far_x, trigger, hold, back_up)])
 			if bait:
 				for trigger: int in PROBE_LEAP_PX:
+					# The idle partner at the take-off spot (under the ledge, at the gap's lip); where no floor lies there,
+					# where the hero stands.
 					var spot: Vector2i = _floor_spot(Vector2i(far_x - dir * trigger, pos.y))
 					if spot == NOWHERE:
-						continue
+						spot = pos
 					for hold: int in PROBE_HOLDS:
 						var leap: LeapPolicy = _leap(PROBE_IDLE_BAIT, far_x, trigger, hold, 0)
 						leap.label += " partner at %d,%d" % [spot.x, spot.y]
@@ -1591,7 +1885,10 @@ class Searcher:
 									0)])
 				if not bait:
 					return items
-				for spot: Vector2i in lure_spots(enemy):
+				var lures: Array[Vector2i] = lure_spots(enemy)
+				if lures.is_empty():
+					lures.append(pos)   # no floor beside it (a perch, a flyer): the idle partner where the hero stands
+				for spot: Vector2i in lures:
 					for wait: int in PROBE_LURE_WAITS:
 						for trigger: int in [PROBE_TRIGGERS_PX[0], PROBE_TRIGGERS_PX[PROBE_TRIGGERS_PX.size() - 1]]:
 							for steer: int in [1, 0]:
@@ -1773,7 +2070,11 @@ class Searcher:
 	func _key_of(node: Dictionary) -> String:
 		var key: String = CoopSearch.state_key(node["pos"], str(node["sig"]))
 		var at: Vector2i = node["partner_at"]
-		return key if at == NOWHERE else "%s|p%s" % [key, str(CoopSearch.node_key(at))]
+		return key if at == NOWHERE else "%s|p%s" % [key, str(CoopSearch.park_key(at))]
+
+	## The key of a changed world: its signature and where the idle partner stands in it (PARK_KEY_PX wide).
+	func _world_key(sig: String, partner_at: Vector2i) -> String:
+		return sig if partner_at == NOWHERE else "%s|p%s" % [sig, str(CoopSearch.park_key(partner_at))]
 
 	## A run configuration for [method run].
 	func _config(start: Vector2i, facing: int, hand: int, partner_mode: int, partner_at: Vector2i) -> Dictionary:
@@ -1832,50 +2133,79 @@ static func search_gate(level_id: StringName, difficulty: int, gate: String) -> 
 	var key: String = ""
 	if use_cache and use_file_cache:
 		key = file_cache_key(path, data, difficulty, gate)
-		var cached: Dictionary = _file_cache_read(key)
+		var cached: Dictionary = {} if refresh_cache else _file_cache_read(key)
 		if not cached.is_empty():
 			return cached
 	var started: int = Time.get_ticks_msec()
 	var result: Dictionary = search_data(data, difficulty, gate)
 	var seconds: float = (Time.get_ticks_msec() - started) / 1000.0
-	if not str(result.get("detail", "")).begins_with("unproven"):
+	var searched: bool = not str(result.get("detail", "")).begins_with("unproven")
+	if searched:
 		record_cost(level_id, difficulty, gate, seconds, int(result.get("simulated", 0)))
-	if key != "" and not str(result.get("detail", "")).begins_with("unproven"):
+	hold_to_verdict(result)
+	if key != "" and searched:
 		result["seconds"] = seconds
 		_file_cache_write(key, result)
+	return result
+
+
+## G59: "refused" never means "stopped at the bound". A raw search result ([method search_data]) whose verdict is
+## UNPROVEN - a bounded search with fewer than BOUNDED_MIN_NODES resting points, or without a probe its gate kind
+## needs - is not a refusal: "reached" becomes true for the contract of [method search_gate] (so
+## tests/test_coop_gates.gd and every tool fail on it), and the detail says "unproven: <what is missing>". Returns
+## `result` (changed in place).
+static func hold_to_verdict(result: Dictionary) -> Dictionary:
+	if not bool(result.get("reached", true)) and str(result.get("verdict", "")) == VERDICT_UNPROVEN:
+		result["reached"] = true
+		result["detail"] = "unproven: %s" % str(result.get("evidence", ""))
 	return result
 
 
 ## G59 (orchestrator, LEVEL_DESIGN 15.7.6): a bounded refusal counts only with at least this many resting points
 ## expanded (the raised bound of the G3 verifier).
 const BOUNDED_MIN_NODES: int = 660
+## The G59 verdicts ([method gate_verdict]).
+const VERDICT_OPEN: String = "open"
+const VERDICT_EXHAUSTIVE: String = "refused (exhaustive)"
+const VERDICT_BOUNDED: String = "refused (bounded)"
+const VERDICT_UNPROVEN: String = "unproven"
 
 
-## The G59 verdict of a [method search_gate] result: {"verdict": "open" | "refused (exhaustive)" |
-## "refused (bounded)" | "unproven", "evidence": String, "missing": PackedStringArray ("<family> at <target>" for
-## every probe its gate kind needs that did not run)}.
+## The G59 verdict of a search result ([method search_data] stores it in the result: "verdict", "evidence",
+## "missing"; a result without one is judged here): {"verdict": VERDICT_*, "evidence": String, "missing":
+## PackedStringArray ("<family> at <target>" for every probe the gate's kind needs that did not run)}.
+static func gate_verdict(result: Dictionary) -> Dictionary:
+	if result.has("verdict"):
+		return {"verdict": str(result["verdict"]), "evidence": str(result.get("evidence", "")),
+			"missing": PackedStringArray(result.get("missing", []))}
+	return judge(result)
+
+
+## The G59 verdict of a raw search result (orchestrator's SEARCH decision: "refused" never means "stopped at the
+## bound"):
 ##  - open: the search or a probe reached the far cell, or a static rule is broken (red, the cause named);
-##  - refused (exhaustive): the frontier emptied below the bound - every resting point the macros and probes reach
-##    inside the gate's area within BOUND_TICKS was expanded;
-##  - refused (bounded): stopped at the bound after at least BOUNDED_MIN_NODES resting points AND every probe family
-##    its gate kinds need ran at every target that needs it (probe_requirements) and none reached the far cell;
-##  - unproven: bounded below BOUNDED_MIN_NODES, or a needed probe did not run (its target never in reach of a probe
-##    site), or the gate could not be searched.
+##  - refused (exhaustive): the frontier emptied below the bounds in both passes ([method Searcher.explore]) - every
+##    resting point the macros and the probe ends reach inside the gate's area on a path of at most BOUND_TICKS was
+##    expanded. The probes ran as well (their counts are part of the evidence; a probe of the gate's kind whose target
+##    never came in reach of an unchanged resting point is named);
+##  - refused (bounded): stopped at the node or tick bound after at least BOUNDED_MIN_NODES resting points AND every
+##    probe family the gate's kinds need ran at every target of the gate that needs it
+##    ([method Searcher.probe_requirements]) and none reached the far cell;
+##  - unproven: bounded below BOUNDED_MIN_NODES, or a needed probe did not run, or the search ran without probes, or
+##    the gate could not be searched. Neither green nor red: [method search_gate] reports it as not refused.
 ## A cached result is the stored result of exactly this search (the cache key holds the level file, its base file,
 ## the simulation's code, the bounds and the probe switch), so it carries the same evidence as an uncached run.
-static func gate_verdict(result: Dictionary) -> Dictionary:
+static func judge(result: Dictionary) -> Dictionary:
 	var detail: String = str(result.get("detail", ""))
 	var missing: PackedStringArray = PackedStringArray()
 	if detail.begins_with("unproven"):
-		return {"verdict": "unproven", "evidence": detail, "missing": missing}
+		return {"verdict": VERDICT_UNPROVEN, "evidence": detail.trim_prefix("unproven: "), "missing": missing}
 	if bool(result.get("reached", true)):
-		return {"verdict": "open", "evidence": detail, "missing": missing}
+		return {"verdict": VERDICT_OPEN, "evidence": detail, "missing": missing}
 	var explored: int = int(result.get("explored", 0))
-	if bool(result.get("exhausted", false)):
-		return {"verdict": "refused (exhaustive)", "evidence": "the frontier emptied after %d resting points" % explored,
-			"missing": missing}
 	var probes_found: Dictionary = result.get("probes", {})
 	var required: Dictionary = result.get("probes_required", {})
+	var names: Dictionary = result.get("probe_targets", {})
 	var counts: PackedStringArray = PackedStringArray()
 	for family: String in PROBE_FAMILIES:
 		var stats: Dictionary = probes_found.get(family, {})
@@ -1883,21 +2213,30 @@ static func gate_verdict(result: Dictionary) -> Dictionary:
 		var needed: Array = required.get(family, [])
 		for target: Variant in needed:
 			if int(covered.get(str(target), 0)) == 0:
-				missing.append("%s at %s" % [family, str(target)])
+				missing.append("%s at %s" % [family, str(names.get(str(target), target))])
 		if not needed.is_empty() or int(stats.get("runs", 0)) > 0:
 			counts.append("%s 0/%d" % [family, int(stats.get("runs", 0))])
-	if not bool(result.get("probes_on", true)):
+	var probes_on: bool = bool(result.get("probes_on", true))
+	var probes_text: String = "probes: none run (the search ran without them)" if not probes_on \
+			else ("probes: no target" if counts.is_empty() else "probes %s" % ", ".join(counts))
+	if bool(result.get("exhausted", false)):
+		var evidence: String = "exhaustive, %d resting points%s; %s" % [explored,
+			"" if int(result.get("passes", 1)) < 2 else " (two passes: %d longer replays taken up in the second)" \
+			% int(result.get("cut", 0)), probes_text]
+		if probes_on and not missing.is_empty():
+			evidence += "; not in reach of any unchanged resting point: %s" % ", ".join(missing)
+		return {"verdict": VERDICT_EXHAUSTIVE, "evidence": evidence, "missing": missing}
+	if not probes_on:
 		missing.append("every probe (the search ran without probes)")
-	var bound: String = "bounded at %d resting points (%s bound%s)" % [explored, str(result.get("stopped", "node")),
-		", %d queued" % int(result.get("queued", 0))]
+	var bound: String = "bounded at %d resting points by the %s bound, %d still queued" % [explored,
+		str(result.get("stopped", "node")).trim_suffix("s"), int(result.get("queued", 0))]
 	if explored < BOUNDED_MIN_NODES:
-		return {"verdict": "unproven", "evidence": "%s, below the %d G59 asks; probes %s" % [bound, BOUNDED_MIN_NODES,
-			", ".join(counts)], "missing": missing}
+		return {"verdict": VERDICT_UNPROVEN, "evidence": "%s - below the %d resting points a bounded refusal needs; %s"
+			% [bound, BOUNDED_MIN_NODES, probes_text], "missing": missing}
 	if not missing.is_empty():
-		return {"verdict": "unproven", "evidence": "%s; probes missing: %s" % [bound, ", ".join(missing)],
-			"missing": missing}
-	return {"verdict": "refused (bounded)", "evidence": "%s; probes %s" % [bound, ", ".join(counts)],
-		"missing": missing}
+		return {"verdict": VERDICT_UNPROVEN, "evidence": "%s; %s; probes missing: %s" % [bound, probes_text,
+			", ".join(missing)], "missing": missing}
+	return {"verdict": VERDICT_BOUNDED, "evidence": "%s; %s" % [bound, probes_text], "missing": missing}
 
 
 ## The one-line G59 verdict of a gate: "GATE <level> <difficulty> <gate>: <verdict> (<evidence>)".
@@ -1907,39 +2246,58 @@ static func verdict_line(level_id: StringName, difficulty: int, gate: String, re
 		verdict["verdict"], verdict["evidence"], " [cached]" if bool(result.get("cached", false)) else ""]
 
 
-## The per-gate report of a [method search_gate] result (orchestrator's SEARCH decision, wf10; G59): the verdict, how
-## far the search went (EXHAUSTIVE: the queue ran dry - every resting point the macros and probes reach inside the
-## gate's area within BOUND_TICKS was expanded; BOUNDED: stopped at the node or tick bound with nodes still queued),
-## the gate kinds, and one line per probe family: the runs, the sites (nodes it ran from), the runs in which a role
-## enemy died, the end states handed to the search, the runs in which the hero died - or "no target".
+## The per-gate report of a [method search_gate] result (orchestrator's SEARCH decision, wf10; G59): how far the
+## search went (EXHAUSTIVE: the queue ran dry in both passes - every resting point the macros and probe ends reach
+## inside the gate's area within BOUND_TICKS was expanded; BOUNDED: stopped at the node or tick bound with nodes still
+## queued), the gate kinds and its own probe targets, and one line per probe family: the runs, the targets and sites
+## (nodes it ran from), the runs in which a role enemy died, the end states handed to the search, the runs in which
+## the hero died - or "no target".
 static func report_lines(result: Dictionary) -> PackedStringArray:
 	var lines: PackedStringArray = PackedStringArray()
-	var verdict: Dictionary = gate_verdict(result)
-	lines.append("verdict: %s - %s" % [verdict["verdict"], verdict["evidence"]])
 	var detail: String = str(result.get("detail", ""))
-	if detail.begins_with("static rule") or detail.begins_with("unproven"):
+	if detail.begins_with("static rule") or not result.has("probes"):
 		lines.append("search: not run (%s)" % detail)
 		return lines
+	var counts: String = "%d runs, %d ticks (%d replayed); %d parked-partner, %d changed-world nodes in %d worlds; %d paths past the %d-tick bound; %d replays missed; %d nodes spawned" % [
+		int(result.get("runs", 0)), int(result.get("simulated", 0)), int(result.get("replayed", 0)),
+		int(result.get("parked", 0)), int(result.get("changed", 0)), int(result.get("worlds", 0)),
+		int(result.get("late", 0)), int(result.get("bound", BOUND_TICKS)), int(result.get("misses", 0)),
+		int(result.get("spawned", 0))]
+	var passes: String = "one pass, no replay cut" if int(result.get("passes", 1)) < 2 and int(result.get("cut", 0)) == 0 \
+			else ("two passes, %d states past the first pass's %d-tick replay cap taken up" % [int(result.get("cut", 0)),
+			MAX_PREFIX_TICKS] if int(result.get("passes", 1)) >= 2 else "first pass, %d states past its %d-tick replay cap waiting"
+			% [int(result.get("cut", 0)), MAX_PREFIX_TICKS])
 	if bool(result.get("exhausted", false)):
-		lines.append("search: EXHAUSTIVE - the queue ran dry after %d resting points (%d runs, %d ticks; %d parked-partner, %d changed-world nodes)" 				% [int(result.get("explored", 0)), int(result.get("runs", 0)), int(result.get("simulated", 0)),
-				int(result.get("parked", 0)), int(result.get("changed", 0))])
-	elif not bool(result.get("reached", false)):
-		lines.append("search: BOUNDED - stopped at the %s bound after %d resting points (%d still queued; limits %d nodes / %d ticks; %d runs, %d ticks)" 				% [str(result.get("stopped", "node")), int(result.get("explored", 0)), int(result.get("queued", 0)),
-				int(result.get("node_limit", node_limit)), int(result.get("tick_limit", tick_limit)),
-				int(result.get("runs", 0)), int(result.get("simulated", 0))])
-	lines.append("gate kinds: %s" % ", ".join(PackedStringArray(result.get("gate_kinds", []))))
+		lines.append("search: EXHAUSTIVE - the queue ran dry after %d resting points (%s; %s)" % [
+			int(result.get("explored", 0)), passes, counts])
+	elif not bool(result.get("reached", false)) or detail.begins_with("unproven"):
+		lines.append("search: BOUNDED - stopped at the %s bound after %d resting points, %d still queued (limits %d nodes / %d ticks; %s; %s)"
+			% [str(result.get("stopped", "node")).trim_suffix("s"), int(result.get("explored", 0)),
+			int(result.get("queued", 0)), int(result.get("node_limit", node_limit)),
+			int(result.get("tick_limit", tick_limit)), passes, counts])
+	else:
+		lines.append("search: REACHED after %d resting points (%s)" % [int(result.get("explored", 0)), counts])
 	var probes_found: Dictionary = result.get("probes", {})
 	var required: Dictionary = result.get("probes_required", {})
+	var names: Dictionary = result.get("probe_targets", {})
+	var own: Dictionary = {}
+	for family: String in required:
+		for target: Variant in required[family]:
+			own[str(names.get(str(target), target))] = true
+	lines.append("gate kinds: %s; its own probe targets: %s; %d other target(s) in the area" % [
+		", ".join(PackedStringArray(result.get("gate_kinds", []))),
+		", ".join(PackedStringArray(own.keys())) if not own.is_empty() else "none", int(result.get("probe_others", 0))])
 	for family: String in PROBE_FAMILIES:
 		var stats: Dictionary = probes_found.get(family, {})
 		var needed: int = (required.get(family, []) as Array).size()
 		if stats.is_empty() or int(stats.get("runs", 0)) == 0:
-			lines.append("probe %s: %s" % [family, "no target in the gate's area" if needed == 0
-				else "NOT RUN (%d targets need it)" % needed])
+			lines.append("probe %s: %s" % [family, "no target" if needed == 0
+				else "NOT RUN (%d of the gate's targets need it)" % needed])
 			continue
-		lines.append("probe %s: %d runs at %d targets from %d sites (%d needed), %d with a role enemy killed, %d ends searched on, %d hero deaths%s" 				% [family, int(stats.get("runs", 0)), (stats.get("targets", {}) as Dictionary).size(),
-				int(stats.get("sites", 0)), needed, int(stats.get("kills", 0)), int(stats.get("seeds", 0)),
-				int(stats.get("dead", 0)), ", REACHED the far cell" if bool(stats.get("reached", false)) else ""])
+		lines.append("probe %s: %d runs at %d targets from %d sites (%d of the gate's own need it), %d with a role enemy killed, %d ends searched on, %d hero deaths%s"
+			% [family, int(stats.get("runs", 0)), (stats.get("targets", {}) as Dictionary).size(),
+			int(stats.get("sites", 0)), needed, int(stats.get("kills", 0)), int(stats.get("seeds", 0)),
+			int(stats.get("dead", 0)), ", REACHED the far cell" if bool(stats.get("reached", false)) else ""])
 		if stats.has("kill"):
 			lines.append("    first kill: %s" % str(stats["kill"]))
 	return lines
@@ -2047,7 +2405,8 @@ static func file_cache_key(path: String, data: LevelData, difficulty: int, gate:
 ## The search's compute bounds and probe switch as text (part of both cache keys: a result found under other bounds is
 ## never read back as this one).
 static func bounds_text() -> String:
-	return "n%d t%d %s" % [node_limit, tick_limit, "probes" if probes else "no-probes"]
+	return "n%d t%d %s%s%s%s" % [node_limit, tick_limit, "probes" if probes else "no-probes",
+		"" if carry_hits else " no-hits", "" if settle_world else " no-settle", "" if share_worlds else " no-share"]
 
 
 ## True when the search world of `gate` in `difficulty` spawns a boss: a `bosses/` record among
@@ -2188,11 +2547,12 @@ static func search_data(data: LevelData, difficulty: int, gate: String) -> Dicti
 	var columns: Vector2i = search_columns(area, starts, grid)
 	result["flood"] = flood_reaches(grid, starts, far, columns)
 	var world_columns: Vector2i = world_columns_of(area, starts, grid)
+	var box: Rect2i = gate_box_of(tablet, grid)
 	var key: String = _explore_key(grid, data.resolved_meta(difficulty), starts, far, area) + "|" \
 			+ str(world_records(data, difficulty, world_columns).hash()) + ("|idle" if idle_partner else "|egg") \
-			+ "|d%d" % difficulty + "|%s" % bounds_text()
+			+ "|d%d" % difficulty + "|%s|%s" % [bounds_text(), str(box)]
 	var found: Dictionary = {}
-	if use_cache and _explore_cache.has(key):
+	if use_cache and not refresh_cache and _explore_cache.has(key):
 		found = _explore_cache[key]
 	else:
 		var searcher: Searcher = Searcher.new()
@@ -2201,7 +2561,9 @@ static func search_data(data: LevelData, difficulty: int, gate: String) -> Dicti
 			return _unproven(result, "the hero scene %s does not exist" % PLAYER_ID)
 		profile_add(&"build", clock)
 		clock = Time.get_ticks_usec()
-		found = searcher.explore(starts, {far: true}, area, BOUND_TICKS, node_limit, tick_limit, probes)
+		searcher.set_gate_box(box)
+		found = searcher.explore(starts, {far: true}, area, BOUND_TICKS, node_limit, tick_limit, probes,
+				mini(BOUNDED_MIN_NODES, node_limit))
 		found["probes"] = searcher.probe_stats.duplicate(true)
 		var needs: Dictionary = searcher.probe_requirements(area, far)
 		found["gate_kinds"] = Array(needs["kinds"] as PackedStringArray)
@@ -2209,6 +2571,8 @@ static func search_data(data: LevelData, difficulty: int, gate: String) -> Dicti
 		for family: String in needs["required"]:
 			required[family] = (needs["required"][family] as Array).duplicate()
 		found["probes_required"] = required
+		found["probe_targets"] = (needs["names"] as Dictionary).duplicate()
+		found["probe_others"] = int(needs["others"])
 		profile_add(&"explore", clock)
 		searcher.close()
 		_explore_cache[key] = found
@@ -2226,6 +2590,14 @@ static func search_data(data: LevelData, difficulty: int, gate: String) -> Dicti
 	result["probes"] = found.get("probes", {})
 	result["gate_kinds"] = found.get("gate_kinds", [])
 	result["probes_required"] = found.get("probes_required", {})
+	result["probe_targets"] = found.get("probe_targets", {})
+	result["probe_others"] = int(found.get("probe_others", 0))
+	result["passes"] = int(found.get("passes", 1))
+	result["cut"] = int(found.get("cut", 0))
+	result["late"] = int(found.get("late", 0))
+	result["worlds"] = int(found.get("worlds", 0))
+	result["misses"] = int(found.get("misses", 0))
+	result["spawned"] = int(found.get("spawned", 0))
 	result["probes_on"] = probes
 	result["node_limit"] = node_limit
 	result["tick_limit"] = tick_limit
@@ -2239,6 +2611,11 @@ static func search_data(data: LevelData, difficulty: int, gate: String) -> Dicti
 		result["windows"] = measure_windows(data, difficulty, area, bare)
 		bare.close()
 	profile_add(&"windows", clock)
+	# 4. The G59 verdict: what this result is evidence of ([method judge]; [method search_gate] holds a gate to it).
+	var verdict: Dictionary = judge(result)
+	result["verdict"] = str(verdict["verdict"])
+	result["evidence"] = str(verdict["evidence"])
+	result["missing"] = Array(verdict["missing"] as PackedStringArray)
 	return result
 
 
@@ -2375,8 +2752,9 @@ static func is_target(id: String) -> bool:
 
 
 ## The world-signature part of one record entity: what a reset would undo. Enemies with a co-op role (a keeper, a
-## trait, a bond): alive or dead (where they walk and the hits short of a kill are not carried; a plain enemy is not
-## carried at all - a move kills him again on its way, see the strike-walk macros); spots and dropped or placed
+## trait, a bond): dead, wounded (its hit points, [member carry_hits]) or whole (where they walk is not carried; a
+## plain enemy is not carried at all - a move kills him again on its way, see the strike-walk macros); spots and
+## dropped or placed
 ## items: nothing (the reference hero holds every special; only the glider counts); platforms and zones: nothing
 ## (their motion is momentary, a reset only adds back what fell);
 ## everything else: its feet point and the PROBE_PROPS it has.
@@ -2385,9 +2763,19 @@ static func probe(entity: SimEntity) -> String:
 		var enemy: EnemyBase = entity
 		if enemy.keeper == &"" and enemy.coop_trait == Defs.CoopTrait.NONE and not enemy.spawn_params.has("bond"):
 			return ""   # a plain enemy is killed again in the move that needs him gone
-		return "e1" if enemy.dead else "e0"
-	if entity is PlatformBase or entity is ZoneBase or entity is SceneryHittable:
-		return ""
+		if enemy.dead:
+			return "e1"
+		# G57: in a co-op file one strike damages an enemy once, so a keeper with more hit points than one strike takes
+		# falls only to several strikes - several moves. The damage is carried from move to move like every other
+		# change (a wounded role enemy is a changed world, replayed), or no chain of strikes could ever kill one.
+		return "e0" if not carry_hits or enemy.hp >= enemy.max_hp else "e0:%d" % enemy.hp
+	if entity is PlatformBase or entity is ZoneBase or entity is SceneryHittable or entity is Geyser:
+		return ""   # (a geyser's state is a function of the tick: a clock, not a change)
+	if entity is Mount and not (entity as Mount).tame and (entity as Mount).driver == null \
+			and (entity as Mount).gunner == null:
+		# A wild rex paces about its home by itself: where it is right now is no change (it is a walker like every
+		# enemy); tamed, ridden or left somewhere, its place counts (below).
+		return "wild"
 	if entity is CollectibleBase:
 		# The reference hero holds every special anyway: only the glider changes what he can do.
 		var item: CollectibleBase = entity
@@ -2521,6 +2909,9 @@ static var _explore_cache: Dictionary = {}
 static var use_cache: bool = true
 ## False: no result file cache (see [method file_cache_key]).
 static var use_file_cache: bool = true
+## True: [method search_gate] searches even when a stored result exists (no cache READ) and stores the new result -
+## the uncached proof run of G59 (tools/coop_search.gd --fresh, tools/world_coop_gates.sh --fresh).
+static var refresh_cache: bool = false
 ## Resting points a gate search may expand (MAX_NODES; unit tests of the search's mechanics lower it to stay quick -
 ## a refusal under a smaller bound proves less, never more).
 static var node_limit: int = MAX_NODES
@@ -2532,6 +2923,17 @@ static var probes: bool = true
 ## False: the search world's partner is only ever an egg (no `partner` macros) - to tell a gate that one player opens
 ## with an idle partner from one he opens alone (tests, tools).
 static var idle_partner: bool = true
+## True: a search level spawns the cosmetic effects too ([method SearchLevel.spawn]; the search before wf10).
+static var search_fx: bool = false
+## False: a rest is a node the moment the hero stands still, whatever still moves ([method Searcher._settled]; the
+## search before wf10).
+static var settle_world: bool = true
+## False: a changed node replays its whole path from the last level-file node ([method Searcher._world_of]; the
+## search before wf10).
+static var share_worlds: bool = true
+## True: a wounded role enemy (a keeper, a trait or bond enemy short of its full hit points) is a changed world, so
+## its wounds carry from move to move ([method probe]); false: only its death does (the search before wf10).
+static var carry_hits: bool = true
 
 
 ## Rows a feet cell may rise above the cell it last stood in, for [method flood_reaches]: the hero's highest jump
@@ -2773,6 +3175,14 @@ static func grid_at_rest(data: LevelData, difficulty: int) -> TileGrid:
 	return grid
 
 
+## The gate box in cells (GATE_BOX_MARGIN): its tablet and far cell grown by the margin, inside the map - what lies
+## in it is the gate's own mechanism ([method Searcher.own_target]).
+static func gate_box_of(tablet: Dictionary, grid: TileGrid) -> Rect2i:
+	var box: Rect2i = Rect2i(tablet["cell"], Vector2i.ONE).merge(Rect2i(tablet["far"], Vector2i.ONE))
+	box = box.grow_individual(GATE_BOX_MARGIN.x, GATE_BOX_MARGIN.y, GATE_BOX_MARGIN.x, GATE_BOX_MARGIN.y)
+	return box.intersection(Rect2i(0, 0, grid.cols, grid.rows))
+
+
 ## The gate's area in cells: its tablet and far cell grown by one view, inside the map.
 static func gate_area(tablet: Dictionary, grid: TileGrid) -> Rect2i:
 	var area: Rect2i = Rect2i(tablet["cell"], Vector2i.ONE).merge(Rect2i(tablet["far"], Vector2i.ONE))
@@ -2813,6 +3223,11 @@ static func _ground_below(grid: TileGrid, cell: Vector2i) -> Vector2i:
 
 static func node_key(pos: Vector2i) -> Vector2i:
 	return Vector2i(pos.x / KEY_PX, pos.y)
+
+
+## The key of a place of the parked idle partner: PARK_KEY_PX wide on his floor line.
+static func park_key(pos: Vector2i) -> Vector2i:
+	return Vector2i(pos.x / PARK_KEY_PX, pos.y)
 
 
 ## The input macros of the search (one hero, from rest): `name`, `facing`, `flags` (one Defs.IN_* mask per tick),

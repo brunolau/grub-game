@@ -12,6 +12,8 @@ extends SceneTree
 ##       GD_TIMEOUT=4000 bash .tools/gd.sh test --slow - or each by name, in parallel:
 ##       bash .tools/gd.sh test campaign_routes / book2_routes / coop_routes, GD_TIMEOUT=3600 ... test coop_gates
 ##       (COOP_GATES_SHARD=<i>/<n> splits it), GD_TIMEOUT=1800 ... test versus_bots)
+##   godot --headless --path . -s res://tests/run_tests.gd -- --slow-tests   (ONLY the slow tests of SLOW_TESTS; with
+##       gd.sh: GD_TIMEOUT=1200 bash .tools/gd.sh test --slow-tests - tools/g3.sh runs it at every gate)
 ##
 ## Slow modules (docs/expansion/PLAN.md 8 V7: the default run stays under about 5 minutes; a slow module runs at every
 ## gate and before every merge that touches its area): SLOW_FILES are left out of a run - a `skip` line names each one
@@ -20,6 +22,13 @@ extends SceneTree
 ## runs the other files it matches and skips the slow one, so a module's quick check never pays for the slow search.
 ## The summary ends with a SKIPPED line when slow modules were left out ([method discover_files] is the rule; the
 ## test tests/test_core_runner.gd keeps it).
+## Slow tests (the same budget, since the G3 follow-up round): SLOW_TESTS names single test methods of files that stay
+## in the default run - some fifteen searches, fairness sweeps and whole-table loops that took most of the time of
+## their seven files, whose other 200 tests stay where they were. They follow the rule of the slow modules: left out
+## - a `skip` line each, one SKIPPED line in the summary - unless the run has --slow or a filter that names their
+## file's module (bash .tools/gd.sh test core_bots runs every test of test_core_bots.gd); --slow-tests runs them and
+## nothing else ([method skips_slow_tests] is the rule; tests/test_integration_g3.gd keeps it and the list). A test
+## that is on no list and takes more than LONG_TEST_SECONDS gets a `note:` line and a NOTE line in the summary.
 ##
 ## Discovers `res://tests/test_*.gd`, runs every `test_*` method of each file (see TestCase) and exits with
 ## code 0 when everything passed, 1 otherwise. Any engine error logged while a test runs fails that test.
@@ -41,8 +50,47 @@ const TEST_USER_DIR: String = "res://build/test_user"
 ## (test_book2_routes, about 1 min and growing to 31 + featured routes) and every two-stream co-op route
 ## (test_coop_routes, about 1.5 min and growing to 57 routes). The default run keeps the Book I identity guards
 ## (test_core_players, test_core_book1_frozen; tools/sp_identity.sh replays every Book I route's digest).
+## Since the G3 follow-up round (V7: the default run had grown to 410 s) also: the Totem Ring match of classic-keyboard
+## humans and rookie bots (one test, a whole match), the layout fairness checks of world 4 (frozen Book I levels,
+## hundreds of staircase climbs) - both integration's - and the nav-graph tests of the bots (test_core_bots, core-B:
+## every test bakes a test level's graph or needs one baked - the first test that asks pays for it, so leaving only
+## the bake tests out just moved their seconds to the next test; about 80 s with the committed graphs baked again.
+## The bots in their modes, test_core_bots_modes, stay in the default run).
 const SLOW_FILES: PackedStringArray = ["test_book2_routes.gd", "test_campaign_routes.gd", "test_coop_gates.gd",
-	"test_coop_routes.gd", "test_versus_bots.gd"]
+	"test_coop_routes.gd", "test_core_bots.gd", "test_integration_totem_ring.gd", "test_levels_w4.gd",
+	"test_versus_bots.gd"]
+## The slow tests (see the header): file -> test methods. Each one is a proof that walks a whole table - every
+## campaign code through a level start, a solo search with its probes, a sweep of every jump timing - beside quick
+## tests of the same file that stay in the default run, and none shares a costly fixture with them (leaving such a
+## test out only moves its seconds to the next test that needs the fixture: a file like that is a slow module). A
+## name the file no longer has fails the run (a renamed test must not drift back unnoticed).
+const SLOW_TESTS: Dictionary = {
+	# The single-hero searches of the co-op boss forms that take seconds (V3.d; the Chieftains' with the idle partner
+	# placed everywhere) and the Colossus's rock fairness sweep (enemies-B / enemies-C). The quick ones stay.
+	"test_enemies_chieftain.gd": [
+		"test_the_single_hero_search_with_an_idle_partner_cannot_beat_the_coop_chieftains"],
+	"test_enemies_colossus.gd": ["test_colossus_rocks_can_be_jumped",
+		"test_coop_the_single_hero_search_cannot_hurt_the_visor_colossus"],
+	"test_enemies_idols.gd": ["test_the_single_hero_search_cannot_crack_the_twin_idols"],
+	"test_enemies_roc.gd": ["test_the_single_hero_search_cannot_beat_the_coop_roc"],
+	# A stage played in real time, tick by tick (integration).
+	"test_integration_flows.gd": ["test_a_real_time_play_starts_on_the_stages_first_tick"],
+	# Every campaign code of both books typed in and its level started (ui-A).
+	"test_ui_screens.gd": ["test_code_entry_accepts_every_campaign_code"],
+	# Real solo searches on test levels (world-B).
+	"test_world_validator.gd": ["test_search_measures_the_windows_near_the_gate",
+		"test_search_partner_is_idle_and_parked_anywhere_counts_for_nothing",
+		"test_search_probes_and_carried_wounds_kill_what_one_move_cannot",
+		"test_search_refuses_a_high_ledge_and_finds_a_low_one",
+		"test_search_rides_on_an_idle_partner_only_as_the_engine_allows",
+		"test_search_settles_the_world_and_shares_changed_worlds",
+		"test_search_small_gate_is_exhaustive_and_probed",
+		"test_search_world_runs_the_real_doors_and_carries_a_latched_plate"],
+}
+## A test of the default run that takes longer than this is named in a `note:` line and in the summary (never
+## failed): the budget of V7 is spent test by test - at G3 and again in the round after it, searches and bakes added
+## to quick files took the default run from under 5 minutes to 6 and 7 - so whoever adds one sees it the same day.
+const LONG_TEST_SECONDS: float = 10.0
 
 
 ## Counts engine errors (push_error, script errors, failed engine checks) while a test runs.
@@ -84,11 +132,23 @@ func _run() -> void:
 	var filter: String = str(options.get("filter", ""))
 	var verbose: bool = options.has("verbose")
 	var only: String = str(options.get("only", ""))
+	var slow_run: bool = options.has("slow")
+	var slow_only: bool = options.has("slow-tests")
 	_redirect_user_data(str(options.get("user-dir", TEST_USER_DIR)))
 	OS.add_logger(_counter)
 	var skipped: PackedStringArray = PackedStringArray()
-	var files: PackedStringArray = _discover(filter, options.has("slow"), skipped)
+	var files: PackedStringArray = _discover(filter, slow_run, skipped)
+	if slow_only:
+		# Only the slow tests: the files that have some (a slow module is not one of them).
+		var with_slow_tests: PackedStringArray = PackedStringArray()
+		for file: String in files:
+			if SLOW_TESTS.has(file):
+				with_slow_tests.append(file)
+		files = with_slow_tests
+		skipped.clear()
 	var slow_skipped: PackedStringArray = skipped.duplicate()
+	var slow_tests_skipped: PackedStringArray = PackedStringArray()
+	var long_tests: PackedStringArray = PackedStringArray()
 	var passed: int = 0
 	var failed: int = 0
 	var failures: PackedStringArray = PackedStringArray()
@@ -116,18 +176,36 @@ func _run() -> void:
 		var file_started: int = Time.get_ticks_msec()
 		var file_passed: int = 0
 		var file_failed: int = 0
+		var slow_names: Array = SLOW_TESTS.get(file, [])
+		var slow_found: int = 0
 		for method: Dictionary in script.get_script_method_list():
 			var method_name: String = method["name"]
 			if not method_name.begins_with(TEST_PREFIX):
 				continue
+			var slow_test: bool = slow_names.has(method_name)
+			if slow_test:
+				slow_found += 1
 			if not only.is_empty() and not method_name.contains(only):
 				continue
+			if slow_only and not slow_test:
+				continue
+			if slow_test and not slow_only and skips_slow_tests(file, filter, slow_run):
+				slow_tests_skipped.append("%s.%s" % [file, method_name])
+				print("    skip %s.%s (slow test, PLAN.md 8 V7: run with --slow-tests, --slow or a filter naming %s)" % [
+						file, method_name, file.get_basename().trim_prefix(TEST_PREFIX)])
+				continue
 			_counter.reset()
+			var test_started: int = Time.get_ticks_msec()
 			test.call("_begin_test")
 			test.call("before_each")
 			await test.call(method_name)
 			test.call("after_each")
 			var problems: PackedStringArray = test.call("_end_test", _counter.errors)
+			var test_seconds: float = float(Time.get_ticks_msec() - test_started) / 1000.0
+			if test_seconds > LONG_TEST_SECONDS and not slow_test and not SLOW_FILES.has(file):
+				long_tests.append("%s.%s %.1f s" % [file, method_name, test_seconds])
+				print("       note: %s.%s took %.1f s (PLAN.md 8 V7: over %d s - a test for SLOW_TESTS, or a faster fixture)" % [
+						file, method_name, test_seconds, int(LONG_TEST_SECONDS)])
 			if problems.is_empty():
 				file_passed += 1
 				if verbose:
@@ -139,6 +217,11 @@ func _run() -> void:
 				for line: String in _counter.lines:
 					failures.append("%s.%s: engine error: %s" % [file, method_name, line])
 		test.free()
+		if slow_found != slow_names.size():
+			# A slow test that was renamed or removed: the list must follow, or nobody knows which run holds it.
+			file_failed += 1
+			failures.append("%s: SLOW_TESTS of tests/run_tests.gd names %d test(s), the file has %d of them (%s)" % [
+					file, slow_names.size(), slow_found, ", ".join(PackedStringArray(slow_names))])
 		passed += file_passed
 		failed += file_failed
 		var verdict: String = "ok  " if file_failed == 0 else "FAIL"
@@ -163,6 +246,12 @@ func _run() -> void:
 	print("TESTS: %d passed, %d failed, %d file(s), %.2f s" % [passed, failed, files.size(), seconds])
 	if not slow_skipped.is_empty():
 		print("SKIPPED: %s (slow modules)" % ", ".join(slow_skipped))
+	if not slow_tests_skipped.is_empty():
+		print("SKIPPED: %d slow test(s) (run them with --slow-tests): %s" % [slow_tests_skipped.size(),
+				", ".join(slow_tests_skipped)])
+	if not long_tests.is_empty():
+		print("NOTE: %d test(s) on no slow list took more than %d s each (PLAN.md 8 V7): %s" % [long_tests.size(),
+				int(LONG_TEST_SECONDS), ", ".join(long_tests)])
 	print("RESULT: %s" % ("PASS" if failed == 0 else "FAIL"))
 	# Let the audio server release its playbacks before the engine shuts down (no leak reports).
 	var audio: Node = root.get_node_or_null("Audio")
@@ -217,6 +306,13 @@ static func discover_files(names: PackedStringArray, filter: String, slow: bool,
 			continue
 		result.append(file)
 	return result
+
+
+## True when a run leaves the slow tests of `file` (SLOW_TESTS) out: it has no --slow and its filter does not name the
+## file's module - hold its whole name after "test_" (core_bots, test_core_bots.gd) - the rule of the slow modules
+## ([method discover_files]). A --slow-tests run never asks: it runs the slow tests and nothing else.
+static func skips_slow_tests(file: String, filter: String, slow: bool) -> bool:
+	return not slow and not filter.contains(file.get_basename().trim_prefix(TEST_PREFIX))
 
 
 func _parse_args(arguments: PackedStringArray) -> Dictionary:

@@ -19,6 +19,15 @@ extends RefCounted
 ##     lands on the target; EVERY integer x of the final window was simulated. A link needs a window of at least
 ##     MIN_WINDOW px; the fastest one is kept, plus the widest when it is much wider.
 ## The bake is deterministic (no RNG; fixed iteration order), so a re-bake of an unchanged level gives the same file.
+##
+## Frames (core-B wf10, wf10_content_to_core-B.txt #3): the bake is a list of jobs (one class start, one source node,
+## one mover phase, one pulley state at a time) run in a fixed order. [method bake_text] runs them all in one go;
+## [method bake_text_in_frames] (await it) lets the engine finish a frame every FRAME_CANDIDATES candidate runs, and
+## gives the same graph. A long bake NEEDS the frames: every sim run frees and spawns the movers and effects of the
+## level, each canvas node that enters the tree queues one redraw callback, and the engine empties that queue (32 MB,
+## about 1.4 million callbacks) only between frames - a bake of some 130 000 runs in one go overflows it and the
+## engine crashes. A level with pulley lifts is such a bake (its lifts get links at every pulley state); the tool
+## (tools/bots/bake_nav.gd) always bakes in frames.
 
 const VERSION: int = 3
 ## Take-off points are sampled this far apart along a node.
@@ -36,6 +45,8 @@ const EDGE_MARGIN_PX: int = 6
 const SCRIPT_TICKS: int = 72
 ## Take-off points in a geyser vent are sampled this far apart.
 const GEYSER_SAMPLE_STEP: int = 4
+## [method bake_text_in_frames]: candidate runs between two frames (a job is never split, so a slice may run longer).
+const FRAME_CANDIDATES: int = 2000
 
 var sim: NavSim = NavSim.new()
 var graph: NavGraph = null
@@ -47,9 +58,12 @@ var verified_starts: int = 0
 var rejected: int = 0
 ## Print progress every this many candidates (0 = quiet; the tool's --verbose).
 var progress_every: int = 0
-## The mover part of the bake (null until [method bake_text] runs).
+## The mover part of the bake (null until [method begin_bake] runs).
 var movers: NavMovers = null
 var _started_msec: int = 0
+# The bake as jobs in their order ([method begin_bake]) and the next one to run ([method step_bake]).
+var _jobs: Array[Callable] = []
+var _next_job: int = 0
 
 var _grid: TileGrid = null
 var _clip: Rect2i = Rect2i()
@@ -82,10 +96,45 @@ func bake_file(parent: Node, path: String, difficulty: int = Defs.Difficulty.BEG
 	return bake_text(parent, StringName(path.get_file().get_basename()), text, difficulty, classes, clip)
 
 
-## Bake the graph of a level given as file text. `classes`: weight classes to bake (NavGraph.WEIGHT_*; empty = those
-## of the arena's modes); `clip`: cells to bake (empty = the whole grid; a boss arena inside a bigger level).
+## [method bake_file] in frames (await it; see [method bake_text_in_frames]).
+func bake_file_in_frames(parent: Node, path: String, difficulty: int = Defs.Difficulty.BEGINNER,
+		classes: PackedInt32Array = PackedInt32Array(), clip: Rect2i = Rect2i()) -> NavGraph:
+	if not FileAccess.file_exists(path):
+		push_error("NavBaker: %s does not exist" % path)
+		return null
+	var text: String = FileAccess.get_file_as_string(path)
+	return await bake_text_in_frames(parent, StringName(path.get_file().get_basename()), text, difficulty, classes,
+			clip)
+
+
+## Bake the graph of a level given as file text, in one go. `classes`: weight classes to bake (NavGraph.WEIGHT_*; empty
+## = those of the arena's modes); `clip`: cells to bake (empty = the whole grid; a boss arena inside a bigger level).
+## A long bake (a level with pulley lifts) must run in frames instead: [method bake_text_in_frames].
 func bake_text(parent: Node, level_id: StringName, text: String, difficulty: int = Defs.Difficulty.BEGINNER,
 		classes: PackedInt32Array = PackedInt32Array(), clip: Rect2i = Rect2i()) -> NavGraph:
+	if not begin_bake(parent, level_id, text, difficulty, classes, clip):
+		return null
+	step_bake(0)
+	return end_bake()
+
+
+## [method bake_text] with a frame of the engine after every FRAME_CANDIDATES candidate runs (await it; `parent` must be
+## in the tree): the same graph, and the engine's callback queue is emptied on the way (see the header). The sim world
+## stays set up between the slices (NavSim owns the simulation: Sim.manual), so nothing else may run a level meanwhile.
+func bake_text_in_frames(parent: Node, level_id: StringName, text: String,
+		difficulty: int = Defs.Difficulty.BEGINNER, classes: PackedInt32Array = PackedInt32Array(),
+		clip: Rect2i = Rect2i()) -> NavGraph:
+	if not begin_bake(parent, level_id, text, difficulty, classes, clip):
+		return null
+	while step_bake(FRAME_CANDIDATES):
+		await parent.get_tree().process_frame
+	return end_bake()
+
+
+## Set up a bake (the sim world under `parent`, the nodes, the jobs of every weight class); false when the sim cannot
+## be set up. Then call [method step_bake] until it returns false, then [method end_bake].
+func begin_bake(parent: Node, level_id: StringName, text: String, difficulty: int = Defs.Difficulty.BEGINNER,
+		classes: PackedInt32Array = PackedInt32Array(), clip: Rect2i = Rect2i()) -> bool:
 	var data: LevelData = LevelData.parse(level_id, text, "%s.lvl" % level_id)
 	var grid: TileGrid = data.build_grid(difficulty)
 	var meta: Dictionary = data.resolved_meta(difficulty)
@@ -101,11 +150,12 @@ func bake_text(parent: Node, level_id: StringName, text: String, difficulty: int
 	_clip = clip
 	if clip.size.x > 0 and clip.size.y > 0:
 		graph.clip = PackedInt32Array([clip.position.x, clip.position.y, clip.size.x, clip.size.y])
+	_jobs.clear()
+	_next_job = 0
 	if not sim.setup(parent, level_id, grid, meta, data.entity_records()):
-		return null
+		return false
 	_grid = grid
-	var started: int = Time.get_ticks_msec()
-	_started_msec = started
+	_started_msec = Time.get_ticks_msec()
 	_build_scripts()
 	movers = NavMovers.new(self)
 	_weight = NavGraph.WEIGHT_LIGHT
@@ -113,26 +163,57 @@ func bake_text(parent: Node, level_id: StringName, text: String, difficulty: int
 	_find_nodes()
 	movers.find_nodes()
 	for weight_class: int in graph.weights:
-		_weight = weight_class
-		sim.weight_class = weight_class
-		_clear_memo()
-		_find_links()
-		_find_geyser_links()
-		movers.find_links(weight_class)
+		_jobs.append(_begin_class.bind(weight_class))
+		for from: int in graph.nodes.size():
+			if graph.nodes[from].mover < 0:  # the mover nodes belong to NavMovers
+				_jobs.append(_links_from_node.bind(from))
+		_jobs.append(_find_geyser_links)
+		movers.add_jobs(_jobs)
+	return true
+
+
+## Run the next jobs of the bake: all that are left (`budget` 0), or jobs until `budget` candidate runs were simulated
+## in this call. True while jobs are left.
+func step_bake(budget: int = 0) -> bool:
+	var until: int = candidates + budget
+	while _next_job < _jobs.size():
+		_jobs[_next_job].call()
+		_next_job += 1
+		if budget > 0 and candidates >= until:
+			break
+	return _next_job < _jobs.size()
+
+
+## Finish the bake: the sim world is removed, the statistics and the report line are written; the graph.
+func end_bake() -> NavGraph:
+	_jobs.clear()
+	_next_job = 0
 	sim.teardown()
 	graph.baker = {
 		"version": VERSION, "candidates": candidates, "simulated_ticks": sim.ticks_simulated,
 		"verified_starts": verified_starts, "rejected": rejected,
 	}
 	report.append("%s: %d nodes (%d on movers), %d links (classes %s), %d candidates, %d ticks simulated, %d ms" % [
-		level_id, graph.nodes.size(), movers.node_count, graph.links.size(), Array(graph.weights), candidates,
-		sim.ticks_simulated, Time.get_ticks_msec() - started,
+		graph.level_id, graph.nodes.size(), movers.node_count, graph.links.size(), Array(graph.weights), candidates,
+		sim.ticks_simulated, Time.get_ticks_msec() - _started_msec,
 	])
+	if movers.clear_count > 0:
+		report.append("%s: %d links past a pulley lift's column hold in some pulley states only (`clear`)" % [
+			graph.level_id, movers.clear_count,
+		])
 	if graph.wrap != "none" and not sim.wrap_step.is_valid():
 		report.append("%s: wrap = %s: no wrap step available, links across the seam are left out" % [
-			level_id, graph.wrap,
+			graph.level_id, graph.wrap,
 		])
 	return graph
+
+
+## Job: the links of weight class `weight_class` start here (the sim hero gets its limits, the run caches are emptied).
+func _begin_class(weight_class: int) -> void:
+	_weight = weight_class
+	sim.weight_class = weight_class
+	_clear_memo()
+	movers.begin_class()
 
 
 func _clear_memo() -> void:
@@ -330,11 +411,7 @@ func _land_node(from: int, s: int, x: int, geyser: int = -1) -> int:
 		return int(_memo[key])
 	var node: NavGraph.NavNode = graph.nodes[from]
 	var outcome: NavSim.Outcome = sim.run(Vector2i(x, node.y), _scripts[s], MAX_TICKS, geyser)
-	candidates += 1
-	if progress_every > 0 and candidates % progress_every == 0:
-		print("NavBaker: %d candidates, %d ticks, %d ms (class %d, node %d, x %d, script %s)" % [
-			candidates, sim.ticks_simulated, Time.get_ticks_msec() - _started_msec, _weight, from, x, _script_keys[s],
-		])
+	count_candidate()
 	var landed: int = settled_node(graph, outcome)
 	if geyser >= 0 and not outcome.geysered:
 		landed = -1
@@ -394,12 +471,10 @@ static func settled_node(p_graph: NavGraph, outcome: NavSim.Outcome) -> int:
 	return node if node == p_graph.node_at(outcome.handback_pos) else -1
 
 
-func _find_links() -> void:
-	for from: int in graph.nodes.size():
-		var node: NavGraph.NavNode = graph.nodes[from]
-		if node.mover >= 0:
-			continue  # NavMovers
-		_links_from(from, _samples(node), _ground_scripts, -1, Vector2i(node.x0, node.x1))
+## Job: the links from static node `from` (the ground scripts from its take-off points).
+func _links_from_node(from: int) -> void:
+	var node: NavGraph.NavNode = graph.nodes[from]
+	_links_from(from, _samples(node), _ground_scripts, -1, Vector2i(node.x0, node.x1))
 
 
 ## Geyser links: from rest in the vent of every launching geyser, the geyser spouting on the first tick.
@@ -579,6 +654,16 @@ func _add_link(from: int, to: int, window: Dictionary, geyser: int) -> void:
 	graph.add_link(link)
 
 
+## Count one candidate run (and print the progress line of `--verbose` every [member progress_every] runs).
+func count_candidate() -> void:
+	candidates += 1
+	if progress_every > 0 and candidates % progress_every == 0:
+		print("NavBaker: %d candidates, %d ticks, %d ms (class %d, job %d of %d)" % [
+			candidates, sim.ticks_simulated, Time.get_ticks_msec() - _started_msec, _weight, _next_job + 1,
+			_jobs.size(),
+		])
+
+
 ## Add a verified link made elsewhere (NavMovers); counts its starts.
 func add_verified_link(link: NavGraph.NavLink) -> void:
 	link.weight = _weight
@@ -588,40 +673,103 @@ func add_verified_link(link: NavGraph.NavLink) -> void:
 
 ## Re-simulate every link of `p_graph` from every x of its window, with its weight class, geyser timing and mover
 ## state (the check of tests and of `bake_nav --verify`); the problems found, empty when all hold. `sim` must be set
-## up on the graph's level.
-func verify_graph(p_graph: NavGraph) -> PackedStringArray:
+## up on the graph's level. `pulley_every` > 1: of the links of a pulley sweep (their `cond` names a pulley lift) only
+## every `pulley_every`-th is checked (a quick check of a graph with thousands of them; all the other links always).
+## A graph with pulley lifts is a long check: [method verify_graph_in_frames].
+func verify_graph(p_graph: NavGraph, pulley_every: int = 1) -> PackedStringArray:
 	var problems: PackedStringArray = PackedStringArray()
 	var mover_check: NavMovers = NavMovers.new(self)
 	graph = p_graph
-	for link: NavGraph.NavLink in p_graph.links:
-		sim.weight_class = link.weight
-		var node: NavGraph.NavNode = p_graph.nodes[link.from]
-		var geyser: int = -1
-		if link.kind == NavGraph.KIND_GEYSER:
-			geyser = _geyser_at(Vector2i(link.window_center(), node.y))
-			if geyser < 0:
-				problems.append("link %d (%d -> %d, geyser): no geyser under its window" % [link.id, link.from, link.to])
-				continue
-		for x: int in range(link.x0, link.x1 + 1):
-			var landed: int = -1
-			var pos: Vector2i = Vector2i.ZERO
-			if node.mover >= 0 or not link.cond.is_empty():
-				var result: Dictionary = mover_check.run_link(link, x)
-				landed = int(result["node"])
-				pos = result["pos"]
-			else:
-				var outcome: NavSim.Outcome = sim.run(Vector2i(x, node.y), link.flags, MAX_TICKS, geyser)
-				landed = settled_node(p_graph, outcome)
-				if geyser >= 0 and not outcome.geysered:
-					landed = -1
-				pos = outcome.pos
-			if landed != link.to:
-				problems.append("link %d (%d -> %d, %s, class %d) from x %d lands on node %d at %s" % [
-					link.id, link.from, link.to, link.keys, link.weight, x, landed, pos,
-				])
-				break
+	for link: NavGraph.NavLink in _links_to_verify(p_graph, pulley_every):
+		_verify_link(link, mover_check, problems, pulley_every > 1)
 	sim.weight_class = NavGraph.WEIGHT_LIGHT
 	return problems
+
+
+## [method verify_graph] with a frame of the engine after every FRAME_CANDIDATES runs (await it; `parent` is in the
+## tree): the same problems, and the engine's callback queue is emptied on the way (see the header).
+func verify_graph_in_frames(p_graph: NavGraph, parent: Node, pulley_every: int = 1) -> PackedStringArray:
+	var problems: PackedStringArray = PackedStringArray()
+	var mover_check: NavMovers = NavMovers.new(self)
+	graph = p_graph
+	var runs: int = 0
+	for link: NavGraph.NavLink in _links_to_verify(p_graph, pulley_every):
+		var before: int = candidates
+		_verify_link(link, mover_check, problems, pulley_every > 1)
+		runs += link.x1 - link.x0 + 1 + candidates - before
+		if runs >= FRAME_CANDIDATES:
+			runs = 0
+			await parent.get_tree().process_frame
+	sim.weight_class = NavGraph.WEIGHT_LIGHT
+	return problems
+
+
+## The links a verification checks: all of them, but of a pulley sweep's only every `pulley_every`-th.
+func _links_to_verify(p_graph: NavGraph, pulley_every: int) -> Array[NavGraph.NavLink]:
+	var result: Array[NavGraph.NavLink] = []
+	var swept: int = 0
+	for link: NavGraph.NavLink in p_graph.links:
+		if pulley_every > 1 and link.cond.size() >= 5 and p_graph.is_pulley_lift(link.cond[0]):
+			swept += 1
+			if (swept - 1) % pulley_every != 0:
+				continue
+		result.append(link)
+	return result
+
+
+## Re-simulate one link of [member graph] from every x of its window; a problem line is added when a start does not
+## land on the link's target. A link past a lift's column (NavLink.clear_at) is also run at the pulley states of its
+## ranges - every one, or with `sample` the two ends and the middle of each range.
+func _verify_link(link: NavGraph.NavLink, mover_check: NavMovers, problems: PackedStringArray,
+		sample: bool = false) -> void:
+	sim.weight_class = link.weight
+	var node: NavGraph.NavNode = graph.nodes[link.from]
+	var geyser: int = -1
+	if link.kind == NavGraph.KIND_GEYSER:
+		geyser = _geyser_at(Vector2i(link.window_center(), node.y))
+		if geyser < 0:
+			problems.append("link %d (%d -> %d, geyser): no geyser under its window" % [link.id, link.from, link.to])
+			return
+	for x: int in range(link.x0, link.x1 + 1):
+		var landed: int = -1
+		var pos: Vector2i = Vector2i.ZERO
+		if node.mover >= 0 or not link.cond.is_empty():
+			var result: Dictionary = mover_check.run_link(link, x)
+			landed = int(result["node"])
+			pos = result["pos"]
+		else:
+			var outcome: NavSim.Outcome = sim.run(Vector2i(x, node.y), link.flags, MAX_TICKS, geyser)
+			landed = settled_node(graph, outcome)
+			if geyser >= 0 and not outcome.geysered:
+				landed = -1
+			pos = outcome.pos
+		if landed != link.to:
+			problems.append("link %d (%d -> %d, %s, class %d) from x %d lands on node %d at %s" % [
+				link.id, link.from, link.to, link.keys, link.weight, x, landed, pos,
+			])
+			return
+	if link.clear_at.size() < 3 or node.mover >= 0:
+		return
+	var step: int = maxi(PartyTuning.PULLEY_SPEED_PX, 1)
+	for i: int in range(1, link.clear_at.size() - 1, 2):
+		var lo: int = link.clear_at[i]
+		var hi: int = link.clear_at[i + 1]
+		var states: PackedInt32Array = PackedInt32Array()
+		if sample:
+			for p: int in [lo, lo + ((hi - lo) / 2 / step) * step, hi]:
+				if not states.has(p):
+					states.append(p)
+		else:
+			for p: int in range(lo, hi + 1, step):
+				states.append(p)
+		for p: int in states:
+			for x: int in range(link.x0, link.x1 + 1):
+				var landed: int = mover_check.run_past_lifts(link, x, NavMovers.encode_preset(link.clear_at[0], p))
+				if landed != link.to:
+					problems.append("link %d (%d -> %d, %s, class %d) from x %d with pulley %d at %d lands on node %d" % [
+						link.id, link.from, link.to, link.keys, link.weight, x, link.clear_at[0], p, landed,
+					])
+					return
 
 
 ## The geyser whose vent holds the feet point `pos`; -1 when none.

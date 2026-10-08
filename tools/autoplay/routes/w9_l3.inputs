@@ -5,8 +5,11 @@
 # checkpoint 2, a bounce over the Guard, the gallery and up the chimney's two grates into the pyre hall; the Rival
 # Chieftains on hero physics (bot graph resources/bots/w9_l3.json) beaten with the club by enemies-C's
 # ChiefClubPilot (tests/test_enemies_chieftain.gd) moved into the hall; then the Great Roast on the altar.
+# Re-recorded in wf10 (bosses, the resumed run) with the same bot on the tree of 2026-10-08 21:25: this round's bot /
+# hero code (core/bots, player.gd) moved the chieftains' fight by a tick, and the Great Roast then fell where the old
+# open-loop inputs did not reach it (the solo form of chieftain.gd is unchanged). Fight 592 ticks (24 s), 8 hits.
 43:L,7:,4:R,6:,12:LU,27:L,6:F,4:,1:L,6:F,4:,22:L,6:F,4:,1:L,6:F,4:,113:L,7:,1:R,5:,1:R,2:,73:U,200:R,7:,1:R,2:
 73:U,4:L,6:,2:R,3:,1:L,1:F,18:,1:F,18:,1:F,35:,4:L,6:,1:R,12:,16:L,7:,5:L,14:LU,31:L,7:,12:U,11:,12:U,4:,18:L
-6:F,16:,3:L,10:LU,1:R,10:RU,4:,1:L,4:,5:L,6:F,5:,3:R,1:L,11:,6:F,14:,16:L,6:F,5:,10:LU,33:,4:R,1:L,6:F,8:,6:F
-8:,6:F,5:,26:R,6:F,6:,7:R,10:RU,9:,1:L,4:,9:L,6:F,5:,1:R,1:L,13:,6:F,4:,3:L,10:LU,1:R,10:RU,4:,1:L,4:,20:L,6:F
-5:,18:R,7:,9:RU
+6:F,16:,3:L,10:LU,1:R,10:RU,4:,1:L,4:,5:L,6:F,5:,3:R,1:L,11:,6:F,14:,16:L,6:F,5:,10:LU,32:,2:L,1:R,6:F,5:,1:L
+1:R,1:L,1:R,6:F,8:,6:F,5:,31:R,8:,7:R,10:RU,6:,15:L,15:,1:R,4:,4:R,10:RU,47:,1:L,6:F,20:,6:F,5:,3:L,10:LU,1:L
+10:LU,1:L,1:R,10:,10:RU,14:,6:R,5:L,5:R,10:,10:R,6:F,20:,6:F,13:,6:R,6:F,5:,2:L,2:,9:R,1:,3:R,6:L,2:,8:RU

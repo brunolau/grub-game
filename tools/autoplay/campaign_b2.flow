@@ -10,9 +10,10 @@
 # solo mode, the wall without completing the book, The End with it. Named screenshots of every map stop, stage start
 # and tally, one every 480 ticks of play.
 # The headless twin is tests/test_book2_routes.gd test_the_book2_{beginner,expert}_campaign_in_one_run (the same
-# routes, the same run). Feast Land D is not visited: its warp in 5-2 needs the spear, which no route that ends 5-1
-# picks up yet (wf9_integration_to_D5.txt #1); bonus_d.inputs proves it on its own. Beginner takes 7-1's warp
-# into Feast Land E (w7_l1.warp.inputs, bonus_e.inputs).
+# routes, the same run). Beginner visits both Feast Lands: 5-1 by its painting route, which leaves with the spear
+# (w5_l1.painting.inputs), so the fresh-club rule puts the spear on the belt for 5-2, whose warp needs two spear steps
+# (w5_l2.warp.inputs, then bonus_d.inputs; the warp passes the Tusker stage 5-2b, which the Expert part fights), and
+# 7-1's warp into Feast Land E (w7_l1.warp.inputs, bonus_e.inputs).
 # Every stop begins with `need` - its files and routes. Until phase 3 was content complete this was a skeleton flow
 # (a stop whose content had not landed ended its section, PENDING); at G3 (Book II complete) the skeleton line went,
 # so a missing `need` fails the run.
@@ -26,6 +27,9 @@
 # Solo, Book II, Beginner
 ########################################################################################################################
 section book2_beginner
+# Every part counts its own events: a stage that fails in one part (a wipe, a death) must not fail the
+# `== 0` checks of the parts after it.
+reset_events
 
 # --- Title, Play > Solo > Book II > Beginner --------------------------------------------------------------------------
 wait_until flow.current_screen == title 900
@@ -62,8 +66,10 @@ expect game.lives == 2
 expect game.score == 0
 expect game.weapon == 0
 
-# --- w5_l1 ------------------------------------------------------------------------------------------------------------
-need w5_l1 tools/autoplay/routes/w5_l1.inputs
+# --- w5_l1, by its painting route (it ends with the spear in hand) -----------------------------------------------------
+# As the headless twin (tests/test_book2_routes.gd CAMPAIGN_SIDES): the painting on the way, the spear picked up, a
+# swap for the club line, the spear back in hand before the exit (w5_l1.painting.inputs, weapon_end:spear).
+need w5_l1 tools/autoplay/routes/w5_l1.painting.inputs
 wait_until flow.current_screen == world_map 900
 wait_until flow.busy == false 600
 expect flow.args.level_id == w5_l1
@@ -79,9 +85,11 @@ expect game.weapon == 0
 wait 2
 shot w5_l1_start
 every 480 w5_l1
-play_file tools/autoplay/routes/w5_l1.inputs
+play_file tools/autoplay/routes/w5_l1.painting.inputs
 every 0
 expect events.player_died == 0
+# The spear leaves 5-1 in hand: the next stage starts with the club and the spear on the belt.
+expect game.weapon == 4
 wait_until flow.current_screen == tally 900
 wait_until flow.busy == false 600
 wait 30
@@ -91,8 +99,11 @@ wait 20
 press ui_accept
 # On to the map (checked by the next stop, after its `need`).
 
-# --- w5_l2 + w5_l2b ---------------------------------------------------------------------------------------------------
-need w5_l2 w5_l2b tools/autoplay/routes/w5_l2.inputs tools/autoplay/routes/w5_l2b.inputs
+# --- w5_l2, by its warp into Feast Land D -----------------------------------------------------------------------------
+# As the headless twin (CAMPAIGN_SIDES): the spear carried over from 5-1 rides on the belt (the fresh-club rule); two
+# spear steps reach the warp on the mesa pillar (w5_l2.warp.inputs); Feast Land D follows without a tally and its
+# tally ends 5-2 - the warp passes the linked Tusker stage 5-2b (the Expert part plays 5-2 and 5-2b by their routes).
+need w5_l2 bonus_d tools/autoplay/routes/w5_l2.warp.inputs tools/autoplay/routes/bonus_d.inputs
 wait_until flow.current_screen == world_map 900
 wait_until flow.busy == false 600
 expect flow.args.level_id == w5_l2
@@ -105,31 +116,30 @@ wait_until flow.current_screen == level 900
 wait_until flow.busy == false 600
 wait_until level.level_id == w5_l2 600
 expect hero.dead == false
-# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
+# Fresh club (DESIGN.md C.1 rule 4): the club in hand, what the hero carried - the spear of 5-1 - on the belt.
 expect game.weapon == 0
+expect game.get_run(0).belt == 4
 wait 2
 shot w5_l2_start
 every 480 w5_l2
-play_file tools/autoplay/routes/w5_l2.inputs
+play_file tools/autoplay/routes/w5_l2.warp.inputs
 every 0
 expect events.player_died == 0
-# The linked stage follows without a tally.
 wait_until flow.current_screen == level 900
 wait_until flow.busy == false 600
-wait_until level.level_id == w5_l2b 600
+wait_until level.level_id == bonus_d 600
 expect hero.dead == false
-# Fresh club (DESIGN.md C.1 rule 4): every Book II and co-op stage starts with the club in hand.
-expect game.weapon == 0
+expect game.warp_return_level == w5_l2
 wait 2
-shot w5_l2b_start
-every 480 w5_l2b
-play_file tools/autoplay/routes/w5_l2b.inputs
+shot bonus_d_start
+every 480 bonus_d
+play_file tools/autoplay/routes/bonus_d.inputs
 every 0
 expect events.player_died == 0
 wait_until flow.current_screen == tally 900
 wait_until flow.busy == false 600
 wait 30
-shot tally_w5_l2_book2_beginner
+shot tally_bonus_d_book2_beginner
 press ui_accept
 wait 20
 press ui_accept
@@ -313,6 +323,9 @@ wait_until flow.busy == false 600
 # Solo, Book II, Expert
 ########################################################################################################################
 section book2_expert
+# Every part counts its own events: a stage that fails in one part (a wipe, a death) must not fail the
+# `== 0` checks of the parts after it.
+reset_events
 
 # --- Title, Play > Solo > Book II > Expert ----------------------------------------------------------------------------
 wait_until flow.current_screen == title 900
@@ -325,8 +338,11 @@ wait 10
 press ui_accept
 wait_until flow.current_screen == book_select 300
 wait_until flow.busy == false 600
-# The book select focuses the book of the last run (Flow.play_book): Book II, played by the part before - the
-# cards wrap, so a Right here would go back to Book I (G3 integration: the first run that got this far).
+# The book select focuses the book of the last run (Flow.play_book): Book II when the part before played to its end
+# (the cards wrap, so a Right would then go back to Book I), Book I when that part was cut short and the runner went
+# back to the title itself. So Right is pressed only while Book II is not the focused book: the part plays the same
+# either way, and a stage that fails in the part before does not fail this one.
+press_if ui_right flow.play_book != 2
 wait 10
 shot book_select_book2_expert
 press ui_accept

@@ -194,8 +194,8 @@ func test_the_band_waits_for_the_first_input_then_rises_and_kills() -> void:
 ## place drags nothing up (so it lands in view and he lives), a climb to a higher footing still raises the view.
 func test_the_rising_view_follows_the_footing_not_a_jump() -> void:
 	var rows: PackedStringArray = _shaft(40)
-	# A ledge 9 rows over the floor on the left (columns 1-8): a higher footing to climb onto, high enough in the view
-	# (camera row 28, ledge row 30: sr 2) for the 12.2 follow to raise the view for it.
+	# A ledge 9 rows over the floor on the left (columns 1-8): a higher footing to climb onto - above the footing room
+	# (LevelCamera.FOOTING_ROOM_PX: every footing less than 72 px under the view's top raises the view).
 	rows[30] = "#" + "#".repeat(8) + ".".repeat(14) + "#"
 	var level: Level = _load("scroll = rising\nrise_speed = 4", rows)
 	var hero: PlayerBase = level.player
@@ -596,3 +596,434 @@ func test_the_world_a_levels_load_and_run() -> void:
 	Sim.step(30)
 	assert_false(coop.get_hero(1).is_down(), "both start on the view")
 	coop.free()
+
+
+# =================================================================================================================
+# The footing room on a real climb (LevelCamera._follow_footing and Level._head_peek; the wf10 follow-up of G42: "the
+# hero must not climb under the HUD band or leave the top of the view")
+# =================================================================================================================
+
+## The HUD band on any device (logical px) and the hero's standing height.
+const HUD_BAND_PX: int = 31
+const HERO_HEIGHT_PX: int = 35
+
+
+## The 6-2b climb in small: a shaft of `rows` rows with one-way ledges three rows apart, one over the other (columns
+## 2-20), from three rows over the floor up to row 8.
+func _ledge_shaft(rows: int) -> PackedStringArray:
+	var lines: PackedStringArray = _shaft(rows)
+	var row: int = rows - 1 - 3
+	while row >= 8:
+		lines[row] = "#." + "-".repeat(19) + "..#"
+		row -= 3
+	return lines
+
+
+## What a climb looked like while the band rose. Per hero, px under the view's top: "feet" and "head" - the lowest of
+## each on the SIMULATED view (the camera's position: the view of record); "settled" - the lowest head once he has
+## stood 5 ticks or more (ground, platform or vine); "drawn" - the lowest head on the DRAWN view (the camera's position
+## less the level's head peek, read from the Camera2D after a frame). And: "below" - the ticks his feet were under the
+## view; "egg" / "leash" - the ticks he was an egg / leashed; "rising" - the rising ticks; "sank" - the ticks the view
+## came down; "peek" - the largest look-up.
+func _watch_climb(level: Level, ticks: int, flags_of: Callable) -> Dictionary:
+	var out: Dictionary = {"head": [1 << 20, 1 << 20], "feet": [1 << 20, 1 << 20], "settled": [1 << 20, 1 << 20],
+		"drawn": [1 << 20, 1 << 20], "rising": 0, "sank": 0, "below": [0, 0], "egg": [0, 0], "leash": [0, 0], "peek": 0.0}
+	var last_top: int = 1 << 30
+	var stood: Array[int] = [0, 0]
+	for t: int in ticks:
+		for slot: int in level.hero_count():
+			GameInput.set_scripted_slot(slot, func(_tick: int) -> int: return int(flags_of.call(slot, t)))
+		Sim.step(1)
+		level._process(1.0 / Tuning.TICK_HZ)
+		var camera: LevelCamera = level._frame_logic if level._tribe_on() else level.get_camera()
+		if not camera.footing_mode:
+			continue
+		out["rising"] += 1
+		if camera.pos.y > last_top:
+			out["sank"] += 1
+		last_top = camera.pos.y
+		out["peek"] = maxf(out["peek"], level.get_head_peek())
+		var drawn_top: float = level._camera.position.y / float(Tuning.ART_SCALE)
+		for hero: PlayerBase in level.heroes:
+			if hero != null and hero.down:
+				out["egg"][hero.slot] += 1
+			if hero == null or hero.dead or hero.down:
+				continue
+			if hero.leash > 0:
+				out["leash"][hero.slot] += 1
+			var feet: int = hero.sim_pos.y - camera.pos.y
+			var head: int = feet - HERO_HEIGHT_PX
+			out["head"][hero.slot] = mini(out["head"][hero.slot], head)
+			out["feet"][hero.slot] = mini(out["feet"][hero.slot], feet)
+			if feet > camera.rows * Tuning.TILE:
+				out["below"][hero.slot] += 1
+			var standing: bool = hero.grounded or hero.on_platform or hero.state == Defs.HeroState.CLIMB
+			stood[hero.slot] = stood[hero.slot] + 1 if standing else 0
+			if stood[hero.slot] >= 5:
+				out["settled"][hero.slot] = mini(out["settled"][hero.slot], head)
+			var drawn_y: float = lerpf(float(hero.sim_prev.y), float(hero.sim_pos.y), Sim.alpha)
+			out["drawn"][hero.slot] = mini(out["drawn"][hero.slot], int(floorf(drawn_y - float(HERO_HEIGHT_PX) - drawn_top)))
+	GameInput.clear_scripted()
+	return out
+
+
+func test_a_rising_climb_keeps_the_hero_under_the_hud_band_and_his_jumps_in_view() -> void:
+	var level: Level = _load("scroll = rising\nrise_speed = 16", _ledge_shaft(70))
+	var hero: PlayerBase = level.player
+	var camera: LevelCamera = level.get_camera()
+	var start_y: int = hero.sim_pos.y
+	# Up held all the way: he jumps to the next ledge as soon as he may - the fastest climb there is (a ledge every 20
+	# ticks, 2.4 px per tick against the band's 1).
+	var seen: Dictionary = _watch_climb(level, 420, func(_slot: int, _t: int) -> int: return Defs.IN_UP)
+	assert_false(hero.dead, "he outclimbs the band")
+	assert_true(start_y - hero.sim_pos.y >= 12 * 3 * Tuning.TILE, "a dozen ledges up (%d px)" % (start_y - hero.sim_pos.y))
+	assert_true(seen["rising"] > 400, "the band rose all the while")
+	assert_eq(seen["sank"], 0, "the view never came down")
+	# The view of record: his feet never leave it, and once he has stood 5 ticks his head is under the band.
+	assert_true(seen["feet"][0] >= 8, "his feet stay inside the view at every apex (%d px)" % seen["feet"][0])
+	assert_true(seen["settled"][0] >= HUD_BAND_PX, "standing, his head is under the HUD band (%d px under the top)"
+			% seen["settled"][0])
+	# The drawn view: his head never passes the band - not at a jump's apex, not on the tick he lands a ledge higher.
+	assert_true(seen["drawn"][0] >= HUD_BAND_PX, "drawn, his head is under the band on every tick (%d px at least)"
+			% seen["drawn"][0])
+	assert_true(seen["peek"] > 40.0 and seen["peek"] <= float(LevelCamera.HEAD_PEEK_MAX_PX), "the drawn view looked up %d px"
+			% int(seen["peek"]))
+	# He stops: the view rests with his ledge 72 px under its top and the look-up is gone.
+	GameInput.set_scripted(func(_tick: int) -> int: return 0)
+	for i: int in 30:
+		Sim.step(1)
+		level._process(1.0 / Tuning.TICK_HZ)
+	GameInput.clear_scripted()
+	assert_true(hero.grounded)
+	assert_eq(hero.sim_pos.y - camera.pos.y, LevelCamera.FOOTING_ROOM_PX, "at rest: the footing 72 px under the top")
+	assert_eq(level.get_head_peek(), 0.0, "at rest the drawn view is the camera's")
+	assert_eq(level._camera.position.y, float(camera.pos.y * Tuning.ART_SCALE))
+
+
+func test_a_jump_in_place_on_a_climb_ledge_still_lands_in_view() -> void:
+	# G42's promise: from a ledge the view follows only the footing; jumping in place costs nothing but the band's own
+	# rise - the drawn view looks up for the jump and comes back.
+	var level: Level = _load("scroll = rising\nrise_speed = 4", _ledge_shaft(70))
+	var hero: PlayerBase = level.player
+	var camera: LevelCamera = level.get_camera()
+	_watch_climb(level, 70, func(_slot: int, _t: int) -> int: return Defs.IN_UP)  # some ledges up
+	GameInput.set_scripted(func(_tick: int) -> int: return 0)
+	Sim.step(20)
+	var ledge_y: int = hero.sim_pos.y
+	assert_true(hero.grounded)
+	assert_eq(ledge_y - camera.pos.y, LevelCamera.FOOTING_ROOM_PX)
+	var top: int = camera.pos.y
+	# Up for one tick, then let go: a short hop that comes down on the same ledge (a full jump would pass the one-way
+	# ledge three rows up and land on it; the 64 px apex is the camera's own test, tests/test_world_tribe.gd).
+	var apex: int = ledge_y
+	var keys: Array[int] = [Defs.IN_UP]
+	for i: int in 40:
+		keys.append(0)
+	var peeked: float = 0.0
+	for i: int in keys.size():
+		var flags: int = keys[i]
+		GameInput.set_scripted(func(_tick: int) -> int: return flags)
+		Sim.step(1)
+		level._process(1.0 / Tuning.TICK_HZ)
+		apex = mini(apex, hero.sim_pos.y)
+		peeked = maxf(peeked, level.get_head_peek())
+		var band_limit: int = level.get_rising_tide().band_top + Tuning.TILE - camera.rows * Tuning.TILE
+		assert_true(camera.pos.y >= mini(top, band_limit), "tick %d: the view rose only with the band" % i)
+	GameInput.clear_scripted()
+	assert_false(hero.dead)
+	assert_true(ledge_y - apex >= 10 and ledge_y - apex < 3 * Tuning.TILE, "a hop (%d px)" % (ledge_y - apex))
+	assert_eq(hero.sim_pos.y, ledge_y, "back on his ledge")
+	assert_true(hero.sim_pos.y - camera.pos.y <= camera.rows * Tuning.TILE, "he is in view where he came down")
+	assert_true(peeked > 0.0, "the drawn view looked up for the hop (%d px)" % int(peeked))
+	assert_eq(level.get_head_peek(), 0.0, "and came back")
+
+
+func test_six_rows_down_from_the_highest_footing_is_still_in_view() -> void:
+	# The Cave Painting nook of 6-2b in small: a block six rows over a climb ledge. The hero stands on it (the view
+	# rises for that footing and never comes down), then walks off and drops back to the ledge: he must land in view -
+	# the 1.0 off-screen rule kills 12 rows under the camera row. (An 8-row footing room would put the ledge there.)
+	var rows: PackedStringArray = _ledge_shaft(70)
+	var ledge_row: int = 69 - 3 * 4      # the fourth ledge
+	# The nook: a block of columns 2-4, rows -6 and -5 over the ledge; no ledge beside it or between it and the ledge.
+	rows[ledge_row - 6] = "#.###" + ".".repeat(18) + "#"
+	rows[ledge_row - 5] = "#.###" + ".".repeat(18) + "#"
+	rows[ledge_row - 3] = "#" + ".".repeat(22) + "#"
+	var level: Level = _load("scroll = rising\nrise_speed = 4", rows)
+	var hero: PlayerBase = level.player
+	var camera: LevelCamera = level.get_camera()
+	GameInput.set_scripted(func(_tick: int) -> int: return Defs.IN_LOOK)
+	Sim.step(2)
+	GameInput.clear_scripted()
+	var nook_y: int = (ledge_row - 6) * Tuning.TILE
+	hero.teleport(Vector2i(3 * Tuning.TILE + 8, ledge_row * Tuning.TILE))
+	Sim.step(30)
+	assert_true(hero.grounded, "on the ledge")
+	hero.teleport(Vector2i(3 * Tuning.TILE + 8, nook_y))
+	Sim.step(30)
+	assert_true(hero.grounded, "on the nook")
+	assert_eq(hero.sim_pos.y, nook_y)
+	assert_eq(nook_y - camera.pos.y, LevelCamera.FOOTING_ROOM_PX, "the view rests on the nook")
+	GameInput.set_scripted(func(_tick: int) -> int: return Defs.IN_RIGHT)
+	Sim.step(50)
+	GameInput.clear_scripted()
+	assert_false(hero.dead, "he walked off the nook and lives")
+	assert_true(hero.grounded)
+	assert_eq(hero.sim_pos.y, ledge_row * Tuning.TILE, "back on the ledge, six rows down")
+	var feet: int = hero.sim_pos.y - camera.pos.y
+	assert_true(feet <= camera.rows * Tuning.TILE, "his feet are in view (%d px under the top of %d)" % [feet,
+			camera.rows * Tuning.TILE])
+
+
+func test_a_pair_climbing_side_by_side_both_stay_under_the_band() -> void:
+	var rows: PackedStringArray = _ledge_shaft(70)
+	var level: Level = _load("scroll = rising\nrise_speed = 16", rows, "objects/hero_start 14 68 slot=2", 2)
+	var p1: PlayerBase = level.player
+	var p2: PlayerBase = level.get_hero(1)
+	assert_true(absi(p1.sim_pos.x - p2.sim_pos.x) >= 8 * Tuning.TILE, "ten columns apart: no head contacts")
+	var seen: Dictionary = _watch_climb(level, 420, func(_slot: int, _t: int) -> int: return Defs.IN_UP)
+	for hero: PlayerBase in [p1, p2]:
+		var who: String = "P%d" % (hero.slot + 1)
+		assert_false(hero.dead or hero.down, who + " climbs on")
+		assert_true(seen["feet"][hero.slot] >= 8, who + ": feet in view at every apex (%d)" % seen["feet"][hero.slot])
+		assert_true(seen["settled"][hero.slot] >= HUD_BAND_PX, who + ": standing, his head under the band (%d)"
+				% seen["settled"][hero.slot])
+		assert_true(seen["drawn"][hero.slot] >= HUD_BAND_PX, who + ": drawn, never with his head in the band (%d)"
+				% seen["drawn"][hero.slot])
+		assert_eq(seen["below"][hero.slot], 0, who + ": never under the view")
+		assert_eq(seen["leash"][hero.slot], 0, who + ": never leashed")
+	assert_eq(seen["sank"], 0)
+
+
+func test_a_pair_two_ledges_apart_stays_on_the_rising_view() -> void:
+	# One hero climbs as fast as he can; the other does the same 40 ticks later - one or two ledges (up to six rows)
+	# behind all the way.
+	# The view rests on the LEADER's footing - whichever slot he is - and its six rows under him hold the partner.
+	for leader_slot: int in 2:
+		var rows: PackedStringArray = _ledge_shaft(70)
+		var level: Level = _load("scroll = rising\nrise_speed = 4", rows, "objects/hero_start 14 68 slot=2", 2)
+		var lead: PlayerBase = level.get_hero(leader_slot)
+		var trail: PlayerBase = level.get_hero(1 - leader_slot)
+		var frame: LevelCamera = level._frame_logic
+		var who: String = "P%d leads: " % (leader_slot + 1)
+		var seen: Dictionary = _watch_climb(level, 400, func(slot: int, t: int) -> int:
+			return Defs.IN_UP if slot == leader_slot or t >= 40 else Defs.IN_LOOK
+		)
+		for hero: PlayerBase in [lead, trail]:
+			assert_false(hero.dead or hero.down, who + "P%d is still climbing" % (hero.slot + 1))
+			assert_eq(seen["below"][hero.slot], 0, who + "P%d was never under the view" % (hero.slot + 1))
+			assert_eq(seen["leash"][hero.slot], 0, who + "P%d was never leashed" % (hero.slot + 1))
+			assert_true(seen["feet"][hero.slot] >= 8, who + "P%d's feet never left the top of the view" % (hero.slot + 1))
+		assert_true(seen["settled"][leader_slot] >= HUD_BAND_PX, who + "standing, his head is under the band (%d)"
+				% seen["settled"][leader_slot])
+		assert_true(seen["drawn"][leader_slot] >= HUD_BAND_PX, who + "drawn, his head never in the band (%d)"
+				% seen["drawn"][leader_slot])
+		assert_eq(seen["sank"], 0)
+		# Both stop.
+		for slot: int in 2:
+			GameInput.set_scripted_slot(slot, func(_tick: int) -> int: return Defs.IN_LOOK)
+		Sim.step(40)
+		GameInput.clear_scripted()
+		assert_true(lead.grounded and trail.grounded)
+		var apart: int = trail.sim_pos.y - lead.sim_pos.y
+		assert_true(apart == 3 * Tuning.TILE or apart == 6 * Tuning.TILE, who + "one or two ledges apart at rest (%d px)" % apart)
+		assert_eq(lead.sim_pos.y - frame.pos.y, LevelCamera.FOOTING_ROOM_PX, who + "the view rests on his footing")
+		assert_true(trail.sim_pos.y - frame.pos.y <= frame.rows * Tuning.TILE, who + "his partner's feet are on the view")
+		level.free()
+		Sim.stop()
+		Game.new_game(Defs.Difficulty.BEGINNER)
+
+
+func test_the_rising_view_goes_with_the_leader_when_his_partner_stays_behind() -> void:
+	# P2 never climbs (he taps Look: awake, but he stays on the floor). The view goes with P1; once P2 is seven rows
+	# behind he is under it: the leash makes him an egg while P1 climbs on. The leader is never the one who pays.
+	var rows: PackedStringArray = _ledge_shaft(70)
+	var level: Level = _load("scroll = rising\nrise_speed = 4", rows, "objects/hero_start 14 68 slot=2", 2)
+	var p1: PlayerBase = level.player
+	var frame: LevelCamera = level._frame_logic
+	var seen: Dictionary = _watch_climb(level, 200, func(slot: int, t: int) -> int:
+		return Defs.IN_UP if slot == 0 else (Defs.IN_LOOK if t % 50 == 0 else 0)
+	)
+	assert_false(p1.dead or p1.down, "the leader climbs on")
+	assert_eq(seen["leash"][0], 0, "and was never off the view")
+	assert_eq(seen["egg"][0], 0)
+	assert_true(seen["feet"][0] >= 8, "his feet never over the view's top (%d)" % seen["feet"][0])
+	assert_true(seen["settled"][0] >= HUD_BAND_PX, "standing, his head is under the band (%d)" % seen["settled"][0])
+	assert_true(seen["leash"][1] >= PartyTuning.leash_egg_ticks(Game.difficulty) - 1, "the hero left behind was leashed ...")
+	assert_true(seen["egg"][1] > 0, "... and became an egg (his partner plays on)")
+	assert_false((level.party_driver as PartyDriver).wipe_pending, "no team wipe")
+	# The leader stops: the view rests on his footing.
+	for slot: int in 2:
+		GameInput.set_scripted_slot(slot, func(_tick: int) -> int: return Defs.IN_LOOK if slot == 0 else 0)
+	Sim.step(40)
+	GameInput.clear_scripted()
+	assert_true(p1.grounded)
+	assert_eq(p1.sim_pos.y - frame.pos.y, LevelCamera.FOOTING_ROOM_PX, "the view rests on the leader's footing")
+
+
+# =================================================================================================================
+# Rafts: the drag clock across a doze, the whole deck of a docked railed raft (raft.gd, PHYSICS.md C.7)
+# =================================================================================================================
+
+## A long water level: banks at columns 0-9 and from 90 on (ground from row 12), water between, the start on the left
+## bank; 100 columns x 14 rows.
+func _lake() -> PackedStringArray:
+	var lines: PackedStringArray = PackedStringArray()
+	for row: int in 14:
+		var line: String = ".".repeat(100)
+		if row >= 12:
+			line = "#".repeat(10) + "~".repeat(80) + "#".repeat(10)
+		elif row == 11:
+			line = "....@" + ".".repeat(95)
+		lines.append(line)
+	return lines
+
+
+func test_a_rafts_drag_clock_counts_the_ticks_it_dozed() -> void:
+	# One raft beside the hero (awake all the time), one far down the lake (it dozes). D6's report: the far one's drag
+	# clock stood still while it slept, so a raft paddled after a doze lost its speed on other ticks than with dozing
+	# off - the per-tick digests of a co-op route parted (wf9_d6_to_objects-B.txt).
+	var level: Level = _load("", _lake(), "objects/raft 14 12\nobjects/raft 70 12")
+	var near: Raft = null
+	var far: Raft = null
+	for entity: SimEntity in level.get_kind(Defs.Kind.PLATFORM):
+		var raft: Raft = entity as Raft
+		if raft != null and raft.sim_pos.x < 400:
+			near = raft
+		elif raft != null:
+			far = raft
+	assert_not_null(near)
+	assert_not_null(far)
+	if near == null or far == null:
+		return
+	Sim.step(37)
+	assert_false(near.is_dozing(), "the raft in view ticks")
+	assert_true(far.is_dozing(), "the raft far down the lake dozes")
+	assert_eq(near._moves, 37, "the drag clock: one per floating tick")
+	level.doze_wake(far)
+	assert_eq(far._moves, near._moves, "awake again: the slept ticks are on its clock")
+	# The same strokes on both: the same speed on every tick until both rest.
+	var problems: PackedStringArray = PackedStringArray()
+	var x_near: int = near.sim_pos.x
+	var x_far: int = far.sim_pos.x
+	for stroke: int in 3:
+		near.paddle(-1)
+		far.paddle(-1)
+	assert_eq(near.rx, Tuning.RAFT_SPEED_CAP)
+	for t: int in 40:
+		Sim.step(1)
+		if near.rx != far.rx or near.sim_pos.x - x_near != far.sim_pos.x - x_far:
+			problems.append("tick %d: rx %d / %d, moved %d / %d" % [t + 1, near.rx, far.rx, near.sim_pos.x - x_near,
+					far.sim_pos.x - x_far])
+	assert_eq(problems, PackedStringArray(), "paddled after its doze, it drags on the same ticks as its twin")
+	assert_eq(near.rx, 0, "both at rest")
+	assert_true(near.sim_pos.x > x_near)
+	# It dozes off again at rest (the level looks at an awake entity again when a doze rectangle crosses a grid line, or
+	# when it is noted); a second sleep is counted too.
+	Sim.step(8)
+	far._doze_note()
+	Sim.step(13)
+	assert_true(far.is_dozing(), "at rest again: asleep")
+	level.doze_wake(far)
+	assert_eq(far._moves, near._moves, "the second doze")
+	# A team wipe / respawn resets both clocks - also the sleeper's.
+	Sim.step(5)
+	far._doze_note()
+	Sim.step(2)
+	assert_true(far.is_dozing())
+	level.respawn_player()
+	Sim.step(13)
+	level.doze_wake(far)
+	assert_eq(far._moves, near._moves, "reset while asleep: both count from the reset")
+	assert_true(near._moves <= 14, "a fresh clock (%d)" % near._moves)
+
+
+func test_a_beached_rafts_clock_stands_still_asleep_as_awake() -> void:
+	var level: Level = _load("", _lake(), "objects/raft 70 12")
+	var raft: Raft = null
+	for entity: SimEntity in level.get_kind(Defs.Kind.PLATFORM):
+		raft = entity as Raft
+	assert_not_null(raft)
+	if raft == null:
+		return
+	Sim.step(3)
+	level.doze_wake(raft)
+	raft.beached = true
+	raft._doze_note()
+	var moves: int = raft._moves
+	Sim.step(30)
+	assert_true(raft.is_dozing(), "a beached raft far away dozes")
+	level.doze_wake(raft)
+	assert_eq(raft._moves, moves, "beached: no drag clock, with or without a doze")
+
+
+func test_a_docked_railed_raft_carries_its_rider_over_the_whole_deck() -> void:
+	# G45's open sentence (content's wf10 report): docked at a bank the fence opens, but the ride test carried a railed
+	# rider only inside the closed fence - on the deck's last 7 px he stood carried by nobody, dropped 3 px and died in
+	# the last water column ("no failure state" on the Long Raft Home). Now the whole deck carries him.
+	var level: Level = _load("", _lake(), "objects/raft 60 12 rails width=4")
+	var hero: PlayerBase = level.player
+	var raft: Raft = null
+	for entity: SimEntity in level.get_kind(Defs.Kind.PLATFORM):
+		raft = entity as Raft
+	assert_not_null(raft)
+	if raft == null:
+		return
+	var half: int = 8 * raft.width
+	var deck_y: int = raft.sim_pos.y - raft.box_h
+	for side: int in [1, -1]:
+		# Docked: its edge against the bank's first cell (column 90 on the right, column 9 on the left).
+		var bank_x: int = 90 * Tuning.TILE if side > 0 else 10 * Tuning.TILE
+		raft.teleport(Vector2i(bank_x - side * half, raft.sim_pos.y))
+		raft.rx = 0
+		hero.teleport(Vector2i(raft.sim_pos.x, deck_y))
+		hero.xvel = 0
+		hero.yvel = 0
+		level.snap_camera()
+		Sim.step(3)
+		var label: String = "right bank" if side > 0 else "left bank"
+		assert_eq(raft.rider_count(), 1, label + ": aboard")
+		assert_true(raft._docked_at(level, side), label + ": docked, the fence is open")
+		# Every pixel of the strip between the closed fence and the bank: he stands there, carried, for 30 ticks.
+		var strip: Array[int] = []
+		if side > 0:
+			for x: int in range(raft.rail_right_excl(), raft.sim_pos.x + half):
+				strip.append(x)
+		else:
+			for x: int in range(raft.sim_pos.x - half, raft.rail_left()):
+				strip.append(x)
+		assert_eq(strip.size(), 7 if side > 0 else 8, label + ": the strip between the closed fence and the bank")
+		for x: int in strip:
+			hero.teleport(Vector2i(x, deck_y))
+			hero.xvel = 0
+			hero.yvel = 0
+			var carried: int = 0
+			for t: int in 30:
+				Sim.step(1)
+				if raft.rider_count() == 1 and hero.on_platform:
+					carried += 1
+			assert_false(hero.dead, "%s, x %d (centre %+d): he does not drown" % [label, x, x - raft.sim_pos.x])
+			assert_eq(carried, 30, "%s, x %d: carried on every tick" % [label, x])
+			if hero.dead:
+				return
+		# One step further is the bank: he walks off onto its floor and the raft lets him go.
+		GameInput.set_scripted(func(_tick: int) -> int: return Defs.IN_RIGHT if side > 0 else Defs.IN_LEFT)
+		Sim.step(40)
+		GameInput.clear_scripted()
+		assert_false(hero.dead, label + ": ashore alive")
+		assert_true(hero.grounded and not hero.on_platform, label + ": on the bank's floor")
+		assert_eq(hero.sim_pos.y, 12 * Tuning.TILE, label + ": the floor of row 12")
+		assert_true((hero.sim_pos.x - bank_x) * side > 4 * Tuning.TILE, label + ": past the open fence - unrailed by the floor")
+		assert_eq(raft.rider_count(), 0)
+	# Afloat (not docked) the closed fence is unchanged: he cannot reach the strip.
+	raft.teleport(Vector2i(50 * Tuning.TILE, raft.sim_pos.y))
+	hero.teleport(Vector2i(raft.sim_pos.x, deck_y))
+	hero.xvel = 0
+	hero.yvel = 0
+	level.snap_camera()
+	Sim.step(3)
+	GameInput.set_scripted(func(_tick: int) -> int: return Defs.IN_RIGHT)
+	Sim.step(40)
+	GameInput.clear_scripted()
+	assert_false(hero.dead)
+	assert_eq(hero.sim_pos.x, raft.rail_right_excl() - 1, "afloat: the rail holds him at its last pixel")
+	assert_eq(raft.rider_count(), 1)

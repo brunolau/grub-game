@@ -516,6 +516,32 @@ func test_keeper_and_guard_halls_are_four_rows_high() -> void:
 	assert_eq(LevelValidator.hall_height(grid, 35, 13), grid.rows + 1, "open sky")
 
 
+func test_keepers_that_can_be_led_warn() -> void:
+	# G66 (world-B's probe on w9_l1b_coop 'stormwall'): a keeper of an archetype that follows its target can be led.
+	var rows: PackedStringArray = _coop_rows()
+	_paint(rows, 9, 10, 30)
+	var entities: String = "
+".join(PackedStringArray([
+		"objects/x2_tablet 4 13 gate=led far=36,13",
+		"enemies/hopper 15 13 keeper=led coop=bond bond=led",
+		"enemies/harrier 20 13 keeper=led coop=bond bond=led",
+		"enemies/walker 25 13 left=0 right=0 keeper=led coop=bond bond=led",
+		"enemies/hopper 28 13 coop=bond bond=free",
+		"objects/column 31 13 trigger=keepers:led",
+	]))
+	var validator: LevelValidator = _validator({"solo_main": _solo("solo_main"),
+		"led_coop": _coop_text("led_coop", entities, rows)})
+	assert_true(validator.has_problem("'enemies/hopper' is a keeper ('led') that can be led", LevelValidator.WARNING),
+			_messages(validator))
+	assert_false(validator.has_problem("'enemies/harrier' is a keeper", LevelValidator.WARNING),
+			"a keeper Harrier holds its perch (G66)")
+	assert_false(validator.has_problem("'enemies/walker' is a keeper", LevelValidator.WARNING), "a walker stands")
+	var count: int = 0
+	for problem: Dictionary in validator.problems:
+		count += 1 if str(problem["message"]).contains("that can be led") else 0
+	assert_eq(count, 1, "only keepers: a bond member that opens no door is no gate")
+
+
 func test_gate_count_by_the_kind_of_the_solo_stage() -> void:
 	var one_gate: String = "objects/x2_tablet 4 13 gate=a far=30,13"
 	var two_gates: String = one_gate + "\nobjects/x2_tablet 6 13 gate=b far=31,13\nobjects/x2_tablet 8 13 secret far=32,13"
@@ -879,8 +905,13 @@ func test_search_partner_is_idle_and_parked_anywhere_counts_for_nothing() -> voi
 			"door")
 	CoopSearch.node_limit = CoopSearch.MAX_NODES
 	assert_false(bool(held["reached"]), "one player and his idle partner: %s" % held["detail"])
-	assert_true(int(held.get("placements", 0)) > 0, "the partner was parked near the plate (%d nodes)"
-			% int(held.get("placements", 0)))
+	# The search parks the idle partner at a mechanism as a node of its own only while the engine weighs an idle hero
+	# on a plate (CoopSearch.idle_partner_weighs: the regression probe of G33 - since G33 it does not, and those
+	# nodes only copied the graph); the idle-bait probes put him on the plate and in the door's way all the same.
+	assert_eq(int(held.get("placements", 0)) > 0, CoopSearch.idle_partner_weighs(),
+			"parked nodes at the plate exactly while an idle hero weighs on one (%d nodes)" % int(held.get("placements", 0)))
+	assert_true(int(held["probes"][CoopSearch.PROBE_IDLE_BAIT]["runs"]) > 0,
+			"the idle-bait probes ran with him on the plate and at the door: %s" % str(held["probes"]))
 
 
 func test_search_rides_on_an_idle_partner_only_as_the_engine_allows() -> void:
@@ -1393,3 +1424,248 @@ func test_deadly_cells_felt_through_one_row_of_rock_warn() -> void:
 	var fresh: LevelValidator = _validator({"fresh_main": _solo("fresh_main").replace(PLAIN_ROWS, trap)
 			.replace("format = 1", "format = 2")})
 	assert_true(fresh.has_problem("deadly cells at columns 5-8 of row 8", LevelValidator.WARNING), _messages(fresh))
+
+
+# =================================================================================================================
+# wf10 (world-B): the orchestrator's SEARCH decision (DESIGN.md G59) - "refused" never means "stopped at the bound":
+# the verdicts, the two passes, the continuous-play probes, the settled and shared worlds, the message-queue guard
+# =================================================================================================================
+
+## A raw search result as [method CoopSearch.judge] reads it.
+func _raw_result(explored: int, exhausted: bool, stopped: String, required: Dictionary, covered: Dictionary) -> Dictionary:
+	var probes: Dictionary = {}
+	for family: String in CoopSearch.PROBE_FAMILIES:
+		var targets: Dictionary = covered.get(family, {})
+		var runs: int = 0
+		for target: String in targets:
+			runs += int(targets[target])
+		probes[family] = {"runs": runs, "sites": targets.size(), "kills": 0, "seeds": 0, "dead": 0, "reached": false,
+			"targets": targets}
+	return {"reached": false, "detail": "", "explored": explored, "exhausted": exhausted, "stopped": stopped,
+		"queued": 0 if exhausted else 40, "probes": probes, "probes_required": required, "probes_on": true,
+		"probe_targets": {"e1": "shellback 12,13", "p2": "plate 6,13", "f": "the far cell 16,5"}}
+
+
+func test_search_verdicts_name_their_evidence() -> void:
+	var keeper: Dictionary = {CoopSearch.PROBE_HOP_OVER: ["e1"], CoopSearch.PROBE_IDLE_BAIT: ["e1"],
+		CoopSearch.PROBE_THROWN: ["e1"]}
+	var all_run: Dictionary = {CoopSearch.PROBE_HOP_OVER: {"e1": 48}, CoopSearch.PROBE_IDLE_BAIT: {"e1": 32},
+		CoopSearch.PROBE_THROWN: {"e1": 18}}
+	# The frontier emptied: exhaustive, whatever the count.
+	var dry: Dictionary = CoopSearch.judge(_raw_result(11, true, "", keeper, all_run))
+	assert_eq(dry["verdict"], CoopSearch.VERDICT_EXHAUSTIVE)
+	assert_true(str(dry["evidence"]).contains("11 resting points") and str(dry["evidence"]).contains("hop-over 0/48"),
+			str(dry["evidence"]))
+	# Stopped at a bound: refused only from 660 resting points on AND with every probe of the gate's kind run.
+	var bounded: Dictionary = CoopSearch.judge(_raw_result(700, false, "ticks", keeper, all_run))
+	assert_eq(bounded["verdict"], CoopSearch.VERDICT_BOUNDED)
+	assert_true(str(bounded["evidence"]).contains("bounded at 700 resting points by the tick bound"),
+			str(bounded["evidence"]))
+	var shallow: Dictionary = CoopSearch.judge(_raw_result(CoopSearch.BOUNDED_MIN_NODES - 1, false, "ticks", keeper, all_run))
+	assert_eq(shallow["verdict"], CoopSearch.VERDICT_UNPROVEN, "659 resting points: stopped at the bound, not refused")
+	var gap: Dictionary = all_run.duplicate(true)
+	gap.erase(CoopSearch.PROBE_IDLE_BAIT)
+	var unprobed: Dictionary = CoopSearch.judge(_raw_result(900, false, "nodes", keeper, gap))
+	assert_eq(unprobed["verdict"], CoopSearch.VERDICT_UNPROVEN, "a probe of the gate's kind did not run")
+	assert_eq(Array(unprobed["missing"] as PackedStringArray), ["idle-bait at shellback 12,13"])
+	assert_true(str(unprobed["evidence"]).contains("probes missing: idle-bait at shellback 12,13"),
+			str(unprobed["evidence"]))
+	var blind: Dictionary = _raw_result(900, false, "nodes", keeper, all_run)
+	blind["probes_on"] = false
+	assert_eq(CoopSearch.judge(blind)["verdict"], CoopSearch.VERDICT_UNPROVEN, "a bounded search without probes")
+	# Reached, a broken static rule, a gate that cannot be searched.
+	var open: Dictionary = _raw_result(5, false, "found", keeper, all_run)
+	open["reached"] = true
+	open["detail"] = "one hero reached 16,5 in 99 ticks: start > probe hop-over"
+	assert_eq(CoopSearch.judge(open)["verdict"], CoopSearch.VERDICT_OPEN)
+	assert_eq(CoopSearch.judge({"reached": true, "detail": "unproven: no objects/x2_tablet gate=x"})["verdict"],
+			CoopSearch.VERDICT_UNPROVEN)
+	# The stored verdict wins (a cached result), and the line of the G3 table.
+	var stored: Dictionary = {"reached": false, "verdict": CoopSearch.VERDICT_BOUNDED, "evidence": "e", "missing": []}
+	assert_eq(CoopSearch.gate_verdict(stored)["verdict"], CoopSearch.VERDICT_BOUNDED)
+	assert_eq(CoopSearch.verdict_line(&"w0_l0_coop", Defs.Difficulty.EXPERT, "hall", stored),
+			"GATE w0_l0_coop expert hall: refused (bounded) (e)")
+
+
+func test_search_small_gate_is_exhaustive_and_probed() -> void:
+	# The 8-row ledge: the whole floor is searched until nothing is left (both passes), and the leaps of the ledge
+	# kind ran (hop-over with run-ups, idle-bait with the partner at the take-off spot).
+	var high: Dictionary = CoopSearch.search_data(_search_level("verdict_coop", 6,
+			"objects/x2_tablet 10 13 gate=hop far=16,5"), Defs.Difficulty.BEGINNER, "hop")
+	assert_false(bool(high["reached"]), str(high["detail"]))
+	assert_true(bool(high["exhausted"]), "the queue ran dry: %s" % str(high.get("evidence", "")))
+	assert_eq(high["verdict"], CoopSearch.VERDICT_EXHAUSTIVE)
+	assert_eq(high["gate_kinds"], ["ledge or gap"])
+	assert_true(int(high["probes"][CoopSearch.PROBE_HOP_OVER]["runs"]) >= 18, str(high["probes"]))
+	assert_true(int(high["probes"][CoopSearch.PROBE_IDLE_BAIT]["runs"]) >= 9, str(high["probes"]))
+	assert_eq((high["missing"] as Array).size(), 0, str(high["missing"]))
+	assert_eq(int(high["misses"]), 0, "no replay missed its world")
+	var lines: PackedStringArray = CoopSearch.report_lines(high)
+	assert_true(lines[0].begins_with("search: EXHAUSTIVE"), lines[0])
+	assert_true("\n".join(lines).contains("probe hop-over: "), "\n".join(lines))
+	# The same gate under a bound it cannot finish in: not refused - UNPROVEN, and search_gate's contract says so.
+	CoopSearch.node_limit = 5
+	var cut: Dictionary = CoopSearch.search_data(_search_level("verdict_cut_coop", 6,
+			"objects/x2_tablet 10 13 gate=hop far=16,5"), Defs.Difficulty.BEGINNER, "hop")
+	CoopSearch.node_limit = CoopSearch.MAX_NODES
+	assert_false(bool(cut["reached"]), "the raw result: not reached")
+	assert_false(bool(cut["exhausted"]))
+	assert_eq(cut["stopped"], "nodes")
+	assert_eq(cut["verdict"], CoopSearch.VERDICT_UNPROVEN, str(cut["evidence"]))
+	var held: Dictionary = CoopSearch.hold_to_verdict(cut.duplicate(true))
+	assert_true(bool(held["reached"]), "G59: a gate that stopped at its bound without its evidence is not refused")
+	assert_true(str(held["detail"]).begins_with("unproven: bounded at 5 resting points"), str(held["detail"]))
+	assert_eq(CoopSearch.gate_verdict(held)["verdict"], CoopSearch.VERDICT_UNPROVEN)
+	var kept: Dictionary = CoopSearch.hold_to_verdict(high.duplicate(true))
+	assert_false(bool(kept["reached"]), "a refusal with its evidence stays a refusal")
+
+
+## The keeper-door map: a 4-row hall cell over a keeper with 100 hit points at column 16 (four club strikes in a co-op
+## file, G57), a wall at column 22 whose bottom four cells are the door its death opens; the far cell lies behind it.
+func _keeper_level(id: String) -> LevelData:
+	var rows: PackedStringArray = _flat_rows()
+	for row: int in range(2, 14):
+		_paint(rows, row, 22, 22)
+	_paint(rows, 9, 16, 16)
+	return _search_rows(id, rows, "\n".join(PackedStringArray([
+		"objects/x2_tablet 6 13 gate=door far=25,13",
+		"enemies/walker 16 13 left=0 right=0 hp=100 keeper=k",
+		"objects/column 22 13 size=1,4 rise=4 trigger=keepers:k",
+	])))
+
+
+func test_search_probes_and_carried_wounds_kill_what_one_move_cannot() -> void:
+	# One strike takes 25 of the keeper's 100 hit points (one hit per strike in a co-op file, G57), and a move holds
+	# one strike: the search before wf10 (wounds not carried, no probes) never opened this door - its blind spot.
+	CoopSearch.node_limit = 150
+	CoopSearch.carry_hits = false
+	CoopSearch.probes = false
+	var blind: Dictionary = CoopSearch.search_data(_keeper_level("keeper_blind_coop"), Defs.Difficulty.BEGINNER, "door")
+	# A continuous-play probe (the duel: over the keeper, then strike after strike) opens it.
+	CoopSearch.probes = true
+	var probed: Dictionary = CoopSearch.search_data(_keeper_level("keeper_probe_coop"), Defs.Difficulty.BEGINNER, "door")
+	CoopSearch.carry_hits = true
+	CoopSearch.node_limit = CoopSearch.MAX_NODES
+	assert_false(str(blind["detail"]).begins_with("static rule"), str(blind["detail"]))
+	assert_false(bool(blind["reached"]), "one strike a move, no wound carried: %s" % str(blind["detail"]))
+	assert_true(bool(probed["reached"]), "a duel of continuous play kills the keeper: %s" % str(probed.get("evidence", "")))
+	assert_true(str(probed["detail"]).contains("probe "), str(probed["detail"]))
+	assert_eq(probed["verdict"], CoopSearch.VERDICT_OPEN)
+	# And the move search carries a wound: a wounded keeper is a changed world (the next strike move starts from it).
+	var searcher: CoopSearch.Searcher = _search_world(_keeper_level("keeper_wound_coop"))
+	var strike: PackedInt32Array = CoopSearch._repeat(Defs.IN_RIGHT, 1) + CoopSearch._repeat(Defs.IN_FIRE, 12) 			+ CoopSearch._repeat(0, 4)
+	var wounded: String = ""
+	var unhurt: String = ""
+	for gap: int in [40, 34, 28, 22, 46]:
+		var carried: Dictionary = searcher.run(_config(Vector2i(16 * Tuning.TILE + 8 - gap, 224)), strike, {})
+		if not carried.is_empty() and str(carried["sig"]) != searcher._baseline:
+			wounded = searcher.sig_changes(str(carried["sig"]))
+			CoopSearch.carry_hits = false
+			var plain: Dictionary = searcher.run(_config(Vector2i(16 * Tuning.TILE + 8 - gap, 224)), strike, {})
+			CoopSearch.carry_hits = true
+			unhurt = "lost" if plain.is_empty() else ("same" if str(plain["sig"]) == searcher._baseline else "changed")
+			break
+	searcher.close()
+	assert_true(wounded.contains("walker 16,13: e0:75"), "one strike: the keeper at 75 is a changed world (%s)" % wounded)
+	assert_eq(unhurt, "same", "without carry_hits the same strike left the level-file world")
+
+
+func test_search_settles_the_world_and_shares_changed_worlds() -> void:
+	# A held plate: the node "he stands on the plate" is ONE world (the door fully risen), not a world per door phase;
+	# stepping off it and waiting gives the level-file world back (a plain node). The gate stays shut for one player.
+	CoopSearch.idle_partner = false
+	var held: Dictionary = CoopSearch.search_data(_door_level("settle_hold_coop", "hold"), Defs.Difficulty.BEGINNER, "door")
+	CoopSearch.settle_world = false
+	CoopSearch.share_worlds = false
+	var before: Dictionary = CoopSearch.search_data(_door_level("settle_old_coop", "hold"), Defs.Difficulty.BEGINNER,
+			"door")
+	CoopSearch.settle_world = true
+	CoopSearch.share_worlds = true
+	CoopSearch.idle_partner = true
+	assert_false(bool(held["reached"]), str(held["detail"]))
+	assert_false(bool(before["reached"]), str(before["detail"]))
+	assert_true(bool(held["exhausted"]), str(held.get("evidence", "")))
+	assert_true(int(held["worlds"]) >= 1, "the pressed plate is a changed world (%d)" % int(held["worlds"]))
+	assert_eq(int(held["misses"]), 0, "every shared world's replay came back to its end")
+	assert_true(int(held["changed"]) < int(before["changed"]),
+			"settled: fewer changed-world nodes (%d) than a node per door phase (%d)" % [int(held["changed"]),
+			int(before["changed"])])
+	assert_true(int(held["replayed"]) < int(before["replayed"]), "and cheaper replays (%d < %d ticks)" % [
+			int(held["replayed"]), int(before["replayed"])])
+	# A latch: the changed world still carries the open door to the next move.
+	var latched: Dictionary = CoopSearch.search_data(_door_level("settle_latch_coop", "latch"), Defs.Difficulty.BEGINNER,
+			"door")
+	assert_true(bool(latched["reached"]), "a latched door stays open across moves: %s" % str(latched.get("evidence", "")))
+
+
+func test_search_level_spawns_no_effect_and_counts_the_rest() -> void:
+	# Godot's message queue (content's wf10 #1): a search passes no frame, so its level makes no cosmetic node at all.
+	var searcher: CoopSearch.Searcher = _search_world(_search_level("fx_coop", 6, ""))
+	var before: int = searcher.level.spawned
+	var effect: Node = searcher.level.spawn(&"fx/dust", Vector2i(100, 224))
+	var effects: int = searcher.level.spawned - before
+	var item: Node = searcher.level.spawn(&"items/food", Vector2i(100, 224), {"index": 1})
+	var counted: int = searcher.level.spawned - before
+	var made: bool = item != null
+	searcher.close()
+	assert_null(effect, "no fx/ node in a search level")
+	assert_eq(effects, 0)
+	assert_true(made, "everything else spawns as in the game")
+	assert_eq(counted, 1, "and is counted (CoopSearch.SPAWN_LIMIT stops a search before the queue is full)")
+
+
+func test_search_probe_sites_gate_box_and_partner_places() -> void:
+	var data: LevelData = _search_rows("sites_coop", _flat_rows(), "\n".join(PackedStringArray([
+		"objects/x2_tablet 6 13 gate=door far=25,13",
+		"objects/plate 10 13 name=p mode=hold",
+		"objects/column 22 13 size=1,2 rise=2 rise_while=p",
+		"objects/plate 2 3 name=other mode=hold",
+	])))
+	var searcher: CoopSearch.Searcher = _search_world(data)
+	var tablet: Dictionary = CoopSearch.find_tablet(data, Defs.Difficulty.BEGINNER, "door")
+	var box: Rect2i = CoopSearch.gate_box_of(tablet, searcher.level.grid)
+	searcher.set_gate_box(box)
+	var area: Rect2i = Rect2i(0, 0, 30, 16)
+	var needs: Dictionary = searcher.probe_requirements(area, Vector2i(25, 13))
+	var names: Dictionary = needs["names"]
+	var own: PackedStringArray = PackedStringArray()
+	for target: String in needs["required"][CoopSearch.PROBE_THROWN]:
+		own.append(str(names[target]))
+	# Sites: the first node in reach, then one NEAR the target on each side of it - no third on a side, none too close.
+	var sites: Dictionary = {}
+	var at: Vector2i = Vector2i(400, 224)
+	var first: bool = searcher._probe_site(sites, "e9", at, Vector2i(100, 224))
+	var far_again: bool = searcher._probe_site(sites, "e9", at, Vector2i(180, 224))
+	var near_left: bool = searcher._probe_site(sites, "e9", at, Vector2i(330, 224))
+	var left_again: bool = searcher._probe_site(sites, "e9", at, Vector2i(270, 224))
+	var near_right: bool = searcher._probe_site(sites, "e9", at, Vector2i(460, 224))
+	var full: bool = searcher._probe_site(sites, "e9", at, Vector2i(520, 224))
+	var out_of_reach: bool = searcher._probe_site({}, "e9", at, Vector2i(400 + 21 * Tuning.TILE, 224))
+	# The parked partner's places: three cells wide.
+	var here: Dictionary = searcher._node(Vector2i(100, 224), 0, "", "", Vector2i(200, 224))
+	var close: Dictionary = searcher._node(Vector2i(100, 224), 0, "", "", Vector2i(230, 224))
+	var apart: Dictionary = searcher._node(Vector2i(100, 224), 0, "", "", Vector2i(260, 224))
+	var same_place: bool = searcher._key_of(here) == searcher._key_of(close)
+	var other_place: bool = searcher._key_of(here) != searcher._key_of(apart)
+	searcher.close()
+	assert_eq(box, Rect2i(0, 7, 30, 9), "tablet and far cell grown by GATE_BOX_MARGIN, inside the map")
+	assert_true(own.has("plate 10,13") and own.has("column 22,13"), "the gate's own plate and door: %s" % str(own))
+	assert_false(own.has("plate 2,3"), "a plate of the area outside the gate box is not waited for: %s" % str(own))
+	assert_eq(int(needs["others"]), 1)
+	assert_true((needs["kinds"] as PackedStringArray).has("plate door / pulley / see-saw / boulder"), str(needs["kinds"]))
+	assert_true((needs["required"][CoopSearch.PROBE_PLATES] as Array).size() == 1, str(needs["required"]))
+	assert_true(first and near_left and near_right, "first in reach, then near on each side")
+	assert_false(far_again, "a second site must be near the target")
+	assert_false(left_again, "one near site a side")
+	assert_false(full, "PROBE_SITES at most")
+	assert_false(out_of_reach, "21 cells away: out of reach")
+	assert_true(same_place, "30 px apart: one place of the parked partner")
+	assert_true(other_place, "60 px apart: another place")
+
+
+## 16 rows of 30 cells, floor rows 14-15.
+func _flat_rows() -> PackedStringArray:
+	var rows: PackedStringArray = PackedStringArray()
+	for row: int in 16:
+		rows.append((TileGrid.CH_SOLID_A if row >= 14 else TileGrid.CH_AIR).repeat(30))
+	return rows

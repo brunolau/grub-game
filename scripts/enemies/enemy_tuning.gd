@@ -106,6 +106,7 @@ const HARRIER_WAYPOINTS: Array[Vector2i] = [
 ]
 const HARRIER_SWOOP_HEIGHT: int = 30     ## way-points at or below this height are the swoop (screech pose) [own]
 const HARRIER_WAYPOINT_TICKS: int = 22   ## heads for the next way-point after this long even when not reached [own]
+const HARRIER_KEEPER_SCREECH_TICKS: int = 22  ## G66: a keeper Harrier's screech pose when a hero comes within `range` [own]
 const DART_RANGE_TILES: int = 8          ## default `range`
 const DART_SPEED: int = 4                ## default `speed`, px per tick
 
@@ -181,8 +182,8 @@ const GUARD_SHIELD_POSE_TICKS: int = 8   ## the raised-shield pose after a glanc
 const GUARD_SWING_TICKS: int = 12        ## the club swing (attack frames 5-10) after its body hurt a hero [own]
 ## `enemies/shellback` on these Walker sheets is the Book I variant: a Walker with the `shell` trait [D D.7].
 const SHELLBACK_WALKER_SKINS: PackedStringArray = ["turtle", "turtle_b"]
-## Front hits (Guard, `shell`, `heavy`, GAMEPLAY.md 13.9.5): a striker within this many px of the feet point counts
-## as in front.
+## Front hits (Guard, `shell`, GAMEPLAY.md 13.9.5; not `heavy` since G57 - it glances on every side): a striker within
+## this many px of the feet point counts as in front.
 const FRONT_DX: int = 4
 ## Least ticks between two glance clanks / sparks of one enemy (one per strike; as BossBase.GLANCE_TICKS). [own]
 const GLANCE_TICKS: int = 12

@@ -5,12 +5,14 @@
 # bounces tame Chomper from the stump; rides him over the tar flats (stops and bites each slime and frog as it
 # comes, hops onto the island and the stump for letter R); off at checkpoint 3, the water bucket, the gnat thicket
 # and the exit totem. Never presses S and never takes the hammer (belt invariance).
+# Re-recorded in wf10 by party with the same bot: raft.gd's drag clock now counts the ticks a raft dozed (it dragged on
+# other ticks with dozing on than off - wf9_d6_to_objects-B.txt); the raft's speed steps moved by a few ticks.
 80:R,8:RU,7:R,6:UF,4:,14:R,6:F,4:,1:R,6:F,4:,24:R,6:F,4:,1:R,6:UF,4:,59:R,2:,1:R,2:,28:U,32:R,7:,1:L,1:F,6:,1:F
-1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,219:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:
+1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,220:,1:F,6:,1:F,1:,1:F,6:,1:F,1:
 1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:
 1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:
 1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:,1:F,6:,1:F,1:
-1:F,1:,81:R,6:F,4:,2:R,6:F,4:,9:R,1:,6:UF,4:,24:R,6:F,4:,1:R,6:F,4:,1:R,6:F,4:,60:R,6:,1:R,2:,10:RU,1:R,2:,4:L
-1:,2:R,14:,16:RU,2:U,4:LU,4:U,13:RU,9:U,13:RU,9:U,13:RU,1:U,6:LU,22:U,39:R,1:,2:R,1:,1:R,1:F,1:,2:R,1:,18:R,17:
-1:F,5:,1:RU,39:R,1:RU,21:R,3:RU,33:R,1:F,1:,2:R,1:,21:R,8:,1:F,5:,18:R,1:,1:R,1:F,1:,2:R,1:,20:R,1:RU,39:R,4:
-1:F,5:,22:R,12:,2:UD,18:,12:R,6:UF,7:,6:F,4:,3:R,6:F,4:,7:R,6:F,4:,6:R,6:F,4:,1:R,6:F,4:,2:R,4:,6:F,4:,24:R
+1:F,6:,1:F,1:,1:F,3:,78:R,6:F,4:,4:R,6:F,4:,8:R,1:,6:UF,4:,23:R,6:F,4:,2:R,6:F,4:,1:R,6:F,4:,1:R,6:F,4:,60:R,6:
+1:R,2:,10:RU,1:R,2:,4:L,1:,2:R,25:RU,2:U,4:LU,4:U,13:RU,9:U,13:RU,9:U,11:RU,2:U,4:LU,21:U,33:R,1:,2:R,1:,1:R
+1:F,1:,2:R,1:,2:R,1:,1:R,1:F,5:,17:R,14:,1:F,5:,1:RU,39:R,1:RU,21:R,3:RU,33:R,1:F,1:,2:R,1:,24:R,1:F,8:,1:F,5:
+1:RU,19:R,1:F,2:R,3:,16:R,1:RU,39:R,5:,1:F,5:,22:R,12:,2:UD,18:,12:R,6:UF,4:,18:R,6:UF,4:,1:R,6:F,4:,22:R
