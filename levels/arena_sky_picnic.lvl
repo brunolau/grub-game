@@ -13,14 +13,16 @@
 #   `=` of feast/terrain_icing). Springs (cols 2 / 17, -224 = 105 px) lift a hero from the floor to the clouds' outer
 #   ends. Nothing stands higher than row 4, so a plain jump never reaches the top seam.
 # - Spots (visible, refill 15 s after they are emptied): one in the floor beside each spring's far side (cols 5 / 14),
-#   one flush in each cloud's outer end (cols 3 / 16), and the big spot in the cake island's top (col 9; col 10 beside
-#   it is plain cake, so the spot is struck alike from either half of the island - the hit test reaches one column).
-#   Its giant falls 7 rows onto the island over the hole.
+#   one flush in each cloud's outer end (cols 3 / 16), and the big spot: two big-spot cells side by side in the cake
+#   island's top (cols 9 / 10, the E.5 sketches' `**`) - each counts its own 3 hits, the first one used up drops the
+#   giant over itself and opens its twin (the flood fill: one giant per refill). Symmetric: either half of the island
+#   strikes its own cell. The giant falls 7 rows onto the island over the hole.
 # - Cookpots: two (4-player arena), on the clouds' inner halves (cols 6 / 13).
 # - Spawns (rotate every round; 2 players use 1 and 2): 1 and 2 on the floor between the springs and the hole (cols
 #   13 / 6), 3 and 4 on the clouds (cols 4 / 15).
 # - Modes: Hot Rock (default), Grub Stack (E.5: "Hot Rock / Grub Stack"; no Last Caveman Standing on the kid-safe
-#   arena); each needs a green bot set in core-B's tests/test_versus_bots.gd.
+#   arena); each has a green bot set in core-B's tests/test_versus_bots.gd (12 seeds x 4 rounds, four Hunters; DA's
+#   phase-3 runs: Hot Rock 4 points worst, Grub Stack 12).
 # - Bot graph: resources/bots/arena_sky_picnic.json, baked with core-B's tool after every edit of this file:
 #   bash .tools/gd.sh script res://tools/bots/bake_nav.gd -- arena_sky_picnic
 
@@ -62,7 +64,7 @@ D = objects/spawn_point index=4
 ...s====....====s...
 ....................
 ....................
-........#*##........
+........#**#........
 ........####........
 ..J...B......@...J..
 #####?##....##?#####

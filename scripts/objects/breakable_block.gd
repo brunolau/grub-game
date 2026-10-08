@@ -90,6 +90,27 @@ func refill() -> void:
 	pass
 
 
+## 2.0 versus only (world-B's arena signature `regrow`, VersusSignatures._grow_back; wf9_world_b_to_party.txt #1): the
+## inverse of [method _on_opened] - the cell is solid again (TileGrid.CH_SOLID_INVISIBLE, what the `$` legend wrote),
+## all its hits back, not opened, no cool-down, the whole block drawn again. The caller makes sure no hero stands in
+## the cell. Never called in single-player or co-op.
+func regrow() -> void:
+	var level: LevelBase = Game.level
+	if level != null:
+		level.set_cell(cell.x, cell.y, TileGrid.CH_SOLID_INVISIBLE)
+	hits_left = hits_total
+	opened = false
+	opened_by_flood = false
+	cooldown = 0
+	_break_age = -1
+	if _sprite != null:
+		_sprite.visible = true
+		_sprite.frame = FRAME_IDLE
+		_sprite.position.x = 0.0
+		_sprite.modulate.a = 1.0
+	_doze_note()
+
+
 func _on_opened() -> void:
 	var level: LevelBase = Game.level
 	if level == null:

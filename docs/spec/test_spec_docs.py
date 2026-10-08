@@ -107,8 +107,9 @@ class EggIsNoSpringboard(unittest.TestCase):
         self.assertIn("**whether UP is held\n  or not**", c12)
         self.assertNotIn("-224 with UP, else -64) and hatches", c12)
         c10 = _section(APPENDIX_C, "### C.10")
-        self.assertIn("if A and B are both **active**: **Shoulder Hop** if A holds UP, else **Totem Ride**", c10)
-        self.assertIn("otherwise there is no head contact at all: A passes through, as heroes do, UP held or not", c10)
+        self.assertIn("if A or B is **idle**: no head contact at all - A passes through, as heroes do, UP held or not",
+                      c10)
+        self.assertIn("**Shoulder Hop** if A holds UP and B is **active**", c10)
         self.assertIn("- **Active**:", c10)
         self.assertIn("**An egg is no springboard** [G1]", _section(DESIGN, "### D.3"))
         self.assertIn("**An egg is no springboard** [G1]", _section(GAMEPLAY_13, "#### 13.9.2"))
@@ -369,6 +370,7 @@ class IdlePartner(unittest.TestCase):
         _pending(self, head and not old_rule,
                  "party / world-A: no Totem Ride on an idle carrier (wf9_lead_design_to_party.txt #1)")
         self.assertNotRegex(head, r"elif a\.holds_up\(\) and not is_active\(b\)")
+        self.assertRegex(head, r"\bb\.idle\b", "an idle partner's head must be passed through (G33)")
 
 
 class BoostLedgeOneHeight(unittest.TestCase):
@@ -435,11 +437,12 @@ class WeakPointsClearOfTheHud(unittest.TestCase):
         hud = _read("scripts/ui/hud.gd")
         self.assertRegex(hud, r"static func weak_point_problem\(")
         self.assertRegex(hud, r"func band_rects\(")
-        m = re.search(r"^const WEAK_POINT_CLEARANCE: float = ([\d.]+)", hud, re.M)
+        m = re.search(r"^const WEAK_POINT_CLEARANCE: float = ([\d.]+)(\s*\*\s*Tuning\.ART_SCALE)?", hud, re.M)
         self.assertIsNotNone(m)
-        _pending(self, float(m.group(1)) != 24.0,
+        art = float(m.group(1)) * (_gd_consts("scripts/core/tuning.gd")["ART_SCALE"] if m.group(2) else 1)
+        _pending(self, art != 24.0,
                  "ui: WEAK_POINT_CLEARANCE 48 art px = 24 logical px (reply in wf9_ui_to_lead-designer.txt)")
-        self.assertEqual(float(m.group(1)), 48.0)
+        self.assertEqual(art, 48.0)
 
     def test_the_arenas_that_changed(self):
         for name, text in (("DESIGN", DESIGN[:DESIGN.index("## Appendix: G1 and phase-2 resolutions")]),

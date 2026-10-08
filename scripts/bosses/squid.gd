@@ -210,8 +210,26 @@ func get_spot() -> int:
 	return _next_x if _state == State.BUBBLES else _up_x
 
 
+## The head as a weak point this tick: while it is up and not armoured by the co-op lock (or the lock stands open),
+## else empty (the contract of Hud.weak_point_rects and the G35 route checks: an empty rect cannot be struck now).
+## [method get_head_box] is the head whatever it does.
 func get_head_rect() -> Rect2i:
+	if fighting and not dead and _state == State.UP and (not _locked() or _open > 0):
+		return get_head_box()
+	return Rect2i()
+
+
+## The top of its head (its box's top 14 px), up or not.
+func get_head_box() -> Rect2i:
 	return _rel(SQUID_HEAD)
+
+
+## The co-op lock's strike targets this tick (Hud.weak_point_rects asks every boss for one): both crossed tentacles (one
+## rectangle around the two) while it is up, locked and shut, else empty.
+func get_weak_rect() -> Rect2i:
+	if fighting and not dead and _state == State.UP and _locked() and _open == 0:
+		return get_tentacle_rect(-1).merge(get_tentacle_rect(1))
+	return Rect2i()
 
 
 func get_tentacle_rect(side: int) -> Rect2i:
@@ -723,7 +741,7 @@ func _poll_hits() -> int:
 	if level == null or dead or not fighting or _state != State.UP:
 		return 0
 	var lock: bool = _locked()
-	var head: Rect2i = get_head_rect()
+	var head: Rect2i = get_head_box()
 	var head_open: bool = not lock or _open > 0
 	var projectiles: Array[SimEntity] = level.get_kind(Defs.Kind.HERO_PROJECTILE)
 	for i: int in range(projectiles.size() - 1, -1, -1):

@@ -12,17 +12,18 @@
 # - Tiers 3 rows apart: the floor (row 10), the side shelves (row 7, cols 0-3 / 16-19) and the central ledge (row 7,
 #   cols 8-11), the upper ledges (row 4, cols 3-7 / 12-16, over the gaps between the shelves and the central ledge).
 #   Every ledge is one-way; nothing stands higher than row 4, so a plain jump never reaches the top seam.
-# - Spots (7, visible, refill 15 s after they are emptied): one in the floor under each shelf (cols 2 / 17), one flush
-#   in each shelf's wall end (cols 0 / 19), one flush in each upper ledge's outer end (cols 3 / 16), and the big spot
-#   in the central ledge (col 9): its giant falls 7 rows onto the ledge over the hole.
+# - Spots (8 cells, visible, refill 15 s after they are emptied): one in the floor under each shelf (cols 2 / 17), one
+#   flush in each shelf's wall end (cols 0 / 19), one flush in each upper ledge's outer end (cols 3 / 16), and the big
+#   spot: two big-spot cells side by side in the middle of the central ledge (cols 9 / 10, the E.5 sketches' `**`) -
+#   each counts its own 3 hits, the first one used up drops the giant over itself and opens its twin (the flood fill:
+#   one giant per refill). Its giant falls 7 rows onto the ledge over the hole.
 # - Cookpots: two (4-player arena), on the upper ledges' inner halves (cols 6 / 13).
 # - Spawns (rotate every round; 2 players use 1 and 2): 1 and 2 on the floor between the shelves and the hole (cols
 #   14 / 5), 3 and 4 on the shelves (cols 1 / 18).
 # - Modes: Hot Rock (default), Grub Stack, Last Caveman Standing; each has a green bot set in core-B's
-#   tests/test_versus_bots.gd (12 seeds x 4 rounds, four Hunters): Hot Rock 8 points worst, LCS 13, Grub Stack 15 -
-#   the edge of the +/-15. The big spot decides Grub Stack: in col 9 the left floor spawn (2) leads, in col 10 the
-#   right one (1) leads by as much; other spawn layouts (floor spawns a cell inward, shelf spawns on the upper
-#   ledges) and a crate lane were worse. A phase-3 candidate: a symmetric big spot.
+#   tests/test_versus_bots.gd (12 seeds x 4 rounds, four Hunters). Phase 3: the symmetric big spot (two cells) took
+#   Grub Stack from 15 points worst (one cell in col 9: the left floor spawn led; in col 10 the right one did) to 8;
+#   Hot Rock 8, LCS 12.
 # - Not built yet (requests to world-B, build/engine_requests/wf8_DA_to_world-B.txt): the darkness pulse every 20 s,
 #   `$` walls that grow back after 15 s, the dangler springboard. The arena plays without them.
 # - Bot graph: resources/bots/arena_echo_hollow.json, baked with core-B's tool after every edit of this file:
@@ -64,7 +65,7 @@ D = objects/spawn_point index=4
 ...s====....====s...
 ....................
 .C................D.
-s===....=*==....===s
+s===....=**=....===s
 ....................
 .....B........@.....
 ##?#####....#####?##

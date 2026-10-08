@@ -496,13 +496,24 @@ func test_boss_stages_keep_weak_points_clear_of_the_hud() -> void:
 		var view: Rect2i = Game.level.get_view_rect()
 		var view_art: Vector2 = Vector2(view.size) * float(Tuning.ART_SCALE)
 		var problems: PackedStringArray = PackedStringArray()
-		for weak: Rect2i in Hud.weak_point_rects(boss):
+		var weak_rects: Array[Rect2i] = Hud.weak_point_rects(boss)
+		if weak_rects.is_empty():
+			# Nothing open at the fight's start (the bosses return an empty rect while a part cannot be struck): the
+			# parts that open later, where the arena holds them.
+			for method: StringName in [&"get_face_box", &"get_head_box"]:
+				if boss.has_method(method) and (boss.call(method) as Rect2i).has_area():
+					weak_rects.append(boss.call(method) as Rect2i)
+		for weak: Rect2i in weak_rects:
 			var art: Rect2 = Rect2(Vector2(weak.position - view.position) * float(Tuning.ART_SCALE),
 					Vector2(weak.size) * float(Tuning.ART_SCALE))
 			var problem: String = Hud.weak_point_problem(art, view_art)
 			if problem != "":
 				problems.append(problem)
-		var verdict: String = "clear" if problems.is_empty() else "; ".join(problems)
+		var verdict: String = "; ".join(problems)
+		if problems.is_empty():
+			verdict = "nothing open at the fight's start (the route checks cover it)"
+			if not weak_rects.is_empty():
+				verdict = "clear (%d weak rect(s))" % weak_rects.size()
 		report.append("%s (%s): %s" % [level_id, boss.get_script().resource_path.get_file(), verdict])
 		if BAND_FROZEN.has(level_id):
 			pass

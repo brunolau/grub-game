@@ -1291,10 +1291,12 @@ static func strike_spots(grid: TileGrid, target: Vector2i) -> Array[Vector2i]:
 
 
 ## True when an axe, a swirling axe or a spear thrown either way from one of `spots` (no tile collision: they pass
-## walls, PHYSICS.md 8.4 / C.3) crosses the cell `target` within THROW_TICKS ticks. Shared with the solo search
-## (CoopSearch.throw_crosses).
+## walls, PHYSICS.md 8.4 / C.3) crosses the body of a member standing in the cell `target` within THROW_TICKS ticks.
+## The body is the cell and the cell above it (an enemy or a drum stands up to 32 px tall on its feet cell; since
+## G36 the larger box: a flat spear at hand height passes 16-32 px over the feet of a member on its own row).
+## Shared with the solo search (CoopSearch.throw_crosses).
 static func throw_crosses(spots: Array[Vector2i], target: Vector2i) -> bool:
-	var box: Rect2i = Rect2i(target.x * Tuning.TILE, target.y * Tuning.TILE, Tuning.TILE, Tuning.TILE)
+	var box: Rect2i = Rect2i(target.x * Tuning.TILE, (target.y - 1) * Tuning.TILE, Tuning.TILE, Tuning.TILE * 2)
 	for spot: Vector2i in spots:
 		for facing: int in [1, -1]:
 			for kind: int in [Defs.Weapon.AXE, Defs.Weapon.BOOMERANG, Defs.Weapon.SPEAR]:
@@ -1343,18 +1345,26 @@ func _check_lee_gaps(data: LevelData, grid: TileGrid) -> void:
 			var width: int = col - first
 			if first == 0 or col >= grid.cols or width > LEE_GAP_MAX_CELLS:
 				continue
-			# A gap [first, col - 1] between the floors at first - 1 and col (row `row` is the floor row).
+			# A gap [first, col - 1] between the floors at first - 1 and col (row `row` is the floor row). The near
+			# edge (downwind: where the jumper waits) must be a floor to stand on (else it is no gap anybody jumps:
+			# rock under a floor, a wall foot), the far edge one to crouch on.
 			for wind_sign: int in signs:
 				# A positive wind blows leftwards (PHYSICS.md 13.1): the far (upwind) side is the right one.
 				var far_col: int = col if wind_sign > 0 else first - 1
-				var spot: Vector2i = Vector2i(far_col, row - 1)
-				var crouch: bool = grid.side_at(spot.x, spot.y) != TileGrid.SIDE_WALL \
-						and grid.floor_at(spot.x, spot.y) != TileGrid.FLOOR_DEADLY
-				if not crouch and not reported.has(Vector3i(first, row, wind_sign)):
+				var near_col: int = first - 1 if wind_sign > 0 else col
+				if not _open_above(grid, near_col, row):
+					continue
+				if not _open_above(grid, far_col, row) and not reported.has(Vector3i(first, row, wind_sign)):
 					reported[Vector3i(first, row, wind_sign)] = true
 					_add(data.path, data.row_lines[row] if row < data.row_lines.size() else 0, WARNING,
 							"gust gap at columns %d-%d over row %d: no crouching spot on its far (%s) edge within %d px of the near edge - no lee leapfrog there (G41)" % [
 							first, col - 1, row, "right" if wind_sign > 0 else "left", LEE_REACH_PX])
+
+
+## True when the cell over the ground (col, row) has room for a hero's feet (not a wall, not deadly).
+static func _open_above(grid: TileGrid, col: int, row: int) -> bool:
+	return row > 0 and grid.side_at(col, row - 1) != TileGrid.SIDE_WALL \
+			and grid.floor_at(col, row - 1) != TileGrid.FLOOR_DEADLY
 
 
 ## True when (col, row) is ground a hero may land on (not a deadly floor).
@@ -1667,8 +1677,9 @@ func _check_arena(data: LevelData, grid: TileGrid, records: Array[Dictionary]) -
 			if grid.floor_at(col, grid.rows - 1) == TileGrid.FLOOR_DEADLY:
 				_add(path, tiles_line, WARNING, "wrap = tb: the bottom row is the seam - no deadly cells there (column %d)" % col)
 				break
+	var ledges: Dictionary = _entity_floor_cells(records)
 	for row: int in grid.rows:
-		var gap: int = _widest_gap(grid, row)
+		var gap: int = _widest_gap(grid, row, ledges)
 		if gap > VersusTuning.ARENA_GAP_MAX_CELLS:
 			_add(path, data.row_lines[row] if row < data.row_lines.size() else tiles_line, WARNING,
 					"a clear gap of %d cells in row %d (at most %d in an arena)" % [gap, row, VersusTuning.ARENA_GAP_MAX_CELLS])
@@ -1692,15 +1703,38 @@ func _check_kid_safe(data: LevelData, records: Array[Dictionary]) -> void:
 ## The widest run of cells without a floor between two floor cells of one row (0 when the row has fewer than two).
 ## A run that ends at a wall face (a side wall with a side wall above it, e.g. the Totem Ring's totem) is no gap
 ## anybody jumps across, so it does not count (DA's report, G1 integration).
-static func _widest_gap(grid: TileGrid, row: int) -> int:
+## `extra` (cell -> true): cells that count as floor although the grid has none there - platforms, drop platforms and
+## see-saw planks at their level-start place ([method _entity_floor_cells]; DA's wf9 #2, the Tar Pulleys lifts).
+static func _widest_gap(grid: TileGrid, row: int, extra: Dictionary = {}) -> int:
 	var widest: int = 0
 	var last: int = -1
 	for col: int in grid.cols:
-		if TileGrid.is_ground(grid.floor_at(col, row)):
+		if TileGrid.is_ground(grid.floor_at(col, row)) or extra.has(Vector2i(col, row)):
 			if last >= 0 and not _wall_face(grid, col, row) and not _wall_face(grid, last, row):
 				widest = maxi(widest, col - last - 1)
 			last = col
 	return widest
+
+
+## The cells an arena's moving floors cover at their level-start place (cell -> true): an `objects/platform` or
+## `objects/drop_platform` 3 cells wide around its anchor column (PlatformSkin: 48 px centred on the feet point), an
+## `objects/seesaw` plank `len` * 8 px either side of its fulcrum, in the anchor's row and the row below (the plank
+## lies across the floor line).
+static func _entity_floor_cells(records: Array[Dictionary]) -> Dictionary:
+	var cells: Dictionary = {}
+	for record: Dictionary in records:
+		var id: String = String(record["id"])
+		var col: int = int(record["col"])
+		var row: int = int(record["row"])
+		if id == "objects/platform" or id == "objects/drop_platform":
+			for c: int in range(col - 1, col + 2):
+				cells[Vector2i(c, row)] = true
+		elif id == "objects/seesaw":
+			var half_cells: int = maxi(int((record["params"] as Dictionary).get("len", 4)) * 8 / Tuning.TILE, 1)
+			for c: int in range(col - half_cells, col + half_cells + 1):
+				cells[Vector2i(c, row)] = true
+				cells[Vector2i(c, row + 1)] = true
+	return cells
 
 
 ## True when the cell is a side wall with a side wall right above it (a wall face, not a ledge to land on).

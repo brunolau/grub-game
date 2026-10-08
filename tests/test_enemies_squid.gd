@@ -21,17 +21,12 @@ var _lab: Lab = null
 var _was_manual: bool = false
 
 
-var _t0_tmp: int = 0
-
-
 func before_each() -> void:
-	_t0_tmp = Time.get_ticks_msec()
 	_was_manual = Sim.manual
 	_lab = Lab.new()
 
 
 func after_each() -> void:
-	print("    TIMING %d ms" % (Time.get_ticks_msec() - _t0_tmp))
 	GameInput.clear_scripted()
 	Sim.stop()
 	Sim.manual = _was_manual
@@ -238,7 +233,7 @@ func test_hits_never_stun_lock_it() -> void:
 	while t < 6000 and not squid.dead:
 		Lab.top_up(hero)
 		if squid.is_up():
-			_shot_at(squid.get_head_rect())
+			_shot_at(squid.get_head_box())
 		var hp: int = squid.hp
 		var was_up: bool = squid.is_up()
 		_lab.step(PackedInt32Array([0]))
@@ -326,7 +321,9 @@ func test_coop_tentacle_lock() -> void:
 	_hold_up(squid, GAP_A)
 	p1.respawn_at(Vector2i(GAP_A - 37, SURFACE))
 	p2.respawn_at(Vector2i(GAP_A + 37, SURFACE))
-	_shot_at(squid.get_head_rect(), 0)
+	assert_false(squid.get_head_rect().has_area(), "locked: the head is no weak point (Hud.weak_point_rects' contract)")
+	assert_eq(squid.get_weak_rect(), squid.get_tentacle_rect(-1).merge(squid.get_tentacle_rect(1)), "the tentacles are")
+	_shot_at(squid.get_head_box(), 0)
 	_step2()
 	assert_eq(squid.hp, squid.max_hp, "the crossed tentacles armour the head")
 	_shot_at(squid.get_tentacle_rect(1), 0)
@@ -340,7 +337,9 @@ func test_coop_tentacle_lock() -> void:
 	_step2()
 	assert_true(squid.get_open_ticks() > 0, "both flinch: the head opens")
 	assert_eq(squid.get_open_ticks(), Squid.SQUID_OPEN_TICKS, "for 33 ticks from the next")
-	_shot_at(squid.get_head_rect(), 0)
+	assert_eq(squid.get_head_rect(), squid.get_head_box(), "open: the head is the weak point")
+	assert_false(squid.get_weak_rect().has_area())
+	_shot_at(squid.get_head_box(), 0)
 	_step2()
 	assert_eq(squid.hp, squid.max_hp - 20, "and takes a hit")
 	# One hero's two flinches never open it.

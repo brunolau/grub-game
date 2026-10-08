@@ -31,6 +31,11 @@ extends BossBase
 ## dodges, the other hero throws. Rocks are spat at the plate holder (the 1.0 speeds, aimed), the ceiling drops rattle
 ## over the thrower. Each rage (the 1st hit and every 4th) moves the live chain to the other plate: the roles swap. A
 ## hall without two plates is a content error (warned once): its visor then stays up and only the holder rule is lost.
+##
+## 2.0 versus, the **neutral statue** of Colossus Hall (DESIGN.md E.5 / G43): in an arena (`kind = arena`) it is a
+## picture in the wall ([method is_neutral]) - no hits, no bar, no music, no wake, no rocks or drops of its own, a body
+## that neither hurts nor blocks; world-B's referee spits at the leader through [method arena_spit] /
+## [method arena_mouth] (scripts/world/versus/signatures.gd).
 
 enum State { DORMANT, IDLE, SPIT, SLAM, HURT, RAGE, BROKEN }
 enum Attack { SPIT, SLAM }
@@ -62,6 +67,12 @@ var _plates: Array[Plate] = []
 var _live: int = 0
 var _visor: Node2D = null
 static var _warned_plates: bool = false
+
+# 2.0 versus: the neutral statue of an arena (Colossus Hall). -1 = not decided yet.
+## The open-jaw pose stays this long after the referee's rock left.
+const ARENA_SPIT_LINGER_TICKS: int = 6
+var _neutral: int = -1
+var _arena_spit_left: int = 0
 
 
 func _default_skin() -> String:
@@ -165,6 +176,9 @@ func _on_defeated() -> void:
 func _ai_tick() -> void:
 	if dead:
 		_play(&"dead")
+		return
+	if _neutral != 0 and is_neutral():
+		_neutral_tick()
 		return
 	var hero: PlayerBase = _target_hero()
 	if not fighting:
@@ -370,10 +384,51 @@ func _ceiling_y(x: int, limit: int) -> int:
 # =================================================================================================================
 
 ## Start the fight (the arena zone or the wake rule): the form is fixed first, so the bar opens with its hit points.
+## The neutral statue of an arena never fights (no bar, no music).
 func start_fight() -> void:
+	if is_neutral():
+		return
 	if not fighting and not dead:
 		_configure_form()
 	super.start_fight()
+
+
+# =================================================================================================================
+# 2.0 versus: the neutral statue of Colossus Hall (DESIGN.md E.5 / G43; DA and world-B, wf9)
+# =================================================================================================================
+
+## True in an arena (`kind = arena`, VersusArena.is_arena): the statue is a NEUTRAL picture in the wall - it never
+## wakes, fights, attacks or takes a hit (weapons pass it), its body neither hurts nor blocks (the arena's own tiles are
+## the collision); world-B's referee (VersusSignatures) makes it spit at the leader through [method arena_spit] and
+## [method arena_mouth]. Decided on its first look at the level; everywhere else the statue above runs unchanged.
+func is_neutral() -> bool:
+	if _neutral < 0:
+		var level: LevelBase = Game.level
+		if level == null:
+			return false
+		_neutral = 1 if VersusArena.is_arena(level) else 0
+	return _neutral == 1
+
+
+## The feet point a spat rock starts from (logical px): its open jaws (VersusSignatures, duck-typed).
+func arena_mouth() -> Vector2i:
+	return sim_pos + EnemyTuning.COLOSSUS_MOUTH
+
+
+## The referee's spit is due in `ticks` ticks: the open-jaw pose shows from now until a little after the rock left
+## (VersusSignatures calls it at the start of VersusTuning.COLOSSUS_JAWS_TICKS; the rock and its touch are world-B's).
+func arena_spit(ticks: int) -> void:
+	_arena_spit_left = maxi(ticks, 1) + ARENA_SPIT_LINGER_TICKS
+	_play(&"spit", true)
+
+
+## One tick of the neutral statue: the spit pose while the referee's spit runs, else idle. Nothing else.
+func _neutral_tick() -> void:
+	if _arena_spit_left > 0:
+		_arena_spit_left -= 1
+		_play(&"spit")
+	else:
+		_play(&"idle")
 
 
 ## The co-op form in a co-op game of two or more heroes on a co-op file: hit points x5/4, the plates of the hall.

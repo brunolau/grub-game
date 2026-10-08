@@ -254,17 +254,12 @@ var _lab: Lab = null
 var _was_manual: bool = false
 
 
-var _t0_tmp: int = 0
-
-
 func before_each() -> void:
-	_t0_tmp = Time.get_ticks_msec()
 	_was_manual = Sim.manual
 	_lab = Lab.new()
 
 
 func after_each() -> void:
-	print("    TIMING %d ms" % (Time.get_ticks_msec() - _t0_tmp))
 	GameInput.clear_scripted()
 	Sim.stop()
 	Sim.manual = _was_manual
@@ -327,15 +322,18 @@ func test_the_head_is_open_only_while_it_lies_dizzy_or_stuck_and_bounces_never_h
 	var boar: Tusker = _open()
 	var hero: PlayerBase = _lab.hero()
 	_lab.step(PackedInt32Array([0]))
-	_shot_at(boar.get_head_rect())
+	assert_false(boar.get_head_rect().has_area(), "closed: no weak point (Hud.weak_point_rects' contract)")
+	assert_false(boar.get_rump_rect().has_area(), "the solo form's rump is never one")
+	_shot_at(boar.get_head_box())
 	_lab.step(PackedInt32Array([0]))
 	assert_eq(boar.hp, boar.max_hp, "closed: the head glances")
 	boar._set_state(Tusker.State.DIZZY)
 	boar._dizzy_len = 100
-	_shot_at(boar.get_head_rect())
+	assert_eq(boar.get_head_rect(), boar.get_head_box(), "dizzy: the head is the weak point")
+	_shot_at(boar.get_head_box())
 	_lab.step(PackedInt32Array([0]))
 	assert_eq(boar.hp, boar.max_hp - 20, "dizzy: an axe on the head counts (power 20)")
-	_shot_at(boar.get_head_rect())
+	_shot_at(boar.get_head_box())
 	_lab.step(PackedInt32Array([0]))
 	assert_eq(boar.hp, boar.max_hp - 20, "the next hit waits for the 22-tick cooldown")
 	# A landing on top bounces the hero and harms nobody.
@@ -418,7 +416,7 @@ func test_hits_never_stun_lock_it() -> void:
 	while t < 4000 and not boar.dead:
 		Lab.top_up(hero)
 		if boar.is_open():
-			_shot_at(boar.get_head_rect())
+			_shot_at(boar.get_head_box())
 		var hp: int = boar.hp
 		_lab.step(PackedInt32Array([0]))
 		t += 1
@@ -451,13 +449,13 @@ func test_two_heroes_striking_together_count_once() -> void:
 	_lab.step(PackedInt32Array([0, 0]))
 	boar._set_state(Tusker.State.DAZED)
 	var hp: int = boar.hp
-	_shot_at(boar.get_head_rect(), 0)
-	_shot_at(boar.get_rump_rect(), 1)
+	_shot_at(boar.get_head_box(), 0)
+	_shot_at(boar.get_rump_box(), 1)
 	_lab.step(PackedInt32Array([0, 0]))
 	assert_eq(boar.hp, hp - 20, "two thrown weapons in one tick: one hit")
 	for t: int in Tuning.BOSS_HIT_COOLDOWN - 2:
 		boar._set_state(Tusker.State.DAZED)
-		_shot_at(boar.get_rump_rect(), 1)
+		_shot_at(boar.get_rump_box(), 1)
 		_lab.step(PackedInt32Array([0, 0]))
 	assert_eq(boar.hp, hp - 20, "the cooldown is the boss's, not the hero's")
 
@@ -514,7 +512,7 @@ func test_coop_form_charges_whoever_hit_it_last() -> void:
 	_lab.step(PackedInt32Array([0, 0]))
 	assert_eq(boar._charge_target(null), p1, "at first the nearest hero")
 	boar._set_state(Tusker.State.DAZED)
-	_shot_at(boar.get_rump_rect(), 1)
+	_shot_at(boar.get_rump_box(), 1)
 	_lab.step(PackedInt32Array([0, 0]))
 	assert_eq(boar.last_hitter, p2)
 	assert_eq(boar._charge_target(null), p2, "then whoever hit it last, however far")
@@ -539,13 +537,15 @@ func test_coop_form_only_the_partner_behind_can_strike_the_rump() -> void:
 	p2.respawn_at(Vector2i(240, 160))
 	_lab.step(PackedInt32Array([0, 0]))
 	assert_eq(boar.facing, -1, "faces P1, the nearer")
-	_shot_at(boar.get_head_rect(), 0)
+	assert_false(boar.get_head_rect().has_area(), "co-op, dizzy: the head is no weak point")
+	assert_eq(boar.get_rump_rect(), boar.get_rump_box(), "the rump is")
+	_shot_at(boar.get_head_box(), 0)
 	_lab.step(PackedInt32Array([0, 0]))
 	assert_eq(boar.hp, boar.max_hp, "the head glances in the co-op form")
-	_shot_at(boar.get_rump_rect(), 0)
+	_shot_at(boar.get_rump_box(), 0)
 	_lab.step(PackedInt32Array([0, 0]))
 	assert_eq(boar.hp, boar.max_hp, "P1 is in front: his throw at the rump glances too")
-	_shot_at(boar.get_rump_rect(), 1)
+	_shot_at(boar.get_rump_box(), 1)
 	_lab.step(PackedInt32Array([0, 0]))
 	assert_eq(boar.hp, boar.max_hp - 20, "P2 stands behind it: the rump counts")
 	p1.respawn_at(Vector2i(230, 160))
@@ -554,7 +554,7 @@ func test_coop_form_only_the_partner_behind_can_strike_the_rump() -> void:
 	assert_eq(boar.facing, 1, "it turned to P1 (now the nearer) on the very next tick")
 	for t: int in Tuning.BOSS_HIT_COOLDOWN:
 		_lab.step(PackedInt32Array([0, 0]))
-	_shot_at(boar.get_rump_rect(), 1)
+	_shot_at(boar.get_rump_box(), 1)
 	_lab.step(PackedInt32Array([0, 0]))
 	assert_eq(boar.hp, boar.max_hp - 40, "P2, behind it again, strikes the rump again")
 
@@ -609,7 +609,7 @@ func test_coop_form_phase_3_skids_and_only_a_brace_wall_stops_it() -> void:
 	assert_eq(p2.hit_timer, 0)
 	assert_true(boar.get_head_rect().size.x > 0)
 	var hp: int = boar.hp
-	_shot_at(boar.get_head_rect(), 0)
+	_shot_at(boar.get_head_box(), 0)
 	_lab.step(PackedInt32Array([Defs.IN_DOWN, Defs.IN_DOWN]))
 	assert_eq(boar.hp, hp - 20, "dazed by the Brace Wall its head is open to the hero in front")
 	# Ticks it was seen dazed so far: the tick of the brace and the tick of the hit.
@@ -705,14 +705,14 @@ func test_coop_form_an_idle_partner_is_no_bait() -> void:
 	assert_true(p1.counts_for_coop() and not p2.counts_for_coop())
 	assert_eq(boar.facing, -1, "it faces P1, not the nearer dozing P2")
 	assert_eq(boar._charge_target(null), p1, "its first target is the hero who plays")
-	_shot_at(boar.get_rump_rect(), 0)
+	_shot_at(boar.get_rump_box(), 0)
 	_lab.step(PackedInt32Array([0, 0]))
 	assert_eq(boar.hp, boar.max_hp, "P1 is in front of it: his throw at the rump glances")
 	# P2's player presses something (a tick of Down): he counts again, and he is the nearer hero.
 	_lab.step(PackedInt32Array([0, Defs.IN_DOWN]))
 	assert_true(p2.counts_for_coop())
 	assert_eq(boar.facing, 1, "it turned to P2 at once")
-	_shot_at(boar.get_rump_rect(), 0)
+	_shot_at(boar.get_rump_box(), 0)
 	_lab.step(PackedInt32Array([0, 0]))
 	assert_eq(boar.hp, boar.max_hp - 20, "P1 is behind it now: the rump counts")
 	# An egg beside it is no bait.
@@ -722,7 +722,7 @@ func test_coop_form_an_idle_partner_is_no_bait() -> void:
 	p2.go_down(&"voluntary")
 	_lab.step(PackedInt32Array([0, 0]))
 	assert_eq(boar.facing, -1, "an egg is no bait")
-	_shot_at(boar.get_rump_rect(), 0)
+	_shot_at(boar.get_rump_box(), 0)
 	_lab.step(PackedInt32Array([0, 0]))
 	assert_eq(boar.hp, boar.max_hp - 20, "P1 in front: glances")
 	# Phase 3: P1 crouches beside his dozing partner in the path of a charge - no Brace Wall, he is trampled.
@@ -790,10 +790,10 @@ func test_coop_form_is_fair_to_either_hero() -> void:
 		other.respawn_at(Vector2i(boar.sim_pos.x - front * 60, 160))
 		_lab.step(PackedInt32Array([0, 0]))
 		assert_eq(boar.facing, front, "slot %d: it keeps facing the nearer hero" % slot)
-		_shot_at(boar.get_rump_rect(), target.slot)
+		_shot_at(boar.get_rump_box(), target.slot)
 		_lab.step(PackedInt32Array([0, 0]))
 		assert_eq(boar.hp, boar.max_hp, "slot %d: his own strike glances" % slot)
-		_shot_at(boar.get_rump_rect(), other.slot)
+		_shot_at(boar.get_rump_box(), other.slot)
 		_lab.step(PackedInt32Array([0, 0]))
 		assert_eq(boar.hp, boar.max_hp - 20, "slot %d: the partner behind it strikes the rump" % (1 - slot))
 		# Phase 3: the Brace Wall, this hero in front.
@@ -834,8 +834,36 @@ func test_every_weak_point_is_clear_of_the_hud() -> void:
 		assert_true(problems.is_empty(), "difficulty %d: %s" % [case[0], problems])
 		_lab.level.free()
 		_lab = Lab.new()
-	print("    G35: %d open-pose weak rects checked, the highest top %d px under the view's top" % [checked[0], worst[0]])
+	# The co-op form: charges into either bank, the recoil hop (the rump is no weak point in it), the dizzy rump.
+	var coop_checked: int = 0
+	for slot: int in 2:
+		var boar: Tusker = _open(Defs.Difficulty.EXPERT, 2, true)
+		_wake_both()
+		_lab.step(PackedInt32Array([0, 0]))
+		var target: PlayerBase = _lab.hero(slot)
+		target.respawn_at(Vector2i(32, 112) if slot == 0 else Vector2i(288, 112))
+		_lab.hero(1 - slot).respawn_at(Vector2i(288, 112) if slot == 0 else Vector2i(32, 112))
+		boar.teleport(Vector2i(160, 160))
+		boar.last_hitter = target
+		boar._begin_idle()
+		var recoils: int = 0
+		for t: int in 200:
+			_lab.step(PackedInt32Array([0, 0]))
+			if boar.get_state() == Tusker.State.RECOIL:
+				recoils += 1
+				assert_true(Hud.weak_point_rects(boar).is_empty(), "co-op: no weak point in the recoil hop")
+			for rect: Rect2i in Hud.weak_point_rects(boar):
+				var why: String = _lab.hud_clear(rect)
+				assert_eq(why, "", "co-op, charging bank %d, state %d" % [slot, boar.get_state()])
+				worst[0] = mini(worst[0], _lab.top_clearance(rect))
+				coop_checked += 1
+		assert_true(recoils > 0, "it crashed into the bank")
+		_lab.level.free()
+		_lab = Lab.new()
+	print("    G35: %d open-pose weak rects checked (%d of the co-op rump), the highest top %d px under the view's top" % [
+		checked[0] + coop_checked, coop_checked, worst[0]])
 	assert_true(checked[0] > 100, "the routes saw it open (%d)" % checked[0])
+	assert_true(coop_checked > 40, "the co-op rump lay open (%d)" % coop_checked)
 
 
 # =================================================================================================================

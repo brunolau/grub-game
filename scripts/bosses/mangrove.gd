@@ -103,11 +103,12 @@ const MANGROVE_PIN_GRACE: int = 3
 ## Co-op: feet up to this far over the fist's top still stand on it (the shake nudge, Tuning.SHAKE_NUDGE) [own]
 const MANGROVE_PIN_HOVER_PX: int = 6
 ## Co-op: the least ticks one hero needs between a face hit and a hand hit on the test level, measured by
-## tests/test_enemies_mangrove.gd (launched from the fist with the spear, the axe or the swirling axe, a throw at the face
-## and one back at the resting hand), which pins this as a lower bound. A measured fact only since DESIGN.md G34: the
-## twin is slot-bound (two heroes' own hits, the slot rule of _twin_half; an idle partner never strikes), so the window
-## is not capped by it.
-const MANGROVE_SOLO_MIN_TICKS: int = 10
+## tests/test_enemies_mangrove.gd (the spear, the axe or the swirling axe, a throw at the face and one turned back at the
+## resting hand, from the springboard or a jump off the lower ledge; with the G35 heights an axe does it in 4 - 10 with the
+## face at the old 112-141 px), which pins this as a lower bound. A measured fact only since DESIGN.md G34: the twin is
+## slot-bound (two heroes' own hits, the slot rule of _twin_half; an idle partner never strikes), so the window is not
+## capped by it (capped, the window would now be 0).
+const MANGROVE_SOLO_MIN_TICKS: int = 4
 const MANGROVE_COUNT_IN_TICKS: int = 8       ## the twin count-in: three blips 8 ticks apart, then "go"
 const MANGROVE_PART_DEBOUNCE: int = 8        ## one strike lights a part once (its boxes live up to 3 ticks) [own]
 const MANGROVE_DYING_TICKS: int = 44         ## withering before the bonus burst [own]
@@ -289,10 +290,32 @@ func get_fist_rect() -> Rect2i:
 			MANGROVE_FIST_BOX.y)
 
 
-## The face's weak rectangle.
+## The face as a weak point this tick: in stage 1 of the fight (the co-op form's merged stage too), else empty (the
+## contract of Hud.weak_point_rects and the G35 route checks: an empty rect cannot be struck now; later a hit on the
+## face glances). [method get_face_box] is the face whatever the stage.
 func get_face_rect() -> Rect2i:
+	if fighting and not dead and _dying < 0 and get_stage() == 1:
+		return get_face_box()
+	return Rect2i()
+
+
+## The face's rectangle in the trunk, weak or not.
+func get_face_box() -> Rect2i:
 	var feet: Vector2i = Vector2i(wall_x, floor_y - MANGROVE_FACE_RISE)
 	return Rect2i(feet + MANGROVE_FACE.position, MANGROVE_FACE.size)
+
+
+## The other weak point this tick (Hud.weak_point_rects asks every boss for it): the resting upper hand while it is one
+## (the solo form's stage 2, the co-op form's merged stage), the stuck fist in stage 3, else empty.
+func get_weak_rect() -> Rect2i:
+	if not fighting or dead or _dying >= 0:
+		return Rect2i()
+	var stage: int = get_stage()
+	if stage == 3:
+		return get_fist_rect() if _fist == Fist.STUCK else Rect2i()
+	if _hand == Hand.REST and (coop_form or stage == 2):
+		return get_hand_rect()
+	return Rect2i()
 
 
 ## The upper hand's box this tick (empty while it is in the wall).
@@ -680,7 +703,7 @@ func _poll_parts() -> void:
 	var level: LevelBase = Game.level
 	if level == null or not fighting:
 		return
-	var face: Rect2i = get_face_rect()
+	var face: Rect2i = get_face_box()
 	var hand: Rect2i = get_hand_rect() if _hand == Hand.REST else Rect2i()
 	var fist: Rect2i = get_fist_rect() if _fist == Fist.STUCK else Rect2i()
 	var projectiles: Array[SimEntity] = level.get_kind(Defs.Kind.HERO_PROJECTILE)
@@ -945,7 +968,7 @@ static func _step_toward(from: Vector2i, to: Vector2i, speed: int) -> Vector2i:
 
 
 func _burst_origin() -> Vector2i:
-	return get_face_rect().get_center()
+	return get_face_box().get_center()
 
 
 ## The level's drops come out on the floor in front of the trunk strip, half a cell out from the wall: from the face

@@ -1,0 +1,38 @@
+# Club & Grub - level texts of world 8, Idol Ruins (Book II), English. Owner: level designer D8
+# (docs/expansion/PLAN.md 6.1). A level sub-catalogue: loaded beside locale/en.po (scripts/ui/ui_kit.gd), never
+# offered as a language. Keys: the level names and the `text=` keys of signs and hint zones of levels/w8_*.lvl and
+# their co-op files. Every sign text fits three board lines (DESIGN.md G27).
+msgid ""
+msgstr ""
+"Project-Id-Version: Club & Grub\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+# --- Level names ---
+msgid "Overgrown Steps"
+msgstr "Overgrown Steps"
+
+msgid "Hall of Idols"
+msgstr "Hall of Idols"
+
+msgid "Idol Court"
+msgstr "Idol Court"
+
+# --- w8_l1 Overgrown Steps ---
+msgid "SIGN_W8_STEPS"
+msgstr "Step on the stone plate to raise the stair."
+
+msgid "SIGN_W8_GUARD"
+msgstr "Its shield turns slowly. Strike its back."
+
+msgid "SIGN_W8_MIMIC"
+msgstr "Not every chest is a chest."
+
+# --- w8_l2 Hall of Idols ---
+msgid "SIGN_W8_GATES"
+msgstr "Press Down on an arch to go through."
+
+msgid "SIGN_W8_NICHE"
+msgstr "Crouch on the hatch to drop. Wait for its back!"

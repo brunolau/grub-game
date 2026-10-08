@@ -392,7 +392,8 @@ func test_coop_snatch_and_the_partners_rescue() -> void:
 	assert_false(target.control_enabled, "he cannot move or strike")
 	var y0: int = roc.sim_pos.y
 	Sim.step(10)
-	assert_eq(roc.sim_pos.y, y0 - 10 * Roc.SNATCH_RISE, "it climbs at 2 px per tick")
+	assert_eq(roc.sim_pos.y, maxi(y0 - 10 * Roc.SNATCH_RISE, roc.snatch_ceiling()),
+			"it climbs at 2 px per tick (to its G35 ceiling at most)")
 	assert_eq(target.sim_pos, roc.sim_pos + Vector2i(0, Roc.SNATCH_HANG_DY), "he hangs under it")
 	var partner: PlayerBase = _p2 if target == _hero else _hero
 	partner.club_box_active = true

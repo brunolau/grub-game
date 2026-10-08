@@ -55,6 +55,14 @@ var v_target: int = 0
 ## step counter and, per player slot, the last group step on which that hero had ground, a platform or a partner
 ## under his feet (the vertical anchor), and the slot of the anchor of the last step (-1 = none).
 var _tribe: Array[PlayerBase] = []
+## 2.0 G42 (`scroll = rising`, PHYSICS.md C.8): true while the rising band pulls the view (the level sets it before
+## every follow step). The vertical follow then reads a hero's FOOTING - his feet y on the last tick he had ground, a
+## platform, a carrier or a vine (CLIMB) under his feet - as a standing hero, never the height of his jump: a jump in
+## place on a rising climb does not drag the view up (it never sinks back there). Always false outside a rising level.
+var footing_mode: bool = false
+## The footing y per slot ([method _note_footing]) and the slots that have one since the last snap.
+var _footing: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
+var _footing_known: int = 0
 var _group_ticks: int = 0
 var _ground_step: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 var anchor_slot: int = -1
@@ -166,6 +174,8 @@ func tick(hero: PlayerBase) -> void:
 	elif pos.y > _max.y:
 		pos.y = maxi(pos.y - step, _max.y)
 	elif _min.y < _max.y:
+		if footing_mode:
+			_note_footing(hero)
 		_follow_y(hero, 0)
 
 
@@ -174,6 +184,7 @@ func tick(hero: PlayerBase) -> void:
 ## right by half a view when the hero would otherwise stand in its right part. Nothing is interpolated.
 func snap(hero: PlayerBase) -> void:
 	_update_limits()
+	_footing_known = 0
 	h_dir = DIR_IDLE
 	v_active = 0
 	v_target = 0
@@ -299,12 +310,16 @@ func apply_rising(band_top: int) -> void:
 
 func _collect_tribe(heroes: Array[PlayerBase]) -> void:
 	_tribe.clear()
+	# (PlayerBase.is_down() / is_grounded() read as their fields: the tribe camera runs every co-op tick - the
+	# multi-hero performance pass of phase 3.)
 	for hero: PlayerBase in heroes:
-		if hero == null or hero.dead or hero.is_down():
+		if hero == null or hero.dead or hero.down:
 			continue
 		_tribe.append(hero)
-		if hero.is_grounded():
+		if hero.grounded or hero.on_platform:
 			_ground_step[clampi(hero.slot, 0, _ground_step.size() - 1)] = _group_ticks
+		if footing_mode:
+			_note_footing(hero)
 
 
 ## The first hero of H (slot order) standing in the look pose (12.3: on the ground, not on a platform, no motion).
@@ -329,12 +344,14 @@ func _keep_grounded(before_y: int) -> void:
 	var lo: int = -(1 << 30)
 	var hi: int = 1 << 30
 	var standing: int = 0
+	var height: int = rows * Tuning.TILE
 	for hero: PlayerBase in _tribe:
-		if not hero.is_grounded() and hero.state != Defs.HeroState.CLIMB:
+		if not (hero.grounded or hero.on_platform) and hero.state != Defs.HeroState.CLIMB:
 			continue
 		standing += 1
-		lo = maxi(lo, hero.sim_pos.y - rows * Tuning.TILE)
-		hi = mini(hi, hero.sim_pos.y - KEEP_HEAD_PX)
+		var feet_y: int = hero.sim_pos.y
+		lo = maxi(lo, feet_y - height)
+		hi = mini(hi, feet_y - KEEP_HEAD_PX)
 	if standing < 2 or lo > hi or (pos.y >= lo and pos.y <= hi):
 		return
 	var target: int = clampi(pos.y, lo, hi)
@@ -368,12 +385,12 @@ func _group_anchor() -> PlayerBase:
 
 ## Group paging of C.13 (see [method tick_group]).
 func _follow_x_group() -> void:
-	var cam_col: int = Tuning.to_cell(pos.x)
+	var cam_col: int = pos.x >> 4  # Tuning.to_cell, written out (every co-op tick)
 	var rear: int = 1 << 30   # L: the left-most screen column of H
 	var front: int = -(1 << 30)   # Rr: the right-most
 	var moving: bool = false
 	for hero: PlayerBase in _tribe:
-		var sc: int = Tuning.to_cell(hero.sim_pos.x) - cam_col
+		var sc: int = (hero.sim_pos.x >> 4) - cam_col
 		rear = mini(rear, sc)
 		front = maxi(front, sc)
 		if hero.xvel != 0 or hero.on_platform:
@@ -597,11 +614,20 @@ func _follow_y(hero: PlayerBase, fixed_step: int) -> void:
 		if not autoscroll_held:
 			pos.y = mini(pos.y + Tuning.CAM_AUTOSCROLL_PX, _max.y)
 		return
-	if hero.yvel == 0:
+	# The hero's feet and speed as the follow reads them: his own (1.0), or his footing as a standing hero while the
+	# rising band pulls the view (G42, [member footing_mode]).
+	var feet_y: int = hero.sim_pos.y
+	var yvel: int = hero.yvel
+	if footing_mode and fixed_step == 0:
+		var bit: int = 1 << clampi(hero.slot, 0, _footing.size() - 1)
+		if (_footing_known & bit) != 0:
+			feet_y = _footing[clampi(hero.slot, 0, _footing.size() - 1)]
+		yvel = 0
+	if yvel == 0:
 		v_active = 0
 	var cam_row: int = Tuning.to_cell(pos.y)
-	var sr: int = Tuning.to_cell(hero.sim_pos.y) - cam_row
-	if hero.yvel != 0:
+	var sr: int = Tuning.to_cell(feet_y) - cam_row
+	if yvel != 0:
 		if sr >= _air_low_sr:
 			v_target = _air_low_target
 			v_active += 1
@@ -623,10 +649,10 @@ func _follow_y(hero: PlayerBase, fixed_step: int) -> void:
 		v_active += 1
 	if v_active == 0:
 		return
-	var y_in_view: int = hero.sim_pos.y - pos.y
+	var y_in_view: int = feet_y - pos.y
 	# Home row (12.2 #6): while the hero is on the main floor the camera may not sink below it and is pulled up
 	# when it is more than one row below.
-	var on_main_floor: bool = home_row >= 0 and hero.sim_pos.y <= (home_row + rows) * Tuning.TILE
+	var on_main_floor: bool = home_row >= 0 and feet_y <= (home_row + rows) * Tuning.TILE
 	if not on_main_floor or home_row >= cam_row - 1:
 		if v_target == sr:
 			v_active = 0
@@ -638,6 +664,15 @@ func _follow_y(hero: PlayerBase, fixed_step: int) -> void:
 			_move_y(1, y_in_view - v_target * Tuning.TILE, fixed_step)
 			return
 	_move_y(-1, v_target * Tuning.TILE - y_in_view, fixed_step)
+
+
+## G42: keep `hero`'s footing - his feet y on a tick on which he has ground, a platform, a carrier or a vine under
+## his feet.
+func _note_footing(hero: PlayerBase) -> void:
+	if hero.grounded or hero.on_platform or hero.state == Defs.HeroState.CLIMB or hero.totem_carrier != null:
+		var slot: int = clampi(hero.slot, 0, _footing.size() - 1)
+		_footing[slot] = hero.sim_pos.y
+		_footing_known |= 1 << slot
 
 
 func _move_y(direction: int, distance: int, fixed_step: int) -> void:

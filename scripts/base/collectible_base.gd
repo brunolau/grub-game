@@ -131,7 +131,13 @@ func _sim_tick(phase: int) -> void:
 		if level == null or not can_be_collected():
 			return
 		# can_be_collected() changes only when collect() succeeds, which returns at once: it is asked once per tick.
+		# Overlap.body's coarse reject is tested here first (the multi-hero performance pass of phase 3: every item asks
+		# every hero on every tick, and nearly every pair is far apart; the same test, without the call).
+		var pos: Vector2i = sim_pos
 		for hero: PlayerBase in level.contact_order():
+			var feet: Vector2i = hero.sim_pos
+			if absi(pos.x - feet.x) >= Tuning.OVERLAP_MAX_DX or absi(pos.y - feet.y) >= Tuning.OVERLAP_MAX_DY:
+				continue
 			if Overlap.body(self, hero, hero) and collect(hero):
 				return
 

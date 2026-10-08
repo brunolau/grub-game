@@ -1,0 +1,32 @@
+# Club & Grub - level texts of the Book I co-op files 2-2 Bone Gorge, 2-2b Brute's Den, 3-1 Frost Summit and 3-1b
+# Blizzard Pass, English. Owner: level designer DB2 (docs/expansion/PLAN.md 6.1, this phase's DB2 globs). A level
+# sub-catalogue: loaded beside locale/en.po (scripts/ui/ui_kit.gd), never offered as a language. Keys: the `text=` keys
+# of the signs of levels/w2_l2_coop.lvl, levels/w2_l2b_coop.lvl, levels/w3_l1_coop.lvl and levels/w3_l1b_coop.lvl
+# (their stage names are the Book I names of locale/en.po). Every text fits a sign board (3 lines, about 60 characters).
+msgid ""
+msgstr ""
+"Project-Id-Version: Club & Grub\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+# --- w2_l2_coop Bone Gorge (co-op) ---
+msgid "SIGN_COOP_W2_SEESAW"
+msgstr "One waits on the see-saw. The other drops on its high end!"
+
+msgid "SIGN_COOP_W2_LIFT"
+msgstr "Hold the plate and the pillar lifts your partner up."
+
+msgid "SIGN_COOP_W2_BRACE"
+msgstr "Bull Rex! Crouch side by side and it stops dead."
+
+# --- w3_l1_coop Frost Summit (co-op) ---
+msgid "SIGN_COOP_W3_BRACE"
+msgstr "Bull Rex on the ice! Crouch side by side to stop it."
+
+msgid "SIGN_COOP_W3_HOP"
+msgstr "Too high? Hop off your partner's head, then drop the vine."
+
+msgid "SIGN_COOP_W3_CAVE"
+msgstr "One holds the plate, the other runs through the door."

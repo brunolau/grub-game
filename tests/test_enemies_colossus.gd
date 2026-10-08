@@ -1376,6 +1376,57 @@ func test_coop_the_visor_head_stays_clear_of_the_hud_in_the_coop_hall() -> void:
 	Game.begin_level(&"")
 
 
+## Colossus Hall (DESIGN.md E.5 / G43; DA and world-B, wf9): in an arena the statue is neutral - a hero walking right up
+## to it and standing in its body wakes nothing and is not hurt, a throw on its head passes, no rock or drop of its own
+## ever comes; world-B's referee calls arena_spit(10): the open-jaw pose shows for those ticks (and a few more), and
+## arena_mouth() is its jaws. Outside an arena the very same record is the 1.0 statue.
+func test_in_an_arena_the_statue_is_neutral_and_spits_only_for_the_referee() -> void:
+	if _aid_running():
+		assert_true(true, "skipped while a route-building aid runs")
+		return
+	var colossus: Colossus = _visor_hall(false, false)
+	assert_false(colossus.is_neutral(), "a level that is no arena: the 1.0 statue")
+	assert_true(colossus.fighting)
+	_coop_teardown()
+	Game.new_game(Defs.Difficulty.EXPERT)
+	Game.begin_level(&"test")
+	var rows: PackedStringArray = PackedStringArray()
+	for row: int in 10:
+		rows.append(".".repeat(20) + "#".repeat(10))
+	rows.append("#".repeat(30))
+	rows.append("#".repeat(30))
+	_hall = make_level(rows)
+	_hall.meta["kind"] = "arena"
+	_p1 = PlayerBase.new()
+	place(_hall, _p1, Vector2i(100, 160), {"slot": 0})
+	_p1.respawn_at(Vector2i(100, 160))
+	var statue: Colossus = Spawner.instantiate(&"bosses/colossus") as Colossus
+	place(_hall, statue, Vector2i(19 * Tuning.TILE + 8, 160))
+	var hp: int = statue.hp
+	for tick: int in 600:
+		_p1.teleport(Vector2i(statue.sim_pos.x - 40 + (tick % 60), 160))
+		Sim.step(1)
+		_p1.run.hearts = Tuning.ENERGY_START
+		assert_true(statue.is_neutral())
+		assert_false(statue.fighting, "tick %d: it never wakes (no bar, no music)" % tick)
+		assert_eq(_p1.hit_timer, 0, "tick %d: its body hurts nobody" % tick)
+	assert_eq(_hall.get_kind(Defs.Kind.ENEMY_PROJECTILE).size(), 0, "no rock or drop of its own")
+	var axe: ProjectileBase = ProjectileBase.new()
+	var head: Rect2i = statue.get_head_rect()
+	place(_hall, axe, Vector2i(head.get_center().x, head.end.y), {"from_hero": true, "power": 20, "owner": 0})
+	Sim.step(1)
+	assert_false(axe.spent, "a throw passes the picture")
+	assert_eq(statue.hp, hp, "no hit")
+	assert_eq(statue.arena_mouth(), statue.sim_pos + EnemyTuning.COLOSSUS_MOUTH, "the rock starts at its jaws")
+	statue.arena_spit(VersusTuning.COLOSSUS_JAWS_TICKS)
+	for tick: int in VersusTuning.COLOSSUS_JAWS_TICKS:
+		Sim.step(1)
+		assert_eq(statue._anim_role, &"spit", "tick %d: the open jaws show for the referee's spit" % tick)
+	Sim.step(Colossus.ARENA_SPIT_LINGER_TICKS + 1)
+	assert_eq(statue._anim_role, &"idle", "then idle again")
+	_coop_teardown()
+
+
 func test_coop_every_rage_moves_the_live_chain_and_the_roles_swap() -> void:
 	if _aid_running():
 		assert_true(true, "skipped while a route-building aid runs")

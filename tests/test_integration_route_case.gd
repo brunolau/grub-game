@@ -67,6 +67,13 @@ var _gates_reached: Dictionary = {}
 var _connections: Array[Array] = []
 var _problems: ProblemCounter = null
 var _counting: bool = false
+## G35 (DESIGN.md G-resolutions, wf9_lead_design_to_integration.txt #1.2 / #2): the first tick of a boss fight on which
+## a weak point that can be struck lies outside the view or less than the clearance under the fight HUD
+## (Hud.weak_point_problem); "" = none. Checked on every tick of every route that fights a boss.
+var _weak_problem: String = ""
+## The HUD script (its static weak-point helpers), loaded at run time: a HUD mid-edit cannot break the route tests.
+var _hud: GDScript = null
+const HUD_SCRIPT: String = "res://scripts/ui/hud.gd"
 
 
 func after_each() -> void:
@@ -275,6 +282,7 @@ func check_expectations(label: String, spec: Dictionary, played: int, before: in
 			label, _count(&"hero_revived")])
 	if party:
 		assert_eq(_doze_problem, "", "%s: no entity dozes inside a view or within reach of a hero (V3.e)" % label)
+	assert_eq(_weak_problem, "", "%s: every boss weak point stays in the view and clear of the fight HUD (G35)" % label)
 	if expect.has("x2_gates"):
 		assert_true(_gates_reached.size() >= int(expect["x2_gates"]), "%s: x2 gates crossed %d of %d (%s)" % [
 			label, _gates_reached.size(), _tablets.size(), str(_gates_reached.keys())])
@@ -368,6 +376,12 @@ const DESIGN_FILES: Dictionary = {
 }
 ## Screens a campaign run may end on.
 const CAMPAIGN_ENDS: Array[StringName] = [&"expert_wall", &"the_end"]
+
+
+## A content gate of the route modules (REQUIRE_EXPERT_ROUTES, REQUIRE_COMPLETE_CAMPAIGN): its constant, or the gate
+## run itself - the environment variable G3_REQUIRE=1 (tools/g3.sh --require) switches every one on.
+static func g3_required(switch: bool) -> bool:
+	return switch or OS.get_environment("G3_REQUIRE") == "1"
 
 
 ## True when every file of `book`'s design exists (with `coop`: every one as its co-op file).
@@ -518,6 +532,7 @@ func _play_campaign_stage(run_name: String, file: String, mode: String, table: D
 	if party:
 		assert_eq(_count(&"party_wiped"), 0, "%s: no team wipe" % label)
 		assert_eq(_doze_problem, "", "%s: no entity dozes inside a view or within reach of a hero (V3.e)" % label)
+	assert_eq(_weak_problem, "", "%s: every boss weak point stays in the view and clear of the fight HUD (G35)" % label)
 	assert_true(Game.lives >= lives, "%s: no life lost (%d -> %d)" % [label, lives, Game.lives])
 	assert_eq(_problems.count, 0, "%s: no engine warning or error (first: %s)" % [label, _problems.first])
 	assert_eq(int(result.get("input_mismatches", 0)), 0, "%s: every slot read its stream" % label)
@@ -562,6 +577,7 @@ func _reset_watch(level_id: StringName, mode: String) -> void:
 	_embers_seen.clear()
 	_embers_close.clear()
 	_gates_reached.clear()
+	_weak_problem = ""
 	_tablets = _x2_tablets(level_id, BEGINNER if mode != EXPERT else EXPERT)
 
 
@@ -604,6 +620,8 @@ func _on_tick(level: LevelBase, stage_tick: int) -> void:
 		_boss_up = stage_tick
 	if _boss_down < 0 and _count(&"boss_defeated") > 0:
 		_boss_down = stage_tick
+	if _weak_problem == "" and _boss_up >= 0 and _boss_down < 0 and _weak_points_apply(level.level_id):
+		_check_weak_points(level, stage_tick)
 	for hero: PlayerBase in level.contact_order():
 		if hero.dead:
 			continue
@@ -620,6 +638,38 @@ func _on_tick(level: LevelBase, stage_tick: int) -> void:
 			var rel: Vector2i = entity.sim_pos - hero.sim_pos
 			if absi(rel.x) < 24 and rel.y > -56 and rel.y < 8:
 				_embers_close[id] = true
+
+
+## G35 is a rule of the 2.0 content: Book II stages and every co-op file (the co-op Brute and visor Colossus of Book I
+## included). Book I's solo stages are frozen 1.0 (the Brute of w2_l2b walks out of its unlocked view, as in 1.0).
+static func _weak_points_apply(level_id: StringName) -> bool:
+	return Levels.is_coop_level(level_id) or Levels.get_book(level_id) == Levels.BOOK_2
+
+
+## G35: every weak point of every living boss that can be struck this tick (Hud.weak_point_rects: logical px, world
+## coordinates; an empty rect is one that cannot be struck now) lies wholly inside the view and the clearance under the
+## fight HUD band (Hud.weak_point_problem, art px in view coordinates, the touch margin: every device). Keeps the first
+## problem.
+func _check_weak_points(level: LevelBase, stage_tick: int) -> void:
+	if _hud == null:
+		_hud = load(HUD_SCRIPT) as GDScript if ResourceLoader.exists(HUD_SCRIPT) else null
+		if _hud == null or not _hud.can_instantiate():
+			_weak_problem = "the HUD script %s does not load (its weak-point check cannot run)" % HUD_SCRIPT
+			return
+	var view: Rect2i = level.get_view_rect()
+	var view_art: Vector2 = Vector2(view.size * Tuning.ART_SCALE)
+	for entity: SimEntity in level.get_kind(Defs.Kind.BOSS):
+		var boss: EnemyBase = entity as EnemyBase
+		if boss == null or boss.dead:
+			continue
+		for rect: Rect2i in _hud.call("weak_point_rects", boss):
+			var art: Rect2 = Rect2(Vector2((rect.position - view.position) * Tuning.ART_SCALE),
+					Vector2(rect.size * Tuning.ART_SCALE))
+			var problem: String = str(_hud.call("weak_point_problem", art, view_art))
+			if problem != "":
+				_weak_problem = "%s on tick %d: weak rect %s (world) in view %s: %s" % [boss.name, stage_tick,
+						str(rect), str(view), problem]
+				return
 
 
 ## PLAN.md 8 V3.e: on a party route no entity dozes while its doze area overlaps a view grown by

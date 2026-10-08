@@ -238,6 +238,71 @@ func test_no_shoulder_hop_off_an_idle_partners_head() -> void:
 	assert_eq(_fall_on_p2_with_up(level), PartyTuning.SHOULDER_HOP_YVEL, "awake again: the hop is back")
 
 
+## P1 falls (no UP) from 40 px over P2's feet at x = 200 for 12 ticks.
+func _drop_p1_on_p2(level: Level) -> void:
+	var p1: PlayerBase = level.player
+	level.get_hero(1).teleport(Vector2i(200, FLOOR_Y))
+	p1.teleport(Vector2i(200, FLOOR_Y - 40))
+	p1.yvel = 64
+	p1.grounded = false
+	p1.no_jump = Tuning.NO_JUMP_TICKS
+	Sim.step(12)
+
+
+func test_an_idle_partners_head_is_no_platform() -> void:
+	var level: Level = _load(2)
+	var p1: PlayerBase = level.player
+	var p2: PlayerBase = level.get_hero(1)
+	_hold(0, Defs.IN_SWAP)
+	Sim.step(1)
+	assert_true(p2.is_idle(), "P2's player never pressed anything")
+	_drop_p1_on_p2(level)
+	assert_null(p1.totem_carrier, "no Totem Ride on a dozing head (G33): P1 passes through")
+	assert_eq(p1.sim_pos.y, FLOOR_Y, "down to the floor")
+	# The same drop once P2's player is there.
+	_hold(1, Defs.IN_SWAP)
+	_drop_p1_on_p2(level)
+	assert_eq(p1.totem_carrier, p2, "a partner who plays carries him")
+
+
+func test_an_idle_hero_starts_no_ride_on_his_partner() -> void:
+	var level: Level = _load(2)
+	var p1: PlayerBase = level.player
+	_hold(1, Defs.IN_SWAP)
+	Sim.step(1)
+	assert_true(p1.is_idle(), "P1's player never pressed anything")
+	_drop_p1_on_p2(level)
+	assert_null(p1.totem_carrier, "a dozing body falling onto a partner who plays rides nothing")
+	assert_eq(p1.sim_pos.y, FLOOR_Y)
+
+
+func test_a_ride_ends_when_the_carrier_or_the_rider_dozes_off() -> void:
+	var level: Level = _load(2)
+	var p1: PlayerBase = level.player
+	var p2: PlayerBase = level.get_hero(1)
+	_hold(0, Defs.IN_SWAP)
+	_hold(1, Defs.IN_SWAP)
+	_drop_p1_on_p2(level)
+	assert_eq(p1.totem_carrier, p2, "both play: a Totem Ride")
+	_hold(1, 0)
+	Sim.step(IDLE - 2)
+	assert_eq(p1.totem_carrier, p2, "the carrier is still there")
+	Sim.step(2)
+	assert_true(p2.is_idle())
+	assert_null(p1.totem_carrier, "his carrier dozed off: the rider falls through")
+	assert_null(p2.totem_rider)
+	Sim.step(12)
+	assert_eq(p1.sim_pos.y, FLOOR_Y, "down to the floor")
+	# The other way round: the rider dozes off.
+	_hold(1, Defs.IN_SWAP)
+	_drop_p1_on_p2(level)
+	assert_eq(p1.totem_carrier, p2, "riding again")
+	_hold(0, 0)
+	Sim.step(IDLE)
+	assert_true(p1.is_idle())
+	assert_null(p1.totem_carrier, "a dozing rider falls off")
+
+
 func test_an_idle_croucher_is_no_windbreak() -> void:
 	var level: Level = _load(2)
 	var p1: PlayerBase = level.player

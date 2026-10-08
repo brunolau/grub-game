@@ -1,0 +1,72 @@
+# Club & Grub - level texts of the final stage and the Book II ending, English. Owner: level designer D9b
+# (docs/expansion/PLAN.md 6.1). A level sub-catalogue: loaded beside locale/en.po (scripts/ui/ui_kit.gd), never
+# offered as a language. Keys: the level names and the `text=` keys of the signs of levels/w9_l3*.lvl ("Chieftains'
+# Pyre") and levels/ending_b*.lvl ("The Long Raft Home": the credits ride on floating signs). Every sign text fits
+# three board lines (DESIGN.md G27; SignBoard.text_lines, proven by build/d9b's sign check).
+msgid ""
+msgstr ""
+"Project-Id-Version: Club & Grub\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+# --- Level names ---
+msgid "Chieftains' Pyre"
+msgstr "Chieftains' Pyre"
+
+msgid "The Long Raft Home"
+msgstr "The Long Raft Home"
+
+# --- w9_l3 Chieftains' Pyre ---
+msgid "SIGN_W9_PYRE_CLIMB"
+msgstr "The Tar Tribe camp! The Great Roast is on the summit."
+
+msgid "SIGN_W9_PYRE_EGG"
+msgstr "A fallen chieftain becomes an egg: smash it before it hatches!"
+
+# --- ending_b The Long Raft Home: the push-off and the credits on floating signs ---
+msgid "SIGN_RAFT_PUSH"
+msgstr "Hop on the raft. Face the shore and strike to push off!"
+
+msgid "SIGN_RAFT_HOME"
+msgstr "The Great Roast is ours again. Next stop: home!"
+
+msgid "SIGN_RAFT_TITLE"
+msgstr "Club & Grub 2.0 - The Far Shore. Thank you for playing!"
+
+msgid "SIGN_RAFT_MESA"
+msgstr "Farewell, Sunbaked Canyon! Tusker still snores in his wallow."
+
+msgid "SIGN_RAFT_ART"
+msgstr "Heroes, beasts and lands: CC0 art by Pixel-boy and Sparklin Labs."
+
+msgid "SIGN_RAFT_ART_MORE"
+msgstr "More CC0 art: AAA, ansimuz, ghostpixxells, Pixel Frog and friends."
+
+msgid "SIGN_RAFT_FEN"
+msgstr "Farewell, Tar Fen! Old Mangrove creaks a goodbye."
+
+msgid "SIGN_RAFT_MUSIC"
+msgstr "Music: Juhani Junkala, Wolfgang_, Spring Spring and nene."
+
+msgid "SIGN_RAFT_MUSIC_MORE"
+msgstr "More music: Tallbeard, MintoDog and celestialghost8."
+
+msgid "SIGN_RAFT_COAST"
+msgstr "Farewell, Coral Coast! Inkjaw waves a tentacle."
+
+msgid "SIGN_RAFT_SOUND"
+msgstr "Sounds: Junkala, MoxieCat, Kenney, Spring Spring and more."
+
+msgid "SIGN_RAFT_IDOLS"
+msgstr "Farewell, Idol Ruins! The Twin Idols nap again."
+
+msgid "SIGN_RAFT_FONTS"
+msgstr "Fonts: Press Start 2P by CodeMan38, Pixelify Sans by Stefie Justprince."
+
+msgid "SIGN_RAFT_SPIRE"
+msgstr "Farewell, Sky Spire! The Roc keeps the rest of its feathers."
+
+msgid "SIGN_RAFT_THANKS"
+msgstr "Made with the Godot Engine. Home is near - smell the feast fires?"

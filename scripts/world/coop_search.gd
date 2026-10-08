@@ -474,13 +474,15 @@ class Searcher:
 			clock = Time.get_ticks_usec()
 			outcome["sig"] = signature()
 			CoopSearch.profile_add(&"sig", clock)
-		if outcome.has("pos") and (hero.on_platform or hero.is_riding_totem()):
-			# He rests on something that moves or is reset (a lift, a raft, a partner's head), not on the grid: a fresh
-			# run cannot put him back there (respawn_at would stand him on the air), so the node is a changed one -
-			# its replay brings back exactly that carrier and him on it.
-			var carrier: Object = hero.totem_carrier if hero.is_riding_totem() else null
-			outcome["sig"] = "%s|support:%s@%d,%d" % [str(outcome["sig"]), "partner" if carrier != null else "platform",
-				hero.sim_pos.x, hero.sim_pos.y]
+		if outcome.has("pos") and hero.is_riding_totem():
+			# At rest on the idle partner's head: no node. A fresh run cannot put him back there (respawn_at would
+			# stand him on the air - the search's own bug before phase 3), and the ride macros already play the ride
+			# and the jump off it in one move (since G33 an idle head carries no ride at all: a regression check).
+			return {}
+		if outcome.has("pos") and hero.on_platform:
+			# He rests on something that moves or is reset (a lift, a raft), not on the grid: a fresh run cannot put
+			# him back there, so the node is a changed one - its replay brings back exactly that platform and him on it.
+			outcome["sig"] = "%s|support@%d,%d" % [str(outcome["sig"]), hero.sim_pos.x, hero.sim_pos.y]
 		return outcome
 
 	## The tick loop of [method run].
@@ -911,7 +913,7 @@ static func search_data(data: LevelData, difficulty: int, gate: String) -> Dicti
 			return _unproven(result, "the hero scene %s does not exist" % PLAYER_ID)
 		profile_add(&"build", clock)
 		clock = Time.get_ticks_usec()
-		found = searcher.explore(starts, {far: true}, area, BOUND_TICKS, MAX_NODES)
+		found = searcher.explore(starts, {far: true}, area, BOUND_TICKS, node_limit)
 		profile_add(&"explore", clock)
 		searcher.close()
 		_explore_cache[key] = found
@@ -1156,8 +1158,11 @@ static func profile_reset() -> void:
 static var _explore_cache: Dictionary = {}
 ## False: [method search_data] always runs the search (no cached explore) - for tests that prove the search itself.
 static var use_cache: bool = true
-## False: no result file cache (see [method _file_cache_path]).
+## False: no result file cache (see [method file_cache_key]).
 static var use_file_cache: bool = true
+## Resting points a gate search may expand (MAX_NODES; unit tests of the search's mechanics lower it to stay quick -
+## a refusal under a smaller bound proves less, never more).
+static var node_limit: int = MAX_NODES
 ## False: the search world's partner is only ever an egg (no `partner` macros) - to tell a gate that one player opens
 ## with an idle partner from one he opens alone (tests, tools).
 static var idle_partner: bool = true

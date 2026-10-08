@@ -1531,6 +1531,7 @@ func test_mayhem_rolls_only_variants_the_profile_has_opened() -> void:
 ## "" = none), then round 0 in `mode` begins again (the signatures read the arena afresh).
 func _signature_arena(count: int, xs: Array, meta: Dictionary, mode: int = Defs.VersusMode.GRUB_STACK,
 		level_id: StringName = &"") -> void:
+	heroes.clear()
 	_arena(count, xs)
 	for key: String in meta:
 		level.meta[key] = meta[key]
@@ -1657,7 +1658,8 @@ func test_neutral_enemies_are_springboards() -> void:
 
 
 func test_cinder_pit_ember_lane() -> void:
-	_signature_arena(2, [88, 256], {"ember_lane": "5,1,30"})
+	# The lane over open ground (column 9; an ember fizzles on the first floor it meets - a one-way bridge shelters).
+	_signature_arena(2, [152, 256], {"ember_lane": "9,1,30"})
 	assert_eq(VersusSignatures.parse_lane("8,4"), PackedInt32Array([8, 4, VersusSignatures.EMBER_PERIOD]))
 	_give(heroes[0], 10)
 	var warned: Array[int] = []
@@ -1670,7 +1672,8 @@ func test_cinder_pit_ember_lane() -> void:
 				continue
 			if hazard.warn_tick == Sim.tick:
 				warned.append(referee.round_ticks)
-				assert_true(referee.danger_rects(0).size() >= 1, "its glow is in the danger rects")
+				assert_true(referee.danger_rects(VersusSignatures.EMBER_WARN_TICKS).size() >= 1,
+						"its glow is in the danger rects")
 			if hazard.armed_tick == Sim.tick:
 				armed.append(hazard.armed_tick - hazard.warn_tick)
 		if referee.stack_of(0) < 10:

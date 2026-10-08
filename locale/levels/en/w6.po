@@ -50,3 +50,20 @@ msgstr "Drop onto the high end to throw your partner up!"
 
 msgid "SIGN_W6_COOP_DRUMS"
 msgstr "Strike both glowing drums at once to open the stalk."
+
+# --- w6_l1_coop Bubbling Fen (co-op) ---
+msgid "SIGN_W6_COOP_BATTER"
+msgstr "Down + Swap curls you up. Your partner bats you over the tar!"
+
+msgid "SIGN_W6_COOP_SUNK"
+msgstr "Stand on the stone: the sunken raft rises for your partner."
+
+msgid "SIGN_W6_COOP_ROOT"
+msgstr "One stands still, the other jumps on his head holding Jump!"
+
+# --- w6_l2b_coop Heart of the Mangrove (co-op) ---
+msgid "SIGN_W6_COOP_VENT"
+msgstr "Tar vents! Heave the boulder onto them together."
+
+msgid "SIGN_W6_COOP_MANGROVE"
+msgstr "One hits the face, one hits the hand - at the same time!"

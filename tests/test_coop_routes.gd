@@ -60,7 +60,8 @@ func test_every_coop_file_has_its_routes() -> void:
 			if routes.size() > 1:
 				problems.append(line)
 			elif routes.is_empty():
-				if REQUIRE_EXPERT_ROUTES or mode == BEGINNER or not Levels.is_available(level_id, Defs.Difficulty.BEGINNER):
+				var required: bool = g3_required(REQUIRE_EXPERT_ROUTES) or mode == BEGINNER
+				if required or not Levels.is_available(level_id, Defs.Difficulty.BEGINNER):
 					problems.append(line)
 				else:
 					pending.append(line)
@@ -160,7 +161,7 @@ func test_the_coop_book2_expert_campaign_in_one_run() -> void:
 
 func _coop_campaign(book: int, mode: String) -> void:
 	var sides: Dictionary = (CAMPAIGN_SIDES.get(book, {}) as Dictionary).get(mode, {})
-	await play_campaign(book, mode, PartyTuning.COOP_PLAYERS, sides, REQUIRE_COMPLETE_CAMPAIGN)
+	await play_campaign(book, mode, PartyTuning.COOP_PLAYERS, sides, g3_required(REQUIRE_COMPLETE_CAMPAIGN))
 
 
 ## V3.b: twice, without dozing, on other devices - the same digests.

@@ -461,7 +461,10 @@ func test_going_down_and_hatching_make_a_hero_idle_again() -> void:
 	Sim.step(5)
 	assert_false(driver.is_active(p2))
 	_wake(level, p2)
-	# Without UP an idle partner still carries a Totem Ride (a still carrier's jump stays below every boost ledge).
+	_wake(level, p1)
+	# Without UP a partner who has not pressed anything since his hatch (not ACTIVE, but not IDLE either: his player
+	# pressed something a moment ago) still carries a Totem Ride (a still carrier's jump stays below every boost
+	# ledge). An IDLE partner carries none (G33: tests/test_player_idle.gd).
 	p2.go_down(&"voluntary")
 	assert_eq(driver.hatch_all(p1), 1)
 	p2.teleport(Vector2i(200, FLOOR_Y))
@@ -469,7 +472,9 @@ func test_going_down_and_hatching_make_a_hero_idle_again() -> void:
 	p1.yvel = 64
 	p1.grounded = false
 	Sim.step(12)
-	assert_eq(p1.totem_carrier, p2, "no UP: the ride on an idle partner")
+	assert_false(driver.is_active(p2), "not active since the hatch")
+	assert_false(p2.is_idle(), "but not idle")
+	assert_eq(p1.totem_carrier, p2, "no UP: the ride on a partner who has not pressed anything since his hatch")
 
 
 # =================================================================================================================

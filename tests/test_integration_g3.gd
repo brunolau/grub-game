@@ -157,3 +157,23 @@ func _arenas_row() -> Array:
 			launch_ok = launch_ok and i >= LAUNCH_ARENAS
 	return ["arenas", have, ARENAS.size(), launch_ok, "launch %d; missing: %s" % [LAUNCH_ARENAS,
 		", ".join(notes) if not notes.is_empty() else "none"]]
+
+
+## tools/g3.sh is the gate's one command: it runs every slow module of tests/run_tests.gd SLOW_FILES (coop_gates
+## sharded), the default suite, sp_identity, the inventory and every campaign flow - a slow module added to the runner
+## and forgotten here would leave the G3 table silently short.
+func test_the_g3_command_runs_every_slow_module() -> void:
+	var text: String = FileAccess.get_file_as_string("res://tools/g3.sh")
+	assert_false(text.is_empty(), "tools/g3.sh exists")
+	var slow: PackedStringArray = (load("res://tests/run_tests.gd") as GDScript).get_script_constant_map()["SLOW_FILES"]
+	assert_true(slow.size() >= 5, "the runner's slow modules")
+	for file: String in slow:
+		var module: String = file.get_basename().trim_prefix("test_")
+		assert_true(text.contains("test %s\"" % module) or text.contains("test %s " % module) \
+				or text.contains("test %s\n" % module), "tools/g3.sh runs the slow module %s" % module)
+	assert_true(text.contains("COOP_GATES_SHARD=$i/$SHARDS"), "coop_gates runs sharded")
+	assert_true(text.contains("tools/sp_identity.sh"), "the single-player identity check (V1)")
+	assert_true(text.contains("test integration_g3"), "the content inventory")
+	for flow: String in ["campaign", "campaign_beginner", "campaign_b2", "campaign_coop"]:
+		assert_true(FileAccess.file_exists("res://tools/autoplay/%s.flow" % flow), "%s.flow exists" % flow)
+		assert_true(text.contains(flow), "tools/g3.sh plays %s.flow headless" % flow)

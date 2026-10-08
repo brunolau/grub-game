@@ -849,7 +849,11 @@ func _camera_step() -> void:
 	if _camera_logic.autoscroll_held and _any_hero_input():
 		_camera_logic.autoscroll_held = false
 	_camera_logic.scroll_flags = scroll_flags
+	# G42: while the band rises the view follows the heroes' footing, never a jump's apex (LevelCamera.footing_mode).
+	var rising: bool = _rising != null and _rising_camera()
+	_camera_logic.footing_mode = rising
 	if _tribe_on():
+		_frame_logic.footing_mode = rising
 		_frame_logic.autoscroll_held = _camera_logic.autoscroll_held
 		_frame_logic.scroll_flags = scroll_flags
 		_frame_logic.tick_group(heroes)

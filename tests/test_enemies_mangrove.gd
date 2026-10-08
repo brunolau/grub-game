@@ -17,17 +17,12 @@ var _lab: Lab = null
 var _was_manual: bool = false
 
 
-var _t0_tmp: int = 0
-
-
 func before_each() -> void:
-	_t0_tmp = Time.get_ticks_msec()
 	_was_manual = Sim.manual
 	_lab = Lab.new()
 
 
 func after_each() -> void:
-	print("    TIMING %d ms" % (Time.get_ticks_msec() - _t0_tmp))
 	GameInput.clear_scripted()
 	Sim.stop()
 	Sim.manual = _was_manual
@@ -64,7 +59,8 @@ func test_mangrove_reads_its_chamber_and_counts_hits_by_stage() -> void:
 	assert_eq(tree.fist_rest_x, 200)
 	assert_eq(tree.hand_rest, Vector2i(76, 80 + Mangrove.MANGROVE_HAND_SINK), "the upper ledge (row 5) ends at x 96")
 	assert_eq(tree.hand_home, Vector2i(240, 80), "it comes out of the wall at the ledge top")
-	assert_eq(tree.get_face_rect(), Rect2i(230, 55, 20, 29), "76-105 px over the floor (G35)")
+	assert_eq(tree.get_face_box(), Rect2i(230, 55, 20, 29), "76-105 px over the floor (G35)")
+	assert_false(tree.get_face_rect().has_area(), "before the fight the face is no weak point")
 	_lab.step(PackedInt32Array([0]))
 	assert_true(tree.fighting)
 	assert_eq(tree.get_stage(), 1)
@@ -337,7 +333,7 @@ func test_hits_never_stun_lock_it() -> void:
 	while t < 6000 and not tree.dead:
 		Lab.top_up(hero)
 		var stage: int = tree.get_stage()
-		var weak: Rect2i = tree.get_face_rect()
+		var weak: Rect2i = tree.get_face_box()
 		if stage == 2:
 			weak = tree.get_hand_rect() if tree.get_hand_state() == Mangrove.Hand.REST else Rect2i()
 		elif stage == 3:
@@ -426,7 +422,7 @@ func test_coop_twin_hits_need_both_heroes_within_the_window() -> void:
 	Game.difficulty = Defs.Difficulty.BEGINNER
 	_rest_hand(tree)
 	# P1 the face, P2 the hand, on the same tick: a twin hit.
-	_shot_at(tree.get_face_rect(), 0)
+	_shot_at(tree.get_face_box(), 0)
 	_shot_at(tree.get_hand_rect(), 1)
 	_lab.step(PackedInt32Array([0, 0]))
 	assert_eq(tree.hp, tree.max_hp - 1, "a twin hit counts one")
@@ -434,7 +430,7 @@ func test_coop_twin_hits_need_both_heroes_within_the_window() -> void:
 	# One hero's face and hand hits: no twin.
 	_wait(Tuning.BOSS_HIT_COOLDOWN + 2)
 	_rest_hand(tree)
-	_shot_at(tree.get_face_rect(), 0)
+	_shot_at(tree.get_face_box(), 0)
 	_lab.step(PackedInt32Array([0, 0]))
 	_shot_at(tree.get_hand_rect(), 0)
 	_lab.step(PackedInt32Array([0, 0]))
@@ -442,7 +438,7 @@ func test_coop_twin_hits_need_both_heroes_within_the_window() -> void:
 	# Both heroes, but further apart than the window: no twin.
 	_wait(Tuning.BOSS_HIT_COOLDOWN + 2)
 	_rest_hand(tree)
-	_shot_at(tree.get_face_rect(), 0)
+	_shot_at(tree.get_face_box(), 0)
 	_wait(tree.twin_window())
 	_rest_hand(tree)
 	_shot_at(tree.get_hand_rect(), 1)
@@ -454,7 +450,7 @@ func test_coop_twin_hits_need_both_heroes_within_the_window() -> void:
 	_shot_at(tree.get_hand_rect(), 1)
 	_wait(tree.twin_window() - 1)
 	_rest_hand(tree)
-	_shot_at(tree.get_face_rect(), 0)
+	_shot_at(tree.get_face_box(), 0)
 	_lab.step(PackedInt32Array([0, 0]))
 	assert_eq(tree.hp, tree.max_hp - 2, "hand first, face within the window: a twin")
 
@@ -537,7 +533,7 @@ func test_coop_an_idle_partner_counts_for_nothing() -> void:
 	_lab.wake(0)
 	# A twin half from the dozing hero lights nothing; the player's half does.
 	_rest_hand(tree)
-	_shot_at(tree.get_face_rect(), 0)
+	_shot_at(tree.get_face_box(), 0)
 	_shot_at(tree.get_hand_rect(), 1)
 	_lab.step(PackedInt32Array([0, 0]))
 	assert_true(tree._face_tick >= 0, "P1's face half is lit")
@@ -639,13 +635,13 @@ func test_coop_form_is_fair_to_either_hero() -> void:
 		_wait(Tuning.BOSS_HIT_COOLDOWN + 2)
 		var hp: int = tree.hp
 		_rest_hand(tree)
-		_shot_at(tree.get_face_rect(), me.slot)
+		_shot_at(tree.get_face_box(), me.slot)
 		_shot_at(tree.get_hand_rect(), mate.slot)
 		_lab.step(PackedInt32Array([0, 0]))
 		assert_eq(tree.hp, hp - 1, "slot %d on the face, his partner on the hand: a twin" % slot)
 		_wait(Tuning.BOSS_HIT_COOLDOWN + 2)
 		_rest_hand(tree)
-		_shot_at(tree.get_face_rect(), mate.slot)
+		_shot_at(tree.get_face_box(), mate.slot)
 		_shot_at(tree.get_hand_rect(), me.slot)
 		_lab.step(PackedInt32Array([0, 0]))
 		assert_eq(tree.hp, hp - 2, "slot %d on the hand, his partner on the face: a twin" % slot)
@@ -959,6 +955,9 @@ class MangroveBot:
 
 	const LEDGE_Y: int = 112
 	const UPPER_Y: int = 80
+	## After the springboard launch: the forward strike is held until this launch tick (with LAUNCH_DRIFT held too).
+	const LAUNCH_STRIKE_END: int = 7
+	const LAUNCH_DRIFT: int = 0
 	const UPPER_SAFE: int = 26
 	const LEDGE_END: int = 143
 	const LEDGE_SPOT: int = 112
@@ -1091,8 +1090,9 @@ class MangroveBot:
 			return 0
 		if _launched == 2:
 			return Defs.IN_RIGHT | Defs.IN_FIRE
-		if _launched >= 3 and _launched < 11:
-			return Defs.IN_FIRE
+		if _launched >= 3 and _launched < LAUNCH_STRIKE_END:
+			return Defs.IN_FIRE | LAUNCH_DRIFT
+		# A face hit cuts the fist's rest short: back onto the lower ledge before the punch comes.
 		return Defs.IN_LEFT
 
 	func _start_jump(direction: int, hold: int) -> void:
@@ -1136,20 +1136,20 @@ class MangroveBot:
 
 ## Recorded by test_the_club_bot_still_wins with MANGROVE_ROUTE=1 (Beginner, Expert).
 const ROUTE_BEGINNER: String = (
-	"9:RU,10:R,10:L,2:,8:R,3:,4:L,110:,18:R,9:UF,15:L,1:,2:L,5:,4:R,37:,18:R,9:UF,15:L,1:,3:L,3:,6:R,36:,20:R," +
-	"3:U,5:L,9:U,13:,1:R,9:UF,15:L,1:,3:L,4:,4:R,37:,17:R,10:L,9:LU,10:L,16:R,1:,8:L,2:,6:R,67:,20:R,3:U,5:L,9:U," +
-	"13:,1:R,9:UF,15:L,1:,3:L,3:,34:D,3:R,1:L,1:UF,3:,11:UF,3:,22:UF,21:D,42:,59:D,8:UF,15:,2:L,2:R,10:,3:R,1:L," +
-	"10:,4:L,10:,4:L,10:,2:R,2:L,10:,3:L,1:R,10:,4:L,10:,3:L,20:R,1:,7:R,15:L,4:,7:F,8:L,1:R,1:,8:R,2:,6:L,1:R," +
-	"82:,1:R,13:,1:R,13:,1:R,13:,1:R,13:,1:R,13:,1:R,13:,1:R,2:,2:R,14:F,48:,7:F,80:,2:R,4:,2:L,1:R,50:,3:R,13:F," +
-	"3:L,1:R,19:,7:F,109:,7:F,59:,1:R,13:,1:R,13:,1:R,13:,1:R,2:,2:R,50:F"
+	"9:RU,10:R,10:L,2:,8:R,3:,4:L,110:,17:R,1:RF,4:F,18:L,1:,2:L,3:,7:R,3:,1:L,3:,2:L,26:,17:R,1:RF,4:F,18:L,1:,2:L," +
+	"3:,7:R,3:,1:L,3:,2:L,26:,17:R,1:RF,4:F,18:L,1:,2:L,3:,8:R,1:,2:L,3:,4:L,2:,5:R,3:,1:R,13:,17:R,10:L,9:LU,10:L," +
+	"16:R,2:,6:L,76:,17:R,1:RF,4:F,18:L,1:,2:L,3:,34:D,5:R,3:,5:L,6:UF,13:,12:UF,21:D,42:,59:D,23:UF,4:,10:UF,1:,2:L," +
+	"1:R,10:,2:R,2:L,10:,3:L,1:R,10:,4:L,10:,2:R,2:L,10:,4:L,19:R,1:,7:R,25:L,1:R,1:,8:R,2:,6:L,1:R,28:,7:F,41:,2:R," +
+	"40:,2:R,40:,2:R,1:,1:R,15:F,2:L,1:R,32:,7:F,128:,1:R,13:,1:R,13:,1:R,13:,1:R,13:,1:R,13:,1:R,2:,2:R,14:F,40:," +
+	"7:F,87:,2:R,40:,2:R,15:,2:R,50:F"
 )
 const ROUTE_EXPERT: String = (
-	"9:RU,10:R,10:L,2:,8:R,3:,4:L,110:,18:R,9:UF,15:L,1:,2:L,5:,4:R,37:,18:R,9:UF,15:L,1:,3:L,3:,6:R,36:,20:R," +
-	"3:U,5:L,9:U,13:,1:R,9:UF,15:L,1:,3:L,4:,4:R,37:,17:R,10:L,9:LU,10:L,16:R,1:,8:L,2:,6:R,67:,20:R,3:U,5:L,9:U," +
-	"13:,1:R,9:UF,15:L,1:,3:L,4:,4:R,51:,18:R,9:UF,13:L,5:LU,26:R,9:U,12:,6:R,6:L,1:,10:R,1:,8:L,2:,6:R,123:," +
-	"20:R,3:U,5:L,9:U,13:,1:R,9:UF,15:L,1:,2:L,32:,21:R,3:U,5:L,9:U,13:,1:R,9:UF,15:L,1:,3:L,3:,34:D,3:R,1:L," +
-	"1:UF,3:,11:UF,3:,11:UF,3:,8:UF,21:D,42:,59:D,44:UF,21:D,42:,59:D,8:UF,10:R,25:L,1:R,1:,8:R,3:,4:L,1:R,40:," +
-	"7:F,79:,2:R,4:,2:L,1:R,50:,3:R,13:F,3:L,1:R,19:,7:F,109:,7:F,65:,1:R,13:,1:R,13:,1:R,13:,1:R,13:,1:R,2:,2:R," +
-	"14:F,24:,7:F,102:,2:R,4:,2:L,1:R,50:,3:R,13:F,3:L,1:R,72:,7:F,102:,1:R,13:,1:R,13:,1:R,13:,1:R,13:,1:R,2:," +
-	"2:R,14:F,60:,7:F,107:,2:R,40:,2:R,11:,1:F,3:,5:R,41:F"
+	"9:RU,10:R,10:L,2:,8:R,3:,4:L,110:,17:R,1:RF,4:F,18:L,1:,2:L,3:,7:R,3:,1:L,3:,2:L,26:,17:R,1:RF,4:F,18:L,1:,2:L," +
+	"3:,7:R,3:,1:L,3:,2:L,26:,17:R,1:RF,4:F,18:L,1:,2:L,3:,8:R,1:,2:L,3:,4:L,2:,5:R,3:,1:R,13:,17:R,10:L,9:LU,10:L," +
+	"16:R,2:,6:L,76:,17:R,1:RF,4:F,18:L,1:,2:L,3:,8:R,1:,2:L,3:,4:L,2:,5:R,3:,1:R,27:,21:R,3:U,5:L,9:U,13:,1:RF,4:F," +
+	"18:L,1:,2:L,3:,7:R,3:,1:L,3:,2:L,68:,17:R,1:RF,4:F,18:L,1:,2:L,3:,34:D,5:R,9:L,1:UF,13:R,1:L,1:UF,11:L,3:UF," +
+	"21:D,42:,59:D,19:UF,3:,11:UF,3:,8:UF,21:D,42:,59:D,38:UF,11:R,25:L,1:R,1:,8:R,2:,6:L,1:R,39:,7:F,31:,2:R,40:," +
+	"2:R,29:,3:R,13:F,3:L,1:R,50:,7:F,136:,1:R,13:,2:R,40:,2:R,1:,1:R,15:F,2:L,1:R,24:,7:F,100:,1:R,13:,1:R,13:,1:R," +
+	"13:,1:R,13:,1:R,13:,1:R,2:,2:R,14:F,76:,7:F,100:,2:R,4:,2:L,1:R,50:,3:R,13:F,1:L,1:,2:L,1:R,6:,7:F,94:,2:R,40:," +
+	"2:R,29:,3:R,50:F"
 )

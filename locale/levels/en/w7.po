@@ -1,0 +1,60 @@
+# Club & Grub - level texts of world 7, Coral Coast (Book II), and Feast Land E, English. Owner: level designer D7
+# (docs/expansion/PLAN.md 6.1). A level sub-catalogue: loaded beside locale/en.po (scripts/ui/ui_kit.gd), never
+# offered as a language. Keys: the level names and the `text=` keys of signs and hint zones of levels/w7_*.lvl,
+# levels/bonus_e.lvl and their co-op files. Every sign text fits three board lines (DESIGN.md G27).
+msgid ""
+msgstr ""
+"Project-Id-Version: Club & Grub\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+# --- Level names ---
+msgid "Shell Beach"
+msgstr "Shell Beach"
+
+msgid "Sea Caves"
+msgstr "Sea Caves"
+
+msgid "Squid Grotto"
+msgstr "Squid Grotto"
+
+msgid "Feast Land E"
+msgstr "Feast Land E"
+
+# --- w7_l1 Shell Beach ---
+msgid "SIGN_W7_SURF"
+msgstr "Ride the rafts. Water is deadly."
+
+msgid "SIGN_W7_BLOWHOLE"
+msgstr "A bubbling blowhole throws you up."
+
+msgid "SIGN_W7_URCHIN"
+msgstr "Chomper walks over urchins. You must jump them."
+
+# --- w7_l2 Sea Caves ---
+msgid "SIGN_W7_FLOE"
+msgstr "Driftwood sinks. Keep moving."
+
+# --- w7_l2b Squid Grotto ---
+msgid "SIGN_W7_INKJAW"
+msgstr "Inkjaw lurks below! Strike the top of its head."
+
+# --- w7_l1_coop Shell Beach (co-op) ---
+msgid "SIGN_W7_COOP_PLATES"
+msgstr "Hold the stone plate: it opens a door for your partner."
+
+msgid "SIGN_W7_COOP_LOB"
+msgstr "Down + Swap curls you up. A high strike lobs your partner!"
+
+# --- w7_l2_coop Sea Caves (co-op) ---
+msgid "SIGN_W7_COOP_SEAGATE"
+msgstr "One holds the plate, the other hops the floes through the gate."
+
+msgid "SIGN_W7_COOP_DRIVE"
+msgstr "Curl up at the edge: a forward strike drives you across!"
+
+# --- w7_l2b_coop Squid Grotto (co-op) ---
+msgid "SIGN_W7_COOP_INKJAW"
+msgstr "Strike both tentacles at once: one hero on each island!"

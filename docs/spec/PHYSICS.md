@@ -1481,7 +1481,11 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
   tick, and it settles on the first `~` surface (floating again) or floor cell (beached: `rx = 0`, currents ignored)
   below it.
 - `rails` (The Long Raft Home): a hero whose last floor contact was this raft (and none since) has his x commit
-  clamped to `raft.x - 8 * width + 8 .. raft.x + 8 * width - 8`, airborne too: nobody leaves the raft.
+  clamped to `raft.x - 8 * width + 8 .. raft.x + 8 * width - 8`, airborne too: nobody leaves the raft - until the raft
+  is stopped by a bank (its leading edge against a floor cell of its surface row, step 3): then the fence opens on that
+  side over the bank's floor, so a rider walks off onto the beach, where his floor contact unrails him (phase 3, D9b's
+  `ending_b` [G45]). The ride test must carry a railed rider over the whole fenced width (no strip at the bow where the
+  halved-width overlap of 11.4 drops him into the liquid).
 - `dir = u|d` currents move only floating dropped items. Dropped items whose feet are in a current's `~` cell float
   at the surface and drift with it.
 - Water stays deadly (7.8); in co-op a fall is an egg (C.12).
@@ -1567,8 +1571,9 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
   with `yvel >= 0`, not gliding, climbing, curled, a ball, an egg, mounted, already riding, nor in a drop lock, and
   each other hatched hero B in slot order: if `Overlap.body(A, B, A)` and `Overlap.stomp` (2.2: B is the lower
   object, so the stomp flag means A's feet are in the top half of B's box, or A falls at 8 px/tick or more), then
-  - if A and B are both **active**: **Shoulder Hop** if A holds UP, else **Totem Ride**;
-  - otherwise there is no head contact at all: A passes through, as heroes do, UP held or not [G1] [G33].
+  - if A or B is **idle**: no head contact at all - A passes through, as heroes do, UP held or not [G33];
+  - else **Shoulder Hop** if A holds UP and B is **active** (below), **Totem Ride** if A does not hold UP; if A holds
+    UP and B is not active there is no head contact either (A passes through) [G1].
   No Totem Ride on a curled or a mounted B (the hop still works on a curled one) [G7]. At most one head contact per
   hero per tick.
 - **Idle** [G33] (orchestrator decision of phase 3; `PlayerBase.input_idle_ticks`, `is_idle()`, `counts_for_coop()`):
@@ -1578,9 +1583,10 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
   his slot has held no flag since he entered the level (a level start, a join, a restart at the checkpoint): an
   untouched partner never counts, not even in the first 243 ticks. He is drawn dozing ("Zzz", drawing only) once
   `input_idle_ticks` reaches 243 on a hatched living hero, until his next input. Never in single-player or versus.
-- **Active**: hatched (in `H`) and not idle (`PlayerBase.counts_for_coop()`); for the head contacts above also: his
-  own slot held some input flag since he last became hatched (the level start, a team-wipe respawn, a hatch by a box,
-  a stomp or a checkpoint; `PartyDriver.is_active`, the G1 rule). Every co-op rule counts only active heroes: head contacts (above), the Totem carry (a ride ends on the tick K or R stops being
+- **Active**: hatched (in `H`) and not idle (`PlayerBase.counts_for_coop()`); for the Shoulder Hop also: his own
+  slot held some input flag since he last became hatched (the level start, a team-wipe respawn, a hatch by a box, a
+  stomp or a checkpoint; `PartyDriver.is_active`, the G1 rule - a partner who is not idle but has not pressed
+  anything since his hatch still carries a Totem Ride). Every co-op rule counts only active heroes: head contacts (above), the Totem carry (a ride ends on the tick K or R stops being
   active), the Brace Wall, the lee (C.6), plate and pulley weight, see-saw launches, x2 tablet lights, count-ins, the
   trait rules that ask for "the nearer hero" and every boss position rule (GAMEPLAY 13.6, 13.9). An idle hero is still
   a body: he stands, is launched (geysers, see-saw ends), rides platforms, is hurt, goes down and is leashed. Together

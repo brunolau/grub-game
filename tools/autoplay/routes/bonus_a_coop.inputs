@@ -1,0 +1,38 @@
+# route: level=bonus_a_coop difficulty=both players=2 source=w1_l2_coop ends=warp after=tally expect=no_enemies:true,eggs:0,wipes:0,min_spots:8
+# Feast Land A "Sky Picnic" for two - the two-stream route on both difficulties (designer DB1; ticks:P1|P2, keys
+# L R U D F K S; recorded from closed-loop duo macros, build/db1/p3/bot_bonus_a.gd): P1 plays the moves of the solo
+# club route and opens the spots, P2 follows a few steps behind and replays each climb from where P1 stood; both ride
+# the waffle lift together; club only, no S (belt invariance).
+# Start: walk to the inset tile and club it three times (low strikes).
+8:R|,10:|,10:DF|,4:|,10:DF|,4:|,10:DF|,6:|
+# Pick up what it threw and jump the candy rainbow over the pink block.
+11:R|,1:RU|,9:RU|R,3:RU|,1:RU|R,2:RU|,3:R|,2:R|R,3:R|,1:R|R,3:R|,6:|R
+# The framed block: three low strikes drop a giant cake from the sky; step back while it falls.
+5:DF|R,5:DF|RU,6:|RU,5:DF|RU,5:DF|R,4:|R,2:|L,1:DF|L,9:DF|,2:|,8:L|,24:|
+# Collect the cake, then a full jump onto the spring: up through the ice creams onto the cloud.
+12:R|,4:|L,2:|,4:RU|,2:RU|L,3:RU|,1:RU|L,3:RU|,7:RU|R,5:|R,6:|,19:|RU
+# Cloud stair: three jumps up and to the right, then over to the cake island.
+1:RU|RU,15:RU|,8:|,7:RU|,11:RU|RU,5:|RU,3:|,5:RU|,13:RU|RU,5:|RU,3:|,4:R|,1:RU|,17:RU|RU,1:|RU,3:|
+# Cake island: club the bush four times (it throws its treats onto the hill), up the hill for them.
+4:R|,1:|,3:|R,1:F|R,7:F|RU,6:|RU,5:F|RU,3:F|,6:|,8:F|,6:|,8:F|,10:|,15:R|,6:|,20:U|,8:|,5:R|,6:|
+20:U|,8:|
+# Down the hill (the bush's treats rest at the island's edge), turn round on the big spot: four low strikes, step back from the falling chocolate cake, then fetch it.
+18:R|,6:|,1:L|,4:|,10:DF|,6:|,10:DF|,6:|,10:DF|,6:|,10:DF|,2:|,8:L|,24:|,32:|R,2:|,1:|R,6:|,1:|L,4:|
+# Fetch the cake and step onto the ride: it carries the hero through the waffles to the icing island.
+20:R|R,92:|
+# Icing island: club the flower pot three times, then the inset tiles (one used up opens all three).
+6:R|R,4:|R,2:F|R,6:F|,6:|,8:F|,6:|,8:F|,6:|,12:R|,4:|,10:DF|,6:|,10:DF|,8:|
+# Along the island for the donuts and the goblet, then off its edge down the waterfall of sweets.
+12:R|,5:R|R,6:R|,1:R|R,2:R|,2:R|R,3:R|,2:R|R,3:R|,26:R|R,6:|R
+# Finale meadow: hop the pink block, collect the strawberry line, club the plain tiles under the flower.
+8:R|R,16:RU|R,6:R|R,4:R|,6:|,8:DF|R,2:DF|RU,6:|RU,8:DF|RU,2:DF|R,1:|R,5:|L
+# Strawberries to the framed block: three low strikes, step back, catch the giant cake.
+8:R|,8:R|DF,1:|DF,1:|LDF,4:|L,1:DF|L,1:DF|,8:DF|DF,1:|DF,1:|LDF,4:|L,1:DF|L,9:DF|,6:|,10:DF|,2:|
+8:L|,24:|
+# On to the cake tower, fetching the giant cake: three forward strikes at the inset tile in its foot.
+40:R|,6:|,8:F|,6:|,8:F|,6:|,8:F|,10:|
+# The tile spits its treats back along the meadow: fetch them.
+28:L|,6:|
+# Back onto the big spring with a straight jump: it throws the hero past the icing layer onto the tower top, where the giant doughnut waits next to the spiral staff.
+13:R|,7:R|R,6:|R,9:U|R,3:U|,1:U|R,5:U|,1:U|L,1:U|,2:R|,2:R|R,3:R|,1:R|L,3:R|,1:R|L,3:R|,2:R|R,3:R|
+1:R|L,3:R|,1:R|L,3:R|,2:R|R,3:R|,1:R|L,3:R|

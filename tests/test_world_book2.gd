@@ -190,6 +190,49 @@ func test_the_band_waits_for_the_first_input_then_rises_and_kills() -> void:
 	assert_true(camera.pos.y <= top, "the view never sank")
 
 
+## G42 (wf9_lead_design_to_world_a.txt #2): while the band rises the view follows the hero's FOOTING - a jump in
+## place drags nothing up (so it lands in view and he lives), a climb to a higher footing still raises the view.
+func test_the_rising_view_follows_the_footing_not_a_jump() -> void:
+	var rows: PackedStringArray = _shaft(40)
+	# A ledge 6 rows over the floor on the left (columns 1-8): a higher footing to climb onto.
+	rows[32] = "#" + "#".repeat(8) + ".".repeat(14) + "#"
+	var level: Level = _load("scroll = rising\nrise_speed = 4", rows)
+	var hero: PlayerBase = level.player
+	var camera: LevelCamera = level.get_camera()
+	var tide: RisingTide = level.get_rising_tide()
+	GameInput.set_scripted(func(_tick: int) -> int: return Defs.IN_LOOK)
+	Sim.step(2)
+	GameInput.clear_scripted()
+	Sim.step(60)
+	assert_true(tide.started and tide.is_rising())
+	assert_true(camera.footing_mode, "the band rises: the view follows the footing")
+	var top: int = camera.pos.y
+	# Jump in place, Up held: the apex is far above the feet, the footing is not.
+	GameInput.set_scripted(func(_tick: int) -> int: return Defs.IN_UP)
+	var apex: int = hero.sim_pos.y
+	for i: int in 40:
+		Sim.step(1)
+		apex = mini(apex, hero.sim_pos.y)
+		var band_limit: int = tide.band_top + Tuning.TILE - camera.rows * Tuning.TILE
+		assert_true(camera.pos.y >= maxi(mini(top, band_limit), camera.get_min().y),
+				"tick %d: the view rose only with the band, never for the jump (%d, top %d, band %d)" % [i,
+				camera.pos.y, top, band_limit])
+	GameInput.clear_scripted()
+	Sim.step(20)
+	assert_true(level.start_pos.y - apex >= 2 * Tuning.TILE, "he jumped (%d px)" % (level.start_pos.y - apex))
+	assert_eq(hero.sim_pos.y, level.start_pos.y, "landed back on the floor")
+	assert_false(hero.dead, "the landing is in view: he lives")
+	assert_true(hero.sim_pos.y <= camera.pos.y + camera.rows * Tuning.TILE, "his feet are in view")
+	# A higher footing raises the view at once (the follow, not only the band).
+	var before: int = camera.pos.y
+	hero.teleport(Vector2i(5 * Tuning.TILE + 8, 32 * Tuning.TILE))
+	Sim.step(12)
+	var band_only: int = tide.band_top + Tuning.TILE - camera.rows * Tuning.TILE
+	assert_true(camera.pos.y < mini(before, band_only), "climbing raised the view: %d (band alone: %d)" % [
+		camera.pos.y, mini(before, band_only)])
+	assert_false(hero.dead)
+
+
 func test_a_respawn_puts_the_band_under_the_checkpoint_and_a_stop_zone_ends_the_rise() -> void:
 	var level: Level = _load("scroll = rising", _shaft(40), "zones/autoscroll_stop 4 30 rect=1,28,22,3")
 	var tide: RisingTide = level.get_rising_tide()

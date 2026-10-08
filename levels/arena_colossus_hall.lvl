@@ -15,10 +15,12 @@
 # - Cookpots: two (4-player arena), on the slabs' inner ends (cols 7 / 12).
 # - Spawns (rotate every round; 2 players use 1 and 2): 1 and 2 on the floor (cols 13 / 6), 3 and 4 on the slabs
 #   (cols 5 / 14).
-# - The Wall Colossus (DESIGN.md E.5: every 10 s it spits at the crowned leader, jaws open 10 ticks ahead) stands in the
-#   right edge at floor level (its picture covers cols 13-19, rows 4-9 and blocks nothing). Its neutral versus form is
-#   asked of enemies-C / world-B (build/engine_requests/wf9_da_to_enemies_c.txt, wf9_da_to_world_b.txt); until it
-#   exists the record stays out of this file and the hall plays without the spit.
+# - The Wall Colossus (DESIGN.md E.5 / G43) stands in the right edge at floor level (`bosses/colossus 19 9`; the map
+#   edge is its wall): in an arena it is enemies-C's NEUTRAL statue (Colossus.is_neutral: it takes no hits, has no bar,
+#   music or attacks of its own, and its picture over cols 13-19, rows 4-9 blocks nothing) and world-B's referee
+#   (VersusSignatures) makes it spit every 10 s (243 round ticks) at the crowned leader (Grub Stack) / the hero with
+#   the most hearts (Last Caveman Standing; a tie: no spit): jaws open 10 ticks ahead, then a rock flies straight at
+#   where he stands - an arena hit (a spill / a heart).
 # - Modes: Grub Stack (default) and Last Caveman Standing (DESIGN.md G43: the spit targets the crowned leader / the hero
 #   with the most hearts); each needs a green bot set in core-B's
 #   tests/test_versus_bots.gd.
@@ -70,6 +72,7 @@ D = objects/spawn_point index=4
 ####################
 
 [entities]
+bosses/colossus 19 9
 props/ruins/brazier_glow 1 9 layer=back
 props/ruins/brazier_glow 18 9 layer=back
 props/ruins/skull_big 4 9 layer=back

@@ -1008,7 +1008,9 @@ chamber at the top of the tar climb; floor row 10, the last row of an 11-row cam
 hand resting on its end stays 60 px under the view's top, left of the boss bar's columns). Walking into the trunk pushes the hero back and costs a bone; the moving fist
 throws him back and costs 3 bones; standing on the resting fist launches him unharmed (-160, -224 with Up
 *(tune: the face must be reachable from the resting fist; pinned by the boss test)*). The face's weak rectangle lies
-at most 105 px over the floor (`MANGROVE_FACE_RISE` <= 70), clear of the HUD [G35]. Hits (any weapon 1):
+76-105 px over the floor (`MANGROVE_FACE_RISE` 70), clear of the HUD [G35]; a jump strike from the floor beside the
+trunk reaches it too. The upper hand sweeps along the upper ledge's top and sinks 12 px onto its edge to rest: a hero
+crouching on the lower ledge stays under the sweep. Hits (any weapon 1):
 Beginner 4 / 3 / 3, Expert 6 / 5 / 5.
 - **Stage 1 Face**: the fist punches along the floor in bursts of 3-8 (`Sim.rng`; the first burst 8), each punch
   after a **10-tick draw-back** with a creak, 3 ticks out and 1 back; each punch shakes (4), shoves the hero 2 px and
@@ -1070,8 +1072,9 @@ take 200 (8 club hits; co-op 250), phase 3 takes **3 glider dives**. Weak point:
   rule); a miss **buries its beak** in the nest or floor for **44 ticks**: head open. After 3 dives it perches again
   (phase 1) until its hp is at or below a third.
 - **Phase 3 Storm** (hp <= 1/3): lightning strikes cells that a darkening cloud marks **22 ticks** ahead (struck nest
-  sticks burn 66 ticks); the Roc climbs above the view and comes down only to swoop. **The hang-glider lies on the
-  nest** (it reappears after a death): take off along a runway (24 ticks at speed, 13.2 / 8.4), climb on lift and
+  sticks burn 66 ticks); the Roc climbs above the view and comes down only to cruise and swoop - it cruises over one
+  runway half (never over the nest nor in the boss bar's columns), its feet about 61 px over the floor, so its back's
+  top stays 55 px under the view's top [G46]. **The hang-glider lies on the nest** (it reappears after a death): take off along a runway (24 ticks at speed, 13.2 / 8.4), climb on lift and
   **dive onto its back**; the dive ladder (1 000 / 5 000 / 10 000) counts the three hits; the third brings it down.
 - Defeat: it tumbles into the clouds and coughs up the fire-starter onto the nest.
 - **Co-op**: phase 1 - a wing shield faces the nearer active hero (head hits from that side glance): a pincer on the
@@ -1194,7 +1197,7 @@ sub-stage keeps its first half's music, a co-op file its solo file's.
   for a trait or a boss, no brace, no lee, no duo move - a hero passes through his head, Up held or not (no Shoulder
   Hop, no Totem Ride; a ride ends when carrier or rider becomes idle). He is still a body: enemies may target and hurt
   him, he is launched, rides platforms, goes down and is leashed. The **active** heroes are the hatched ones that are
-  not idle (and gave input since they last hatched). One player can never use an egg or an idle partner as a step, a
+  not idle (a Shoulder Hop also needs a partner who gave input since he last hatched). One player can never use an egg or an idle partner as a step, a
   weight or a bait; a human who must wait long on a plate crouches (Down held is input).
 - **Flies** (7.9): the flies a hero gathers circle him (one swarm per hero); the water bucket washes only the hero
   who took it.
@@ -1223,7 +1226,7 @@ sub-stage keeps its first half's music, a co-op file its solo file's.
 - **Windows** (twin drums, bonds, split halves, twin boss hits, the tentacle flinch): **24 ticks on Beginner, 12 on
   Expert**, and never longer than the measured solo minimum minus 4 ticks: `window = min(24 B / 12 E, solo_min - 4)`
   per placed gate or record (`tests/test_coop_gates.gd` measures `solo_min` with the single-hero search). A record
-  sets its own cap with `window=<ticks>` (bond, split, daze): effective = `min(difficulty value, window)`; a bond uses
+  sets its own cap with `window=<ticks>` (bond, split; a daze is slot-bound [G47]): effective = `min(difficulty value, window)`; a bond uses
   the smallest `window` of its members; one value serves both difficulties [G2]. A rule that needs **two different
   heroes' own hits** (Old Mangrove's twin, Inkjaw's flinches, the Twin Idols' twin, the Roc's tail strike) is exempt
   from the `solo_min - 4` cap: no single player meets it at any speed, so its window is the difficulty value [G34].
@@ -1275,7 +1278,7 @@ of the enemy records carry a trait, and every enemy guarding a main-path chokepo
 |---|---|---|
 | `shell` | the shield faces the nearer active hero **every tick** (no active hero near: the nearest hatched one); a hit from that side (striker's x, or a projectile flying into the shield; `abs(dx) < 4` counts as front) glances with a clank and a spark; back hits count | one hero is always in front |
 | `bond` | records with the same `bond=<name>`: when one dies a window opens; every other record of the bond must die before it closes, or the dead ones **regrow** at their anchors with full hp (a 22-tick regrow, harmless) | targets are out of one hero's reach within the window, and no thrown special hits two members in one throw [G36] |
-| `daze` | when any active hero within 48 px (and 32 px vertically) starts a strike, it hops away from him (`xvel` +/-64, `yvel` -96 *(tune)*); it hops over a thrown weapon coming at it within 48 px (`yvel` -128); a head bounce **dazes** it 14 ticks (Beginner) / 12 (Expert), capped like a window (13.9.3); only a dazed one can be hurt (other hits glance) | one hero needs about 15 ticks from his bounce to a damaging strike |
+| `daze` | when any active hero within 48 px (and 32 px vertically) starts a strike, it hops away from him (`xvel` +/-64, `yvel` -96 *(tune)*); it hops over a thrown weapon coming at it within 48 px (`yvel` -128); a head bounce **dazes** it 14 ticks (Beginner) / 12 (Expert); only a dazed one can be hurt, and only by a hero of another slot than the one whose bounce dazed it (his hits glance; slot-bound, so not capped by the solo minimum [G47]); other hits glance | the bouncer cannot hurt his own daze |
 | `heavy` | front hits glance; it is stopped only by a **Brace Wall** (P-C.10), which dazes it 44 ticks with its head open (hits from any side count while dazed) | needs two braced bodies |
 | `lone` | while the two active heroes are within 64 px of each other on both axes it keeps away (it does not dive, charge or rise; flyers circle 32 px wider); otherwise it targets the hero farther from the view centre (ties -> the higher slot) [R9]. Off on Beginner (plain targeting) | staying together is the defence |
 | `grab` | a hero who touches it from below (his feet below its feet point) or whom it dives onto is **seized** instead of hurt: he cannot move or strike, and it carries him towards its perch (`perch=c,r`, a pit-side cell) at 1 px/tick, dropping him there; the partner frees him with any hit on it (the hit counts; the freed hero falls with 44 ticks of immunity) | a grabbed hero cannot strike |
@@ -1353,7 +1356,7 @@ one-shot. **Snatcher**: `kind=stinger` after a carry flies back to where it seiz
 | Setting | Co-op Beginner | Co-op Expert |
 |---|---|---|
 | Twin windows | 24 ticks (or solo minimum - 4) | 12 ticks (or solo minimum - 4) |
-| Raptor daze | 14 ticks (capped likewise) | 12 ticks (capped likewise) |
+| Raptor daze | 14 ticks (slot-bound [G47]) | 12 ticks |
 | Leash before the egg | 121 ticks | 73 ticks |
 | Hatch hearts | 2 | 1 |
 | Unhatched egg | follows forever | returns to the checkpoint after 243 ticks |
@@ -1568,7 +1571,7 @@ records every change in DESIGN.md, then here and in PHYSICS Appendix C.
 | Vine re-grab lock | 12 ticks | vine-to-vine leaps |
 | Totem drop lock, egg drift (2 / 6 px), egg nudge | 12 / 2-6 / 1 | P4.5 pair playtests (unchanged at G1) |
 | Curl box, all Batter Up velocities | 24 x 20; P-C.11 | P4.5: gap and lob gates (no Batter Up gate in the G1 slice) |
-| Twin windows / daze | 24 B / 12 E; 14 B / 12 E | P4.5 pair playtests; per record `window=`; always `<= solo_min - 4` |
+| Twin windows / daze | 24 B / 12 E; 14 B / 12 E | P4.5 pair playtests; per record `window=`; a timing window always `<= solo_min - 4` (slot-bound rules - the daze [G47], twin boss hits - are not capped) |
 | Lee reach | 64 px downwind, 16 px vertical | 3-1b / 9-2 co-op playtests |
 | `TARGET_HOLD_TICKS` | 22 | co-op enemy feel |
 | Roller walk / range / uncurl, Guard patrol, Mimic daze, Shaman speed, split run | 32 v16, 4 rows, 154; 24 v16; 22; 48 v16; 48 v16 for 22 | enemy tests and playtests |

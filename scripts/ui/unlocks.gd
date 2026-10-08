@@ -337,7 +337,7 @@ static func painting_where(index: int) -> String:
 	if level_id == &"":
 		return ""
 	var name: String = String(level_id)
-	var parts: RegexMatch = RegEx.create_from_string("^w(\\d+)_l(\\d+)(b?)").search(name)
+	var parts: RegExMatch = RegEx.create_from_string("^w(\\d+)_l(\\d+)(b?)").search(name)
 	if parts != null:
 		# A stage still being built: its number ("9-2b") rather than the file id.
 		name = "%s-%s%s" % [parts.get_string(1), parts.get_string(2), parts.get_string(3)]

@@ -28,3 +28,24 @@ msgstr "A crystal cache up the wall! Hop off your partner's head."
 # --- ending_coop Way Home (co-op) ---
 msgid "SIGN_COOP_END_GATE"
 msgstr "The gate is barred! Hop onto the lookout off your partner."
+
+# --- w4_l1_coop Cinder Shaft (co-op) ---
+msgid "SIGN_COOP_W4_BOULDER"
+msgstr "Push the boulder together: into the chute and onto the vent!"
+
+msgid "SIGN_COOP_W4_LOB"
+msgstr "Curl up by the cliff: a high strike lobs you to the top."
+
+# --- w4_l2_coop Obsidian Keep (co-op) ---
+msgid "SIGN_COOP_W4_PLATES"
+msgstr "One holds the plate, the other goes through - then swap!"
+
+msgid "SIGN_COOP_W4_DRUMS"
+msgstr "Two drums, far apart: strike them together to lift the gate."
+
+msgid "SIGN_COOP_W4_TOWER"
+msgstr "The keep tower: a hop off your partner's head gets you up."
+
+# --- w4_l2b_coop Colossus Hall (co-op) ---
+msgid "SIGN_COOP_W4_VISOR"
+msgstr "One stands on the glowing plate, the other throws the axe!"

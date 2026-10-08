@@ -202,7 +202,9 @@ func register_entity(entity: SimEntity) -> void:
 			_tag_add(tag, StringName(str(entity.spawn_params[tag])), entity)
 	if kind == Defs.Kind.PLAYER and entity is PlayerBase:
 		_add_hero(entity as PlayerBase)
-	if entity._level_awake_slot < 0 and not entity._sim_suspended:
+	# The on_screen pass skips cosmetic effects (kind FX: nothing reads their on_screen, they never doze; the multi-hero
+	# performance pass of phase 3 - a versus arena or a boss burst keeps dozens of puffs alive).
+	if kind != Defs.Kind.FX and entity._level_awake_slot < 0 and not entity._sim_suspended:
 		entity._level_awake_slot = _awake.size()
 		_awake.append(entity)
 	if doze_enabled and kind != Defs.Kind.PLAYER and kind != Defs.Kind.FX and entity._doze_slot < 0:
@@ -1063,8 +1065,9 @@ func _doze_update() -> void:
 	else:
 		_doze_hero = Vector2i(-1, -1)
 	var more_changed: bool = false
-	if _hero_total > 1 or get_view_count() > 1:
-		more_changed = _doze_party_rects(first)
+	var views: int = get_view_count()
+	if _hero_total > 1 or views > 1:
+		more_changed = _doze_party_rects(first, view, views)
 	elif _dz_more_count > 0:
 		_dz_more_count = 0
 		more_changed = true
@@ -1138,11 +1141,12 @@ func _doze_full_pass() -> void:
 
 
 ## The rectangles of the further views (1..) and heroes (all but `first`) into `_dz_more`, the feet points of every
-## hero into `_doze_feet` and every view into `_doze_views`. Returns true when the rectangles changed.
-func _doze_party_rects(first: PlayerBase) -> bool:
+## hero into `_doze_feet` and every view into `_doze_views`. Returns true when the rectangles changed. `view0` is
+## view 0 (get_view_rect(), already read by the caller) and `views` get_view_count(). (Phase-3 performance pass: no
+## second view call for view 0 and no new array when the rectangles change - `_dz_more` is overwritten in place.)
+func _doze_party_rects(first: PlayerBase, view0: Rect2i, views: int) -> bool:
 	var grid: int = Tuning.DOZE_GRID_PX
 	var mask: int = ~(grid - 1)
-	var views: int = get_view_count()
 	var order: Array = _orders[0] if _hero_total > 1 else _no_heroes
 	var needed: int = (maxi(views - 1, 0) + order.size()) * 4
 	if _dz_scratch.size() < needed:
@@ -1151,11 +1155,11 @@ func _doze_party_rects(first: PlayerBase) -> bool:
 		_doze_views.resize(views)
 	var n: int = 0
 	var reach: int = Tuning.DOZE_VIEW_REACH_PX
-	for i: int in views:
+	if views > 0:
+		_doze_views[0] = view0
+	for i: int in range(1, views):
 		var view: Rect2i = get_view_rect_at(i)
 		_doze_views[i] = view
-		if i == 0:
-			continue
 		_dz_scratch[n] = (view.position.x - reach) & mask
 		_dz_scratch[n + 1] = (view.position.y - reach) & mask
 		_dz_scratch[n + 2] = (view.position.x + view.size.x + reach + grid - 1) & mask
@@ -1171,12 +1175,13 @@ func _doze_party_rects(first: PlayerBase) -> bool:
 		_doze_feet[k * 2 + 1] = feet.y
 		if hero == first:
 			continue
+		var box_h: int = hero.box_h
 		var box_left: int = feet.x - hero.box_xo
-		var box_top: int = feet.y - hero.box_h
+		var box_top: int = feet.y - box_h
 		_dz_scratch[n] = (mini(feet.x, box_left) - reach) & mask
 		_dz_scratch[n + 1] = (mini(feet.y, box_top) - reach) & mask
 		_dz_scratch[n + 2] = (maxi(feet.x + 1, box_left + maxi(hero.box_w, 1)) + reach + grid - 1) & mask
-		_dz_scratch[n + 3] = (maxi(feet.y + 1, box_top + maxi(hero.box_h, 1)) + reach + grid - 1) & mask
+		_dz_scratch[n + 3] = (maxi(feet.y + 1, box_top + maxi(box_h, 1)) + reach + grid - 1) & mask
 		n += 4
 	var changed: bool = n != _dz_more_count * 4
 	if not changed:
@@ -1185,7 +1190,10 @@ func _doze_party_rects(first: PlayerBase) -> bool:
 				changed = true
 				break
 	if changed:
-		_dz_more = _dz_scratch.slice(0, n)
+		if _dz_more.size() != n:
+			_dz_more.resize(n)
+		for j: int in n:
+			_dz_more[j] = _dz_scratch[j]
 		_dz_more_count = n / 4
 	return changed
 

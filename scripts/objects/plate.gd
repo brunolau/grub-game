@@ -154,25 +154,26 @@ func _sim_tick(_phase: int) -> void:
 func measure_weight(level: LevelBase) -> int:
 	var total: int = 0
 	holder_mask = 0
+	var floor_y: int = sim_pos.y
+	var top_y: int = floor_y - ObjTuning.PLATE_FEET_SLACK_PX
 	for hero: PlayerBase in level.contact_order():
-		# 2.0 IDLE rule: a dozing hero (PlayerBase.counts_for_coop) weighs nothing - nor does the mount he drives.
-		if not hero.counts_for_coop():
+		# 2.0 IDLE rule: a dozing hero (PlayerBase.counts_for_coop, read as its fields: every plate asks every hero on
+		# every tick) weighs nothing - nor does the mount he drives.
+		if hero.dead or hero.down or hero.idle:
 			continue
-		if hero.is_mounted():
-			# The mount weighs for its riders (counted once, through the driver - or through the gunner while the
-			# driver does not count: idle).
+		if hero.mount != null:
+			# The mount weighs for its riders: once, through its driver - only while a hero who plays sits in the
+			# driver's seat (G33: a Chomper with an idle driver, or parked riderless, weighs nothing).
 			var mount: SimEntity = hero.mount
-			var counts: bool = hero.mount_seat == PlayerBase.SEAT_DRIVER
-			if not counts and is_instance_valid(mount):
-				var driver: Variant = mount.get(&"driver")
-				counts = driver is PlayerBase and (driver as PlayerBase).is_idle()
-			if counts and is_instance_valid(mount) and feet_on(mount.sim_pos.x, mount.sim_pos.y):
+			if hero.mount_seat == PlayerBase.SEAT_DRIVER and is_instance_valid(mount) \
+					and feet_on(mount.sim_pos.x, mount.sim_pos.y):
 				total += PartyTuning.PLATE_WEIGHT_CHOMPER
 				holder_mask |= 1 << hero.slot
 			continue
-		if hero.yvel < 0 and not hero.is_grounded():
+		if hero.yvel < 0 and not (hero.grounded or hero.on_platform):
 			continue
-		if feet_on(hero.sim_pos.x, hero.sim_pos.y):
+		var feet: Vector2i = hero.sim_pos
+		if feet.x >= _left and feet.x < _right and feet.y <= floor_y and feet.y >= top_y:  # feet_on, written out
 			total += PartyTuning.PLATE_WEIGHT_HERO
 			holder_mask |= 1 << hero.slot
 	if not _boulders_found:

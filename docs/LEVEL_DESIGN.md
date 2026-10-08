@@ -643,7 +643,7 @@ Hop off a partner standing in tar, or Chomper's dismount over tar flats.
 ### 15.4 New entities
 
 **Enemies** (all take `skin`, `hp` [25], `score`, `expert`, and in co-op files `coop=<trait>`, `bond=<name>`,
-`keeper=<name>`, `perch=c,r` for `grab`, `window=<ticks>` for `bond` / `split` / `daze` [G2]):
+`keeper=<name>`, `perch=c,r` for `grab`, `window=<ticks>` for `bond` / `split` [G2]):
 
 | Id | What it does | Parameters |
 |---|---|---|
@@ -652,9 +652,10 @@ Hop off a partner standing in tar, or Chomper's dismount over tar flats.
 | `enemies/mimic` | a chest that bites a hero on its floor within 2 cells (32 px across, 16 px up or down: a hero jumping over it does not wake it); dies from behind or after a head bounce; drawn as the closed chest, never mirrored | `contents` [`treasure`], `range` px [42] |
 | `enemies/shellback`, `raptor`, `snatcher`, `leech`, `bull_rex`, `tar_splitter`, `shaman` | the co-op-only presets (GAMEPLAY 13.9.6); **only in co-op files** | as their archetype; `snatcher kind=dangler\|stinger` |
 
-`window=<ticks>` caps that record's window: effective = `min(24 B / 12 E (daze 14 / 12), window)`, a bond uses the
-smallest `window` of its members, one value serves both difficulties. Set it after `test_coop_gates` measured the
-record's `solo_min`: `window <= solo_min - 4`.
+`window=<ticks>` caps that record's window: effective = `min(24 B / 12 E, window)`, a bond uses the smallest `window`
+of its members, one value serves both difficulties. Set it after `test_coop_gates` measured the record's `solo_min`:
+`window <= solo_min - 4`. A `daze` record needs none since [G47]: only a hero other than the bouncer hurts a dazed
+enemy, so its 14 / 12 ticks are not capped.
 
 **Bosses**: `bosses/tusker`, `bosses/mangrove`, `bosses/squid`, `bosses/idols`, `bosses/roc` (each `arena=<zone>`,
 `hp`, `drops` [`fire_starter`]), `bosses/chieftain` (two records, `name=` and `mate=<the other's name>`, `drops`
@@ -819,7 +820,8 @@ No bark board within 12 cells of any gate. Plates at least 8 tiles from their do
 high. Then **the search**: for every x2 gate a bounded single-hero search on the route tools' simulator, starting at
 the tablet and at the last checkpoint before it, with the club and every special from the belt and Chomper where a pen
 is in the stage, must **fail** to reach the tablet's `far` cell within 1 457 ticks *(tune)*. It also measures
-`solo_min` for every twin window and daze record: the window used is `min(24 B / 12 E, solo_min - 4)`.
+`solo_min` for every twin window: the window used is `min(24 B / 12 E, solo_min - 4)` (a slot-bound daze is not
+capped [G47]).
 `test_coop_gates` is a slow module (PLAN 8 V7): a plain `bash .tools/gd.sh test` skips it; run it by name with
 `GD_TIMEOUT=3600 bash .tools/gd.sh test coop_gates` (about 1.5 minutes per gate and difficulty;
 `COOP_GATES_SHARD=<i>/<n>` runs every n-th gate, so n processes share the table) after every change to a co-op file and before you hand one over

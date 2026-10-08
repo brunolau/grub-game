@@ -1,33 +1,31 @@
 {
   "format": 2,
   "level": "test_enemies_chieftain",
-  "source_sha256": "b060bcfbaa87fb5f6fdccbc3cd1949026186c5bc23fa166c5449a6e07cf91a34",
+  "source_sha256": "da766a9d109f16e7a881cdb95c44f0dc66459c193208e1a2680627967d26a126",
   "difficulty": "beginner",
   "cols": 20,
   "rows": 12,
   "wrap": "none",
   "weights": [0],
   "clip": [],
-  "baker": {"candidates":5162,"rejected":0,"simulated_ticks":146113,"verified_starts":175,"version":3},
+  "baker": {"candidates":5040,"rejected":0,"simulated_ticks":129707,"verified_starts":166,"version":3},
   "movers": [
   ],
   "nodes": [
-    {"id":0,"row":5,"y":80,"x0":144,"x1":175,"ice":0},
-    {"id":1,"row":8,"y":128,"x0":32,"x1":79,"ice":0},
+    {"id":0,"row":8,"y":128,"x0":32,"x1":79,"ice":0},
+    {"id":1,"row":8,"y":128,"x0":144,"x1":175,"ice":0},
     {"id":2,"row":8,"y":128,"x0":224,"x1":271,"ice":0},
     {"id":3,"row":11,"y":176,"x0":25,"x1":294,"ice":0}
   ],
   "links": [
-    {"id":0,"from":0,"to":1,"kind":"jump","x0":144,"x1":158,"dir":-1,"keys":"3:LU,15:L","ticks":18,"land_x0":48,"land_x1":62,"weight":0},
-    {"id":1,"from":0,"to":2,"kind":"drop","x0":163,"x1":172,"dir":1,"keys":"14:R","ticks":15,"land_x0":230,"land_x1":233,"weight":0},
-    {"id":2,"from":0,"to":2,"kind":"drop","x0":144,"x1":167,"dir":1,"keys":"19:R","ticks":19,"land_x0":230,"land_x1":234,"weight":0},
-    {"id":3,"from":1,"to":0,"kind":"jump","x0":66,"x1":79,"dir":1,"keys":"8:RU,11:R","ticks":19,"land_x0":150,"land_x1":163,"weight":0},
-    {"id":4,"from":1,"to":3,"kind":"drop","x0":32,"x1":41,"dir":-1,"keys":"4:L","ticks":14,"land_x0":25,"land_x1":29,"weight":0},
-    {"id":5,"from":1,"to":3,"kind":"drop","x0":60,"x1":79,"dir":1,"keys":"6:R,10:L","ticks":16,"land_x0":50,"land_x1":99,"weight":0},
-    {"id":6,"from":2,"to":0,"kind":"jump","x0":230,"x1":233,"dir":-1,"keys":"3:LU,11:L","ticks":14,"land_x0":166,"land_x1":169,"weight":0},
-    {"id":7,"from":2,"to":0,"kind":"jump","x0":228,"x1":247,"dir":-1,"keys":"8:LU,11:L","ticks":19,"land_x0":150,"land_x1":169,"weight":0},
-    {"id":8,"from":2,"to":3,"kind":"drop","x0":224,"x1":233,"dir":-1,"keys":"4:L","ticks":14,"land_x0":193,"land_x1":206,"weight":0},
-    {"id":9,"from":3,"to":1,"kind":"jump","x0":25,"x1":48,"dir":1,"keys":"3:RU,8:","ticks":11,"land_x0":40,"land_x1":63,"weight":0},
-    {"id":10,"from":3,"to":2,"kind":"jump","x0":179,"x1":202,"dir":1,"keys":"3:RU,8:R","ticks":11,"land_x0":230,"land_x1":253,"weight":0}
+    {"id":0,"from":0,"to":3,"kind":"drop","x0":32,"x1":41,"dir":-1,"keys":"4:L","ticks":14,"land_x0":25,"land_x1":29,"weight":0},
+    {"id":1,"from":0,"to":3,"kind":"jump","x0":43,"x1":66,"dir":1,"keys":"3:RU,11:R","ticks":14,"land_x0":117,"land_x1":140,"weight":0},
+    {"id":2,"from":1,"to":3,"kind":"drop","x0":144,"x1":153,"dir":-1,"keys":"4:L","ticks":14,"land_x0":113,"land_x1":126,"weight":0},
+    {"id":3,"from":1,"to":3,"kind":"jump","x0":144,"x1":167,"dir":1,"keys":"3:RU,11:R","ticks":14,"land_x0":218,"land_x1":241,"weight":0},
+    {"id":4,"from":2,"to":3,"kind":"drop","x0":224,"x1":233,"dir":-1,"keys":"4:L","ticks":14,"land_x0":193,"land_x1":206,"weight":0},
+    {"id":5,"from":2,"to":3,"kind":"drop","x0":252,"x1":271,"dir":1,"keys":"6:R,10:L","ticks":16,"land_x0":242,"land_x1":273,"weight":0},
+    {"id":6,"from":3,"to":0,"kind":"jump","x0":25,"x1":48,"dir":1,"keys":"3:RU,8:","ticks":11,"land_x0":40,"land_x1":63,"weight":0},
+    {"id":7,"from":3,"to":1,"kind":"jump","x0":99,"x1":118,"dir":1,"keys":"3:RU,8:R","ticks":11,"land_x0":150,"land_x1":169,"weight":0},
+    {"id":8,"from":3,"to":2,"kind":"jump","x0":179,"x1":202,"dir":1,"keys":"3:RU,8:R","ticks":11,"land_x0":230,"land_x1":253,"weight":0}
   ]
 }

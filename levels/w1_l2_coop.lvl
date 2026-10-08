@@ -1,6 +1,6 @@
 # Club & Grub - World 1, stage 2 co-op: "Canopy Village" for two (designer DB1; docs/expansion/DESIGN.md D.9).
 # The co-op file of levels/w1_l2.lvl (kind = coop, coop_of, coop_base_hash; never edit the solo file). Gate 1
-# "treehouse": the floor lift is gone - the first tree house stands 5 rows over a root mound at its foot, and only a
+# "treehouse": the floor lift is gone - the first tree house stands 6 rows over a root mound at its foot, and only a
 # Totem Ride and a jump (or a Shoulder Hop) get one hero up; he clubs the coiled vine at the deck's edge down for the
 # other. Gate 2 "pulley": the upper branches of the trunk climb are gone; the way to the trunk top leads through the
 # trunk room, now a shaft with two pans on a pulley - one partner stands on the counterweight pan while the other hops
@@ -181,13 +181,13 @@ A = enemies/harrier skin=pterodactyl range=6 hp=10 coop=lone
 ............................................########................%%%%%%%%%%%%%%%%%%%%y%%%%%%%
 ............................................########................%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ............................................########............................................
+............................................########............................................
 ........................................############............................................
+........................................############..............k.............................
 ......................................##############............................................
-......................................##############..............k.............................
-....................................################............................................
-....................................################............................................
-...............................gg.##################............................................
-...@........ff.....b....T...K.....##################....N...ii......................V...........
+......................................##############............................................
+...............................gg...################............................................
+...@........ff.....b....T...K.......################....N...ii......................V...........
 #########a######################################################x###############################
 ################################################################################################
 ################################################################################################
@@ -367,15 +367,15 @@ props/jungle/boulders 54 105
 props/jungle/mound_leafy 47 29
 # ---- co-op (DB1) ------------------------------------------------------------------------------------------------
 objects/hero_start 2 105 slot=2
-# Gate 1 "treehouse" (a Totem ledge): the tree house deck is 5 rows over the root mound under its face (no lift, no
+# Gate 1 "treehouse" (a Totem ledge): the tree house deck is 6 rows over the root mound under its face (no lift, no
 # snapper). One hero rides his partner's head and jumps; up top he clubs the coiled vine at the deck's edge (its coil
 # 13 cells from the far cell) and it unrolls down to the mound for his partner. A checkpoint on the forest floor.
 objects/checkpoint 31 105
 objects/sign 29 105 text=SIGN_COOP_W1_TOTEM
 objects/x2_tablet 33 105 gate=treehouse far=27,93
-objects/vine 40 94 length=5 rolled
-# Specials in pairs: a second axe on the tree house deck.
-items/weapon 33 93 kind=axe
+objects/vine 40 94 length=6 rolled
+# Specials in pairs: a second axe floats over the tree house deck (a jump takes it).
+items/weapon 31 90 kind=axe
 # Gate 2 "pulley": two pans in the trunk shaft. The counterweight pan (pa) hangs over its pit, the lift pan (pb) by
 # the shaft's left wall; the lift rises only while its rider is in the air and the counterweight loaded, 7 rows at
 # most, so the ledge it serves (row 35) is 11 rows over the shaft floor. The rolled vine at the ledge's edge is the way
@@ -388,12 +388,13 @@ objects/platform 45.5 45 name=pb mode=ride
 objects/pulley 47.5 33 a=pa b=pb range=7
 objects/vine 49 35 length=17 rolled
 # The Feast Land A warp waits in a cage in the crow's nest: its door rises when both drums of 'nest' are struck
-# within the window (one on the trunk top, one on the big branch, 15 columns and 6 rows apart). The bat over the
-# trunk top still bounces a hero up to the nest, where the tablet stands by the cage door.
+# within the window (one on the trunk top, one on the big branch, 5 columns and 6 rows apart, on no throw line of
+# the other: G36). The bat over the trunk top still bounces a hero up to the nest, where the tablet stands by the cage
+# door.
 objects/sign 48 29 text=SIGN_COOP_W1_DRUMS
 objects/x2_tablet 49 21 gate=nest far=44,21
 objects/drum 51 29 bond=nest
-objects/drum 66 35 bond=nest
+objects/drum 56 35 bond=nest
 objects/column 45 21 size=1,2 rise=2 trigger=drums:nest
 # Bonded leapers of the lower right deck: one in each pit.
 enemies/leaper 67 73 skin=dragon hp=10 coop=bond bond=squirrels

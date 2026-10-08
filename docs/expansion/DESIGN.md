@@ -444,7 +444,8 @@ The codes are unique across both books (D5 picks those of `w5_l2` / `w5_l2b` fro
   speed (paddling halves the trip); `zones/food_rain skin=food` stretches from the Roc's broken hoard; the five islands
   pass as props on sand bars (a mesa, a mangrove, a sea stack, an idol head, the spire); no enemy, no cell at the
   raft's surface row before the beach, no vine within reach of the raft route (a hero who grabs one leaves the rails). **Painting 19** in a big spot in the underside of a rock arch 3 rows over the
-  raft path (a high strike from the raft as it passes; missing it fails nothing). The beach is the exit (a team exit
+  raft path (a high strike from the raft as it passes; missing it fails nothing). The beach is the exit: the docked
+  raft's rails open towards it and the riders walk off [G45] (a team exit
   in co-op; one raft for two). One route, `ending_b.inputs` (Expert).
 
 ---
@@ -514,8 +515,9 @@ The original's tree-stump archetype (GAMEPLAY 6.2; 12.1 stretch goal).
   row 4: the hand resting on it and a face 112-141 px over the floor were drawn under the HUD [G35]).
 - **Stage 1 Face**: the fist punches along the floor in bursts of 3-8 (10-tick draw-back with a creak); each punch
   shakes and shoves 2 px and drops one leaf from 150 px. **The resting fist is a springboard** that launches the hero
-  unharmed to the face, whose weak rectangle lies at most 105 px over the floor (55 px or more under the view's
-  top [G35]). Defeated, it drops on the floor in front of its trunk [G30].
+  unharmed to the face, whose weak rectangle lies 76-105 px over the floor (55 px or more under the view's top
+  [G35]; so low that a jump strike from the floor beside the trunk also reaches it - the springboard is the easy way,
+  not the only one). Defeated, it drops on the floor in front of its trunk [G30].
 - **Stage 2 Upper hand**: a second root sweeps the upper ledge (14-tick ledge shake), then **rests on the ledge 44
   ticks**: high-strike it from the lower ledge.
 - **Stage 3 Fist**: bursts of 8, bugs burrow up (every shake sends them down); the fist is hittable **20 ticks after
@@ -582,9 +584,11 @@ The original's tree-stump archetype (GAMEPLAY 6.2; 12.1 stretch goal).
 - **Phase 2 Dive**: circles the hero (harrier loop), screeches 14 ticks, dives at his position (dart rule); a miss
   **buries its beak** in the nest or floor for 44 ticks: head open.
 - **Phase 3 Storm** (< 1/3): lightning strikes cells a darkening cloud marks **22 ticks** ahead (struck nest sticks
-  burn 66 ticks); the Roc climbs above the view and comes down only to swoop. **The hang-glider lies on the nest**:
-  take off along the runway (24 ticks at speed, the original rule), climb on lift and **dive onto its back**; the
-  dive ladder (1 000 / 5 000 / 10 000) counts the three hits; the third dive brings it down.
+  burn 66 ticks); the Roc climbs above the view and comes down only to cruise and swoop. It cruises over one
+  runway half, never over the nest nor in the boss bar's columns, with its feet about 61 px over the floor, so its
+  back's top stays 55 px under the view's top [G46]. **The hang-glider lies on the nest**: take off along the runway
+  (24 ticks at speed, the original rule), climb on lift and **dive onto its back**; the dive ladder (1 000 / 5 000 /
+  10 000) counts the three hits; the third dive brings it down.
 - **Hit points**: phases 1-2 take 200 (8 club hits); phase 3 takes 3 dives. Expert only.
 - **Defeat**: it tumbles into the clouds and coughs up the fire-starter for the summit totem.
 - **Co-op form**: phase 1 - a wing shield faces the nearer active hero [G33] (pincer on the nest). Phase 2 **Snatch** - a dive
@@ -895,7 +899,7 @@ on a team wipe; hit points unchanged (two heroes already deal double damage).
 |---|---|---|
 | `shell` (guard) | the shield faces the nearer **active** hero **every tick** [G33]; front hits glance (clank and spark) | one hero is always "in front" (a parked idle partner is no bait); the partner hits the back |
 | `bond` (bond) | linked records (`bond=<name>`): when one dies, the others must die within the window or the dead one regrows | targets are placed out of one hero's reach in the window, never where one thrown special hits two of them [G36] |
-| `daze` (daze-gate) | hops back out of reach when any hero within 48 px starts a strike and jumps low throws; a head bounce **dazes** it 12 ticks (Expert) / 14 (Beginner); only a dazed one can be hurt | one hero needs about 15 ticks from his bounce to a damaging strike |
+| `daze` (daze-gate) | hops back out of reach when any hero within 48 px starts a strike and jumps low throws; a head bounce **dazes** it 12 ticks (Expert) / 14 (Beginner); only a dazed one can be hurt, and only by a hero **other than the one whose bounce dazed it** [G47] | the bouncer's own hits glance (in a 4-row hall one hero strikes 8 ticks after his own bounce, so a timing rule alone failed) |
 | `heavy` (heavy) | front hits glance; stopped only by a **Brace Wall**, which dazes it 44 ticks with its head open | needs two braced bodies |
 | `lone` (pack) | keeps away while the active heroes are within 64 px of each other; otherwise targets the **straggler**, the active hero farther from the view centre [R9] | staying together is the defence |
 | `grab` (grabber) | seizes a hero who touches it from below or that it dives on and reels / carries him toward a pit-side perch at 1 px/tick; the partner frees him with any hit on it | a grabbed hero cannot strike |
@@ -962,7 +966,8 @@ he hops over that hero (45 px high, harmless during the hop). So one hero rarely
    The search (world-B's v2, phase 2) plays the gate's columns with the file's real entities and the partner a lone
    player has - an egg drifting after him, or his idle hatched partner placed anywhere the partner could be hatched,
    who counts for no co-op rule (no weight, no bait, no carrier) [G33] - and throws every special as movement [G28].
-4. **Windows**: every twin window and daze time is `min(24 B / 12 E, measured solo minimum - 4)`. The solo minimum is
+4. **Windows**: every twin window is `min(24 B / 12 E, measured solo minimum - 4)` (the daze is slot-bound since
+   [G47]: 14 B / 12 E, not capped). The solo minimum is
    measured by the search (one hero striking one target and throwing a special at the other included: an axe crosses
    12 columns in about 15 ticks). A bond whose two members one thrown special hits in one throw measures 0 and is a
    build error, not a short window [G36]. Rules that need two heroes' own hits are not capped (D.4 [G34]).
@@ -978,18 +983,18 @@ never drift silently. Co-op files carry no passwords. Specials are placed in pai
 | Stage | Main-path co-op gates | Trait enemies | x2 secret (painting) |
 |---|---|---|---|
 | 1-1 Vine Bridges | (1) the springy flower becomes an 8-tile Shoulder Hop ledge, and the upper hero clubs a rolled vine down (teaches hop and gift) [G28]; (2) a leapfrog plate door on the canopy road. Signs teach the egg and the x2 tablet at the first checkpoint | two Shellback turtles before the exit (taught by a sign) | High Cache 7 tiles up, Totem Ride high strike (#20) |
-| 1-2 Canopy Village | (1) the first tree house only by Totem Ride + jump; (2) a pulley in the trunk room. The Feast Land A warp sits behind twin drums | bonded flying-squirrel leapers; a Snatcher bat on the bat bounce | treetop cache by Batter Up lob (#21) |
-| 2-1 Echo Caverns | (1) paired plates on two hatches (one holds, one drops); (2) a keeper door guarded by two Raptors in a 4-row hall | Leeches under the dark section; `lone` stingers | a secret-room wall of `$` opened by a Batter Up line drive (#22) |
+| 1-2 Canopy Village | (1) the first tree house only by Totem Ride + jump (a 5-row Totem ledge: a gate since a ride needs an active carrier [G33]); (2) a pulley in the trunk room (a counterweight hop up the shaft [G48]). The Feast Land A warp sits in a cage behind twin drums | bonded leapers in two pits (the solo file's dragon leapers) | treetop cache, 8 rows up, by a charged Batter Up lob (#21) [G48] |
+| 2-1 Echo Caverns | (1) paired plates on two hatches (one holds, one drops); (2) a keeper door guarded by two Shellback turtles in a 4-row hall (Raptors need the slot-bound daze of G47 [G48]) | Leeches under the dark section; `lone` stingers | a secret-room wall of `$` opened by a Batter Up line drive (#22) |
 | 2-2 Bone Gorge | (1) a see-saw on the rising stepping stones; (2) the lift pillar driven by a plate. Two gliders over the gorge with bonded harrier pairs | a Bull Rex on the gorge floor (Brace Wall) | x2 ledge over the lift pillar (#23) |
 | 2-2b Brute's Den | a keeper door into the den (two bonded diggers); **the co-op Brute** (B.7) | - | - |
 | 3-1 Frost Summit | (1) a Bull Rex on the frozen lake (bracing on ice slides both heroes - the joke of the level); (2) the cliff climb by Shoulder Hop steps with a rolled vine back | bonded chargers, Shellback turtles on the slopes | x2 ice cave (#24) |
 | 3-1b Blizzard Pass | (1) a keeper hall of Shellback turtles, 4 rows high, in the gusts; (2) lee leapfrog: a crouching hero shelters the hero behind him from the wind over the last gaps | Snatcher pterodactyls riding the gusts | x2 lee ledge (#25) |
-| 3-2 Crystal Grotto | (1) a Batter Up line drive over 9 tiles of icy water; (2) twin drums that freeze a floe bridge (a column) | Raptors, twin leapers from the water pits | the Feast Land C warp on a boost ledge; crystal cache (#26) |
+| 3-2 Crystal Grotto | (1) a Batter Up line drive over 9 tiles of icy water (8 on Beginner: a `beginner` floe column on the near lip); (2) twin drums, one on each bank, that freeze a floe bridge (a column) so the batter can follow - both gates at the leaper lake [G44] | Raptors, twin leapers from the water pits | the Feast Land C warp on a boost ledge; crystal cache (#26) |
 | 4-1 Cinder Shaft | (1) both inside the auto-scroll: a heave boulder pushed off a ledge plugs a lava vent before the view passes; (2) a Batter Up lob across a lava stratum | `lone` stingers in the ember rain | x2 shelf (#27) |
-| 4-2 Obsidian Keep | (1) leapfrog plate doors (A holds for B, B holds for A); (2) twin drums that stop a spike column | Shamans shielding the keep guards; Raptors | x2 keep tower (#28) |
+| 4-2 Obsidian Keep | (1) leapfrog plate doors (A holds for B, B holds for A); (2) twin drums that raise a portcullis on the ramparts for good (spikes are no door) [G44] | Shamans shielding the keep guards; Raptors | x2 keep tower (#28) |
 | 4-2b Colossus Hall | **the visor Colossus** (B.7); two axes at the checkpoint | - | - |
 | Feast Land A / B / C | team exit only; a giant roast spot pays its giant bonus only when both strike it within the window; **Relay Bounce**: alternate bounces by both heroes on one enemy extend the 1-2-3-4-6-8 ladder to x10 and x12 | - | - |
-| Way Home | the village gate is barred: one hero is lifted to the lookout (Shoulder Hop) to open it; team exit | - | x2 lookout (#29) |
+| Way Home | the village gate is barred: one hero is lifted to the lookout gallery 8 rows over the road (Shoulder Hop) and steps on its latch plate, 9+ cells from the door, to open it [G44]; team exit | - | x2 lookout (#29) |
 
 Paintings 0-19 are the Book II ones (one per level, in `A.2` order).
 
@@ -1068,7 +1073,7 @@ and adds the co-op gates, traits and the P2 start.
   | Setting | Co-op Beginner | Co-op Expert |
   |---|---|---|
   | Twin windows | 24 ticks (or solo minimum - 4) | 12 ticks (or solo minimum - 4) |
-  | Raptor daze | 14 ticks (or solo minimum - 4 [R12]) | 12 ticks (or solo minimum - 4) |
+  | Raptor daze | 14 ticks (only the other hero hurts it [G47]) | 12 ticks |
   | Leash before the egg | 5 s (121 ticks) | 3 s (73 ticks) |
   | Hatch hearts | 2 | 1 |
   | Unhatched egg | follows forever | returns to the checkpoint after 10 s |
@@ -1258,7 +1263,7 @@ row  3   ......P......P......   cookpots on the upper ledges
 row  4   ...?====....====?...   upper ledges, spots flush in their outer ends
 row  5   ....................
 row  6   .3................4.   spawns 3 / 4 on the side shelves
-row  7   ?===....=*==....===?   side shelves with spots in the wall ends; central ledge with the big spot
+row  7   ?===....=**=....===?   side shelves with spots in the wall ends; the big spot's two cells mid central ledge
 row  8   ....................
 row  9   .....2........1.....   spawns 1 / 2 on the floor
 row 10   ##?#####....#####?##   floor spots; the 4-cell hole wraps to the top and drops onto the central ledge
@@ -1266,9 +1271,11 @@ row 11   ########....########
 ```
 
 Rising past the top seam (a stomp bounce) comes in at the bottom harmlessly (floors are one-way for the feet,
-PHYSICS 11.2). Measured: Hot Rock 8, Grub Stack 14, Last Caveman Standing 12 points worst; the big spot's column
-decides Grub Stack (col 9: the left floor spawn leads, col 10: the right one), so a symmetric big spot is DA's phase-3
-work. Not built at G2: the darkness pulse, the regrowing `$` walls and the dangler springboard (world-B's referee).
+PHYSICS 11.2). The big spot is two cells side by side (cols 9 / 10, phase 3): each counts its own 3 hits, the first
+used up drops the giant over itself and opens its twin (one giant per refill). One cell decided Grub Stack (col 9: the
+left floor spawn led, col 10: the right one; 15 points worst); the pair measures Grub Stack 8, Hot Rock 8, Last
+Caveman Standing 12. Not built at G2: the darkness pulse, the regrowing `$` walls and the dangler springboard - the
+referee's `dark_pulse`, `regrow` and neutral enemies since phase 3 [G43].
 
 **Tar Pulleys** (walled; the design sketch):
 
@@ -1608,3 +1615,8 @@ went to the owners as `build/engine_requests/wf9_lead_design_to_*.txt`).
 | G41 | The lee gap (G2 report) | the validator has no lee-gap check; a lee gate is proven only if the search runs the wind | **kept as a gate kind**: gust gaps of up to 3 cells whose gusts never pause, a crouching spot within 64 px downwind of each far edge; only an active croucher shelters (a crouch is input) [G33]; the search decides, the fallback is a Brace corridor (9-2) - and the fallback is used if world-B's search world does not run the level's wind; the validator warning stays optional (LD 15.5, LD 15.7.3) |
 | G42 | The rising-scroll camera (G2 report, follows G32) | G32 made "every jump lands higher" a building rule because the view chases a jump's apex and never sinks; a jump in place on a climb ledge (to strike a bat) is then an unfair death | **engine change asked of world-A**: in a `scroll = rising` level the view rises for a hero's footing (his feet on the last tick he had ground, a platform, a carrier or a vine under them), never for a jump's apex; it still never moves down and rises at least with the band. Until world-A confirms it, G32 stays the building rule of 6-2b (P-C.8, LD 15.5) |
 | G43 | Arenas as built and Colossus Hall (G2 report, DA) | E.5 still drew the G1 sketches; Colossus Hall's "crowned leader" does not exist outside Grub Stack | **written in**: E.5 draws Totem Ring, Cinder Pit, Echo Hollow and Coconut Cove as built [G31] and LD 15.8 carries DA's lessons; Colossus Hall plays Grub Stack (the crowned leader) and Last Caveman Standing (the hero with the most hearts; a tie: no spit), no Hot Rock or Clubball; the statue is a neutral picture that takes no hits (E.5, LD 15.8) |
+| G44 | Book I co-op as built (DB3, phase 3) | 3-2's two gates, 4-2's "spike column" and the Way Home lookout needed a concrete form | **accepted**: 3-2 puts both gates at the leaper lake (the line drive over 9 cells, 8 on Beginner through a `beginner` floe column on the near lip; drums on both banks freeze the floe bridge for the batter), each with its own tablet and `far`; the Feast Land C warp and painting 26 share the 8-row crystal cache; 4-2's drum bond raises a portcullis for good; the Way Home lookout is a gallery 8 rows over the road with a latch plate 9+ cells from the door, also the x2 secret of painting 29 (D.9) |
+| G45 | Railed raft at the beach (D9b, phase 3) | with `rails` a rider is fenced to the raft for good, so "the home beach is the exit" of `ending_b` could not be built; a railed rider fell into the water at the bow (the halved-width ride overlap) | **decided**: when a railed raft is stopped by a bank, its fence opens on that side over the bank's floor and the riders walk off (their floor contact unrails them); the ride test carries a railed rider over the whole fenced width - objects-B (A.6, P-C.7) |
+| G46 | The Storm Roc's phase-3 cruise (enemies-C, phase 3) | the glider dive's target, the Roc's back, cruised at the nest's centre with its feet 40 px over the nest top: its top 44 px under the view's top - inside the boss bar's columns and 11 px short of the HUD row's clearance; a lower cruise over the nest would run into heroes standing on it | **decided**: in phase 3 the Roc cruises over one runway half only (out of the boss bar's columns and off the nest by a cell), its feet about 61 px over the floor (29 over the nest top), so its back's top is 55 px under the view's top; heroes on the floor keep 26 px under it; it swoops and climbs out as before; the co-op tumble over the nest is clear already (B.5, G 13.6) |
+| G47 | The daze trait is slot-bound (integration's coop_gates run, phase 3) | the search measured that one hero strikes a Raptor he dazed himself 8 ticks after his bounce in a 4-row hall (`w2_l1_coop` 'den'), so the daze would have to shrink to 4 ticks - unplayable for a pair and fragile wherever Raptors keep a hall | **decided** (the orchestrator's actions principle, G34): a dazed `daze` enemy can be hurt only by a hero of another slot than the one whose head bounce dazed it - the bouncer's hits glance; so a lone player (an idle partner never strikes) can never kill it, and the daze keeps 14 B / 12 E, not capped by the solo minimum; `window=` on daze records is no longer needed. enemies-A builds it (`coop_traits.gd`), world-B's search and integration's window check treat the daze as slot-bound (D.6, D.8, D.11, G 13.9.5, LD 15.4) |
+| G48 | Book I co-op as built (DB1, phase 3) | 2-1's Raptor keepers could not be a gate with a daze capped at the measured solo minimum (8 - 4 = 4 ticks); 1-2's tree house, pulley, warp cage, leapers and treetop cache needed concrete forms | **accepted**: 2-1's 'den' keeps two Shellback turtles as keepers (Raptors may return there once the slot-bound daze of G47 is built); 1-2's tree house is the 5-row Totem ledge (a gate only with G33's active carrier; a rolled vine of 5 is the carrier's way up), the trunk-room pulley a counterweight hop (A on the counterweight pan, B hops while the lift rises, a ledge 11 rows over the shaft floor, a rolled vine back for A), the Feast Land A warp in a cage whose door the drum bond 'nest' raises (drums 15 columns and 6 rows apart), the bonded leapers two dragon leapers in two pits one row under the deck top, the treetop cache 8 rows up for a charged lob (a 7-row lob ledge falls to one player since G28); 2-1's x2 secret the Deep Pantry behind 8 cells of black water. Feast Lands A / B: the giant-roast twin rule (G 13.9.8) is not built yet (objects-A asked) (D.9) |

@@ -23,10 +23,11 @@ extends BossBase
 ## Co-op form (`<id>_coop` files: meta `kind = coop`; tests force it with the parameter `form=coop`): it charges whoever
 ## hit it last (at first the nearest hero who counts); while it lies open (recoil, dizzy, stuck) it turns EVERY tick to
 ## face the nearer hero and its head glances: only a hero BEHIND it (his x on the side it turns away from; for a thrown
-## weapon its thrower's x) can strike the leafy rump. Phase 3: its charges skid and turn 32 px before a wall (no
-## impact, no rocks, no dizziness); a charge may still stick in the wallow (DESIGN.md G38: the rump from behind, a
-## pair's opening). A Brace Wall (PHYSICS.md C.10: two crouching heroes within 16 px, both grounded) in the path of a
-## charge stops it dead: DAZED 66 ticks with head and rump open to everybody; a lone croucher is trampled.
+## weapon its thrower's x) can strike the leafy rump, once it lies on the ground (dizzy, stuck - not in the recoil
+## hop, whose apex would lift the rump under the fight HUD, G35). Phase 3: its charges skid and turn 32 px before a
+## wall (no impact, no rocks, no dizziness); a charge may still stick in the wallow (DESIGN.md G38: the rump from
+## behind, a pair's opening). A Brace Wall (PHYSICS.md C.10: two crouching heroes within 16 px, both grounded) in the
+## path of a charge stops it dead: DAZED 66 ticks with head and rump open to everybody; a lone croucher is trampled.
 ## IDLE rule (DESIGN.md G33 / G34): every "nearer hero" here is the nearer hero who COUNTS (PlayerBase.counts_for_coop:
 ## alive, hatched, not idle - LevelBase.nearest_coop_hero), the striker behind must count too, and the Brace Wall
 ## refuses an idle partner (PlayerBase.braces_with). A dozing partner parked anywhere is no bait: one player is always
@@ -182,13 +183,30 @@ func is_dangerous() -> bool:
 	return fighting and not dead and not is_open() and _state != State.DYING and _state != State.DORMANT
 
 
-## The head this tick (logical px).
+## The head as a weak point this tick (logical px): while a hit on it can count - lying open in the solo form, dazed by
+## a Brace Wall in the co-op form -, else empty (the contract of Hud.weak_point_rects and the G35 route checks: an
+## empty rect cannot be struck now). [method get_head_box] is the head whatever it does.
 func get_head_rect() -> Rect2i:
+	if is_open() and (not coop_form or _state == State.DAZED):
+		return get_head_box()
+	return Rect2i()
+
+
+## The leafy rump as a weak point this tick (logical px): while it lies open ON THE GROUND in the co-op form (dizzy,
+## stuck, dazed - not in the recoil hop), else empty (as [method get_head_rect]).
+func get_rump_rect() -> Rect2i:
+	if coop_form and is_open() and _state != State.RECOIL:
+		return get_rump_box()
+	return Rect2i()
+
+
+## The head's box this tick, open or not (logical px; the tusks glance on it while it is closed).
+func get_head_box() -> Rect2i:
 	return _part(TUSKER_HEAD)
 
 
-## The leafy rump this tick (logical px).
-func get_rump_rect() -> Rect2i:
+## The leafy rump's box this tick, open or not (logical px).
+func get_rump_box() -> Rect2i:
 	return _part(TUSKER_RUMP)
 
 
@@ -517,13 +535,16 @@ func _poll_hits() -> int:
 	var behind_only: bool = false
 	if is_open():
 		if _state == State.DAZED:
-			parts = [get_head_rect(), get_rump_rect()]
+			parts = [get_head_box(), get_rump_box()]
 		elif coop_form:
-			parts = [get_rump_rect()]
+			# The rump counts once it lies on the ground (B.1: "while dizzy"; stuck too) - not in the recoil hop, whose
+			# apex would lift it into the fight HUD's band (G35; 5-2b's arena).
+			if _state != State.RECOIL:
+				parts = [get_rump_box()]
 			behind_only = true
 		else:
-			parts = [get_head_rect()]
-	var armour: Rect2i = get_box() if _state == State.ROLL or _state == State.HOP else get_head_rect()
+			parts = [get_head_box()]
+	var armour: Rect2i = get_box() if _state == State.ROLL or _state == State.HOP else get_head_box()
 	var projectiles: Array[SimEntity] = level.get_kind(Defs.Kind.HERO_PROJECTILE)
 	for i: int in range(projectiles.size() - 1, -1, -1):
 		var projectile: ProjectileBase = projectiles[i] as ProjectileBase

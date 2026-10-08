@@ -3,11 +3,11 @@
 # "hatches": the first hatch of the Hatch Well became two stone trapdoors in the floor, each lifted by a plate (one
 # holds, one drops): A stands on plate pa, trapdoor 1 rises and B drops into the first chamber; there B stands on plate
 # pb and trapdoor 2 rises for A (a leapfrog of two doors, LEVEL_DESIGN 15.7.3). Gate 2 "den": the low passage from the
-# fourth chamber into the Dark Deep is a keeper hall, 4 rows high, held by two Raptors (daze: one hero bounces on a
-# head, the partner strikes the dazed Raptor); their door opens when both are dead. Leeches lurk in the dark beyond;
-# the Expert stinger of the shaft is a loner; the turtles are Shellbacks (shell) and the Echo Gallery's bats a bonded
-# pair. x2 secret: at the foot of the Echo Shaft a channel of black water runs under the rock - only a Batter Up line
-# drive crosses it, to a cracked wall and the Deep Pantry with Cave Painting 22 (a gate brings the batter back).
+# fourth chamber into the Dark Deep is a keeper hall, 4 rows high, held by two Shellback turtles (one hero hops over a
+# turtle and baits its shell, the partner clubs its back); their door opens when both are dead. Leeches lurk in the
+# dark beyond; the Expert stinger of the shaft is a loner; the other turtles are Shellbacks too, and every special lies
+# in pairs. x2 secret: at the foot of the Echo Shaft a channel of black water runs under the rock - only a Batter Up
+# line drive crosses it, to a cracked wall and the Deep Pantry with Cave Painting 22 (a gate brings the batter back).
 
 [meta]
 format = 2
@@ -28,7 +28,7 @@ music = level_cave
 bonus = bonus_b
 bonus_tier = 1
 author = DB1
-notes = "Co-op 2-1: plate trapdoors (leapfrog) in the Hatch Well, Raptor keeper hall into the Dark Deep, leeches, the Deep Pantry by line drive (painting 22)."
+notes = "Co-op 2-1: plate trapdoors (leapfrog) in the Hatch Well, Shellback keeper hall into the Dark Deep, leeches, the Deep Pantry by line drive (painting 22)."
 
 [legend]
 ? = objects/hidden_spot kind=small count=3 contents=food:13,food:21,food:9 look=inset tile=#
@@ -341,12 +341,17 @@ objects/column 58 18 size=2,1 rise=3 rise_while=pa
 objects/plate 50 24 name=pb
 objects/column 60 18 size=2,1 rise=3 rise_while=pb
 objects/checkpoint 63 24
-# Gate 2 "den": two Raptors (daze) keep the low passage, 4 rows high; their door (col 88) rises when both are dead.
-objects/sign 70 50 text=SIGN_COOP_W2_RAPTOR
+# Gate 2 "den": two Shellback turtles (shell, standing still) keep the low passage, 4 rows high; their door (col 88)
+# rises when both are dead. One hero hops over a turtle and stands close behind it (the shell turns to the nearer
+# caveman), the other clubs its back - then the same at the second one. (DESIGN.md D.9 asked for Raptors here: the
+# search measured a daze solo minimum of 8 ticks, which would cap the daze window at 4 - too short for two players.)
+objects/sign 70 50 text=SIGN_COOP_W1_SHELL
 objects/x2_tablet 74 50 gate=den far=89,50
-enemies/raptor 80 50 keeper=den
-enemies/raptor 85 50 keeper=den
+enemies/walker 79 50 skin=turtle_b left=0 right=0 speed=0 hp=10 coop=shell keeper=den
+enemies/walker 84 50 skin=turtle_b left=0 right=0 speed=0 hp=10 coop=shell keeper=den
 objects/column 88 50 size=1,4 rise=4 trigger=keepers:den
+# Specials in pairs: a second hammer floats over the alcove of the big chamber (a jump takes it).
+items/weapon 76 28 kind=hammer
 # x2 secret: the Deep Pantry behind the black-water channel at the foot of the Echo Shaft. A Batter Up line drive
 # from the shaft floor crosses the 8 cells of water; the batter clubs the cracked wall and takes Cave Painting 22;
 # the arch in the pantry brings him back to the shaft.

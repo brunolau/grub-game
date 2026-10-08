@@ -13,7 +13,8 @@ extends TestCase
 ##   coop_search.gd: static func search_gate(level_id: StringName, difficulty: int, gate: String) -> Dictionary
 ##     "reached": bool     true = a single hero got to the far cell (the gate is not co-op only)
 ##     "bound": int        ticks the search was allowed (LEVEL_DESIGN 15.7.6: 1 457 *(tune)*)
-##     "windows": Array    [{"what": String, "window": int, "solo_min": int}] for every twin window / daze record
+##     "windows": Array    [{"what": String, "window": int, "solo_min": int, "slot_bound": bool}] for every twin
+##                         window / daze record; "slot_bound" (G34 / G47) exempts it from the solo_min - 4 cap
 ##     "detail": String    how the hero got there (when reached), for the failure message
 
 ## Running it: `GD_TIMEOUT=3600 bash .tools/gd.sh test coop_gates` (a slow module, PLAN.md V7; about 1.5 min per gate
@@ -28,9 +29,17 @@ const TABLET_ID: StringName = &"objects/x2_tablet"
 const WINDOW_MARGIN: int = 4
 
 
-## Every co-op gate: [level id, difficulty, gate name, far cell (Vector2i), tablet cell (Vector2i)].
+## Every co-op gate: [level id, difficulty, gate name, far cell (Vector2i), tablet cell (Vector2i)] - the search's own
+## table (CoopSearch.gate_table, wf9_world_b_to_integration.txt #1.4) when it has one, so tools/coop_search.gd
+## --shard and this test can never disagree about a shard; else read here in the same order.
 func _gates() -> Array[Array]:
 	var gates: Array[Array] = []
+	var search: GDScript = load(SEARCH) as GDScript if ResourceLoader.exists(SEARCH) else null
+	if search != null and search.get_script_method_list().any(func(method: Dictionary) -> bool:
+			return str(method["name"]) == "gate_table"):
+		for entry: Dictionary in search.call("gate_table"):
+			gates.append([entry["level"], entry["difficulty"], entry["gate"], entry["far"], entry["cell"]])
+		return gates
 	for level_id: StringName in Levels.all_ids():
 		if not Levels.is_coop_level(level_id):
 			continue
@@ -73,13 +82,20 @@ func test_every_coop_gate_is_refused_by_the_solo_search() -> void:
 		assert_ne(gate[3], Vector2i(-1, -1), "%s: its tablet names a far cell" % label)
 		var started: int = Time.get_ticks_msec()
 		var result: Dictionary = search.call("search_gate", gate[0], gate[1], gate[2])
-		print("    %s: %s in %.1f s" % [label, "REACHED" if bool(result.get("reached", true)) else "refused",
-				(Time.get_ticks_msec() - started) / 1000.0])
+		print("    %s: %s in %.1f s%s" % [label, "REACHED" if bool(result.get("reached", true)) else "refused",
+				(Time.get_ticks_msec() - started) / 1000.0, " cached" if bool(result.get("cached", false)) else ""])
 		# Let the main loop turn: the freed search world's canvas callbacks are flushed (see the header).
 		await Engine.get_main_loop().process_frame
 		assert_false(bool(result.get("reached", true)), "%s: a single hero must not reach %s (%s)" % [label,
 				str(gate[3]), str(result.get("detail", ""))])
 		for window: Dictionary in result.get("windows", []):
+			# G34 / G47: a slot-bound rule (two heroes' own hits: the Mangrove twin, Inkjaw's flinch, the Idols' twin,
+			# the daze - only a hero of another slot than the bouncer hurts a dazed enemy) cannot be met by one player,
+			# whatever its window: the search marks such a record "slot_bound" and it is exempt from the cap.
+			if bool(window.get("slot_bound", false)):
+				print("      %s: %s window %d is slot-bound (exempt, G34 / G47)" % [label, window.get("what", "?"),
+						int(window["window"])])
+				continue
 			assert_true(int(window["window"]) <= int(window["solo_min"]) - WINDOW_MARGIN,
 					"%s: %s window %d below the solo minimum %d - %d" % [label, window.get("what", "?"),
 					window["window"], window["solo_min"], WINDOW_MARGIN])

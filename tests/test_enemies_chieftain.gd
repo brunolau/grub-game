@@ -15,6 +15,10 @@ extends "res://tests/test_enemies_case.gd"
 const PLAYER_SCENE: String = "res://scenes/player/player.tscn"
 const FLOOR_Y: int = 176
 const ALTAR_Y: int = 128
+## The developer level with its baked bot graph (resources/bots/test_enemies_chieftain.json): the chieftains fight on
+## hero physics there, played in the real level scene by the Lab of tests/test_enemies_tusker.gd.
+const LEVEL_PATH: String = "res://levels/test_enemies_chieftain.lvl"
+const Lab = preload("res://tests/test_enemies_tusker.gd").Lab
 
 var _p2: PlayerBase = null
 ## The idle-partner searches: P2 (hatched, idle) is kept at the side of the chieftain nobody smashes (_keep_alive).
@@ -24,6 +28,8 @@ var _gulla: Chieftain = null
 var _defeated: Array[BossBase] = []
 ## The pyre's bot graph as JSON text, baked once for the whole file (a bake simulates thousands of hero runs).
 static var _pyre_graph_json: String = ""
+var _lab: Lab = null
+var _was_manual: bool = false
 
 
 func before_each() -> void:
@@ -31,6 +37,8 @@ func before_each() -> void:
 	_defeated.clear()
 	_p2 = null
 	_shadow = false
+	_lab = null
+	_was_manual = Sim.manual
 	Events.boss_defeated.connect(_on_defeated)
 	NavGraph.clear_cache()
 
@@ -39,6 +47,14 @@ func after_each() -> void:
 	Events.boss_defeated.disconnect(_on_defeated)
 	Chieftain.hero_bot_enabled = true
 	GameInput.clear_scripted()
+	if _lab != null:
+		if _lab.level != null and is_instance_valid(_lab.level):
+			_lab.level.free()
+		Sim.stop()
+		Sim.manual = _was_manual
+		Audio.stop_music(0.0)
+		Lab.cleanup_flow(get_tree())
+		_lab = null
 	GameInput.reset_slots()
 	NavGraph.clear_cache()
 	Game.new_game(Defs.Difficulty.BEGINNER)
@@ -564,6 +580,192 @@ func test_hero_bot_the_single_hero_search_cannot_beat_the_coop_chieftains() -> v
 
 
 # =================================================================================================================
+# The test level: hero physics, the HUD, the recorded club routes
+# =================================================================================================================
+
+## G35 (lead designer, wf9 #2 / D9b): on the test level (the altar 3 rows up under a 5-row crown, the camera locked on
+## the pyre) the chieftains fight on hero physics (its baked graph), and through a long fight every rectangle a hit
+## must touch - a fighting chieftain's body, an egg - lies wholly in the view and clear of the fight HUD
+## (Hud.weak_point_problem), wherever the bodies walk, jump, stack or carry the roast.
+func test_the_bodies_stay_clear_of_the_hud_on_the_test_level() -> void:
+	var chiefs: Array[Chieftain] = _open_pyre_lab(Defs.Difficulty.EXPERT)
+	var hero: PlayerBase = _lab.hero()
+	_lab.step(PackedInt32Array([0]))
+	assert_not_null(chiefs[0].get_body(), "Gorm fights on hero physics here (the level's bot graph)")
+	var view: Rect2i = _lab.level.get_view_rect()
+	var checked: int = 0
+	for tick: int in 1500:
+		# The hero roams the floor (kept alive): the chieftains chase him all over the pyre.
+		var keys: int = Defs.IN_RIGHT if (tick / 90) % 2 == 0 else Defs.IN_LEFT
+		_lab.step(PackedInt32Array([keys | (Defs.IN_UP if tick % 45 == 0 else 0)]))
+		Lab.top_up(hero)
+		for chief: Chieftain in chiefs:
+			var weak: Rect2i = chief.get_weak_rect()
+			if not weak.has_area():
+				continue
+			checked += 1
+			assert_true(view.encloses(weak), "tick %d: %s wholly in the view (%s)" % [tick, chief.name, weak])
+			var art: Rect2 = Rect2(Vector2(weak.position - view.position) * 2, Vector2(weak.size) * 2)
+			var problem: String = Hud.weak_point_problem(art, Vector2(view.size) * 2)
+			if problem != "":
+				assert_eq(problem, "", "tick %d: %s (%s)" % [tick, chief.name, weak])
+				return
+	assert_true(checked > 1000, "the weak points were checked (%d)" % checked)
+
+
+## G2 criterion (PLAN.md 5, enemies-C): the solo Rival Chieftains on hero physics fall to the club on their test
+## level, played by the real hero from the level start with no refill - replayed tick for tick from the routes
+## [ChiefClubPilot] recorded (CHIEF_ROUTE=1 on test_the_club_pilot_still_wins_on_the_test_level prints fresh ones).
+func test_the_club_routes_beat_the_solo_chieftains_on_the_test_level() -> void:
+	for case: Array in [[Defs.Difficulty.BEGINNER, ROUTE_BEGINNER], [Defs.Difficulty.EXPERT, ROUTE_EXPERT]]:
+		var chiefs: Array[Chieftain] = _open_pyre_lab(int(case[0]))
+		var hero: PlayerBase = _lab.hero()
+		var lives: int = Game.lives
+		var route: PackedInt32Array = Lab.parse_route(str(case[1]))
+		var specials: Array[int] = [0]
+		var played: int = _lab.play([route] as Array[PackedInt32Array], func() -> bool:
+			if hero.run.weapon != Defs.Weapon.CLUB:
+				specials[0] += 1
+			return (chiefs[0].dead and chiefs[1].dead) or hero.dead)
+		print("    chieftains route difficulty %d: won on tick %d of %d, hearts %d bones %d" % [case[0], played,
+				route.size(), hero.run.hearts, hero.run.bones])
+		assert_true(chiefs[0].dead and chiefs[1].dead, "difficulty %d: the club route beats both (Gorm %s, Gulla %s)" % [
+				case[0], chiefs[0].life, chiefs[1].life])
+		assert_false(hero.dead, "difficulty %d: without a death" % case[0])
+		assert_eq(Game.lives, lives, "no life lost")
+		assert_eq(specials[0], 0, "the club in his hand all the way")
+		_close_pyre_lab()
+
+
+## The pilot that recorded those routes still wins from the level start (a guard against drift of the bots or the
+## tuning; CHIEF_ROUTE=1 prints the fresh routes).
+func test_the_club_pilot_still_wins_on_the_test_level() -> void:
+	for difficulty: int in [Defs.Difficulty.BEGINNER, Defs.Difficulty.EXPERT]:
+		var chiefs: Array[Chieftain] = _open_pyre_lab(difficulty)
+		var hero: PlayerBase = _lab.hero()
+		var pilot: ChiefClubPilot = ChiefClubPilot.new()
+		var hurts: int = 0
+		for tick: int in 9000:
+			_lab.step(PackedInt32Array([pilot.flags(hero, chiefs)]))
+			if hero.hit_timer == Tuning.HIT_TIMER - 1:
+				hurts += 1
+			if (chiefs[0].dead and chiefs[1].dead) or hero.dead:
+				break
+		if OS.has_environment("CHIEF_ROUTE"):
+			print("ROUTE %d %s" % [difficulty, Lab.route_text(_lab.streams[0])])
+		print("    chieftains pilot difficulty %d: won %s after %d ticks (Gorm %s %d, Gulla %s %d), hurts %d, hearts %d bones %d" % [
+				difficulty, chiefs[0].dead and chiefs[1].dead, _lab.ticks(), chiefs[0].life, chiefs[0].hp, chiefs[1].life,
+				chiefs[1].hp, hurts, hero.run.hearts, hero.run.bones])
+		assert_true(chiefs[0].dead and chiefs[1].dead, "difficulty %d: the club pilot beats the chieftains" % difficulty)
+		assert_false(hero.dead)
+		_close_pyre_lab()
+
+
+## The test level in the real level scene (the fixture's own room freed first), one real hero, club in hand; returns
+## [Gorm, Gulla].
+func _open_pyre_lab(difficulty: int) -> Array[Chieftain]:
+	if _level != null and is_instance_valid(_level):
+		_level.free()
+	_level = null
+	_hero = null
+	_lab = Lab.new()
+	assert_true(_lab.open(self, LEVEL_PATH, "bosses/chieftain", difficulty), "the pyre came up")
+	var chiefs: Array[Chieftain] = []
+	for entity: SimEntity in _lab.level.get_kind(Defs.Kind.BOSS):
+		chiefs.append(entity as Chieftain)
+	chiefs.sort_custom(func(a: Chieftain, b: Chieftain) -> bool:
+		return String(a.spawn_params.get("name", "")) < String(b.spawn_params.get("name", "")))
+	return chiefs
+
+
+func _close_pyre_lab() -> void:
+	if _lab != null and _lab.level != null and is_instance_valid(_lab.level):
+		_lab.level.free()
+	GameInput.clear_scripted()
+	GameInput.reset_slots()
+	_lab = null
+
+
+## The club pilot of the solo Rival Chieftains on the test level (it recorded ROUTE_BEGINNER / ROUTE_EXPERT): it goes
+## for an egg first (three blows before it hatches), else for the chieftain in the fight; it takes the floor, the
+## ledges or the altar he stands on (a jump where he is higher or a wall blocks), keeps STRIKE_MIN..STRIKE_MAX px in
+## front of him, faces him and swings the club whenever the forward box would meet him and a hit may count (his
+## cooldown, the egg's gap). Its strikes land first: a counted hit makes the body flinch and drops an announced attack.
+class ChiefClubPilot:
+	extends RefCounted
+
+	const STRIKE_MIN: int = 14
+	const STRIKE_MAX: int = 30
+	const JUMP_TICKS: int = 10
+	const STRIKE_TICKS: int = 7
+
+	var plan: Array[int] = []
+	var _last_x: int = -100000
+	var _stuck: int = 0
+
+	func flags(hero: PlayerBase, chiefs: Array[Chieftain]) -> int:
+		if not plan.is_empty():
+			return plan.pop_front()
+		var target: Chieftain = pick(chiefs)
+		if target == null or not hero.is_grounded():
+			return 0
+		var weak: Rect2i = target.get_weak_rect()
+		var x: int = hero.sim_pos.x
+		var tx: int = target.sim_pos.x
+		var dir: int = 1 if tx >= x else -1
+		var toward: int = Defs.IN_RIGHT if dir > 0 else Defs.IN_LEFT
+		var away: int = Defs.IN_LEFT if dir > 0 else Defs.IN_RIGHT
+		var dx: int = absi(tx - x)
+		var same_floor: bool = absi(target.sim_pos.y - hero.sim_pos.y) <= 6
+		if same_floor and dx >= STRIKE_MIN - 4 and dx <= STRIKE_MAX + 6:
+			if hero.facing != dir:
+				return toward
+			var ready: bool = target.hit_cooldown == 0 if target.life == Chieftain.Life.FIGHT else target._egg_gap == 0
+			if ready and Overlap.rects(front_box(hero.sim_pos, dir), weak):
+				for i: int in STRIKE_TICKS - 2:
+					plan.append(Defs.IN_FIRE)
+				plan.append(0)
+				return Defs.IN_FIRE
+			if dx < STRIKE_MIN:
+				return away
+			return toward if dx > STRIKE_MAX else 0
+		if same_floor and dx < STRIKE_MIN - 4:
+			return away
+		# Get to him: walk; jump where he stands higher, or where a wall stops the walk.
+		var key: int = toward
+		if x == _last_x:
+			_stuck += 1
+		else:
+			_stuck = 0
+		_last_x = x
+		var higher: bool = target.sim_pos.y < hero.sim_pos.y - 6 and dx <= 40
+		if higher or _stuck >= 2:
+			_stuck = 0
+			for i: int in JUMP_TICKS - 1:
+				plan.append(Defs.IN_UP | key)
+			return Defs.IN_UP | key
+		return key
+
+	## The target: an egg first (it hatches by itself), else the fighting chieftain.
+	static func pick(chiefs: Array[Chieftain]) -> Chieftain:
+		for chief: Chieftain in chiefs:
+			if not chief.dead and chief.life == Chieftain.Life.EGG:
+				return chief
+		for chief: Chieftain in chiefs:
+			if not chief.dead and chief.life == Chieftain.Life.FIGHT:
+				return chief
+		return null
+
+	## The forward strike's front box (frames 5-7 of the script, PHYSICS.md 8.2) of a hero at `feet` facing `facing`.
+	static func front_box(feet: Vector2i, facing: int) -> Rect2i:
+		var rect: Rect2i = Tuning.CLUB_BOX[Tuning.ClubFrame.FWD_FRONT]
+		var origin: Vector2i = Tuning.CLUB_ORIGIN[Tuning.ClubFrame.FWD_FRONT]
+		var xo: int = origin.x - rect.position.x
+		var ox: int = feet.x + facing * origin.x
+		return Rect2i(ox - xo, feet.y + rect.position.y, rect.size.x, rect.size.y)
+
+
+# =================================================================================================================
 # Helpers
 # =================================================================================================================
 
@@ -703,3 +905,8 @@ func _episode(hero: PlayerBase, weapon: int, pos: Vector2i, flags: PackedInt32Ar
 
 func _on_defeated(boss: BossBase) -> void:
 	_defeated.append(boss)
+
+
+## Recorded by test_the_club_pilot_still_wins_on_the_test_level with CHIEF_ROUTE=1 (Beginner, Expert).
+const ROUTE_BEGINNER: String = ""
+const ROUTE_EXPERT: String = ""

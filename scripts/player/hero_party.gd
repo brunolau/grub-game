@@ -86,6 +86,9 @@ var _egg_sprite: Sprite2D = null
 var _bubble: EmoteBubble = null
 ## The dozing look of an IDLE co-op hero (PlayerBase.is_idle; made on first need).
 var _idle_mark: IdleMark = null
+## The level's PartyDriver last seen by [method weapon_pass] and whether it has `weapon_pass`.
+var _wp_driver: SimEntity = null
+var _wp_ok: bool = false
 
 
 func _init(p_hero: Player) -> void:
@@ -111,9 +114,14 @@ func weapon_pass(level: LevelBase) -> void:
 	if level.hero_count() <= 1:
 		return
 	if coop:
-		# Co-op: the PartyDriver's (Batter Up launch and the hatch by a box or a throw, PLAN.md P1.6).
-		if _driver(level, &"weapon_pass"):
-			level.party_driver.call(&"weapon_pass", hero)
+		# Co-op: the PartyDriver's (Batter Up launch and the hatch by a box or a throw, PLAN.md P1.6). Whether the driver
+		# has the method is asked once per driver (phase-3 performance pass: not a has_method per hero and tick).
+		var driver: SimEntity = level.party_driver
+		if driver != _wp_driver:
+			_wp_driver = driver
+			_wp_ok = _driver(level, &"weapon_pass")
+		if _wp_ok and is_instance_valid(driver):
+			driver.call(&"weapon_pass", hero)
 		return
 	var heroes: Array[PlayerBase] = level.contact_order()
 	if hero.club_box_active and not hero.dead:

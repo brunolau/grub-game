@@ -368,3 +368,23 @@ func test_fan_bursts_spread_to_both_sides() -> void:
 	assert_eq(ObjTuning.fan_velocity(0, 48, -128), Vector2i(48, -128))
 	assert_eq(ObjTuning.fan_velocity(1, 48, -128), Vector2i(-48, -128))
 	assert_eq(ObjTuning.fan_velocity(2, 48, -128), Vector2i(32, -144))
+
+
+func test_a_broken_block_regrows_whole_for_the_versus_signature() -> void:
+	var block: BreakableBlock = spawn(&"objects/breakable_block", cell_feet(20, 9), {"hits": 2}) as BreakableBlock
+	var sprite: Sprite2D = block.get_node("Sprite") as Sprite2D
+	block.open()
+	Sim.step(12)
+	assert_true(block.opened)
+	assert_eq(level.get_cell(20, 9), TileGrid.CH_AIR, "broken: the cell is air")
+	assert_false(sprite.visible, "the break animation ended")
+	block.regrow()
+	assert_eq(level.get_cell(20, 9), TileGrid.CH_SOLID_INVISIBLE, "regrown: solid again (wf9 world-B #1)")
+	assert_false(block.opened)
+	assert_false(block.opened_by_flood)
+	assert_eq(block.hits_left, block.hits_total)
+	assert_eq(block.hits_left, 2)
+	assert_eq(block.cooldown, 0)
+	assert_true(sprite.visible)
+	assert_eq(sprite.frame, BreakableBlock.FRAME_IDLE)
+	assert_eq(sprite.modulate.a, 1.0)

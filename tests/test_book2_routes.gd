@@ -69,7 +69,7 @@ func test_every_book2_stage_has_its_club_routes() -> void:
 				problems.append(line)
 			elif club.is_empty():
 				# An Expert-only stage's only route is its Beginner-named file, so it is required like a Beginner one.
-				var required: bool = REQUIRE_EXPERT_ROUTES or mode == BEGINNER \
+				var required: bool = g3_required(REQUIRE_EXPERT_ROUTES) or mode == BEGINNER \
 						or not Levels.is_available(stage, Defs.Difficulty.BEGINNER)
 				if required:
 					problems.append(line)
@@ -168,11 +168,11 @@ func test_book2_routes() -> void:
 ## tools/autoplay/campaign_b2.flow. Until G3 (REQUIRE_COMPLETE_CAMPAIGN) the run plays the stops that have landed and
 ## stops, PENDING, at the first stage without its route.
 func test_the_book2_beginner_campaign_in_one_run() -> void:
-	await play_campaign(Levels.BOOK_2, BEGINNER, 1, CAMPAIGN_SIDES[BEGINNER], REQUIRE_COMPLETE_CAMPAIGN)
+	await play_campaign(Levels.BOOK_2, BEGINNER, 1, CAMPAIGN_SIDES[BEGINNER], g3_required(REQUIRE_COMPLETE_CAMPAIGN))
 
 
 func test_the_book2_expert_campaign_in_one_run() -> void:
-	await play_campaign(Levels.BOOK_2, EXPERT, 1, CAMPAIGN_SIDES[EXPERT], REQUIRE_COMPLETE_CAMPAIGN)
+	await play_campaign(Levels.BOOK_2, EXPERT, 1, CAMPAIGN_SIDES[EXPERT], g3_required(REQUIRE_COMPLETE_CAMPAIGN))
 
 
 ## V2.b: every Book II club route gives the same per-tick digests whatever special rides on the belt.

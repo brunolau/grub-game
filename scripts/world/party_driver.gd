@@ -8,10 +8,11 @@ extends SimEntity
 ## it is. A party of one never has a driver (TECH_AUDIT.md 2: N = 1 is the identity); single-player never reaches a
 ## line of this file. Everything is integer and deterministic: no signal, no listener, no randomness.
 ##
-## The IDLE rule (orchestrator decision of phase 3): a hero whose own slot gave no input for PlayerBase.IDLE_TICKS
-## (10 s; each hero counts it himself, PlayerBase.note_own_input) is counted by no co-op rule of this driver - no
-## Shoulder Hop off his head ([method is_active]), no lee behind him, no Relay Bounce by him - while the physical steps
-## (edge walls, Totem carry, leash, eggs) treat him as any hatched hero. PlayerBase.counts_for_coop is the query.
+## The IDLE rule (orchestrator decision of phase 3, DESIGN.md G33): a hero whose own slot gave no input for
+## PlayerBase.IDLE_TICKS (10 s), or none since he entered the level, is counted by no co-op rule of this driver and no
+## duo move uses him: no head contact by him or on his head (no Shoulder Hop, Totem Ride or stomp hatch), a running ride
+## ends when its rider or carrier becomes idle, no lee behind him, no Relay Bounce by him. The physical steps (edge
+## walls, leash, eggs) treat him as any hatched hero. PlayerBase.counts_for_coop / is_idle are the queries.
 ##
 ## Per tick (each step runs after every hero's own step of the phase):
 ##  - WEAPONS: who is ACTIVE ([method is_active]); who stands in a crouching partner's lee on this tick
@@ -81,14 +82,44 @@ func _sim_tick(phase: int) -> void:
 		return
 	match phase:
 		Defs.Phase.WEAPONS:
-			_update_active(level)
-			_update_lee(level)
-			_fence_edge_walls(level)
+			_weapons_step(level)
 		Defs.Phase.PLAYER:
 			_carry_riders(level)
 			_head_contacts(level)
 		Defs.Phase.POST:
 			_post(level)
+
+
+## WEAPONS, in one pass over the party (the multi-hero performance pass of phase 3; the same results as the former
+## separate passes, whose steps never read each other's): who is ACTIVE, a Totem Ride whose rider or carrier became
+## IDLE ends (G33), the
+## edge-wall fence of every hero of the tribe (PlayerBase.clear_fence + fence_x written out), then the lee - skipped
+## while there is no wind and no lee left over (it would only write 0 again).
+func _weapons_step(level: LevelBase) -> void:
+	var walls: Vector2i = Vector2i.ZERO if level.completed else level.get_edge_walls()
+	var fence: bool = walls != Vector2i.ZERO
+	for hero: PlayerBase in level.contact_order():
+		var bit: int = 1 << hero.slot
+		if hero.dead or hero.down:
+			active_mask &= ~bit
+			continue
+		if GameInput.get_flags(hero.slot) != 0:
+			active_mask |= bit
+		var carrier: PlayerBase = hero.totem_carrier
+		if carrier != null and (hero.idle or carrier.idle):
+			# G33: a Totem Ride needs two heroes who play. On the tick either becomes idle the rider falls through the
+			# carrier's head (his yvel as it is, no drop lock: an idle head starts no new ride, an idle rider none).
+			hero.end_totem_ride()
+			hero.on_platform = false
+			hero.grounded = false
+		if fence:
+			# A hero who is outside the walls (a teleport, a snap of the view) may still walk back in, never further out.
+			var x: int = hero.sim_pos.x
+			hero._fenced = true
+			hero._fence_left = mini(walls.x, x)
+			hero._fence_right = maxi(walls.y, x + 1)
+	if level.wind != 0 or level.lee_mask != 0 or _lee_sign != 0:
+		_update_lee(level)
 
 
 ## A team wipe reset the world: arrivals at the exit, egg clocks and bounce memories start afresh.
@@ -127,8 +158,9 @@ func rider_of(carrier: PlayerBase) -> PlayerBase:
 ## True when `hero` is ACTIVE: hatched (in H), his own slot held some input flag (GameInput.get_flags) on a tick
 ## since he last became hatched - the level start, a team-wipe respawn or a hatch - and he is not IDLE (the phase-3
 ## IDLE rule, PlayerBase.is_idle: no input of his own for PlayerBase.IDLE_TICKS). Only an active partner's head gives
-## the full Shoulder Hop (G1 resolution: the egg and the idle body that pops out of it are no springboard); an idle
-## partner still carries a Totem Ride (a still carrier's 98 px are below every boost ledge).
+## the full Shoulder Hop (G1 resolution: the egg and the idle body that pops out of it are no springboard). A hatched
+## partner who has not pressed anything since his hatch (not active, not IDLE either) still carries a Totem Ride; an
+## IDLE one carries none (G33, [method _head_contacts]).
 func is_active(hero: PlayerBase) -> bool:
 	return is_in_tribe(hero) and not hero.idle \
 			and (active_mask & (1 << clampi(hero.slot, 0, Defs.MAX_PLAYERS - 1))) != 0
@@ -140,18 +172,10 @@ func is_idle(hero: PlayerBase) -> bool:
 	return hero != null and hero.is_idle()
 
 
-## WEAPONS: a hero down or in his toss is inactive; a hatched hero becomes active on the first tick his slot holds any
-## input flag. Every hatch the driver makes clears the bit too ([method _deactivate]), so an egg made and hatched inside
-## one tick still pops out inactive; POST clears the bit of every hero who left the tribe during the tick
-## ([method _post]).
-func _update_active(level: LevelBase) -> void:
-	for hero: PlayerBase in level.contact_order():
-		if not is_in_tribe(hero):
-			_deactivate(hero)
-		elif GameInput.get_flags(hero.slot) != 0:
-			active_mask |= 1 << clampi(hero.slot, 0, Defs.MAX_PLAYERS - 1)
-
-
+## (WEAPONS, [method _weapons_step]: a hero down or in his toss is inactive; a hatched hero becomes active on the first
+## tick his slot holds any input flag. Every hatch the driver makes clears the bit too ([method _deactivate]), so an
+## egg made and hatched inside one tick still pops out inactive; POST clears the bit of every hero who left the tribe
+## during the tick ([method _post]).)
 func _deactivate(hero: PlayerBase) -> void:
 	if hero != null:
 		active_mask &= ~(1 << clampi(hero.slot, 0, Defs.MAX_PLAYERS - 1))
@@ -173,18 +197,7 @@ func partner_of(hero: PlayerBase) -> PlayerBase:
 # WEAPONS: edge walls; Batter Up and the hatch by a box (called by the hero)
 # =================================================================================================================
 
-func _fence_edge_walls(level: LevelBase) -> void:
-	if level.completed:
-		return
-	var walls: Vector2i = level.get_edge_walls()
-	if walls == Vector2i.ZERO:
-		return
-	for hero: PlayerBase in level.contact_order():
-		if not is_in_tribe(hero):
-			continue
-		hero.clear_fence()
-		# A hero who is outside the walls (a teleport, a snap of the view) may still walk back in, never further out.
-		hero.fence_x(mini(walls.x, hero.sim_pos.x), maxi(walls.y, hero.sim_pos.x + 1))
+## (The edge walls: every hatched hero is fenced into LevelBase.get_edge_walls() in [method _weapons_step].)
 
 
 ## The lee (co-op gusts: the "lee leapfrog" of DESIGN.md 3-1b / 9-2; rule text proposed to the lead designer in
@@ -236,7 +249,16 @@ func in_lee(order: Array[PlayerBase], hero: PlayerBase, wind_sign: int) -> bool:
 ## egg hatches it - and the box is consumed (`club_box_active = false`), so it hits no enemy. Thrown weapons never bat.
 func weapon_pass(hero: PlayerBase) -> void:
 	var level: LevelBase = Game.level
-	if level == null or hero == null or hero.dead or hero.is_down() or level.hero_count() <= 1:
+	if level == null or hero == null or hero.dead or hero.down or level.hero_count() <= 1:
+		return
+	# Nothing to bat or hatch (no partner is an egg or curled - nearly every co-op tick): no projectile is looked at
+	# (the multi-hero performance pass of phase 3; the steps below find nothing then).
+	var targets: bool = false
+	for other: PlayerBase in level.contact_order():
+		if other != hero and not other.dead and (other.down or other.curl == PlayerBase.CURL_CURLED):
+			targets = true
+			break
+	if not targets:
 		return
 	var hearts: int = PartyTuning.hatch_hearts(Game.difficulty)
 	var projectiles: Array[SimEntity] = level.get_kind(Defs.Kind.HERO_PROJECTILE)
@@ -341,22 +363,31 @@ func _carry_riders(level: LevelBase) -> void:
 ## An egg is no springboard (G1 resolution): a hatch by a stomp bounces Tuning.BOUNCE_YVEL (-64) whatever UP does
 ## (the hero side's rule, PlayerBase.land_on_partner), and A holding UP meets no hatched B that is not ACTIVE
 ## ([method is_active]): no Shoulder Hop off the idle body that pops out of an egg; A passes through as heroes do.
+## IDLE rule (G33): no duo move uses an IDLE hero (PlayerBase.is_idle) - an idle A makes no head contact at all (no
+## hop, ride or stomp hatch), and an idle hatched B is no platform: A passes through his head, UP held or not.
 func _head_contacts(level: LevelBase) -> void:
 	var order: Array[PlayerBase] = level.contact_order()
 	for a: PlayerBase in order:
-		if not a.can_land_on_partner():
+		if a.idle:
 			continue
+		# a.can_land_on_partner() is pure: asked only once a partner is near (phase-3 performance pass; -1 = not yet).
+		var may_land: int = -1
+		var apos: Vector2i = a.sim_pos
 		for b: PlayerBase in order:
 			if b == a or b.dead:
 				continue
 			# Overlap.body's coarse reject first (as land_on_partner's own first test): nearly every co-op tick the
 			# two heroes are farther apart than any two boxes reach, and nothing below may happen then.
-			if absi(a.sim_pos.x - b.sim_pos.x) >= Tuning.OVERLAP_MAX_DX \
-					or absi(a.sim_pos.y - b.sim_pos.y) >= Tuning.OVERLAP_MAX_DY:
+			var bpos: Vector2i = b.sim_pos
+			if absi(apos.x - bpos.x) >= Tuning.OVERLAP_MAX_DX or absi(apos.y - bpos.y) >= Tuning.OVERLAP_MAX_DY:
 				continue
+			if may_land < 0:
+				may_land = 1 if a.can_land_on_partner() else 0
+			if may_land == 0:
+				break
 			if b.down:
 				_deactivate(b)
-			elif a.holds_up() and not is_active(b):
+			elif b.idle or (a.holds_up() and not is_active(b)):
 				continue
 			var result: int = a.land_on_partner(b)
 			if result == PlayerBase.HEAD_HATCH:
@@ -379,8 +410,8 @@ func _post(level: LevelBase) -> void:
 	var order: Array[PlayerBase] = level.contact_order()
 	for hero: PlayerBase in order:
 		# A hero who left the tribe this tick is inactive (_make_egg below deactivates the ones it makes).
-		if not is_in_tribe(hero):
-			_deactivate(hero)
+		if hero.dead or hero.down:
+			active_mask &= ~(1 << hero.slot)
 		var rider: PlayerBase = hero.totem_rider
 		if rider == null:
 			continue
@@ -398,11 +429,17 @@ func _post(level: LevelBase) -> void:
 func _leash(level: LevelBase, order: Array[PlayerBase]) -> void:
 	var frame: Rect2i = level.get_party_frame()
 	var limit: int = PartyTuning.leash_egg_ticks(Game.difficulty)
+	# Overlap.point_in(frame, x, y - 1) written out on the frame's edges (once per hero and co-op tick).
+	var left: int = frame.position.x
+	var top: int = frame.position.y + 1
+	var right: int = left + frame.size.x
+	var bottom: int = top + frame.size.y
 	for hero: PlayerBase in order:
-		if not is_in_tribe(hero):
+		if hero.dead or hero.down:
 			hero.leash = 0
 			continue
-		if Overlap.point_in(frame, hero.sim_pos.x, hero.sim_pos.y - 1):
+		var feet: Vector2i = hero.sim_pos
+		if feet.x >= left and feet.x < right and feet.y >= top and feet.y < bottom:
 			hero.leash = 0
 			continue
 		hero.leash += 1
@@ -474,7 +511,7 @@ func _wipe_check(level: LevelBase, order: Array[PlayerBase]) -> void:
 	if wipe_pending or level.completed or order.is_empty():
 		return
 	for hero: PlayerBase in order:
-		if not hero.is_down() or hero.dead:
+		if not hero.down or hero.dead:
 			return
 	wipe_pending = true
 	level.team_wipe()

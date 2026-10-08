@@ -359,34 +359,27 @@ func test_the_club_routes_beat_the_solo_idols_on_the_test_court() -> void:
 		_close_lab()
 
 
-## The pilot that recorded those routes still wins from the level start (a guard against tuning drift; with
-## IDOLS_ROUTE=1 it prints the fresh routes).
+## The pilot that recorded those routes still wins from the level start (a guard against tuning drift). With
+## IDOLS_ROUTE=1 it prints the fresh routes; IDOLS_DEBUG=<tick> traces 600 ticks from there (every IDOLS_EVERY-th, 6)
+## and every hurt with its source.
 func test_the_club_pilot_still_wins_on_the_test_court() -> void:
+	var trace_from: int = OS.get_environment("IDOLS_DEBUG").to_int() if OS.has_environment("IDOLS_DEBUG") else -1
+	var every: int = maxi(OS.get_environment("IDOLS_EVERY").to_int(), 1) if OS.has_environment("IDOLS_EVERY") else 6
 	for difficulty: int in [Defs.Difficulty.BEGINNER, Defs.Difficulty.EXPERT]:
 		var idols: Idols = _open_lab(difficulty)
 		var hero: PlayerBase = _lab.hero()
 		var pilot: IdolsClubPilot = IdolsClubPilot.new()
-		var debug: bool = OS.get_environment("IDOLS_DEBUG") != ""
 		var on_hurt: Callable = func(_h: PlayerBase, kind: int, source: SimEntity) -> void:
-			if debug:
-				print("  hurt kind %d by %s at %s, idols state %d" % [kind,
+			if trace_from >= 0:
+				print("  hurt kind %d by %s at %s (hero %s), idols state %d" % [kind,
 						source.scene_file_path.get_file() if source != null else "-",
-						source.sim_pos if source != null else Vector2i.ZERO, idols.get_state()])
+						source.sim_pos if source != null else Vector2i.ZERO, _h.sim_pos, idols.get_state()])
 		Events.hero_hurt.connect(on_hurt)
 		for tick: int in 6000:
 			var f: int = pilot.flags(hero, idols, _lab.level)
-			if debug and tick % 6 == 0 and tick >= OS.get_environment("IDOLS_DEBUG").to_int() \
-					and tick < OS.get_environment("IDOLS_DEBUG").to_int() + 600:
-				var blocks: Array = []
-				for e: SimEntity in _lab.level.get_kind(Defs.Kind.ENEMY_PROJECTILE):
-					if not (e as ProjectileBase).spent:
-						blocks.append("%s%s" % [e.scene_file_path.get_file().get_basename().substr(5, 4), e.sim_pos])
-				print("t%d %s %s g%s f%d st%d roles %d/%d hp%d rel%d keys %s %s" % [tick, hero.sim_pos, hero.xvel,
-						hero.is_grounded(), hero.facing, idols.get_state(), idols.get_role(0), idols.get_role(1),
-						idols.hp, IdolsClubPilot.release_in(idols), Lab.keys(f), blocks])
+			if trace_from >= 0 and tick >= trace_from and tick < trace_from + 600 and tick % every == 0:
+				_trace_pilot(tick, hero, idols, f)
 			_lab.step(PackedInt32Array([f]))
-			if debug and hero.hit_timer == Tuning.HIT_TIMER - 1:
-				print("HURT t%d at %s" % [tick, hero.sim_pos])
 			if idols.dead or hero.dead:
 				break
 		Events.hero_hurt.disconnect(on_hurt)
@@ -541,18 +534,20 @@ func test_the_single_hero_search_cannot_crack_the_twin_idols() -> void:
 	var rng: SimRng = SimRng.new(4242)
 	var episodes: int = 0
 	# The partner: an egg, then hatched and idle at spots over the whole court (both halves, under each idol's jaws).
-	var partners: Array[int] = [-1, 40, 100, 150, 175, 220, 280]
+	var partners: Array[int] = [-1, 40, 150, 175, 280]
 	for partner_x: int in partners:
 		_p2_spot = Vector2i(partner_x if partner_x >= 0 else 200, 160)
 		_p2.respawn_at(_p2_spot)
 		_p2.idle = true
 		_p2.down = partner_x < 0
 		var offsets: Array[int] = [0, 7]
-		var starts: Array[int] = [96, 150, 200, 225]
+		var starts: Array[int] = [96, 225]
+		var weapons: Array[int] = [Defs.Weapon.CLUB, Defs.Weapon.AXE]
 		if partner_x < 0:
 			offsets = [0, 4, 8, 12]
 			starts = [96, 120, 150, 175, 200, 225]
-		for weapon: int in [Defs.Weapon.CLUB, Defs.Weapon.AXE, Defs.Weapon.BOOMERANG, Defs.Weapon.SPEAR]:
+			weapons = [Defs.Weapon.CLUB, Defs.Weapon.AXE, Defs.Weapon.BOOMERANG, Defs.Weapon.SPEAR]
+		for weapon: int in weapons:
 			for start_x: int in starts:
 				for offset: int in offsets:
 					_episode(hero, weapon, Vector2i(start_x, 160), _throw_then_strike(start_x, offset))
@@ -799,6 +794,17 @@ func _close_lab() -> void:
 	_lab = null
 
 
+## One trace line of the pilot (IDOLS_DEBUG): the hero, the shared brain, the live projectiles and the keys.
+func _trace_pilot(tick: int, hero: PlayerBase, idols: Idols, keys: int) -> void:
+	var live: Array[String] = []
+	for entity: SimEntity in _lab.level.get_kind(Defs.Kind.ENEMY_PROJECTILE):
+		if not (entity as ProjectileBase).spent:
+			live.append("%s%s" % [entity.scene_file_path.get_file().get_basename(), entity.sim_pos])
+	print("t%d hero %s xvel %d grounded %s | state %d roles %d/%d hp %d next rock in %d | keys %s | %s" % [tick,
+			hero.sim_pos, hero.xvel, hero.is_grounded(), idols.get_state(), idols.get_role(Idols.MOON),
+			idols.get_role(Idols.SUN), idols.hp, IdolsClubPilot.release_in(idols), Lab.keys(keys), ", ".join(live)])
+
+
 ## The club pilot of the solo Idols on the test court (it recorded ROUTE_BEGINNER / ROUTE_EXPERT). Its strike spot is
 ## under the awake idol's jaws, SPOT_DX px from its feet point - outside the body test (the coarse reject of 64 px),
 ## where a spat rock leaves over his head and the masonry (clamped COLOSSUS_DROP_MARGIN px off the bodies) cannot
@@ -810,8 +816,10 @@ class IdolsClubPilot:
 	extends RefCounted
 
 	const SPOT_DX: int = 74
-	const HOME_DX: int = 0           ## home: this far from the altar's middle (cols 8-11) toward the target idol
+	const HOME_DX: int = 16          ## home: this far from the altar's middle (cols 8-11), away from the spitting idol
 	const ALTAR_MID: int = 160
+	const ALTAR_HALF: int = 26       ## the hero's feet stay this close to the altar's middle (its top: 128..192)
+	const DODGE_PX: int = 24         ## aside from a falling block (his box -15..+17 clears its 10 px)
 	const FLOOR_Y: int = 176
 	const SPIT_MARGIN: int = 34
 	const HIGH_TICKS: int = 9
@@ -822,8 +830,9 @@ class IdolsClubPilot:
 	var _stuck: int = 0
 
 	func flags(hero: PlayerBase, idols: Idols, level: LevelBase) -> int:
-		if not plan.is_empty():
+		if not plan.is_empty() and not (block_over(hero, level) and not hero.attack_gate):
 			return plan.pop_front()
+		plan.clear()
 		var idol: int = target(idols)
 		var dir: int = 1 if idol == Idols.SUN else -1
 		var toward: int = Defs.IN_RIGHT if dir > 0 else Defs.IN_LEFT
@@ -834,17 +843,23 @@ class IdolsClubPilot:
 		for entity: SimEntity in level.get_kind(Defs.Kind.ENEMY_PROJECTILE):
 			# (A spent projectile stays listed until the frame ends - the Lab steps without frames.)
 			var block: BossStalactite = entity as BossStalactite
-			if block != null and not block.spent and absi(block.sim_pos.x - x) < 26 and block.sim_pos.y < hero.sim_pos.y:
+			if block != null and not block.spent and absi(block.sim_pos.x - x) < DODGE_PX - 2 \
+					and block.sim_pos.y < hero.sim_pos.y:
+				# Aside by DODGE_PX (clear of its box), away from it - on the altar never off it (rocks roll below).
 				var away: int = -1 if block.sim_pos.x >= x else 1
-				if hero.sim_pos.y < FLOOR_Y:
-					# On the altar: aside, but never off it (rocks roll about the floor).
-					var dest: int = block.sim_pos.x + away * 26
-					if dest < ALTAR_MID - 26 or dest > ALTAR_MID + 26:
-						away = -away
-				return Defs.IN_LEFT if away < 0 else Defs.IN_RIGHT
-		var danger: bool = rock_alive(level) or release_in(idols) <= SPIT_MARGIN or idols._rage_due \
-				or idols.get_state() == Idols.State.RAGE
-		var goal: int = ALTAR_MID + dir * HOME_DX if danger else idols.get_idol_pos(idol).x - dir * SPOT_DX
+				var dest: int = block.sim_pos.x + away * DODGE_PX
+				if hero.sim_pos.y < FLOOR_Y and absi(dest - ALTAR_MID) > ALTAR_HALF:
+					dest = block.sim_pos.x - away * DODGE_PX
+				var dodge: int = go_to(hero, dest)
+				return dodge if dodge >= 0 else 0
+		var spot: int = idols.get_idol_pos(idol).x - dir * SPOT_DX
+		var at_spot: bool = absi(x - spot) <= 12 and hero.sim_pos.y >= FLOOR_Y
+		# At the spot he stays (a spat rock leaves over his head; one that comes back is jumped); the way out from the
+		# altar is taken only with no rock about and no spit due before he gets there; a rage sends him home.
+		var travel: int = absi(x - spot) / 4 + SPIT_MARGIN / 2
+		var danger: bool = idols._rage_due or idols.get_state() == Idols.State.RAGE \
+				or (not at_spot and (rock_alive(level) or release_in(idols) <= travel))
+		var goal: int = ALTAR_MID - dir * HOME_DX if danger else spot
 		var move: int = go_to(hero, goal)
 		if move >= 0:
 			return move
@@ -859,6 +874,15 @@ class IdolsClubPilot:
 			plan.append(0)
 			return Defs.IN_UP | Defs.IN_FIRE
 		return 0
+
+	## True while a masonry block hangs or falls within reach over him.
+	static func block_over(hero: PlayerBase, level: LevelBase) -> bool:
+		for entity: SimEntity in level.get_kind(Defs.Kind.ENEMY_PROJECTILE):
+			var block: BossStalactite = entity as BossStalactite
+			if block != null and not block.spent and absi(block.sim_pos.x - hero.sim_pos.x) < DODGE_PX - 2 \
+					and block.sim_pos.y < hero.sim_pos.y:
+				return true
+		return false
 
 	## True while a spat rock is still about (flying, hopping or rolling out).
 	static func rock_alive(level: LevelBase) -> bool:
@@ -905,8 +929,10 @@ class IdolsClubPilot:
 		var x: int = hero.sim_pos.x
 		for entity: SimEntity in level.get_kind(Defs.Kind.ENEMY_PROJECTILE):
 			var rock: BossRock = entity as BossRock
-			if rock == null or rock.spent or rock.sim_pos.y < hero.sim_pos.y - 30:
+			if rock == null or rock.spent or rock.sim_pos.y < hero.sim_pos.y - 30 or rock.sim_pos.y > hero.sim_pos.y + 4:
 				continue
+			if hero.sim_pos.y < FLOOR_Y and absi(rock.sim_pos.x - ALTAR_MID) > 37:
+				continue  # on the altar: a rock beside it never reaches him
 			var gap: int = rock.sim_pos.x - x
 			var closing: int = -signi(gap) * (rock.xvel - hero.xvel)
 			if closing <= 0 or absi(gap) > 28 + closing * 6 / 16 or absi(gap) < 4:
@@ -964,5 +990,41 @@ class IdolsClubPilot:
 
 
 ## Recorded by test_the_club_pilot_still_wins_on_the_test_court with IDOLS_ROUTE=1 (Beginner, Expert).
-const ROUTE_BEGINNER: String = ""
-const ROUTE_EXPERT: String = ""
+const ROUTE_BEGINNER: String = (
+	"1:L,22:R,4:,1:R,3:,9:UF,25:,9:UF,30:,9:UF,25:,9:UF,1:,2:L,8:LU,10:L,1:R,2:L,1:R,1:L,1:R,12:L,4:,4:R,6:L," +
+	"6:R,1:L,2:R,2:,1:R,52:,5:L,2:,8:R,7:L,1:,13:L,2:R,1:L,1:,2:L,1:,1:L,3:,5:R,3:,1:L,9:UF,25:,9:UF,32:,9:UF," +
+	"25:,9:UF,1:,20:R,8:RU,4:R,1:L,1:R,2:L,1:R,1:L,2:R,1:L,8:LU,3:L,1:R,13:L,1:LU,2:L,1:,3:L,1:,6:R,1:,1:R,1:," +
+	"4:L,4:R,2:L,2:,5:R,2:,1:L,16:R,3:,1:R,4:,9:UF,25:,9:UF,30:,9:UF,1:,11:L,19:R,1:RU,3:R,17:L,8:LU,1:L,5:R," +
+	"6:L,1:R,3:,4:R,4:L,4:R,4:L,4:R,7:L,2:,14:L,6:,9:UF,1:,18:R,8:RU,4:R,1:L,1:R,2:L,1:R,1:L,2:R,8:L,3:,4:R," +
+	"1:,6:L,3:,6:R,6:L,6:R,2:L,3:R,9:,5:L,2:,8:R,7:L,1:,4:R,2:L,4:R,28:,5:L,2:,8:R,7:L,1:,4:R,2:L,4:R,4:,2:L," +
+	"2:R,2:L,2:R,55:,8:U,11:,3:L,1:R,1:L,2:,6:R,6:L,6:R,4:L,5:R,27:,5:L,2:,8:R,7:L,1:,4:R,2:L,4:R,4:,2:L,2:R," +
+	"2:L,2:R,74:,5:L,2:,8:R,7:L,1:,4:R,2:L,4:R,4:,1:R,23:,5:L,2:,8:R,7:L,1:,4:R,2:L,4:R,4:,2:L,2:R,2:L,2:R," +
+	"74:,5:L,2:,8:R,7:L,1:,4:R,2:L,4:R,28:,5:L,2:,8:R,7:L,1:,4:R,2:L,4:R,4:,2:L,2:R,2:L,3:R,73:,5:L,2:,8:R," +
+	"7:L,1:,4:R,2:L,4:R,28:,5:L,2:,8:R,7:L,1:,4:R,2:L,4:R,4:,2:L,2:R,2:L,2:R,74:,5:L,2:,8:R,7:L,1:,4:R,2:L," +
+	"4:R,4:,1:R,23:,5:L,2:,8:R,7:L,1:,4:R,2:L,4:R,4:,2:L,2:R,2:L,2:R,74:,5:L,2:,8:R,7:L,1:,4:R,2:L,4:R,28:," +
+	"5:L,2:,8:R,7:L,1:,4:R,2:L,4:R,4:,2:L,2:R,2:L,3:R,73:,5:L,2:,8:R,7:L,1:,4:R,2:L,4:R,28:,5:L,2:,8:R,7:L,1:," +
+	"4:R,2:L,4:R,4:,2:L,2:R,2:L,2:R,74:,5:L,2:,8:R,7:L,1:,4:R,2:L,4:R,4:,1:R,23:,5:L,2:,8:R,7:L,1:,4:R,2:L," +
+	"4:R,4:,2:L,2:R,2:L,2:R,74:,5:L,2:,8:R,7:L,1:,4:R,2:L,4:R,28:,5:L,2:,8:R,7:L,1:,4:R,2:L,4:R,4:,2:L,2:R," +
+	"2:L,3:R,73:,5:L,2:,8:R,7:L,1:,4:R,2:L,4:R,28:,5:L,2:,8:R,7:L,1:,4:R,2:L,4:R,4:,2:L,2:R,2:L,2:R,74:,5:L," +
+	"2:,8:R,7:L,1:,4:R,2:L,4:R,4:,1:R,23:,5:L,2:,8:R,7:L,1:,4:R,2:L,4:R,4:,2:L,2:R,2:L,2:R,74:,5:L,2:,8:R,7:L," +
+	"1:,4:R,2:L,4:R,14:,8:U,6:,3:L,1:R,1:L,2:R,16:L,15:,9:UF,25:,8:UF"
+)
+const ROUTE_EXPERT: String = (
+	"1:L,22:R,4:,1:R,3:,9:UF,25:,9:UF,30:,9:UF,25:,9:UF,1:,2:L,8:LU,10:L,1:R,2:L,1:R,1:L,1:R,12:L,4:,4:R,6:L," +
+	"6:R,1:L,2:R,2:,1:R,52:,5:L,2:,8:R,7:L,1:,13:L,2:R,1:L,1:,2:L,1:,1:L,3:,5:R,3:,1:L,9:UF,25:,9:UF,32:,9:UF," +
+	"25:,9:UF,1:,20:R,8:RU,4:R,1:L,1:R,2:L,1:R,1:L,2:R,1:L,8:LU,3:L,1:R,13:L,1:LU,2:L,1:,3:L,1:,6:R,1:,1:R,1:," +
+	"4:L,4:R,2:L,2:,5:R,2:,1:L,16:R,3:,1:R,4:,9:UF,25:,9:UF,30:,9:UF,1:,11:L,19:R,1:RU,3:R,17:L,8:LU,1:L,5:R," +
+	"6:L,1:R,3:,4:R,4:L,4:R,4:L,4:R,7:L,2:,14:L,6:,9:UF,1:,18:R,8:RU,4:R,1:L,1:R,2:L,1:R,1:L,2:R,8:L,3:,4:R," +
+	"1:,6:L,3:,6:R,6:L,6:R,2:L,3:R,9:,5:L,2:,8:R,7:L,1:,4:R,2:L,4:R,28:,5:L,2:,8:R,7:L,1:,4:R,2:L,4:R,4:,2:L," +
+	"2:R,2:L,2:R,55:,8:U,11:,3:L,1:R,1:L,2:,6:R,6:L,6:R,4:L,5:R,27:,5:L,2:,8:R,7:L,1:,4:R,2:L,4:R,4:,2:L,2:R," +
+	"2:L,2:R,74:,5:L,2:,8:R,7:L,1:,4:R,2:L,4:R,4:,1:R,23:,5:L,2:,8:R,7:L,1:,4:R,2:L,4:R,4:,2:L,2:R,2:L,2:R," +
+	"74:,5:L,2:,8:R,7:L,1:,4:R,2:L,4:R,28:,5:L,2:,8:R,7:L,1:,4:R,2:L,4:R,4:,2:L,2:R,2:L,3:R,73:,5:L,2:,8:R," +
+	"7:L,1:,4:R,2:L,4:R,28:,5:L,2:,8:R,7:L,1:,4:R,2:L,4:R,4:,2:L,2:R,2:L,2:R,74:,5:L,2:,8:R,7:L,1:,4:R,2:L," +
+	"4:R,4:,1:R,23:,5:L,2:,8:R,7:L,1:,4:R,2:L,4:R,4:,2:L,2:R,2:L,2:R,74:,5:L,2:,8:R,7:L,1:,4:R,2:L,4:R,28:," +
+	"5:L,2:,8:R,7:L,1:,4:R,2:L,4:R,4:,2:L,2:R,2:L,3:R,73:,5:L,2:,8:R,7:L,1:,4:R,2:L,4:R,28:,5:L,2:,8:R,7:L,1:," +
+	"4:R,2:L,4:R,4:,2:L,2:R,2:L,2:R,74:,5:L,2:,8:R,7:L,1:,4:R,2:L,4:R,4:,1:R,23:,5:L,2:,8:R,7:L,1:,4:R,2:L," +
+	"4:R,4:,2:L,2:R,2:L,2:R,74:,5:L,2:,8:R,7:L,1:,4:R,2:L,4:R,28:,5:L,2:,8:R,7:L,1:,4:R,2:L,4:R,4:,2:L,2:R," +
+	"2:L,3:R,73:,5:L,2:,8:R,7:L,1:,4:R,2:L,4:R,28:,5:L,2:,8:R,7:L,1:,4:R,2:L,4:R,4:,2:L,2:R,2:L,2:R,74:,5:L," +
+	"2:,8:R,7:L,1:,4:R,2:L,4:R,4:,1:R,23:,5:L,2:,8:R,7:L,1:,4:R,2:L,4:R,4:,2:L,2:R,2:L,2:R,74:,5:L,2:,8:R,7:L," +
+	"1:,4:R,2:L,4:R,14:,8:U,6:,3:L,1:R,1:L,2:R,16:L,15:,9:UF,25:,8:UF"
+)

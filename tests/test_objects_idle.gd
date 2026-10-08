@@ -108,7 +108,7 @@ func test_an_idle_rider_weighs_nothing_on_a_pulley() -> void:
 	assert_true(pulley.offset > 0, "awake: lift a sinks")
 
 
-func test_an_idle_hero_landing_on_the_high_end_flips_no_see_saw() -> void:
+func test_an_idle_hero_landing_on_the_high_end_flips_the_plank_but_launches_nobody() -> void:
 	party(40, 60)
 	var seesaw: Seesaw = spawn(&"objects/seesaw", feet(10, 9), {"len": 5}) as Seesaw
 	Sim.step(1)
@@ -119,9 +119,10 @@ func test_an_idle_hero_landing_on_the_high_end_flips_no_see_saw() -> void:
 	p2.yvel = 200
 	p2.fall_ticks = 14
 	Sim.step(1)
-	assert_eq(seesaw.flips, 0, "a dozing lander flips nothing")
-	assert_eq(seesaw.high_side, 1)
-	assert_true(hero.yvel >= 0, "P1 is not launched")
+	assert_eq(seesaw.flips, 1, "a weight flips the plank (G33)")
+	assert_eq(seesaw.high_side, -1)
+	assert_eq(seesaw.last_launch, 0, "but a dozing lander launches nobody")
+	assert_true(hero.yvel > -64, "P1 only rises with his end (yvel %d)" % hero.yvel)
 	# The same landing by a partner who plays (P2 first off the plank, so that his next catch is a landing).
 	level.reset_entities()
 	p2.teleport(Vector2i(600, FLOOR_Y))
@@ -131,9 +132,11 @@ func test_an_idle_hero_landing_on_the_high_end_flips_no_see_saw() -> void:
 	p2.teleport(Vector2i(seesaw.high_end().sim_pos.x, seesaw.high_end().top() + 3))
 	p2.yvel = 200
 	p2.fall_ticks = 14
+	var flips: int = seesaw.flips
 	Sim.step(1)
-	assert_eq(seesaw.flips, 1, "a landing that counts flips it")
-	assert_true(hero.yvel < 0, "and launches the low-end rider")
+	assert_eq(seesaw.flips, flips + 1, "a landing that counts flips it")
+	assert_true(seesaw.last_launch <= ObjTuning.SEESAW_LIFT_ONLY_YVEL)
+	assert_true(hero.yvel < -64, "and launches the low-end rider (yvel %d)" % hero.yvel)
 
 
 func test_a_dozing_rider_of_the_low_end_is_still_thrown() -> void:
@@ -199,24 +202,28 @@ func test_an_idle_hero_solves_no_x2_tablet() -> void:
 	assert_true(tablet.solved, "his player is back")
 
 
-func test_a_dozing_driver_lets_the_gunner_weigh_chomper_on_a_plate() -> void:
+func test_chomper_weighs_only_with_a_driver_who_plays() -> void:
 	party(40, 400)
 	var plate: Plate = spawn(&"objects/plate", feet(10, 9), {"name": "p", "count": 2}) as Plate
 	var holder: MountStub = MountStub.new()
 	place(level, holder, Vector2i(170, FLOOR_Y))
+	Sim.step(1)
+	assert_eq(plate.weight, 0, "a riderless Chomper parked on the plate weighs nothing")
 	hero.sit_on_mount(holder, PlayerBase.SEAT_DRIVER)
 	p2.sit_on_mount(holder, PlayerBase.SEAT_GUNNER)
 	holder.driver = hero
 	holder.gunner = p2
 	Sim.step(1)
 	assert_eq(plate.weight, PartyTuning.PLATE_WEIGHT_CHOMPER, "the mount weighs once, through its driver")
+	assert_true(plate.pressed)
 	hero.idle = true
 	Sim.step(1)
-	assert_eq(plate.weight, PartyTuning.PLATE_WEIGHT_CHOMPER, "a dozing driver: through the gunner who plays")
+	assert_eq(plate.weight, 0, "a dozing driver: nothing, even with a gunner who plays (G33)")
+	assert_eq(plate.holder_mask, 0, "and nobody is listed as a holder")
+	hero.idle = false
 	p2.idle = true
 	Sim.step(1)
-	assert_eq(plate.weight, 0, "both dozing: nothing")
-	hero.idle = false
+	assert_eq(plate.weight, PartyTuning.PLATE_WEIGHT_CHOMPER, "a dozing gunner changes nothing")
 	p2.idle = false
 	hero.leave_mount()
 	p2.leave_mount()

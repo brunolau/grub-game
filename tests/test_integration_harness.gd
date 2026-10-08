@@ -340,3 +340,24 @@ func test_the_belt_invariance_runner() -> void:
 func test_a_party_route_replays_the_same_every_way() -> void:
 	var problems: PackedStringArray = await determinism_problems(PARTY_ROUTE, EXPERT, _fixtures())
 	assert_eq(problems, PackedStringArray(), "twice, without dozing, on other devices")
+
+
+## G35 (the boss weak point clear of the fight HUD) is checked on the 2.0 content only - Book II stages and co-op
+## files - never on Book I's frozen solo stages (the 1.0 Brute leaves its unlocked view); and the HUD's own rule finds
+## a weak rect under the band and one cut off by the view.
+func test_the_weak_point_check_covers_the_2_0_content() -> void:
+	assert_false(_weak_points_apply(&"w2_l2b"), "Book I solo: frozen 1.0")
+	assert_false(_weak_points_apply(&"w4_l2b"), "Book I solo: frozen 1.0")
+	assert_true(_weak_points_apply(&"w5_l2b"), "Book II")
+	assert_true(_weak_points_apply(&"w5_l2b_coop"), "a co-op file")
+	var hud: GDScript = load(HUD_SCRIPT) as GDScript
+	assert_not_null(hud, "the HUD script loads")
+	if hud == null:
+		return
+	var view: Vector2 = Vector2(Tuning.VIEW_W, Tuning.VIEW_H) * Tuning.ART_SCALE
+	var under_band: Rect2 = Rect2(Vector2(view.x * 0.5, 4.0), Vector2(40.0, 40.0))
+	var cut_off: Rect2 = Rect2(Vector2(view.x - 20.0, view.y * 0.5), Vector2(40.0, 40.0))
+	var clear: Rect2 = Rect2(Vector2(40.0, view.y * 0.5), Vector2(40.0, 40.0))
+	assert_ne(str(hud.call("weak_point_problem", under_band, view)), "", "a weak rect under the band is a problem")
+	assert_ne(str(hud.call("weak_point_problem", cut_off, view)), "", "a weak rect cut off by the view is a problem")
+	assert_eq(str(hud.call("weak_point_problem", clear, view)), "", "a weak rect low in the view is clear")

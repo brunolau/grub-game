@@ -59,7 +59,8 @@ extends Node
 ##   need <what> [<what> ...]         content the lines after it need: a level id (Levels.has_level) or a file path
 ##                                    (a route). In a skeleton flow (a `# skeleton:` line, filled in as the content
 ##                                    lands) a missing one ends the part: the run goes on at the next `section` and
-##                                    reports the part as PENDING; in any other flow it is a failure
+##                                    reports the part as PENDING; in any other flow - and in every flow when the
+##                                    environment says G3_REQUIRE=1 (tools/g3.sh --require) - it is a failure
 ##   quit                             end the run here
 ##
 ## Expressions are `<path> <op> <value>` (op: == != < <= > >=) or a single path that must be true. A path starts
@@ -387,6 +388,9 @@ func begin(script_text: String, out_dir: String, fast: bool, can_capture: bool) 
 		if line.is_empty() or line.begins_with("#"):
 			continue
 		_commands.append(line.split(" ", false))
+	# The gate run (tools/g3.sh --require): every `need` must be met, skeleton or not.
+	if OS.get_environment("G3_REQUIRE") == "1":
+		_skeleton = false
 	if _commands.is_empty():
 		push_error("Autoplay flow: the script has no commands")
 		_finish.call_deferred(EXIT_BAD_SCRIPT)
