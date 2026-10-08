@@ -1,0 +1,24 @@
+# route: level=w9_l2b_coop difficulty=expert players=2 ends=exit after=tally expect=wipes:0,min_checkpoints:1,painting:15,unlocked:true
+# The two-stream Expert route of Storm Nest in co-op (designer D9a; recorded from closed-loop macros,
+# build/d9a/bot_w9_l2b_coop.gd, P1|P2): the painting hollow (P1), the drop into the arena; the co-op Storm Roc:
+# perched, P2 stands under its outer wing (the shield turns to him) while P1 high-strikes the head from the nest;
+# both dodge its dives and strike the buried beak; in the storm P1 glides onto its back and P2 strikes the
+# tumbling Roc's tail from the nest (Pilot and Spotter), three times; the fire-starter, the exit totem.
+4:R|,2:|,1:R|,2:|,9:RU|,2:R|,5:R|R,2:|,1:L|,1:L|R,2:L|,6:|RU,3:R|RU,7:R|R,1:R|,1:|,4:|L,1:|,1:R|,2:|,2:DF|
+5:DF|R,1:DF|,6:|,8:DF|,6:|,4:R|,6:|,1:L|,3:|,11:R|,2:|,1:R|,6:|,12:L|,5:|,9:LU|,5:L|,1:|,5:R|,4:|,1:|D,9:RU|
+10:R|,1:|,4:L|,4:|,2:R|,24:|,4:R|,1:L|,6:UF|,4:|,3:R|,2:|,1:R|,2:|,4:|R,1:|,5:RU|,4:RU|RU,4:R|RU,1:|RU,5:L|R
+1:|R,1:R|R,3:|R,1:|,1:|L,3:RU|L,4:RU|,2:RU|R,4:R|R,6:R|,2:|,2:L|,2:L|RU,6:|RU,1:R|RU,4:R|R,2:R|,4:R|L,7:|,1:|RU
+8:D|RU,16:D|R,2:D|,3:D|R,6:D|D,1:D|R,3:D|D,11:R|D,50:R|R,9:L|R,3:|R,1:L|R,1:|R,1:|,3:R|,2:|,1:L|,2:R|,1:|,1:L|
+8:UF|,1:|,1:UF|D,4:UF|,3:UF|R,2:|R,5:UF|R,3:UF|RD,2:|RD,8:UF|RD,2:|RD,21:D|D,8:UF|D,22:|D,8:UF|D,22:|D,8:UF|D
+1:|D,21:D|D,8:UF|D,1:|D,30:D|D,1:L|L,3:R|L,1:R|,6:R|R,2:|R,1:|,5:|L,2:R|L,1:|L,1:|,8:|R,1:|,8:|L,1:|,2:|R,4:L|R
+2:R|R,1:R|D,8:R|L,1:|,1:|R,7:L|R,1:L|,1:L|L,7:R|L,1:R|,3:R|R,2:|R,3:L|R,1:L|,2:L|L,6:R|L,1:R|,1:R|R,2:|R,5:L|R
+1:L|,7:L|L,1:R|L,1:R|,8:R|R,1:L|,1:|,7:|L,2:|,4:|R,8:|,3:L|,2:|,3:|D,4:|,31:R|,2:|,11:R|,4:|,3:L|,2:L|L,8:L|
+15:L|R,2:L|RD,23:LU|RD,2:LU|R,1:R|R,2:R|,6:R|L,27:R|,4:RD|,1:R|D,2:RU|D,2:RU|,3:RD|,1:R|,5:L|,3:LD|,3:D|,2:LU|
+5:R|,1:RD|,3:D|,2:RD|,2:R|,4:L|,1:LD|,4:D|,1:LD|,2:D|,1:LD|,1:D|,1:LD|,1:LD|D,1:LU|D,5:D|U,3:D|,4:D|LF,9:D|
+2:L|,9:|,4:|R,8:|,1:|L,2:R|L,2:|L,1:|D,10:|R,1:|,8:|L,2:|,6:|R,3:|,2:|L,16:|,3:|D,17:|,5:R|,5:|,1:R|,12:|,1:L|
+6:|,3:|D,14:|,9:R|,3:|,11:R|,2:|,1:R|,7:L|,3:L|D,7:L|,2:|,6:L|,3:L|L,5:L|LD,3:|LD,19:R|LD,12:R|L,1:RU|L,1:RU|
+10:RU|R,1:RU|,8:RU|L,2:RU|,2:RU|R,4:L|R,11:L|,3:L|D,29:L|,3:LD|,5:D|U,3:D|,4:D|RF,10:D|,10:R|,11:R|L,8:R|,7:R|R
+2:R|,6:R|L,2:R|D,4:R|,2:|,1:R|,40:|,3:|D,5:L|,17:|,1:R|,3:|,5:R|,16:|,3:|D,6:|,1:R|,9:|,5:L|,17:|,1:R|,3:|,5:R|
+1:|D,3:|R,10:L|R,20:L|RD,6:LU|RD,3:LU|R,2:LU|,6:LU|L,2:LU|D,6:LU|,38:R|,3:RD|,1:RD|D,2:RU|D,6:R|,5:L|,1:LD|
+1:D|,1:LD|,5:D|,2:LD|,2:L|,5:R|,1:RD|,11:D|,2:RU|,3:R|,2:L|,3:L|D,2:LD|,3:D|,2:LD|,2:L|,4:R|,2:RD|,11:D|,1:RU|
+5:D|U,3:D|,4:D|LF,2:D|,158:|,10:R|,14:R|R

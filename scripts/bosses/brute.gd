@@ -124,8 +124,12 @@ func get_hold_left() -> int:
 	return _hold_left if _held != null else 0
 
 
-## The weak point this tick (logical px): the top 30 px of the body, mirrored by the facing.
+## The weak point this tick (logical px): the top 30 px of the body, mirrored by the facing. G56: none after the lethal
+## blow (DYING, every form: nothing hits a dying Brute) and, in the co-op form, none from the high jump's take-off to
+## its landing (the 1.0 leap lifts the head out of the den view, under the HUD band: a hit there glances).
 func get_head_rect() -> Rect2i:
+	if _state == State.DYING or (_coop and _state == State.JUMP and not _grounded):
+		return Rect2i()
 	var back: int = EnemyTuning.BRUTE_HEAD_BACK if facing > 0 else EnemyTuning.BRUTE_HEAD_FRONT
 	var width: int = EnemyTuning.BRUTE_HEAD_BACK + EnemyTuning.BRUTE_HEAD_FRONT
 	return Rect2i(sim_pos.x - back, sim_pos.y - box_h, width, EnemyTuning.BRUTE_HEAD_HEIGHT)

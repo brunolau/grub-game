@@ -33,8 +33,8 @@ msgstr "The gate is barred! Hop onto the lookout off your partner."
 msgid "SIGN_COOP_W4_BOULDER"
 msgstr "Push the boulder together: into the chute and onto the vent!"
 
-msgid "SIGN_COOP_W4_LOB"
-msgstr "Curl up by the cliff: a high strike lobs you to the top."
+msgid "SIGN_COOP_W4_CLIFF"
+msgstr "The exit is up on the cliff: hop off your partner's head!"
 
 # --- w4_l2_coop Obsidian Keep (co-op) ---
 msgid "SIGN_COOP_W4_PLATES"

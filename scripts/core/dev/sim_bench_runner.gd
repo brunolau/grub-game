@@ -536,12 +536,13 @@ func _play_stage(file: String, mode: String) -> void:
 
 
 ## The input slots after a tick of a single-player route: slot 0 read exactly the route's flags, `flags` is
-## get_flags(0), and slots 1..3 read nothing (PLAN.md P0.5). A mismatch is counted and reported.
+## get_flags(0), and slots 1..3 read nothing (PLAN.md P0.5) - except a boss's bot body slot ([method _is_bot_slot]).
+## A mismatch is counted and reported.
 func _check_input(expected: int, level_id: StringName) -> void:
 	_input_ticks += 1
 	var ok: bool = GameInput.flags == expected and GameInput.get_flags(0) == GameInput.flags
 	for slot: int in range(1, Defs.MAX_PLAYERS):
-		ok = ok and GameInput.get_flags(slot) == 0
+		ok = ok and (GameInput.get_flags(slot) == 0 or _is_bot_slot(slot))
 	if not ok:
 		_input_mismatches += 1
 		if _input_mismatches <= 3:
@@ -550,11 +551,14 @@ func _check_input(expected: int, level_id: StringName) -> void:
 
 
 ## The input party check (PLAN.md P0.5, TECH_AUDIT.md 4.11): after a tick of a party route, slot k read exactly
-## stream k, `flags` is get_flags(0), and the slots beyond the party read nothing.
+## stream k, `flags` is get_flags(0), and the slots beyond the party read nothing (a boss's bot body slot beyond the
+## party is skipped, [method _is_bot_slot]).
 func _check_party_input(streams: Array[PackedInt32Array], played: int, level_id: StringName) -> void:
 	_input_ticks += 1
 	var ok: bool = GameInput.get_flags(0) == GameInput.flags
 	for slot: int in Defs.MAX_PLAYERS:
+		if slot >= streams.size() and _is_bot_slot(slot):
+			continue
 		var expected: int = streams[slot][played] if slot < streams.size() else 0
 		ok = ok and GameInput.get_flags(slot) == expected
 	if not ok:
@@ -562,6 +566,14 @@ func _check_party_input(streams: Array[PackedInt32Array], played: int, level_id:
 		if _input_mismatches <= 3:
 			push_error("SimBench: input slots differ in %s tick %d: slots %s" % [level_id, Sim.tick,
 					str(GameInput.slot_flags)])
+
+
+## A boss's bot body slot is no player slot (the Rival Chieftains fight on hero physics: Chieftain.BOT_SLOT_BASE,
+## HeroBot.install assigns InputSlot.bot to slots 2 / 3 for the fight and gives them back to NONE after it;
+## wf9_d9b_to_integration.txt). Book I never installs one, so the P0.5 identity of V1 is untouched.
+static func _is_bot_slot(slot: int) -> bool:
+	var input_slot: InputSlot = GameInput.get_slot(slot)
+	return input_slot != null and input_slot.kind == Defs.InputSlotKind.BOT
 
 
 ## The input text of a route: its file, after the prefix of a side path (tests/test_campaign_routes.gd). A header

@@ -25,8 +25,9 @@ extends SimEntity
 ##    HEAD_BOUNCE_MIN_YVEL. A slow ball passes through bodies. The strikers of the last shot (and a missile with its
 ##    batter) are not knocked down by it for SHOOTER_GRACE_TICKS.
 ##
-## The physics ([method physics_step], GAMEPLAY.md 13.10.6): x step first - the box's leading edge entering a SIDE-1
-## cell (or the level edge) stops it flush against the wall and reflects xvel at 3/4; then the y step - rising, a
+## The physics ([method physics_step], GAMEPLAY.md 13.10.6): x step first (|xvel| / 16 px, signed: mirror-symmetric) -
+## the box's leading edge entering a SIDE-1 cell (or the level edge) stops it flush against the wall and reflects xvel
+## at 3/4 (rounded towards zero); then the y step - rising, a
 ## CEILING-1 cell over the box's top stops it under the cell and reflects yvel at 3/4; falling, a floor at the feet
 ## cell (ground, or floor spikes) lands it on the surface: yvel >= BOUNCE_MIN_YVEL bounces with
 ## `yvel = -(yvel * 3) >> 2`, slower rests (yvel 0); then, airborne (a bounce included: it leaves the floor on its own
@@ -309,11 +310,15 @@ static func physics_step(grid: TileGrid, state: PackedInt32Array) -> int:
 		xv = speed if xv > 0 else -speed
 	# x step: the leading edge of the box against walls and the level edges.
 	if xv != 0:
-		var next_x: int = x + Tuning.floor16(xv)
+		# Symmetric in x (wf9_world_b_to_objects_b.txt): the step is the speed's magnitude floored, then signed - an
+		# arithmetic shift of a negative speed would floor it 1 px further to the left every tick, and the ball would
+		# drift towards the left goal (Clubball's side bias of V4.b).
+		var step: int = Tuning.floor16(absi(xv))
+		var next_x: int = x + (step if xv > 0 else -step)
 		var stop_x: int = _wall_stop(grid, x, next_x, y)
 		if stop_x != next_x:
 			events |= EV_WALL
-			xv = _reflect34(xv)
+			xv = _reflect34_x(xv)
 		x = stop_x
 	# y step.
 	var old_y: int = y
@@ -426,6 +431,12 @@ static func _ceiling_over(grid: TileGrid, x: int, row: int) -> bool:
 ## A wall or a ceiling reflects a velocity component at 3/4 (GAMEPLAY.md 13.10.6), floored like the floor bounce.
 static func _reflect34(v: int) -> int:
 	return (-(v * VersusTuning.BALL_BOUNCE_NUM)) >> 2
+
+
+## A wall reflects the x component at 3/4, rounded towards zero, so a rebound off the left wall and one off the right
+## wall are mirror images (the floored [method _reflect34] would hand one side 1 v16 more).
+static func _reflect34_x(v: int) -> int:
+	return -(v * VersusTuning.BALL_BOUNCE_NUM) / 4
 
 
 ## Half a velocity component, rounded towards zero (the knock-down rebound).

@@ -615,6 +615,8 @@ code for a party of one: **target** `level.target_hero(self)`, **every** `for he
 `level.player`. Members: `heroes: Array[PlayerBase]` (index = slot, slot 0 = `player`), `start_positions` (index =
 slot; the loader fills it from '@', `objects/hero_start slot=n` and an arena's `objects/spawn_point index=n`), `hero_count()`, `get_hero(slot)`, `contact_order()` (slot order; rotated by `Sim.tick % N` in versus; no
 allocation), `target_hero(from)` (party: the nearest `is_party_targetable()` hero, ties to the lower slot),
+`nearest_coop_hero(from)` (phase 3, the IDLE rule: the same choice among the heroes that `counts_for_coop()`, null when
+none - for co-op POSITION rules such as a `shell` shield, a boss's "nearer hero"; `target_hero` in a party of one),
 `any_hero_dead_or_down()`, `all_heroes_dead_or_down()`, `any_hero_feasting()`, `get_start_pos_for(slot)`,
 `get_respawn_pos_for(slot)` (24 px spread per slot, PHYSICS.md C.12), `spawn_party_heroes()` (slots 1..party - 1,
 after P1). Views: `get_view_count()`, `get_view_rect_at(i)`, `get_view_rect_of(entity)`, `get_views_bounds()`;
@@ -668,7 +670,11 @@ iris closes), `bounce(yvel, depth)`, `ride_platform(platform, dx, dy)`,
 
 2.0 (PLAN.md P0.6 / P0.8; every member keeps its default for a single-player hero): `slot` (spawn parameter `slot`,
 0 = P1; sets `run`), `run: PlayerRun` (= `Game.runs[slot]`; the hero calls `run.*` where 1.0 called `Game.*`),
-`carried_on_tick` (the per-hero platform guard), `is_down()`, `is_party_targetable()`, `braces_with(partner)` (the
+`carried_on_tick` (the per-hero platform guard), `is_down()`, `is_party_targetable()` (targeting and harm),
+`counts_for_coop()` / `is_idle()` (phase 3, the IDLE-PARTNER rule, DESIGN.md D.3 [G33]: alive, hatched and not idle -
+no input of his own slot for `IDLE_TICKS` = `PartyTuning.IDLE_TICKS` = 243 ticks or none since he entered the level;
+the query of every co-op RULE; `note_own_input(flags)` counts it first thing in his WEAPONS phase, co-op only;
+`input_idle_ticks` / `gave_input` / `idle`), `braces_with(partner)` (the
 Brace Wall test of C.10: both crouch on the ground within `PartyTuning.BRACE_GAP_PX`; read by `heavy` enemies and
 bosses). Egg (PHYSICS.md C.12): `down`,
 `go_down(cause)` (an egg at once: not dead, no control, `Events.hero_down`), `hatch(by, hearts)` (`shield` =
@@ -1783,14 +1789,32 @@ Flow scripts can also resize the window (`window 1600 720` gives the 800 x 360 v
 focus away from the game (`focus out` / `focus in`), so view sizes and the background rules are checked in a window. `pad <button>` sends gamepad events (buttons, d-pad,
 left stick, as a pad reports them) and `input device` lets the hero read the devices instead of the script, for
 keyboard-free paths through menus and play.
-With `--fast` a stage that has just started waits for its first `play`, so a route file plays tick for tick as in
-the headless tests; a `play` ends when another stage takes over (sub-stage, bonus stage, epilogue), and
-`weapon <name>` hands the hero a weapon. The campaign flows:
+A stage that has just started waits for its first `play` (or `input device`), with `--fast` and in real time alike:
+in real time the runner holds the new stage's clock (Sim.manual) from Flow.screen_changed(&"level") - before its
+first tick, at EVERY stage start of a run - until the `play` starts, so a real-time run (`--perf`, a showcase) replays
+a route tick for tick like a `--fast` one (tests/test_integration_flows.gd proves the real-time trace equals the
+`--fast` trace). A `play` ends when another stage takes over (sub-stage, bonus stage, epilogue), and `weapon <name>`
+hands the hero a weapon. Engine errors logged while a flow runs (push_error, SCRIPT ERROR, failed engine checks) fail
+it, as in the test runner (warnings are printed); `expect_errors <n>` announces errors a flow provokes on purpose.
+Phase-3 commands: `wait_ms <ms>` (real time), `section <name>` (an independent part that starts at the title;
+Flow.goto_title when the game is elsewhere - a part that stops is cut short and the run goes on at the next
+`section`, still failing with exit 4) and `need <level id | route path> ...` (a skeleton flow - a `# skeleton:` line -
+skips to the next section when the content has not landed and reports the part PENDING; any other flow fails).
+The campaign flows:
 
 ```
 GD_TIMEOUT=1800 bash .tools/gd.sh play --flow=tools/autoplay/campaign.flow --fast --fresh-user     Expert, all levels
 bash .tools/gd.sh play --flow=tools/autoplay/campaign_beginner.flow --fast --fresh-user            code -> expert wall
+GD_TIMEOUT=3600 bash .tools/gd.sh play --flow=tools/autoplay/campaign_b2.flow --fast --fresh-user   Book II solo,
+                    Beginner (expert wall) then Expert (The End)
+GD_TIMEOUT=5400 bash .tools/gd.sh play --flow=tools/autoplay/campaign_coop.flow --fast --fresh-user  co-op Books I
+                    and II, both difficulties (four sections)
 ```
+
+Their headless twins: `test_book2_routes` / `test_coop_routes` `test_the_*_campaign_in_one_run`
+(RouteTestCase.play_campaign). Gate G3 in one command: `bash tools/g3.sh` (every slow module - coop_gates sharded,
+versus_bots sharded by `tools/g3_versus_bots.sh` - the default suite, sp_identity, the campaign flows headless and the
+content inventory `tests/test_integration_g3.gd` -> the G3 table; header in the file).
 
 **Headless flows and the view** (P2.6 investigation, core-A): a flow run headless (`scripts/core/dev/
 headless_flow.gd`) must give every level the view of a window. The headless display server keeps a window of its own

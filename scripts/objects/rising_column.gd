@@ -296,7 +296,7 @@ func _plate_tick() -> void:
 	# hero's cells (it waits and tries again on the next tick).
 	var up: bool = away != sinks
 	if not up and _blocked_below(level, away):
-		return
+		return  # (only a hero who counts stops it: an IDLE one is pushed out below, G53)
 	_timer = 0
 	if risen == 0 and away:
 		ObjTuning.play_cue(Sfx.BOULDER_PUSH, Sfx.QUAKE if shake > 0 else &"")
@@ -305,6 +305,12 @@ func _plate_tick() -> void:
 		carry = _riders(level)
 	risen += 1 if away else -1
 	_render(level)
+	if not up:
+		# G53: the row it moved down into - an IDLE hero there is pushed out of it, sideways or onto the block.
+		var bottom: int = block.end.y - 1 + (risen if sinks else -risen)
+		var top_row: int = _block_top_row()
+		ObjTuning.push_idle_out(level, Rect2i(block.position.x, top_row, block.size.x, block.size.y),
+				Rect2i(block.position.x, bottom, block.size.x, 1))
 	for hero: PlayerBase in carry:
 		hero.teleport(Vector2i(hero.sim_pos.x, hero.sim_pos.y - Tuning.TILE))
 	var top_now: int = _block_top_row()
@@ -339,7 +345,8 @@ func _riders(level: LevelBase) -> Array[PlayerBase]:
 	return riders
 
 
-## True when the row the block would move down into holds a hatched hero.
+## True when the row the block would move down into holds a hatched hero who counts (PlayerBase.counts_for_coop: an
+## IDLE co-op hero is no obstacle, G53 - ObjTuning.hero_in_cell).
 func _blocked_below(level: LevelBase, away: bool) -> bool:
 	var next: int = risen + (1 if away else -1)
 	var bottom: int = block.end.y - 1 + (next if sinks else -next)

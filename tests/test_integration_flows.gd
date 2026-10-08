@@ -178,12 +178,18 @@ func test_an_engine_error_fails_a_flow() -> void:
 
 
 ## `need` in a skeleton flow: a part without its content is skipped up to the next `section` and reported as
-## pending (the run passes); in any other flow a missing `need` fails the run.
+## pending (the run passes); in any other flow a missing `need` fails the run. The runner's own rule is tested here, so
+## the gate run's G3_REQUIRE=1 (tools/g3.sh --require: every `need` must be met) is lifted for the skeleton run and put
+## back after it - otherwise the gate's default suite fails this test whatever the content.
 func test_need_skips_a_part_of_a_skeleton_flow() -> void:
 	var part: String = "\n".join([
 		"need zz_nowhere", "expect game.score == 123456789", "section next", "expect sim.running == false", "quit",
 	])
+	var gate_run: String = OS.get_environment("G3_REQUIRE")
+	OS.unset_environment("G3_REQUIRE")
 	var skeleton: Dictionary = await _run_flow("# skeleton: test\n" + part, true)
+	if gate_run != "":
+		OS.set_environment("G3_REQUIRE", gate_run)
 	assert_eq(int(skeleton["exit_code"]), 0, "a skeleton flow passes: %s" % str(skeleton["failures"]))
 	assert_eq((skeleton["pending"] as PackedStringArray).size(), 1, "one part pending")
 	assert_eq(int(skeleton["checks"]), 1, "only the next section's check ran")

@@ -864,7 +864,14 @@ func _next_flags(_tick: int) -> int:
 	return _scripted_flags(0)
 
 
-func _slot_flags(_tick: int, slot: int) -> int:
+func _slot_flags(tick: int, slot: int) -> int:
+	# A boss's bot body (the Rival Chieftains: an InputSlotKind.BOT slot 2 / 3 for the fight, HeroBot.install) is no
+	# player slot: a `play` that does not name the slot leaves it to its bot, as the route bench does (it scripts the
+	# party's slots only) - else the flow's script would freeze the chieftains (G3 integration).
+	if slot >= _streams.size():
+		var input_slot: InputSlot = GameInput.get_slot(slot)
+		if input_slot != null and input_slot.kind == Defs.InputSlotKind.BOT and input_slot.source.is_valid():
+			return int(input_slot.source.call(tick))
 	return _scripted_flags(slot)
 
 

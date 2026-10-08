@@ -1,0 +1,14 @@
+# route: level=w9_l2b difficulty=expert ends=exit after=tally expect=max_hurts:2,deaths:0,min_checkpoints:1,painting:15,unlocked:true
+# The Expert club route of Storm Nest (designer D9a; recorded from a closed-loop bot, build/d9a/bot_w9_l2b.gd): the
+# painting hollow under the breakable floor blocks, the checkpoint, the drop into the arena; the Storm Roc's head
+# struck from the nest while it perches and on the buried beak after its dives, then three glider dives onto its
+# back while it cruises (run-up, a climb on lift against the side wall, a dive); the fire-starter, the exit.
+4:R,2:,1:R,2:,9:RU,7:R,2:,4:L,6:,11:R,6:,1:R,2:,8:DF,6:,8:DF,6:,4:R,6:,1:L,3:,11:R,2:,1:R,6:,12:L,5:,9:LU,5:L
+1:,5:R,5:,9:RU,10:R,1:,4:L,4:,4:R,6:UF,4:,1:L,6:UF,4:,4:R,9:,9:RU,4:R,1:,5:L,1:,1:R,5:,9:RU,10:R,2:,4:L,6:,11:R
+6:,1:R,1:,1:D,62:R,1:D,4:,11:R,39:RD,6:R,5:D,1:R,2:D,3:L,8:U,16:,19:L,5:D,8:U,13:,4:L,5:,8:UF,22:,8:UF,1:,21:D
+8:UF,1:,21:D,8:UF,1:,2:D,5:L,1:,20:R,8:,8:R,2:,1:R,52:,5:L,18:,1:R,2:,5:R,2:,9:L,13:,1:R,3:,6:R,1:,11:L,12:,1:R
+2:,8:R,2:,1:R,2:,31:L,25:LU,37:R,2:RD,1:R,3:RD,3:RU,4:R,5:L,1:LD,8:D,3:LD,2:L,4:R,2:RD,2:D,1:RD,3:D,1:RD,2:D
+2:RU,5:L,4:LD,3:L,5:R,1:RD,14:D,1:RU,24:D,52:L,42:,5:R,5:,1:R,12:,1:L,23:,9:R,3:,6:R,2:,1:R,22:L,2:,4:L,4:,30:R
+25:RU,47:L,3:LD,22:D,51:R,3:,1:R,41:,5:L,17:,1:R,3:,5:R,2:,9:L,14:,1:R,2:,6:R,1:,11:L,11:,1:R,3:,8:R,2:,1:R,2:
+31:L,25:LU,37:R,2:RD,1:R,3:RD,3:RU,4:R,5:L,1:LD,8:D,3:LD,2:L,4:R,2:RD,2:D,1:RD,3:D,1:RD,2:D,2:RU,5:L,4:LD,3:L
+5:R,1:RD,14:D,1:RU,158:,27:R,17:L,20:R

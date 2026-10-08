@@ -535,6 +535,28 @@ func test_a_resting_ball_rolls_losing_2_per_tick() -> void:
 	assert_eq(ball.xvel, -38, "both ways")
 
 
+## The ball's x is mirror-symmetric (wf9_world_b_to_objects_b.txt: an arithmetic shift of a negative speed moved it
+## 1 px a tick farther left - the Clubball side bias of V4.b): a shot and its mirror from the centre of a mirrored
+## room rest at mirrored x, walls included, with mirrored speeds on every tick.
+func test_mirrored_shots_rest_at_mirrored_x() -> void:
+	level = make_flat_level(20, 12, 10)
+	var grid: TileGrid = level.grid
+	for shot: Vector2i in [Vector2i(96, 0), Vector2i(100, 0), Vector2i(40, 0), Vector2i(32, -240), Vector2i(150, -120),
+			Vector2i(288, -64)]:
+		var right: PackedInt32Array = PackedInt32Array([160, 160, shot.x, shot.y])
+		var left: PackedInt32Array = PackedInt32Array([160, 160, -shot.x, shot.y])
+		for t: int in 240:
+			Coconut.physics_step(grid, right)
+			Coconut.physics_step(grid, left)
+			assert_eq([right[0] - 160, right[1], right[2], right[3]], [160 - left[0], left[1], -left[2], left[3]],
+					"shot %s tick %d: mirrored" % [shot, t])
+			if right[0] - 160 != 160 - left[0]:
+				break
+	assert_eq(Coconut._reflect34_x(-64), 48, "a wall hands back 3/4, rounded towards zero")
+	assert_eq(Coconut._reflect34_x(66), -49)
+	assert_eq(Coconut._reflect34_x(-66), 49)
+
+
 func test_walls_level_edges_and_ceilings_reflect_at_three_quarters() -> void:
 	var rows: PackedStringArray = PackedStringArray()
 	for row: int in 12:

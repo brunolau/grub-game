@@ -11,18 +11,20 @@ extends RouteTestCase
 
 ## Content gates (PLAN.md 4.2 G1, 6.2 G3): until phase 3 is content complete only the Beginner club route of every
 ## Book II stage is required (G1: "`w5_l1` with its Beginner club route"); a missing Expert route is printed, not
-## failed. Integration switches this on at G3 (every (stage, difficulty) cell, V2.a).
-const REQUIRE_EXPERT_ROUTES: bool = false
+## failed. Integration switches this on at G3 (every (stage, difficulty) cell, V2.a): ON since the G3 integration
+## (2026-10-08: 31 of 31 solo cells).
+const REQUIRE_EXPERT_ROUTES: bool = true
 ## The Book II stages of the G1 vertical slice (PLAN.md 4.2): when one exists, its Beginner club route must too.
 const SLICE_STAGES: Array[StringName] = [&"w5_l1"]
-## G3: the campaign runs must play the whole book (no stage without its route); until then they stop, PENDING, where
-## the content ends.
-const REQUIRE_COMPLETE_CAMPAIGN: bool = false
-## The side routes the campaign runs take instead of a stage's club route (V2.c). None yet: the warp of Rattlesnake
-## Gulch into Feast Land D needs the spear on the belt, and no route that ends 5-1 picks it up (requested from D5,
-## wf9_integration_to_D5.txt #1); until then both runs fight Tusker and Feast Land D is proven by its own route.
+## G3: the campaign runs must play the whole book (no stage without its route); until then they stopped, PENDING,
+## where the content ended. ON since the G3 integration (Beginner: 10 stages to the expert wall; Expert: 18 to The End).
+const REQUIRE_COMPLETE_CAMPAIGN: bool = true
+## The side routes the campaign runs take instead of a stage's club route (V2.c). Beginner: Shell Beach's warp into
+## Feast Land E (w7_l1.warp.inputs, then bonus_e.inputs as Flow starts it; the run goes on with 7-2). Not yet: the warp
+## of Rattlesnake Gulch into Feast Land D needs the spear on the belt, and no route that ends 5-1 picks it up (asked
+## of D5, wf9_integration_to_D5.txt #1; no D5 in phase 3) - Feast Land D is proven by its own route, bonus_d.inputs.
 const CAMPAIGN_SIDES: Dictionary = {
-	BEGINNER: {},
+	BEGINNER: {"w7_l1": "w7_l1.warp.inputs"},
 	EXPERT: {},
 }
 

@@ -1,0 +1,13 @@
+# route: level=w9_l2 difficulty=expert ends=exit after=level:w9_l2b expect=max_hurts:3,deaths:0,min_checkpoints:5,painting:14
+# The Expert club route of The Roc's Spire (designer D9; recorded from closed-loop macros, build/d9a): every gust
+# gap jumped in a lull (the hero crouches through the gusts), the drop clouds over the tar lake with a crouch on
+# the slate stack, the tar pockets and the Guards of the terraces, the Roller valley and the cloud bridge, the Cave
+# Painting (index 14) out of the big spot in the cloud over the path, the cloud hall and the final drop clouds.
+35:R,7:,9:RU,10:R,1:,4:L,15:R,24:RU,1:R,5:L,11:R,4:L,28:R,6:UF,3:,1:D,1:L,6:F,1:,20:R,3:,12:D,6:UF,4:,1:L,6:F
+1:,7:R,5:L,6:F,4:,3:R,6:,1:L,6:F,26:,53:D,6:UF,3:D,9:RU,10:R,2:,4:L,6:UF,4:,43:R,7:,33:D,6:UF,52:D,9:RU,7:R,1:
+5:L,1:,2:R,2:,9:RU,13:R,2:,9:RU,11:R,2:,1:L,102:D,9:RU,12:R,1:,5:L,2:,9:RU,14:R,2:,3:L,2:,9:RU,12:R,2:,1:L,95:R
+4:RU,6:R,9:,9:RU,6:R,2:,4:L,15:R,24:RU,9:R,6:L,6:R,3:,9:RU,13:R,1:,1:L,4:R,1:UF,8:,9:RU,13:R,2:,5:L,5:R,20:RU
+2:L,3:,7:UF,4:,4:L,30:R,6:F,1:,12:R,3:,7:R,6:UF,4:,6:R,22:D,6:R,1:L,6:UF,3:,1:D,4:R,5:D,4:UF,9:RU,10:R,2:UF,4:
+31:R,7:,9:RU,10:R,2:,3:L,2:,11:R,6:,1:R,2:,76:D,9:RU,10:R,2:,3:L,6:R,6:F,1:,4:R,3:,2:F,28:R,7:,95:D,9:RU,9:R,2:
+3:L,6:,10:R,2:,1:R,6:,1:L,2:,8:UF,16:,8:UF,16:,8:UF,3:,63:D,13:L,7:,9:RU,4:R,1:,5:L,7:,11:R,2:,1:R,6:,8:R,4:
+1:R,6:,2:L,3:,54:R,1:D,1:R,33:D,9:RU,4:R,1:,5:L,1:,5:R,2:,9:RU,7:R,1:,5:L,1:,2:R,2:,9:RU,9:R,2:,4:L,41:R

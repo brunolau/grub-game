@@ -1,0 +1,92 @@
+# Club & Grub level file - format 2 (docs/ARCHITECTURE.md 7.11). Versus arena #3 of docs/expansion/DESIGN.md E.5:
+# Floe Rink - ice, open sides into icy water; an ice floor, two fixed floes in the water, alternating gusts toward the
+# open sides; sudden death: the Whiteout (the gusts grow). Owner: DA (arenas, docs/expansion/PLAN.md 6.1). Rules:
+# docs/LEVEL_DESIGN.md 15.8. Dressing: art-B's hand-over (.tools/asset_candidates/expansion/_handover/ARENA_DRESSING.md,
+# "Floe Rink"; E.5 has no sketch, the geometry is DA's).
+#
+# Layout notes:
+# - Open sides: the floor (row 10, cols 4-15) is ice (`ice_a = 1`: set A slides, knock-backs carry) between two rock
+#   cells (`%` of terrain_b = ice/terrain_rock, cols 4 / 15, no slide) and ends in icy water (`~`, deadly: a ring-out)
+#   at cols 3 / 16; cols 0 / 19 are water too.
+# - The floes (DESIGN.md G51): two FIXED rock-topped floes, 2 cells wide at floor level in the water (cols 1-2 /
+#   17-18), one water cell off the floor's ends - a hop across, and a gust or a knock-back on them is a ring-out.
+#   E.5's see-saw floes (land on your end to fling whoever stands on the other out over the water) return when
+#   core-B's bots ride a tilted see-saw: the baker keeps one link state per rider mover, so after a plank's first flip
+#   a bot on it has no link that matches and stands there (build/engine_requests/wf9_da_to_core_b.txt #1 / #5). An
+#   arena see-saw keeps both ends over standable ground (G51).
+# - Alternating gusts (the signature; world-B's arena wind, synced to the round): `wind` / `wind_loop` below - 121
+#   ticks toward the right-hand water, 121 toward the left (positive = to the left). The first gust blows right: the
+#   hero physics is left-right asymmetric (a slide to the left carries a little further), and a left-first gust sent
+#   most ring-outs into the left water. The Whiteout sudden death grows the gusts.
+# - Tiers 3 rows apart: the floor (row 10), the central floe (row 7, cols 8-11, one-way rock with the big spot), the
+#   upper ledges (row 4, cols 3-7 / 12-16, one-way rock `=`; ice is set A only, so no ledge slides).
+# - Spots (visible, refill 15 s after they are emptied): one in the ice by each floor spawn (cols 7 / 12), one flush in
+#   each upper ledge's outer end (cols 3 / 16), and the big spot: two big-spot cells side by side in the central floe
+#   (cols 9 / 10) - each counts its own 3 hits, the first one used up drops the giant over itself and opens its twin
+#   (one giant per refill); symmetric, struck from either half. Its giant falls 7 rows onto the floe.
+# - Cookpots: two (4-player arena), on the upper ledges (cols 5 / 14).
+# - Spawns (rotate every round; 2 players use 1 and 2): 1 and 2 on the floor (cols 13 / 6), 3 and 4 on the upper
+#   ledges' inner ends (cols 7 / 12).
+# - Modes: Grub Stack only for now - its bot set is green (core-B's tests/test_versus_bots.gd, 12 seeds x 4 rounds,
+#   four Hunters; DA's phase-3 run: 2 points worst). E.5's default, Last Caveman Standing, is NOT listed: no layout of
+#   phase 3 got its set inside +/-15 points (ten fixed-floe layouts and gust scripts measured 17-50 points worst: a
+#   four-way ring-out rink is decided in the first seconds of each round); it is listed again - with meta `bots` (G50)
+#   leaving it out while the bots cannot play it fairly - once core-B's test honours `bots`.
+# - Bot graph: resources/bots/arena_floe_rink.json, baked with core-B's tool after every edit of this file:
+#   bash .tools/gd.sh script res://tools/bots/bake_nav.gd -- arena_floe_rink
+
+[meta]
+format = 2
+id = arena_floe_rink
+name = "Floe Rink"
+kind = arena
+biome = ice
+terrain_a = ice/terrain
+terrain_b = ice/terrain_rock
+ice_a = 1
+background = ice
+liquid = ice_water
+music = versus_battle_c
+players = 4
+modes = grub_stack
+round_time = 90
+wrap = none
+sudden = whiteout
+wind = 0:-24,121:24
+wind_loop = 242
+author = DA
+notes = "Versus arena 3 (DESIGN.md E.5, G51): ice, open sides into icy water; a slippery floor, two fixed floes in the water at the edges, the central floe with the big spot, upper ledges; alternating gusts toward the open sides, growing in the whiteout."
+
+[legend]
+? = objects/hidden_spot kind=small count=3 look=block tile=#
+s = objects/hidden_spot kind=small count=3 look=block tile=%
+* = objects/hidden_spot kind=big look=inset tile=%
+P = objects/cookpot
+Q = objects/cookpot
+B = objects/spawn_point index=2
+C = objects/spawn_point index=3
+D = objects/spawn_point index=4
+
+[tiles]
+....................
+....................
+....................
+.....P.C....D.Q.....
+...s====....====s...
+....................
+....................
+........=**=........
+....................
+......B......@......
+~%%~%##?####?##%~%%~
+~%%~############~%%~
+
+[entities]
+props/ice/icicle 7 5 layer=back
+props/ice/icicle 12 5 layer=back
+props/ice/crystal_ice_a 5 9 layer=back
+props/ice/crystal_ice_b 14 9 layer=back
+props/ice/rocks_small 9 9 layer=back
+props/ice/tusk_a 4 3 layer=back
+props/ice/tusk_b 15 3 layer=back
+props/ice/sprouts 10 6 layer=back

@@ -758,6 +758,38 @@ func test_rails_keep_a_rider_on_the_raft() -> void:
 	assert_true(hero.fence_allows(raft.sim_pos.x + 40), "on the bank's floor: free")
 
 
+## G45: a railed raft carries its rider over the whole fence - also at the bow, where the 1.0 halved-width overlap let
+## him fall through - and once a bank stops it the fence opens over that bank (he may step off onto the beach).
+func test_a_railed_raft_carries_to_the_bow_and_opens_at_a_bank() -> void:
+	_raft_level()
+	var raft: Raft = _raft(6, {"rails": true, "width": 4})
+	Sim.step(1)
+	var hero: PlayerBase = _hero(Vector2i(raft.sim_pos.x, raft.sim_pos.y - raft.box_h + 1))
+	Sim.step(1)
+	assert_true(raft.ridden)
+	hero.teleport(Vector2i(raft.rail_right_excl() - 1, raft.sim_pos.y - raft.box_h))
+	Sim.step(3)
+	assert_eq(raft.rider_count(), 1, "at the bow (x = centre + %d): still carried" % (hero.sim_pos.x - raft.sim_pos.x))
+	hero.clear_fence()
+	Sim.step(1)
+	assert_false(hero.fence_allows(raft.rail_right_excl()), "fenced while it floats free")
+	hero.teleport(Vector2i(raft.rail_left(), raft.sim_pos.y - raft.box_h))
+	Sim.step(3)
+	assert_eq(raft.rider_count(), 1, "at the stern too")
+	raft.teleport(Vector2i(18 * 16 - 8 * raft.width - 6, raft.sim_pos.y))
+	hero.teleport(Vector2i(raft.sim_pos.x, raft.sim_pos.y - raft.box_h))
+	Sim.step(1)
+	raft.rx = 32
+	Sim.step(6)
+	assert_eq(raft.sim_pos.x + 8 * raft.width, 18 * 16, "the right bank stopped it")
+	assert_eq(raft.rx, 0)
+	assert_eq(raft.rider_count(), 1)
+	hero.clear_fence()  # a bare hero never ends his fences himself (the real one does after his x step)
+	Sim.step(1)
+	assert_true(hero.fence_allows(raft.rail_right_excl() + 8), "docked: the fence is open over the bank")
+	assert_false(hero.fence_allows(raft.rail_left() - 1), "the water side stays fenced")
+
+
 func test_a_geyser_launch_flies_the_raft_and_it_settles_again() -> void:
 	_raft_level()
 	var raft: Raft = _raft(6)

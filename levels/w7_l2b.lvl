@@ -1,0 +1,96 @@
+# Club & Grub - World 7, stage 2b: "Squid Grotto" (designer D7, Book II "The Far Shore").
+# The second half of the Sea Caves and the last Beginner stage (DESIGN.md A.3 / A.6 / B.3, difficulty 7): a short
+# approach - behind the start a breakable wall hides the Cave Painting (index 8); driftwood floes over the grotto
+# water under an octopus; checkpoint and sign on the ledge; steps up to the hole in the grotto roof - then the drop
+# into the one-screen grotto of Inkjaw, the Grotto Squid, exactly as GAMEPLAY.md 13.6: deadly water across the
+# floor, rock islands at arena columns 2-5, 8-11 and 14-17 (surface row 9 of the 11-row lock), one-way root ledges
+# at row 6 over the two gaps it surfaces in. The squid coughs up the fire-starter; the exit totem stands locked on
+# the right island. Clearing it ends a Beginner run (the expert wall). Nothing needs a special.
+
+[meta]
+format = 2
+id = w7_l2b
+name = "Squid Grotto"
+kind = sub
+book = 2
+world = 7
+stage = 2
+biome = coast
+terrain_a = coast/terrain_cave
+terrain_b = coast/terrain
+background = sea_cave
+music = level_sea_caves
+liquid = water
+password_beginner = "SQU1"
+password_expert = "JAWZ"
+bonus_tier = 1
+author = D7
+
+[legend]
+o = objects/drop_platform skin=driftwood delay=10
+C = objects/checkpoint
+
+[tiles]
+############################################################
+############################################################
+##################################........##################
+##################################........##################
+########..................................##################
+########..................................##################
+########....................................################
+########....................................################
+########.............................#####..################
+########.............................####..................#
+########.............................####..................#
+##.....#..........................#######..................#
+##.....$..........................#######..................#
+##.....$..@......................C#######..................#
+##############..o...o...o...o..##########.....--....--.....#
+##############.................##########..................#
+##############~~~~~~~~~~~~~~~~~##########..................#
+##############~~~~~~~~~~~~~~~~~###############~~####~~######
+##############~~~~~~~~~~~~~~~~~###############~~####~~######
+############################################################
+
+[entities]
+# the approach: the painting nook behind the start, the floes, the checkpoint, the steps to the roof hole
+items/painting 4 13 index=8
+zones/secret 2 11 name=grotto_nook rect=2,11,5,3
+items/food 3 13 index=4
+items/food 5 13 index=6
+props/coast/whale_ribs 4 13 layer=back
+props/coast/shell_snail 11.5 13
+props/coast/glow_anemone_cyan 8.5 13
+props/coast/stalactite 12 4
+enemies/dropper 11 13 skin=sea_snail zone=9,7,5,6 max=1 hp=10 expert
+enemies/lurker 22 4 skin=octopus_b range=3 hp=10
+enemies/dangler 26 4 skin=octopus depth=80 hp=10 expert
+enemies/flyer 19 8 skin=jelly left=-3 right=3 speed=20 hp=10
+props/coast/drips 18 4
+props/coast/vine_b 25 4
+items/food 16 11 index=8
+items/food 20 11 index=9
+items/food 24 11 index=10
+items/food 28 11 index=11
+objects/sign 31 13 text=SIGN_W7_INKJAW
+items/heart 32 11
+enemies/walker 35.5 10 skin=turtle left=-1 right=1 hp=10
+enemies/dropper 38 7 skin=sea_snail zone=37,2,3,5 max=1 hp=10
+props/coast/glow_crystal_coral 38 7
+# the arena: Inkjaw surfaces in the gaps 6-7 / 12-13 of the lock; the exit totem on the right island
+zones/arena 49 16 name=grotto rect=40,8,20,11
+bosses/squid 46 16 arena=grotto
+objects/exit 56 16 locked=true
+props/coast/glow_anemone_pink 43 16
+props/coast/glow_anemone_cyan 49 16
+props/coast/vine_a 44 9
+props/coast/vine_a 55 9
+props/coast/stalactite 50 9
+props/coast/drips 10 4
+props/coast/moss_fringe 16 4
+props/coast/stalactite 29 4
+props/coast/drip_cap 33 4
+props/coast/seaweed 13 13
+props/coast/coral_teal 32.5 13
+props/coast/seagrass_a 35 10
+props/coast/coral_pink 39 7

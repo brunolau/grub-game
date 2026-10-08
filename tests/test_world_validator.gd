@@ -1132,7 +1132,26 @@ bosses/brute 20 13")
 	var path: String = "res://levels/w5_l1_coop.lvl"
 	var key_plain: String = CoopSearch.file_cache_key(path, plain, 0, "g")
 	var key_boss: String = CoopSearch.file_cache_key(path, boss, 0, "g")
-	assert_ne(key_plain, key_boss, "a level with a boss keys on the full fingerprint")
+	assert_true(CoopSearch.world_has_boss(boss, 0, "g"), "the Brute stands in the gate's search world")
+	assert_ne(key_plain, key_boss, "a gate whose search world holds a boss keys on the full fingerprint")
+	# A boss stage's other gate: the boss's arena lies far beyond the gate's columns (its search world spawns no boss),
+	# so the screens / bots edits of other owners do not throw that gate's result away.
+	var rows: PackedStringArray = PackedStringArray()
+	for row: int in 16:
+		rows.append((TileGrid.CH_SOLID_A if row >= 14 else TileGrid.CH_AIR).repeat(120))
+	rows[13] = ".@" + ".".repeat(116) + "E."
+	var wide: LevelData = LevelData.parse(&"fp_far_boss_coop", "[meta]\nformat = 2\nid = fp_far_boss_coop\nkind = coop\n"
+			+ "book = 2\nterrain_a = jungle/terrain_grass\nmusic = level_jungle\ncoop_of = solo_bonus\n"
+			+ "coop_base_hash = %s\n[legend]\nE = objects/exit\n[tiles]\n%s\n[entities]\n" % ["ab".repeat(32),
+			"\n".join(rows)] + "objects/x2_tablet 10 13 gate=g far=16,13\nobjects/x2_tablet 100 13 gate=h far=106,13\n"
+			+ "bosses/brute 110 13\n", "fp_far_boss_coop.lvl")
+	assert_not_null(wide)
+	if wide == null:
+		return
+	assert_false(CoopSearch.world_has_boss(wide, 0, "g"), "gate g's columns end far before the Brute")
+	assert_true(CoopSearch.world_has_boss(wide, 0, "h"), "gate h's world holds the Brute")
+	assert_true(CoopSearch.world_has_boss(wide, 0, "nope"), "an unknown gate: the cautious answer")
+	assert_eq(CoopSearch.file_cache_key(path, wide, 0, "g").length(), 32)
 
 
 func test_visor_colossus_chain_plates_are_no_gate_mechanism() -> void:
@@ -1182,3 +1201,195 @@ func test_arena_gap_rule_ignores_planks_and_bumps_on_a_floor() -> void:
 	bumps[9] = "#@..C....P....Q.D.B#"
 	var bumped: LevelValidator = _validator({"arena_bumps": _arena_text("arena_bumps", "modes = grub_stack", bumps)})
 	assert_false(bumped.has_problem("gap of 17 cells in row 9", LevelValidator.WARNING), _messages(bumped))
+
+
+func test_search_idle_doorstop_route_follows_g53() -> void:
+	# G53 (lead designer, after the search found it): a plate door / column / slab does not wait for an IDLE hero. The
+	# route the search found in w2_l1_coop 'hatches' - the idle partner parked beside slab H1 kept it open while the
+	# lone hero ran from plate pa to the hole - is replayed on both difficulties as the regression probe: it never
+	# reaches the hole without the partner, and since objects-A built G53 (ObjTuning.push_idle_out) not with him either:
+	# the slab sinks through the idle body's cells and pushes him out.
+	var data: LevelData = LevelData.load_file("res://levels/w2_l1_coop.lvl")
+	assert_not_null(data)
+	if data == null:
+		return
+	for difficulty: int in [Defs.Difficulty.BEGINNER, Defs.Difficulty.EXPERT]:
+		var tablet: Dictionary = CoopSearch.find_tablet(data, difficulty, "hatches")
+		if tablet.is_empty():
+			print("    w2_l1_coop has no gate 'hatches' any more: nothing to replay")
+			return
+		var grid: TileGrid = CoopSearch.grid_at_rest(data, difficulty)
+		var area: Rect2i = CoopSearch.gate_area(tablet, grid)
+		var starts: Array[Vector2i] = CoopSearch.start_points(data, difficulty, tablet, grid)
+		var searcher: CoopSearch.Searcher = CoopSearch.Searcher.new()
+		assert_true(searcher.build_world(data, difficulty, CoopSearch.grid_at_rest(data, difficulty),
+				CoopSearch.world_columns_of(area, starts, grid)))
+		var macros: Dictionary = {}
+		for macro: Dictionary in searcher.macros:
+			macros[str(macro["name"])] = macro
+		var slab: SimEntity = null
+		for i: int in searcher._entities.size():
+			if String(searcher._records[i]["id"]) == "objects/column" \
+					and str(searcher._records[i]["params"].get("rise_while", "")) == "pa":
+				slab = searcher._entities[i]
+		var first: Dictionary = searcher.run(searcher._config(starts[0], 1, -1, CoopSearch.PARTNER_EGG,
+				CoopSearch.NOWHERE), macros["walk R10"]["flags"], {})
+		if slab == null or first.is_empty() or first["pos"] != Vector2i(924, 288):
+			searcher.close()
+			print("    w2_l1_coop 'hatches' changed: the doorstop route no longer applies (%s)" % str(first.get("pos")))
+			return
+		var spot: Vector2i = first["pos"]
+		var outcome: Dictionary = {}
+		for parked: bool in [false, true]:
+			var at: Vector2i = spot if parked else CoopSearch.NOWHERE
+			var config: Dictionary = searcher._config(spot, -1, -1, CoopSearch.PARTNER_EGG, at)
+			var jump: Dictionary = searcher.run(config, macros["jump L"]["flags"], {})
+			if jump.is_empty():
+				continue
+			var played: PackedInt32Array = jump["played"]
+			var walk: Dictionary = searcher.run(config, played + (macros["walk R24"]["flags"] as PackedInt32Array),
+					{tablet["far"]: true}, played.size(), jump["pos"])
+			outcome[parked] = [bool(walk.get("goal", false)), int(slab.get(&"risen")) > 0]
+		searcher.close()
+		var label: String = Defs.difficulty_name(difficulty)
+		assert_true(outcome.has(false) and outcome.has(true), "%s: the route replays (%s)" % [label, str(outcome)])
+		if not outcome.has(true) or not outcome.has(false):
+			continue
+		assert_false(bool(outcome[false][0]), "%s: alone (the partner an egg) the hole is shut again" % label)
+		assert_false(bool(outcome[true][1]), "%s: G53 - slab H1 does not wait for the idle partner (%s)" % [label,
+				str(outcome)])
+		assert_false(bool(outcome[true][0]), "%s: G53 - the parked idle partner keeps no door open: the route fails (%s)" % [
+				label, str(outcome)])
+
+
+func test_search_parks_the_partner_beside_keepers_and_shells() -> void:
+	# Lead designer's wf9 #5 (G33 shell facing): from every start the idle partner is also parked in front of and behind
+	# every keeper and shell enemy of the gate's area, within club reach - so a refusal holds even where the engine
+	# still lets an idle body turn a shell or bait a keeper.
+	var data: LevelData = _search_level("bait_coop", 6, "\n".join(PackedStringArray([
+		"objects/x2_tablet 4 13 gate=g far=27,13",
+		"enemies/walker 16 13 left=0 right=0 speed=0 coop=shell keeper=k",
+		"enemies/walker 23 13 left=0 right=0 speed=0",
+	])))
+	var searcher: CoopSearch.Searcher = _search_world(data)
+	var spots: Array[Vector2i] = searcher._bait_spots.duplicate()
+	var keeper: Vector2i = Vector2i(-1, -1)
+	for i: int in searcher._entities.size():
+		if str(searcher._records[i]["params"].get("keeper", "")) == "k":
+			keeper = searcher._entities[i].sim_pos
+	var found: Dictionary = searcher.explore([Vector2i(40, 224)], {Vector2i(27, 13): true}, Rect2i(0, 0, 30, 16),
+			CoopSearch.BOUND_TICKS, 4)
+	searcher.close()
+	assert_eq(spots.size(), 2, "in front of and behind the shell keeper, none for the plain walker: %s" % str(spots))
+	for spot: Vector2i in spots:
+		assert_eq(spot.y, keeper.y, "on the keeper's floor")
+		assert_true(absi(spot.x - keeper.x) > 8 and absi(spot.x - keeper.x) <= 32, "within club reach: %s" % str(spot))
+	assert_true(spots.size() == 2 and signi(spots[0].x - keeper.x) != signi(spots[1].x - keeper.x), "one each side")
+	assert_true(int(found.get("placements", 0)) >= 2, "both parked from the start: %s" % str(found))
+
+
+func test_search_idle_bait_keeper_replays_follow_g33_shell_facing() -> void:
+	# Lead designer's wf9 #6 (D8's build/d8/bot_idle_bait.gd / bot_idle_bait_l1.gd): one player opens w8_l1_coop 'hall'
+	# and w8_l2_coop 'shamans' with today's engine - his idle partner hatched in front of a shell keeper, he strikes its
+	# back. The regression probe, in the search world of EVERY gate whose area holds a shell keeper (so 'den' and 'gully'
+	# get their own replay too, as the lead designer's ruling asks): for each such keeper the hero stands behind it (14 px
+	# clear of its box, facing it) and strikes for 400 ticks (D8's rhythm: 8 ticks on, 8 off) - once with the partner an
+	# egg behind him, once with the idle partner parked in front of it (10 px clear: the nearer body). Alone every back
+	# strike must glance. With the idle bait the keeper dies exactly while the engine turns the shell to the idle partner
+	# (coop_traits.gd's post_ai SHELL reads Game.level.target_hero, G33 not built: printed KNOWN); once the shell faces
+	# the nearer ACTIVE hero (LevelBase.nearest_coop_hero) the replay must fail. (It places the striker behind the keeper;
+	# whether one player gets there is the route's question - D8's replays show it for 'hall' and 'shamans'.)
+	var strikes: PackedInt32Array = PackedInt32Array()
+	for i: int in 400:
+		strikes.append(Defs.IN_FIRE if i % 16 < 8 else 0)
+	var probed: Dictionary = {}
+	var named: Array = [["w8_l1_coop", "hall"], ["w8_l2_coop", "shamans"]]
+	var named_seen: int = 0
+	for entry: Dictionary in CoopSearch.gate_table():
+		var gate: String = str(entry["gate"])
+		var difficulty: int = int(entry["difficulty"])
+		var label: String = "%s (%s) '%s'" % [entry["level"], Defs.difficulty_name(difficulty), gate]
+		var path: String = CoopSearch.level_path(entry["level"])
+		var text: String = FileAccess.get_file_as_string(path)
+		if not "keeper=" in text or not ("enemies/shellback" in text or "coop=shell" in text):
+			continue
+		var data: LevelData = LevelData.load_file(path)
+		assert_not_null(data, label)
+		if data == null:
+			continue
+		var tablet: Dictionary = CoopSearch.find_tablet(data, difficulty, gate)
+		var grid: TileGrid = CoopSearch.grid_at_rest(data, difficulty)
+		var area: Rect2i = CoopSearch.gate_area(tablet, grid)
+		var starts: Array[Vector2i] = CoopSearch.start_points(data, difficulty, tablet, grid)
+		var searcher: CoopSearch.Searcher = CoopSearch.Searcher.new()
+		assert_true(searcher.build_world(data, difficulty, CoopSearch.grid_at_rest(data, difficulty),
+				CoopSearch.world_columns_of(area, starts, grid)), label)
+		var keepers: Array[int] = []
+		for i: int in searcher._entities.size():
+			var enemy: EnemyBase = searcher._entities[i] as EnemyBase
+			if enemy != null and enemy.keeper != &"" and enemy.coop_trait == Defs.CoopTrait.SHELL 					and area.has_point(Vector2i(Tuning.to_cell(enemy.sim_pos.x), Tuning.to_cell(enemy.sim_pos.y - 1))):
+				keepers.append(i)
+		if [str(entry["level"]), gate] in named:
+			named_seen += 1
+			assert_true(keepers.size() >= 1, "%s: its shell keepers are in the search world" % label)
+		for i: int in keepers:
+			var keeper: EnemyBase = searcher._entities[i] as EnemyBase
+			var home: Vector2i = keeper.sim_pos
+			var spots: Array[Vector2i] = searcher.bait_spots(keeper)
+			if spots.size() != 2:
+				print("    %s: keeper at %s has no floor on both sides - skipped" % [label, str(home)])
+				continue
+			var bait: Vector2i = spots[0]                          # in front (left), 10 px clear
+			var behind: Vector2i = spots[1] + Vector2i(4, 0)       # behind (right), 14 px clear: the farther body
+			var outcome: Dictionary = {}
+			var faces_idle: bool = false
+			for parked: bool in [false, true]:
+				var config: Dictionary = searcher._config(behind, -1, -1, CoopSearch.PARTNER_EGG,
+						bait if parked else CoopSearch.NOWHERE)
+				if parked:
+					# Which way the shell turns with the idle partner the nearer body (the cause, read before the strikes).
+					searcher.run(config, PackedInt32Array([0, 0, 0, 0]), {})
+					var turned: EnemyBase = searcher._entities[i] as EnemyBase
+					faces_idle = turned != null and turned.facing < 0
+				searcher.run(config, strikes, {})
+				var after: EnemyBase = searcher._entities[i] as EnemyBase
+				outcome[parked] = after == null or not is_instance_valid(after) or after.dead
+			var where: String = "%s: keeper at %s" % [label, str(home)]
+			assert_false(bool(outcome[false]), "%s: alone, every back strike glances (%s)" % [where, str(outcome)])
+			assert_eq(bool(outcome[true]), faces_idle, "%s: the idle bait kills it exactly while the shell faces the idle partner (G33: never) - %s" % [where, str(outcome)])
+			if faces_idle:
+				print("    %s: KNOWN - its shell faces the idle partner (coop_traits.gd post_ai SHELL, G33 not built): one player kills it from behind" % where)
+			probed[label] = true
+		searcher.close()
+	if named_seen < 2:
+		print("    D8's w8_l1_coop 'hall' / w8_l2_coop 'shamans' are not both in the gate table any more")
+	print("    shell keeper gates replayed: %s" % ", ".join(PackedStringArray(probed.keys())))
+
+
+func test_deadly_cells_felt_through_one_row_of_rock_warn() -> void:
+	# LEVEL_DESIGN.md 4 "Collision facts" (D6's report, lead designer 08:42): the body probes look through solid tiles,
+	# so a liquid / kill cell needs TWO solid rows between it and any space a hero can rise into below it.
+	var rows: PackedStringArray = _coop_rows()
+	_paint(rows, 9, 5, 8, TileGrid.CH_LIQUID)      # a basin on a deck one row thick, over the path (floor row 14)
+	_paint(rows, 10, 5, 8)
+	_paint(rows, 9, 15, 18, TileGrid.CH_LIQUID)    # the same basin on two rows of rock: fine
+	_paint(rows, 10, 15, 18)
+	_paint(rows, 11, 15, 18)
+	_paint(rows, 4, 25, 28, TileGrid.CH_LIQUID)    # one row of rock, but no floor within a jump below it: fine
+	_paint(rows, 5, 25, 28)
+	var validator: LevelValidator = _validator({"solo_main": _solo("solo_main"), "rock_coop": _coop_text("rock_coop",
+			"", rows)})
+	assert_true(validator.has_problem("deadly cells at columns 5-8 of row 9 have one solid row under them",
+			LevelValidator.WARNING), _messages(validator))
+	assert_true(validator.has_problem("rising from the floor of row 14", LevelValidator.WARNING), _messages(validator))
+	assert_false(validator.has_problem("deadly cells at columns 15-18", LevelValidator.WARNING), "two rows of rock")
+	assert_false(validator.has_problem("deadly cells at columns 25-28", LevelValidator.WARNING),
+			"no floor a hero rises from within 7 rows")
+	# A frozen format-1 file is never checked (Book I stays as 1.0 shipped it); the same rows in a 2.0 file are.
+	var trap: String = "\n".join(PackedStringArray(["....." + TileGrid.CH_LIQUID.repeat(4) + ".".repeat(15),
+			".....####" + ".".repeat(15), ".@" + ".".repeat(20) + "E."]))
+	var frozen: LevelValidator = _validator({"frozen_main": _solo("frozen_main").replace(PLAIN_ROWS, trap)})
+	assert_false(frozen.has_problem("felt through", LevelValidator.WARNING), _messages(frozen))
+	var fresh: LevelValidator = _validator({"fresh_main": _solo("fresh_main").replace(PLAIN_ROWS, trap)
+			.replace("format = 1", "format = 2")})
+	assert_true(fresh.has_problem("deadly cells at columns 5-8 of row 8", LevelValidator.WARNING), _messages(fresh))

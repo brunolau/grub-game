@@ -74,7 +74,8 @@ else
 	for ((i = 0; i < SHARDS; i++)); do
 		add "coop_gates_$i" "COOP_GATES_SHARD=$i/$SHARDS GD_TIMEOUT=7200 bash $GD test coop_gates"
 	done
-	add versus_bots "GD_TIMEOUT=5400 bash $GD test versus_bots"
+	# The bot sets in shards side by side (tools/g3_versus_bots.sh: one merged log, the runner's TESTS / RESULT lines).
+	add versus_bots "VERSUS_BOTS_SHARDS=${G3_VERSUS_SHARDS:-8} bash tools/g3_versus_bots.sh"
 	add default "GD_TIMEOUT=2400 bash $GD test"
 	for flow in campaign_coop campaign_b2 campaign campaign_beginner; do
 		add "flow_$flow" "GD_TIMEOUT=5400 bash $GD script res://scripts/core/dev/headless_flow.gd -- \

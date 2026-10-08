@@ -1,0 +1,270 @@
+# Club & Grub - World 9, stage 3: "Chieftains' Pyre" in co-op (designer D9b, Book II "The Far Shore").
+# The co-op file of w9_l3 (DESIGN.md D.8 / D.10, LEVEL_DESIGN.md 15.7): the same climb and pyre hall for two. The
+# final-boss stage's co-op gate is its boss form (DESIGN.md D.8 #1): both Rival Chieftains fight at once and a
+# knocked-out chieftain's egg hatches in 66 ticks; it cracks only while an active hero other than the smasher keeps
+# the other chieftain (or his egg) within 64 px (B.6, G33), so one hero smashes the egg while the other holds the mate
+# off. Traits: every tribesman is `lone` (he keeps away from a pair that sticks together and hunts a straggler); the
+# Guard is left out (a co-op Guard needs a 4-row hall, LEVEL_DESIGN 15.7.5; G22). P2 starts beside P1. The chieftains
+# run on hero physics over resources/bots/w9_l3_coop.json (core-B's baker).
+
+[meta]
+format = 2
+id = w9_l3_coop
+name = "Chieftains' Pyre"
+kind = coop
+coop_of = w9_l3
+coop_base_hash = "15044fd4c3b6d434a8d56717429ec55b83722e1ab9ace75750612e3d6f2c0c4a"
+book = 2
+world = 9
+stage = 3
+biome = sky
+terrain_a = sky/terrain_rock
+terrain_b = ruins/terrain_carved
+background = pyre
+music = level_pyre
+liquid = tar
+min_difficulty = expert
+next = ending_b
+bonus_tier = 2
+author = D9b
+
+[tiles]
+....................../####################\................
+...................../######################\...............
+.....................########################...............
+.....................########################...............
+.....................########################...............
+.....................####..................##...............
+.....................####..................##...............
+.....................####..................##...............
+.....................####.---...====...---.##...............
+.....................####..................##...............
+.....................####..................##...............
+.....................####%%%%%%%%%%%%%---%%##...............
+.....................#################...####...............
+.....................#################...####...............
+.....................#################---...................
+.....................#################......................
+.....................#################......................
+.....................#####################################..
+.....................#####################################..
+........................#####...#############...##########..
+............................................................
+............................................................
+......................---...........---..........---........
+............................................................
+............................................................
+............................................................
+##.###########################:::::#########################
+##.#########################################################
+.........#####.............###.................######.......
+................................................####........
+............................................................
+....---..----...............................................
+............................................................
+........................................................@...
+............................................./##############
+#################::::::################~~~##################
+#######################################~~~##################
+############################################################
+############################################################
+############################################################
+
+[entities]
+# --- the bottom terrace (feet row 34), walked from the right: the start, a tar pit, a tar wade, tribesmen
+objects/hero_start 58 33 slot=2
+props/sky/rock_big 59 33
+props/sky/dead_tree 53 33 layer=back
+objects/sign 50 33 text=SIGN_W9_PYRE_CLIMB
+items/food 47 31 index=2
+items/food 46 31 index=3
+props/sky/rocks_small 44 34
+items/food 40 31 index=5
+props/sky/banner 37 34 layer=back
+props/sky/drum 35 34 layer=back
+props/sky/bone_pile 32 34
+objects/hidden_spot 30 35 kind=small count=3 contents=food:9,food:11,food:13 look=inset
+props/sky/skull_big 26 34
+items/food 20 32 index=7
+items/food 19 32 index=8
+props/sky/tribe_fence 14 34 layer=back
+enemies/charger 10 30 skin=rival_tar facing=r coop=lone
+enemies/charger 5 30 skin=rival_tar facing=r coop=lone
+props/sky/rocks_small 8 34
+props/sky/bone_pile 1 34
+# --- the vine up to the middle terrace (its top is the terrace floor)
+objects/vine 2 26 length=8
+# --- the middle terrace (feet row 25), walked to the right: checkpoint 1, the Tar Tribe camp, tribesmen
+objects/checkpoint 7 25
+props/sky/banner 5 25 layer=back
+props/sky/tent 11 25 layer=back
+props/sky/stump 15 25
+items/food 17 23 index=12
+enemies/charger 23 21 skin=rival_tar facing=l coop=lone
+props/sky/tribe_hut 20 25 layer=back
+objects/container 26 25 skin=pot contents=food:20,food:21
+props/sky/drum 28 25 layer=back
+items/food 31 23 index=17
+items/food 33 23 index=18
+enemies/charger 37 21 skin=rival_tar facing=l coop=lone
+props/sky/tent_torn 39 25 layer=back
+props/sky/bone_pile 42 25
+props/sky/banner 43 25 layer=back
+items/food 45 23 index=22
+enemies/charger 50 21 skin=rival_tar facing=l coop=lone
+props/sky/tribe_fence 53 25 layer=back
+items/heart 55 23
+# --- the vine up to the upper terrace
+objects/vine 58 17 length=8
+# --- the upper terrace (feet row 16), walked to the left: the chieftains' tent (Cave Painting 16 in its big
+#     spot), checkpoint 2, the lookout and the Guard, the gallery into the spire
+zones/secret 55 16 name=chiefs_tent rect=53,13,4,4
+objects/hidden_spot 55 16 kind=big hits=3 contents=painting:16 prop=sky/tent
+props/sky/banner 53 16 layer=back
+objects/checkpoint 51 16
+props/sky/tribe_post 46.5 16 layer=back
+# --- the gallery under the hall and the chimney with its two log grates (one way up)
+objects/sign 43 16 text=SIGN_W9_PYRE_EGG
+items/food 41 15 index=24
+props/sky/skull_ribs 42 16
+# --- the sky around the spire
+props/sky/cloud_puff 3 4 layer=back
+props/sky/cloud_puff 12 9 layer=back
+props/sky/cloud_puff 8 17 layer=back
+props/sky/cloud_puff 52 3 layer=back
+props/sky/cloud_puff 56 10 layer=back
+props/sky/cloud_puff 16 2 layer=back
+# --- the pyre hall: the Rival Chieftains, the Great Roast on its altar over the pyre
+zones/arena 33 10 name=pyre rect=24,0,20,11
+props/sky/pyre 33.5 10 layer=back
+props/sky/stalactite 27 5
+props/sky/drips 30 5
+props/sky/stalactite 37 5
+props/sky/drips 40 5
+props/sky/banner 25 10 layer=back
+props/sky/banner 42 10 layer=back
+props/sky/skull_big 29 10
+props/sky/bone_pile 36 10
+bosses/chieftain 27 10 name=gorm mate=gulla arena=pyre
+bosses/chieftain 32 7 name=gulla mate=gorm arena=pyre drops=trophy
+
+[backwall]
+25 5 18 6 set=b deco=12
+38 14 7 3 set=a deco=20
+38 12 3 2 set=a deco=10
+
+[overrides]
+25 5 a 30
+26 5 a 31
+27 5 a 31
+28 5 a 31
+29 5 a 31
+30 5 a 31
+31 5 a 31
+32 5 a 31
+33 5 a 31
+34 5 a 31
+35 5 a 31
+36 5 a 31
+37 5 a 31
+38 5 a 31
+39 5 a 31
+40 5 a 31
+41 5 a 31
+42 5 a 32
+21 19 a 30
+22 19 a 31
+23 19 a 32
+29 19 a 30
+30 19 a 31
+31 19 a 32
+45 19 a 30
+46 19 a 31
+47 19 a 32
+24 20 a 30
+25 20 a 31
+26 20 a 31
+27 20 a 31
+28 20 a 32
+32 20 a 30
+33 20 a 31
+34 20 a 31
+35 20 a 31
+36 20 a 31
+37 20 a 31
+38 20 a 31
+39 20 a 31
+40 20 a 31
+41 20 a 31
+42 20 a 31
+43 20 a 31
+44 20 a 32
+48 20 a 30
+49 20 a 31
+50 20 a 31
+51 20 a 31
+52 20 a 31
+53 20 a 31
+54 20 a 31
+55 20 a 31
+56 20 a 31
+57 20 a 32
+0 28 a 30
+1 28 a 32
+3 28 a 30
+4 28 a 31
+5 28 a 31
+6 28 a 31
+7 28 a 31
+8 28 a 32
+14 28 a 30
+15 28 a 31
+16 28 a 31
+17 28 a 31
+18 28 a 31
+19 28 a 31
+20 28 a 31
+21 28 a 31
+22 28 a 31
+23 28 a 31
+24 28 a 31
+25 28 a 31
+26 28 a 32
+30 28 a 30
+31 28 a 31
+32 28 a 31
+33 28 a 31
+34 28 a 31
+35 28 a 31
+36 28 a 31
+37 28 a 31
+38 28 a 31
+39 28 a 31
+40 28 a 31
+41 28 a 31
+42 28 a 31
+43 28 a 31
+44 28 a 31
+45 28 a 31
+46 28 a 32
+53 28 a 30
+54 28 a 31
+55 28 a 31
+56 28 a 31
+57 28 a 31
+58 28 a 31
+59 28 a 32
+9 29 a 30
+10 29 a 31
+11 29 a 31
+12 29 a 31
+13 29 a 32
+27 29 a 30
+28 29 a 31
+29 29 a 32
+47 29 a 33
+52 29 a 33
+48 30 a 30
+49 30 a 31
+50 30 a 31
+51 30 a 32

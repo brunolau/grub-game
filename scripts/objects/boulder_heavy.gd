@@ -171,11 +171,20 @@ func _try_move(level: LevelBase, step: Vector2i) -> bool:
 				return false
 			if ObjTuning.hero_in_cell(level, col, row):
 				return false
+	var before: Rect2i = block
 	_uncover(level, block)
 	block = target
 	_cover(level, block)
 	sim_pos = _feet_of(block)
 	moves += 1
+	# G53: an IDLE co-op hero in the cells it just covered (ObjTuning.hero_in_cell let it move) is pushed out.
+	var filled: Rect2i = Rect2i(target.position.x + (target.size.x - 1 if step.x > 0 else 0),
+			target.position.y + (target.size.y - 1 if step.y > 0 else 0),
+			1 if step.x != 0 else target.size.x, 1 if step.y != 0 else target.size.y)
+	if step.x < 0 or step.y < 0:
+		filled = Rect2i(target.position, Vector2i(1 if step.x != 0 else target.size.x, 1 if step.y != 0 else target.size.y))
+	if not before.encloses(filled):
+		ObjTuning.push_idle_out(level, block, filled)
 	return true
 
 

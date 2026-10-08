@@ -74,6 +74,8 @@ var count_in: int = -1
 ## `daze`: hopping away (airborne until it lands); bit per player slot: that hero was striking on the last look.
 var _hop: bool = false
 var _strikers: int = 0
+## `daze` (G47): the player slot whose head bounce dazed it (-1 = none): his own hits glance while it is dazed.
+var _dazer_slot: int = -1
 ## `heavy`: its run before the Brace Wall stopped it (given back when the daze ends).
 var _run_xvel: int = 0
 ## `grab`: where it seized the hero (it flies back there after the drop), flying back, ticks held without a perch,
@@ -222,7 +224,8 @@ func accepts_hit(source: SimEntity) -> bool:
 		Defs.CoopTrait.HEAVY:
 			return dazed > 0 or not enemy._hit_from_front(source)
 		Defs.CoopTrait.DAZE:
-			return dazed > 0
+			# G47: the daze is slot-bound - only a hero of another slot than the bouncer's hurts it.
+			return dazed > 0 and Defs.hitter_slot(source) != _dazer_slot
 	return true
 
 
@@ -245,11 +248,13 @@ func absorbs_hit(slot: int, source: SimEntity) -> bool:
 	return false
 
 
-## A hero bounced on its head (the `daze` rule: dazed PartyTuning.daze_ticks, only then can it be hurt).
-func on_bounced(_hero: PlayerBase) -> void:
+## A hero bounced on its head (the `daze` rule: dazed PartyTuning.daze_ticks, only then can it be hurt - and, G47,
+## only by a hero of another slot than this bouncer's: a lone player never kills it, an idle partner never strikes).
+func on_bounced(hero: PlayerBase) -> void:
 	if kind != Defs.CoopTrait.DAZE or not party_on():
 		return
 	dazed = daze_window()
+	_dazer_slot = hero.slot if hero != null else -1
 	_hop = false
 	enemy.xvel = 0
 	enemy._play(&"dizzy", true)
@@ -261,6 +266,7 @@ func on_bounced(_hero: PlayerBase) -> void:
 func on_killed() -> void:
 	_let_go()
 	dazed = 0
+	_dazer_slot = -1
 	_hop = false
 	_run = 0
 	regrow = 0
@@ -291,6 +297,7 @@ func on_reset() -> void:
 	if regrow > 0:
 		enemy.tangible = _saved_tangible
 	dazed = 0
+	_dazer_slot = -1
 	regrow = 0
 	died_tick = -1
 	sealed = false
@@ -358,8 +365,9 @@ func post_ai() -> void:
 		return
 	match kind:
 		Defs.CoopTrait.SHELL:
-			# The shield faces the nearer hatched hero every tick (not the sticky target).
-			var hero: PlayerBase = Game.level.target_hero(enemy)
+			# The shield faces the nearer hero who COUNTS every tick (not the sticky target; G33: never a dozing
+			# partner - an idle body is no bait); nobody counts: it keeps its facing.
+			var hero: PlayerBase = Game.level.nearest_coop_hero(enemy)
 			if hero != null:
 				enemy.facing = enemy._dir_to(hero)
 		Defs.CoopTrait.HEAVY:
@@ -408,16 +416,17 @@ func dead_tick() -> void:
 			traits._regrow_at(member.spawn_pos)
 
 
-## `lone` (Expert, PartyTuning.lone_trait_on): null while the hatched heroes keep together (within
-## PartyTuning.LONE_KEEP_AWAY_PX of each other on both axes: it keeps away), else the straggler - the hatched hero
-## farther from the view centre, ties to the higher slot [R9]. With one hatched hero: him.
+## `lone` (Expert, PartyTuning.lone_trait_on): null while the heroes who COUNT keep together (within
+## PartyTuning.LONE_KEEP_AWAY_PX of each other on both axes: it keeps away), else the straggler - the counting hero
+## farther from the view centre, ties to the higher slot [R9]. With one counting hero: him (G33: a dozing partner
+## parked beside a lone player is no protection).
 func lone_target() -> PlayerBase:
 	var level: LevelBase = Game.level
 	if level == null:
 		return null
 	var hatched: Array[PlayerBase] = []
 	for hero: PlayerBase in level.contact_order():
-		if hero.is_party_targetable():
+		if hero.counts_for_coop():
 			hatched.append(hero)
 	if hatched.size() <= 1:
 		return hatched[0] if hatched.size() == 1 else null
@@ -893,8 +902,8 @@ static func _count_leader(members: Array[EnemyBase]) -> EnemyBase:
 	return null
 
 
-## True when every member is alive and awake with a hatched hero within EnemyTuning.COUNT_IN_REACH_PX, and those
-## heroes are not all the same one.
+## True when every member is alive and awake with a hero who COUNTS (G33: not idle) within
+## EnemyTuning.COUNT_IN_REACH_PX, and those heroes are not all the same one.
 static func _count_ready_now(members: Array[EnemyBase]) -> bool:
 	var used: int = 0
 	var heroes: Array[PlayerBase] = Game.level.contact_order()
@@ -903,7 +912,7 @@ static func _count_ready_now(members: Array[EnemyBase]) -> bool:
 			return false
 		var near: int = 0
 		for hero: PlayerBase in heroes:
-			if hero.is_party_targetable() \
+			if hero.counts_for_coop() \
 					and absi(hero.sim_pos.x - member.sim_pos.x) <= EnemyTuning.COUNT_IN_REACH_PX \
 					and absi(hero.sim_pos.y - member.sim_pos.y) <= EnemyTuning.COUNT_IN_REACH_PX:
 				near |= 1 << hero.slot

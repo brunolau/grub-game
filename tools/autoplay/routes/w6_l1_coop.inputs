@@ -1,0 +1,28 @@
+# route: level=w6_l1_coop difficulty=beginner players=2 ends=exit after=tally expect=wipes:0,eggs:0,x2_gates:2,min_checkpoints:5
+# The Beginner two-stream route of Bubbling Fen in co-op (designer D6; recorded from build/d6/bot_w6_l1_coop.gd,
+# P1|P2; club only, never S): the shore and the tar pit together; the raft for two (both paddle it out of the jetty's
+# eddy, then P1 paddles and P2 stands guard);
+# gate 'sunk' - P1 curls up at the near bank (Down + Swap), P2 bats him over the 8 cells of open tar,
+# P1 stands on the latch plate and the sunken raft rises for P2; the root deck; gate 'root' - P2 stands at Old
+# Root's face, P1
+# lands on his head holding Jump (Shoulder Hop) onto the root and clubs the rolled vine down, P2 climbs it, both drop
+# behind; P1 tames wild Chomper and drives, P2 jumps on behind as the gunner; the tar flats; both get off and walk
+# into the exit totem. No role waits 243 ticks without input (a waiting hero taps Down after 150 quiet ticks, G33).
+10:R|,70:R|R,8:RU|R,7:R|R,2:UF|R,4:UF|RU,4:|RU,14:R|R,4:F|R,2:F|F,4:|F,1:R|,3:F|,1:F|R,2:F|F,4:|F,4:R|,19:R|R
+6:F|R,1:|R,3:|F,1:R|F,2:UF|F,4:UF|,1:|R,3:|UF,3:R|UF,4:R|,15:R|R,38:R|,3:|,28:U|,3:R|,19:R|R,4:|R,1:R|R,4:|R
+9:R|R,7:|R,1:L|,1:|,1:|R,2:|,28:|U,18:|R,4:|,1:|R,4:|,12:|R,7:|,1:|L,1:F|F,6:|,1:F|F,1:|,1:F|F,6:|,1:F|F,1:|
+1:F|,147:|,1:|D,1:|,1:D|,37:|,1:F|,6:|,1:F|,1:|,1:F|,6:|,1:F|,1:|,1:F|,6:|,1:F|,1:|,1:F|,6:|,1:F|,1:|,1:F|,6:|
+1:F|,1:|,1:F|,6:|,1:F|,1:|,1:F|,6:|,1:F|,1:|,1:F|,6:|,1:F|,1:|,1:F|,6:|,1:F|,1:|,1:F|,6:|,1:F|,1:|,1:F|,6:|
+1:F|,1:|,1:F|,6:|,1:F|,1:|,1:F|,1:|,1:|D,4:|,1:F|,1:|,1:F|,6:|,1:F|,1:|,1:F|,6:|,1:F|,1:|,1:F|,6:|,1:F|,1:|
+1:F|,6:|,1:F|,1:|,1:F|,6:|,1:F|,1:|,1:F|,6:|,1:F|,1:|,1:F|,6:|,1:F|,1:|,1:F|,6:|,1:F|,1:|,1:F|,6:|,1:F|,1:|
+1:F|,6:|,1:F|,1:|,1:F|,6:|,1:F|,1:|,1:F|,6:|,1:F|,1:|,1:F|,6:|,1:F|,1:|,1:F|,6:|,1:F|,1:|,1:F|,6:|,1:F|,1:|R
+27:R|R,4:R|,2:|,1:R|,1:|R,5:|,1:L|,2:|,1:R|,1:DS|,2:D|,6:D|F,16:|,21:R|,19:|,75:R|R,6:F|R,4:|R,14:R|R,6:F|R
+4:|R,8:R|R,6:F|R,4:|R,1:R|R,6:F|R,4:|R,42:R|R,6:R|UF,4:R|,23:R|R,4:|R,1:R|R,32:|R,11:R|,2:|,1:L|,2:|,18:U|
+20:RU|,1:|,1:R|,5:|,1:L|,1:DF|,14:|,1:DF|,14:|,1:DF|,14:|,1:DF|,14:|,1:DF|,14:|,1:DF|,11:|,1:|D,2:|,1:DF|,14:|
+1:DF|,14:|,1:DF|,14:|,1:DF|,14:|,1:DF|,14:|,1:DF|,14:|,1:DF|,14:|,1:DF|,14:|,1:DF|,14:|,1:DF|,11:|,1:|D,2:|
+1:DF|,14:|,1:DF|,14:|,1:DF|,14:|,1:DF|,14:|,1:DF|,14:|,1:DF|,14:|,1:DF|,14:|,1:DF|,14:|,1:DF|,14:|,1:DF|,11:|
+1:|D,2:|,1:DF|,10:|,4:R|U,61:|U,1:|R,47:R|R,4:R|,7:|,10:RU|,1:R|,2:|,4:L|,1:|,2:R|,59:|,16:RU|,2:U|,4:LU|,4:U|
+13:RU|,9:U|,11:RU|,1:RU|D,1:RU|,9:U|,13:RU|,1:U|,6:LU|,22:U|,9:|R,6:|,1:|R,2:|,10:|RU,1:|R,2:|,4:|L,1:|,10:|R
+26:|RU,1:|U,1:|,29:R|,1:F|,1:|,2:R|,1:|,26:R|,7:|,1:F|,5:|,1:RU|,44:R|,3:R|F,1:RU|F,1:R|F,1:RF|,20:R|,2:RU|
+28:R|,1:F|,2:R|,1:|,2:R|,1:|,18:R|,1:F|,8:|,1:F|,5:|,18:R|,12:|,1:UD|,1:UD|UD,14:|UD,5:R|UD,13:R|R,6:UF|R,1:|R
+3:|F,3:R|F,4:F|,2:F|R,4:|R,1:R|R,6:F|F,4:|,25:R|R

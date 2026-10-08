@@ -83,10 +83,11 @@ func _ai_tick() -> void:
 	_shield_neighbours()
 
 
-## The nearer hatched hero when he is within the flee distance at about his height, else null.
+## The nearer hero who counts (G33: a parked idle hero does not corner him) when he is within the flee distance at
+## about his height, else null.
 func _threat() -> PlayerBase:
 	var level: LevelBase = Game.level
-	var hero: PlayerBase = level.target_hero(self) if level != null else null
+	var hero: PlayerBase = level.nearest_coop_hero(self) if level != null else null
 	if hero == null or (level.hero_count() > 1 and not hero.is_party_targetable()):
 		return null
 	if absi(hero.sim_pos.x - sim_pos.x) > EnemyTuning.SHAMAN_FLEE_PX \

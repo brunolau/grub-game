@@ -942,6 +942,36 @@ func _burst_origin() -> Vector2i:
 	return Vector2i(_up_x, surface_y - SQUID_BOX.y)
 
 
+## G52: the level's drops (the fire-starter) are thrown from over the island ground nearest to where it died, a cell
+## over that island's top - never from over a gap's water: a key item that sinks returns to the point it was spawned
+## at (CollectibleBase._lose), so it comes back on standable ground. The bonus burst stays at [method _burst_origin].
+## No island in its room (no land cell in the surface row): the burst origin.
+func _drop_origin() -> Vector2i:
+	var level: LevelBase = Game.level
+	if level == null or level.grid == null:
+		return _burst_origin()
+	var grid: TileGrid = level.grid
+	var row: int = Tuning.to_cell(surface_y)
+	var room: Rect2i = _room()
+	var first: int = maxi(Tuning.to_cell(room.position.x), 0)
+	var last: int = mini(Tuning.to_cell(room.end.x - 1), grid.cols - 1)
+	var best: int = -1
+	var best_distance: int = 0
+	for col: int in range(first, last + 1):
+		if grid.get_char(col, row) == TileGrid.CH_LIQUID or grid.side_at(col, row) != TileGrid.SIDE_WALL:
+			continue
+		var distance: int = absi(col * Tuning.TILE + (Tuning.TILE >> 1) - _up_x)
+		if best < 0 or distance < best_distance:
+			best = col
+			best_distance = distance
+	if best < 0:
+		return _burst_origin()
+	var top: int = row
+	while top > 0 and grid.get_char(best, top - 1) != TileGrid.CH_LIQUID 			and grid.side_at(best, top - 1) == TileGrid.SIDE_WALL:
+		top -= 1
+	return Vector2i(best * Tuning.TILE + (Tuning.TILE >> 1), top * Tuning.TILE - Tuning.TILE)
+
+
 ## Wake rule: a hero within SQUID_WAKE_RANGE px across and a screen up or down.
 func _wakes_for(hero: PlayerBase) -> bool:
 	return absi(hero.sim_pos.x - sim_pos.x) < SQUID_WAKE_RANGE and absi(hero.sim_pos.y - sim_pos.y) < Tuning.VIEW_H

@@ -478,22 +478,52 @@ static func arena_modes(arena_id: StringName) -> Array[int]:
 	return result
 
 
+## G50 (PLAN.md cut 4's switch, DESIGN.md appendix): the launch modes CPUs play `arena_id` in - its meta `bots`, a list
+## of mode names (`bots = grub_stack,last_caveman`) or `none`; without the key (or with an empty one) every mode the
+## arena has ([method arena_modes]). The arena screens ask VersusArenaScreen.bot_modes, the same rule.
+static func bot_modes(arena_id: StringName) -> Array[int]:
+	var modes: Array[int] = arena_modes(arena_id)
+	var value: Variant = Levels.get_value(arena_id, "bots", null)
+	if value == null or str(value).strip_edges() == "":
+		return modes
+	var listed: PackedStringArray = PackedStringArray()
+	for part: String in LevelText.to_list(value):
+		listed.append(part.strip_edges())
+	var result: Array[int] = []
+	for launch_mode: int in modes:
+		if listed.has(String(Defs.versus_mode_name(launch_mode))):
+			result.append(launch_mode)
+	return result
+
+
+## True while a CPU seat is filled (G50: the per-round picks then skip a humans-only arena / mode).
+func cpu_seated() -> bool:
+	return player_count() > human_count()
+
+
 ## Arena of round `index`: the chosen arena, or a pick of this match's own random sequence (ARENA_RANDOM: among the
-## arenas of the mode; ARENA_PARTY_MIX: among every arena for this many players). "" when none fits.
+## arenas of the mode; ARENA_PARTY_MIX: among every arena for this many players). "" when none fits. G50: with a CPU
+## seated, Random skips an arena whose `bots` leaves the mode out and Party Mix one where no CPU plays any mode (with
+## no `bots` key anywhere the choices - and so the picks - are the 1.0-of-versus ones).
 func arena_for_round(index: int) -> StringName:
 	if arena != ARENA_RANDOM and arena != ARENA_PARTY_MIX:
 		return arena if Levels.is_arena(arena) else &""
 	var choices: Array[StringName] = available_arenas(player_count(), -1 if arena == ARENA_PARTY_MIX else mode)
+	if cpu_seated():
+		choices = choices.filter(func(id: StringName) -> bool:
+			var playable: Array[int] = bot_modes(id)
+			return not playable.is_empty() if arena == ARENA_PARTY_MIX else playable.has(mode))
 	if choices.is_empty():
 		return &""
 	return choices[_pick(index, 0).pick_index(choices.size())]
 
 
-## Mode of round `index` on `arena_id`: the match's mode, or with Party Mix a pick among the arena's launch modes.
+## Mode of round `index` on `arena_id`: the match's mode, or with Party Mix a pick among the arena's launch modes (G50:
+## with a CPU seated, among those its `bots` names).
 func mode_for_round(index: int, arena_id: StringName) -> int:
 	if arena != ARENA_PARTY_MIX:
 		return mode
-	var modes: Array[int] = arena_modes(arena_id)
+	var modes: Array[int] = bot_modes(arena_id) if cpu_seated() else arena_modes(arena_id)
 	if modes.is_empty():
 		return mode
 	return modes[_pick(index, 1).pick_index(modes.size())]

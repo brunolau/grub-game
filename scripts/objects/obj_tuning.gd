@@ -147,20 +147,77 @@ static func bit_count(mask: int) -> int:
 
 
 ## True when a hatched hero (alive, not an egg) occupies tile (col, row) by the body rule of HERO_BODY_HALF_W_PX /
-## HERO_BODY_H_PX: the cells a tile mover must not move into.
+## HERO_BODY_H_PX: the cells a tile mover must not move into. 2.0 G33 / G53: only a hero who COUNTS
+## (PlayerBase.counts_for_coop) stops a mover - an IDLE co-op hero is no obstacle (the mover pushes him out of its
+## cells, [method push_idle_out]). Single-player: counts_for_coop() is is_party_targetable() (nobody is idle there).
 static func hero_in_cell(level: LevelBase, col: int, row: int) -> bool:
 	if level == null:
 		return false
 	for hero: PlayerBase in level.contact_order():
-		if not hero.is_party_targetable():
+		if not hero.counts_for_coop():
 			continue
-		var x: int = hero.sim_pos.x
-		var y: int = hero.sim_pos.y
-		if col < (x - HERO_BODY_HALF_W_PX) >> 4 or col > (x + HERO_BODY_HALF_W_PX) >> 4:
-			continue
-		if row <= (y - 1) >> 4 and row >= (y - HERO_BODY_H_PX) >> 4:
+		if _body_in_cell(hero, col, row):
 			return true
 	return false
+
+
+static func _body_in_cell(hero: PlayerBase, col: int, row: int) -> bool:
+	var x: int = hero.sim_pos.x
+	var y: int = hero.sim_pos.y
+	if col < (x - HERO_BODY_HALF_W_PX) >> 4 or col > (x + HERO_BODY_HALF_W_PX) >> 4:
+		return false
+	return row <= (y - 1) >> 4 and row >= (y - HERO_BODY_H_PX) >> 4
+
+
+## G53 (DESIGN.md G33 follow-up, the lead designer's ruling of phase 3): a tile mover (a plate / keeper / drum door, a
+## column, a heave boulder) has just filled the cells `filled` of its block `block` (tile rects). Every hatched, living
+## IDLE hero whose body (the hero_in_cell rule) overlaps a filled cell is pushed out of them, unharmed: sideways to the
+## nearer side of the block where his body fits (no wall cell, no other part of a mover), else up onto the block's
+## top. No damage, no reset of his idle timer; level.notify_hero_teleported follows (the doze reach). Nothing for an
+## egg, a dead hero or a hero who counts (the mover waited for him).
+static func push_idle_out(level: LevelBase, block: Rect2i, filled: Rect2i) -> void:
+	if level == null or level.hero_count() <= 1:
+		return
+	for hero: PlayerBase in level.contact_order():
+		if hero.dead or hero.down or not hero.idle:
+			continue
+		var hit: bool = false
+		for row: int in range(filled.position.y, filled.end.y):
+			for col: int in range(filled.position.x, filled.end.x):
+				if _body_in_cell(hero, col, row):
+					hit = true
+					break
+			if hit:
+				break
+		if not hit:
+			continue
+		var y: int = hero.sim_pos.y
+		var left_x: int = block.position.x * Tuning.TILE - HERO_BODY_HALF_W_PX - 1
+		var right_x: int = block.end.x * Tuning.TILE + HERO_BODY_HALF_W_PX
+		var go_left: bool = hero.sim_pos.x - left_x <= right_x - hero.sim_pos.x
+		var target: Vector2i = Vector2i(-1, -1)
+		for attempt: int in 2:
+			var x: int = left_x if go_left != (attempt == 1) else right_x
+			if _body_fits(level, x, y):
+				target = Vector2i(x, y)
+				break
+		if target.x < 0:
+			# Neither side is free: up onto the block's top.
+			target = Vector2i(clampi(hero.sim_pos.x, block.position.x * Tuning.TILE, block.end.x * Tuning.TILE - 1),
+					block.position.y * Tuning.TILE)
+		hero.teleport(target)
+		hero.yvel = 0
+		level.notify_hero_teleported(hero)
+
+
+## True when a hero body (the hero_in_cell rule) with its feet at (x, y) touches no wall cell of the grid.
+static func _body_fits(level: LevelBase, x: int, y: int) -> bool:
+	var grid: TileGrid = level.grid
+	for row: int in range((y - HERO_BODY_H_PX) >> 4, ((y - 1) >> 4) + 1):
+		for col: int in range((x - HERO_BODY_HALF_W_PX) >> 4, ((x + HERO_BODY_HALF_W_PX) >> 4) + 1):
+			if not grid.in_bounds(col, row) or grid.side_at(col, row) == TileGrid.SIDE_WALL:
+				return false
+	return true
 
 # =================================================================================================================
 # Effects (cosmetic) [M 9]

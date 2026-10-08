@@ -101,6 +101,13 @@ func _extra_weight() -> int:
 	return 0
 
 
+## 2.0: true when this platform carries `hero` anywhere over his fence although the 1.0 overlap (halved widths) misses
+## him - a railed raft's rider over its whole fenced width (PHYSICS.md C.7, DESIGN.md G45: no strip at the bow where
+## a fenced rider falls through). The feet band test has passed already. Default: false (every 1.0 platform).
+func _carries_fenced(_hero: PlayerBase) -> bool:
+	return false
+
+
 ## The ride test of PHYSICS.md 11.4 for one hero: true when `hero` is now riding this platform. An egg (2.0,
 ## PlayerBase.down: never in single-player) rides nothing and weighs nothing.
 func _ride_test_hero(hero: PlayerBase) -> bool:
@@ -123,7 +130,7 @@ func _ride_test_hero(hero: PlayerBase) -> bool:
 		hero.sim_pos.x, hero_bottom, ride.x, ride.y, ride.z,
 		sim_pos.x, band_bottom, box_w, depth, box_xo,
 		false, hero.yvel, 1
-	):
+	) and not (hero_bottom >= band_bottom - depth and _carries_fenced(hero)):
 		return false
 	hero.carried_on_tick = Sim.total_ticks
 	hero.ride_platform(self, dx, dy)

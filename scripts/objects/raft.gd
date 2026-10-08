@@ -28,6 +28,9 @@ const DEFAULT_SKIN: String = "log"
 ## wafer w3, wafer w4), pivot (64, 0) = the top-centre = the ride surface; each rider dips it RAFT_DIP_PX.
 const SHEET: Texture2D = preload("res://assets/sprites/objects/raft.png")
 const CELL_ART: Vector2 = Vector2(128, 24)
+## The rails fence sheet (128 x 32 cells, 3 states x 2 widths) and its pivot, the deck's top centre (art px).
+const RAILS_SHEET: Texture2D = preload("res://assets/sprites/objects/raft_rails.png")
+const RAILS_PIVOT_ART: Vector2 = Vector2(64, 26)
 
 ## Cells (3 or 4).
 var width: int = 3
@@ -53,6 +56,8 @@ var _home_row: int = 0
 var _moves: int = 0
 ## Bit per slot: the hero's last floor contact was this raft (rails).
 var _railed_mask: int = 0
+## G45: how far (tiles) the fence opens over a bank that stopped the raft.
+const RAIL_OPEN_TILES: int = 4
 ## Bit per slot: the end of a forward strike was already counted (edge detection of the paddle).
 var _paddle_seen_mask: int = 0
 var _currents: Array[SimEntity] = []
@@ -61,6 +66,9 @@ var _currents_found: bool = false
 var _zone_count: int = -1
 var _drawn_riders: int = 0
 var _sprite: Sprite2D = null
+## The fence of a `rails` raft (art-A's raft_rails.png, wf9_art_to_objects-B.txt): over the deck, behind the riders;
+## frame (width - 3) * 3 + state (0 closed, 1 open towards the left bank, 2 towards the right one, G45). Drawing only.
+var _rails_sprite: Sprite2D = null
 
 
 func _init() -> void:
@@ -97,6 +105,16 @@ func _ready() -> void:
 	_sprite.vframes = maxi(int(SHEET.get_height() / CELL_ART.y), 1)
 	_sprite.frame = mini((2 if skin == "wafer" else 0) + (1 if width == 4 else 0), _sprite.vframes - 1)
 	add_child(_sprite)
+	if rails and skin != "wafer" and (width == 3 or width == 4):
+		_rails_sprite = Sprite2D.new()
+		_rails_sprite.texture = RAILS_SHEET
+		_rails_sprite.centered = false
+		_rails_sprite.offset = -RAILS_PIVOT_ART
+		_rails_sprite.hframes = 3
+		_rails_sprite.vframes = 2
+		_rails_sprite.frame = (width - 3) * 3
+		add_child(_rails_sprite)
+		_rails_sprite.position = _sprite.position
 	_refresh_look()
 
 
@@ -161,6 +179,7 @@ func _sim_tick(phase: int) -> void:
 	super._sim_tick(phase)
 	if phase == Defs.Phase.PLATFORMS:
 		_update_rails()
+		_update_rails_look()
 		var riders: int = rider_count()
 		if riders != _drawn_riders:
 			_drawn_riders = riders
@@ -320,7 +339,34 @@ func _update_rails() -> void:
 			# Another platform carried him, or his feet stand on a floor tile: his last floor contact is not this raft.
 			_railed_mask &= ~bit
 		if (_railed_mask & bit) != 0:
-			hero.fence_x(rail_left(), rail_right_excl())
+			hero.fence_x(_fence_left(level), _fence_right_excl(level))
+
+
+## G45: the fence opens towards a bank that stopped the raft (its leading edge against a floor cell of its surface row,
+## at rest): over the bank's floor a rider may step off onto it (and his floor contact unrails him). Else rail_left().
+func _fence_left(level: LevelBase) -> int:
+	if _docked_at(level, -1):
+		return rail_left() - Tuning.TILE * RAIL_OPEN_TILES
+	return rail_left()
+
+
+## G45: as [method _fence_left] for the right side; else rail_right_excl().
+func _fence_right_excl(level: LevelBase) -> int:
+	if _docked_at(level, 1):
+		return rail_right_excl() + Tuning.TILE * RAIL_OPEN_TILES
+	return rail_right_excl()
+
+
+## True when the raft floats at rest with a bank right ahead on side `side` (-1 left, 1 right).
+func _docked_at(level: LevelBase, side: int) -> bool:
+	return not flying and not beached and rx == 0 and cd == 0 and _bank_ahead(level.grid, side)
+
+
+## A railed raft carries a rider anywhere over his fence (the bow strip bug of the 1.0 halved-width overlap, G45).
+func _carries_fenced(hero: PlayerBase) -> bool:
+	if not rails or (_railed_mask & (1 << hero.slot)) == 0:
+		return false
+	return hero.sim_pos.x >= rail_left() and hero.sim_pos.x < rail_right_excl()
 
 
 ## A hero's own move carried his feet past a raft's deck into the liquid cell under it (the deck sits only
@@ -386,3 +432,13 @@ func _refresh_look() -> void:
 		return
 	var surface_art: float = float(-box_h * Tuning.ART_SCALE)
 	_sprite.position = Vector2(0.0, surface_art + float(Tuning.RAFT_DIP_PX * rider_count() * Tuning.ART_SCALE))
+	if _rails_sprite != null:
+		_rails_sprite.position = _sprite.position
+
+
+## The fence picture's state: closed, or open towards the bank that stopped the raft (drawing only).
+func _update_rails_look() -> void:
+	if _rails_sprite == null or Game.level == null:
+		return
+	var state: int = 1 if _docked_at(Game.level, -1) else (2 if _docked_at(Game.level, 1) else 0)
+	_rails_sprite.frame = (width - 3) * 3 + state

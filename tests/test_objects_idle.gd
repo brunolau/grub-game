@@ -234,3 +234,66 @@ class MountStub:
 	extends SimEntity
 	var driver: PlayerBase = null
 	var gunner: PlayerBase = null
+
+
+# =================================================================================================================
+# G53: an idle hero blocks no mover
+# =================================================================================================================
+
+func _fill(col: int, row: int, w: int, h: int, ch: String) -> void:
+	for r: int in range(row, row + h):
+		for c: int in range(col, col + w):
+			level.set_cell(c, r, ch)
+
+
+## The lead designer's G53 (world-B's w2_l1_coop 'hatches' probe): a returning plate door waits only for a hero who
+## plays; an IDLE partner in its doorway is no obstacle - the door closes and he stands beside it, unharmed.
+func test_a_returning_door_closes_on_an_idle_partner_and_pushes_him_aside() -> void:
+	party(40, 400)
+	var plate: Plate = spawn(&"objects/plate", feet(8, 9), {"name": "p"}) as Plate
+	_fill(20, 0, 1, 10, TileGrid.CH_SOLID_A)
+	var door: RisingColumn = spawn(&"objects/column", feet(20, 9), {"size": "1,3", "rise": 3, "rise_while": "p"}) \
+			as RisingColumn
+	hero.teleport(Vector2i(140, FLOOR_Y))
+	Sim.step(1 + PartyTuning.PLATE_COLUMN_PERIOD * 4)
+	assert_eq(door.risen, 3, "open")
+	assert_true(plate.pressed)
+	# A partner who plays in the doorway: it waits (1.0 / phase-2 rule).
+	p2.teleport(Vector2i(20 * 16 + 4, FLOOR_Y))
+	hero.teleport(Vector2i(40, FLOOR_Y))
+	Sim.step(1 + PartyTuning.PLATE_COLUMN_PERIOD * 3)
+	assert_eq(door.risen, 2, "it waits above P2 who plays")
+	# The same partner dozing: the door closes, P2 stands beside it.
+	p2.idle = true
+	Sim.step(PartyTuning.PLATE_COLUMN_PERIOD * 3)
+	assert_eq(door.risen, 0, "closed: an idle body is no doorstop")
+	for row: int in range(7, 10):
+		assert_eq(level.get_cell(20, row), TileGrid.CH_SOLID_A, "row %d shut" % row)
+	assert_false(ObjTuning._body_in_cell(p2, 20, 9), "pushed out of the door's cells")
+	assert_eq(p2.sim_pos.y, FLOOR_Y, "beside it, on the floor")
+	assert_true(p2.sim_pos.x < 20 * 16, "to the nearer side (he stood in its left half): x %d" % p2.sim_pos.x)
+	assert_false(p2.dead, "unharmed")
+	assert_false(p2.down)
+	assert_true(p2.idle, "still idle (a push is not his input)")
+	p2.idle = false
+
+
+func test_a_falling_boulder_pushes_an_idle_hero_aside_but_waits_for_one_who_plays() -> void:
+	party(40, 400)
+	_fill(30, 10, 2, 2, TileGrid.CH_AIR)
+	var boulder: HeavyBoulder = spawn(&"objects/boulder_heavy", feet(30, 9)) as HeavyBoulder
+	p2.teleport(Vector2i(30 * 16 + 8, 12 * 16))
+	Sim.step(ObjTuning.BOULDER_FALL_TICKS * 3)
+	assert_eq(boulder.block.position.y, 8, "P2 who plays stands in the gap: it waits")
+	p2.idle = true
+	Sim.step(ObjTuning.BOULDER_FALL_TICKS * 3)
+	assert_eq(boulder.block, Rect2i(30, 10, 2, 2), "an idle body does not stop it: it fills the gap")
+	assert_false(p2.dead, "unharmed")
+	for row: int in range(10, 12):
+		for col: int in range(30, 32):
+			assert_false(ObjTuning._body_in_cell(p2, col, row), "P2 is out of cell %d,%d" % [col, row])
+	assert_eq(p2.sim_pos.y, 9 * 16, "neither side of the 2-row-deep gap is free: up onto the boulder's top (row 9 when it"
+			+ " covered row 10; a bare hero does not fall)")
+	assert_true(p2.sim_pos.x >= 30 * 16 and p2.sim_pos.x < 32 * 16, "over the boulder")
+	assert_true(p2.idle)
+	p2.idle = false

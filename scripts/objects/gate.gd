@@ -229,6 +229,9 @@ func _arrive() -> void:
 	else:
 		level.unlock_camera()
 	level.snap_camera()
+	# The party's doze re-decision once more, now that the view stands at the arrival (V3.e: nothing dozes in a
+	# view; wf9_d8_to_objects-A.txt). A party of one returns at once (single-player tick identity).
+	level.notify_hero_teleported(hero)
 	Events.gate_used.emit(from, hero.sim_pos)
 
 

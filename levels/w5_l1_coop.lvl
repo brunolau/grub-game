@@ -9,9 +9,10 @@
 #    plate B beyond the mesa is held (each plate 8+ tiles from its door);
 #  - 'gully': two Shellbacks keep the gully under the plain (a hall exactly 4 rows high); one hero baits the shield
 #    while the other, dropped in through a hole behind it, clubs its back; the keeper door opens when both are dead.
-# The Rollers of the long climb are one bond; the first Roller, the plateau Roller and tortoise, the Expert Roller of
-# the plain and the Expert eagle are left out (a bounce for a lone hero at the hop cliff, or a hit on a plate holder
-# or a baiter).
+# The Rollers of the long climb carry `shell` (G36: as one bond 'climb' a single thrown special could hit two
+# members; the lead designer's ruling, applied by integration in phase 3 - the routes jump them unchanged); the first
+# Roller, the plateau Roller and tortoise, the Expert Roller of the plain and the Expert eagle are left out (a bounce
+# for a lone hero at the hop cliff, or a hit on a plate holder or a baiter).
 
 [meta]
 format = 2
@@ -154,9 +155,9 @@ props/canyon/jar_a 157 15 layer=back
 props/canyon/cave_mouth 175 21 layer=back
 objects/checkpoint 180 21
 objects/sign 71 18 text=SIGN_W5_ROLLER
-enemies/roller 203 11 left=-1 right=1 range=10 coop=bond bond=climb
-enemies/roller 207 11 left=-1 right=1 range=7 coop=bond bond=climb
-enemies/roller 195 14 left=-1 right=1 expert coop=bond bond=climb
+enemies/roller 203 11 left=-1 right=1 range=10 coop=shell
+enemies/roller 207 11 left=-1 right=1 range=7 coop=shell
+enemies/roller 195 14 left=-1 right=1 expert coop=shell
 enemies/walker 205 11 skin=turtle left=-2 right=2 hp=10 expert
 zones/secret 188 11 name=mesa_top rect=187,11,4,2
 zones/secret 196 6 name=high_mesa rect=195,6,3,2

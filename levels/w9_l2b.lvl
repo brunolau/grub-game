@@ -1,0 +1,85 @@
+# Club & Grub - World 9, stage 2b: "Storm Nest" (designer D9a, Book II "The Far Shore").
+# The second half of The Roc's Spire (difficulty 9, Expert only; DESIGN.md A.2 / A.6 / B.5, GAMEPLAY.md 13.6): a
+# short approach along the spire top - the Cave Painting (index 15) waits in a hollow under a breakable floor
+# blocks - the checkpoint, then a drop of ten rows into the Storm Roc's arena (the boss owner's
+# levels/test_enemies_roc.lvl, shifted): a 20 x 11 lock with the stone floor on its last row, the stick nest
+# (one-way, arena cols 6-13 row 8) with the Roc perched on it, the floor at row 10 (the runway, wall to wall)
+# and the air over both runways free for its storm cruise (G46). Phases 1-2 fall to the club (the head while it
+# perches, the buried beak after a dive); in phase 3 the hang-glider appears on the nest by itself: a run-up, a
+# climb on lift against a side wall and three dives onto its back while it cruises over one runway half. The Roc
+# coughs up the fire-starter over the nest; the exit totem stands locked on the right runway.
+
+[meta]
+format = 2
+id = w9_l2b
+name = "Storm Nest"
+kind = sub
+book = 2
+world = 9
+stage = 2
+biome = sky
+terrain_a = sky/terrain_rock
+terrain_b = sky/terrain
+background = storm
+music = level_spire
+min_difficulty = expert
+password_expert = "R0CS"
+bonus_tier = 2
+author = D9a
+
+[legend]
+
+[tiles]
+.................................................|
+.................................................|
+.................................................|
+..................###............................|
+..@.%%............###............................|
+%%%%%%%%%%%$%%%%%%%%%%%%%%%%%%#..................|
+###########......##############..................|
+###########......##############..................|
+###############################..................|
+###############################..................|
+###############################..................|
+###############################..................|
+###############################..................|
+###############################.....--------.....|
+###############################..................|
+##################################################
+##################################################
+
+[entities]
+# --- the approach along the spire top
+props/sky/dead_tree 7 4
+props/sky/rocks_small 9 4
+items/food 4 2 index=1
+items/food 6 2 index=2
+items/painting 15 7 index=15
+zones/secret 14 7 name=hollow rect=11,6,6,2
+items/food 13 7 index=3
+items/treasure 14 7 index=10
+props/sky/feather_a 23 4
+props/sky/skull_ribs 22 4
+props/sky/bone_pile 16 4
+props/sky/crystal_b 25 4
+enemies/harrier 21 1 skin=storm_ptero range=5 hp=10
+items/heart 24 2
+objects/checkpoint 26 4
+props/sky/nest_broken 28 4
+props/sky/cloud_puff 10 1 layer=back
+# --- the Storm Nest (bosses/roc on the nest; the phase-3 gliders appear there by themselves)
+zones/arena 39 14 name=nest rect=30,5,20,11
+bosses/roc 39 12 arena=nest drops=fire_starter
+objects/exit 47 14 locked=true
+props/sky/nest 38 13
+props/sky/nest 41 13
+props/sky/twigs 36 13
+props/sky/twigs 43 13
+props/sky/feather_c 44 14
+props/sky/bone_pile 33 14
+props/sky/skull_big 32 14
+props/sky/feather_b 46 14
+props/sky/rock_big 34 14
+props/sky/crystal_a 48 14
+props/sky/rocks_small 45 14
+props/sky/cloud_puff 40 8 layer=back

@@ -1,0 +1,418 @@
+# Club & Grub - World 4, stage 1 co-op: "Cinder Shaft" for two (designer DB3; docs/expansion/DESIGN.md D.9,
+# LEVEL_DESIGN.md 15.7). The co-op file of levels/w4_l1.lvl (kind = coop, coop_of, coop_base_hash; never edit the
+# solo file): the auto-scrolling descent down the volcanic chimney, for two - the view sinks one pixel per tick and
+# its top edge eggs a hero while his partner lives (DESIGN.md D.2). Expert only, as the solo stage.
+# Co-op gates:
+#  - "boulder": in the lava strata a heave boulder waits on the upper floor. Only two heroes pushing together move
+#    it; pushed into the chute it falls into the lava pool below, plugs the lava vent there and stands in the
+#    pool as a stepping stone - the pool (10 cells) is far too wide to jump alone. Both must manage it inside the
+#    descent, before the view passes.
+#  - "cliff": the magma chamber at the bottom (where the descent stops): the exit totem stands on the cinder cliff,
+#    8 rows over the floor - a boost ledge [G28]: one hero Shoulder-Hops off his partner's head onto it and clubs
+#    the coiled vine at the cliff face down for him. (D.9 named a Batter Up lob here: a 7-row lob ledge falls to
+#    one player [G48], and the 171 px arc of a charged lob onto 8 rows meets the chamber's ceiling.)
+# Traits: the stingers of the ember rain and the diggers are loners, the gallery turtle a Shellback (the stingers
+# over the zigzag ledges and the spike strata stay plain: those steps themselves part the pair by a row). The x2
+# secret: the Cinder Cache vault got a shelf 8 rows over its floor (Shoulder Hop) with Cave Painting 27.
+
+[meta]
+format = 2
+id = w4_l1_coop
+name = "Cinder Shaft"
+kind = coop
+coop_of = w4_l1
+coop_base_hash = "95263d9f0edeaa2f7efe72b092289c6c7565a5239cae197e6928e79363fc3fc2"
+book = 1
+world = 4
+stage = 1
+biome = volcano
+terrain_a = volcano/terrain
+terrain_b = volcano/terrain_obsidian
+liquid = lava
+background = volcano_shaft
+music = level_shaft
+scroll = autoscroll
+min_difficulty = expert
+author = DB3
+notes = "Co-op 4-1: heave boulder into the lava pool (plugs the vent), Shoulder Hop onto the 8-row exit cliff, lone stingers, the Cinder Cache shelf (painting 27)."
+
+[legend]
+j = items/food index=42
+f = items/food index=47
+g = items/food index=41
+h = items/food index=45
+b = items/food index=46
+k = items/food index=33
+n = items/food index=43
+m = items/food index=40
+t = items/treasure index=4
+C = objects/checkpoint
+H = items/heart
+G = items/letter index=0
+R = items/letter index=1
+U = items/letter index=2
+S = items/letter index=4
+Q = objects/hidden_spot kind=small count=3 look=inset tile=# contents=food:40,food:35,treasure:1
+
+[tiles]
+####............##############################
+###..............#############################
+##................############################
+#..................###########################
+#..................###########################
+#..................###########################
+#.......j......@...###########################
+#.....------##################################
+#...........##################################
+#..........f.......###########################
+#-------------.....###########################
+#..................###########################
+#..................###########################
+#.....-------------###########################
+#..................###########################
+#.........j........###########################
+#-------------.....###########################
+#..................###########################
+#..................###########################
+#.....-------------###########################
+#Q.................###########################
+#Q.....j...........###########################
+##------------.....###########################
+#..................###########################
+#.............g....###########################
+#.............g....###########################
+#.....-------------###########################
+#..................###########################
+#.t................###########################
+#-----.............###########################
+#..................###########################
+#.....h.h.h......G.###########################
+##########Q#####...###########################
+################...###########################
+#..................###########################
+#..................###########################
+#.......k....h..---###########################
+#.....h............###########################
+#..................###########################
+#..#?##..#####################################
+#..####..#####################################
+?..####..........#############################
+?..................###########################
+#---...............###########################
+#..................###########################
+#..................###########################
+#........n.n.n.....###########################
+###~~~~~~~~~~####..###########################
+#################..###########################
+#################..###########################
+#..................###########################
+#...............---###########################
+#..................###########################
+#.....b............###########################
+#..b...............###########################
+#..##~~#####Q#################################
+#..###########################################
+#..###########################################
+#..................###########################
+#--................###########################
+#..................###########################
+#......C...........###########################
+###############...############################
+###############...############################
+#..................###########################
+#..................###########################
+#..................###########################
+#.........j........###########################
+#..........========###########################
+#..................###########################
+#..................###########################
+#..................###########################
+#..................###########################
+#..................###########################
+#..j......b........###########################
+#==========........###########################
+#..................###########################
+#..................###########################
+#..................###########################
+#..................###########################
+#............jg.gR.###########################
+#..........========###########################
+#..................##########................#
+#..................##########................#
+#..................#########.............#####
+#....j.....f.......########..................#
+###???###___###############..................#
+#########...###############..................#
+#########...###############===...............#
+#..................########..................#
+#.......-----......########..................#
+#..................########..................#
+#..................###########QQ##############
+#....C...h.h.h.....###########################
+##?###########...#############################
+##############...#############################
+###..............#############################
+###...........---#############################
+###..............#############################
+###......f.......#############################
+###..###^#####################################
+###..#########################################
+###..............#############################
+###---...........#############################
+###..............#############################
+###.........f....#############################
+############^##..#############################
+###############..#############################
+###!!!!!!!!......#############################
+###...........---#############################
+###.............$..###########################
+###..g.g.g......$U.###########################
+###..#########################################
+###..#########################################
+###..............#############################
+###---...........#############################
+###..............#############################
+###......k.k.....#############################
+###########^###..#############################
+###############..#############################
+#..................###########################
+#..................###########################
+#..................###########################
+#........#####################################
+#........#####################################
+#..................###########################
+#..................###########################
+#..................###########################
+#..f.f.............###########################
+###########........###########################
+###########........###########################
+#..................###########################
+#..................###########################
+#..................###########################
+#............j..k..###########################
+#........#####################################
+#........#####################################
+#..................###########################
+#..................###########################
+#..................###########################
+#...g.h............###########################
+###########........###########################
+###########........###########################
+#..................###########################
+#..................#########................##
+#.......h.h......C.########..................#
+#.......###?###############..................#
+#.......###################.......=====......#
+#..................########..................#
+############.......########..................#
+############....###########..%%%%......%%%%..#
+#...............$..########..................#
+#.........n.....$..########..................#
+#.......#######################?*?########*###
+#.......######################################
+#..................###########################
+#..................###########################
+#...------m...m....###########################
+#..................###########################
+#...H...m..........###########################
+#################..###########################
+#..................###########################
+#..................###########################
+#.......S..........###########################
+#############......###########################
+#############......###########################
+#############......###########################
+#############......###########################
+#############......###########################
+#############......###########################
+#############......###########################
+#############......###########################
+##############################################
+
+[entities]
+# Crater throat: a boulder by the start hides a snack
+objects/hidden_spot 13 6 kind=small count=3 contents=food:43,food:45,food:33 prop=volcano/rock_big
+# Teaching sign under the start: the view only starts to sink once the player moves (Level, autoscroll).
+objects/sign 16.5 6 text=SIGN_W4_SHAFT
+# Digger gallery 1
+enemies/digger 8 31 skin=lizard_b zone=1,27,15,5 coop=lone
+# More of the shaft's dwellers (review fresh_eyes: the finale had the fewest enemies of the game): a turtle on the
+# gallery floor, stingers hovering in the chimneys. Placed so that every weapon's route keeps its timing.
+enemies/walker 12 31 skin=turtle_b left=-3 right=3 hp=25 coop=shell
+enemies/stinger 8 14 skin=insect_b range=3 hp=20
+enemies/stinger 9 102 skin=insect_b range=3 hp=20
+enemies/stinger 14 125 skin=insect_b range=4 hp=20 coop=lone
+objects/hidden_spot 13 31 kind=small count=3 contents=food:35,food:43,treasure:2 prop=volcano/skull_big
+# Lava strata: an obsidian raft crosses the wide pool when the hero steps on it
+enemies/leaper 5.5 55 skin=dragon pause=88
+# Ember chute
+zones/ember_rain 9 74 rect=1,64,18,22 period=28
+# A hint as the hero enters the first ember rain (review fresh_eyes: the rain started unannounced).
+zones/message 9 65 rect=1,62,18,5 text=SIGN_W4_EMBERS
+enemies/stinger 17 77 skin=insect_b range=4 hp=20 coop=lone
+objects/hidden_spot 5 74 kind=small count=3 contents=food:46,food:41,food:45 prop=volcano/bone_big
+# Hatch band: the gate to the Cinder Cache
+objects/gate 16 85 name=v1_door dest=v1_in skin=hole
+# Digger gallery 2
+enemies/digger 8 93 skin=lizard_b zone=1,89,13,5 coop=lone
+objects/marker 2 93 name=v1_back
+# Spike strata: the niche behind the breakable wall
+zones/secret 17 111 name=u_niche rect=17,110,2,2
+# Obsidian cavern: zigzag ledges under the ember rain; the vault door hides behind a breakable wall
+zones/ember_rain 9 138 rect=1,120,18,34 period=30
+objects/hidden_spot 15 134 kind=small count=3 contents=food:33,food:43,treasure:6 prop=volcano/skull_ribs
+objects/gate 17 152 name=v2_door dest=v2_in skin=hole
+# Lava gallery
+objects/marker 2 159 name=v2_back
+# Magma chamber: the descent stops here
+zones/autoscroll_stop 9 169 rect=1,163,18,8
+# Vault 1: the Cinder Cache (gate on the hatch band)
+zones/secret 35 91 name=cinder_cache rect=27,83,18,9
+objects/gate 28 91 name=v1_in dest=v1_back lock=26,82 skin=hole
+items/letter 43 91 index=3
+items/treasure 33 91 index=8
+items/treasure 28 87 index=14
+items/code_stone 33 91 index=0
+items/code_stone 36 91 index=1
+items/food 38 91 index=40
+items/food 40 91 index=35
+objects/hidden_spot 42 92 kind=big hits=3 contents=giant:0 tile=# look=block
+# Vault 2: the Ember Hoard (gate behind the breakable wall at the bottom of the cavern)
+zones/secret 35 152 name=ember_hoard rect=27,144,18,9
+objects/gate 28 152 name=v2_in dest=v2_back lock=26,143 skin=hole
+items/treasure 36 146 index=15
+items/treasure 31 149 index=10
+items/treasure 41 149 index=12
+items/code_stone 38 152 index=2
+items/code_stone 40 152 index=3
+items/one_up 36 152
+# Scenery
+props/volcano/bone_big 17 6
+props/volcano/grass_a 11 6
+props/volcano/stalactite 14 9
+props/volcano/drip_cap 16 9
+props/volcano/mound_small 7 9 flip
+props/volcano/skull_buried 9 12 flip
+props/volcano/rocks_small 6 15
+props/volcano/mound_small 11 18
+props/volcano/bone_pile 10 21 flip
+props/volcano/skull_buried 13 67
+props/volcano/mound_small 7 74 flip
+props/volcano/skull_buried 12 80 flip
+props/volcano/skull_buried 2 85 flip
+props/volcano/rocks_small 14 85
+props/volcano/drip_cap 6 120
+props/volcano/rocks_small 11 122
+props/volcano/bone_big 17 122
+props/volcano/stalactite 12 125
+props/volcano/drips 15 125
+props/volcano/mound_brown 8 128
+props/volcano/stalactite 3 131
+props/volcano/drips 7 131
+props/volcano/twigs 17 134
+props/volcano/stalactite 14 137
+props/volcano/drip_cap 11 137
+props/volcano/bone_big 2 140
+props/volcano/boulders 9 140 flip
+props/volcano/stalactite 6 143
+props/volcano/drip_cap 3 1
+props/volcano/bone_pile 13 25
+props/volcano/bone_pile 4 28
+props/volcano/mound_small 1 31 flip
+props/volcano/mound_small 5 31 flip
+props/volcano/skull_buried 11 31 flip
+props/volcano/drip_cap 2 34
+props/volcano/stalactite 3 34
+props/volcano/stalactite 7 34
+props/volcano/stalactite 11 34
+props/volcano/twigs 18 35
+props/volcano/bone_big 3 38
+props/volcano/boulders 11 38
+props/volcano/boulders 17 38
+props/volcano/drip_cap 10 42
+props/volcano/drip_cap 14 42
+props/volcano/stalactite 15 42
+props/volcano/tusk_a 2 46 flip
+props/volcano/drip_cap 6 50
+props/volcano/stalactite 7 50
+props/volcano/bone_big 11 54
+props/volcano/twigs 15 54
+props/volcano/drips 17 58
+props/volcano/bone_pile 1 61 flip
+props/volcano/bone_big 6 61
+props/volcano/grave_cross 10 61
+props/volcano/drip_cap 8 64
+props/volcano/stalactite 10 64
+props/volcano/stalactite 1 89
+props/volcano/skull_buried 10 89
+props/volcano/skull_buried 27 91 flip
+props/volcano/skull_ribs 31 91 flip
+props/volcano/skull_buried 39 91 flip
+props/volcano/gravestone 1 93 flip
+props/volcano/grave_cross 6 93
+props/volcano/rocks_small 12 93
+props/volcano/drip_cap 8 96
+props/volcano/mound_small 15 96
+props/volcano/mound_small 5 99 flip
+props/volcano/skull_ribs 11 99 flip
+props/volcano/stalactite 8 102
+props/volcano/drip_cap 10 102
+props/volcano/rock_big 7 105 flip
+props/volcano/mound_small 11 105 flip
+props/volcano/drips 11 108
+props/volcano/stalactite 13 108
+props/volcano/rock_big 13 111 flip
+props/volcano/stalactite 11 114
+props/volcano/stalactite 12 114
+props/volcano/stalactite 16 114
+props/volcano/mound_brown 4 117
+props/volcano/mound_brown 12 117
+props/volcano/stalactite 1 120
+props/volcano/grave_cross 14 145
+props/volcano/drip_cap 27 145
+props/volcano/bone_pile 2 148 flip
+props/volcano/tusk_b 8 148 flip
+props/volcano/stalactite 14 148
+props/volcano/skull_buried 17 149 flip
+props/volcano/gravestone 29 149 flip
+props/volcano/rocks_small 40 149
+props/volcano/stalactite 3 151
+props/volcano/stalactite 4 151
+props/volcano/drips 6 151
+props/volcano/bone_big 9 152
+props/volcano/gravestone 30 152 flip
+props/volcano/bone_pile 42 152 flip
+props/volcano/stalactite 11 155
+props/volcano/drip_cap 17 155
+props/volcano/drips 18 155
+props/volcano/tusk_a 1 159 flip
+props/volcano/bone_big 12 159
+props/volcano/stalactite 3 163
+props/volcano/drips 6 163
+props/volcano/stalactite 7 163
+props/volcano/stalactite 11 163
+props/volcano/drips 14 163
+# ---- co-op (DB3) --------------------------------------------------------------------------------------------
+objects/hero_start 14 6 slot=2
+# Gate "boulder" (DESIGN.md D.9 4-1): the heave boulder on the upper floor of the lava strata; pushed left into the
+# chute (cols 7-8) it falls into the pool below and plugs the lava vent there. The tablet stands where the
+# heroes drop in; the far cell is the lower chamber's right bank.
+objects/sign 15 38 text=SIGN_COOP_W4_BOULDER
+objects/x2_tablet 17 38 gate=boulder far=14,46
+objects/boulder_heavy 10 38
+objects/geyser 7 47 deadly period=66 delay=20
+# Gate "cliff" (DESIGN.md D.9 4-1): the exit totem on the cinder cliff, 8 rows over the magma chamber floor (a
+# boost ledge). One hero Shoulder-Hops off his partner's head onto it and clubs the coiled vine at the cliff face
+# (col 13) down for him. The far cell is the cliff top by the exit; the coil is 12 cells from it and 8 rows over
+# the floor (out of a jumping strike reach).
+objects/sign 17 171 text=SIGN_COOP_W4_CLIFF
+objects/x2_tablet 16 171 gate=cliff far=1,163
+objects/vine 13 164 length=8 rolled
+objects/exit 3 163
+# The letter S of the solo pillar (the chamber was rebuilt) lies on the cliff top, on the way to the exit.
+# The x2 secret: the Cinder Cache's shelf, 8 rows over the vault floor (Shoulder Hop), with Cave Painting 27.
+objects/x2_tablet 37 91 secret far=43,83
+items/painting 43 83 index=27
+props/volcano/bone_pile 42 83
+props/volcano/drip_cap 42 85
+props/volcano/drips 44 85

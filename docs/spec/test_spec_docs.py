@@ -319,7 +319,7 @@ class ResolutionMarkers(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------------------------------------------------
-# Phase-3 rulings (DESIGN.md G33-G43, 2026-10-08)
+# Phase-3 rulings (DESIGN.md G33-G56, 2026-10-08)
 # ---------------------------------------------------------------------------------------------------------------------
 
 def _pending(case, done, what):
@@ -508,7 +508,12 @@ class RisingCameraAndLee(unittest.TestCase):
         self.assertIn("- **Footing follow** [G42]", c8)
         self.assertIn("[G42]", _section(LEVEL_DESIGN_15, "### 15.5"))
         self.assertIn("a croucher\n  is never idle [G41]", _section(APPENDIX_C, "### C.6"))
-        self.assertIn("else build the fallback, a Brace corridor [G41]", LEVEL_DESIGN_15)
+        # [G55] supersedes G41's gate kind: the lee is a comfort; a gate there is a Brace corridor, a line drive or a hall.
+        self.assertIn("| ~~Lee gap~~ | **retired as a gate kind** [G55]", LEVEL_DESIGN_15)
+        self.assertIn("a co-op lee is a comfort, not a gate [G55]", LEVEL_DESIGN_15)
+        self.assertIn("never a gate - the first hero crosses unsheltered [G55]", _section(APPENDIX_C, "### C.6"))
+        self.assertIn("**Superseded by [G55]**: the lee is no gate.", DESIGN)
+        self.assertNotIn("else build the fallback, a Brace corridor", LEVEL_DESIGN_15)
 
     def test_the_footing_follow_is_built_and_the_docs_say_so(self):
         # world-A built G42 in phase 3: the docs no longer keep G32's "every jump lands higher" as a building rule.
@@ -579,6 +584,10 @@ class PendingOwnerChanges(unittest.TestCase):
     until the owner's file carries the change, asserted from then on (so the gate table shows what is open)."""
 
     def test_g33_traits_count_only_active_heroes(self):
+        # Until the shell faces the nearer ACTIVE hero, the shell keeper halls are open on the engine (D8's replays):
+        # the docs must say so and keep the "a replay wins over a bounded refusal" rule.
+        self.assertIn("**A refusal is bounded; a replay wins.**", _section(LEVEL_DESIGN_15, "#### 15.7.6"))
+        self.assertIn("are **open on the engine** until `coop_traits.gd`", DESIGN)
         src = _read("scripts/enemies/coop_traits.gd")
         _pending(self, "nearest_coop_hero" in src or "counts_for_coop" in src,
                  "enemies-A (no owner this phase): coop_traits.gd still counts idle heroes - shell bait, lone, "
@@ -609,12 +618,36 @@ class PendingOwnerChanges(unittest.TestCase):
                  "(wf9_lead_design_to_party.txt #2)")
         self.assertRegex(src, r"counts_for_coop|G53")
 
+    def test_g54_a_head_is_never_a_step_into_rock(self):
+        self.assertIn("- **A head is never a step into rock** [G54]", _section(APPENDIX_C, "### C.10"))
+        built = [rel for rel in ("scripts/world/party_driver.gd", "scripts/base/player_base.gd",
+                                 "scripts/player/player.gd", "scripts/bosses/chieftain.gd") if "G54" in _read(rel)]
+        _pending(self, built != [], "party / player-A and enemies-C: no head lifts a hero into rock "
+                 "(wf9_lead_design_to_party.txt #3, wf9_lead_design_to_enemies_c.txt #5)")
+
     def test_g52_inkjaw_drops_its_key_item_over_an_island(self):
         src = _read("scripts/bosses/squid.gd")
         _pending(self, re.search(r"func _drop_origin\(", src) is not None,
                  "enemies-B: Inkjaw's _drop_origin over the nearest island, a sunk key item back on ground "
                  "(wf9_lead_design_to_enemies_b.txt #3)")
         self.assertIn("[G52]", _section(DESIGN, "### B.0"))
+
+    def test_g56_the_brutes_leaps_are_no_weak_point(self):
+        # [G56] no weak point after a lethal blow (every boss); the co-op Brute's 1.0 high jump leaves the den's view:
+        # no counted hit from take-off to landing, so G35 holds.
+        self.assertIn("all - in both poses it is no weak point [G56]", _section(DESIGN, "### B.7"))
+        b0 = _section(DESIGN, "### B.0")
+        self.assertIn("**cannot be struck**", b0)
+        self.assertIn("A boss after its lethal blow (the death leap or fall) has no weak", b0)
+        self.assertIn("so it is no weak point there [G56]. (Every boss: no weak point after its lethal blow.)",
+                      GAMEPLAY_13.replace("\n  ", " "))
+        src = _read("scripts/bosses/brute.gd")
+        test = _read("tests/test_enemies_brute.gd")
+        _pending(self, "G56" in src, "enemies-C: the Brute's head rect is empty while DYING (every form) and, in the "
+                 "co-op form, in the high jump (no counted hit there); test_enemies_brute pins both poses "
+                 "(wf9_db2_to_enemies_c.txt #1 / #2, wf9_lead_design_to_enemies_c.txt #6 / #7)")
+        self.assertRegex(test, r"(?s)DYING.*weak_point_problem|weak_point_problem.*DYING")
+        self.assertRegex(test, r"(?s)JUMP.*weak_point_problem|weak_point_problem.*JUMP")
 
     def test_g46_the_roc_cruises_over_one_runway_half(self):
         # Built by enemies-C in phase 3 (roc.gd, test_enemies_roc.gd); DESIGN G46 says so.
@@ -674,7 +707,8 @@ class ArenasAsBuilt(unittest.TestCase):
     """[G31] [G43] E.5 draws the arenas DA built at G2: the sketch's collision equals the level file's."""
 
     ARENAS = {"Totem Ring": "arena_totem_ring", "Cinder Pit": "arena_cinder_pit", "Echo Hollow": "arena_echo_hollow",
-              "Coconut Cove": "arena_coconut_cove"}
+              "Coconut Cove": "arena_coconut_cove", "Sky Picnic": "arena_sky_picnic",
+              "Colossus Hall": "arena_colossus_hall", "Floe Rink": "arena_floe_rink"}
 
     def test_sketches_equal_the_files(self):
         for name, level_id in self.ARENAS.items():
@@ -683,6 +717,12 @@ class ArenasAsBuilt(unittest.TestCase):
             self.assertEqual(len(sketch), 12, name)
             self.assertEqual(sketch, built, "%s: E.5 and levels/%s.lvl differ (update the sketch) [G43]"
                              % (name, level_id))
+
+    def test_floe_rink_has_no_see_saw_while_bots_cannot_ride_one(self):
+        # [G51] the fixed floes; a see-saw may return only with both ends over standable ground.
+        text = _read("levels/arena_floe_rink.lvl")
+        self.assertNotRegex(text, r"(?m)^objects/seesaw\b")
+        self.assertIn("[G51]", _section(DESIGN, "### E.5", r"\n### "))
 
     def test_colossus_hall_modes(self):
         row = [r for r in _table_rows(_section(DESIGN, "### E.5", r"\n### "), "| # | Arena |") if "Colossus Hall" in r[1]][0]

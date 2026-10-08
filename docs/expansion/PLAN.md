@@ -207,6 +207,9 @@ test levels (enemies-C, before D8 / D9 build 8-2b, 9-1b and 9-3).
 **Phase 3 start (2026-10-08)**: the orchestrator's decisions (the idle partner, boss co-op forms by actions, boss weak
 points clear of the HUD, bonded-pair placement, cut 2 applied, cut 3 conditional) and the lead designer's decisions
 on the G2 reports are DESIGN.md G33-G43; the rulings went to every owner as `build/engine_requests/wf9_lead_design_to_*.txt`.
+The lead designer's rulings on the reports of phase 3 (designers' as-built forms, the daze and the lee, boss key items,
+idle doorstops, human-only arenas, the co-op Brute's leap) are G44-G56; `docs/spec/test_spec_docs.py` pins them
+against the code and skips, with the request named, each one whose owner has not built it yet.
 
 ### 6.1 Level-designer write areas
 
@@ -245,6 +248,31 @@ Integration keeps `test_book2_routes` / `test_coop_routes` / `test_coop_gates` a
 
 **Gate G3**: 20 Book II files + 35 co-op files + 10 arenas; 31 solo club routes, about 6 featured routes, 57 two-stream
 co-op routes, belt invariance on all, every x2 gate refused by the search, every (arena, mode) bot test green.
+
+**G3 integration (2026-10-08, `bash tools/g3.sh`, run dir `build/g3/run_g3final2`)**: content 20 / 20 Book II files,
+35 / 35 co-op files, 31 / 31 solo route cells, 6 / 6 featured routes, paintings 20 / 20, x2 gates 76 / 76 (9-3 and the
+boss sub-stages gated by their co-op form, G49), 8 / 8 launch arenas (Tar Pulleys human-only, G50; Mesa Rodeo and
+Cloud Top not built, cut 3); co-op route cells **51 / 57** - `w1_l2_coop`, `w2_l1_coop` and `bonus_b_coop` (DB1) have no
+two-stream route on either difficulty. Proofs: default suite 1 657 / 1 657 (313-433 s, V7); `campaign_routes` 18 / 18;
+`book2_routes` 8 / 8 with its G3 switches ON (every Expert cell; the Beginner run plays 10 stages - Feast Land E by
+7-1's warp - to the expert wall, the Expert run 18 to The End); `coop_routes` 9 / 10 (the one red test lists DB1's three
+files; every other co-op route passes V3.a / V3.b / V3.e / G35, the co-op Book II runs reach the expert wall and The
+End, the Book I runs stop PENDING at `w1_l2_coop`); `coop_gates` 76 / 76 refused on the G33 / G47 engine
+(`tools/world_coop_gates.sh`, 12 workers, 382 s); `versus_bots` green in 8 shards (`tools/g3_versus_bots.sh`): 15 launch
+cells plus the test arenas, Coconut Cove's Clubball 48 / 52 % after the coconut's symmetric x step; `tools/sp_identity.sh`
+IDENTICAL; validator `--strict` 0 errors on 120 files (2 optional lee warnings in `w3_l1b_coop`); smoke clean; the
+campaign flows headless (`campaign` 116 checks, `campaign_beginner` 14, `campaign_b2` 155, `campaign_coop` 234 with
+Book I PENDING); windowed with screenshots looked at: `tools/autoplay/g3_versus.flow` (every bot cell through the real
+versus UI, 96 checks, 149 screenshots), `campaign_b2.flow` (155 checks, 187 screenshots, both difficulties to the
+expert wall and The End), `campaign_coop.flow` (234 checks, 233 screenshots; Book I PENDING at `w1_l2_coop`); the
+Windows build
+(`tools/build_windows.ps1`: suite, export, smoke - 78 levels, 0 errors). Built by the integrator for owners who did not
+run in phase 3 (DESIGN appendix "Built at G3"): G33 / G47 (`coop_traits.gd`), G39, G45 + the rails picture, G50
+(`test_versus_bots`, `VersusMatch`), G52, G56, the gate.gd doze re-decision (V3.e), the bench's boss bot slots, the
+flow runner's boss bot slots, the coconut, w5_l1_coop's bond (G36), w9_l2's feast kit order (a kit carried from 8-1
+completed it early in the Expert campaign), bonus_a_coop's route. **Gate G3 is not reached**: the three DB1 co-op files
+need their routes; open besides: G54 (a head as a step into rock), the raft's drag clock while dozing, the 5-1 spear
+route for the Feast Land D warp (D5), Floe Rink's see-saw floes (G51) and Tar Pulleys' CPUs (core-B).
 
 ---
 

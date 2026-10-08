@@ -203,8 +203,8 @@ var death_origin: Vector2i = Vector2i.ZERO
 var death_cause: StringName = &""
 
 # --- 2.0 IDLE rule (orchestrator decision of phase 3; counted only in a co-op party, [method note_own_input]) ---------
-## Ticks without input of his own after which a co-op hero is IDLE (10 s at Tuning.TICK_HZ). Private constant until
-## core-A adds PartyTuning.IDLE_TICKS (build/engine_requests/wf9_party_to_core-A.txt).
+## Ticks without input of his own after which a co-op hero is IDLE (10 s at Tuning.TICK_HZ): the value of
+## PartyTuning.IDLE_TICKS (tests/test_core_expansion.gd pins that the two agree).
 const IDLE_TICKS: int = 243
 ## Ticks since his own player slot last held an input flag (0 on a tick on which it held one), counted from his entry
 ## into the level and capped at IDLE_TICKS. Kept through hatches, respawns and team wipes. Always 0 in single-player.

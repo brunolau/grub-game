@@ -1442,7 +1442,7 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
   ground, a platform or a carrier under his feet again, or the wind changes sign (a jump taken in the lee crosses the
   gap in it). A sheltered hero's `WIND` primitive sees wind 0. 64 / 16 px *(tune)*: the second hero waits at the near
   edge in the lee of the first, who crouches just past the far edge, so gaps of up to 3 tiles leapfrog both ways
-  ("lee leapfrog", 3-1b and 9-2 co-op). No wind, a completed level or one hero of `H`: nobody is sheltered. The hero
+  ("lee leapfrog": a co-op comfort, never a gate - the first hero crosses unsheltered [G55]). No wind, a completed level or one hero of `H`: nobody is sheltered. The hero
   reads the wind per hero (`LevelBase.wind_for(hero)`: 0 in a lee, else the level's wind) in every `WIND` step of
   5.1 (idle, walk, hurt, both of the jump, the glider take-off).
 - **Lightning** `zones/lightning period=<ticks> [delay] [mark=22]` (`period` default 66): the strike clock counts the
@@ -1598,7 +1598,12 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
   a body: he stands, is launched (geysers, see-saw ends), rides platforms, is hurt, goes down and is leashed - but he
   **blocks no mover** [G53]: a plate door, column, slab or heave boulder that would wait for a hero in its way does not
   wait for an idle one; it moves as if he were not there, and on the tick it fills cells his body overlaps he is pushed
-  out of them, unharmed, sideways to the nearer free side (up onto the block's top when neither side is free). Together
+  out of them, unharmed, sideways to the nearer free side (up onto the block's top when neither side is free).
+- **A head is never a step into rock** [G54]: when standing on, riding or bouncing off a head (an enemy's, a boss
+  body's or a hero's) would put a hero's box into a solid cell, he slides off that head instead (to the side away
+  from the rock, else the nearer side) and the bounce is cut to the free room under the ceiling; a corner slip never
+  lifts a hero into a solid cell. Book I has no head under a ceiling closer than a hero's height, so single-player
+  routes are unchanged. Together
   with the hatch bounce of C.12 (b) this is the rule **an egg is no springboard**: one player can never use his
   partner's egg or idle body as a step, a weight or a bait.
 - **Shoulder Hop**: `A.bounce(-224, depth)` - exactly the enemy bounce of section 9 (`yvel = -224`,

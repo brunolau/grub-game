@@ -1,4 +1,4 @@
-# route: level=w6_l2_coop difficulty=beginner players=2 ends=exit after=tally expect=wipes:0,eggs:0,x2_gates:2,min_checkpoints:4
+# route: level=w6_l2_coop difficulty=beginner players=2 ends=exit after=level:w6_l2b_coop expect=wipes:0,eggs:0,x2_gates:2,min_checkpoints:4
 # The Beginner two-stream route of Spore Hollow in co-op (designer D6; recorded from build/d6/bot_w6_l2_coop.gd, P1|P2):
 # gate 'seesaw' (P2 springs onto the cap ledge and drops on the high end, P1 flies up and unrolls the vine, P2
 # climbs it), the geyser and the shelf passage one after the other, gate 'caps' (P1 at the floor drum, P2 on the

@@ -1,0 +1,302 @@
+# Club & Grub - World 3, stage 2 co-op: "Crystal Grotto" for two (designer DB3; docs/expansion/DESIGN.md D.9,
+# LEVEL_DESIGN.md 15.7). The co-op file of levels/w3_l2.lvl (kind = coop, coop_of, coop_base_hash; never edit the
+# solo file): the same mountain - the crystal gallery, the leaper lake, the chasm floe, the lower gallery, the
+# crystal shaft and the skylight cave - for two.
+# Co-op gates (both at the leaper lake, its wide pool narrowed to 9 cells of icy water; the near bank is a rock lip
+# two rows over the far one, from which a line drive carries over and a running jump falls short):
+#  - "drive": a Batter Up line drive - one hero curls at the bank's edge and his partner bats him over the pool;
+#  - "floes": the twin drums - the batted hero strikes the far bank's drum while his partner strikes the near
+#    bank's drum on the count of three: the floes under the surface freeze into a bridge and the batter walks over.
+#    The drums stand 19 columns apart, so one hero alone needs far longer than the window (and no throw from one
+#    bank reaches the other drum).
+# Traits: the walking turtles are Shellbacks (shell), the hoppers Raptors (daze), and the lower gallery's two ice
+# pits hold twin leapers (bond, 17 columns apart). The warp to Feast Land C moved up into the crystal cache, a
+# boost ledge 8 rows over the skylight cave's floor: one hero Shoulder-Hops there off his partner's head - the x2
+# secret, with Cave Painting 26. Checkpoint behind the gates on the far bank.
+
+[meta]
+format = 2
+id = w3_l2_coop
+name = "Crystal Grotto"
+kind = coop
+coop_of = w3_l2
+coop_base_hash = "f62d74e708c0bfb6da25c2be0add533555e13e535dcf56ef1acf0d5e2a22cd09"
+book = 1
+world = 3
+stage = 2
+biome = ice
+terrain_a = ice/terrain_rock
+terrain_b = ice/terrain
+ice_a = 0
+ice_b = 2
+liquid = ice_water
+background = ice
+music = level_grotto
+bonus = bonus_c
+bonus_tier = 1
+author = DB3
+notes = "Co-op 3-2: Batter Up line drive + twin drums over the leaper lake, Shellbacks, Raptors, twin leapers, the warp and painting 26 in the crystal cache (Shoulder Hop)."
+
+[legend]
+? = objects/hidden_spot kind=small count=3 contents=food:34,food:32,food:31 tile=#
+i = objects/hidden_spot kind=small count=3 contents=food:34,food:32,treasure:3 look=inset tile=#
+* = objects/hidden_spot kind=big hits=3 contents=giant:5 tile=#
+$ = objects/breakable_block hits=2 contents=food:15 tile=;
+r = objects/hidden_spot kind=small count=2 contents=food:3,food:2 tile=#
+C = objects/checkpoint
+E = objects/exit
+O = objects/drop_platform skin=ice delay=8
+D = enemies/dart skin=bat_b range=6 speed=3 hp=10
+d = enemies/dart skin=pterodactyl_b range=7 speed=4 hp=10 expert
+X = enemies/leaper skin=dragon_b pause=110 hp=10
+A = enemies/dangler skin=bat_b depth=56 hp=10
+f = items/food index=34
+g = items/food index=32
+k = items/food index=19
+c = items/food index=31
+j = items/treasure index=10
+n = items/treasure index=15
+t = items/treasure index=6
+
+[tiles]
+................................................................................................................................................................................
+................................................................................................................................................................................
+................................................................................................................................................................................
+................................................................................................................................................................................
+......................##........................................................................................................................................................
+......................##......###############################...................................................................................................................
+##....................################################################################################################################################################..........
+##....................################################################################################################################################################..........
+##....................################################################################################################################################################..........
+##....................################################################################################################################################################..........
+##....................################################################################################################################################################..........
+##.........................A.....#####################################################################################################################################..........
+##................................####################################################################################################################################..........
+##.................................###################################################################################################################################..........
+##..................................##################################################################################################################################..........
+##...................................#######...#######################################################################################################################..........
+##......fff...........................######D.d#######################################################################################################################..........
+##..@....................g.g.g...................#####################################################################################################################..........
+######rrr######?#############??#\g................####################################################################################################################..........
+#################################\.................###################################################################################################################..........
+##################################\g................##################################################################################################################..........
+###################################\.................#################################################################################################################..........
+####################################\g................################################################################################################################..........
+#####################################\...........................#####################################################################################################..........
+########################################*#######\g................####.................................................###############################################..........
+#################################################\.................###................................c................#########################################................
+##################################################\g................##.................................................###############################D##d######................
+###################################################\.................#............................c....................#############################...........#................
+####################################################\g.................................................................#############################...........#########........
+#####################################################\....................................................j............#############################...........#######..........
+##############################################################$$\.............................c..........---...........#############################............................
+########################################################........#\.....................................................#############################............................
+########################################################........##\.........k.k........................................#############################............................
+########################################################......--###\.......k...k...k...k....................--.....O...#############################............................
+########################################################..n.....####\..................#########.......................#############################............................
+############################################################i#..#####\.C.....X.......X.#########.......................#############################.......................E....
+############################################################################~~~#####~~~#########~~~~~~~~~##??###.......#############################......-----##iii############
+############################################################################~~~#####~~~#########%%%%%%%%%#######.......#############################...........#######.....#####
+############################################################################~~~#####~~~#########~~~~~~~~~#######.......#############################....f......#######.....#####
+################################################################################################################.......#############################.----......#...........#####
+################################################################################################################.......#############################...........$...........#####
+################################################################################################################.......#############################........f..$....j......#####
+################################################################################################################............########################......-----#################
+################################################################################################################............########################...........#################
+################################################################################################################........t...########################...f.......#################
+################################################################################################################........---.#########..#############.----......#################
+################################################################################################################............d########D.#############...........#################
+################################################################################################################............................................f..#################
+################################################################################################################.........--...............................-----#################
+################################################################################################################...............................................#################
+################################################################################################################.............................k.k.......f.......#################
+################################################################################################################........---.................k...k....----......#################
+################################################################################################################...............c..c.....c......................#################
+################################################################################################################.....C.........................................#################
+############################################################################################################################~~~%%%%%%%%%%%%##~~~##*#############################
+############################################################################################################################~~~##############~~~################################
+############################################################################################################################~~~##############~~~################################
+################################################################################################################################################################################
+################################################################################################################################################################################
+################################################################################################################################################################################
+################################################################################################################################################################################
+################################################################################################################################################################################
+################################################################################################################################################################################
+################################################################################################################################################################################
+
+[entities]
+objects/hidden_spot 17 17 kind=small count=3 contents=food:28,food:27,food:26 prop=ice/boulders
+props/ice/dead_tree 2.5 5
+props/ice/crystal_ice_b 6 17
+props/ice/grass_a 11 17
+props/ice/rocks_small 20 17
+items/letter 42 21 index=0
+items/weapon 59 29 kind=boomerang
+props/cave/crystal_cyan_b 57.5 29
+props/cave/crystal_cyan_c 60.5 29
+zones/secret 59 33 name=side_grotto rect=56,31,8,4
+items/letter 57 34 index=4
+items/code_stone 59 34 index=0
+props/ice/icicle 24 11
+props/ice/icicle 30 11
+props/ice/icicle 39 17
+props/ice/icicle 43 17
+props/ice/icicle 47 17
+props/ice/icicle 55 23
+props/ice/icicle 61 23
+props/cave/crystal_violet_b 23.5 17
+props/cave/crystal_cyan_d 31 17
+props/ice/rocks_small 46 23
+props/cave/crystal_cyan_a 55 29
+props/ice/skull_buried 42.5 23
+props/ice/icicle 22 11
+props/ice/icicle 23 11
+objects/sign 73 35 text=SIGN_W3_WATER
+items/letter 85 32 index=1
+objects/hidden_spot 90 35 kind=small count=3 contents=food:35,food:36,treasure:4 prop=cave/crystal_cyan_b
+items/code_stone 107 29 index=1
+# The pool floes (reviewed): centred so that a running jump from the last two shore cells lands mid-floe and a jump
+# from a floe lands mid-floe on the next (64 px apart, 48 px rise). Beginner floes wait 16 ticks, Expert 8.
+props/ice/icicle 72 24
+props/ice/icicle 80 24
+props/ice/icicle 88 24
+props/ice/icicle 96 24
+props/ice/icicle 101 24
+props/ice/icicle 110 24
+props/ice/stalactite 74 24
+props/ice/stalactite 90 24
+props/ice/stalactite 98 24
+props/cave/crystal_cyan_a 80 35
+props/cave/crystal_violet_c 88 35 layer=front
+props/ice/crystal_ice_b 110 35
+props/ice/rock_big 72.5 35
+props/ice/icicle 113 24
+props/ice/icicle 117 24
+props/cave/crystal_cyan_d 111.5 30
+props/cave/crystal_cyan_d 119.5 38
+props/cave/crystal_cyan_d 111.5 46
+items/heart 120 53
+items/letter 121 44 index=2
+items/code_stone 122 44 index=2
+zones/secret 121 44 name=crystal_alcove rect=119,42,5,4
+props/ice/icicle 122 47
+props/ice/icicle 128 47
+props/ice/icicle 137 47
+props/ice/icicle 145 47
+props/cave/crystal_violet_a 125 53
+props/cave/crystal_cyan_b 139 53
+props/ice/skull_buried 129.5 53 layer=front
+props/cave/crystal_cyan_c 119.5 41.5
+props/cave/crystal_violet_d 123 45
+items/letter 150 38 index=3
+items/code_stone 162 41 index=3
+zones/secret 165 41 name=warp_room rect=160,37,11,5
+props/cave/crystal_cyan_a 166 41
+props/cave/crystal_violet_b 170 41
+props/cave/crystal_cyan_d 161 41
+props/ice/icicle 149 27
+props/ice/icicle 152 27
+props/ice/icicle 155 27
+props/ice/icicle 158 27
+props/ice/crystal_ice_a 165 35
+props/ice/dead_tree 174 35
+props/cave/crystal_violet_c 157.5 41
+props/ice/icicle 24 11
+props/ice/icicle 29 11
+props/ice/icicle 32 11
+props/cave/drip_cap 33 12
+props/ice/icicle 45 15
+props/cave/drip_cap 38 17
+props/ice/icicle 40 17
+props/ice/icicle 42 17
+props/ice/icicle 48 17
+props/ice/icicle 52 21
+props/cave/crystal_cyan_a 38.75 23
+props/cave/drip_cap 63 23
+props/ice/stalactite 65 24
+props/cave/drip_cap 70 24
+props/ice/stalactite 74 24
+props/ice/icicle 80 24
+props/ice/stalactite 85 24
+props/cave/drip_cap 93 24
+props/ice/stalactite 98 24
+props/ice/icicle 100 24
+props/cave/drip_cap 106 24
+props/ice/icicle 117 24
+props/ice/icicle 66 25
+props/ice/icicle 67 26
+props/cave/drip_cap 148 27
+props/ice/icicle 155 27
+props/ice/icicle 160 30
+props/ice/icicle 162 30
+props/ice/icicle 57 31
+props/ice/stalactite 60 31
+props/cave/crystal_cyan_d 63.25 35
+props/ice/crystal_ice_d 74.75 35
+props/ice/crystal_ice_d 82 35
+props/cave/crystal_violet_d 105.75 35
+props/ice/icicle 120 42
+props/ice/stalactite 134 45
+props/ice/icicle 132 47
+props/ice/stalactite 138 47
+props/ice/icicle 141 47
+props/ice/stalactite 147 47
+props/ice/rocks_small 112.25 53
+props/cave/crystal_cyan_d 120.75 53
+props/cave/crystal_cyan_d 124.75 53
+props/cave/crystal_cyan_d 134 53
+props/cave/crystal_cyan_c 135.75 53
+props/cave/crystal_violet_c 139 53
+props/cave/crystal_violet_c 144.25 53
+props/ice/crystal_ice_d 152.25 53
+# ---- co-op (DB3) --------------------------------------------------------------------------------------------
+objects/hero_start 3 17 slot=2
+# The swirling axe of the gallery, in a pair (one for each hero): the second hangs three rows over the first,
+# so the hero who walks over the first leaves it to his partner (a jump takes it).
+items/weapon 59 26 kind=boomerang
+# The first turtle carries its shell to the nearer caveman (a Shellback): one hero in front, the other behind.
+enemies/walker 13 17 skin=turtle_b left=0 right=0 speed=0 hp=10 coop=shell
+objects/sign 9 17 text=SIGN_COOP_W3_SHELL
+# Gates "drive" and "floes" at the leaper lake (DESIGN.md D.9 3-2). Near bank cols 92-95, the icy pool 96-104 (9
+# cells; on Beginner a frozen floe at col 96 leaves 8), far bank 105-111. The floe bridge waits under the surface
+# (row 37) and rises once when both drums are struck within the window.
+objects/sign 85 35 text=SIGN_COOP_W3_DRIVE
+objects/x2_tablet 93 33 gate=drive far=106,35
+objects/drum 89 33 bond=floes
+objects/drum 108 35 bond=floes
+objects/x2_tablet 87 33 gate=floes far=110,35
+objects/sign 110 35 text=SIGN_COOP_W3_DRUMS
+objects/column 96 37 size=9,1 rise=1 trigger=drums:floes
+# Beginner: a frozen floe lengthens the near lip by one cell (8 cells of water to the far bank, R17).
+objects/column 96 35 size=1,2 rise=0 beginner
+objects/checkpoint 106 35
+# The lower gallery: on Expert a Raptor waits on the rock before the first ice pit (5 columns from the
+# checkpoint, range 3), fought on solid ground; on the ice between the pits a Shellback and the twin leapers of
+# the two pits (17 columns apart: no single hero clubs both inside the window).
+enemies/raptor 122 53 skin=mini_rex_b range=3 hp=10 expert
+enemies/walker 132 53 skin=turtle_b left=-3 right=3 hp=10 coop=shell
+enemies/leaper 125 53 skin=dragon_b pause=110 hp=10 coop=bond bond=pits
+enemies/leaper 142 53 skin=dragon_b pause=110 hp=10 coop=bond bond=pits
+# The hopper by the exit became a Raptor and moved down to the lower gallery (no bouncing near the cache ledge):
+# on the ice between the pits on Beginner, on the rock after the second pit on Expert (the Expert ice strip keeps
+# only the Shellback and the leapers: both Expert Raptors are fought on solid ground).
+enemies/raptor 136 53 skin=mini_rex_b range=4 hp=10 beginner
+enemies/raptor 150 53 skin=mini_rex_b range=3 hp=10 expert
+# The x2 secret: the crystal cache in the chimney's wall, its ledge 8 rows over the exit floor (a boost ledge:
+# Shoulder Hop). It holds Cave Painting 26 and the warp to Feast Land C.
+objects/x2_tablet 170 35 secret far=165,27
+items/painting 165 27 index=26
+items/warp 161 27
+zones/secret 163 26 name=crystal_cache rect=160,25,8,3
+objects/sign 173 35 text=SIGN_COOP_W3_CACHE
+props/cave/crystal_cyan_a 162 27
+props/cave/crystal_violet_b 164 27
+props/cave/crystal_cyan_d 160 27
+props/ice/icicle 162 25
+props/ice/icicle 164 25
+props/cave/crystal_violet_d 167 27
+
+[backwall]
+22 6 144 58 set=a deco=30
+166 37 5 5 set=a deco=30
+160 25 6 3 set=a deco=30

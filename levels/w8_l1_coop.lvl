@@ -4,12 +4,13 @@
 #  - 'hall': the low arch of terrace T1 is a keeper hall exactly 4 rows high; two Shellbacks stand still in it and
 #    turn their shields to the nearer hero every tick - one hero baits them from the front while the other, dropped
 #    in through the hole in the lintel behind them, clubs their backs; the keeper door opens when both are dead;
-#  - 'stairs': the lift stair of the hall is a stair of four columns that rise while plates A and B are both
-#    pressed. The two heroes heave the boulder onto plate A (it holds it for good); one stands on plate B while the
-#    other climbs and steps on plate C on the summit, which sinks the door in the end wall of the roof gallery: the
-#    holder's way up is the vine, the gallery and the bridge over the shaft.
-# The Guards carry the shell trait, the temple raptors are Raptors (daze: one bounces, the other strikes); the
-# scarabs under the old arch are left out (they would drop on the bait).
+#  - 'stairs': on a dais at the end of the hall the two heroes heave the boulder onto plate A (it holds it for
+#    good); one stands on plate B while the other climbs the three stair columns that rise while A and B are both
+#    pressed, and holds plate C on the summit, which lifts the door of a vine shaft in the cliff: the holder's way
+#    up. Everything of the gate lies within one view, the summit 9 rows over the dais (the tribe camera).
+# Co-op traits: the two Shellback keepers, `lone` ruin ghosts and a temple Raptor (daze: one bounces, the other
+# strikes) before the exit. Left out for the gates' role holders: the Guards (a co-op Guard needs a 4-row hall),
+# the scarabs under the old arch and the ghost over terrace T1. The swirling axe comes in a pair at checkpoint 2.
 
 [meta]
 format = 2
@@ -110,10 +111,9 @@ items/food 10 50 index=2
 items/food 15 49 index=3
 items/food 16 48 index=4
 objects/hidden_spot 3 39 kind=small count=3 contents=food:5,food:6,treasure:0 prop=ruins/fern
-# (B) terrace T1: checkpoint 1, the first Guard, the low arch, a real chest, the plinth of plate 2
+# (B) terrace T1: checkpoint 1, the keeper hall under the old arch, the low arch, a real chest, the plinth of plate 2
 objects/sign 34 44 text=SIGN_W8_GUARD
 objects/container 33 44 skin=chest contents=food:9,food:10,treasure:1
-enemies/harrier 12 45 skin=ghost range=4 hp=10 coop=lone
 items/feast_piece 51 38 index=0
 items/food 36 41 index=7
 items/food 37 40 index=8
@@ -137,7 +137,7 @@ enemies/harrier 92 32 skin=ghost range=8 hp=10 coop=lone
 items/food 85 36 index=16
 items/food 86 35 index=19
 items/food 87 36 index=20
-# (E) the hall: checkpoint 3, the vine through the roof, Guard, raptors and scarabs
+# (E) the hall: checkpoint 3, the vine through the roof to the roof gallery, a swinging bat
 objects/vine 110 24 length=13
 enemies/swinger 120.5 28 skin=bat_b radius=40 hp=10
 enemies/lurker 183 24 skin=insect range=2 hp=10
@@ -160,8 +160,8 @@ items/food 120 20 index=29
 items/food 126 20 index=30
 items/food 133 22 index=31
 items/food 135 21 index=32
-# (F) stair 3: the lift stair, each column triggered by the hero standing on it
-# (G) the summit: checkpoint 4, the third feast piece, Guards, raptors, a scarab arch and the exit
+# (F) the solo lift stair is the co-op gate 'stairs' (below)
+# (G) the summit: checkpoint 4, the third feast piece, ghosts, raptors, a scarab arch and the exit
 items/feast_piece 160 25 index=2
 enemies/harrier 167 20 skin=ghost_b range=6 hp=10 coop=lone
 enemies/hopper 174 26 skin=mini_rex_b range=4 hp=10

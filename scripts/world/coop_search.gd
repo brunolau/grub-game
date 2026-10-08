@@ -104,6 +104,9 @@ const WORLD_MARGIN_COLS: int = 6
 ## the second.
 const STRIKE_REACH_CELLS: Vector2i = Vector2i(6, 4)
 const THROW_REACH_CELLS: Vector2i = Vector2i(18, 6)
+## [method Searcher.bait_spots]: the idle partner's feet this far (px) clear of a keeper's or shell enemy's box, in
+## front of it and behind it - within the reach of a club swung at it from there.
+const BAIT_GAP_PX: int = 10
 ## A strike or throw macro faces one way: a target counts for it when it lies on that side or at most this far (px)
 ## behind the hero's feet point (a target overlapping him, a walker coming round him during the move).
 const BEHIND_REACH_PX: int = 2 * Tuning.TILE
@@ -264,6 +267,9 @@ class Searcher:
 	## Feet points of the co-op mechanisms and trait enemies where parking the idle partner is tried
 	## ([method placement_useful]).
 	var _partner_targets: Array[Vector2i] = []
+	## Spots beside every keeper and `shell` enemy of the world, in front of it and behind it within club reach
+	## ([method bait_spots]): the idle partner is parked there from every start (lead designer's wf9 #5).
+	var _bait_spots: Array[Vector2i] = []
 	## The level's wind script, when the file has one ([class SearchWind]).
 	var _wind: SearchWind = null
 
@@ -335,6 +341,8 @@ class Searcher:
 				_targets.append(node.sim_pos)
 			if CoopSearch.is_partner_target(record):
 				_partner_targets.append(node.sim_pos)
+			if node is EnemyBase:
+				_bait_spots.append_array(bait_spots(node as EnemyBase))
 		hero = level.spawn(PLAYER_ID, Vector2i(Tuning.TILE * 2, Tuning.TILE * 2), {}) as PlayerBase
 		partner = level.spawn(PLAYER_ID, Vector2i(Tuning.TILE * 3, Tuning.TILE * 2), {"slot": PARTNER_SLOT}) \
 				as PlayerBase
@@ -610,11 +618,31 @@ class Searcher:
 				return true
 		return false
 
+	## The spots beside `enemy` where an idle partner baits it, when it is a keeper or a `shell` enemy (G33's "the
+	## nearer hero" rules - the shell's facing, the keeper's bait): one in front of it and one behind it, his feet
+	## CoopSearch.BAIT_GAP_PX clear of its box (within club reach of it), on a floor and not in a wall; none for any
+	## other enemy.
+	func bait_spots(enemy: EnemyBase) -> Array[Vector2i]:
+		var result: Array[Vector2i] = []
+		if enemy.keeper == &"" and enemy.coop_trait != Defs.CoopTrait.SHELL:
+			return result
+		var grid: TileGrid = level.grid
+		for side: int in [-1, 1]:
+			var spot: Vector2i = enemy.sim_pos + Vector2i(side * (enemy.box_w / 2 + CoopSearch.BAIT_GAP_PX), 0)
+			var col: int = Tuning.to_cell(spot.x)
+			var body_row: int = Tuning.to_cell(spot.y - 1)
+			if grid.in_bounds(col, body_row) and grid.side_at(col, body_row) != TileGrid.SIDE_WALL \
+					and TileGrid.is_ground(grid.floor_at(col, Tuning.to_cell(spot.y))):
+				result.append(spot)
+		return result
+
 	## Breadth-first over resting points from `starts` (feet points) inside `area` (cells) until a cell of `goals` is
 	## entered. A node ([method _node]) is a resting point, the world's signature and where the idle partner was left
 	## ("partner_at"; G33: he may be placed anywhere his egg reaches - the egg drifts after the lone hero and is clubbed
 	## open where he stands - so a `place partner` step parks him at the node, and every later move starts with him
-	## there). Returns {"reached", "ticks", "detail", "nodes", "runs", "simulated", "replayed"}.
+	## there). From every start the partner is also parked at each bait spot inside the area ([method bait_spots]: in
+	## front of and behind every keeper and shell enemy, within club reach) before the hero moves.
+	## Returns {"reached", "ticks", "detail", "nodes", "runs", "simulated", "replayed", "placements"}.
 	func explore(starts: Array[Vector2i], goals: Dictionary, area: Rect2i, bound: int, max_nodes: int) -> Dictionary:
 		var queue: Array[Dictionary] = []
 		var seen: Dictionary = {}
@@ -624,6 +652,17 @@ class Searcher:
 			if not seen.has(_key_of(first)):
 				seen[_key_of(first)] = 0
 				queue.append(first)
+		if world and CoopSearch.idle_partner:
+			for start: Vector2i in starts:
+				for spot: Vector2i in _bait_spots:
+					if not area.has_point(Vector2i(Tuning.to_cell(spot.x), Tuning.to_cell(spot.y - 1))):
+						continue
+					var baited: Dictionary = _node(start, 0, "start %d,%d > place partner at %d,%d" % [start.x,
+						start.y, spot.x, spot.y], _baseline, spot)
+					if not seen.has(_key_of(baited)):
+						seen[_key_of(baited)] = 0
+						queue.append(baited)
+						placements += 1
 		var head: int = 0
 		while head < queue.size() and head < max_nodes:
 			var node: Dictionary = queue[head]
@@ -871,7 +910,9 @@ const FINGERPRINT_EXTENSIONS: Array[String] = ["gd", "tscn", "tres", "json", "cf
 ## (a bot re-bake, a HUD change) do not throw every cached gate away. The sim code names a few of their classes in
 ## comments and presentation only (Hud's G35 contract, UiKit on sign boards - not in a search world -, UiPlayers'
 ## colours of effects); the bosses are the exception (the Chieftains drive themselves with the bots' code and graphs,
-## the weak points answer the HUD): a level holding a `bosses/` record keys on the full fingerprint.
+## the weak points answer the HUD): a gate whose search world spawns a boss ([method world_has_boss]) keys on the full
+## fingerprint - only such a gate (a boss stage's other gates do not: their search worlds hold no boss, and the edits of
+## the screens and bots that other owners make all day no longer throw them away).
 const FINGERPRINT_SKIP: Array[String] = [
 	"res://scripts/ui", "res://scenes/ui", "res://resources/ui", "res://scripts/world/versus", "res://scripts/core/bots",
 	"res://resources/bots", "res://scripts/core/dev",
@@ -882,20 +923,33 @@ static var _fingerprint_full: String = ""
 
 
 ## The key of a search result: md5 over the search version, the code fingerprint ([method code_fingerprint]; the full
-## one when the level holds a boss), the level file's text, its `coop_of` base file's text (the static rules read its
-## kind), the difficulty, the gate, and the partner model.
+## one when the gate's search world holds a boss, [method world_has_boss]), the level file's text, its `coop_of` base
+## file's text (the static rules read its kind), the difficulty, the gate, and the partner model.
 static func file_cache_key(path: String, data: LevelData, difficulty: int, gate: String) -> String:
-	var bosses: bool = false
-	for record: Dictionary in data.entity_records():
-		bosses = bosses or String(record["id"]).begins_with("bosses/")
-	var parts: PackedStringArray = PackedStringArray([FILE_CACHE_VERSION, code_fingerprint(bosses),
-		FileAccess.get_file_as_string(path)])
+	var parts: PackedStringArray = PackedStringArray([FILE_CACHE_VERSION,
+		code_fingerprint(world_has_boss(data, difficulty, gate)), FileAccess.get_file_as_string(path)])
 	var base: String = str(data.value("coop_of"))
 	if base != "":
 		var base_path: String = level_path(StringName(base))
 		parts.append(FileAccess.get_file_as_string(base_path) if FileAccess.file_exists(base_path) else "")
 	parts.append("%d|%s|%s" % [difficulty, gate, "idle" if idle_partner else "egg"])
 	return "|".join(parts).md5_text()
+
+
+## True when the search world of `gate` in `difficulty` spawns a boss: a `bosses/` record among
+## [method world_record_list] of the gate's columns (exactly the records [method search_data] builds the world from) -
+## or when the gate cannot be laid out (no tablet, no far cell: the cautious answer). Only then can a result depend on
+## the code FINGERPRINT_SKIP leaves out.
+static func world_has_boss(data: LevelData, difficulty: int, gate: String) -> bool:
+	var tablet: Dictionary = find_tablet(data, difficulty, gate)
+	if tablet.is_empty() or tablet["far"] == Vector2i(-1, -1):
+		return true
+	var grid: TileGrid = grid_at_rest(data, difficulty)
+	var columns: Vector2i = world_columns_of(gate_area(tablet, grid), start_points(data, difficulty, tablet, grid), grid)
+	for record: Dictionary in world_record_list(data, difficulty, columns):
+		if String(record["id"]).begins_with("bosses/"):
+			return true
+	return false
 
 
 ## The md5 of every script, scene and resource file of the simulation (FINGERPRINT_DIRS without FINGERPRINT_SKIP;

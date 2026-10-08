@@ -21,6 +21,10 @@ msgstr "Hold the plate and the pillar lifts your partner up."
 msgid "SIGN_COOP_W2_BRACE"
 msgstr "Bull Rex! Crouch side by side and it stops dead."
 
+# --- w2_l2b_coop Brute's Den (co-op) ---
+msgid "SIGN_COOP_W2_BOND"
+msgstr "Two bonded lizards: club both at once, or one grows back!"
+
 # --- w3_l1_coop Frost Summit (co-op) ---
 msgid "SIGN_COOP_W3_BRACE"
 msgstr "Bull Rex on the ice! Crouch side by side to stop it."
@@ -30,3 +34,10 @@ msgstr "Too high? Hop off your partner's head, then drop the vine."
 
 msgid "SIGN_COOP_W3_CAVE"
 msgstr "One holds the plate, the other runs through the door."
+
+# --- w3_l1b_coop Blizzard Pass (co-op) ---
+msgid "SIGN_COOP_W3_LEE"
+msgstr "Crouch in the gust: the one behind you feels no wind."
+
+msgid "SIGN_COOP_W3_HUT"
+msgstr "Shellbacks face the nearer one: bait it, club its back!"

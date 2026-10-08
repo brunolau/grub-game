@@ -1,4 +1,4 @@
-# route: level=w7_l1 difficulty=beginner ends=exit after=tally expect=min_checkpoints:4,letters:1
+# route: level=w7_l1 difficulty=beginner ends=exit after=tally expect=min_checkpoints:4,letters:3
 # The Beginner club route of Shell Beach (designer D7; recorded from closed-loop macros, build/d7/bot_w7_l1.gd).
 # Boards every raft from its bank, paddles it into the surf current and rides it to the next bar; the two
 # blowholes onto the sea stack and the sea arch (letter B); the fish pools between leaps; the urchin beds on

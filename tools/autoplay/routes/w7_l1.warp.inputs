@@ -1,4 +1,4 @@
-# route: level=w7_l1 difficulty=beginner ends=warp after=level:bonus_e expect=min_checkpoints:4,letters:1
+# route: level=w7_l1 difficulty=beginner ends=warp after=level:bonus_e expect=min_checkpoints:4,letters:3
 # Featured route of Shell Beach (designer D7): the club route to checkpoint 4, then the tallest sea stack -
 # its blowhole throws the hero to the kelp vine (Up held), he climbs it and takes the Feast Land E warp.
 12:R,6:F,4:,6:R,6:F,4:,4:R,6:F,4:,25:R,4:,1:R,4:,3:R,8:,2:R,1:,1:R,1:,1:R,4:,1:L,1:F,6:,1:F,1:,1:F,6:,1:F,1:

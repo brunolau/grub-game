@@ -1,0 +1,245 @@
+# Club & Grub - World 6, stage 2b for two: "Heart of the Mangrove" co-op (designer D6, Book II "The Far Shore").
+# The solo trunk (w6_l2b) for a tribe of two (DESIGN.md A.6 / D.10, LEVEL_DESIGN.md 15.7): up the hollow trunk
+# ahead of the rising tar, then the co-op Old Mangrove. Co-op gates:
+#  - 'vent' (rows 68-74): the second vine of the solo climb is the vent room - two deadly tar vents side by side
+#    (period 34, half a period apart) under a ceiling five rows up, so one hero is always inside a spout box on
+#    the way across and the two boxes leave him no common gap; a heave boulder on the floor that only two heroes
+#    push (the 3 cells of floor behind it, 5 rows of air) rolls 4 tiles onto both vents and plugs them, its top
+#    flush with the step beyond. A checkpoint on the ledge below the room (the tar restarts 6 rows under it: the
+#    push has its own spare) and one on the step behind it;
+#  - the co-op Old Mangrove (B.2): the face and the resting hand struck by the two heroes within the twin window
+#    (one rides the fist springboard to the face, the other strikes the hand from the root ledges), a hero standing
+#    on the resting fist pins it, and in stage 3 the knuckle armour faces the nearer active hero. The lower root
+#    ledge's last two cells are rotten bark (hatch tiles): crouch there to drop onto the wrist side of the stuck fist.
+# Traits: lone mangrove bugs, a bonded Puffcap pair (8 columns and 9 rows apart: no thrown special from beside one
+# crosses the other); no Snatcher (a grab on a rising climb would be a death trap).
+
+[meta]
+format = 2
+id = w6_l2b_coop
+name = "Heart of the Mangrove"
+kind = coop
+coop_of = w6_l2b
+coop_base_hash = b4b051dc625e18b687a320b097d0e589334ae44771f586df79b3ff74c9574dc3
+book = 2
+world = 6
+stage = 2
+biome = swamp
+terrain_a = swamp/terrain_bark
+terrain_b = swamp/terrain
+background = mangrove
+music = level_mangrove_climb
+liquid = tar
+scroll = rising
+rise_speed = 16
+rise_speed.expert = 20
+bonus_tier = 1
+author = D6
+
+[legend]
+C = objects/checkpoint
+E = objects/exit locked=true
+
+[tiles]
+########################################
+##.....................................#
+##.....................................#
+##.....................................#
+##.....................................#
+##.....................................#
+##.....................................#
+##.....................................#
+##.....................................#
+##.....................................#
+##.....................................#
+##.....................................#
+##.................C...................#
+##.......----------###..################
+##.................###..################
+##.................##..............#####
+##.......------....##..............#####
+##.................##..............#####
+##.................##..............#####
+##....------.......##-----.........#####
+##.................##..............#####
+##.................##------__......#####
+##.......------....##..............#####
+##.................##E.............#####
+##.................#####################
+##....------.......#####################
+##.................#####################
+##.................#####################
+##.......------....#####################
+##.................#####################
+##.................#####################
+##....------.......#####################
+##.................#####################
+##.................#####################
+##.......------....#####################
+##.................#####################
+##.........C.......#####################
+##.%%%%%%----......#####################
+##.%%%%%%..........#####################
+##.................#####################
+##.......------....#####################
+##.................#####################
+##.................#####################
+##....------.......#####################
+##.................#####################
+##.................#####################
+##.........------..#####################
+##.................#####################
+##%%%..............#####################
+##%%%..............#####################
+##.................#####################
+##.................#####################
+##.................#####################
+##.................#####################
+##..--------.......#####################
+##.................#####################
+##.................#####################
+##.......------....#####################
+##.................#####################
+##.................#####################
+##....------.......#####################
+##.................#####################
+##.......C.........#####################
+##.%%%%%%----......#####################
+##.%%%%%%..........#####################
+##.................#####################
+##..........------.#####################
+##.................#####################
+###############....#####################
+##..............---#####################
+##.................#####################
+##............C....#####################
+##...........###########################
+##...........###########################
+##-----#################################
+##.....#################################
+##...C.............#####################
+##.------..........#####################
+##.................#####################
+##.................#####################
+##.------..........#####################
+##.................#####################
+##.................#####################
+##....------.......#####################
+##.................#####################
+##.................#####################
+##.......------....#####################
+##.................#####################
+##.........C.......#####################
+##.%%%%%%----......#####################
+##.%%%%%%..........#####################
+##.................#####################
+##....------.......#####################
+##.................#####################
+##.................#####################
+##.........------..#####################
+##.................#####################
+##.................#####################
+##.................#####################
+##.................#####################
+##.................#####################
+##.................#####################
+##.................#####################
+##....------.......#####################
+##.................#####################
+##.................#####################
+##.......------....#####################
+##.................#####################
+##.................#####################
+##....------.......#####################
+##.................#####################
+##.................#####################
+##.......------....#####################
+##.................#####################
+##.................#####################
+##....------.......#####################
+##.................#####################
+##...@.............#####################
+########################################
+########################################
+
+[entities]
+# the trunk: P2 starts beside P1; the sign, the vines, the painting's side vine and nook
+objects/hero_start 3 117 slot=2
+objects/sign 8 117 text=SIGN_W6_TIDE
+objects/vine 10 95 length=8
+objects/vine 10 46 length=8
+objects/vine 5 48 length=5
+items/painting 3 47 index=5
+zones/secret 3 47 name=root_nook rect=2,46,3,2
+props/swamp/glowcaps 2 47
+# co-op gate 'vent' (DESIGN.md A.6): two deadly tar vents half a period apart under a ceiling 5 rows up; the
+# heave boulder rolls 4 tiles onto both and plugs them
+objects/x2_tablet 3 73 gate=vent far=16,71
+objects/sign 4 73 text=SIGN_W6_COOP_VENT
+objects/boulder_heavy 7 73
+objects/geyser 11 73 deadly period=34 delay=0
+objects/geyser 12 73 deadly period=34 delay=17
+props/swamp/glowcaps 15 71
+items/food 16 69 index=12
+# enemies of the climb: lone mangrove bugs on the checkpoint ledges, cave bats beside the jump column, Puffcaps
+# on ledge ends away from it (a bonded pair 11 columns and 6 rows apart)
+enemies/dangler 15 98 skin=cave_bat depth=24 hp=10
+enemies/snapper 14 105 skin=puffcap range=30 hp=10
+enemies/digger 5 88 skin=lizard zone=3,85,6,4 hp=10 coop=lone
+enemies/dangler 15 82 skin=cave_bat depth=24 hp=10
+enemies/snapper 14 85 skin=puffcap range=30 hp=10
+enemies/digger 5 62 skin=lizard zone=3,59,6,4 hp=10 coop=lone
+enemies/dangler 15 50 skin=cave_bat depth=24 hp=10
+enemies/snapper 14 39 skin=puffcap range=30 hp=10 coop=bond bond=caps
+enemies/snapper 6 30 skin=puffcap range=30 hp=10 coop=bond bond=caps
+enemies/digger 5 36 skin=lizard zone=3,33,6,4 hp=10 coop=lone
+enemies/dangler 4 108 skin=cave_bat depth=24 hp=10 expert
+enemies/snapper 6 59 skin=puffcap range=30 hp=10 expert
+enemies/dangler 15 26 skin=cave_bat depth=24 hp=10 expert
+enemies/dangler 4 17 skin=cave_bat depth=24 hp=10 expert
+items/food 12 116 index=1
+items/food 8 111 index=3
+items/food 12 105 index=5
+items/food 13 94 index=7
+items/food 9 82 index=9
+items/food 6 76 index=11
+items/food 15 66 index=13
+items/food 12 63 index=15
+items/food 9 54 index=17
+items/food 13 43 index=19
+items/food 8 34 index=21
+items/food 12 26 index=23
+items/food 8 20 index=25
+items/heart 4 88
+# the landing: the tar stops, the checkpoint, the hole into the chamber
+zones/autoscroll_stop 24 12 rect=19,4,20,9
+props/swamp/glowcaps 26 12
+props/swamp/root_arch 34 12 layer=back
+items/food 33 10 index=27
+items/food 36 10 index=29
+objects/sign 30 12 text=SIGN_W6_COOP_MANGROVE
+props/swamp/glowcaps 27 20 layer=back
+props/swamp/glowcaps 28 20 layer=back
+# Old Mangrove's chamber (B.2, G35): the arena (= the camera lock) is the 11 rows from the ceiling to the floor
+# row - the locked view shows the floor row and 4 px under it, so the face sits as low in the view as the
+# chamber allows; the record stands in the floor-level air cell left of the Guardian's bark wall; its default
+# drop (the fire-starter) comes out on the floor in front of the trunk (BossBase._drop_origin)
+zones/arena 27 23 name=chamber rect=20,14,20,11
+bosses/mangrove 34 23 arena=chamber
+props/swamp/vine_b 38 17 layer=front
+props/swamp/moss_fringe 37 15 layer=front
+
+[backwall]
+21 15 14 9 set=a deco=15
+2 69 13 5 set=a deco=10
+
+[overrides]
+36 16 a 23
+36 22 a 23
+37 19 a 23
+37 23 a 23
+38 17 a 23
+38 22 a 23
+39 15 a 23
+39 18 a 23
+39 21 a 23

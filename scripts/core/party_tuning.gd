@@ -171,10 +171,13 @@ const BOSS_HP_MAX_DEN: int = 4
 # =================================================================================================================
 # Requiredness and stage rules [D D.8] [D D.9] [D D.11]
 # =================================================================================================================
+## The IDLE-PARTNER rule (orchestrator, phase 3; DESIGN.md D.3 [G33]): a co-op hero whose own slot gave no input for
+## this many ticks (10 s) is IDLE and counts for no co-op rule (PlayerBase.is_idle / counts_for_coop).
+const IDLE_TICKS: int = 243
 const MAIN_MIN_GATES: int = 2                ## co-op gates on the main path of every co-op `main` file
 const SUB_MIN_GATES: int = 1                 ## every co-op `sub` file: a gate or its boss's co-op form
-## Boost ledges (Shoulder Hop / Totem Ride), tiles over the floor.
-const BOOST_LEDGE_TILES_BEGINNER: int = 7
+## Boost ledges (Shoulder Hop / Totem Ride), tiles over the floor: 8 on both difficulties (G28 / G39).
+const BOOST_LEDGE_TILES_BEGINNER: int = 8
 const BOOST_LEDGE_TILES_EXPERT: int = 8
 const BATTER_GAP_TILES_MIN: int = 8          ## a Batter Up gap: 8-9 tiles of deadly liquid ...
 const BATTER_GAP_TILES_MAX: int = 9

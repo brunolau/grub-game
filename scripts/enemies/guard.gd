@@ -87,8 +87,9 @@ func _ai_tick() -> void:
 		return
 	_turn_clock += 1
 	if _shell_on():
-		# The Shellback: the shield faces the nearer hatched hero every tick (CoopTraits post_ai does the same).
-		var nearest: PlayerBase = Game.level.target_hero(self)
+		# The Shellback: the shield faces the nearer hero who counts every tick (CoopTraits post_ai does the same;
+		# G33: never a dozing partner).
+		var nearest: PlayerBase = Game.level.nearest_coop_hero(self)
 		if nearest != null:
 			_shield = _dir_to(nearest)
 		_turn_clock = 0

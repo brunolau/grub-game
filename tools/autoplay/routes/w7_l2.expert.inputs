@@ -1,0 +1,9 @@
+# route: level=w7_l2 difficulty=expert ends=exit after=level:w7_l2b expect=min_checkpoints:4,letters:4,painting:7
+# The Expert club route of Sea Caves (designer D7; the same macros as the Beginner route). No S.
+98:R,7:,7:RU,6:R,2:,4:L,2:,4:R,2:,7:RU,10:R,2:,4:L,4:,7:RU,15:R,1:,2:L,2:,7:RU,10:R,2:,4:L,4:,7:RU,15:R,1:,2:L
+2:,7:RU,7:R,1:,5:L,1:,32:R,2:,1:R,6:,7:RU,5:R,2:,4:L,2:,4:R,3:,7:RU,10:R,1:,5:L,1:,1:R,2:,7:RU,15:R,2:,1:L,2:
+7:RU,11:R,1:,5:L,3:,7:RU,16:R,1:,19:R,1:,8:L,2:,6:R,46:,17:R,2:,9:R,57:,22:R,42:,1:L,6:F,19:,7:RU,6:R,2:,4:L,1:
+5:R,2:,7:RU,10:R,1:,5:L,1:,1:R,2:,7:RU,16:R,1:,1:L,2:,7:RU,9:R,2:,4:L,6:,3:R,3:,1:R,3:,121:U,10:R,6:,14:L,1:
+7:R,17:,4:R,2:,1:R,7:,2:L,3:,7:RU,6:R,1:,5:L,1:,5:R,2:,7:RU,12:R,1:,5:L,2:,7:RU,16:R,1:,1:L,2:,7:RU,12:R,2:,3:L
+52:R,10:RU,4:R,2:,1:L,5:,10:LU,7:L,5:,10:RU,7:R,5:,10:LU,8:L,5:,10:RU,6:R,6:,10:LU,7:L,5:,10:RU,6:R,6:,7:RU,1:U
+2:LU,3:L,1:,63:R

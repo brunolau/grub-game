@@ -1008,8 +1008,8 @@ hold Ctrl Kp_Enter
 wait_until flow.current_screen == book_select 600
 release all
 wait_until flow.busy == false 600
-# The book select has Book I focused (Flow.play_book); Right = Book II.
-press ui_right
+# The book select focuses the book of the last run (Flow.play_book): Book II, played by the part before - the
+# cards wrap, so a Right here would go back to Book I (G3 integration: the first run that got this far).
 wait 10
 shot book_select_coop_book2_expert
 press ui_accept

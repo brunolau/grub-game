@@ -122,8 +122,9 @@ func _gates_row() -> Array:
 		var data: LevelData = LevelData.load_file(Levels.get_level_path(level_id))
 		if data == null:
 			continue
-		if data.entity_records().any(func(record: Dictionary) -> bool:
-				return str(record["id"]).begins_with("bosses/")):
+		var boss_form: bool = data.entity_records().any(func(record: Dictionary) -> bool:
+				return str(record["id"]).begins_with("bosses/"))
+		if boss_form:
 			boss_forms.append(String(level_id))
 		for difficulty: int in [Defs.Difficulty.BEGINNER, Defs.Difficulty.EXPERT]:
 			if not Levels.is_available(level_id, difficulty):
@@ -136,7 +137,8 @@ func _gates_row() -> Array:
 					count += 1
 			gates += count
 			var main: bool = Levels.get_level_kind(Levels.get_coop_base(level_id)) == Levels.KIND_MAIN
-			if main and count < MIN_GATES_MAIN:
+			# DESIGN D.8 #1 (the validator's _check_gate_count): the final-boss stage 9-3 is gated by its boss form.
+			if main and count < MIN_GATES_MAIN and not boss_form:
 				short.append("%s (%s): %d" % [level_id, Defs.difficulty_name(difficulty), count])
 	var complete: bool = short.is_empty() and design_complete(Levels.BOOK_1, true) and design_complete(Levels.BOOK_2, true)
 	var detail: String = "%d co-op file(s); main stages under %d gates: %s" % [files, MIN_GATES_MAIN,
@@ -264,7 +266,10 @@ func test_the_g3_command_runs_every_slow_module() -> void:
 	assert_true(slow.size() >= 5, "the runner's slow modules")
 	for file: String in slow:
 		var module: String = file.get_basename().trim_prefix("test_")
-		assert_true(text.contains("test %s\"" % module) or text.contains("test %s " % module) \
+		# versus_bots runs in shards through tools/g3_versus_bots.sh (each shard: `gd.sh test versus_bots`).
+		var wrapped: bool = module == "versus_bots" and text.contains("tools/g3_versus_bots.sh") \
+				and FileAccess.get_file_as_string("res://tools/g3_versus_bots.sh").contains("test versus_bots")
+		assert_true(wrapped or text.contains("test %s\"" % module) or text.contains("test %s " % module) \
 				or text.contains("test %s\n" % module), "tools/g3.sh runs the slow module %s" % module)
 	assert_true(text.contains("COOP_GATES_SHARD=$i/$SHARDS"), "coop_gates runs sharded")
 	# A co-op file landing mid-run shifts the shard partition (seen 03:42-04:10: shards on 28 and 29 gates, 26 searched,

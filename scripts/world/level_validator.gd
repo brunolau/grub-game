@@ -318,6 +318,11 @@ const THROW_TICKS: int = 40
 ## 15.7.3), sheltered within LEE_REACH_PX downwind of a croucher.
 const LEE_GAP_MAX_CELLS: int = 3
 const LEE_REACH_PX: int = 64
+## Deadly cells felt through rock (LEVEL_DESIGN.md 4 "Collision facts", D6's wf9 report): the hero's body probes
+## (PHYSICS.md 11.2 #8) read the rows 2 and 3 over his feet row and look through solid tiles, so a liquid or kill cell
+## with ONE solid row under it kills a hero who rises into the space below that row - from a floor at most this many
+## rows under the deadly cell (3 rows: his head at the rock; up to 4 more: a jump of 64 px).
+const DEADLY_THROUGH_ROCK_ROWS: int = 7
 ## Things a single hero could climb on near a ledge gate (enemies are checked by category).
 const BOOSTERS: Array[String] = [
 	"objects/spring", "objects/geyser", "objects/vine", "objects/bark_board", "items/glider", "objects/platform",
@@ -1075,6 +1080,8 @@ func _check_visual_sections(data: LevelData) -> void:
 func _check_content(data: LevelData, grid: TileGrid) -> void:
 	var kind: String = str(data.value("kind"))
 	var records: Array[Dictionary] = data.entity_records()
+	if int(data.meta.get("format", LevelText.FORMAT_2)) != LevelText.FORMAT_1 and kind != "test":
+		_check_deadly_through_rock(data, grid)
 	_check_trait_places(data, kind, records)
 	_check_plates(data, records)
 	if kind == LevelText.KIND_COOP:
@@ -1415,11 +1422,12 @@ static func _rects_overlap(a: Rect2i, b: Rect2i) -> bool:
 			and a.position.y < b.position.y + b.size.y and b.position.y < a.position.y + a.size.y
 
 
-## G41 (optional, a warning): a gust gap of a co-op file - a run of 1..LEE_GAP_MAX_CELLS cells without a floor
+## G41 / G55 (optional, a warning): a gust gap of a co-op file - a run of 1..LEE_GAP_MAX_CELLS cells without a floor
 ## between two floors of one row, in a file with wind - whose far side (upwind: the wind blows from it into the gap)
 ## offers no crouching spot at its edge: the croucher of a lee leapfrog stands there, LEE_REACH_PX upwind of his
 ## partner at the near edge (P-C.6 "Lee": only an ACTIVE croucher shelters, so no idle body does it for one player).
-## Both directions are checked when the wind script blows both ways.
+## Since G55 the lee is no gate, only a co-op comfort - LEVEL_DESIGN.md 15.5 still asks for that crouching spot, so the
+## warning stays. Both directions are checked when the wind script blows both ways.
 func _check_lee_gaps(data: LevelData, grid: TileGrid) -> void:
 	var signs: Dictionary = {}
 	for difficulty: int in [Defs.Difficulty.BEGINNER, Defs.Difficulty.EXPERT]:
@@ -1453,8 +1461,44 @@ func _check_lee_gaps(data: LevelData, grid: TileGrid) -> void:
 				if not _open_above(grid, far_col, row) and not reported.has(Vector3i(first, row, wind_sign)):
 					reported[Vector3i(first, row, wind_sign)] = true
 					_add(data.path, data.row_lines[row] if row < data.row_lines.size() else 0, WARNING,
-							"gust gap at columns %d-%d over row %d: no crouching spot on its far (%s) edge within %d px of the near edge - no lee leapfrog there (G41)" % [
+							"gust gap at columns %d-%d over row %d: no crouching spot on its far (%s) edge within %d px of the near edge - no lee leapfrog there (the co-op comfort of G41 / G55)" % [
 							first, col - 1, row, "right" if wind_sign > 0 else "left", LEE_REACH_PX])
+
+
+## LEVEL_DESIGN.md 4 "Collision facts" (D6, lead designer 08:42; optional, a warning, 2.0 files only - the frozen
+## format-1 files are never checked): a deadly cell the body probes feel (TileGrid.SIDE_DEADLY: a liquid, a kill cell)
+## with exactly ONE solid row under it and open air under that row which a hero can rise into - a floor at most
+## DEADLY_THROUGH_ROCK_ROWS rows under the deadly cell, with no wall between - kills a hero who jumps (or is bounced)
+## there: his feet two or three rows under the deadly cell, it is "felt through rock". Needs two solid rows. One
+## warning per run of such cells in a row.
+func _check_deadly_through_rock(data: LevelData, grid: TileGrid) -> void:
+	for row: int in range(0, grid.rows - 2):
+		var first: int = -1
+		var floor_row: int = -1
+		for col: int in grid.cols + 1:
+			var hit: int = _rise_floor_under_rock(grid, col, row) if col < grid.cols else -1
+			if hit >= 0 and first < 0:
+				first = col
+				floor_row = hit
+			elif hit < 0 and first >= 0:
+				_add(data.path, data.row_lines[row] if row < data.row_lines.size() else 0, WARNING,
+						"deadly cells at columns %d-%d of row %d have one solid row under them: a hero rising from the floor of row %d below feels them through the rock and dies (PHYSICS.md 11.2 #8) - make the rock two rows thick (LEVEL_DESIGN.md 4)" % [
+						first, col - 1, row, floor_row])
+				first = -1
+
+
+## For [method _check_deadly_through_rock]: the row of a floor a hero can rise from into the open space under the one
+## solid row under the deadly cell (col, row), or -1 (not deadly, rock two rows thick, no open space, no floor in reach).
+static func _rise_floor_under_rock(grid: TileGrid, col: int, row: int) -> int:
+	if grid.side_at(col, row) != TileGrid.SIDE_DEADLY or grid.side_at(col, row + 1) != TileGrid.SIDE_WALL:
+		return -1
+	for below: int in range(row + 2, mini(row + DEADLY_THROUGH_ROCK_ROWS, grid.rows - 1) + 1):
+		if _ground(grid, col, below):
+			return below if below >= row + 3 else -1    # a floor right under the rock leaves no room to rise into
+		var side: int = grid.side_at(col, below)
+		if side == TileGrid.SIDE_WALL or side == TileGrid.SIDE_DEADLY:
+			return -1
+	return -1
 
 
 ## True when the cell over the ground (col, row) has room for a hero's feet (not a wall, not deadly).

@@ -1,0 +1,31 @@
+# route: level=w3_l1b_coop difficulty=expert players=2 ends=exit after=tally expect=wipes:0,eggs:0,x2_gates:2,painting:25
+# w3_l1b_coop Expert two-stream route: "Blizzard Pass" for two (designer DB2; ticks:P1|P2; recorded from closed-loop
+# duo bots, build/db2/bot_w3_l1b_coop.gd --ledge=1). Every jump waits for a lull that lasts (the Expert gusts reach
+# 72), the waiting partner crouches through the gusts and nobody crouches while sliding on ice. A Shellback pincer at
+# the cave mouth; the crevasse of pillars and the pond's floes one after the other (P1 waits on the last floe until
+# the ridge charger has run past the far shore into the pond); up to the shelter ridge; the x2 secret 'lee': P2
+# stands right of the ledge, P1 hops off his head in a lull, rides the bounce clear of the ledge's underside and
+# lands on it (painting 25), then drops off its right end; over the ice bridge with a run-up; gate 'hut': P1 drops
+# into the keeper hall through the first hole (bait), P2 through the second and clubs the first turtle's back; then
+# P2 baits the second one while P1 climbs the vine, crosses the crust and drops behind it.
+25:R|R,1:|R,1:R|R,1:|R,3:|,1:|R,18:|,12:|RU,13:|R,2:|,8:|L,7:|,3:|R,3:|,1:|L,1:|,14:R|,1:|,1:R|,4:|,1:R|,4:|
+1:R|,3:|,1:D|F,7:|F,4:|,6:|F,1:|R,57:R|R,6:R|F,4:R|,1:|R,6:UF|UF,4:|,18:R|R,4:R|,2:R|L,1:|L,1:|,1:R|L,2:|,1:|L
+1:|,1:R|,3:|,1:R|,3:|,3:|R,2:|,1:|R,2:|,1:|D,3:L|D,8:|D,4:R|D,3:|D,11:R|D,14:RU|D,7:R|D,1:|D,1:R|D,6:|D,99:D|D
+7:R|D,14:RU|D,4:R|D,3:|D,1:L|D,3:R|R,4:|R,1:R|R,1:R|,1:R|R,3:R|,1:R|R,4:RU|,10:RU|R,1:R|R,5:R|RU,3:|RU,1:R|RU
+4:|RU,1:R|RU,2:R|R,5:|R,1:|,4:|D,1:R|R,1:R|,1:R|R,1:R|,2:L|,1:L|D,109:D|D,7:RU|R,7:RU|RU,7:R|RU,3:R|R,1:|R,3:|
+1:R|L,3:|R,4:R|,3:R|R,4:RU|R,10:RU|RU,4:R|RU,2:|R,1:|D,1:L|D,2:R|R,2:R|,1:R|R,4:|,1:R|,3:|R,7:R|,3:RU|,4:RU|R
+3:RU|L,4:RU|D,6:R|D,2:|D,1:R|D,1:|D,2:R|D,1:|D,1:R|D,1:|D,1:R|D,1:|D,2:R|D,1:|D,1:R|D,1:|D,1:R|D,1:|D,2:R|D
+1:|D,1:R|D,1:|D,1:R|D,1:|D,2:R|D,1:|D,2:R|D,1:|D,2:R|D,1:|D,4:R|D,1:|D,58:R|D,1:|D,1:R|D,1:R|RU,1:|RU,2:R|RU
+5:|RU,1:R|RU,1:|RU,1:R|RU,2:|RU,1:R|R,3:|R,5:R|R,1:R|,1:R|R,4:R|,2:RU|,6:RU|R,6:RU|RU,7:R|RU,1:|RU,1:R|R,3:|R
+1:R|R,2:|,1:|L,1:|R,1:R|R,2:|R,2:|,2:D|,1:D|R,3:D|,6:D|R,1:R|R,9:R|RU,5:RU|RU,6:RU|R,2:RU|,1:RU|D,8:R|D,6:R|R
+3:R|,1:R|R,3:R|,6:R|D,72:|D,10:|R,14:|RU,10:|R,1:|,1:D|,1:|R,4:|,1:|R,3:|,1:|R,3:|,10:|R,14:|RU,9:|R,7:R|R,2:|R
+1:R|R,4:|R,1:R|R,3:|R,1:R|,3:|,8:D|,1:D|L,2:D|,85:D|D,14:RU|D,2:R|D,13:R|RU,1:|RU,5:|R,1:R|R,3:|R,1:R|R,2:|R
+3:|,1:|R,4:|,1:|R,11:R|R,2:R|,8:|,2:|L,6:L|L,1:L|,1:|L,2:|,1:L|,7:|,3:|R,2:|,1:R|R,2:R|,2:R|D,7:|D,1:R|D,3:|D
+87:D|D,15:R|D,14:RU|D,8:R|D,7:R|R,10:R|,14:R|R,2:R|RU,12:|RU,36:|R,12:R|R,1:R|,1:R|R,1:R|,1:R|R,1:R|,1:|,1:R|
+1:|R,1:R|,1:|R,1:R|R,1:|,1:R|R,1:|R,1:R|,1:|R,3:R|R,8:R|,42:|,15:|R,38:R|R,1:R|,1:R|R,4:R|,1:R|R,4:R|,1:|R,1:R|
+4:|,1:R|,4:|,1:R|,3:|,122:D|D,6:|,10:LU|,1:U|,33:RU|,1:U|,6:LU|,1:U|,2:U|D,1:RU|D,10:LU|D,1:L|R,8:|R,1:|,1:R|R
+2:R|,1:|,1:|R,1:|,4:R|,11:R|D,15:|D,1:|R,10:R|R,2:L|L,4:L|,66:D|,17:R|,7:R|D,14:RU|D,8:R|D,3:|R,1:R|R,3:|R
+1:R|R,4:|R,1:R|R,2:|R,11:D|R,14:D|RU,4:D|R,3:D|,1:D|L,6:|,1:|D,26:R|D,5:|R,1:L|R,3:|R,1:R|R,7:|R,1:|,4:|R,1:|
+1:|R,2:|,47:|D,10:|RU,12:|R,1:|,13:|R,1:D|R,8:|R,6:|,5:|L,9:|,2:|R,1:|,1:|R,1:|,1:|R,2:|,1:|L,1:|F,1:D|F,6:|F
+4:|,6:|F,1:|R,4:L|R,5:|R,3:|,1:U|R,5:U|,1:U|L,2:U|,1:U|R,39:U|,46:D|,10:RU|,4:R|,1:R|D,7:R|,1:|,4:R|,4:L|
+10:RU|,9:R|,2:|,2:L|,32:R|,3:L|,6:|,2:R|,1:|,1:R|,2:|,1:L|,1:F|D,7:F|,4:|,6:F|,1:|D,3:D|D,59:R|R

@@ -1655,6 +1655,28 @@ func test_neutral_enemies_are_springboards() -> void:
 	Sim.step(1)
 	assert_false(dangler.dead, "hits glance off it")
 	assert_eq(dangler.hp, VersusSignatures.NEUTRAL_HP)
+	# A springboard: a hero falling onto its head bounces as on any enemy (the referee makes the bounce: the hero's own
+	# contact skips an enemy that hurts nobody), and nobody is hurt.
+	_unshield()
+	var hearts: int = heroes[0].run.hearts
+	var bounces: int = dangler.bounce_count
+	# (The bare heroes of these tests do not move by themselves: his feet are put 3 px into the head, falling.)
+	var top: int = dangler.sim_pos.y - dangler.box_h
+	heroes[0].teleport(Vector2i(dangler.sim_pos.x, top + 3))
+	heroes[0].yvel = 64
+	heroes[0].grounded = false
+	Sim.step(1)
+	assert_eq(heroes[0].yvel, Tuning.BOUNCE_YVEL, "a hero falling onto the dangler's head bounces off it (-64)")
+	assert_eq(heroes[0].sim_pos.y, top, "lifted out of the head by the overlap, as a bounce does")
+	assert_eq(dangler.bounce_count, bounces + 1, "the enemy counts the bounce")
+	assert_false(dangler.dead)
+	assert_eq(heroes[0].run.hearts, hearts, "a springboard hurts nobody")
+	# Rising into it from below is no stomp: no bounce.
+	heroes[1].teleport(Vector2i(dangler.sim_pos.x + 4, dangler.sim_pos.y + 10))
+	heroes[1].yvel = -48
+	heroes[1].grounded = false
+	Sim.step(1)
+	assert_eq(heroes[1].yvel, -48, "no bounce from below")
 
 
 func test_cinder_pit_ember_lane() -> void:

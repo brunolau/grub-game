@@ -15,7 +15,8 @@ extends SimEntity
 ##    the spawn shield when a hero starts a strike or a throw, the body bump, the stomp chain reset on the ground, the
 ##    weight caps of Grub Stack.
 ##  - CONTACT_ENEMIES: stomps gathered then applied (the stomp ladder 1-2-3-4-6-8 since the stomper's last ground
-##    tick, an 8-tick squash, 30 immune ticks; an immune, shielded, curled or teammate head is a free springboard).
+##    tick, an 8-tick squash, 30 immune ticks; an immune, shielded, curled or teammate head is a free springboard),
+##    then the head bounces off the arena's neutral enemies (VersusSignatures.springboard_step).
 ##  - WORLD: the round: intro countdown, clock, Feast Rush, gong, the Golden Drumstick on a tie.
 ##  - POST: hazards (knock-outs: credit to the last hitter within 73 ticks), respawns after 48 ticks at the free spawn
 ##    farthest from the rivals with a 48-tick spawn shield, the referee's own counters (spawn shield, squash, hit-stop,
@@ -1503,6 +1504,8 @@ func _stomp_step() -> void:
 					_emit_stack(stomper.slot)
 			Defs.VersusMode.LAST_CAVEMAN:
 				_lose_hearts(victim, 1, stomper, &"stomp")
+	# The arena's neutral enemies are springboards (the hero's own contact skips them: they hurt nobody).
+	signatures.springboard_step()
 
 
 # --- WORLD: the round -------------------------------------------------------------------------------------------------

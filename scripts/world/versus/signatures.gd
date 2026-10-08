@@ -18,7 +18,9 @@ extends RefCounted
 ##    hero's body overlaps the cell (else the ghost waits).
 ##  - NEUTRAL ENEMIES: every enemy record of an arena (Echo Hollow's dangler) is a neutral springboard - it never hurts
 ##    anyone (EnemyBase.contact_hurts off), never dies (its hp is topped up every tick: hits flash and glance), and a
-##    hero landing on its head bounces as on any enemy.
+##    hero landing on its head bounces as on any enemy. The hero's own enemy contact skips an enemy whose contact does
+##    not hurt (Player: `not enemy.contact_hurts`), so that bounce is made here ([method springboard_step], the
+##    referee's CONTACT_ENEMIES step) exactly as Player._bounce_on makes it.
 ##  - EMBER LANE: meta `ember_lane = <col>,<width>[,<period>]` (Cinder Pit): every `period` round ticks (EMBER_PERIOD
 ##    66 by default) an ember drifts down a random column of the lane from the top row, after EMBER_WARN_TICKS of a
 ##    glow at its start (the telegraph, in the danger rects); its touch is an arena hit (VersusReferee.arena_hit: the
@@ -220,6 +222,39 @@ func world_step() -> void:
 		_spit()
 
 
+## CONTACT_ENEMIES while the round is played, after the rivals' stomps: a hero who falls (or stands: yvel 0) onto a
+## neutral enemy's head - the body test flags a stomp, as in the hero's own enemy contact - bounces off it
+## (Tuning.BOUNCE_YVEL, with Up held Tuning.BOUNCE_YVEL_UP or Big Bounce's; a squashed hero has no Up) and the enemy
+## counts the bounce (EnemyBase.on_bounced; it is never hurt). A hero who already bounced this tick (yvel < 0), a
+## curled or a gliding one is left alone. Returns the heroes that bounced.
+func springboard_step() -> Array[PlayerBase]:
+	var bounced: Array[PlayerBase] = []
+	if neutrals.is_empty():
+		return bounced
+	var up_yvel: int = VersusRules.BIG_BOUNCE_YVEL if _referee.rules.has(VersusRules.BIG_BOUNCE) \
+			else Tuning.BOUNCE_YVEL_UP
+	for hero: PlayerBase in _referee.heroes_in_order():
+		if not _referee.is_in_play(hero) or hero.yvel < 0 or hero.is_curled() or hero.is_gliding():
+			continue
+		for entry: Variant in neutrals:
+			if not is_instance_valid(entry):
+				continue
+			var enemy: EnemyBase = entry as EnemyBase
+			if enemy == null or enemy.dead or not enemy.awake or not enemy.is_targetable():
+				continue
+			if not Overlap.body(hero, enemy, hero) or not Overlap.stomp:
+				continue
+			var up: bool = (GameInput.get_flags(hero.slot) & Defs.IN_UP) != 0 and hero.control_enabled \
+					and hero.squash == 0
+			hero.bounce(up_yvel if up else Tuning.BOUNCE_YVEL, Overlap.depth)
+			enemy.on_bounced(hero)
+			if AudioTable.SFX.has(Sfx.BOUNCE):
+				Audio.play_sfx(Sfx.BOUNCE)
+			bounced.append(hero)
+			break
+	return bounced
+
+
 func _ring_outs() -> void:
 	if ring_rects.is_empty():
 		return
@@ -270,20 +305,13 @@ func _cell_taken(cell: Vector2i) -> bool:
 	return false
 
 
-## The block is back: its cell solid (the `$` cell's invisible solid), its hits and look of the level file.
+## The block is back: its cell solid (the `$` cell's invisible solid), its hits and look of the level file
+## (objects-A's BreakableBlock.regrow(), wf9_world_b_to_party.txt #1; the cell is written here too, on the referee's
+## level, in case Game.level is another one).
 func _grow_back(block: BreakableBlock) -> void:
 	var level: LevelBase = _referee.level
 	level.set_cell(block.cell.x, block.cell.y, TileGrid.CH_SOLID_INVISIBLE)
-	if block.has_method(&"regrow"):
-		block.call(&"regrow")
-	else:
-		# objects-A's BreakableBlock has no regrow() yet (asked: wf9_world_b_to_objects_a.txt): its level-file state.
-		block.hits_left = block.hits_total
-		block.opened = false
-		block.opened_by_flood = false
-		block.cooldown = 0
-		block.set(&"_break_age", -1)
-		_show_ghost(block, false)
+	block.regrow()
 	if AudioTable.SFX.has(Sfx.SPOT_OPENED):
 		Audio.play_sfx(Sfx.SPOT_OPENED)
 

@@ -81,6 +81,24 @@ func test_inkjaw_reads_its_grotto_and_surfaces_after_its_bubbles() -> void:
 		assert_eq(other.max_hp, int(case[2]))
 
 
+## G52: the fire-starter is thrown from over the island nearest to where Inkjaw died, a cell over its top - a key item
+## that sinks returns to where it was spawned, so it comes back on ground, never over a gap's water.
+func test_the_key_item_is_thrown_from_over_the_nearest_island() -> void:
+	var squid: Squid = _open()
+	var grid: TileGrid = _lab.level.grid
+	var row: int = Tuning.to_cell(SURFACE)
+	for gap: int in [GAP_A, GAP_B]:
+		squid._up_x = gap
+		var origin: Vector2i = squid._drop_origin()
+		var col: int = Tuning.to_cell(origin.x)
+		assert_ne(grid.get_char(col, row), TileGrid.CH_LIQUID, "gap %d: over island ground (col %d)" % [gap, col])
+		assert_eq(grid.side_at(col, row), TileGrid.SIDE_WALL, "solid ground")
+		assert_true(absi(origin.x - gap) <= 24, "gap %d: the island beside it (x %d)" % [gap, origin.x])
+		assert_true(origin.y < SURFACE, "over the surface")
+		assert_eq(grid.get_char(Tuning.to_cell(squid._burst_origin().x), row), TileGrid.CH_LIQUID,
+				"the burst itself still comes out of the gap")
+
+
 ## An ink blob costs a heart and 6 bones and dims the screen to the night palette for 66 ticks; then the light returns.
 func test_an_ink_blob_dims_the_screen() -> void:
 	var squid: Squid = _open()

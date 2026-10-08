@@ -1,0 +1,8 @@
+# route: level=w9_l1 difficulty=expert ends=none expect=hurts:0,painting:12,secrets:1,weapon_end:spear
+# Featured route of Cloudbreak Climb (designer D9; recorded from closed-loop macros, build/d9a): the Cave Painting
+# (index 12) in the nook on the slate pillar, two spear steps up. The club route to checkpoint 1, up onto the ledge
+# for the spear, a high throw into the first bark board, onto its step, a high throw into the second board, onto
+# that step, onto the pillar top and into the nook.
+24:R,5:,36:R,6:UF,4:,13:R,6:UF,19:,3:R,1:,1:L,6:UF,40:,17:R,2:,10:R,10:,9:RU,6:R,2:,3:L,2:,9:RU,9:R,3:,9:RU,9:R
+7:,4:L,6:,2:R,6:,9:R,6:,1:R,2:,1:L,97:U,16:L,7:,1:R,2:,11:L,10:,9:U,10:,5:L,7:,79:L,5:,8:UF,12:,9:U,21:,2:U,6:F
+20:,9:U,14:,10:LU,4:L,1:,2:R,3:L,6:,2:R,33:

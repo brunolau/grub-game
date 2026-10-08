@@ -19,6 +19,10 @@ extends SceneTree
 ##   ... -- --queue=<dir>       a WORKER of a shared queue: take the gates dearest first (CoopSearch.order_by_cost) and
 ##                              search only those this process claims in <dir> (CoopSearch.claim_gate) - N workers
 ##                              started on the same <dir> share the table without a fixed split (tools/world_coop_gates.sh)
+##   ... -- --repeat=<k>        a SCALE BENCH: the chosen gates k times over (copy 0 as usual, copies 1..k-1 searched
+##                              afresh - no cache read or write), so a table of 45 gates times 3 costs what about 70 gates x
+##                              2 difficulties will (tools/world_coop_gates.sh --bench <k>); with --queue each copy is claimed
+##                              on its own
 ## Prints one line per gate (refused / REACHED, seconds, resting points, runs, ticks simulated) and a summary. Exit
 ## code 0 = every gate refused and every window below its solo minimum - 4, 1 = not, 2 = bad arguments.
 ##
@@ -70,6 +74,7 @@ func _run() -> void:
 	var stats: bool = false
 	var queue: String = ""
 	var egg: bool = false
+	var repeat: int = 1
 	for argument: String in OS.get_cmdline_user_args():
 		if argument == "--list":
 			listing = true
@@ -85,6 +90,13 @@ func _run() -> void:
 			egg = true
 		elif argument.begins_with("--queue="):
 			queue = argument.get_slice("=", 1)
+		elif argument.begins_with("--repeat="):
+			var count: String = argument.get_slice("=", 1)
+			if not count.is_valid_int() or count.to_int() < 1:
+				print("coop_search: bad --repeat (want a count of 1 or more)")
+				_finish(2)
+				return
+			repeat = count.to_int()
 		elif argument == "--no-cache":
 			cache = false
 		elif argument.begins_with("--shard="):
@@ -130,19 +142,35 @@ func _run() -> void:
 		root.get_node("Sim").set(&"_profiler", sim_profile)
 	if queue != "":
 		chosen = search.call(&"order_by_cost", chosen)
+	if repeat > 1:
+		# The bench: every copy of a gate after the first one is searched afresh (copy 0 keeps the cache rules).
+		var copies: Array = []
+		for entry: Dictionary in chosen:
+			for copy: int in repeat:
+				var twin: Dictionary = entry.duplicate()
+				twin["copy"] = copy
+				copies.append(twin)
+		chosen = copies
 	var failures: int = 0
 	var searched: int = 0
+	var gate_seconds: float = 0.0
 	var started: int = Time.get_ticks_msec()
 	for entry: Dictionary in chosen:
+		var copy: int = int(entry.get("copy", 0))
+		var claim_gate: String = str(entry["gate"]) if copy == 0 else "%s#%d" % [entry["gate"], copy]
 		if queue != "" and not bool(search.call(&"claim_gate", queue, entry["level"], int(entry["difficulty"]),
-				str(entry["gate"]))):
+				claim_gate)):
 			continue   # another worker has it
 		searched += 1
 		search.call(&"profile_reset")
+		search.set(&"use_cache", cache and copy == 0)
+		search.set(&"use_file_cache", cache and copy == 0)
 		var clock: int = Time.get_ticks_msec()
 		var result: Dictionary = search.call(&"search_gate", entry["level"], entry["difficulty"], entry["gate"])
 		var seconds: float = (Time.get_ticks_msec() - clock) / 1000.0
-		var label: String = "%s (%s) gate %s" % [entry["level"], _difficulty_name(int(entry["difficulty"])), entry["gate"]]
+		gate_seconds += seconds
+		var label: String = "%s (%s) gate %s%s" % [entry["level"], _difficulty_name(int(entry["difficulty"])),
+			entry["gate"], "" if copy == 0 else " (bench copy %d)" % copy]
 		var reached: bool = bool(result.get("reached", true))
 		var bad_windows: PackedStringArray = PackedStringArray()
 		for window: Dictionary in result.get("windows", []):
@@ -175,8 +203,8 @@ func _run() -> void:
 			sim_profile.parts.clear()
 		# Let the main loop turn: the freed search world's canvas callbacks are flushed (wf8_D5_to_integration #1).
 		await process_frame
-	print("coop_search: %d gate(s) in %.1f s, %d failing" % [searched, (Time.get_ticks_msec() - started) / 1000.0,
-		failures])
+	print("coop_search: %d gate(s) in %.1f s (%.1f s searching), %d failing" % [searched,
+		(Time.get_ticks_msec() - started) / 1000.0, gate_seconds, failures])
 	_finish(1 if failures > 0 else 0)
 
 

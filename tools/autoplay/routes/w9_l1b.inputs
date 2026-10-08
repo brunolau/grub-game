@@ -1,0 +1,7 @@
+# route: level=w9_l1b difficulty=expert ends=exit after=tally expect=hurts:0,min_checkpoints:2,painting:13,glider:true
+# The Expert club route of Thunderhead Glide (designer D9a; recorded from closed-loop macros, build/d9a): the
+# glider from the runway, the first crossing high over the storm pterodactyls past the lightning, checkpoint 2 on
+# the landing cloud, a run-up and a climb on lift to the high cloud of the Cave Painting (index 13), off its edge
+# into the second crossing to the last landing cloud and the exit totem (no hit taken).
+24:R,2:,1:R,6:,22:L,7:,1:R,2:,28:R,15:RU,71:R,5:RD,14:RU,72:R,5:RD,14:RU,82:R,7:RD,7:,11:L,7:,28:R,19:RU,27:R
+5:RD,20:RU,8:RD,5:RU,16:R,13:RD,7:,6:L,7:,1:R,2:,38:R,5:RU,91:R,5:RD,9:RU,22:R,13:RD,136:R,2:

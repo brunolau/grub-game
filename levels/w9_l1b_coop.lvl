@@ -1,0 +1,133 @@
+# Club & Grub - World 9, stage 1b in co-op: "Thunderhead Glide" (designer D9a). The co-op file of levels/w9_l1b.lvl
+# (DESIGN.md A.6 / D.10, LEVEL_DESIGN.md 15.7): the same storm with P2's start, two gliders on each runway and one
+# co-op gate with its tablet and a checkpoint behind:
+#  - 'stormwall': a cloud wall stands on the last landing cloud; its door (a keeper column) rises only when both
+#    storm pterodactyls of a bonded pair are dead within the window. They perch 14 columns apart, 3 rows over the
+#    cloud (range 0: only a hero right under one wakes it); one hero high-strikes each, on the count of three.
+# Traits: shell storm pterodactyls over the crossings (flyers: a harrier would chase a glider to the landing clouds),
+# the bonded keepers.
+
+[meta]
+format = 2
+id = w9_l1b_coop
+name = "Thunderhead Glide"
+kind = coop
+coop_of = w9_l1b
+coop_base_hash = "3bf796badd6a12681ec6848d0bd7ee16393d86728fcea1be336ff757af9814aa"
+book = 2
+world = 9
+stage = 1
+biome = sky
+terrain_a = sky/terrain_rock
+terrain_b = sky/terrain
+background = storm
+music = level_storm_glide
+min_difficulty = expert
+bonus_tier = 2
+author = D9a
+
+[legend]
+
+[tiles]
+......................................................................................................................................................................................................................%%..................................
+......................................................................................................................................................................................................................%%..................................
+......................................................................................................................................................................................................................%%..................................
+........................................................................................................................................%%%%%%........................................................................%%..........................########
+........................................................................................................................................%%%%%%........................................................................%%..........................########
+......................................................................................................................................................................................................................%%..........................########
+......................................................................................................................................................................................................................%%..........................########
+......................................................................................................................................................................................................................%%..........................########
+......................................................................................................................................................................................................................%%..........................########
+......................................................................................................................................................................................................................%%..........................########
+..@.............................................................................................%%%%%%%%%%%%%%%%%%%%%%................................................................................................%%..........................########
+########################........................................................................%%%%%%%%%%%%%%%%%%%%%%................................................................................................%%..........................########
+########################..........................................................................%%%%%%%%%%%%%%%%%%..........................................................................%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+########################......................................................................................................................................................................%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+########################..............................................%%%%%%....................................................................................................................%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%..
+########################....................%%%%%%....................%%%%%%..................................................................................%%%%%%......................................................................................
+########################....................%%%%%%....................%%%%%%..................................................................................%%%%%%......................................................................................
+########################....................%%%%%%....................%%%%%%..................................................................................%%%%%%......................................................................................
+########################....................%%%%%%....................%%%%%%..................................................................................%%%%%%......................................................................................
+########################....................%%%%%%....................%%%%%%..................................................................................%%%%%%......................................................................................
+
+[entities]
+# --- the start runway: the sign, the glider, checkpoint 1
+objects/sign 4 10 text=SIGN_W9_LIGHTNING
+items/glider 10 10
+items/glider 12 10
+objects/hero_start 1 10 slot=2
+objects/checkpoint 7 10
+props/sky/dead_tree 16 10
+props/sky/rocks_small 17 10
+props/sky/feather_a 21 10
+# --- crossing A: lightning, storm pterodactyls, two cloud stacks with thermal geysers
+zones/lightning 24 0 rect=24,0,72,20 period=66
+enemies/flyer 30 13 skin=storm_ptero left=-3 right=3 hp=10 coop=shell
+enemies/flyer 40 15 skin=storm_ptero left=-3 right=3 hp=10
+enemies/flyer 52 12 skin=storm_ptero left=-2 right=2 hp=10 coop=shell
+enemies/flyer 62 14 skin=storm_ptero left=-3 right=3 hp=10
+enemies/flyer 78 13 skin=storm_ptero left=-3 right=3 hp=10 coop=shell
+enemies/flyer 88 15 skin=storm_ptero left=-2 right=2 hp=10
+objects/geyser 46 14 period=66 skin=steam
+objects/geyser 72 13 period=66 delay=33 skin=steam
+props/sky/crystal_a 48 14
+props/sky/crystal_b 74 13
+items/food 30 7 index=1
+items/food 33 7 index=2
+items/food 40 9 index=3
+items/food 52 8 index=4
+items/food 56 8 index=5
+items/food 78 7 index=6
+items/food 88 6 index=7
+items/food 91 6 index=8
+# --- the landing cloud: checkpoint 2 and a second glider
+objects/checkpoint 99 9
+items/glider 102 9
+items/glider 104 9
+props/sky/pine_trunk 112 9
+props/sky/pine_crown 112 7.75
+props/sky/bone_pile 110 9
+objects/hidden_spot 108 10 kind=small count=3 contents=food:9,food:10,treasure:4 look=inset tile=%
+# --- crossing B: lightning, the high cloud of the painting, a cloud stack
+zones/lightning 118 0 rect=118,0,72,20 period=66
+enemies/flyer 122 13 skin=storm_ptero left=-3 right=3 hp=10 coop=shell
+enemies/flyer 130 15 skin=storm_ptero left=-3 right=3 hp=10
+enemies/flyer 146 13 skin=storm_ptero left=-3 right=3 hp=10
+enemies/flyer 154 15 skin=storm_ptero left=-2 right=2 hp=10 coop=shell
+enemies/flyer 166 12 skin=storm_ptero left=-3 right=3 hp=10
+enemies/flyer 174 14 skin=storm_ptero left=-3 right=3 hp=10
+enemies/flyer 182 13 skin=storm_ptero left=-3 right=3 hp=10 coop=shell
+enemies/flyer 186 15 skin=storm_ptero left=-2 right=2 hp=10
+objects/geyser 160 14 period=66 skin=steam
+items/painting 138 2 index=13
+zones/secret 138 2 name=high_cloud rect=136,0,6,3
+items/treasure 140 2 index=9
+items/food 137 2 index=11
+items/food 124 7 index=12
+items/food 127 7 index=13
+items/food 145 9 index=14
+items/food 152 12 index=15
+items/food 166 8 index=16
+items/food 178 9 index=17
+items/food 186 8 index=18
+# --- the last landing cloud and the exit ledge
+props/sky/rocks_small 194 11
+props/sky/skull_big 200 11
+objects/hidden_spot 205 12 kind=big hits=3 look=inset tile=%
+# co-op gate 'stormwall': the cloud wall's door rises once both perched storm pterodactyls are dead within the window:
+# each perches over the cloud 14 columns from the other (range 0: only a hero right under one wakes it);
+# one hero high-strikes each on the count-in
+objects/x2_tablet 196 11 gate=stormwall far=222,11
+objects/sign 191 11 text=SIGN_W9_COOP_STORM
+objects/checkpoint 193 11
+objects/column 214 11 size=2,4 rise=4 trigger=keepers:storm
+enemies/harrier 198 9 skin=storm_ptero range=0 hp=10 coop=bond bond=storm keeper=storm
+enemies/harrier 212 9 skin=storm_ptero range=0 hp=10 coop=bond bond=storm keeper=storm
+objects/checkpoint 224 11
+props/sky/feather_b 228 11
+props/sky/pine_trunk 232 11
+props/sky/pine_crown 232 9.75
+objects/exit 239 11
+props/sky/cloud_puff 60 17 layer=back
+props/sky/cloud_puff 130 16 layer=back
+props/sky/cloud_puff 175 17 layer=back

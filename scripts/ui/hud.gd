@@ -318,10 +318,14 @@ func get_boss() -> BossBase:
 
 
 ## The weak points of `boss` this tick (logical px, world coordinates; see WEAK_POINT_METHODS), empty rectangles left
-## out. For the HUD's fade and for the designers' checks of the fight band ([method weak_point_problem]).
+## out. For the HUD's fade and for the designers' checks of the fight band ([method weak_point_problem]). A boss after
+## its lethal blow (hp <= 0: the death leap or fall) has none (DESIGN.md G56: it takes no hit while dying).
 static func weak_point_rects(boss: Object) -> Array[Rect2i]:
 	var result: Array[Rect2i] = []
 	if boss == null or not is_instance_valid(boss):
+		return result
+	var hp: Variant = boss.get(&"hp")
+	if hp is int and int(hp) <= 0:
 		return result
 	for method: StringName in WEAK_POINT_METHODS:
 		if not boss.has_method(method):

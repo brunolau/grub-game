@@ -135,10 +135,11 @@ func _on_hurt(power: int) -> void:
 	super._on_hurt(power)
 
 
-## The nearer hatched hero (GAMEPLAY.md 13.9.4: "bites the nearer; its back faces the far hero"); in a party of one
-## the hero (LevelBase.target_hero).
+## The nearer hero who counts (GAMEPLAY.md 13.9.4: "bites the nearer; its back faces the far hero"; G33: the nearer
+## ACTIVE hero, so a dozing partner never turns its back to a lone player); in a party of one the hero
+## (LevelBase.nearest_coop_hero is LevelBase.target_hero there).
 func _nearest_hero() -> PlayerBase:
-	return Game.level.target_hero(self) if Game.level != null else null
+	return Game.level.nearest_coop_hero(self) if Game.level != null else null
 
 
 ## A hero within EnemyTuning.MIMIC_SENSE_PX horizontally, on its floor.

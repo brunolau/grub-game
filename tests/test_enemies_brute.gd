@@ -140,6 +140,47 @@ func test_coop_the_head_stays_clear_of_the_hud() -> void:
 		assert_eq(Hud.weak_point_problem(art, Vector2(view.size) * 2), "", "state %d: the HUD rule" % state)
 
 
+## G56: the co-op Brute's 1.0 high JUMP (take-off to landing) and its DYING leap carry no weak point - an empty head
+## rect, so Hud.weak_point_problem has nothing to judge there and a throw during the leap does no damage; on the floor
+## its head stays clear of the HUD band (the JUMP's taunt on the ground included).
+func test_coop_the_jump_and_the_death_leap_are_no_weak_point() -> void:
+	var brute: Brute = _coop_fight(Defs.Difficulty.BEGINNER, Vector2i(250, 160), Vector2i(560, 160))
+	var view: Rect2i = Rect2i(brute.sim_pos.x - Tuning.VIEW_W / 2, 160 + Tuning.TILE - Tuning.VIEW_H, Tuning.VIEW_W,
+			Tuning.VIEW_H)
+	brute._set_state(Brute.State.JUMP)
+	var ground_head: Rect2i = brute.get_head_rect()
+	assert_true(ground_head.has_area(), "JUMP, still on the floor (the chest beat): the head is open")
+	var art: Rect2 = Rect2(Vector2(ground_head.position - view.position) * 2, Vector2(ground_head.size) * 2)
+	assert_eq(Hud.weak_point_problem(art, Vector2(view.size) * 2), "", "JUMP on the floor: the HUD rule")
+	var airborne: int = _step_until(func() -> bool: return brute.get_state() == Brute.State.JUMP and not brute._grounded,
+			EnemyTuning.BRUTE_TAUNT_TICKS + 10)
+	assert_true(airborne > 0, "the high jump takes off")
+	assert_false(brute.get_head_rect().has_area(), "JUMP in the air (co-op form): no weak point (G56)")
+	assert_eq(Hud.weak_point_rects(brute), [] as Array[Rect2i], "nothing for weak_point_problem to judge")
+	var hp: int = brute.hp
+	_shot(Rect2i(brute.sim_pos.x - 16, brute.sim_pos.y - brute.box_h, 32, 30), 1)
+	Sim.step(1)
+	assert_eq(brute.hp, hp, "a throw during the leap does no damage")
+	brute._set_state(Brute.State.WATCH)
+	brute.hp = 1
+	brute.last_hitter = _p2
+	brute._on_lethal_hit()
+	brute.hp = 0
+	assert_eq(brute.get_state(), Brute.State.DYING)
+	assert_false(brute.get_head_rect().has_area(), "DYING (every form): no weak point after the lethal blow (G56)")
+	assert_eq(Hud.weak_point_rects(brute), [] as Array[Rect2i], "and no weak_point_problem for the HUD band")
+
+
+## G56 in the 1.0 form: the solo Brute's high jump keeps its 1.0 head (V1); only its death leap has no weak point.
+func test_the_solo_brute_keeps_its_jump_head_and_loses_it_dying() -> void:
+	var brute: Brute = _brute()
+	brute._set_state(Brute.State.JUMP)
+	brute._grounded = false
+	assert_true(brute.get_head_rect().has_area(), "the 1.0 high jump keeps its head")
+	brute._set_state(Brute.State.DYING)
+	assert_false(brute.get_head_rect().has_area(), "DYING: none")
+
+
 ## G33: no Totem Ride exemption on an idle carrier (party allows no ride on one; the guard checks it too).
 func test_coop_a_rider_on_a_dozing_carrier_stays_under_the_guard() -> void:
 	var brute: Brute = _coop_fight(Defs.Difficulty.BEGINNER, Vector2i(330, 160), Vector2i(330, 160))

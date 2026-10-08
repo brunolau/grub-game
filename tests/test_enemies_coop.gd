@@ -113,6 +113,34 @@ func test_shell_faces_the_nearer_hero_every_tick_and_only_its_back_can_be_hit() 
 	assert_eq(shell.hp, 30, "one flying at its back counts")
 
 
+## G33 (the IDLE-PARTNER rule): the shield faces the nearer hero who COUNTS - a dozing partner is no bait.
+func test_an_idle_partner_is_no_shell_bait() -> void:
+	var shell: EnemyBase = _enemy(&"enemies/walker", Vector2i(160, 160), {"coop": "shell", "speed": 0, "hp": 100})
+	var back: EnemyBase = _enemy(&"enemies/shellback", Vector2i(260, 160), {"speed": 0, "hp": 100})
+	_hero.teleport(Vector2i(120, 160))
+	_p2.teleport(Vector2i(180, 160))
+	_p2.idle = true
+	Sim.step(2)
+	assert_eq(shell.facing, -1, "the shield faces the active P1, not the dozing P2 who stands nearer")
+	shell.take_hit(25, _hero)
+	assert_eq(shell.hp, 100, "P1's strike glances: he cannot club its back over his idle partner")
+	_hero.teleport(Vector2i(220, 160))
+	_p2.teleport(Vector2i(280, 160))
+	Sim.step(2)
+	assert_eq(back.facing, -1, "the Shellback preset too")
+	back.take_hit(25, _hero)
+	assert_eq(back.hp, 100)
+	_p2.idle = false
+	Sim.step(1)
+	assert_eq(back.facing, 1, "P2 plays again: he is the nearer hero who counts")
+	_hero.idle = true
+	_p2.idle = true
+	_p2.teleport(Vector2i(240, 160))
+	_hero.teleport(Vector2i(300, 160))
+	Sim.step(1)
+	assert_eq(back.facing, 1, "nobody counts: it keeps its facing")
+
+
 # =================================================================================================================
 # bond
 # =================================================================================================================
@@ -253,6 +281,28 @@ func test_one_hero_between_both_members_is_no_count_in() -> void:
 	_p2.teleport(Vector2i(230, 160))
 	Sim.step(1)
 	assert_eq(a.coop_traits().count_in, 1, "two heroes: it counts in")
+
+
+## G33: a dozing partner is nobody for the count-in and no company for a `lone` record.
+func test_an_idle_partner_counts_for_no_count_in_and_no_lone_company() -> void:
+	var a: EnemyBase = _bonded(Vector2i(60, 160))
+	var b: EnemyBase = _bonded(Vector2i(280, 160))
+	_hero.teleport(Vector2i(80, 160))
+	_p2.teleport(Vector2i(270, 160))
+	_p2.idle = true
+	Sim.step(3)
+	assert_eq(a.coop_traits().count_in, -1, "the idle P2 at the second member: no count-in")
+	_p2.idle = false
+	Sim.step(1)
+	assert_eq(a.coop_traits().count_in, 1, "awake: the first blip")
+	assert_eq(b.coop_traits().count_in, -1)
+	Game.difficulty = Defs.Difficulty.EXPERT
+	var stinger: EnemyBase = _enemy(&"enemies/stinger", Vector2i(560, 100), {"coop": "lone"})
+	_hero.teleport(Vector2i(550, 160))
+	_p2.teleport(Vector2i(570, 160))
+	assert_null(stinger._target_hero(), "together: it keeps away")
+	_p2.idle = true
+	assert_eq(stinger._target_hero(), _hero, "a dozing partner beside him is no protection: P1 is the straggler")
 
 
 func test_split_halves_count_in_too() -> void:
@@ -442,6 +492,28 @@ func test_only_a_dazed_record_can_be_hurt() -> void:
 	Game.difficulty = Defs.Difficulty.EXPERT
 	raptor.on_bounced(_p2)
 	assert_eq(raptor.coop_traits().dazed, PartyTuning.DAZE_TICKS_EXPERT, "Expert: 12")
+
+
+## G47: the daze is slot-bound - only a hero of another slot than the bouncer's hurts the dazed record.
+func test_the_daze_is_slot_bound() -> void:
+	var raptor: EnemyBase = _raptor(Vector2i(200, 160))
+	_hero.teleport(Vector2i(180, 160))
+	_p2.teleport(Vector2i(300, 160))
+	Sim.step(2)
+	raptor.on_bounced(_hero)
+	assert_true(raptor.coop_traits().dazed > 0, "P1's head bounce dazes it")
+	raptor.take_hit(25, _hero)
+	assert_eq(raptor.hp, 100, "the bouncer's own strike glances: one hero never dazes and strikes alone")
+	raptor.take_hit(25, _p2)
+	assert_eq(raptor.hp, 75, "the partner's strike counts")
+	var axe: ProjectileBase = _shot(Vector2i(160, 156), 208, 0)
+	raptor.take_hit(20, axe)
+	assert_eq(raptor.hp, 75, "P1's thrown weapon is his too")
+	raptor.on_bounced(_p2)
+	raptor.take_hit(25, _hero)
+	assert_eq(raptor.hp, 50, "P2 bounced it last: now P1's strike counts ...")
+	raptor.take_hit(25, _p2)
+	assert_eq(raptor.hp, 50, "... and P2's glances")
 
 
 # =================================================================================================================

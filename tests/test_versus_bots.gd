@@ -18,7 +18,11 @@ extends TestCase
 ##  - a match log replays identically: the first round of each set is played again from the same start with the
 ##    bots' recorded flags as plain scripted input (no bot) and gives the same digest on every tick.
 ## Each set prints one line (rounds, ticks, wins per spawn with the mean score, links played / failed) for the arena
-## designers. Also here (too slow for the quick tests): the rider movers of the arena kit - a see-saw's two ends and a
+## designers. G50 (PLAN.md cut 4's switch): an (arena, mode) outside the arena's meta `bots` (a mode list or `none`;
+## default every mode) ships human-only - it prints a skip line "human-only (cut 4)" and is not played. Every round
+## awaits a frame (the freed levels' queued callbacks are flushed; one frame for all sets overflowed Godot's message
+## queue, wf9_integration_to_core-B.txt #1). VERSUS_BOTS_SHARD=<i>/<n> plays every n-th (arena, mode) set from the
+## i-th (tools/g3_versus_bots.sh runs the shards side by side; the mover bake runs in shard 0). Also here (too slow for the quick tests): the rider movers of the arena kit - a see-saw's two ends and a
 ## pulley's two lifts - bake as mover nodes whose every link verifies.
 
 const LEVEL_SCENE: String = "res://scenes/world/level.tscn"
@@ -121,15 +125,36 @@ func after_each() -> void:
 func test_hunter_bots_play_every_arena_and_mode() -> void:
 	var arenas: Array[Dictionary] = _arenas()
 	assert_true(not arenas.is_empty(), "arenas to play")
+	var shard: Vector2i = _shard()
 	var sets: int = 0
+	var index: int = 0
 	for arena: Dictionary in arenas:
 		for mode: int in arena["modes"]:
-			_play_set(arena, mode)
+			if not (arena["bots"] as Array).has(mode):
+				print("    %s/%s: human-only (cut 4) - meta `bots` leaves the mode out (G50), no bot set" % [arena["id"],
+						Defs.VERSUS_MODE_NAMES[mode]])
+				continue
+			index += 1
+			if (index - 1) % shard.y != shard.x:
+				continue
+			await _play_set(arena, mode)
 			sets += 1
-	assert_true(sets >= 4, "%d (arena, mode) sets" % sets)
+	assert_true(sets >= (4 if shard.y == 1 else 1), "%d (arena, mode) sets" % sets)
+
+
+## VERSUS_BOTS_SHARD=<i>/<n>: (i, n); (0, 1) without it.
+static func _shard() -> Vector2i:
+	var text: String = OS.get_environment("VERSUS_BOTS_SHARD")
+	var parts: PackedStringArray = text.split("/")
+	if parts.size() != 2 or not parts[0].is_valid_int() or not parts[1].is_valid_int() or int(parts[1]) < 1:
+		return Vector2i(0, 1)
+	return Vector2i(clampi(int(parts[0]), 0, int(parts[1]) - 1), int(parts[1]))
 
 
 func test_see_saw_and_pulley_lifts_bake_as_verified_rider_movers() -> void:
+	if _shard().x != 0:
+		assert_true(true, "the mover bake runs in shard 0")
+		return
 	var graph: NavGraph = NavBaker.new().bake_text(self, &"test_core_bots_seesaw", MOVERS_ROOM)
 	assert_not_null(graph)
 	if graph == null:
@@ -207,6 +232,7 @@ func _play_set(arena: Dictionary, mode: int) -> void:
 				wins[spawn] += 1.0
 			if record:
 				_check_replay(name, arena, mode, players, round_index, round_seed, result)
+			await get_tree().process_frame
 		for bot: HeroBot in bots:
 			played += bot.nav.links_played
 			failed += bot.nav.links_failed
@@ -415,8 +441,19 @@ func _arena_entry(id: StringName, text: String) -> Dictionary:
 	for mode: int in VersusArena.modes_of(meta):
 		if LAUNCH_MODES.has(mode):
 			modes.append(mode)
+	# G50: the modes bots play here (meta `bots`: a list of mode names or `none`; absent or empty: every mode).
+	var bots: Array[int] = modes.duplicate()
+	var listed: String = str(meta.get("bots", "")).strip_edges()
+	if listed != "":
+		bots.clear()
+		var names: PackedStringArray = PackedStringArray()
+		for part: String in listed.split(",", false):
+			names.append(part.strip_edges())
+		for mode: int in modes:
+			if names.has(String(Defs.versus_mode_name(mode))):
+				bots.append(mode)
 	return {"id": id, "text": text, "modes": modes, "players": mini(VersusArena.players_of(meta), Defs.MAX_PLAYERS),
-			"meta": meta, "shipped": String(id).begins_with("arena_")}
+			"meta": meta, "shipped": String(id).begins_with("arena_"), "bots": bots}
 
 
 ## The arena's graph: the committed one when it was baked from this text, else a bake of this run.

@@ -1,0 +1,135 @@
+# Club & Grub - Book II ending: "The Long Raft Home" (designer D9b, Book II "The Far Shore").
+# The playable credits (DESIGN.md A.2 / A.6, GAMEPLAY.md 13.1; difficulty 2, Expert only, no enemy): Grub floats home
+# on one log raft with rails (objects/raft rails: a rider never leaves it) on a gentle current of 1 px per tick (about
+# two minutes; paddling - a forward strike - halves the trip). He starts on the Roc's broken hoard, crouches on the
+# hatch planks of its jetty to drop aboard and strikes towards the shore to push off. The credits ride past on
+# floating signs at reading speed, food rains from the hoard, and the five islands of the Far Shore pass behind the
+# raft - the red mesa, the tar delta's mangrove, the coral sea stacks, the idol isle and the storm spire. No cell in the
+# raft's row before the beach, no vine. The current rests in a calm pool under the rock arch at the spire's foot (a
+# sign says so): the raft stops there until a rider paddles on, so the high strikes at the big spot in the arch's
+# underside, 3 rows over the water, never leave a hopping rider behind - three of them drop Cave Painting 19 (missing
+# it fails nothing). The raft stops at the home beach; the welcome totem stands on a jetty plank over the last
+# water, where every rider touches it: the tally, then THE END (the cave mural when all 30 paintings are found), the
+# credits and the title.
+
+[meta]
+format = 2
+id = ending_b
+name = "The Long Raft Home"
+kind = ending
+order = 0
+book = 2
+world = 0
+stage = 0
+biome = village
+terrain_a = coast/terrain_sand
+terrain_b = jungle/terrain_grass
+background = coast
+music = ending_raft
+liquid = water
+min_difficulty = expert
+password_expert = "RAFT"
+bonus_tier = 2
+author = D9b
+
+[tiles]
+........................................................................................................................................................................................
+........................................................................................................................................................................................
+........................................................................................................................................................................................
+........................................................................................................................................................................................
+.........##.............................................................................................................................................................................
+.........##.............................................................................................................................................................................
+.........##.............................................................................................................................................................................
+.........##.............................................................................................................................................................................
+.........##.............................................................................................................................................................................
+.........##.............................................................................................................................................................................
+.........##.............................................................................................................................................................................
+.........##.............................................................................................................................................................................
+.........##...................................................................................................................................../#####\.................................
+.........##..................................................................................................................................../#######\................................
+.........##....................................................................................................................................#########................................
+..@......##....................................................................................................................................#########................................
+######-__........................................................................................................................................................................../%%%%
+######..................................................................................................................................................................-........./%%%%%
+######.....................................................................................................................................................................|..../#######
+######~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~############
+######~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~############
+######~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~############
+######~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~############
+######~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~############
+######~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~############
+
+[entities]
+# --- the Roc's broken hoard: the start on the spur, the jetty, the raft docked under its hatch planks
+objects/sign 3 15 text=SIGN_RAFT_BOARD
+objects/sign 6 15 text=SIGN_RAFT_PUSH
+objects/raft 8 19 rails width=4 skin=log
+zones/current 77 19 rect=9,19,137,1 dir=r speed=1
+zones/current 159 19 rect=147,19,25,1 dir=r speed=1
+props/sky/nest_broken 9.5 3 layer=back
+props/sky/feather_a 4 15
+props/sky/feather_c 0.5 15
+props/sky/bone_pile 4 15
+props/sky/twigs 2 15 layer=back
+props/sky/feather_b 10 3
+zones/food_rain 22 18 rect=0,6,44,13 period=26 skin=food
+# --- the credits on floating signs
+objects/sign 14 18 text=SIGN_RAFT_HOME
+objects/sign 22 18 text=SIGN_RAFT_TITLE
+objects/sign 40 18 text=SIGN_RAFT_MESA
+objects/sign 49 18 text=SIGN_RAFT_ART
+objects/sign 57 18 text=SIGN_RAFT_ART_MORE
+objects/sign 72 18 text=SIGN_RAFT_FEN
+objects/sign 81 18 text=SIGN_RAFT_MUSIC
+objects/sign 89 18 text=SIGN_RAFT_MUSIC_MORE
+objects/sign 104 18 text=SIGN_RAFT_COAST
+objects/sign 112 18 text=SIGN_RAFT_SOUND
+objects/sign 127 18 text=SIGN_RAFT_IDOLS
+objects/sign 135 18 text=SIGN_RAFT_FONTS
+objects/sign 140 18 text=SIGN_RAFT_POOL
+objects/sign 161 18 text=SIGN_RAFT_SPIRE
+objects/sign 166 18 text=SIGN_RAFT_THANKS
+# --- the five islands of the Far Shore: set pieces standing in the sea behind the raft (no collision)
+props/coast/isle_mesa 33 19 layer=back
+props/coast/isle_mangrove 64 19 layer=back
+props/coast/isle_stacks 96 19 layer=back
+props/coast/isle_idols 120 19 layer=back
+props/coast/isle_spire 136 19 layer=back
+props/sky/dead_tree 147 11 layer=back
+props/sky/crystal_b 145.5 11 layer=back
+# --- Cave Painting 19: a big spot hanging under the arch (three high strikes from the raft)
+zones/secret 147 16 name=arch rect=143,16,9,3
+objects/hidden_spot 147 16 kind=big hits=3 contents=painting:19 prop=coast/drip_cap
+props/coast/drips 145 16
+props/coast/drips 149.5 16
+# --- the home beach: the welcome totem on its jetty plank (the exit), the village behind it
+objects/exit 168 16
+props/canyon/driftwood_log 168 18 layer=back
+props/coast/palm_tall 172 18 layer=back
+props/coast/feast_spit 173 18
+props/coast/feast_table 175.5 18
+objects/npc 177 17 kind=kid facing=l
+props/village/watchtower 179 16 layer=back
+objects/npc 180 15 kind=elder facing=l
+props/village/hut_dome 182 15 layer=back
+objects/npc 182.5 15 kind=warrior facing=l
+
+[overrides]
+142 16 a 8 layer=back
+143 16 a 10 layer=back
+151 16 a 8 layer=back
+152 16 a 10 layer=back
+9 16 a 8 layer=back
+10 16 a 10 layer=back
+142 17 a 8 layer=back
+143 17 a 10 layer=back
+151 17 a 8 layer=back
+152 17 a 10 layer=back
+9 17 a 8 layer=back
+10 17 a 10 layer=back
+142 18 a 8 layer=back
+143 18 a 10 layer=back
+151 18 a 8 layer=back
+152 18 a 10 layer=back
+9 18 a 8 layer=back
+10 18 a 10 layer=back

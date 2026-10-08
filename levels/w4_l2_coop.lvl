@@ -1,0 +1,308 @@
+# Club & Grub - World 4, stage 2 co-op: "Obsidian Keep" for two (designer DB3; docs/expansion/DESIGN.md D.9,
+# LEVEL_DESIGN.md 15.7). The co-op file of levels/w4_l2.lvl (kind = coop, coop_of, coop_base_hash; never edit the
+# solo file): the fortress on the volcano - the ash road, the gatehouse, the great hall, the column staircase and
+# the ramparts - for two. Expert only, as the solo stage.
+# Co-op gates:
+#  - "plates": a leapfrog in the great hall (DESIGN.md D.5 [G9]). A masonry wall crosses the hall with two corridors,
+#    each shut by a door at the end far from its plate: A stands on plate pa (11 cells before the lower door) and
+#    the lower corridor opens for B; B walks through to plate pb behind the wall and the upper corridor (its door
+#    10 cells from pb) opens for A, who climbs the slabs over pa to it. The plates are 14 cells apart, so both
+#    heroes stay on one view. A plate counts only a hatched, active hero: one player cannot park his partner on it.
+#  - "drums": the spiked portcullis on the ramparts rises (for good) only when its twin drums are struck within the
+#    window - one on a ledge by the portcullis, 4 rows up, the other by the keep tower 14 columns back, the spike
+#    well between them (no single throw line crosses both: G36).
+# Traits: a Shaman shields the keep guards of the far rampart (the Shellback turtle, the lone rex of the hill); two
+# Raptors keep the hidden armory; the harriers and stingers are loners (they keep away from a pair that sticks
+# together). The x2 secret: the keep tower, 8 rows over the rampart (Shoulder Hop), with Cave Painting 28. A
+# checkpoint behind each gate.
+
+[meta]
+format = 2
+id = w4_l2_coop
+name = "Obsidian Keep"
+kind = coop
+coop_of = w4_l2
+coop_base_hash = "4440fc43fcca436877c595997a99d98d86dc77e8084b61b30695fc509162708f"
+book = 1
+world = 4
+stage = 2
+biome = volcano
+terrain_a = volcano/terrain_obsidian
+terrain_b = volcano/terrain
+liquid = lava
+background = volcano
+music = level_volcano
+min_difficulty = expert
+next = w4_l2b
+tally = false
+bonus_tier = 2
+author = DB3
+notes = "Co-op 4-2: leapfrog plate doors in the great hall, twin drums under the spiked portcullis, Shamans, Raptors, the keep tower (painting 28)."
+
+[legend]
+a = items/food index=46
+b = items/food index=43
+c = items/food index=45
+d = items/food index=33
+e = items/food index=40
+C = objects/checkpoint
+E = objects/exit
+H = items/heart
+Q = objects/hidden_spot kind=small count=3 look=inset tile=% contents=food:40,food:35,treasure:3
+q = objects/hidden_spot kind=small count=3 look=inset tile=# contents=food:33,food:43,treasure:6
+k = objects/hidden_spot kind=small count=3 look=inset tile=# contents=food:45,food:46,treasure:5
+K = objects/hidden_spot kind=small count=3 look=inset tile=% contents=food:43,food:33,food:46
+# The big spot in the orange road before the lava pits (the default '*' is a '#' cell: an obsidian block in it).
+Z = objects/hidden_spot kind=big hits=3 tile=%
+
+[tiles]
+%%......................................................................................##############################################......................##....................................##
+%%......................................................................................##############################################......................##....................................##
+%%......................................................................................##############################################......................##....................................##
+%%......................................................................................##############################################......................##....................................##
+%%......................................................................................##############################################......................##....................................##
+%%......................................................................................##############################################......................##....................................##
+%%......................................................................................##############################################......................##....................................##
+%%......................................................................................##..........................#......#......####......................##....................................##
+%%......................................................................................##..........................#......#......####......................##....................................##
+%%......................................................................................##..........................#......#......####......................##....................................##
+%%......................................................................................##..........................#......#......####......................##....................................##
+%%......................................................................................##..........................#......#......####......................##....................................##
+%%......................................................................................##..........................#......#......####......................##....................................##
+%%..........................................#..#..#..#..#..#..#..#..#..#..#..#..#..#..#.##..........................#......#......####......................##....................................##
+%%..........................................##############################################..........................#......#......####......................##....................................##
+%%..........................................##############################################..........................#......#......####......................##....................................##
+%%..........................................######..................######################..........................#......#......####......................##....................................##
+%%..........................................######..................######################..........................#......#......####......................##....................................##
+%%..........................................######..................######################..........................#......#......####......................##....................................##
+%%..........................................######...........====...######################..........................#......#......####..####................##....................................##
+%%..........................................######..................######################..........................########......####..####................##....................................##
+%%..........................................######..................######################..........................#......#......####..####................##......=====.........................##
+%%..........................................######......====........######################..........................#......#............####................##.............e......................##
+%%..........................................######..................######################..........................#......k............####....c........#####......................b.............##
+%%..........................................######..................k#####################..........................#$$#####......................c.........##.........../###\........b...........##
+%%..........................................#######*####??################################..................................................................##........../#####\...................##
+%%..........................................##############################################....................e.e.e..........d.d..........a.a.........C.....##........./#######\..........H...E...##
+%%..........................................##############################################.......................#q#####################q#######...###########*#####################...#############
+%%..........................................###.......................##########........##.......................###############################...#################################...#############
+%%..........................................###........................#................##......................................################...#################################...#############
+%%..........................................###........................#................##......................................################...#################################...#############
+%%..........................................###........................#................##......................................################...#################################...#############
+%%..........................................###.....................--##########........##......................................################...#################################...#############
+%%....................................................................##########................................................################^^^#################################^^^#############
+%%.................................c.cc...............................##########................................................####################################################################
+%%.........a.a....................======............e.e........c.---..........#.--------........................................####################################################################
+%%......../%Q%%\......b.b.b..b.b................d...........c.................#.................................................####################################################################
+%K@....../%%%%%%\.........................C...................................#......C..........................................####################################################################
+%%%%%%%%%%%%%%%%%%%%Z%%%...%%...%%%%%%%%%%%%#######......######^^^##############q###########^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^####################################################################
+%%%%%%%%%%%%%%%%%%%%%%%%~~~%%~~~%%%%%%%%%%%%#######......###########################################################################################################################################
+%%%%%%%%%%%%%%%%%%%%%%%%~~~%%~~~%%%%%%%%%%%%#######^^^^^^###########################################################################################################################################
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%########################################################################################################################################################
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%########################################################################################################################################################
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%########################################################################################################################################################
+
+[entities]
+# Teaching sign before the first lava pits (cols 24-26 and 29-31).
+objects/sign 18.5 37 text=SIGN_W4_LAVA
+# Ash road
+objects/hidden_spot 5 37 kind=small count=3 contents=food:43,food:46,treasure:4 prop=volcano/rock_big
+objects/hidden_spot 39 37 kind=small count=3 contents=food:33,food:45,food:35 prop=volcano/skull_big
+items/letter 27.5 36 index=0
+enemies/harrier 37 34 skin=pterodactyl_b range=6 coop=lone
+# Gatehouse: the column bridge over the spike pit rises when the hero comes near
+objects/column 53 42 size=2,2 rise=3 trigger=47,33,4,5
+objects/gate 59 37 name=armory_door dest=armory_in skin=arch
+items/letter 82 34 index=1
+objects/hidden_spot 71 37 kind=small count=3 contents=food:40,food:33,treasure:7 prop=volcano/gravestone
+# The armory (secret room above the hall)
+zones/secret 58 24 name=armory rect=50,16,18,9
+objects/gate 52 24 name=armory_in dest=armory_door lock=49,15 skin=arch
+items/letter 63 18 index=2
+items/treasure 57 21 index=13
+items/code_stone 60 24 index=0
+items/code_stone 66 24 index=1
+items/food 54 24 index=40
+items/food 63 24 index=35
+# Column hall: each column rises when the hero stands on the previous one
+objects/column 94 40 size=4,2 rise=3 trigger=88,33,4,5
+objects/column 100 40 size=3,2 rise=6 trigger=94,33,4,3
+objects/column 105 40 size=3,2 rise=9 trigger=100,30,3,3
+objects/column 110 40 size=3,2 rise=12 trigger=105,27,3,3
+enemies/harrier 114 20 skin=pterodactyl range=2 coop=lone
+zones/secret 120 23 name=closet rect=117,21,6,3
+items/letter 121 23 index=3
+items/code_stone 120 23 index=2
+items/treasure 122 23 index=9
+# Ramparts
+enemies/charger 171 23 skin=rex_b speed=64 hp=30 coop=lone
+enemies/harrier 170 15 skin=pterodactyl_b range=6 coop=lone
+zones/secret 166 20 name=sky_ledge rect=164,18,5,3
+items/letter 165 20 index=4
+items/code_stone 167 20 index=3
+items/treasure 166 20 index=15
+objects/hidden_spot 163 26 kind=small count=3 contents=food:40,heart,food:35 prop=volcano/boulder_orange
+# More guards for the keep (review fresh_eyes: the finale had the fewest enemies of the game): stingers hover in the
+# great hall over the column staircase and over the ramparts and dive at a hero who climbs into their reach; a turtle
+# patrols the far rampart. Placed so that every weapon's route keeps its timing (tests/test_campaign_routes.gd).
+enemies/stinger 96 24 skin=insect_b range=5 hp=25 coop=lone
+enemies/stinger 110 15 skin=insect_b range=6 hp=25 coop=lone
+enemies/stinger 122 12 skin=insect_b range=7 hp=25 coop=lone
+enemies/stinger 163 13 skin=insect_b range=5 hp=25 coop=lone
+enemies/stinger 178 16 skin=insect_b range=5 hp=25 coop=lone
+enemies/walker 181 26 skin=turtle_b left=-2 right=2 hp=25 coop=shell
+# Scenery
+props/volcano/drips 90 7
+props/volcano/drips 102 7
+props/volcano/drips 106 7
+props/volcano/drips 110 7
+props/volcano/drip_cap 117 7
+props/volcano/stalactite 119 7
+props/volcano/stalactite 127 7
+props/volcano/drip_cap 52 16
+props/volcano/skull_ribs 120 19
+props/volcano/drip_cap 133 22
+props/volcano/grave_cross 50 24 flip
+props/volcano/tusk_b 113 26 flip
+props/volcano/bone_big 119 26
+props/volcano/grave_cross 124 26 flip
+props/volcano/skull_buried 132 26 flip
+props/volcano/grass_a 137 26
+props/volcano/grass_a 141 26
+props/volcano/bone_big 147 26
+props/volcano/grass_a 157 26
+props/volcano/mound_brown 165 26
+props/volcano/grass_a 177 26
+props/volcano/mound_brown 193 26
+props/volcano/drips 51 28
+props/volcano/drip_cap 52 28
+props/volcano/stalactite 54 28
+props/volcano/stalactite 57 28
+props/volcano/drips 59 28
+props/volcano/stalactite 61 28
+props/volcano/drips 71 28
+props/volcano/stalactite 78 28
+props/volcano/drips 79 28
+props/volcano/stalactite 81 28
+props/volcano/drips 83 28
+props/volcano/drip_cap 84 28
+props/volcano/stalactite 86 28
+props/volcano/stalactite 45 33
+props/volcano/mound_brown 8 37
+props/volcano/rocks_small 22 37
+props/volcano/grass_a 44 37
+props/volcano/grass_a 68 37
+props/volcano/grave_cross 73 37 flip
+props/volcano/tusk_b 91 37 flip
+# The keep dressed (review fresh_eyes: the interior looked unfinished): bones, skulls and tusks on its floors,
+# stalactites and drips under its ceilings, so the dark halls have landmarks.
+props/volcano/bone_pile 46 37
+props/volcano/skull_buried 57 37 flip
+props/volcano/tusk_a 62 37
+props/volcano/rocks_small 75 37
+props/volcano/bone_big 82 37 flip
+props/volcano/twigs 87 37
+props/volcano/stalactite 88 33
+props/volcano/skull_ribs 117 19
+props/volcano/tusk_b 122 19 flip
+props/volcano/mound_small 116 26
+props/volcano/bone_pile 121 26
+props/volcano/drips 92 7
+props/volcano/drip_cap 96 7
+props/volcano/stalactite 100 7
+props/volcano/drips 104 7
+props/volcano/stalactite 108 7
+props/volcano/drips 112 7
+props/volcano/drip_cap 121 7
+props/volcano/stalactite 125 7
+props/volcano/drips 117 21
+props/volcano/stalactite 121 21
+props/volcano/drips 116 25
+props/volcano/drip_cap 120 25
+props/volcano/stalactite 113 29
+props/volcano/drips 117 29
+props/volcano/stalactite 121 29
+props/volcano/drips 125 29
+props/volcano/skull_buried 27 37 flip
+props/volcano/tusk_a 32 37
+props/volcano/rocks_small 37 37
+props/volcano/bone_big 130 26 flip
+props/volcano/twigs 143 26
+props/volcano/skull_ribs 152 26
+props/volcano/tusk_b 160 26 flip
+props/volcano/mound_small 179 26
+props/volcano/bone_pile 184 26
+props/volcano/drip_cap 130 22
+# ---- co-op (DB3) --------------------------------------------------------------------------------------------
+objects/hero_start 3 37 slot=2
+# Gate "plates" (DESIGN.md D.9 4-2): the leapfrog wall across the great hall. Plate pa (11 cells before door D1
+# at the far end of the lower corridor) opens the lower corridor; plate pb behind the wall (10 cells from door D2
+# at the near end of the upper corridor) opens the upper one, whose mouth the slabs over pa climb to. The plates
+# are 14 cells apart: both heroes stay on one view.
+objects/sign 55 37 text=SIGN_COOP_W4_PLATES
+objects/x2_tablet 57 37 gate=plates far=86,37
+objects/plate 67 37 name=pa
+objects/column 78 37 size=1,3 rise=3 rise_while=pa
+objects/plate 81 37 name=pb
+objects/column 71 31 size=1,3 rise=3 rise_while=pb
+# Gate "drums": the spiked portcullis of the ramparts (its door block cols 156-157, rows 23-26, rises 4 rows into
+# the gate tower once its twin drums are struck within the window: drum A on the ledge by the
+# portcullis, 4 rows over the rampart, drum B by the keep tower: no throw line from beside one crosses the other).
+objects/sign 149 26 text=SIGN_COOP_W4_DRUMS
+objects/x2_tablet 152 26 gate=drums far=160,26
+objects/drum 155 22 bond=spikes
+objects/drum 141 26 bond=spikes
+objects/column 156 26 size=2,4 rise=4 trigger=drums:spikes
+objects/checkpoint 162 26
+# The keep guards past the portcullis: a Shaman on the far rampart shields the Shellback turtle (and the lone rex
+# on the hill when it comes near); two Raptors keep the hidden armory.
+enemies/shaman 185 26 left=-1 right=2
+enemies/raptor 56 24 skin=mini_rex_b range=4
+enemies/raptor 63 24 skin=mini_rex_b range=4
+# The x2 secret: the keep tower (cols 136-139), its top 8 rows over the rampart, an archway under it; Cave
+# Painting 28 on top.
+objects/x2_tablet 142 26 secret far=138,18
+items/painting 138 18 index=28
+zones/secret 137 17 name=keep_tower rect=136,16,4,3
+objects/sign 143 26 text=SIGN_COOP_W4_TOWER
+props/volcano/bone_pile 137 18
+props/volcano/skull_buried 139 18 flip
+props/volcano/drips 137 24
+props/volcano/stalactite 138 24
+
+[backwall]
+# The first lava pits: rock behind them, so the pit reads as a hole in the ground (not the burnt forest behind).
+24 38 3 1 set=b deco=0
+29 38 3 1 set=b deco=0
+47 28 43 10 set=a deco=25
+51 38 6 3 set=a deco=10
+63 38 3 1 set=a deco=0
+90 7 40 32 set=a deco=20
+50 16 18 9 set=a deco=30
+117 21 6 3 set=a deco=40
+136 24 4 3 set=a deco=20
+156 23 2 4 set=a deco=10
+
+[overrides]
+113 29 a 30
+114 29 a 31
+115 29 a 31
+116 29 a 31
+117 29 a 31
+118 29 a 31
+119 29 a 31
+120 29 a 31
+121 29 a 31
+122 29 a 31
+123 29 a 31
+124 29 a 31
+125 29 a 31
+126 29 a 31
+127 29 a 32
+45 29 a 15
+45 31 a 15
+89 29 a 15
+89 31 a 15
+131 9 a 15
+131 12 a 15
+131 15 a 15
+131 18 a 15

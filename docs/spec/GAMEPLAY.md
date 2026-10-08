@@ -918,7 +918,8 @@ ever needed** on a main path; specials open shortcuts, secrets and paintings (13
 - **Alternating gusts** (P-C.6): negative wind pushes right; `wind_loop` repeats a wind script (9-2, Floe Rink, Cloud
   Top); crouching braces as in 1.0; outside the ice biome the wind shows as gust streaks. **Co-op lee** [G23]: a hero
   up to 64 px downwind of a crouching partner feels no wind, and a jump taken in the lee stays sheltered until he
-  lands - the "lee leapfrog" over gust gaps of up to 3 tiles. **Lightning** (`zones/lightning`, `period` [66]; 9-1b,
+  lands - the "lee leapfrog" over gust gaps of up to 3 tiles, a co-op comfort, never a gate (the first hero over
+  crosses unsheltered, as a lone hero can) [G55]. **Lightning** (`zones/lightning`, `period` [66]; 9-1b,
   Cloud Top): a darkening cloud marks a hero's column 22 ticks before the bolt (the target alternates between the
   heroes inside; eggs are never struck); a bolt hurts like an enemy (a glider is lost instead of a heart); cue
   `Sfx.LIGHTNING_STRIKE`. **Drop clouds / crumbling clouds / driftwood floes** are 1.0 drop platforms in new skins.
@@ -1026,7 +1027,9 @@ Beginner 4 / 3 / 3, Expert 6 / 5 / 5.
   by the measured solo minimum of 10 [G34]): a twin hit counts one; Beginner 5, Expert 7 twin hits *(tune)*, then
   stage 3 with Beginner 3, Expert 6. An **active** hero standing on the resting fist **pins** it (no punches) until it
   flings him off (launch -160) after **66 ticks**; an idle body pins nothing [G33]. Stage 3: the knuckle armour turns
-  to the nearer active hero every tick, so the wrist must be struck from the far side.
+  to the nearer active hero every tick, so the wrist must be struck from the far side (side by the hero's x against
+  the stuck fist's centre). In `w6_l2b_coop` the lower ledge's last two cells (cols 7-8) are hatch cells (rotten
+  bark): a striker crouches through them onto the stuck fist's wrist side; the solo chamber is unchanged.
 
 **Inkjaw, the Grotto Squid** (`bosses/squid`, `w7_l2b`). Arena: one screen; deadly water across the floor; rock
 islands at cols 2-5, 8-11, 14-17 (surface row 9; the outer islands may reach cols 1 / 18, closing the 1-cell water
@@ -1096,8 +1099,9 @@ take 200 (8 club hits; co-op 250), phase 3 takes **3 glider dives**. Weak point:
   do. Their club boxes and stomps hit heroes as a boss body (one bone, knock-back); their bodies are not solid. Every
   attack is announced by a "HUP!" pop-up and a **14-tick crouch**. **Fallback** (PLAN cut 8): a Brute-style state
   machine on the same sprite with the same phases.
-- Arena: one screen around the pyre; the Great Roast on an altar 3 tiles up at the centre; a see-saw and two plates on
-  the floor; ledges 3 rows up and nothing standable higher (a chieftain at the centre stands in the boss bar's
+- Arena: one screen around the pyre; the Great Roast on an altar 3 tiles up at the centre; ledges 3 rows up (no
+  see-saw, no plates) and nothing standable higher; the camera locks the 11 rows over the floor (the floor's top 4 px
+  show at the view's bottom) under a crown of rock 6 rows over the floor (a chieftain at the centre stands in the boss bar's
   columns: on a 3-row altar his body's top is 77 px under the view's top [G35]). **Energy: 4 pips each** (1 counted hit = 1 pip, hit cooldown per chieftain); two rows
   of pips.
 - **P1 Raiders** (4-3 pips): flank, strike and stomp heads; they pick the hero farther from the view centre (the
@@ -1124,7 +1128,9 @@ take 200 (8 club hits; co-op 250), phase 3 takes **3 glider dives**. Weak point:
   the **Grab** - after a **22-tick chest beat** his hands open **8 ticks**; a target within 30 px in front is squeezed
   (one bone per 44 ticks); alternating Left / Right shortens the hold by 4 ticks per press; a partner's head hit frees
   him and staggers the Brute 19 ticks. The ground pound shakes both (crouch to stand firm). Grabs are off on Beginner
-  (13.9.10).
+  (13.9.10). From the very high jump's take-off to its landing the head takes no counted hit (a throw glances as off
+  the arm guard), and after the lethal blow none at all: the 1.0 leaps carry it out of the den's view, so it is no
+  weak point there [G56]. (Every boss: no weak point after its lethal blow.)
 - **The Wall Colossus** (hp 24 -> 30): a stone **visor** covers the face; two stone plates at the hall's sides lift it
   while an active hero stands on the plate whose chain glows (the co-op hall keeps the face clear of the HUD [G35]); rocks are spat at the plate holder, stalactites rattle over the
   thrower. Thrown weapons only, as in 1.0; the co-op checkpoint places **two** axes. Each rage (the 1st hit and every
@@ -1310,7 +1316,8 @@ Presets (archetype + trait + skin), each its own scene, only in `*_coop.lvl` fil
 **Shaman** [G11]: patrols his platform at 48 v16 *(tune)*, fleeing from the nearer active hero within 64 px at about his
 height (32 px vertically) by turning at once; at the edge of his platform he turns (never walks off); cornered while
 fleeing (his limit, a wall or the edge right ahead) he hops over that hero (45 px high, 4 px per tick, harmless to
-touch during the hop) and runs on - so one hero rarely corners him and two pin him. **Bone shield**: every other enemy
+touch during the hop) and runs on; a walking hero (80 v16) still catches him from behind, so a Shaman alone is no
+gate (two pin him sooner; his shielded keepers carry a hall). **Bone shield**: every other enemy
 within 64 px on both axes, in a co-op party only (a party of one meets a plain patroller); Shamans and bosses are
 never shielded; a bone floats over each shielded enemy, all its hits glance, and it holds through the tick he dies
 in. hp [25], score index 5.

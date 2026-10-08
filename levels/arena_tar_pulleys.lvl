@@ -1,0 +1,83 @@
+# Club & Grub level file - format 2 (docs/ARCHITECTURE.md 7.11). Versus arena #5 of docs/expansion/DESIGN.md E.5:
+# Tar Pulleys - swamp, walled, two pulley lifts over a tar pit; sudden death: the tar rises. Owner: DA (arenas,
+# docs/expansion/PLAN.md 6.1). Rules: docs/LEVEL_DESIGN.md 15.8. Dressing: art-B's hand-over
+# (.tools/asset_candidates/expansion/_handover/ARENA_DRESSING.md, "Tar Pulleys").
+#
+# Layout notes (the E.5 sketch, with what a bot graph and two cookpots need):
+# - The pit: banks (row 10, cols 0-4 / 15-19) round the tar (`~`, liquid = tar, deadly) with a mud stump in the middle
+#   (cols 9-10): each tar gap is a 4-cell running jump. Springs on the banks (cols 3 / 16, -224 = 105 px) lift a hero to
+#   the side ledges (rows 6-7, cols 0-2 / 17-19) or onto a lift; under a side ledge the bank has two rows of air.
+# - The lifts: two objects/platform mode=ride (L cols 5-7, R cols 12-14) hang from one objects/pulley (range 3): at
+#   rest both stand on row 6, level with the side ledges; the heavier one sinks 2 px/tick down to row 9 (one row over
+#   the tar) while the other rises to row 3, level with the island. Step on your lift to yank a rival's side up to the
+#   island - or down towards the tar; equal weights stay where they are.
+# - The mud island (rows 3-4, cols 8-11, set B) with the big spot (col 9; col 10 beside it is plain, so it is struck
+#   alike from either half - the hit test reaches one column) and the two cookpots (cols 8 / 11): the contested middle,
+#   a 3-row jump up from a lift at rest or a walk off the high lift. Its giant falls 7 rows onto it.
+# - Spots (visible, refill 15 s after they are emptied): one flush in each side ledge's inner end (cols 2 / 17), one in
+#   each bank under the side ledge (cols 2 / 17), and the big spot.
+# - Spawns (rotate every round; 2 players use 1 and 2): 1 and 2 on the side ledges (cols 18 / 1), 3 and 4 on the banks
+#   (cols 1 / 18).
+# - Modes: Grub Stack (default), Last Caveman Standing, Hot Rock. HUMANS ONLY (PLAN.md cut 4, DESIGN.md G50:
+#   `bots = none`): the bots' graph has no links for a pulley lift away from its rest state, so a lift that moved
+#   strands them (worst idle 404-611 ticks in DA's Grub Stack set, wf9_da_to_core_b.txt #1). Shipped human-only by
+#   integration at G3; CPUs return when core-B's baker / navigator handle displaced lifts and the set is green.
+# - Bot graph: resources/bots/arena_tar_pulleys.json, baked with core-B's tool after every edit of this file (the lifts
+#   are rider movers):  bash .tools/gd.sh script res://tools/bots/bake_nav.gd -- arena_tar_pulleys
+
+[meta]
+format = 2
+id = arena_tar_pulleys
+name = "Tar Pulleys"
+kind = arena
+biome = swamp
+terrain_a = swamp/terrain
+terrain_b = swamp/terrain_bark
+background = swamp
+liquid = tar
+music = versus_battle_b
+players = 4
+modes = grub_stack,last_caveman,hot_rock
+bots = none
+round_time = 90
+wrap = none
+sudden = tar_rise
+author = DA
+notes = "Versus arena 5 (DESIGN.md E.5): swamp, walled; two pulley lifts over a tar pit - ride one up to the mud island with the big spot and the pots, or yank a rival's down; springs from the banks; the tar rises in sudden death."
+
+[legend]
+? = objects/hidden_spot kind=small count=3 look=block tile=#
+* = objects/hidden_spot kind=big look=inset tile=%
+J = objects/spring
+P = objects/cookpot
+Q = objects/cookpot
+L = objects/platform name=lift_l mode=ride
+R = objects/platform name=lift_r mode=ride
+B = objects/spawn_point index=2
+C = objects/spawn_point index=3
+D = objects/spawn_point index=4
+
+[tiles]
+....................
+....................
+........P..Q........
+........%*%%........
+........%%%%........
+.B................@.
+##?...L......R...?##
+###..............###
+....................
+.C.J............J.D.
+##?##~~~~##~~~~##?##
+#####~~~~##~~~~#####
+
+[entities]
+objects/pulley 9 0 a=lift_l b=lift_r range=3
+props/swamp/reeds_a 0 9 layer=back
+props/swamp/reeds_b 19 9 layer=back
+props/swamp/moss_fringe 1 7 layer=back
+props/swamp/moss_fringe 18 7 layer=back
+props/swamp/pulley_beam 10 0 layer=back
+props/swamp/glowcaps 10 2 layer=back
+props/swamp/vine_a 0 0 layer=back
+props/swamp/vine_b 19 0 layer=back

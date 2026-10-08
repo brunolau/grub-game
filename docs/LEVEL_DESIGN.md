@@ -215,6 +215,11 @@ Collision facts worth knowing:
 - Ceiling spikes (`!`) kill as soon as the hero's head probe (feet row - 2) reaches them: with the floor at row r,
   spikes in row r-4 kill after a rise of only 17 px, and every enemy hit knocks the hero up 36 px. Keep enemies
   away from the floor under ceiling spikes that are 4-5 rows up, or put the spikes 6+ rows above the floor.
+- Deadly cells are felt **through rock**: the body probes (PHYSICS.md 11.2 step 8: feet row - 2, - 3) test only for
+  deadly tiles and never stop at a solid one. A liquid basin on a deck only one row thick over a passage kills a hero
+  who jumps or is knocked up under that deck ("hero_died liquid" with no liquid in sight). Keep **two solid rows**
+  between the bottom of a liquid or `+` cell and any space a hero can rise into below it (D6's root deck in `w6_l1`).
+  The validator warns on it in every 2.0 file (`_check_deadly_through_rock`; the frozen Book I files are not checked).
 - The hero's x stays within 8 px of the left edge and 8 px of the right edge. Close both ends with ground or `|`
   unless a pit is wanted.
 
@@ -702,10 +707,10 @@ every hero glows warm and every prop whose name holds "glow" (`swamp/props/glowc
 | Vine | grabbed with Up (not Down + Up) when the hands (32 px over the feet) reach it; climb 2 px/tick up, 3 down; leap off 36 px up and 47-83 px out; climbable from a raft, spear step or lift | a vine whose bottom hangs up to 2 rows over a floor is grabbed standing, up to 5 rows with a jump |
 | Tar | wade 2 px/tick; hop 33 px | 15.3 |
 | Geyser | -224: 105 px, the same as a spring or an Up bounce | a geyser lifts to a ledge up to 6 tiles above its vent, also from a tar floor (the way out of a tar pit) |
-| Raft | current 1-3 px/tick; paddle up to 3 px/tick of its own; banks stop it | keep a raft's path free of cells at its surface row except the banks you want |
+| Raft | current 1-3 px/tick; paddle up to 3 px/tick of its own; banks stop it | keep a raft's path free of cells at its surface row except the banks you want. Known engine bug (phase 3, objects-B unowned): a raft that dozes at rest keeps its paddle-drag clock still, so a co-op route that paddles it after it dozed differs with and without dozing (V3.b); until the drag clock is restored on wake, put a paddled raft's home in a one-cell eddy (`zones/current` of 1 x 2 cells against its way, speed 1: a raft in a current never dozes), as D6's w6_l1_coop does |
 | Rising tide | 1 px/tick = one row per 16 ticks; the view follows each hero's footing, never a jump's apex, and never sinks (P-C.8 "footing follow" [G42], built in phase 3; at G2 the view chased the apex and a jump that did not land higher killed - G32's building rule [G32], now retired) | a Beginner stopping 73 ticks (3 s) loses 4.5 rows: give every climb that much spare; a jump in place on a climb ledge (to strike a bat) is fair now; never ask a hero to step down more than 2 rows under the highest footing he reached (the follow puts a climbing hero on view row 8 of 11 and the view does not come down) |
 | Chomper | 4 px/tick; hop 55 px, 84 px far at full speed | mounted gaps <= 4 tiles, steps <= 3 rows, 4 rows of air in mounted corridors, no sprite platforms on mounted stretches |
-| Gusts | negative `wind` pushes right; crouching braces; co-op: a hero up to 64 px downwind of a crouching (so active) partner (16 px up or down) feels no wind, and a jump taken there stays sheltered until he lands (the lee) [G41] | alternate with `wind_loop`; give a crouching spot before every gap; a co-op lee gap is at most 3 tiles with a crouching spot within 64 px downwind of its far edge |
+| Gusts | negative `wind` pushes right; crouching braces; co-op: a hero up to 64 px downwind of a crouching (so active) partner (16 px up or down) feels no wind, and a jump taken there stays sheltered until he lands (the lee) [G41] | alternate with `wind_loop`; give a crouching spot before every gap; a co-op lee is a comfort, not a gate [G55]: give a crouching spot within 64 px downwind of the far edge of gaps of up to 3 tiles |
 | Lightning | the column is marked 22 ticks before the bolt; `period` [66]; it alternates between the heroes inside | never two bolts on the only safe cell in a row |
 
 ### 15.6 Book II rules
@@ -731,7 +736,9 @@ every hero glows warm and every prop whose name holds "glow" (`swamp/props/glowc
   locked tick), and keep every rectangle a counted hit must touch at least 55 px under the view's top - 72 px in the boss bar's columns (53 px left to 38 px
   right of the view's centre): at most 105 / 88 px over the floor's top. The fight HUD is the top row (31 px on
   touch devices) plus the boss bar under the hearts; `Hud.weak_point_problem` checks a rectangle. Old Mangrove's upper
-  ledge is row 5 (ending at col 5), the Chieftains' altar is 3 rows up; the boss test pins it, the preview at the base
+  ledge is row 5 (ending at col 5), the Chieftains' altar is 3 rows up (their hall locks the 11 rows OVER the floor -
+  the floor's top 4 px show at the view's bottom - under a crown 6 rows over the floor: with the floor on the view's
+  last row no tile boundary gives a 3-row altar both a standing chieftain's 35 px and a jumping one's 72 px; D9b); the boss test pins it, the preview at the base
   view shows it.
 
 ### 15.7 Co-op files
@@ -781,11 +788,11 @@ and keepers).
 | **Twin drums** | two or more `objects/drum bond=<name>` with a column `trigger=drums:<name>` (or a gate `needs=<name>`); place them so one hero needs at least 28 ticks (Beginner) / 16 (Expert) to strike both - in practice 10+ tiles apart and 4+ rows apart, out of one axe's flight line; the search decides |
 | **See-saw** | `objects/seesaw` with its high end 1 row over the floor, a ledge 4+ rows above the high end within 3 cells to drop from, the target up to 9 rows over the low end; no enemy may fall onto it |
 | **Heave boulder** | `objects/boulder_heavy` with 3+ cells of floor behind the pushed side and 2+ rows of air; it fills a 2-cell gap, plugs a vent (`objects/geyser deadly`) or presses a plate |
-| **Pulley** | `objects/pulley` with two `objects/platform mode=ride` 4+ cells apart; the rider's target `range` rows above his platform's start |
+| **Pulley** | `objects/pulley` with two `objects/platform mode=ride` 4+ cells apart; the rider's target `range` rows above his platform's start. Keep rider and counterweight within about 7 rows of each other (`range` 3 at most): while the rider is in the air the view is anchored on the standing counterweight (rows 4-9 of the view), and a lift off the view carries nobody - a range-6 pulley drops its rider through his own lift (D9a, 9-1). Reach a higher target from a co-op ledge over the risen lift. The same holds for a vertical co-op climb: give drop clouds a twin beside each step so both climb side by side |
 | **Keeper door** | `objects/column trigger=keepers:<name>` behind a hall **exactly 4 rows high** (the Guard and Shellback art is 54 px tall); its keepers (`keeper=<name>`) carry `shell`, `bond` or `daze`. Keepers meant for a pincer stand still (`speed=0`: a walker with left = right = 0 still sways about 30 px); bait about 30 px in front, the striker's way in about 40 px behind [G5] |
-| **Brace corridor** | a `heavy` (Bull Rex) in a 4-row-high hall between walls |
+| **Brace corridor** | a `heavy` (Bull Rex) in a 4-row-high hall between walls. A heavy presses against the wall nearest its target, so the heroes must step into the corridor while it is NOT pressing at their way in (asleep out of view at the far end, or far away): a corridor whose entrance is where the heavy stops makes every entry a trample; a brace across a step is impossible (the body overlap lends the leftmost box half its width) - keep the braced floor flat (DB2, 3-1) [G55] |
 | **Chomper two seats** | a mounted stretch where only the gunner can clear the way (Leeches, a Snatcher) over ground a hero on foot cannot cross (spikes with no run-up) |
-| **Lee gap** | gust gaps of up to 3 tiles whose gusts never pause, strong enough that a lone hero falls short; a crouching spot within 64 px downwind of each far edge (P-C.6 lee) [G23]; the search decides - and only if its search world runs the level's wind (it does since phase 3: world-B's `SearchWind` plays `wind` / `wind_loop`); else build the fallback, a Brace corridor [G41] |
+| ~~Lee gap~~ | **retired as a gate kind** [G55]: the lee shelters only the second hero (the croucher already stands past the gap), so whatever carries the first hero over a gust gap carries a lone hero too - it can never be solo-impossible (DB2). The lee stays a co-op comfort taught by a sign; build a Brace corridor, a line drive or a keeper hall where a gate is needed (the search ran the wind - world-B's `SearchWind` - so this is a rule of the move, not of the proof [G41]) |
 
 #### 15.7.4 x2 tablets
 
@@ -841,6 +848,13 @@ pogo) and throw the axe, the swirling axe and the spear. So build every gate for
 [G28], two-corridor leapfrogs, no booster in reach. The flood prefilter of G1 is a diagnostic only. Each boss test
 runs the same partner model against the co-op form (one hero plus an idle partner placed anywhere) [G34].
 
+**A refusal is bounded; a replay wins.** The search stops at its node bound (220 resting points), so a long chain - park
+the partner on one side of a keeper, walk the long way round to the other - can lie beyond it. When a direct replay
+(a development bot with a quiet second stream) gets one player through a gate the search refused, the gate is **red**
+with the replay's cause named, whatever the table says; keep the replay as a regression probe that must fail once the
+cause is fixed (world-B's `probe_hatches` for [G53], D8's idle-bait bots for the shell facing of [G33]). If the cause is
+engine code that does not follow the spec, the design stays and the code is fixed - do not redesign around it.
+
 #### 15.7.7 Two heroes on one camera
 
 - Keep each gate inside one view: both heroes must see each other's role (20 x 11 cells).
@@ -853,6 +867,11 @@ runs the same partner model against the co-op form (one hero plus an idle partne
   stand above the other within 9 rows, or have both drop together.
 - Checkpoints: keep 2 free cells on each side (P2 respawns 24 px beside P1).
 - Locked rooms (arenas, gates with `lock=`, camera locks) pull the partner in.
+- **Dozing and determinism** (V3.b replays every co-op route with and without dozing): entities out of every view
+  doze, and a few phase-3 objects do not yet restore their clocks on waking (no owner this phase). Known: a paddled
+  raft's drag clock (home it in a one-cell eddy - 15.5's raft row), a team gate's arrival view re-deciding the doze
+  before the camera snaps (objects-A asked; D8), a dropper copy that lands "beside the other hero" and walks out of view
+  (D7 left that Snatcher out). Run the determinism check after placing movers or droppers in a co-op copy.
 
 #### 15.7.8 Conventions confirmed after G1
 
@@ -862,7 +881,9 @@ What the phase-1 owners and the slice designers settled in code, confirmed by th
 - **Plate**: anchored at its LEFT cell, covering `w` cells to the right; an active hero counts while his feet are over
   its cells, on its floor or up to 8 px above it and not rising (an idle hero weighs nothing [G33]). Columns rise while ALL their plates are pressed, so one
   door cannot be opened from both sides: a leapfrog uses **two corridors** (plate A opens the lower corridor for B,
-  plate B beyond opens the upper corridor for A; 1-1 and 5-1 co-op).
+  plate B beyond opens the upper corridor for A; 1-1 and 5-1 co-op). Both plates on one view: the tribe leash holds
+  the heroes about 285 px (17-18 cells) apart, so plates 23 columns apart can never be held in turn (DB3's 4-2;
+  interleave the corridors - each door at the far end from its plate - to keep 8+ cells per plate on one view).
 - **Door rule** (`objects/column`): a driven block whose next cell in its direction of travel is solid is a door (the
   cells it leaves become air, a portcullis into a ceiling slot); into air it keeps the 1.0 pillar rule. Build a keeper
   door as the bottom cells of a wall that continues above the hall, `rise` = the hall height (4). A returning door
@@ -912,8 +933,8 @@ team wipe does not. What it means for a level:
   any key!" (one idea per sign [G27]).
 - **The team exit** counts an idle hero on the view as present (an absent partner never blocks the end of a stage).
 - **No doorstops** [G53]: an idle body blocks no door, slab, column or boulder - they move and push him aside. A
-  hold-plate door with floor beside its slab is therefore safe; until objects-A has built it, the search may still
-  find a doorstop route (world-B's 'hatches' finding) - that is the engine's gap, not the gate's.
+  hold-plate door with floor beside its slab is therefore safe (built by objects-A in phase 3 after world-B's search
+  found the doorstop route through w2_l1_coop 'hatches').
 
 ### 15.8 Arenas
 
