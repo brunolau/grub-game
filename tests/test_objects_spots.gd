@@ -388,3 +388,68 @@ func test_a_broken_block_regrows_whole_for_the_versus_signature() -> void:
 	assert_true(sprite.visible)
 	assert_eq(sprite.frame, BreakableBlock.FRAME_IDLE)
 	assert_eq(sprite.modulate.a, 1.0)
+
+
+## A stand-in PartyDriver of a co-op Feast Land: only what the giant roast spot asks (relay_active).
+class FeastDriver:
+	extends SimEntity
+	var feast: bool = true
+
+	func relay_active() -> bool:
+		return feast
+
+
+## GAMEPLAY.md 13.9.8 / DESIGN.md D.9 (wf9 DB1 -> objects-A): in a co-op Feast Land a big spot is a giant roast spot
+## for two - its last hit pays only within the twin window after a hit by the OTHER hero, otherwise it just puffs; a
+## dozing partner's hit is no partner's hit; outside a Feast Land (or a party of one) 1.0's rule.
+func test_a_coop_giant_roast_spot_pays_only_for_a_twin_strike() -> void:
+	Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.COOP, 2)
+	var p2: PlayerBase = PlayerBase.new()
+	place(level, p2, HERO_FEET + Vector2i(24, 0), {"slot": 1})
+	p2.respawn_at(HERO_FEET + Vector2i(24, 0))
+	assert_eq(level.get_hero(1), p2)
+	var driver: FeastDriver = FeastDriver.new()  # never in the tree: nothing of it ticks
+	level.party_driver = driver
+	var window: int = PartyTuning.window_ticks(Defs.Difficulty.BEGINNER)
+	assert_eq(window, 24)
+	var spot: HiddenSpot = add_spot(13, 10, {"kind": "big", "hits": 2})
+	var club: int = Tuning.WEAPON_POWER[Defs.Weapon.CLUB]
+	# One hero alone: the last hit only puffs, again and again.
+	hit(spot)
+	hit(spot)
+	assert_false(spot.opened, "P1 alone: his last hit puffs")
+	assert_eq(spot.hits_left, 1, "the counter stays at its last hit")
+	hit(spot)
+	assert_false(spot.opened)
+	assert_eq(count_items(), 0)
+	# The partner strikes within the window after P1's hit: the giant bonus.
+	spot.take_hit(club, hero)
+	Sim.step(Tuning.HIDDEN_SPOT_HIT_COOLDOWN)
+	spot.take_hit(club, p2)
+	assert_true(spot.opened, "P2 struck 6 ticks after P1: the twin strike pays")
+	assert_eq(items_of(&"items/giant_bonus").size(), 1)
+	# Too late: the partner's hit after the window puffs (and opens the next try).
+	var late: HiddenSpot = add_spot(16, 10, {"kind": "big", "hits": 1})
+	late.take_hit(club, hero)
+	Sim.step(window)
+	late.take_hit(club, p2)
+	assert_false(late.opened, "24 ticks later: outside the window")
+	Sim.step(Tuning.HIDDEN_SPOT_HIT_COOLDOWN)
+	late.take_hit(club, hero)
+	assert_true(late.opened, "P1 answers P2's puff within the window")
+	# A dozing partner's hit counts for nothing (G33).
+	var doze: HiddenSpot = add_spot(19, 9, {"kind": "big", "hits": 1})
+	p2.idle = true
+	doze.take_hit(club, p2)
+	Sim.step(Tuning.HIDDEN_SPOT_HIT_COOLDOWN)
+	doze.take_hit(club, hero)
+	assert_false(doze.opened, "after an idle hero's hit: P1 alone")
+	p2.idle = false
+	# Outside a Feast Land the 1.0 rule: one hero's last hit opens it.
+	driver.feast = false
+	var plain: HiddenSpot = add_spot(22, 10, {"kind": "big", "hits": 1})
+	plain.take_hit(club, hero)
+	assert_true(plain.opened, "not a Feast Land: 1.0")
+	level.party_driver = null
+	driver.free()
+	Game.new_game(Defs.Difficulty.BEGINNER)

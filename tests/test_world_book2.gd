@@ -194,8 +194,9 @@ func test_the_band_waits_for_the_first_input_then_rises_and_kills() -> void:
 ## place drags nothing up (so it lands in view and he lives), a climb to a higher footing still raises the view.
 func test_the_rising_view_follows_the_footing_not_a_jump() -> void:
 	var rows: PackedStringArray = _shaft(40)
-	# A ledge 6 rows over the floor on the left (columns 1-8): a higher footing to climb onto.
-	rows[32] = "#" + "#".repeat(8) + ".".repeat(14) + "#"
+	# A ledge 9 rows over the floor on the left (columns 1-8): a higher footing to climb onto, high enough in the view
+	# (camera row 28, ledge row 30: sr 2) for the 12.2 follow to raise the view for it.
+	rows[30] = "#" + "#".repeat(8) + ".".repeat(14) + "#"
 	var level: Level = _load("scroll = rising\nrise_speed = 4", rows)
 	var hero: PlayerBase = level.player
 	var camera: LevelCamera = level.get_camera()
@@ -225,7 +226,7 @@ func test_the_rising_view_follows_the_footing_not_a_jump() -> void:
 	assert_true(hero.sim_pos.y <= camera.pos.y + camera.rows * Tuning.TILE, "his feet are in view")
 	# A higher footing raises the view at once (the follow, not only the band).
 	var before: int = camera.pos.y
-	hero.teleport(Vector2i(5 * Tuning.TILE + 8, 32 * Tuning.TILE))
+	hero.teleport(Vector2i(5 * Tuning.TILE + 8, 30 * Tuning.TILE))
 	Sim.step(12)
 	var band_only: int = tide.band_top + Tuning.TILE - camera.rows * Tuning.TILE
 	assert_true(camera.pos.y < mini(before, band_only), "climbing raised the view: %d (band alone: %d)" % [

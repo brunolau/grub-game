@@ -305,6 +305,9 @@ const REACH_ROWS: int = 11
 const BARK_GATE_CELLS: int = 12
 ## Arena meta keys of the signatures the referee runs (VersusSignatures; not in LevelData.META_KEYS yet).
 const ARENA_SIGNATURE_KEYS: Array[String] = ["dark_pulse", "regrow", "ember_lane"]
+## G50: an arena's meta key naming the modes its bots play (a subset of `modes`) or ARENA_BOTS_NONE.
+const ARENA_BOTS_KEY: String = "bots"
+const ARENA_BOTS_NONE: String = "none"
 ## The one boss an arena may hold: the neutral Colossus of Colossus Hall (G43).
 const ARENA_BOSS_ID: String = "bosses/colossus"
 ## Cells that kill (a Syrup flood arena is kid-safe: none of them, LEVEL_DESIGN.md 15.8 / DESIGN.md E.5 Sky Picnic).
@@ -482,6 +485,9 @@ func _check_meta_value(data: LevelData, key: String, value: Variant) -> void:
 	if ARENA_SIGNATURE_KEYS.has(base):
 		_check_signature_key(data, path, line, key, base, str(value))
 		return
+	if base == ARENA_BOTS_KEY and str(data.value("kind")) == LevelText.KIND_ARENA:
+		_check_arena_bots(data, path, line, key, str(value))
+		return
 	if not LevelData.META_KEYS.has(base):
 		_add(path, line, WARNING, "unknown meta key '%s'" % key)
 		return
@@ -570,6 +576,24 @@ func _check_meta_value(data: LevelData, key: String, value: Variant) -> void:
 			_check_int(path, line, key, value, 0, 99999)
 		"id", "name", "format", "author", "notes":
 			pass
+
+
+## G50 (cut 4's switch, LEVEL_DESIGN.md 15.2 / 15.8): an arena's `bots` - the modes its bots play, a comma list that
+## is a subset of `modes`, or `none` (default: every mode of `modes`). Unknown in any other file, as before.
+func _check_arena_bots(data: LevelData, path: String, line: int, key: String, text: String) -> void:
+	var listed: PackedStringArray = LevelText.to_list(text)
+	if listed.size() == 1 and listed[0].strip_edges() == ARENA_BOTS_NONE:
+		return
+	if listed.is_empty():
+		_add(path, line, ERROR, "%s lists no mode (a comma list of the arena's modes, or %s)" % [key, ARENA_BOTS_NONE])
+		return
+	var modes: PackedStringArray = LevelText.to_list(str(data.value("modes")))
+	for mode: String in listed:
+		var name: String = mode.strip_edges()
+		if name == ARENA_BOTS_NONE:
+			_add(path, line, ERROR, "%s: '%s' stands alone (no bots in any mode)" % [key, ARENA_BOTS_NONE])
+		elif not modes.has(name):
+			_add(path, line, ERROR, "%s: '%s' is not one of the arena's modes (%s)" % [key, name, ", ".join(modes)])
 
 
 ## An arena signature key (VersusSignatures): `dark_pulse = <period>[:<night>]`, `regrow = <ticks>`,
@@ -1068,6 +1092,7 @@ func _check_content(data: LevelData, grid: TileGrid) -> void:
 			_check_bonded_pairs(data, records, difficulty)
 		_check_halls(data, grid, records)
 		_check_lee_gaps(data, grid)
+		_check_colossus_chains(data, records)
 	elif kind == LevelText.KIND_ARENA:
 		_check_arena(data, grid, records)
 
@@ -1131,10 +1156,74 @@ func _check_plates(data: LevelData, records: Array[Dictionary]) -> void:
 					_add(data.path, int(plates[name_key]["line"]), content,
 							"plate '%s' is %d tiles from its door (the column at line %d); at least %d" % [
 							name_key, gap, int(record["line"]), PartyTuning.PLATE_DOOR_MIN_TILES])
+	var chains: Dictionary = colossus_chain_plates(data, records)
 	for plate_name: String in plates:
-		if not driven.has(plate_name):
+		if not driven.has(plate_name) and not chains.has(int(plates[plate_name]["line"])):
 			_add(data.path, int(plates[plate_name]["line"]), WARNING,
 					"plate '%s' drives no column (rise_while= / sink_while=)" % plate_name)
+
+
+## G49 (DB3's wf9 request; DESIGN.md B.7, LEVEL_DESIGN.md 15.7.4): the visor Colossus's chains. In a co-op file the
+## `objects/plate` records that drive no column (no rise_while= / sink_while= names them) and stand in the columns of
+## the room of a `bosses/colossus` record - its `zones/arena` rect (`arena=`), else the view left of the statue, as
+## Colossus._room / _find_plates take them - hold the visor's chains: no gate mechanism, no "drives no column".
+## Returns record line -> the boss's line.
+static func colossus_chain_plates(data: LevelData, records: Array[Dictionary]) -> Dictionary:
+	var chains: Dictionary = {}
+	if str(data.value("kind")) != LevelText.KIND_COOP:
+		return chains
+	var zones: Dictionary = {}     # zones/arena name -> its rect (cells)
+	var driven: Dictionary = {}
+	for record: Dictionary in records:
+		var params: Dictionary = record["params"]
+		var id: String = String(record["id"])
+		if id == "zones/arena" and params.has("name"):
+			var rect: PackedInt32Array = LevelText.to_int_list(params.get("rect", ""))
+			if rect.size() == 4:
+				zones[str(params["name"])] = Rect2i(rect[0], rect[1], rect[2], rect[3])
+		elif id == "objects/column":
+			for key: String in ["rise_while", "sink_while"]:
+				for name: String in LevelText.to_list(str(params.get(key, ""))):
+					driven[name.strip_edges()] = true
+	for boss: Dictionary in records:
+		if String(boss["id"]) != ARENA_BOSS_ID:
+			continue
+		var col: int = int(boss["col"])
+		var room: Vector2i = Vector2i(col - Tuning.VIEW_COLS, col)   # [first, end) columns
+		var arena: String = str(boss["params"].get("arena", ""))
+		if zones.has(arena):
+			var rect: Rect2i = zones[arena]
+			room = Vector2i(rect.position.x, rect.end.x)
+		for record: Dictionary in records:
+			if String(record["id"]) != "objects/plate" or driven.has(str(record["params"].get("name", ""))):
+				continue
+			if int(record["col"]) >= room.x and int(record["col"]) < room.y:
+				chains[int(record["line"])] = int(boss["line"])
+	return chains
+
+
+## G49: the visor Colossus of a co-op file needs two chain plates in its room in every difficulty it is placed for
+## (with fewer the boss leaves its visor up and the co-op form is lost - a silent loss at run time).
+func _check_colossus_chains(data: LevelData, records: Array[Dictionary]) -> void:
+	var chains: Dictionary = colossus_chain_plates(data, records)
+	var by_line: Dictionary = {}
+	for record: Dictionary in records:
+		by_line[int(record["line"])] = record
+	for boss: Dictionary in records:
+		if String(boss["id"]) != ARENA_BOSS_ID:
+			continue
+		for difficulty: int in [Defs.Difficulty.BEGINNER, Defs.Difficulty.EXPERT]:
+			if not LevelText.applies_to(boss["params"], difficulty):
+				continue
+			var count: int = 0
+			for line: int in chains:
+				if int(chains[line]) == int(boss["line"]) and by_line.has(line) \
+						and LevelText.applies_to((by_line[line] as Dictionary)["params"], difficulty):
+					count += 1
+			if count < 2:
+				_add(data.path, int(boss["line"]), ERROR,
+						"the visor Colossus needs two chain plates in its arena (objects/plate driving no column in its room; found %d in %s, G49)" % [
+						count, Defs.difficulty_name(difficulty)])
 
 
 ## True for a valid `objects/plate mode=` value: `hold`, `latch` or `timed:<ticks>` with ticks >= 1.
@@ -1314,9 +1403,16 @@ static func throw_crosses(spots: Array[Vector2i], target: Vector2i) -> bool:
 						_:
 							if t >= Tuning.SPEAR_FLAT_TICKS:
 								yvel = mini(yvel + 16, Tuning.SPEAR_FALL_MAX)
-					if Overlap.rects(Rect2i(pos.x - 8, pos.y - 16, 16, 16), box):
+					if _rects_overlap(Rect2i(pos.x - 8, pos.y - 16, 16, 16), box):
 						return true
 	return false
+
+
+## Overlap.rects written out: the validator is loaded by tool scripts before the autoloads exist, and overlap.gd
+## pulls in SimEntity (which names the Game autoload): a compile error at every tools/validate_levels.gd start.
+static func _rects_overlap(a: Rect2i, b: Rect2i) -> bool:
+	return a.position.x < b.position.x + b.size.x and b.position.x < a.position.x + a.size.x \
+			and a.position.y < b.position.y + b.size.y and b.position.y < a.position.y + a.size.y
 
 
 ## G41 (optional, a warning): a gust gap of a co-op file - a run of 1..LEE_GAP_MAX_CELLS cells without a floor
@@ -1432,9 +1528,11 @@ func _check_gate_mechanisms(data: LevelData, records: Array[Dictionary], tablets
 	for tablet: Dictionary in tablets:
 		if tablet["gate"] != "":
 			areas.append(_gate_area(tablet))
+	var chains: Dictionary = colossus_chain_plates(data, records)
 	for record: Dictionary in records:
-		if not LevelText.applies_to(record["params"], difficulty) or not _is_mechanism(record):
-			continue
+		if not LevelText.applies_to(record["params"], difficulty) or not _is_mechanism(record) \
+				or chains.has(int(record["line"])):
+			continue   # (G49: the visor Colossus's chain plates are its co-op form, not a gate's mechanism)
 		var cell: Vector2i = Vector2i(int(record["col"]), int(record["row"]))
 		if areas.is_empty():
 			_add(data.path, int(record["line"]), ERROR,
@@ -1702,24 +1800,40 @@ func _check_kid_safe(data: LevelData, records: Array[Dictionary]) -> void:
 
 ## The widest run of cells without a floor between two floor cells of one row (0 when the row has fewer than two).
 ## A run that ends at a wall face (a side wall with a side wall above it, e.g. the Totem Ring's totem) is no gap
-## anybody jumps across, so it does not count (DA's report, G1 integration).
+## anybody jumps across, so it does not count (DA's report, G1 integration); nor is a run with a floor right under
+## every one of its cells (one walks across it a row lower: two see-saws or bumps on a floor, DA's wf9 #3a).
 ## `extra` (cell -> true): cells that count as floor although the grid has none there - platforms, drop platforms and
 ## see-saw planks at their level-start place ([method _entity_floor_cells]; DA's wf9 #2, the Tar Pulleys lifts).
 static func _widest_gap(grid: TileGrid, row: int, extra: Dictionary = {}) -> int:
 	var widest: int = 0
 	var last: int = -1
 	for col: int in grid.cols:
-		if TileGrid.is_ground(grid.floor_at(col, row)) or extra.has(Vector2i(col, row)):
-			if last >= 0 and not _wall_face(grid, col, row) and not _wall_face(grid, last, row):
-				widest = maxi(widest, col - last - 1)
+		if _floor_cell(grid, col, row, extra):
+			if last >= 0 and col - last - 1 > widest and not _wall_face(grid, col, row) \
+					and not _wall_face(grid, last, row) and not _floored_below(grid, last + 1, col, row, extra):
+				widest = col - last - 1
 			last = col
 	return widest
 
 
+static func _floor_cell(grid: TileGrid, col: int, row: int, extra: Dictionary) -> bool:
+	return TileGrid.is_ground(grid.floor_at(col, row)) or extra.has(Vector2i(col, row))
+
+
+## True when every cell of columns [first, end) of `row` has a floor right under it (row + 1).
+static func _floored_below(grid: TileGrid, first: int, end: int, row: int, extra: Dictionary) -> bool:
+	if row + 1 >= grid.rows or first >= end:
+		return false
+	for col: int in range(first, end):
+		if not _floor_cell(grid, col, row + 1, extra):
+			return false
+	return true
+
+
 ## The cells an arena's moving floors cover at their level-start place (cell -> true): an `objects/platform` or
 ## `objects/drop_platform` 3 cells wide around its anchor column (PlatformSkin: 48 px centred on the feet point), an
-## `objects/seesaw` plank `len` * 8 px either side of its fulcrum, in the anchor's row and the row below (the plank
-## lies across the floor line).
+## `objects/seesaw` plank `len` * 8 px either side of its fulcrum in the row below its anchor (the plank lies on the
+## feet line, the top of that row - the floor a hero stands on there; DA's wf9 #3a: never in the anchor's own row).
 static func _entity_floor_cells(records: Array[Dictionary]) -> Dictionary:
 	var cells: Dictionary = {}
 	for record: Dictionary in records:
@@ -1732,7 +1846,6 @@ static func _entity_floor_cells(records: Array[Dictionary]) -> Dictionary:
 		elif id == "objects/seesaw":
 			var half_cells: int = maxi(int((record["params"] as Dictionary).get("len", 4)) * 8 / Tuning.TILE, 1)
 			for c: int in range(col - half_cells, col + half_cells + 1):
-				cells[Vector2i(c, row)] = true
 				cells[Vector2i(c, row + 1)] = true
 	return cells
 

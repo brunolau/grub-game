@@ -25,9 +25,12 @@ msgstr "The Tar Tribe camp! The Great Roast is on the summit."
 msgid "SIGN_W9_PYRE_EGG"
 msgstr "A fallen chieftain becomes an egg: smash it before it hatches!"
 
-# --- ending_b The Long Raft Home: the push-off and the credits on floating signs ---
+# --- ending_b The Long Raft Home: boarding, the push-off and the credits on floating signs ---
+msgid "SIGN_RAFT_BOARD"
+msgstr "The raft waits below. Crouch on the planks to drop aboard!"
+
 msgid "SIGN_RAFT_PUSH"
-msgstr "Hop on the raft. Face the shore and strike to push off!"
+msgstr "On the raft, face the shore and strike to push off!"
 
 msgid "SIGN_RAFT_HOME"
 msgstr "The Great Roast is ours again. Next stop: home!"
@@ -63,7 +66,10 @@ msgid "SIGN_RAFT_IDOLS"
 msgstr "Farewell, Idol Ruins! The Twin Idols nap again."
 
 msgid "SIGN_RAFT_FONTS"
-msgstr "Fonts: Press Start 2P by CodeMan38, Pixelify Sans by Stefie Justprince."
+msgstr "Fonts: Press Start 2P (CodeMan38), Pixelify Sans (Stefie Justprince)."
+
+msgid "SIGN_RAFT_POOL"
+msgstr "The current rests under the arch. Paddle on when you are ready!"
 
 msgid "SIGN_RAFT_SPIRE"
 msgstr "Farewell, Sky Spire! The Roc keeps the rest of its feathers."

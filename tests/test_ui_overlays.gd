@@ -451,11 +451,9 @@ func test_weak_point_band_rule() -> void:
 
 ## Boss stages whose weak point still breaks the band rule, with the request that fixes it (the test reports them and
 ## says when they are clear, so the entry can go). Book I's solo boss stages keep their 1.0 framing (frozen files):
-## reported, never failed.
-const BAND_OPEN: Dictionary = {
-	&"w6_l2b": "D6 lowers Old Mangrove's face (G35, wf9_d6_to_enemies-B.txt: face_rise <= 70)",
-	&"w6_l2b_coop": "D6 lowers Old Mangrove's face (G35, wf9_d6_to_enemies-B.txt: face_rise <= 70)",
-}
+## reported, never failed. Empty since D6's 11-row chamber lock of w6_l2b landed (03:20, MANGROVE_FACE_RISE 70: the
+## face's top 55 px under the view's top); w6_l2b_coop is asserted as soon as it lands.
+const BAND_OPEN: Dictionary = {}
 const BAND_FROZEN: Array[StringName] = [&"w2_l2b", &"w4_l2b"]
 
 
@@ -1347,6 +1345,43 @@ func test_pause_menu_belongs_to_the_player_who_paused() -> void:
 	assert_eq(menu.page, PauseMenu.Page.MAIN, "Num . left the options page")
 	Events.pause_changed.emit(false)
 	Flow.pause_slot = 0
+
+
+## The UI pass of the pause menu (wf9, the check of tests/test_ui_screens.gd layout_problems): the 1.0 menu of a solo
+## run, P2's menu in co-op, its join page and P2's options page, at 640 x 360 and 800 x 360 - no text or entry past the
+## view's edge, no two texts over each other, no clipped text that cuts its words.
+func test_pause_menu_passes_the_ui_check_at_640_and_800() -> void:
+	const Screens: GDScript = preload("res://tests/test_ui_screens.gd")
+	var report: PackedStringArray = PackedStringArray()
+	for state: String in ["solo", "co-op P2", "co-op P2 join", "co-op P2 options"]:
+		for view: Vector2 in Screens.PASS_VIEWS:
+			var coop: bool = state.begins_with("co-op")
+			Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.COOP if coop else Defs.GameMode.SINGLE, 2 if coop else 1)
+			if coop:
+				GameInput.assign_slot(0, InputSlot.keyboard(Defs.InputSlotKind.KEYBOARD_LEFT))
+				GameInput.assign_slot(1, InputSlot.keyboard(Defs.InputSlotKind.KEYBOARD_RIGHT))
+			var menu: PauseMenu = await _overlay(Flow.PAUSE_SCENE) as PauseMenu
+			menu.size = view
+			Flow.pause_slot = 1 if coop else 0
+			Events.pause_changed.emit(true)
+			if state.ends_with("join"):
+				menu.open_join()
+			elif state.ends_with("options"):
+				menu.open_options()
+			for frame: int in 3:
+				await get_tree().process_frame
+			var problems: PackedStringArray = Screens.layout_problems(menu)
+			var seen: Vector2i = Screens.pass_checked
+			assert_true(problems.is_empty(), "%s at %d x %d: %s" % [state, view.x, view.y, "; ".join(problems)])
+			assert_true(seen.x >= 2, "%s: the check saw its texts (%d)" % [state, seen.x])
+			report.append("%s %d: %d texts %d entries" % [state, view.x, seen.x, seen.y])
+			Events.pause_changed.emit(false)
+			Flow.pause_slot = 0
+			menu.queue_free()
+			await get_tree().process_frame
+			GameInput.reset_slots()
+	print("    ui pass: %s" % ", ".join(report))
+	Game.new_game(Defs.Difficulty.BEGINNER)
 
 
 ## Joining and leaving from the pause menu (DESIGN.md D.1, Flow's join / leave / lost pads): a second player joins with

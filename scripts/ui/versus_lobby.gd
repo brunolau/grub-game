@@ -53,6 +53,8 @@ var _start: UiButton = null
 var _paintings: UiButton = null
 var _key_button: UiButton = null
 var _status: Label = null
+## G50: why the last "Add CPU" was refused (the chosen arena is for humans only in this mode); "" otherwise.
+var _cpu_note: String = ""
 var _summary: Label = null
 var _picture: JoinScreen.KeyboardPicture = null
 var _key_test_layer: Control = null
@@ -341,9 +343,18 @@ func leave(slot: int) -> bool:
 	return true
 
 
-## Seat a CPU of `level` (Defs.BotLevel) at `slot` ("Add CPU" on a free seat card). Returns false when it is taken.
+## Seat a CPU of `level` (Defs.BotLevel) at `slot` ("Add CPU" on a free seat card). Returns false when it is taken, or
+## when the match's chosen arena is for humans only in its mode (G50: its meta `bots` leaves the mode out; the status
+## line says so - Random and Party Mix take CPUs).
 func add_cpu(slot: int, level: int = Defs.BotLevel.HUNTER) -> bool:
-	if Game.versus_match.seat_bot(level, slot) < 0:
+	var versus_match: VersusMatch = Game.versus_match
+	if not VersusArenaScreen.bots_play(versus_match.arena, versus_match.mode):
+		Audio.play_sfx(Sfx.MENU_BACK)
+		_cpu_note = cpu_refused_text(versus_match.arena, versus_match.mode)
+		refresh()
+		return false
+	_cpu_note = ""
+	if versus_match.seat_bot(level, slot) < 0:
 		return false
 	_dress(slot)
 	_place_in_team(slot)
@@ -653,8 +664,11 @@ func _refresh_rules() -> void:
 		status = tr("UI_VS_TEAMS_UNEVEN")
 	elif not versus_match.can_start():
 		status = tr("UI_VS_NOT_READY")
-	_status.text = status
-	_status.add_theme_color_override(&"font_color", UiKit.COL_BAD if status != "" else UiKit.COL_GOOD)
+	# G50: a refused "Add CPU" says why (it does not hold START back) until the arena or the mode takes CPUs again.
+	if _cpu_note != "" and VersusArenaScreen.bots_play(versus_match.arena, versus_match.mode):
+		_cpu_note = ""
+	_status.text = _cpu_note if _cpu_note != "" else status
+	_status.add_theme_color_override(&"font_color", UiKit.COL_BAD if _status.text != "" else UiKit.COL_GOOD)
 	_start.disabled = status != ""
 
 
@@ -669,6 +683,14 @@ func _refresh_keyboard() -> void:
 					UiPlayers.PALETTE_COLOURS[&"yellow"])[UiPlayers.FILL])
 		data[half] = {"keys": info["keys"], "colour": colour, "taken": slot >= 0}
 	_picture.set_halves(data)
+
+
+## G50: "No CPU plays Grub Stack on Floe Rink." (the lobby's status when "Add CPU" is refused).
+static func cpu_refused_text(arena_id: StringName, mode: int) -> String:
+	return TranslationServer.translate("UI_VS_NO_CPU_HERE").format({
+		"mode": TranslationServer.translate(str(MODE_KEYS.get(mode, [""])[0])),
+		"arena": TranslationServer.translate(arena_text(arena_id)),
+	})
 
 
 ## The name the lobby and the arena screen show for `arena_id`.

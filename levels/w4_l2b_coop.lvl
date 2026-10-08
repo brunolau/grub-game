@@ -1,0 +1,99 @@
+# Club & Grub - World 4, stage 2b co-op: "Colossus Hall" for two (designer DB3; docs/expansion/DESIGN.md B.7 / D.9,
+# LEVEL_DESIGN.md 15.7). The co-op file of levels/w4_l2b.lvl (kind = coop, coop_of, coop_base_hash; never edit the
+# solo file): the antechamber and the hall of the Wall Colossus, for two. The co-op form comes by itself in a co-op
+# game on a co-op file (scripts/bosses/colossus.gd, enemies-C): hit points 30, a stone visor over its face, lifted
+# only while an active hero stands on the plate whose chain glows - the left-most and the right-most objects/plate
+# of the hall - and only the OTHER hero's thrown weapon counts; every rage moves the live chain to the other plate,
+# so the roles swap. Thrown weapons only, as in 1.0: the checkpoint holds two axes, one for each hero. The slab of
+# the hall became a rock ledge two rows high between the plates: the thrower stands on it (rolling rocks turn at
+# its faces), the holder hops the rocks spat at him and the drops rattle over the thrower. The arena
+# lock is the 1.0 one (11 rows, the floor on its last row), which keeps the face clear of the fight HUD (G35).
+# Expert only, as the solo stage. Its trophy leads to the Way Home (ending_coop in a co-op campaign).
+
+[meta]
+format = 2
+id = w4_l2b_coop
+name = "Colossus Hall"
+kind = coop
+coop_of = w4_l2b
+coop_base_hash = "b3fea03bfd658ec8cc257fb38c503ae501890d319291eeba1af47e9cb228e7f1"
+book = 1
+world = 4
+stage = 2
+biome = volcano
+terrain_a = volcano/terrain_obsidian
+terrain_b = volcano/terrain
+liquid = lava
+background = volcano_shaft
+music = level_volcano
+min_difficulty = expert
+next = ending
+bonus_tier = 2
+author = DB3
+notes = "Co-op 4-2b: the visor Colossus (B.7) - two chain plates in the hall, two axes at the checkpoint."
+
+[legend]
+C = objects/checkpoint
+
+[tiles]
+##############################################
+##############################################
+#...................##########################
+#.....................########################
+#.........................####################
+#...........................................##
+#@...C......................................##
+##########################..................##
+##########################..................##
+##########################..................##
+##########################....####..........##
+##########################....####..........##
+##############################################
+##############################################
+
+[entities]
+# Antechamber: the axe is always here (it comes back after a death), food
+items/weapon 8 6 kind=axe
+# Teaching sign by the axe: only thrown weapons hurt the Colossus (melee hits glance off its head).
+objects/sign 11 6 text=SIGN_W4_COLOSSUS
+items/food 14 6 index=40
+items/food 16 6 index=35
+items/food 18 6 index=33
+# The arena: a single locked screen under a low rock ceiling (the stalactites the Colossus shakes loose hang below
+# the HUD row and the boss bar, in plain sight); the Colossus is part of the right wall
+zones/arena 33 12 name=colossus_hall rect=24,2,20,11
+bosses/colossus 43 11 arena=colossus_hall
+# A reserve heart in the far corner of the arena, away from the Colossus: it waits while the hero is unhurt
+items/heart 29 11
+# Scenery
+props/volcano/stalactite 1 2
+props/volcano/stalactite 2 2
+props/volcano/stalactite 5 2
+props/volcano/stalactite 6 2
+props/volcano/drip_cap 11 2
+props/volcano/stalactite 13 2
+props/volcano/stalactite 14 2
+props/volcano/drip_cap 29 5
+props/volcano/drips 33 5
+props/volcano/drip_cap 37 5
+props/volcano/drip_cap 22 4
+props/volcano/bone_big 22 6
+props/volcano/rocks_small 27 11
+props/volcano/skull_big 20 6
+props/volcano/gravestone 3 6
+props/volcano/bone_pile 25 11
+props/volcano/skull_ribs 32 9 flip
+# ---- co-op (DB3) --------------------------------------------------------------------------------------------
+objects/hero_start 2 6 slot=2
+# Two axes at the checkpoint (a special in a pair, one for each hero): the second hangs three rows up, so the hero
+# who walks over the first leaves it to his partner (a jump takes it).
+items/weapon 11 3 kind=axe
+objects/sign 4 6 text=SIGN_COOP_W4_VISOR
+# The visor's chains: the left-most and the right-most plate of the hall (DESIGN.md B.7). The one whose chain glows
+# lifts the visor while an active hero stands on it; rocks go for him, the drops for the thrower.
+objects/plate 26 11 name=chain_west
+objects/plate 36 11 name=chain_east
+
+[backwall]
+1 2 23 5 set=a deco=30
+24 4 20 8 set=a deco=15

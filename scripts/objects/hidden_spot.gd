@@ -9,6 +9,11 @@ extends SceneryHittable
 ## dropped for a big one; `random` = a random bonus of the level's tier, or a random giant bonus for a big spot);
 ## `look=plain|inset|block` [plain] for solid cells; `prop=<biome>/<name>` picture for air cells.
 ## Used up, it opens every hidden cell that touches it (flood fill in HittableBase).
+## 2.0 co-op Feast Lands (GAMEPLAY.md 13.9.8, DESIGN.md D.9): a big spot is a giant roast spot for two - its last hit
+## pays the giant bonus only when it comes within the twin window (PartyTuning.window_ticks: 24 B / 12 E; slot-bound,
+## so no solo-minimum cap) after a hit by the OTHER hero; otherwise that hit just puffs and the counter stays at its
+## last hit. A hit by an IDLE hero (PlayerBase.is_idle) is no partner's hit (G33). A party of one, versus and every
+## other level kind keep 1.0's rule.
 
 const KIND_SMALL: StringName = &"small"
 const KIND_BIG: StringName = &"big"
@@ -28,6 +33,11 @@ var contents: ItemContents = null
 var look: int = ObjTuning.ATLAS_AUTO
 ## Items thrown out so far (small spot).
 var thrown: int = 0
+## The twin rule of a co-op giant roast spot: the slot (Defs.hitter_slot) and Sim.total_ticks of the last accepted hit
+## (-1 = none yet). Window length: -1 = PartyTuning.window_ticks(Game.difficulty); tests may set it.
+var twin_slot: int = -1
+var twin_tick: int = -1
+var twin_window: int = -1
 
 var _prop: Sprite2D = null
 
@@ -67,6 +77,9 @@ func _on_hit(_power: int, _source: SimEntity) -> void:
 	var level: LevelBase = Game.level
 	if level == null:
 		return
+	if spot_kind == KIND_BIG and _twin_rule(level):
+		twin_slot = _partner_slot(level, _source)
+		twin_tick = Sim.total_ticks
 	wobble(_prop)
 	spray(level_debris_kind(), ObjTuning.SPOT_HIT_DEBRIS, get_hit_point())
 	if spot_kind == KIND_SMALL:
@@ -84,9 +97,37 @@ func _on_opened() -> void:
 		_drop_from_sky(level)
 
 
+## The giant roast twin rule (see the header): the last hit of a big spot in a co-op Feast Land pays only when the
+## other hero struck it within the window before.
+func _last_hit_pays(source: SimEntity) -> bool:
+	var level: LevelBase = Game.level
+	if spot_kind != KIND_BIG or level == null or not _twin_rule(level):
+		return true
+	var slot: int = _partner_slot(level, source)
+	var window: int = twin_window if twin_window >= 0 else PartyTuning.window_ticks(Game.difficulty)
+	return slot >= 0 and twin_slot >= 0 and slot != twin_slot and Sim.total_ticks - twin_tick < window
+
+
+## True in a co-op party's Feast Land (PartyDriver.relay_active: the Feast Land rules of GAMEPLAY.md 13.9.8).
+static func _twin_rule(level: LevelBase) -> bool:
+	var driver: SimEntity = level.party_driver
+	return driver != null and driver.has_method(&"relay_active") and bool(driver.call(&"relay_active"))
+
+
+## The slot a hit by `source` counts for in the twin rule: its hero's (Defs.hitter_slot), -1 for no hero or an IDLE one.
+static func _partner_slot(level: LevelBase, source: SimEntity) -> int:
+	var slot: int = Defs.hitter_slot(source)
+	if slot < 0:
+		return -1
+	var hero: PlayerBase = level.get_hero(slot)
+	return -1 if hero == null or hero.is_idle() else slot
+
+
 ## 2.0 versus refill (HittableBase.refill): the items start again from the first token, the inset / block look is back.
 func _on_refilled() -> void:
 	thrown = 0
+	twin_slot = -1
+	twin_tick = -1
 	if look != ObjTuning.ATLAS_AUTO and Game.level != null:
 		Game.level.set_cell_look(cell.x, cell.y, look)
 	if Game.level != null:

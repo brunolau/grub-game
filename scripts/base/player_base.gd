@@ -132,6 +132,11 @@ var mount_seat: int = SEAT_NONE
 var _fenced: bool = false
 var _fence_left: int = 0
 var _fence_right: int = 0
+## True when this tick's fence CLAMPS the x commit into it instead of refusing a step that leaves it: a fence set by
+## [method fence_x] (a raft's rails, PHYSICS.md C.7 - "clamped, never refused": a rider the ride test catches while
+## his feet are still outside the fence is pulled to its edge by his next x step). The co-op edge walls (C.13: a hero
+## outside them may walk back in, never further out) are written by the PartyDriver without it.
+var _fence_clamp: bool = false
 
 # --- 2.0 duo moves of the hero's side (player-A, PLAN.md P1.4; PHYSICS.md C.10) ----------------------------------------
 # The PartyDriver (world-A) runs the party-wide steps after every hero moved (PHYSICS.md C.0 table, PLAYER phase):
@@ -658,6 +663,7 @@ func fence_x(left: int, right_excl: int) -> void:
 		_fenced = true
 		_fence_left = left
 		_fence_right = right_excl
+	_fence_clamp = true  # C.7 rails: the hero's x commit is clamped into the fence (see [member _fence_clamp])
 
 
 ## True when the fence of this tick lets the x commit move him to `x` (always true without a fence: the 1.0 rule).
@@ -668,6 +674,7 @@ func fence_allows(x: int) -> bool:
 ## End this tick's fence (the hero calls it right after his x step).
 func clear_fence() -> void:
 	_fenced = false
+	_fence_clamp = false
 
 
 ## True when the x commit rule (PHYSICS.md 2) lets this hero stand at `x` now: inside the level bounds and, in a

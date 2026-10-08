@@ -97,6 +97,9 @@ func take_hit(power: int, source: SimEntity) -> bool:
 		return true
 	cooldown = Tuning.HIDDEN_SPOT_HIT_COOLDOWN
 	hits_left -= 1
+	if hits_left <= 0 and not _last_hit_pays(source):
+		# 2.0 co-op (a giant roast spot of a Feast Land, HiddenSpot): this last hit only puffs, the counter stays.
+		hits_left = 1
 	if source is PlayerBase:
 		strike_dir = source.facing
 	elif source != null:
@@ -111,6 +114,12 @@ func take_hit(power: int, source: SimEntity) -> bool:
 		open()
 		if joins_flood:
 			_open_touching()
+	return true
+
+
+## Whether the hit by `source` that would use it up does so (asked in [method take_hit] before `_on_hit`). True in
+## 1.0 and for every hittable but a co-op giant roast spot (HiddenSpot, GAMEPLAY.md 13.9.8). Override.
+func _last_hit_pays(_source: SimEntity) -> bool:
 	return true
 
 

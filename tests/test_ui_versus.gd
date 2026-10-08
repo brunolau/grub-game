@@ -779,6 +779,194 @@ func test_results_medals_keep_clear_of_the_award_texts() -> void:
 	await _cleanup()
 
 
+## The UI pass of the versus screens (wf9 / PLAN.md 6, the check of tests/test_ui_screens.gd layout_problems): the
+## lobby (empty, and full with teams and CPUs), the rules, the arena select, the scoreboard of a 2 v 2 match and the
+## results of four, three and two players with every award shown - at 640 x 360 and 800 x 360, no text or entry past
+## the view's edge, no two texts over each other, no clipped text that cuts its words.
+func test_versus_screens_pass_the_ui_check_at_640_and_800() -> void:
+	const Screens: GDScript = preload("res://tests/test_ui_screens.gd")
+	Save.reset()
+	var report: PackedStringArray = PackedStringArray()
+	for state: String in ["lobby empty", "lobby full", "rules", "arena", "scoreboard", "results 4", "results 3",
+			"results 2"]:
+		for view: Vector2 in Screens.PASS_VIEWS:
+			var node: UiScreen = await _open_pass_state(state)
+			node.size = view
+			for frame: int in 3:
+				await get_tree().process_frame
+			if node is VersusResultsScreen:
+				(node as VersusResultsScreen).show_all_awards()
+				node._process(0.01)
+				await get_tree().process_frame
+			var problems: PackedStringArray = Screens.layout_problems(node)
+			var seen: Vector2i = Screens.pass_checked
+			assert_true(problems.is_empty(), "%s at %d x %d: %s" % [state, view.x, view.y, "; ".join(problems)])
+			assert_true(seen.x >= 3, "%s: the check saw its texts (%d)" % [state, seen.x])
+			report.append("%s %d: %d texts %d entries%s" % [state, view.x, seen.x, seen.y,
+					"" if problems.is_empty() else " FAIL"])
+			node.queue_free()
+			await get_tree().process_frame
+			await _cleanup()
+			GameInput.set_menu_clusters(false)
+			GameInput.reset_slots()
+			Game.versus_match = null
+	print("    ui pass: %s" % ", ".join(report))
+	Save.reset()
+
+
+## Open a versus screen of the UI pass in its state.
+func _open_pass_state(state: String) -> UiScreen:
+	match state:
+		"lobby empty":
+			return await _open_lobby()
+		"lobby full":
+			var lobby: VersusLobbyScreen = await _open_lobby()
+			_key(KEY_SPACE)
+			_key(KEY_KP_0)
+			lobby.add_cpu(2, Defs.BotLevel.CHIEF)
+			lobby.add_cpu(3, Defs.BotLevel.ROOKIE)
+			lobby.set_teams(true)
+			await get_tree().process_frame
+			return lobby
+		"rules":
+			var rules_match: VersusMatch = _two_humans()
+			rules_match.mode = Defs.VersusMode.LAST_CAVEMAN
+			Flow.args = {"owner": 0}
+			return await _open(&"versus_rules")
+		"arena":
+			var arena_match: VersusMatch = _two_humans()
+			arena_match.mode = Defs.VersusMode.GRUB_STACK
+			Flow.args = {"owner": 0}
+			return await _open(&"versus_arena")
+	var players: int = 4
+	var mode: int = Defs.VersusMode.GRUB_STACK
+	var awards: Dictionary = {0: [&"leaning_tower", &"glutton", &"chain_gang"], 1: [&"pickpocket", &"butterfingers",
+			&"comeback_caveman"], 2: [&"pacifist", &"clang_master", &"head_case"], 3: [&"lava_lover", &"slugger"]}
+	if state == "results 3":
+		players = 3
+		mode = Defs.VersusMode.HOT_ROCK
+		awards = {0: [&"hot_potato", &"comeback_caveman", &"head_case"], 1: [&"clang_master", &"lava_lover"],
+				2: [&"pacifist"]}
+	elif state == "results 2":
+		players = 2
+		mode = Defs.VersusMode.CLUBBALL
+		awards = {0: [&"home_run", &"chain_gang", &"slugger"], 1: [&"comeback_caveman"]}
+	var versus_match: VersusMatch = VersusMatch.new()
+	versus_match.arena = ARENA
+	versus_match.mode = mode
+	versus_match.rounds_to_win = 3
+	versus_match.seat_human(InputSlot.keyboard(Defs.InputSlotKind.KEYBOARD_LEFT))
+	versus_match.seat_human(InputSlot.keyboard(Defs.InputSlotKind.KEYBOARD_RIGHT))
+	for extra: int in players - 2:
+		versus_match.seat_bot(Defs.BotLevel.HUNTER if extra == 0 else Defs.BotLevel.CHIEF)
+	if state == "scoreboard":
+		for slot: int in players:
+			versus_match.get_seat(slot).team = 1 if slot % 2 == 0 else 2
+	versus_match.ready_all()
+	versus_match.begin_match(3)
+	Game.versus_match = versus_match
+	Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.VERSUS, players, 1)
+	var rounds: Array = [[0, 2], [1, 3], [0, 2]] if state == "scoreboard" else [[1], [1], [0]]
+	for winners: Array in rounds:
+		versus_match.begin_round(ARENA)
+		versus_match.record_round(PackedInt32Array(winners))
+	if state == "scoreboard":
+		Flow.args = {"round_index": 2, "winners": PackedInt32Array([0, 2])}
+		return await _open(&"versus_scoreboard")
+	Flow.args = {"winners": versus_match.leaders(), "awards": awards}
+	return await _open(&"versus_results")
+
+
+## G50 (PLAN.md cut 4's switch, DESIGN.md appendix): an arena whose meta `bots` leaves out the match's mode is for
+## humans only. With every seat human it is offered as any other; with a CPU seated its card is greyed ("Humans only",
+## the info line says why), it never becomes the arena and cannot be chosen; `bots = none` keeps CPUs off in every
+## mode; an arena without the key takes CPUs in all its modes. The lobby adds no CPU while such an arena is the chosen
+## one (the status line says why, START is not held back) and adds one again once the mode takes CPUs.
+func test_humans_only_arenas() -> void:
+	_inject_bot_arenas()
+	assert_eq(VersusArenaScreen.bot_modes(BOTS_LCS_ARENA), [Defs.VersusMode.LAST_CAVEMAN] as Array[int])
+	assert_true(VersusArenaScreen.bot_modes(BOTS_NONE_ARENA).is_empty(), "bots = none")
+	assert_eq(VersusArenaScreen.bot_modes(ARENA), VersusMatch.arena_modes(ARENA), "no key: every mode of the arena")
+	assert_true(VersusArenaScreen.bots_play(VersusMatch.ARENA_RANDOM, Defs.VersusMode.GRUB_STACK), "Random takes CPUs")
+	# Every seat human: offered as any other.
+	var versus_match: VersusMatch = _two_humans()
+	versus_match.mode = Defs.VersusMode.GRUB_STACK
+	versus_match.ready_all()
+	Flow.args = {"owner": 0}
+	var node: VersusArenaScreen = await _open(&"versus_arena") as VersusArenaScreen
+	assert_not_null(node.get_card(BOTS_LCS_ARENA), "the arena is offered")
+	assert_false(node.get_card(BOTS_LCS_ARENA).humans_only, "humans only: an arena as any other")
+	node.queue_free()
+	await _cleanup()
+	# A CPU seated, Grub Stack: greyed, never the arena, refused.
+	versus_match = _two_humans()
+	versus_match.mode = Defs.VersusMode.GRUB_STACK
+	versus_match.seat_bot(Defs.BotLevel.HUNTER)
+	versus_match.ready_all()
+	Flow.args = {"owner": 0}
+	node = await _open(&"versus_arena") as VersusArenaScreen
+	var card: VersusArenaScreen.ArenaCard = node.get_card(BOTS_LCS_ARENA)
+	assert_true(card.humans_only, "a CPU is seated: humans only")
+	assert_true(node.get_card(BOTS_NONE_ARENA).humans_only, "bots = none")
+	assert_false(node.get_card(ARENA).humans_only, "no key: CPUs play it")
+	assert_false(node.get_card(VersusMatch.ARENA_RANDOM).humans_only)
+	card.grab_focus()
+	assert_ne(versus_match.arena, BOTS_LCS_ARENA, "a humans-only card never becomes the arena")
+	assert_eq(node.get_info_text(), VersusArenaScreen.humans_only_text(Defs.VersusMode.GRUB_STACK))
+	assert_true(node.get_info_text().contains(tr("UI_VS_MODE_GRUB_STACK")), "the info names the mode")
+	node.choose(BOTS_LCS_ARENA)
+	assert_false(node.leaving, "it cannot be chosen")
+	assert_eq(node.get_status_text(), VersusArenaScreen.humans_only_text(Defs.VersusMode.GRUB_STACK))
+	node.queue_free()
+	await _cleanup()
+	# Last Caveman Standing: CPUs play it there.
+	versus_match = _two_humans()
+	versus_match.mode = Defs.VersusMode.LAST_CAVEMAN
+	versus_match.seat_bot(Defs.BotLevel.HUNTER)
+	versus_match.ready_all()
+	Flow.args = {"owner": 0}
+	node = await _open(&"versus_arena") as VersusArenaScreen
+	assert_false(node.get_card(BOTS_LCS_ARENA).humans_only, "its `bots` names Last Caveman Standing")
+	assert_true(node.get_card(BOTS_NONE_ARENA).humans_only, "bots = none: in every mode")
+	node.queue_free()
+	await _cleanup()
+	# The lobby: no CPU while the chosen arena is for humans only in the match's mode.
+	var lobby: VersusLobbyScreen = await _open_lobby()
+	_key(KEY_SPACE)
+	_key(KEY_KP_0)
+	Game.versus_match.arena = BOTS_LCS_ARENA
+	Game.versus_match.mode = Defs.VersusMode.GRUB_STACK
+	lobby.refresh()
+	assert_false(lobby.add_cpu(2), "no CPU on a humans-only arena")
+	assert_false(Game.versus_match.is_bot(2))
+	assert_eq(lobby.get_status_text(), VersusLobbyScreen.cpu_refused_text(BOTS_LCS_ARENA, Defs.VersusMode.GRUB_STACK))
+	assert_true(lobby.get_status_text().contains(tr(UiKit.level_name(BOTS_LCS_ARENA))), "the status names the arena")
+	Game.versus_match.mode = Defs.VersusMode.LAST_CAVEMAN
+	assert_true(lobby.add_cpu(2), "Last Caveman Standing takes CPUs there")
+	assert_true(Game.versus_match.is_bot(2))
+	assert_ne(lobby.get_status_text(), VersusLobbyScreen.cpu_refused_text(BOTS_LCS_ARENA, Defs.VersusMode.GRUB_STACK),
+			"the note goes")
+	Game.versus_match.arena = VersusMatch.ARENA_RANDOM
+	Game.versus_match.mode = Defs.VersusMode.GRUB_STACK
+	assert_true(lobby.add_cpu(3), "Random takes CPUs")
+	await _cleanup()
+	_remove_injected()
+
+
+## Two arenas for G50 (injected for one test, on the test arena's file): `bots = last_caveman` and `bots = none`.
+const BOTS_LCS_ARENA: StringName = &"arena_g50_lcs_bots"
+const BOTS_NONE_ARENA: StringName = &"arena_g50_no_bots"
+
+
+func _inject_bot_arenas() -> void:
+	for entry: Array in [[BOTS_LCS_ARENA, "Bot Test Ring", "last_caveman"], [BOTS_NONE_ARENA, "Human Test Ring", "none"]]:
+		var text: String = ("[meta]\nformat = 2\nid = %s\nname = \"%s\"\nkind = arena\nbiome = jungle\nplayers = 4\n"
+				+ "modes = grub_stack,last_caveman\nwrap = none\nbots = %s\n") % entry
+		Levels._meta[entry[0]] = Levels.parse_meta(text)
+		Levels._paths[entry[0]] = Levels.get_level_path(ARENA)
+	Levels._index_campaign()
+
+
 ## A four-player match (two keyboard humans, two Hunters) of `mode` on the test arena, its runs started.
 func _four_players(mode: int) -> VersusMatch:
 	var versus_match: VersusMatch = VersusMatch.new()

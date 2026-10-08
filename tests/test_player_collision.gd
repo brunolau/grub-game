@@ -298,3 +298,37 @@ func test_deadly_side_tile_in_the_body_rows() -> void:
 	play(hold("RD", 30))
 	assert_false(hero.dead, "crawling (30 px) only the first row above the feet row is probed")
 	assert_true(hero.sim_pos.x > 11 * 16, "crawled past it")
+
+
+## PHYSICS.md C.7 `rails` (wf9 D9b #3 to objects-B, cc player-A; the lead designer's ruling): a fence set through
+## PlayerBase.fence_x (a raft's rails) CLAMPS the x commit - a hero still outside it is pulled to its edge by his next x
+## step, standing or walking either way, and never leaves it; the co-op edge walls (written by the PartyDriver with
+## `_fence_clamp` off) refuse a step out instead, as C.13 says.
+func test_a_rail_fence_clamps_the_x_commit_and_an_edge_wall_refuses() -> void:
+	world_flat()
+	spawn_hero()
+	var x0: int = START_X
+	# Outside the rails on their left (as a rider the ride test caught from the bank): pulled in at once.
+	var fence: Callable = func(_tick: int) -> void: hero.fence_x(x0 + 7, x0 + 40)
+	hero.fence_x(x0 + 7, x0 + 40)
+	play(hold("", 1), fence)
+	assert_eq(hero.sim_pos.x, x0 + 7, "standing: pulled to the fence's edge")
+	# Walking away from it: clamped at the edge, never off the raft.
+	play(hold("L", 10), fence)
+	assert_eq(hero.sim_pos.x, x0 + 7, "walking out: held at the left edge")
+	# Walking across: free inside, clamped at the far edge.
+	play(hold("R", 40), fence)
+	assert_eq(hero.sim_pos.x, x0 + 39, "the last x inside (right exclusive)")
+	play(hold("", 1))
+	assert_false(hero._fenced, "the fence ends with the x step")
+	assert_false(hero._fence_clamp)
+	# An edge wall (the PartyDriver writes the fence without the clamp): a step out is refused, not clamped.
+	hero.respawn_at(START)
+	var wall: Callable = func(_tick: int) -> void:
+		hero._fenced = true
+		hero._fence_clamp = false
+		hero._fence_left = mini(x0 - 100, hero.sim_pos.x)
+		hero._fence_right = maxi(x0 + 5, hero.sim_pos.x + 1)
+	wall.call(0)
+	play(hold("R", 12), wall)
+	assert_true(hero.sim_pos.x < x0 + 5 and hero.sim_pos.x >= x0, "the wall refused the step out (x %d)" % hero.sim_pos.x)

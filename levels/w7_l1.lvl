@@ -1,0 +1,251 @@
+# Club & Grub - World 7, stage 1: "Shell Beach" (designer D7, Book II "The Far Shore").
+# The Coral Coast opens with a breather after the swamp (DESIGN.md A.3 / A.6, difficulty 5): a drift-log stack
+# with two bark boards behind the landing beach (the Cave Painting, index 6, two spear steps up); three raft
+# reaches on the surf currents between sand bars (each raft rests in still water at its bank: one backward strike
+# paddles it into the current), the axe on a driftwood ledge over the first bar; checkpoint 1 and a blowhole that
+# throws the hero onto a sea stack, a second blowhole up to letter B on a sea arch; the long reach with leaping fish
+# and gulls; checkpoint 2 and the fish pools; checkpoint 3, Chomper's pen before the urchin beds (he walks over
+# them; on foot they are jumped); checkpoint 4, the feast kit and the tallest sea stack, an arch over the beach
+# (its blowhole throws the hero to a kelp vine that climbs to the Feast Land E warp on top); a strong blowhole on
+# a 3-row rock throws him onto the sea-stack shoulder, 10 rows over the beach, and the exit totem stands on it.
+# Nothing on the main path needs a special or Chomper.
+
+[meta]
+format = 2
+id = w7_l1
+name = "Shell Beach"
+kind = main
+order = 130
+book = 2
+world = 7
+stage = 1
+biome = coast
+terrain_a = coast/terrain_sand
+terrain_b = coast/terrain
+background = coast
+music = level_coast
+liquid = water
+password_beginner = "SHEL"
+password_expert = "SURF"
+bonus = bonus_e
+bonus_tier = 1
+author = D7
+
+[legend]
+T = objects/raft width=3 skin=log tile=~
+G = objects/geyser skin=blowhole period=88
+H = objects/geyser skin=blowhole period=88 power=-256
+K =objects/bark_board face=r tile=%
+C = objects/checkpoint
+E = objects/exit
+
+[tiles]
+................................................................................................................................................................................................................................................
+................................................................................................................................................................................................................................................
+................................................................................................................................................................................................................................................
+................................................................................................................................................................................................................................................
+................................................................................................................................................................................................................................................
+................................................................................................................................................................................................................................................
+................................................................................................................................................................................................................................................
+................................................................................................................................................................................................................................................
+..............................................................................................................................................................................................................%%%...............................
+..............................................................................................................................................................................................................%%%...............................
+..............................................................................................................................................................................................................%%%...............................
+..............................................................................................................................................................................................................%%%...............................
+..............................................................................................................................................................................................................%%%...............................
+..............................................................................................................................................................................................................%%%...............................
+..............................................................................................................................................................................................................%%%...............................
+..............................................................................................................................................................................................................%%%...............................
+..........................................................................................%%%.................................................................................................................%%%...............................
+..........................................................................................%%%.................................................................................................................%%%............................E..
+..........................................................................................%%%.................................................................................................................%%%..........%%%%%%%%%%%%%%%%%%%%%
+..........................................................................................%%%.................................................................................................................%%%..........%%%%%%%%%%%%%%%%%%%%%
+%%%...........................................................................................................................................................................................................%%%..........%%%%%%%%%%%%%%%%%%%%%
+%%%.....................................................................................G.....................................................................................................................%%%..........%%%%%%%%%%%%%%%%%%%%%
+%%%.................................................................................%%%%%%%%%%%%%.............................................................................................................%%%..........%%%%%%%%%%%%%%%%%%%%%
+%%K.................................................................................%%%%%%%%%%%%%..........................................................................................................................%%%%%%%%%%%%%%%%%%%%%
+%%%.................................................................................%%%%%%%%%%%%%%.......................................................................................................................H.%%%%%%%%%%%%%%%%%%%%%
+%%%.........................................===.....................................%%%%%%%%%%%%%%....................................................................................................................%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%K.................................................................................%%%%%%%%%%%%%%%...................................................................................................................%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%....@..................................................................C.......G.%%%%%%%%%%%%%%%...........................................C...........................C...............................C..G........%%%%%%%%%%%%%%%%%%%%%%%%%%
+#######################................############....................##########################################..........................##########~~~####~~~####~~~############^^^^####^^^^^#####^^^^########################################
+#######################~T~~~~~~~~~~~~~~############~T~~~~~~~~~~~~~~~~~~##########################################~T~~~~~~~~~~~~~~~~~~~~~~~~##########~~~####~~~####~~~##########################################################################
+#######################~~~~~~~~~~~~~~~~############~~~~~~~~~~~~~~~~~~~~##########################################~~~~~~~~~~~~~~~~~~~~~~~~~~#####################################################################################################
+################################################################################################################################################################################################################################################
+################################################################################################################################################################################################################################################
+################################################################################################################################################################################################################################################
+################################################################################################################################################################################################################################################
+################################################################################################################################################################################################################################################
+
+[entities]
+# the landing beach; behind it the drift-log stack with two bark boards (the Cave Painting, index 6)
+props/canyon/raft_beached 9.5 27
+props/coast/driftwood_log 4.5 27 layer=back
+items/painting 1 19 index=6
+zones/secret 0 18 name=driftlog_stack rect=0,18,3,2
+items/food 0.5 19 index=3
+props/coast/palm_tall 5 27 layer=back
+props/coast/shell_conch 11 27
+props/coast/dune_grass 14 27
+enemies/walker 13 27 skin=turtle left=-2 right=3 hp=10
+objects/sign 17 27 text=SIGN_W7_SURF
+props/coast/palm_short 20 27 layer=back
+items/food 9 25 index=1
+items/food 12 24 index=2
+items/food 15 25 index=4
+items/food 19 25 index=5
+# reach 1: the raft rests in still water; one backward strike paddles it into the surf current
+zones/current 25 29 rect=25,29,13,2 dir=r speed=1
+enemies/leaper 31 28 skin=fish speed=40 pause=88 hp=10
+enemies/harrier 33 19 skin=gull range=6 hp=10 expert
+props/coast/rock_sea_a 30 30 layer=back
+items/food 27 25 index=7
+items/food 30 25 index=8
+items/food 34 25 index=10
+items/food 37 25 index=11
+# bar 1: the axe on a driftwood ledge three rows up (off the path)
+items/weapon 45 24 kind=axe
+props/coast/driftwood 45 25 layer=back
+props/coast/cycad 41 27 layer=back
+props/coast/shell_snail 49 27
+enemies/dropper 47 27 skin=sea_snail zone=42,22,8,6 max=1 hp=10
+items/food 44 26 index=12
+items/food 48 26 index=13
+# reach 2: a faster current; a fish, a gull (Expert: a red fish)
+zones/current 53 29 rect=53,29,17,2 dir=r speed=1
+enemies/leaper 60 28 skin=fish speed=40 pause=88 hp=10
+enemies/leaper 66 28 skin=fish_b speed=48 pause=88 hp=10 expert
+enemies/harrier 63 18 skin=gull range=6 hp=10
+props/coast/rock_sea_b 57 30 layer=back
+items/food 55 25 index=14
+items/food 58 25 index=15
+items/food 62 25 index=16
+items/food 65 25 index=17
+items/food 68 25 index=18
+# checkpoint 1, the blowhole onto the sea-stack plateau; on it the sea arch with letter B on top
+props/coast/palm_short 72 27 layer=back
+objects/sign 78 27 text=SIGN_W7_BLOWHOLE
+props/coast/pebbles 80 27
+items/heart 76 25
+enemies/walker 94 21 skin=turtle left=-2 right=2 hp=10
+enemies/harrier 86 13 skin=gull range=6 hp=10
+items/letter 91 15 index=3
+zones/secret 90 14 name=letter_arch rect=90,14,3,2
+props/coast/rock_arch 91 21 layer=back
+props/coast/coral_pink 86 21
+props/coast/seagrass_a 95 21
+items/food 85 19 index=19
+items/food 87 19 index=20
+items/food 93 19 index=21
+items/food 96 19 index=22
+# beach C: a tortoise, a sea snail
+enemies/walker 104 27 skin=turtle left=-3 right=3 hp=10
+enemies/dropper 109 27 skin=sea_snail zone=105,22,7,6 max=1 hp=10
+props/coast/whale_skull 101 27 layer=back
+props/coast/palm_tall 110 27 layer=back
+items/food 103 25 index=23
+items/food 107 25 index=24
+# reach 3, the long one: fish from both sides and a gull
+zones/current 115 29 rect=115,29,22,2 dir=r speed=1
+enemies/leaper 121 28 skin=fish speed=40 pause=88 hp=10
+enemies/leaper 126 28 skin=fish_b speed=48 pause=100 hp=10 expert
+enemies/harrier 127 18 skin=gull range=6 hp=10
+props/coast/sea_stack 125 30 layer=back
+items/food 117 25 index=25
+items/food 120 25 index=26
+items/food 124 25 index=27
+items/food 128 25 index=28
+items/food 132 25 index=29
+items/food 135 25 index=30
+# checkpoint 2, the fish pools
+props/coast/palm_short 140 27 layer=back
+enemies/walker 145 27 skin=turtle left=-2 right=2 hp=10
+enemies/leaper 150 27 skin=fish speed=32 pause=88 hp=10
+enemies/leaper 157 27 skin=fish_b speed=40 pause=88 hp=10 expert
+enemies/leaper 164 27 skin=fish speed=32 pause=100 hp=10
+enemies/harrier 157 19 skin=gull range=6 hp=10
+enemies/harrier 104 18 skin=gull range=6 hp=10 expert
+props/coast/coral_head 146 27 layer=back
+props/coast/seaweed 153 27
+props/coast/coral_teal 161 27
+props/coast/rocks_small 167 27
+items/food 150 24 index=31
+items/food 157 24 index=32
+items/food 164 24 index=33
+# checkpoint 3, Chomper's pen before the urchin beds (a safe cell at each end of every bed)
+objects/rex_pen 174 27 name=beach
+objects/mount 174 27 kind=rex pen=beach
+objects/sign 176 27 text=SIGN_W7_URCHIN
+props/coast/boulders 172 27 layer=back
+enemies/dropper 193 27 skin=sea_snail zone=191,22,5,6 max=1 hp=10
+enemies/harrier 192 19 skin=gull range=6 hp=10 expert
+props/coast/dune_grass 183 27
+props/coast/shell_conch 193 27
+items/food 179.5 24 index=34
+items/food 188 24 index=35
+items/food 197.5 24 index=36
+# checkpoint 4, the feast kit; the tallest stack - a sea arch over the beach: its blowhole throws the hero to
+# the kelp vine on its face, which climbs to the Feast Land E warp on top
+props/coast/palm_tall 200 27 layer=back
+items/feast_piece 204 26 index=0
+items/feast_piece 210 26 index=1
+items/feast_piece 213 26 index=2
+objects/vine 205 8 length=15
+items/warp 207 7
+zones/secret 206 6 name=warp_stack rect=206,6,3,2
+items/food 208 7 index=41
+props/coast/glow_anemone_pink 206 7
+props/coast/rock_arch 207 27 layer=back
+# the 3-row rock: a strong blowhole throws the hero onto the sea-stack shoulder (10 rows over the beach)
+props/coast/rock_big 212 27 layer=back
+enemies/walker 226 17 skin=turtle left=-2 right=2 hp=10
+enemies/harrier 229 11 skin=gull range=6 hp=10
+props/coast/seagrass_b 221 17
+props/coast/coral_orange 225 17
+props/coast/whale_ribs 231 17 layer=back
+props/coast/palm_short 235 17 layer=back
+items/food 221 15 index=37
+items/food 224 15 index=38
+items/food 228 15 index=39
+items/food 232 15 index=40
+# dressing: sea rocks in the surf, shells, coral and sea grass on the bars
+props/coast/rock_sea_b 26 30 layer=back
+props/coast/rocks_small 35 30 layer=back
+props/coast/rocks_small 54 30 layer=back
+props/coast/rock_sea_a 62 30 layer=back
+props/coast/rocks_small 67 30 layer=back
+props/coast/rock_sea_a 116 30 layer=back
+props/coast/rocks_small 121 30 layer=back
+props/coast/rock_sea_b 131 30 layer=back
+props/coast/rocks_small 136 30 layer=back
+props/coast/seagrass_a 3 27
+props/coast/seaweed 15.5 27
+props/coast/shell_snail 21 27
+props/coast/seagrass_b 40 27
+props/coast/shell_conch 43 27
+props/coast/pebbles 50 27
+props/coast/seagrass_a 73 27
+props/coast/shell_conch 81 27
+props/coast/seagrass_b 100 27
+props/coast/pebbles 106 27
+props/coast/shell_snail 112 27
+props/coast/seagrass_a 139.5 27
+props/coast/pebbles 143.5 27
+props/coast/seagrass_b 171 27
+props/coast/shell_snail 177 27
+props/coast/seaweed 201 27
+props/coast/shell_conch 203 27
+props/coast/seagrass_a 209 27
+props/coast/dune_grass 213 27
+props/coast/coral_teal 84.5 21
+props/coast/seagrass_b 88.5 21
+props/coast/coral_orange 93 21
+props/coast/dune_grass 96 21
+props/coast/palm_short 87 21 layer=back
+props/coast/cycad 198 27 layer=back
+props/coast/palm_tall 215 24 layer=back
+props/coast/coral_head_b 220 17 layer=back
+props/coast/sea_stack 64 30 layer=back
+
+[backwall]
+206 23 3 5 set=b deco=30

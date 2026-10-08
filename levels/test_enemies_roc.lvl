@@ -1,9 +1,13 @@
 # Club & Grub level file - format 2 (docs/ARCHITECTURE.md 7.11). Storm Nest: developer level of enemies-C for the
 # Storm Roc (docs/expansion/PLAN.md P2.3; DESIGN.md B.5, GAMEPLAY.md 13.6): one 20 x 12 screen at the spire top, a stick
 # nest of one-way cells (cols 6-13, row 8) with the Roc perched on it, a stone floor at row 10 with a 4-cell runway on
-# each side and two drop clouds (one-way here) at row 5. Phase 1 blows gusts across the nest, phase 2 dives, phase 3
-# the lightning and the hang-glider dives (the gliders appear on the nest). tests/test_enemies_roc.gd builds its own
-# room of these cells; this file is for visual QA in the windowed game. Not part of any campaign (kind = test).
+# each side; the air over the runways stays free (G46: the Roc cruises there - no drop clouds, as D9's w9_l2b draft).
+# Phase 1 blows gusts across the nest, phase 2 dives, phase 3
+# the lightning and the hang-glider dives (the gliders appear on the nest). The arena zone locks the camera on rows
+# 0-10 (the authentic 20 x 11 view: the view's top is the arena's top in every lockable view, the floor row 10 at its
+# bottom), so the Roc's G46 cruise flies 61 px over the floor with its back 55 px under the view's top (G35). The club
+# routes of tests/test_enemies_roc.gd are played here; the other tests build their own room of these cells. Not part of
+# any campaign (kind = test).
 
 [meta]
 format = 2
@@ -27,7 +31,7 @@ notes = "PLAN.md P2.3: the Storm Roc on art-B's roc sheet (the pterodactyl at 2x
 |..................|
 |..................|
 |..................|
-|.---..........---.|
+|..................|
 |..................|
 |..................|
 |.....--------.....|
@@ -36,5 +40,5 @@ notes = "PLAN.md P2.3: the Storm Roc on art-B's roc sheet (the pterodactyl at 2x
 ####################
 
 [entities]
-zones/arena 2 9 name=nest rect=0,0,20,12 music=boss_roc
+zones/arena 2 9 name=nest rect=0,0,20,11 music=boss_roc
 bosses/roc 9 7 arena=nest drops=trophy

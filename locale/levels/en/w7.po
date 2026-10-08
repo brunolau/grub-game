@@ -50,7 +50,7 @@ msgstr "Down + Swap curls you up. A high strike lobs your partner!"
 
 # --- w7_l2_coop Sea Caves (co-op) ---
 msgid "SIGN_W7_COOP_SEAGATE"
-msgstr "One holds the plate, the other hops the floes through the gate."
+msgstr "One holds the plate. The other hops through the sea gate."
 
 msgid "SIGN_W7_COOP_DRIVE"
 msgstr "Curl up at the edge: a forward strike drives you across!"

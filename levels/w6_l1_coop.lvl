@@ -1,0 +1,215 @@
+# Club & Grub - World 6, stage 1 for two: "Bubbling Fen" co-op (designer D6, Book II "The Far Shore").
+# The solo fen (w6_l1) for a tribe of two (DESIGN.md A.6 / D.10, LEVEL_DESIGN.md 15.7): the landing shore and
+# the raft reach as in solo (a raft for two: one paddles, the other clubs the tar blobs that drop on it); then two
+# co-op gates on the main path, each with its x2 tablet and a checkpoint behind it:
+#  - 'sunk': where the raft sank, a Batter Up gap - 8 cells of open tar (9 on Expert: a Beginner-only block fills
+#    the ninth) between two banks at one height under open sky, no raft: one curls up (Down + Swap), the other bats
+#    him over with a forward strike; on the far bank a latch plate 8 cells on raises the sunken raft (a column
+#    under the tar) for the batter;
+#  - 'root': Old Root, a mangrove root 8 rows over the floor in front of it (A.6's fallback for "thorns": a lone
+#    rider crosses a thorn bed in 24 ticks and the Leeches only drain bones, so Chomper's two seats cannot be a
+#    gate): a Shoulder Hop takes one up, who clubs the rolled vine down for his partner (its coil 12 cells from
+#    the far cell behind the root); both drop behind it. It stands before Chomper, who never gets near it.
+# Then wild Chomper with his two seats (the first to sit drives and bites, the partner on his back clubs) and the
+# tar flats. Traits: Tar Splitters and split tar blobs, Leeches under the root deck (only the partner clubs one off
+# a back), a bonded frog pair (18 columns and 4 rows apart: no thrown special from beside one crosses the other),
+# lone mosquitoes. The hammer lies on the jetty in a pair.
+
+[meta]
+format = 2
+id = w6_l1_coop
+name = "Bubbling Fen"
+kind = coop
+coop_of = w6_l1
+coop_base_hash = 4bcd0963720f3151eda56a3406ef880fc80975fe8d137fc2b6bb25749eb02d72
+book = 2
+world = 6
+stage = 1
+biome = swamp
+terrain_a = swamp/terrain
+terrain_b = swamp/terrain_bark
+background = swamp
+music = level_fen
+liquid = tar
+bonus_tier = 1
+author = D6
+
+[legend]
+V = objects/vine length=3
+W = objects/vine length=7
+T = objects/raft width=3 skin=log tile=~
+C = objects/checkpoint
+E = objects/exit
+
+[tiles]
+..|.............................................................................................................................................................................................................................................................
+..|.............................................................................................................................................................................................................................................................
+..|.............................................................................................................................................................................................................................................................
+..|.............................................................................................................................................................................................................................................................
+..|.............................................................................................................................................................................................................................................................
+..|.............................................................................................................................................................................................................................................................
+..|.............................................................................................................................................................................................................................................................
+..|.............................................................................................................................................................................................................................................................
+..|.............................................................................................................................................................................................................................................................
+..|.............................................................................................................................................................................................................................................................
+..|.............................................................................................................................................................................................................................................................
+..|.............................................................................................................................................................................................................................................................
+..|.............................................................................................................................................................................................................................................................
+..|.............................................................................................................................................................................................................................................................
+..|............................................................................................................................................%%%%.............................................................................................................
+..|............................................................................................................................................%%%%.............................................................................................................
+..|............................................................................................................................................%%%%.............................................................................................................
+..|............................................................................................................................................$..%............................................................................................................%
+..|........................................................................................................................W%%%%%..............$..%%%%%%%%%...........%%%%%....................................................................................%
+..|.........................................................................................................................%%%%%~T~~~~~~~~~~~~%%%%%%%%%%%%...........%%%%%....................................................................................%
+..|.........................................................................................................................%%%%%~~~~~~~~~~~~~~%%%%%%%%%%%%...........%%%%%....................................................................................%
+..|.........................................................................................................................%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%...........%%%%%....................................................................................%
+..|...................................................................................................................................................................%%%%%....................................................%%..............................%
+..|...................................................................................................................................................................%%%%%....................................................%%..............................%
+..|....................................................C..............................................................................................................%%%%%...............%%...................................%%..............................%
+..|..@................###################........V#########.............................C.......................C.....................................................%%%%%.........C.....%%.................................######................C........E..%
+~~############::::::::######################......#########~T~~~~~~~~~~~~~~~~~~~~~~~########.~~~~~~~~###################################################################################################:::::::::::::::::::::::::::::::::::::::::###############
+~~##########################################......#########~~~~~~~~~~~~~~~~~~~~~~~~~########~%%%%%%%%###########################################################################################################################################################
+############################################::::::##############################################################################################################################################################################################################
+################################################################################################################################################################################################################################################################
+################################################################################################################################################################################################################################################################
+################################################################################################################################################################################################################################################################
+################################################################################################################################################################################################################################################################
+################################################################################################################################################################################################################################################################
+################################################################################################################################################################################################################################################################
+################################################################################################################################################################################################################################################################
+
+[entities]
+# (1) the landing shore (P2 starts beside P1)
+objects/hero_start 3 25 slot=2
+props/canyon/raft_beached 4 25
+props/swamp/reeds_tall 1 25 layer=front
+objects/sign 10 25 text=SIGN_W6_TAR
+props/swamp/reeds_a 13 25
+props/swamp/mangrove_trunk_small 24 24 layer=back
+enemies/tar_splitter 30 24 left=-3 right=3 hp=10
+enemies/stinger 27 20 skin=mosquito range=4 hp=10
+enemies/walker 26 24 skin=larva left=-2 right=2 hp=10 expert
+enemies/hopper 38 24 skin=frog range=5 hp=10
+enemies/dropper 35 24 skin=slime zone=31,19,9,6 max=1 hp=10 coop=split
+props/swamp/dead_tree 34 24 layer=back
+props/swamp/bush_murky 41 25
+props/swamp/snag_small 47 27 layer=back
+props/swamp/reeds_b 52 24
+items/food 15 24 index=1
+items/food 17 23 index=2
+items/food 19 24 index=4
+items/food 23 23 index=5
+items/food 28 23 index=7
+items/food 32 22 index=11
+items/food 46 25 index=13
+items/food 47 25 index=14
+items/food 51 23 index=16
+items/heart 42 24
+# (2) the raft reach, a raft for two: one paddles, the other clubs the tar blobs that drop on it
+objects/sign 53 24 text=SIGN_W6_RAFT
+zones/current 61 26 rect=61,26,15,2 dir=r speed=1
+props/swamp/snag_big 73 27 layer=back
+enemies/dropper 70 21 skin=slime zone=64,18,14,4 max=1 hp=10 coop=split
+enemies/stinger 78 20 skin=mosquito range=4 hp=10 coop=lone expert
+items/food 66 23 index=17
+items/food 70 23 index=18
+items/food 74 23 index=20
+items/food 79 23 index=21
+items/food 82 23 index=23
+# co-op gate 'sunk' (DESIGN.md A.6 / D.10): where the raft sank, a Batter Up gap of 8 cells of open tar on
+# Beginner (the block over the Expert cell) and 9 on Expert; on the far bank a latch plate raises the sunken raft
+objects/x2_tablet 86 25 gate=sunk far=103,25
+objects/sign 85 25 text=SIGN_W6_COOP_BATTER
+objects/column 92 26 rise=0 beginner
+objects/column 93 27 size=8,1 rise=1 rise_while=sunk
+objects/plate 108 25 name=sunk mode=latch
+objects/sign 104 25 text=SIGN_W6_COOP_SUNK
+props/swamp/reeds_tall 91 25 layer=front
+props/swamp/snag_small 97 27 layer=back
+props/swamp/reeds_b 101 25
+items/food 95 23 index=24
+items/food 98 23 index=27
+items/food 106 24 index=30
+# the root deck: the hammers on the jetty (a pair), the side raft, the painting behind the stump's block wall
+items/weapon 126 17 kind=hammer
+items/weapon 127 17 kind=hammer
+zones/current 131 19 rect=131,19,12,2 dir=r speed=1
+items/painting 145 18 index=3
+zones/secret 144 18 name=painting_stump rect=144,17,2,2
+props/swamp/mangrove_trunk 144.5 14 layer=back
+props/swamp/canopy_moss 144.5 12 layer=back
+props/swamp/root_arch 127 25 layer=back
+props/swamp/log_moss 150 17
+items/food 149 16 index=25
+items/food 151 16 index=26
+# under the deck: a Tar Splitter, a frog and two Leeches hanging from the deck (only the partner clubs one off a
+# back)
+enemies/tar_splitter 134 25 left=-3 right=3 hp=10
+enemies/leech 139 22 range=3 hp=10
+enemies/leech 148 22 range=3 hp=10
+enemies/hopper 141 25 skin=frog range=5 hp=10
+enemies/stinger 129 23 skin=mosquito range=4 hp=10 coop=lone expert
+items/food 121 24 index=28
+items/food 130 24 index=29
+items/food 137 24 index=31
+items/food 144 24 index=32
+items/food 152 24 index=33
+# co-op gate 'root' (DESIGN.md A.6 "thorns" fallback, G28 / G39): Old Root, 8 rows over the floor in front of
+# it and 11+ cells from the root deck; a Shoulder Hop takes one up, who clubs the rolled vine down for his
+# partner; both drop behind it
+objects/x2_tablet 162 25 gate=root far=177,25
+objects/sign 159 25 text=SIGN_W6_COOP_ROOT
+objects/vine 165 18 length=7 rolled=true
+props/swamp/mangrove_trunk 168 17 layer=back
+props/swamp/canopy_murky 168 15 layer=back
+props/swamp/moss_fringe 168 19 layer=front
+props/swamp/reeds_tall 172 25 layer=front
+items/food 168 16 index=40
+items/food 174 24 index=41
+# (3) wild Chomper pacing before the rock fall; two seats: the first to sit drives, the partner is the gunner
+objects/sign 183 25 text=SIGN_W6_REX
+props/swamp/rock_big 192 25 layer=back
+props/swamp/boulders 195 25 layer=back
+props/swamp/boulders 189 25 layer=back
+objects/rex_pen 192 25 name=fen
+objects/mount 192 25 kind=rex pen=fen wild
+objects/sign 198 25 text=SIGN_W6_RIDE
+# (4) the tar flats: Tar Splitters, a split tar blob, a bonded frog pair (one on the flats, one on letter R's
+# stump), lone mosquitoes (Expert)
+enemies/walker 203 25 skin=larva left=-1 right=1 hp=10 expert
+enemies/hopper 205 25 skin=frog range=1 hp=10 coop=bond bond=frogs
+enemies/tar_splitter 211 25 left=-2 right=2 hp=10
+enemies/dropper 216 24 skin=slime zone=213,18,6,6 max=1 hp=10 coop=split
+enemies/hopper 223 21 skin=frog range=1 hp=10 coop=bond bond=frogs
+enemies/tar_splitter 231 25 left=-2 right=2 hp=10
+enemies/tar_splitter 237 25 left=-1 right=1 hp=10
+enemies/stinger 209 20 skin=mosquito range=4 hp=10 coop=lone expert
+enemies/stinger 228 20 skin=mosquito range=4 hp=10 coop=lone expert
+items/letter 223.5 20 index=1
+zones/flies 226 25 rect=226,20,14,6 count=3
+items/food 202 23 index=34
+items/food 208 23 index=35
+items/food 214 23 index=36
+items/food 229 23 index=37
+items/food 234 23 index=38
+items/food 239 23 index=39
+props/swamp/stump 223.5 21 layer=back
+props/swamp/reeds_a 204 25 layer=front
+props/swamp/reeds_b 233 25 layer=front
+# (5) checkpoint 4, the water bucket, the gnat thicket and the exit totem
+items/water_bucket 246 25
+zones/flies 247 25 rect=247,20,8,6 count=4
+enemies/stinger 248 22 skin=mosquito range=4 hp=10 coop=lone
+enemies/tar_splitter 250 25 left=-1 right=1 hp=10
+enemies/stinger 254 21 skin=mosquito range=4 hp=10 expert
+props/swamp/bush_big 247 25 layer=front
+props/swamp/foliage_clump 250 25 layer=front
+props/swamp/bush_murky 254 25 layer=front
+props/swamp/mangrove_trunk 254 25 layer=back
+items/food 245 24 index=42
+items/food 249 24 index=43
+items/food 251 24 index=44
+
+[backwall]
+143 17 4 2 set=b deco=20

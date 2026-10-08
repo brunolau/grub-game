@@ -586,7 +586,8 @@ files and their 72 route files are frozen: never edit them** (a guard test check
 | `coop_base_hash` | sha256 (hex) of the solo file | required for `coop` | the validator warns when the solo file changed since the co-op file was made |
 | `players` | `2` .. `4` | required for `arena` | most players the arena is built for |
 | `round_time` | seconds | `90` | arena round length (Grub Stack plays 60 with two players) |
-| `modes` | list of `grub_stack` `last_caveman` `hot_rock` `clubball` ... | required for `arena` | modes the arena supports (each needs a green bot test) |
+| `modes` | list of `grub_stack` `last_caveman` `hot_rock` `clubball` ... | required for `arena` | modes the arena supports (each needs a green bot test, or is left out of `bots`) |
+| `bots` | a subset of `modes`, or `none` | every mode of `modes` | arenas: the modes in which bots play it; in any other mode the arena is offered only while every seat is human - PLAN cut 4, human-only [G50] |
 | `wrap` | `none` `lr` `tb` | `none` | arena edges joined left-right or top-bottom |
 | `sudden` | `stampede` `cave_in` `whiteout` `lava_rise` `tar_rise` `high_tide` `syrup_flood` `stalactites` `rockslide` `lightning` | by biome | the arena's sudden death |
 | `liquid` | + `tar` `honey` `syrup` | | look of `~` and `:` (all deadly as water) |
@@ -702,7 +703,7 @@ every hero glows warm and every prop whose name holds "glow" (`swamp/props/glowc
 | Tar | wade 2 px/tick; hop 33 px | 15.3 |
 | Geyser | -224: 105 px, the same as a spring or an Up bounce | a geyser lifts to a ledge up to 6 tiles above its vent, also from a tar floor (the way out of a tar pit) |
 | Raft | current 1-3 px/tick; paddle up to 3 px/tick of its own; banks stop it | keep a raft's path free of cells at its surface row except the banks you want |
-| Rising tide | 1 px/tick = one row per 16 ticks; the view chases a jump's apex and never sinks again, so a jump that does not land higher kills (6-2b, D6) [G32]; world-A is asked to make the view follow the hero's footing instead (P-C.8 "footing follow" [G42]) | a Beginner stopping 73 ticks (3 s) loses 4.5 rows: give every climb that much spare; until the footing follow is built every jump of a rising climb lands higher - one-way ledges 3 rows apart in one jump column, and no target (a bat, a spot) that invites a jump in place on a climb ledge |
+| Rising tide | 1 px/tick = one row per 16 ticks; the view follows each hero's footing, never a jump's apex, and never sinks (P-C.8 "footing follow" [G42], built in phase 3; at G2 the view chased the apex and a jump that did not land higher killed - G32's building rule [G32], now retired) | a Beginner stopping 73 ticks (3 s) loses 4.5 rows: give every climb that much spare; a jump in place on a climb ledge (to strike a bat) is fair now; never ask a hero to step down more than 2 rows under the highest footing he reached (the follow puts a climbing hero on view row 8 of 11 and the view does not come down) |
 | Chomper | 4 px/tick; hop 55 px, 84 px far at full speed | mounted gaps <= 4 tiles, steps <= 3 rows, 4 rows of air in mounted corridors, no sprite platforms on mounted stretches |
 | Gusts | negative `wind` pushes right; crouching braces; co-op: a hero up to 64 px downwind of a crouching (so active) partner (16 px up or down) feels no wind, and a jump taken there stays sheltered until he lands (the lee) [G41] | alternate with `wind_loop`; give a crouching spot before every gap; a co-op lee gap is at most 3 tiles with a crouching spot within 64 px downwind of its far edge |
 | Lightning | the column is marked 22 ticks before the bolt; `period` [66]; it alternates between the heroes inside | never two bolts on the only safe cell in a row |
@@ -725,8 +726,9 @@ every hero glows warm and every prop whose name holds "glow" (`swamp/props/glowc
   fine, but give each idea one short sign. `tests/test_ui_signs.gd` guards `locale/en.po`; check your own `.po` the
   same way.
 - **Boss arenas** as section 10, one walled screen each; the geometry of every arena is in GAMEPLAY 13.6. **Weak points
-  clear of the HUD** [G35]: lock the camera on 11 rows whose last row is the arena floor, and keep every rectangle a
-  counted hit must touch at least 55 px under the view's top - 72 px in the boss bar's columns (53 px left to 38 px
+  clear of the HUD** [G35]: lock the camera on 11 rows whose last row is the arena floor (a taller lock lets the view
+  float: then every view it allows must pass - the boss tests check both extremes, the route tests every settled
+  locked tick), and keep every rectangle a counted hit must touch at least 55 px under the view's top - 72 px in the boss bar's columns (53 px left to 38 px
   right of the view's centre): at most 105 / 88 px over the floor's top. The fight HUD is the top row (31 px on
   touch devices) plus the boss bar under the hearts; `Hud.weak_point_problem` checks a rectangle. Old Mangrove's upper
   ledge is row 5 (ending at col 5), the Chieftains' altar is 3 rows up; the boss test pins it, the preview at the base
@@ -783,7 +785,7 @@ and keepers).
 | **Keeper door** | `objects/column trigger=keepers:<name>` behind a hall **exactly 4 rows high** (the Guard and Shellback art is 54 px tall); its keepers (`keeper=<name>`) carry `shell`, `bond` or `daze`. Keepers meant for a pincer stand still (`speed=0`: a walker with left = right = 0 still sways about 30 px); bait about 30 px in front, the striker's way in about 40 px behind [G5] |
 | **Brace corridor** | a `heavy` (Bull Rex) in a 4-row-high hall between walls |
 | **Chomper two seats** | a mounted stretch where only the gunner can clear the way (Leeches, a Snatcher) over ground a hero on foot cannot cross (spikes with no run-up) |
-| **Lee gap** | gust gaps of up to 3 tiles whose gusts never pause, strong enough that a lone hero falls short; a crouching spot within 64 px downwind of each far edge (P-C.6 lee) [G23]; the search decides - and only if its search world runs the level's wind; else build the fallback, a Brace corridor [G41] |
+| **Lee gap** | gust gaps of up to 3 tiles whose gusts never pause, strong enough that a lone hero falls short; a crouching spot within 64 px downwind of each far edge (P-C.6 lee) [G23]; the search decides - and only if its search world runs the level's wind (it does since phase 3: world-B's `SearchWind` plays `wind` / `wind_loop`); else build the fallback, a Brace corridor [G41] |
 
 #### 15.7.4 x2 tablets
 
@@ -791,7 +793,10 @@ and keepers).
 15.7.3); `secret` marks an x2 secret instead. `far` is a cell beyond the gate that the hero reaches only through it
 (the solo search's goal); the tablet lights once an active hero stood there. The validator pairs them: one tablet per gate name, every co-op mechanism (plate-driven or
 drum or keeper column, boulder, pulley, see-saw, boost ledge, gap) inside some tablet's gate, names unique, `far` an
-air cell above a floor.
+air cell above a floor. A boss's own objects are no gate mechanism [G49]: the plates inside the `zones/arena` of a
+`bosses/colossus` record that drive no column are the visor Colossus's chains (DESIGN.md B.7) - no tablet, no "drives
+no column" warning, and fewer than two of them in a co-op file is an error; the boss's co-op form is that stage's
+gate (D.8 #1).
 
 #### 15.7.5 Traits and keeper halls
 
@@ -906,6 +911,9 @@ team wipe does not. What it means for a level:
 - **Teach it once**: the egg and tablet signs at the first checkpoint of 1-1 and 5-1 co-op may add "Asleep? Press
   any key!" (one idea per sign [G27]).
 - **The team exit** counts an idle hero on the view as present (an absent partner never blocks the end of a stage).
+- **No doorstops** [G53]: an idle body blocks no door, slab, column or boulder - they move and push him aside. A
+  hold-plate door with floor beside its slab is therefore safe; until objects-A has built it, the search may still
+  find a doorstop route (world-B's 'hatches' finding) - that is the engine's gap, not the gate's.
 
 ### 15.8 Arenas
 
@@ -920,8 +928,10 @@ team wipe does not. What it means for a level:
   checkpoint, no co-op objects except see-saws and pulleys, no traits.
 - **Wrap**: `wrap = lr` joins the left and right edges (the floor must continue across the seam); `wrap = tb` joins top
   and bottom (no pits: the bottom row is the seam). Sky Picnic has no deadly cell at all.
-- **Bots**: bake `resources/bots/arena_<name>.json` with `tools/bots/bake_nav.gd`; an arena ships in a mode only when
-  its bot test is green (else human-only).
+- **Bots**: bake `resources/bots/arena_<name>.json` with `tools/bots/bake_nav.gd`; an arena ships in a mode with bots
+  only when its bot test is green; else that mode leaves `bots` (15.2) and the arena is human-only there (PLAN cut 4
+  [G50]: the test skips it, the setup offers no CPU seat, G3 lists it as human-only). Until that switch is built, an
+  arena whose bot set is not green stays out of `levels/`.
 - **Validator** (`kind = arena`): the size, row 0, spawn count, cookpots, goals for `clubball`, no exit or
   checkpoint, `modes` and `sudden` known, tier and gap rules (warnings; a run that ends at a wall face is no gap).
 - **What the Totem Ring taught** (DA at G1, DESIGN.md E.5 [G14]): every strike ends in a hop or a pogo, so keep spot
@@ -945,6 +955,11 @@ team wipe does not. What it means for a level:
   (15.2); every enemy record of an arena is a **neutral springboard** (never hurts, never dies, bounces heroes - Echo
   Hollow's dangler); in every mode but Clubball each `zones/goal` mouth is **surf**, a ring-out (Coconut Cove); one
   `bosses/colossus` record is the neutral statue of Colossus Hall (the validator accepts exactly one).
+- **Movers and bots** (DA, phase 3 [G51]): the bots' links of a see-saw or a pulley lift are baked for its level-start
+  state only, so a bot left on a flipped plank or a moved lift stands there; and a see-saw end over a liquid cell kills
+  its rider (and tips a lander into it within 2 ticks - no telegraph). Keep both ends of an arena see-saw over
+  standable ground; until the baker covers every state, build Floe Rink with fixed floes and Tar Pulleys only if its
+  set is green.
 - **Order** [G37]: Floe Rink, Tar Pulleys, Sky Picnic and Colossus Hall first; Mesa Rodeo and Cloud Top only once those
   four are done and their bot tests green. Colossus Hall plays Grub Stack and Last Caveman Standing only (the neutral
   statue spits at the crowned leader / the hero with the most hearts).

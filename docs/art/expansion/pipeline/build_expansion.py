@@ -8,7 +8,8 @@ raft, rex pen, paintings), the versus art (cookpot, spawn pads, crown, stack pic
 skins (see-saw skins, Chomper's saddle); phase 2: the Far Shore map page, the painting slab / mural / pictures and
 unlock icons (build_far_shore.py), the versus screen and HUD art (build_versus_ui.py: portraits, heads, sundial, hit
 sparks, medals, scoreboard plate, results cave wall and painted heroes), the Feast Land D / E skins
-(build_feast_skins.py), the world 6-9 object skins (build_world_objects.py); then the art-B hand-over rows and staged
+(build_feast_skins.py), the world 6-9 object skins (build_world_objects.py), phase 3's custard floor and raft rails
+(build_phase3_objects.py); then the art-B hand-over rows and staged
 files, the audio hand-over rows, the provenance / licence checks, the licence files of the 2.0 packs, the 2.0 section
 of docs/ASSET_MANIFEST.md, and the proof sheets in docs/art/expansion/. A PNG is written only when its bytes change
 (no needless Godot re-imports).
@@ -109,7 +110,9 @@ GAPS = [
     "`hero_palette.gd` (player-A) reads it at runtime, check that the export carries it (an `include_filter` entry "
     "by core-A); otherwise keep the few values it needs as constants. The LUT / atlas PNGs are ordinary textures.",
     "Arena thumbnails (`ui/arena/thumb_<arena id>.png`, 120 x 66) are not drawn: the arenas are DA's level files "
-    "(only the Totem Ring exists yet) and ui-A's arena select draws a mini map of each file in its biome's colours.",
+    "(still changing in phase 3) and ui-A's arena select draws a mini map of each file in its biome's colours.",
+    "The arena side frames (`ui/arena/frame_<biome>.png`, ten with phase 3's canyon and sky) exist for screens wider "
+    "than 20 cells (DESIGN E.5), but no script draws them yet (asked of world-B, wf9_art_to_world-B.txt).",
     "The versus corner panels are one arena row (32 px) tall: the 2x Ninja Adventure portrait (E.9) does not fit, so "
     "they get `ui/portrait_heads.png` (28 px heads painted from the 1.0 HUD head's silhouette); the Ninja portrait "
     "(`ui/portraits.png`) is for the lobby, the results and the join panel.",
@@ -122,6 +125,10 @@ GAPS = [
     "`ui/mural.png` given in 17.13.",
     "Chomper's saddle: `sprites/objects/rex_saddle.png` is an overlay on the shipped rex sheets (same grid); the "
     "riders themselves are the hero sheets drawn by code.",
+    "Phase 3: the railed raft's fence (`sprites/objects/raft_rails.png`) is an overlay that objects-B's raft.gd must "
+    "draw over raft.png (closed / open towards the bank that stopped it, G45); until it does, a railed raft looks "
+    "like a plain one. Feast Land E's custard ':' floor is `tiles/feast/syrup_floor.png` (world-A's biome-first "
+    "lookup); every other feast + syrup level - the Sky Picnic arena - draws it too.",
 ]
 
 
@@ -542,10 +549,12 @@ def main(previews=True):
     import build_versus_ui
     import build_feast_skins
     import build_world_objects
+    import build_phase3_objects
     build_far_shore.build()
     build_versus_ui.build()
     build_feast_skins.build()
     build_world_objects.build()
+    build_phase3_objects.build()
     for k, e in REGISTRY.items():
         e.setdefault("owner", "art-A")
         if "/palettes/" in k:
@@ -601,6 +610,8 @@ def main(previews=True):
         build_previews.build()
         build_previews_b2.build()
         build_previews_p2.build()
+        import build_previews_p3
+        build_previews_p3.build()
     missing = check_credits(uses) + check_audio_credits(audio_packs, audio_uses)
     loose = unregistered_new_files()
     n_a = sum(1 for k, e in REGISTRY.items() if k.startswith("assets/") and e.get("owner") == "art-A")

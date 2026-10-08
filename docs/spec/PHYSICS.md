@@ -1481,9 +1481,10 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
   tick, and it settles on the first `~` surface (floating again) or floor cell (beached: `rx = 0`, currents ignored)
   below it.
 - `rails` (The Long Raft Home): a hero whose last floor contact was this raft (and none since) has his x commit
-  clamped to `raft.x - 8 * width + 8 .. raft.x + 8 * width - 8`, airborne too: nobody leaves the raft - until the raft
-  is stopped by a bank (its leading edge against a floor cell of its surface row, step 3): then the fence opens on that
-  side over the bank's floor, so a rider walks off onto the beach, where his floor contact unrails him (phase 3, D9b's
+  clamped to `raft.x - 8 * width + 8 .. raft.x + 8 * width - 8`, airborne too (clamped, never refused: a hero the ride
+  test catches while his feet are still outside the fence is pulled to its edge by his next x step - D9b), so nobody
+  leaves the raft - until the raft is stopped by a bank (its leading edge against a floor cell of its surface row,
+  step 3): then the fence opens on that side over the bank's floor, so a rider walks off onto the beach, where his floor contact unrails him (phase 3, D9b's
   `ending_b` [G45]). The ride test must carry a railed rider over the whole fenced width (no strip at the bow where the
   halved-width overlap of 11.4 drops him into the liquid).
 - `dir = u|d` currents move only floating dropped items. Dropped items whose feet are in a current's `~` cell float
@@ -1502,11 +1503,16 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
   row; the camera's top y (px) is then `min(candidate, band_top + 16 - 176, previous)`: the view never moves down,
   rises at least with the band (whose top row is then the view's bottom row), and rises faster when a hero climbs
   ahead (the band may then be below the view). Horizontal follow is unchanged.
-- **Footing follow** [G42] (asked of world-A at the start of phase 3): while the band rises, the candidate row of the
-  vertical follow is computed from the hero's **footing** - his feet y on the last tick he had ground, a platform, a
-  carrier or a vine (CLIMB) under his feet - not from his current y (co-op: the anchor's footing, C.13), so a jump's
-  apex never raises the view and a jump in place lands in view. Until it is built the view follows the current y and
-  every jump of a rising climb must land higher (DESIGN.md G32; LEVEL_DESIGN 15.5).
+- **Footing follow** [G42] (built in phase 3 by world-A: `LevelCamera.footing_mode`, set by the level on every tick
+  the band pulls the view): while the band rises, the candidate row of the vertical follow is computed from the hero's
+  **footing** - his feet y on the last tick he had ground, a platform, a carrier or a vine (CLIMB) under his feet -
+  and he is followed as a standing hero (the ground thresholds of 12.2, `yvel` read as 0), not from his current y
+  (co-op: each hero's footing feeds the tribe camera, C.13). A jump's apex never raises the view and a jump in place
+  lands in view; landing on a higher footing raises it by the ground rule of 12.2 (a footing on view row 3 or higher
+  is brought to row 8). Before a hero's first footing after a snap his current y is used. After an
+  `autoscroll_stop` the normal follow returns. G32's building rule ("every jump of a rising climb lands higher") is
+  retired; the view still never sinks, so a climb never asks a hero to step down more than 2 rows under the highest
+  footing he reached (the follow puts a climbing hero on view row 8 of 11 and never brings the view down).
 - `zones/autoscroll_stop`: the first hero to enter it stops the rise for the rest of the stage (the band stays and
   stays deadly) and the camera returns to the normal follow.
 - 16 v16 is 1 px/tick; a hero climbs a vine at 2 px/tick and walks at 5.
@@ -1589,7 +1595,10 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
   anything since his hatch still carries a Totem Ride). Every co-op rule counts only active heroes: head contacts (above), the Totem carry (a ride ends on the tick K or R stops being
   active), the Brace Wall, the lee (C.6), plate and pulley weight, see-saw launches, x2 tablet lights, count-ins, the
   trait rules that ask for "the nearer hero" and every boss position rule (GAMEPLAY 13.6, 13.9). An idle hero is still
-  a body: he stands, is launched (geysers, see-saw ends), rides platforms, is hurt, goes down and is leashed. Together
+  a body: he stands, is launched (geysers, see-saw ends), rides platforms, is hurt, goes down and is leashed - but he
+  **blocks no mover** [G53]: a plate door, column, slab or heave boulder that would wait for a hero in its way does not
+  wait for an idle one; it moves as if he were not there, and on the tick it fills cells his body overlaps he is pushed
+  out of them, unharmed, sideways to the nearer free side (up onto the block's top when neither side is free). Together
   with the hatch bounce of C.12 (b) this is the rule **an egg is no springboard**: one player can never use his
   partner's egg or idle body as a step, a weight or a bait.
 - **Shoulder Hop**: `A.bounce(-224, depth)` - exactly the enemy bounce of section 9 (`yvel = -224`,

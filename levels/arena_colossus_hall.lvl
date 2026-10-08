@@ -22,8 +22,8 @@
 #   the most hearts (Last Caveman Standing; a tie: no spit): jaws open 10 ticks ahead, then a rock flies straight at
 #   where he stands - an arena hit (a spill / a heart).
 # - Modes: Grub Stack (default) and Last Caveman Standing (DESIGN.md G43: the spit targets the crowned leader / the hero
-#   with the most hearts); each needs a green bot set in core-B's
-#   tests/test_versus_bots.gd.
+#   with the most hearts; no Hot Rock, no Clubball); each has a green bot set in core-B's tests/test_versus_bots.gd
+#   (12 seeds x 4 rounds, four Hunters; DA's phase-3 runs: Grub Stack 4 points worst, LCS 10).
 # - Bot graph: resources/bots/arena_colossus_hall.json, baked with core-B's tool after every edit of this file:
 #   bash .tools/gd.sh script res://tools/bots/bake_nav.gd -- arena_colossus_hall
 

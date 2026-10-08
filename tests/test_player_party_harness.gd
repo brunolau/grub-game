@@ -45,6 +45,7 @@ class DuoDriver:
 				if not hero.dead and not hero.is_down():
 					hero.clear_fence()
 					hero.fence_x(walls.x, walls.y)
+					hero._fence_clamp = false  # the edge walls refuse a step out (C.13), as the PartyDriver writes them
 			return
 		contacts.clear()
 		if Game.mode != Defs.GameMode.COOP:

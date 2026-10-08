@@ -788,6 +788,7 @@ func test_search_windows_report_the_records_caps() -> void:
 	]))
 	var data: LevelData = _search_level("caps_coop", 6, entities)
 	CoopSearch.measure_daze_solo_min("enemies/raptor")
+	CoopSearch.daze_slot_bound()   # the engine probe builds a world of its own: before the bare searcher (no nesting)
 	var bare: CoopSearch.Searcher = CoopSearch.Searcher.new()
 	assert_true(bare.build(data.id, data.resolved_meta(Defs.Difficulty.BEGINNER), CoopSearch.grid_at_rest(data,
 			Defs.Difficulty.BEGINNER)))
@@ -799,6 +800,10 @@ func test_search_windows_report_the_records_caps() -> void:
 	assert_eq(by_what.get("bond pair", -1), 9, "a bond: the smallest window= of its members (%s)" % str(windows))
 	assert_eq(by_what.get("bond wide", -1), PartyTuning.window_ticks(Defs.Difficulty.BEGINNER), "no cap: the difficulty's")
 	assert_eq(by_what.get("daze enemies/raptor", -1), 5, "a daze record: its own window=")
+	for window: Dictionary in windows:
+		# G47: the daze record is slot-bound exactly when the engine binds the daze to the other slot; bonds never are.
+		var daze: bool = str(window["what"]).begins_with("daze ")
+		assert_eq(bool(window.get("slot_bound", false)), daze and CoopSearch.daze_slot_bound(), str(window))
 	var validator: LevelValidator = _validator({"solo_bonus": _solo("solo_bonus", "bonus"), "capped_coop":
 			_coop_text("capped_coop", "enemies/walker 3 13 coop=bond bond=b window=x
 enemies/walker 9 13 coop=bond bond=b window=12",
@@ -857,14 +862,15 @@ func test_search_partner_is_idle_and_parked_anywhere_counts_for_nothing() -> voi
 	var partner_counts: bool = searcher.partner.counts_for_coop()
 	var hero_idle: bool = searcher.hero.is_idle()
 	var partner_at: Vector2i = searcher.partner.sim_pos
-	var pressed: bool = bool(plate.get(&"pressed")) if plate != null else true
-	searcher.close()
+	var plate_found: bool = plate != null
+	var pressed: bool = bool(plate.get(&"pressed")) if plate_found else true
+	searcher.close()   # (frees the world: the plate reads null from here on)
 	assert_false(outcome.is_empty(), "the hero stood still")
 	assert_true(partner_idle, "the search world's partner is IDLE (PlayerBase.is_idle)")
 	assert_false(partner_counts, "he counts for no co-op rule")
 	assert_false(hero_idle, "the lone hero is active")
 	assert_eq(partner_at, on_plate, "parked where the lone player hatched him")
-	assert_not_null(plate, "the plate is in the search world: %s" % ", ".join(spawned))
+	assert_true(plate_found, "the plate is in the search world: %s" % ", ".join(spawned))
 	assert_false(pressed, "an idle partner weighs nothing on a plate (G33)")
 	# The whole search: the held plate door 12 tiles from its plate stays shut for one player even with his partner
 	# parked anywhere near it (the search parks him and finds nothing).
@@ -1034,3 +1040,145 @@ func test_arena_gap_rule_counts_platforms_and_planks() -> void:
 	bare_rows[6] = "##?..............?##"
 	var bare: LevelValidator = _validator({"arena_bare": _arena_text("arena_bare", "modes = grub_stack", bare_rows)})
 	assert_true(bare.has_problem("a clear gap of 14 cells in row 6", LevelValidator.WARNING), _messages(bare))
+
+
+func test_search_engine_probes_daze_and_ride() -> void:
+	# G47: the probe dazes a still `coop=daze` target with a real head bounce (the other slot's hit is accepted: the
+	# control) and reads whether the bouncer's own hit glances - slot-bound exactly then.
+	var probe: Dictionary = CoopSearch.probe_daze()
+	assert_true(bool(probe["dazed"]), "the probe's head bounce dazes the target: %s" % str(probe))
+	assert_true(bool(probe["other"]), "a hero of the other slot may hurt it while it is dazed: %s" % str(probe))
+	assert_eq(CoopSearch.daze_slot_bound(), not bool(probe["own"]), "slot-bound = the bouncer's own hit glances")
+	assert_null(Game.level, "the probe's world is gone again")
+	assert_eq(Game.mode, Defs.GameMode.SINGLE, "and the co-op game of two put back")
+	# G33: the ride probe agrees with a direct run, and the partner ride macros follow it (the probe first: it builds a
+	# world of its own).
+	var carries: bool = CoopSearch.idle_partner_carries()
+	var direct: CoopSearch.Searcher = _search_world(_search_level("ride_probe_direct_coop", 6, ""))
+	direct.run(_config(Vector2i(10 * Tuning.TILE + 8, 224), CoopSearch.PARTNER_IDLE),
+			CoopSearch._repeat(Defs.IN_UP, 9) + CoopSearch._repeat(0, 16), {})
+	var rides: bool = direct.hero.is_riding_totem()
+	var ride_macro: Dictionary = {}
+	for macro: Dictionary in direct.macros:
+		if str(macro["kind"]) == "partner":
+			ride_macro = macro
+	var fits: bool = direct._macro_fits(ride_macro, {"pos": Vector2i(10 * Tuning.TILE + 8, 224),
+		"prefix": PackedInt32Array()})
+	direct.close()
+	assert_eq(carries, rides, "the probe = the engine (a ride on an idle head: %s)" % rides)
+	assert_false(ride_macro.is_empty(), "the ride macros are still made (the regression check)")
+	assert_eq(fits, rides, "and run exactly while a ride on an idle head is possible")
+
+
+func test_search_strikes_and_throws_face_their_targets() -> void:
+	var searcher: CoopSearch.Searcher = _search_world(_search_level("facing_coop", 6, "enemies/walker 20 13"))
+	var walker: Vector2i = searcher._targets[0]
+	var left_of: Vector2i = walker - Vector2i(5 * Tuning.TILE, 0)
+	var on_it: Vector2i = walker + Vector2i(Tuning.TILE, 0)
+	var strike_r: bool = searcher.target_near(left_of, CoopSearch.STRIKE_REACH_CELLS, 1)
+	var strike_l: bool = searcher.target_near(left_of, CoopSearch.STRIKE_REACH_CELLS, -1)
+	var close_l: bool = searcher.target_near(on_it, CoopSearch.STRIKE_REACH_CELLS, 1)
+	var either: bool = searcher.target_near(left_of, CoopSearch.STRIKE_REACH_CELLS)
+	searcher.close()
+	assert_true(strike_r, "a target 5 cells ahead: the strikes facing it run")
+	assert_false(strike_l, "facing away from it they do not")
+	assert_true(close_l, "a target within BEHIND_REACH_PX behind him still counts (it may come round him)")
+	assert_true(either, "without a facing: either side")
+
+
+func test_search_queue_claims_and_cost_order() -> void:
+	var queue: String = "res://build/coop_gates/test_queue_%d" % OS.get_process_id()
+	assert_true(CoopSearch.claim_gate(queue, &"probe_coop", 0, "a"), "the first claim of a gate wins")
+	assert_false(CoopSearch.claim_gate(queue, &"probe_coop", 0, "a"), "a second claim of the same gate loses")
+	assert_true(CoopSearch.claim_gate(queue, &"probe_coop", 1, "a"), "the other difficulty is another gate")
+	for name: String in ["probe_coop__a__0", "probe_coop__a__1"]:
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(queue.path_join(name)))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(queue))
+	var level: StringName = StringName("cost_probe_%d_coop" % OS.get_process_id())
+	CoopSearch.record_cost(level, 0, "cheap", 12.5, 1000)
+	CoopSearch.record_cost(level, 0, "dear", 250.0, 90000)
+	var table: Array = [{"level": level, "difficulty": 0, "gate": "cheap"}, {"level": level, "difficulty": 0,
+		"gate": "new"}, {"level": level, "difficulty": 0, "gate": "dear"}]
+	var order: Array = CoopSearch.order_by_cost(table)
+	var cheap_cost: float = CoopSearch.gate_cost(level, 0, "cheap")
+	var unknown_cost: float = CoopSearch.gate_cost(level, 0, "new")
+	for gate: String in ["cheap", "dear"]:
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(CoopSearch.COST_DIR.path_join("%s__%s__0.txt" % [
+			level, gate])))
+	assert_eq(cheap_cost, 12.5)
+	assert_eq(unknown_cost, -1.0, "never searched")
+	assert_eq(order.map(func(entry: Dictionary) -> String: return str(entry["gate"])), ["dear", "new", "cheap"],
+			"dearest first, a gate never searched counts UNKNOWN_COST_SECONDS")
+
+
+func test_search_cache_fingerprint_leaves_out_presentation_but_not_for_bosses() -> void:
+	var narrow: String = CoopSearch.code_fingerprint()
+	var full: String = CoopSearch.code_fingerprint(true)
+	assert_eq(full.length(), 32)
+	assert_ne(narrow, full, "the screens, the referee, the bots and the dev tools are left out")
+	var files: PackedStringArray = PackedStringArray()
+	CoopSearch._collect_files("res://scripts", files, false)
+	var skipped: PackedStringArray = PackedStringArray()
+	for file: String in files:
+		for folder: String in ["res://scripts/ui/", "res://scripts/world/versus/", "res://scripts/core/bots/"]:
+			if file.begins_with(folder):
+				skipped.append(file)
+	assert_eq(skipped.size(), 0, "no file of a skipped folder in the narrow fingerprint: %s" % ", ".join(skipped))
+	assert_true(files.has("res://scripts/world/coop_search.gd") and files.has("res://scripts/player/player.gd"),
+			"the simulation is in it")
+	var plain: LevelData = _search_level("fp_plain_coop", 6, "objects/x2_tablet 10 13 gate=g far=16,5")
+	var boss: LevelData = _search_level("fp_boss_coop", 6, "objects/x2_tablet 10 13 gate=g far=16,5
+bosses/brute 20 13")
+	var path: String = "res://levels/w5_l1_coop.lvl"
+	var key_plain: String = CoopSearch.file_cache_key(path, plain, 0, "g")
+	var key_boss: String = CoopSearch.file_cache_key(path, boss, 0, "g")
+	assert_ne(key_plain, key_boss, "a level with a boss keys on the full fingerprint")
+
+
+func test_visor_colossus_chain_plates_are_no_gate_mechanism() -> void:
+	# G49 (DB3's w4_l2b_coop): the plates in the Colossus's room that drive no column are its chains - no gate needed,
+	# no "drives no column"; fewer than two is an error.
+	var hall: String = "\n".join(PackedStringArray([
+		"zones/arena 30 13 name=hall rect=20,2,20,12",
+		"bosses/colossus 39 13 arena=hall",
+		"objects/plate 22 13 name=chain_west",
+		"objects/plate 34 13 name=chain_east",
+	]))
+	var two: LevelValidator = _validator({"solo_main": _solo("solo_main"), "visor_coop": _coop_text("visor_coop", hall)})
+	assert_false(two.has_problem("drives no column", LevelValidator.WARNING), _messages(two))
+	assert_false(two.has_problem("is a co-op mechanism but the file has no objects/x2_tablet"), _messages(two))
+	assert_false(two.has_problem("the visor Colossus needs two chain plates"), _messages(two))
+	var one: LevelValidator = _validator({"solo_main": _solo("solo_main"), "visor1_coop": _coop_text("visor1_coop",
+			hall.replace("objects/plate 34 13 name=chain_east", ""))})
+	assert_true(one.has_problem("the visor Colossus needs two chain plates in its arena"), _messages(one))
+	# A plate outside the room still is a gate mechanism (and drives nothing).
+	var outside: LevelValidator = _validator({"solo_main": _solo("solo_main"), "visor2_coop": _coop_text(
+			"visor2_coop", hall + "\nobjects/plate 4 13 name=loose")})
+	assert_true(outside.has_problem("plate 'loose' drives no column", LevelValidator.WARNING), _messages(outside))
+	assert_true(outside.has_problem("is a co-op mechanism but the file has no objects/x2_tablet"), _messages(outside))
+
+
+func test_arena_bots_key_is_a_subset_of_the_modes() -> void:
+	# G50: `bots` lists the modes the arena's bots play (a subset of `modes`) or `none`.
+	for meta: String in ["modes = grub_stack,hot_rock\nbots = hot_rock", "modes = grub_stack\nbots = none"]:
+		var good: LevelValidator = _validator({"arena_bots": _arena_text("arena_bots", meta)})
+		assert_false(good.has_problem("bots"), "%s\n%s" % [meta, _messages(good)])
+	var bad: LevelValidator = _validator({"arena_badbots": _arena_text("arena_badbots",
+			"modes = grub_stack\nbots = grub_stack,clubball")})
+	assert_true(bad.has_problem("bots: 'clubball' is not one of the arena's modes"), _messages(bad))
+	var elsewhere: LevelValidator = _validator({"bots_level": _level("bots_level", "bots = none")})
+	assert_true(elsewhere.has_problem("unknown meta key 'bots'", LevelValidator.WARNING), _messages(elsewhere))
+
+
+func test_arena_gap_rule_ignores_planks_and_bumps_on_a_floor() -> void:
+	# DA's wf9 #3a: two see-saws at the ends of a continuous floor make no gap in the row above it.
+	var rows: PackedStringArray = ARENA_ROWS.duplicate()
+	rows[7] = "...................."
+	var planks: LevelValidator = _validator({"arena_floes": _arena_text("arena_floes", "modes = grub_stack", rows,
+			ARENA_LEGEND, "objects/seesaw 1.5 9 len=3\nobjects/seesaw 17.5 9 len=3")})
+	assert_false(planks.has_problem("a clear gap of", LevelValidator.WARNING), _messages(planks))
+	# Two bumps on the floor: a row walked across a row lower is no gap either.
+	var bumps: PackedStringArray = rows.duplicate()
+	bumps[9] = "#@..C....P....Q.D.B#"
+	var bumped: LevelValidator = _validator({"arena_bumps": _arena_text("arena_bumps", "modes = grub_stack", bumps)})
+	assert_false(bumped.has_problem("gap of 17 cells in row 9", LevelValidator.WARNING), _messages(bumped))

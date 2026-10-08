@@ -361,3 +361,33 @@ func test_the_weak_point_check_covers_the_2_0_content() -> void:
 	assert_ne(str(hud.call("weak_point_problem", under_band, view)), "", "a weak rect under the band is a problem")
 	assert_ne(str(hud.call("weak_point_problem", cut_off, view)), "", "a weak rect cut off by the view is a problem")
 	assert_eq(str(hud.call("weak_point_problem", clear, view)), "", "a weak rect low in the view is clear")
+
+
+## G35 speaks of the LOCKED view: once a boss room's camera lock holds and the view has glided into it, only those
+## ticks count (RouteTestCase.weak_point_verdict); the walk in and the glide are not the fight's framing. A view is
+## settled when it lies inside the lock on each axis, or - on an axis where the lock is the smaller - around it.
+func test_the_weak_point_check_reads_the_settled_locked_view() -> void:
+	var view_size: Vector2i = Vector2i(320, 180)
+	# A lock taller than the view (Idol Court: 20 x 12 cells): any view inside it is settled, one gliding in is not.
+	var tall: Rect2i = Rect2i(464, 80, 320, 192)
+	assert_true(view_settled_in_lock(Rect2i(Vector2i(464, 92), view_size), tall), "bottom of a taller lock")
+	assert_true(view_settled_in_lock(Rect2i(Vector2i(464, 80), view_size), tall), "top of a taller lock")
+	assert_false(view_settled_in_lock(Rect2i(Vector2i(192, 0), view_size), tall), "still on the approach")
+	assert_false(view_settled_in_lock(Rect2i(Vector2i(448, 92), view_size), tall), "one tile short (gliding in)")
+	# A lock smaller than the view (an 11-row room in a 180-px view): the view settles around it.
+	var short: Rect2i = Rect2i(320, 224, 320, 176)
+	assert_true(view_settled_in_lock(Rect2i(Vector2i(320, 222), view_size), short), "around a shorter lock")
+	assert_false(view_settled_in_lock(Rect2i(Vector2i(320, 236), view_size), short), "cuts the shorter lock's top")
+	# The verdict: a settled locked view's problem when the fight had one, else the unlocked view's (a boss without a
+	# camera lock is checked on every tick).
+	_weak_problem = ""
+	_weak_problem_free = "an unlocked problem"
+	_weak_locked_ticks = 0
+	assert_eq(weak_point_verdict(), "an unlocked problem", "no locked tick: every tick counts")
+	_weak_locked_ticks = 12
+	assert_eq(weak_point_verdict(), "", "a fight framed by its lock: the walk in does not count")
+	_weak_problem = "a locked problem"
+	assert_eq(weak_point_verdict(), "a locked problem")
+	_weak_problem = ""
+	_weak_problem_free = ""
+	_weak_locked_ticks = 0

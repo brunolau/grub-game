@@ -10,6 +10,8 @@ extends ProjectileBase
 ##  3. When that first floor is the Roc's stick nest (`nest_x0` <= x < `nest_x1`, surface `nest_top`), the struck
 ##     sticks burn BURN_TICKS: a 16 x 8 fire on the nest top that hurts like the bolt. Otherwise it is gone.
 ## The tests use plain rectangles (a bolt is a tall thin column; the body test's coarse reject would miss a glider).
+## The struck floor shelters a hero beneath it (his feet below its surface): standing on the floor under the nest he is
+## neither struck nor burnt by a bolt on the nest over his head.
 ##
 ## Parameters (set by the Roc): `mark` ticks [22], `bottom` y of the room's bottom (px), `nest_x0`, `nest_x1`,
 ## `nest_top` (px).
@@ -101,6 +103,10 @@ func _test_hero() -> void:
 		return
 	for hero: PlayerBase in level.contact_order():
 		if hero.dead or hero.is_down():
+			continue
+		# The struck floor shelters whoever stands beneath it: a hero on the floor under the nest (his head pokes 3 px
+		# into the one-way nest row) is neither struck nor burnt by a bolt that hits the nest over him.
+		if hero.sim_pos.y > strike_y:
 			continue
 		if Overlap.rects(harm, hero.get_box()) and hero.hurt(self, hurt_kind):
 			_on_hit_hero()

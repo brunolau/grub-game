@@ -34,3 +34,16 @@ msgstr "A dark cloud marks where lightning strikes."
 # --- w9_l2 The Roc's Spire ---
 msgid "SIGN_W9_GUST"
 msgstr "Crouch to stand firm in the wind."
+
+# --- co-op files (w9_l1_coop, w9_l1b_coop, w9_l2_coop) ---
+msgid "SIGN_W9_COOP_SEESAW"
+msgstr "One waits on the low end. One drops on the high end!"
+
+msgid "SIGN_W9_COOP_PULLEY"
+msgstr "One stands on a lift. The other hops on his!"
+
+msgid "SIGN_W9_COOP_STORM"
+msgstr "Two storm birds keep the wall. Strike both at once!"
+
+msgid "SIGN_W9_COOP_BRACE"
+msgstr "Crouch side by side: the charging rex stops dead."

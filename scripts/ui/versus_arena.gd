@@ -10,6 +10,10 @@ extends UiScreen
 ## (UnlockTable.reward_of_arena) shows a lock and the paintings its reward needs until it is open; it cannot be
 ## chosen (the info line says how many are still missing, VersusMatch.arena_paintings_needed).
 ##
+## G50 (PLAN.md cut 4's switch): an arena's meta `bots` (a list of modes, or `none`; default every mode it has) names the
+## modes CPUs play it in. While a CPU seat is filled, an arena whose `bots` leaves out the match's mode shows greyed with
+## "Humans only" and cannot be chosen ([method bots_play]); with every seat human it is offered as any other.
+##
 ## The focused card is the match's arena (Game.versus_match.arena); confirm starts the match (Flow.start_versus).
 ## Like the rules screen, only the owner (args {"owner": slot}, the player who pressed START) drives it. "Back" returns
 ## to the rules.
@@ -60,6 +64,8 @@ class ArenaCard:
 	var locked: bool = false
 	## Paintings the reward needs (locked cards).
 	var needs: int = 0
+	## G50: true while a CPU is seated and the arena's `bots` leaves out the match's mode (it cannot be chosen).
+	var humans_only: bool = false
 
 	var _thumb: Texture2D = null
 	var _small: Font = UiKit.font(UiKit.Style.SMALL)
@@ -67,10 +73,11 @@ class ArenaCard:
 	var _body: Font = UiKit.font(UiKit.Style.BODY)
 	var _time: float = 0.0
 
-	func _init(p_arena: StringName, p_locked: bool, p_needs: int) -> void:
+	func _init(p_arena: StringName, p_locked: bool, p_needs: int, p_humans_only: bool = false) -> void:
 		arena = p_arena
 		locked = p_locked
 		needs = p_needs
+		humans_only = p_humans_only
 		flat = true
 		focus_mode = Control.FOCUS_ALL
 		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
@@ -110,9 +117,12 @@ class ArenaCard:
 				_draw_party_mix(picture)
 			_:
 				if _thumb != null:
-					draw_texture_rect(_thumb, picture, false, Color(0.35, 0.35, 0.4) if locked else Color.WHITE)
+					draw_texture_rect(_thumb, picture, false, Color(0.35, 0.35, 0.4) if locked or humans_only
+							else Color.WHITE)
 				if locked:
 					_draw_lock(picture.get_center())
+				elif humans_only:
+					_draw_humans_only(picture)
 		var name: String = tr(VersusArenaScreen.card_title(arena))
 		var name_font: Font = _small
 		var name_size: int = UiKit.SIZE_SMALL
@@ -122,7 +132,7 @@ class ArenaCard:
 			name = name.left(name.length() - 2) + "."
 			width = name_font.get_string_size(name, HORIZONTAL_ALIGNMENT_LEFT, -1.0, name_size).x
 		var colour: Color = UiKit.COL_FOCUS if focused else UiKit.COL_CREAM
-		if locked:
+		if locked or humans_only:
 			colour = UiKit.COL_DIM
 		draw_string_outline(name_font, Vector2(roundf((size.x - width) * 0.5), baseline), name,
 				HORIZONTAL_ALIGNMENT_LEFT, -1.0, name_size, 4, UiKit.COL_INK)
@@ -158,6 +168,17 @@ class ArenaCard:
 			draw_rect(cell.grow(1.0), UiKit.COL_INK)
 			draw_rect(cell, Color("8fd8ff"))
 			draw_rect(Rect2(cell.position + Vector2(0.0, 18.0), Vector2(44.0, 6.0)), colours[(i + shift) % 4])
+
+	## G50: "Humans only" across the greyed picture, in the small face on an ink band.
+	func _draw_humans_only(picture: Rect2) -> void:
+		var text: String = tr("UI_VS_ARENA_HUMANS_ONLY")
+		var width: float = _small.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, UiKit.SIZE_SMALL).x
+		var band: Rect2 = Rect2(Vector2(picture.position.x, roundf(picture.get_center().y - 8.0)),
+				Vector2(picture.size.x, 16.0))
+		draw_rect(band, Color(UiKit.COL_INK, 0.75))
+		var at: Vector2 = Vector2(roundf(picture.get_center().x - width * 0.5), band.position.y + 12.0)
+		draw_string_outline(_small, at, text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, UiKit.SIZE_SMALL, 4, UiKit.COL_INK)
+		draw_string(_small, at, text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, UiKit.SIZE_SMALL, UiKit.COL_CREAM)
 
 	func _draw_lock(centre: Vector2) -> void:
 		var body: Rect2 = Rect2(centre - Vector2(10.0, 2.0), Vector2(20.0, 16.0))
@@ -210,8 +231,9 @@ func _build_screen() -> void:
 	grid.add_theme_constant_override(&"h_separation", 8)
 	grid.add_theme_constant_override(&"v_separation", 6)
 	centre.add_child(grid)
-	for entry: Array in choices(maxi(versus_match.player_count(), VersusTuning.PLAYERS_MIN), versus_match.mode):
-		var card: ArenaCard = ArenaCard.new(entry[0], bool(entry[1]), int(entry[2]))
+	for entry: Array in choices(maxi(versus_match.player_count(), VersusTuning.PLAYERS_MIN), versus_match.mode,
+			has_cpu(versus_match)):
+		var card: ArenaCard = ArenaCard.new(entry[0], bool(entry[1]), int(entry[2]), bool(entry[3]))
 		card.pressed.connect(choose.bind(card.arena))
 		card.focus_entered.connect(_on_card_focused.bind(card))
 		grid.add_child(card)
@@ -239,7 +261,7 @@ func _screen_ready() -> void:
 	Flow.play_mode = Defs.GameMode.VERSUS
 	var at: int = 0
 	for i: int in _cards.size():
-		if _cards[i].arena == Game.versus_match.arena and not _cards[i].locked:
+		if _cards[i].arena == Game.versus_match.arena and not _cards[i].locked and not _cards[i].humans_only:
 			at = i
 	UiKit.focus_silently(_cards[at])
 	_on_card_focused(_cards[at])
@@ -255,22 +277,60 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 
 
-## The cards for a match of `players` in `mode` (Defs.VersusMode): [id, locked, paintings its reward needs] -
-## Random, the open arenas (VersusMatch.available_arenas), the closed ones that fit (UnlockTable.is_arena_open), the
-## developer arenas in debug builds, Party Mix.
-static func choices(players: int, mode: int) -> Array[Array]:
-	var result: Array[Array] = [[VersusMatch.ARENA_RANDOM, false, 0]]
+## The cards for a match of `players` in `mode` (Defs.VersusMode): [id, locked, paintings its reward needs, humans
+## only] - Random, the open arenas (VersusMatch.available_arenas), the closed ones that fit (UnlockTable.is_arena_open),
+## the developer arenas in debug builds, Party Mix. With `with_cpu` (a CPU seat is filled) an open arena whose `bots`
+## leaves out `mode` is "humans only" (G50, [method bots_play]).
+static func choices(players: int, mode: int, with_cpu: bool = false) -> Array[Array]:
+	var result: Array[Array] = [[VersusMatch.ARENA_RANDOM, false, 0, false]]
 	var mode_name: StringName = Defs.versus_mode_name(mode)
 	var open: Array[StringName] = VersusMatch.available_arenas(players, mode)
 	for id: StringName in Levels.get_arenas(players, mode_name):
+		var humans_only: bool = with_cpu and not bots_play(id, mode)
 		if open.has(id):
-			result.append([id, false, 0])
+			result.append([id, false, 0, humans_only])
 		elif not UnlockTable.is_arena_open(id):
-			result.append([id, true, UnlockTable.paintings_needed(UnlockTable.reward_of_arena(id))])
+			result.append([id, true, UnlockTable.paintings_needed(UnlockTable.reward_of_arena(id)), false])
 		elif OS.is_debug_build() and String(id).begins_with(VersusMatch.DEVELOPER_ARENA_PREFIX):
-			result.append([id, false, 0])
-	result.append([VersusMatch.ARENA_PARTY_MIX, false, 0])
+			result.append([id, false, 0, humans_only])
+	result.append([VersusMatch.ARENA_PARTY_MIX, false, 0, false])
 	return result
+
+
+## G50 (DESIGN.md appendix, PLAN.md cut 4's switch): the launch modes CPUs play `arena_id` in - its meta `bots`, a list
+## of mode names (`bots = grub_stack,last_caveman`) or `none`; without the key (or with an empty one) every mode the
+## arena has (VersusMatch.arena_modes).
+static func bot_modes(arena_id: StringName) -> Array[int]:
+	var modes: Array[int] = VersusMatch.arena_modes(arena_id)
+	var value: Variant = Levels.get_value(arena_id, "bots", null)
+	if value == null or str(value).strip_edges() == "":
+		return modes
+	var listed: PackedStringArray = PackedStringArray()
+	for part: String in LevelText.to_list(value):
+		listed.append(part.strip_edges())
+	var result: Array[int] = []
+	for mode: int in modes:
+		if listed.has(String(Defs.versus_mode_name(mode))):
+			result.append(mode)
+	return result
+
+
+## G50: true when CPUs may play `arena_id` in `mode` (Random and Party Mix: the round's pick decides).
+static func bots_play(arena_id: StringName, mode: int) -> bool:
+	if arena_id == VersusMatch.ARENA_RANDOM or arena_id == VersusMatch.ARENA_PARTY_MIX:
+		return true
+	return bot_modes(arena_id).has(mode)
+
+
+## True when a CPU seat of `versus_match` is filled.
+static func has_cpu(versus_match: VersusMatch) -> bool:
+	return versus_match != null and versus_match.player_count() > versus_match.human_count()
+
+
+## G50: "Humans only: no CPU plays Grub Stack here."
+static func humans_only_text(mode: int) -> String:
+	return TranslationServer.translate("UI_VS_ARENA_HUMANS_ONLY_INFO").format({"mode": TranslationServer.translate(
+			str(VersusLobbyScreen.MODE_KEYS.get(mode, [""])[0]))})
 
 
 ## The title of a card: Random, Party Mix or the arena's name.
@@ -428,6 +488,10 @@ func choose(arena_id: StringName) -> void:
 		Audio.play_sfx(Sfx.MENU_BACK)
 		_status.text = tr("UI_VS_ARENA_LOCKED_INFO").format({"count": VersusMatch.arena_paintings_needed(arena_id)})
 		return
+	if card != null and card.humans_only:
+		Audio.play_sfx(Sfx.MENU_BACK)
+		_status.text = humans_only_text(Game.versus_match.mode)
+		return
 	var versus_match: VersusMatch = Game.versus_match
 	versus_match.arena = arena_id
 	if not versus_match.can_start():
@@ -457,10 +521,10 @@ func _on_tap() -> void:
 	pass
 
 
-## The focused card becomes the match's arena (unless it is locked) and explains itself on the info line.
+## The focused card becomes the match's arena (unless it is locked or humans only) and explains itself on the info line.
 func _on_card_focused(card: ArenaCard) -> void:
 	_status.text = ""
-	if not card.locked:
+	if not card.locked and not card.humans_only:
 		Game.versus_match.arena = card.arena
 	match card.arena:
 		VersusMatch.ARENA_RANDOM:
@@ -470,6 +534,8 @@ func _on_card_focused(card: ArenaCard) -> void:
 		_:
 			if card.locked:
 				_info.text = tr("UI_VS_ARENA_LOCKED_INFO").format({"count": VersusMatch.arena_paintings_needed(card.arena)})
+			elif card.humans_only:
+				_info.text = humans_only_text(Game.versus_match.mode)
 			else:
 				_info.text = arena_info(card.arena)
 

@@ -36,3 +36,16 @@ msgstr "Press Down on an arch to go through."
 
 msgid "SIGN_W8_NICHE"
 msgstr "Crouch on the hatch to drop. Wait for its back!"
+
+# --- w8_l1_coop / w8_l2_coop: the co-op gates ---
+msgid "SIGN_W8_COOP_HALL"
+msgstr "Shells face the nearer hero. One baits, one drops in behind."
+
+msgid "SIGN_W8_COOP_STAIRS"
+msgstr "Heave the boulder onto a plate. Hold the other one!"
+
+msgid "SIGN_W8_COOP_ROOMS"
+msgstr "A plate holds a door in the other room. Take turns."
+
+msgid "SIGN_W8_COOP_SHAMAN"
+msgstr "Pin the Shaman between you. Then one baits, one strikes."

@@ -908,5 +908,11 @@ func _on_defeated(boss: BossBase) -> void:
 
 
 ## Recorded by test_the_club_pilot_still_wins_on_the_test_level with CHIEF_ROUTE=1 (Beginner, Expert).
-const ROUTE_BEGINNER: String = ""
-const ROUTE_EXPERT: String = ""
+const ROUTE_BEGINNER: String = (
+	"8:R,6:F,21:,6:F,5:,5:R,10:RU,8:,6:F,7:,1:L,1:R,3:L,32:,1:R,4:,6:F,1:,6:F,8:,10:R,6:F,9:,6:F,8:,6:F"
+)
+const ROUTE_EXPERT: String = (
+	"8:R,6:F,21:,6:F,5:,5:R,10:RU,8:,6:F,7:,1:L,1:R,3:L,32:,20:RU,47:,20:RU,10:,1:L,6:F,5:,2:R,1:L,1:R,20:," +
+	"10:LU,14:,7:L,10:,5:L,6:F,5:,3:R,1:L,11:,6:F,6:,6:L,10:LU,10:,20:RU,13:,14:R,6:F,22:,6:F,46:,15:L,6:F,5:," +
+	"10:LU,34:,7:R,10:RU,4:,3:R,10:,6:F,5:,2:R,1:,6:F,5:,3:L,6:F,13:,7:R,1:L,1:,4:F"
+)

@@ -312,6 +312,50 @@ func test_the_moon_sits_in_the_left_wall_of_the_test_court() -> void:
 				"the Moon is drawn where it stands")
 
 
+## The same rule on D8's real court (levels/w8_l2b.lvl, the arena zone `court`, its 2-row altar in the middle and a
+## ledge in front of each idol's jaws): each idol stands in its own wall - the Moon's body reaches the court's left wall,
+## the Sun's its right wall - on its own half, the bodies apart and neither on the altar, the halves meeting over the
+## altar. Structural, so D8 may move things; skipped while the file does not exist.
+func test_the_moon_sits_in_the_left_wall_of_the_real_court() -> void:
+	var path: String = "res://levels/w8_l2b.lvl"
+	if not FileAccess.file_exists(path):
+		assert_true(true, "w8_l2b.lvl not built yet")
+		return
+	if _level != null and is_instance_valid(_level):
+		_level.free()
+	_level = null
+	_hero = null
+	_lab = Lab.new()
+	assert_true(_lab.open(self, path, "bosses/idols", Defs.Difficulty.EXPERT), "the court came up")
+	var idols: Idols = _lab.boss as Idols
+	_lab.step(PackedInt32Array([0]))
+	var zone: SimEntity = _lab.level.find_named(idols.arena)
+	assert_not_null(zone, "the arena zone of the record")
+	if zone == null:
+		return
+	var court: Rect2i = LevelText.to_rect_px(zone.spawn_params["rect"])
+	var grid: TileGrid = _lab.level.grid
+	var feet: Vector2i = idols.get_idol_pos(Idols.SUN)
+	var row: int = Tuning.to_cell(feet.y - 1)
+	# The court's inner walls on the idols' feet row (the first open cell from either side of the zone).
+	var inner_left: int = court.position.x
+	while inner_left < court.end.x and grid.side_at(Tuning.to_cell(inner_left), row) == TileGrid.SIDE_WALL:
+		inner_left += Tuning.TILE
+	var inner_right: int = court.end.x
+	while inner_right > court.position.x and grid.side_at(Tuning.to_cell(inner_right - 1), row) == TileGrid.SIDE_WALL:
+		inner_right -= Tuning.TILE
+	var moon: Rect2i = idols.get_body_rect(Idols.MOON)
+	var sun: Rect2i = idols.get_body_rect(Idols.SUN)
+	assert_eq(idols.get_idol_pos(Idols.MOON).y, feet.y, "both on the same floor")
+	assert_true(moon.position.x <= inner_left, "the Moon's body reaches into the left wall (%s, wall at %d)" % [moon,
+			inner_left])
+	assert_true(sun.end.x >= inner_right, "the Sun's body reaches into the right wall (%s, wall at %d)" % [sun, inner_right])
+	assert_true(moon.end.x <= idols.get_mid_x() and sun.position.x >= idols.get_mid_x(), "each on its own half")
+	assert_false(moon.intersects(sun), "the bodies apart")
+	assert_true(absi(idols.get_mid_x() - ((inner_left + inner_right) >> 1)) <= Tuning.TILE, "the halves meet in the middle")
+	_close_lab()
+
+
 ## G35 (lead designer, wf9 #2 as corrected): every pose in which a head can be struck lies wholly in the locked view of
 ## the test court, clear of the fight HUD (Hud.weak_point_problem: 24 px under the band - 55 px under the view's top,
 ## 72 px in the boss bar's columns), on the real level's view; and in a view whose last row is the court's floor (the

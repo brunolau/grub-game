@@ -557,7 +557,12 @@ func _hero_update() -> void:
 			sim_pos.x = next_x
 		elif next_x >= _fence_left and next_x < _fence_right:  # fence_allows(next_x)
 			sim_pos.x = next_x
+		elif _fence_clamp and _fence_left < _fence_right:
+			# 2.0 raft rails (PHYSICS.md C.7): clamped into the fence, never refused - a rider caught while his feet
+			# are still outside it is pulled to its edge (wf9 D9b #3). The co-op edge walls refuse (C.13).
+			sim_pos.x = clampi(next_x, _fence_left, _fence_right - 1)
 	_fenced = false  # clear_fence(): a fence lasts for this tick's x step
+	_fence_clamp = false
 	sim_pos.y += yvel >> 4
 	# 8g: tile collision.
 	var low: bool = selected == Defs.HeroState.CRAWL or selected == Defs.HeroState.CROUCH
@@ -1061,11 +1066,13 @@ func _left_the_playfield(level: LevelBase, col: int, row: int) -> bool:
 	# 2.0 co-op: a hero above or below the tribe camera's frame while a partner of the tribe holds the view (a
 	# partner's jump scrolled it up, or he dropped below a partner who stands) is the leash's case (C.13: an egg after
 	# 121 / 73 ticks outside the view, the edge arrow counts down), not an instant down. The pit rule below still takes
-	# a hero who falls out of the map. (G1 integration; the D5 / DB1 / world-B reports.)
-	var out_rows: bool = absi(row - cell.y) > max_rows and not _partner_holds_view(level)
-	if out_rows or absi(col - cell.x) > max_cols:
-		kill(&"off_screen")
-		return true
+	# a hero who falls out of the map. (G1 integration; the D5 / DB1 / world-B reports.) The same for the columns
+	# (wf9 DB1): a hero CARRIED past the side of the frame (a ride platform, a current - his own steps stop at the
+	# edge walls) while a partner holds the view is leashed, not downed at once.
+	if absi(row - cell.y) > max_rows or absi(col - cell.x) > max_cols:
+		if not _partner_holds_view(level):
+			kill(&"off_screen")
+			return true
 	if (level.scroll_flags & Defs.SCROLL_AUTO_DOWN) != 0 and sim_pos.y < view.position.y:
 		kill(&"off_screen")
 		return true

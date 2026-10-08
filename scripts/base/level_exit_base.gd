@@ -88,13 +88,15 @@ func _driver_tick(level: LevelBase, driver: SimEntity) -> void:
 
 ## The co-op team exit without a PartyDriver (DESIGN.md D.1, GAMEPLAY.md 13.9.2): the stage ends when every hero is
 ## present - each hatched hero touching the totem, each egg anywhere on the view - and at least one hatched hero
-## touches it; a hero in his death toss is not present (the totem waits). The first who arrived waits there.
+## touches it; a hero in his death toss is not present (the totem waits). The first who arrived waits there. IDLE rule
+## (G33): an IDLE hatched hero (PlayerBase.is_idle) anywhere on the view counts as present, as an egg does - only a
+## hero who plays is waited for (the driver's team_at_exit rule).
 func _team_tick(level: LevelBase) -> void:
 	present_mask = 0
 	var toucher: PlayerBase = null
 	var everyone: bool = true
 	for hero: PlayerBase in level.contact_order():
-		if hero.down:
+		if hero.down or (hero.idle and not hero.dead and not Overlap.body(self, hero, hero)):
 			if level.is_in_view(hero):
 				present_mask |= 1 << hero.slot
 			else:

@@ -40,7 +40,13 @@ extends RefCounted
 ##     box on a still target), timed plates (the ticks from the plate to its door against the time the door stays
 ##     open). The window reported is the record's own: the difficulty's value capped by its `window=` (enemies-A's
 ##     CoopTraits.capped_window; a bond the smallest cap of its members). test_coop_gates demands window <= solo_min
-##     - 4.
+##     - 4, except for a record marked "slot_bound" (G34 / G47): the daze, once [method daze_slot_bound] finds the
+##     engine glancing the bouncer's own hits (one player never meets it, whatever its window).
+##  The partner model of G33 (orchestrator, IDLE-PARTNER RULE): the idle hatched partner is part of the lone player's
+##  toolkit - parked anywhere his egg could be clubbed open (a `place partner` node at every resting point near a co-op
+##  mechanism or trait enemy) - but counts for no co-op rule (the engine's PlayerBase.is_idle / counts_for_coop, which
+##  the search world forces on him at every placement); the ride macros on his head run only while
+##  [method idle_partner_carries] finds the engine still giving a ride on an idle head (since G33 it does not).
 ## The cheap flood of [method flood_reaches] (no chain of feet cells on the grid at rest) is kept as a diagnostic
 ## (result "flood"); it never decides a gate: the search runs on every gate.
 ## Limits (v2): the moving things (walking enemies, platforms, geysers) start every macro in their level-file phase,
@@ -98,6 +104,9 @@ const WORLD_MARGIN_COLS: int = 6
 ## the second.
 const STRIKE_REACH_CELLS: Vector2i = Vector2i(6, 4)
 const THROW_REACH_CELLS: Vector2i = Vector2i(18, 6)
+## A strike or throw macro faces one way: a target counts for it when it lies on that side or at most this far (px)
+## behind the hero's feet point (a target overlapping him, a walker coming round him during the move).
+const BEHIND_REACH_PX: int = 2 * Tuning.TILE
 ## [method Searcher.partner_useful]: the rows over the hero's feet cell (inclusive) and the columns either side where a
 ## floor makes the idle partner worth a try.
 const PARTNER_LEDGE_ROWS: Vector2i = Vector2i(4, 9)
@@ -590,10 +599,14 @@ class Searcher:
 				return true
 		return false
 
-	## True when something a strike (`reach` = STRIKE_REACH_CELLS) or a throw can act on lies near `pos`.
-	func target_near(pos: Vector2i, reach: Vector2i) -> bool:
+	## True when something a strike (`reach` = STRIKE_REACH_CELLS) or a throw can act on lies near `pos` - with
+	## `facing` (+1 / -1) only on that side of him (or at most BEHIND_REACH_PX behind his feet point: a walker may come
+	## round him during the move); every strike and throw macro acts in the direction he faces.
+	func target_near(pos: Vector2i, reach: Vector2i, facing: int = 0) -> bool:
 		for target: Vector2i in _targets:
-			if absi(target.x - pos.x) <= reach.x * Tuning.TILE and absi(target.y - pos.y) <= reach.y * Tuning.TILE:
+			var dx: int = target.x - pos.x
+			if absi(dx) <= reach.x * Tuning.TILE and absi(target.y - pos.y) <= reach.y * Tuning.TILE \
+					and (facing == 0 or dx * facing >= -CoopSearch.BEHIND_REACH_PX):
 				return true
 		return false
 
@@ -625,7 +638,10 @@ class Searcher:
 				print("  node %d at %s t%d prefix %d partner %s: %s%s" % [head - 1, str(pos), int(node["ticks"]),
 					prefix.size(), str(node["partner_at"]), str(node["path"]).right(90), "" if not changed else " | "
 					+ CoopSearch.sig_diff(_baseline, str(node["sig"]))])
-			# Park the idle partner here (G33): a node of its own, no move played.
+			# Park the idle partner here (G33): a node of its own, no move played - so it costs no depth either: it is
+			# expanded right after this node (its moves join this node's at the same breadth-first level), not after
+			# every node already queued (w2_l1_coop 'hatches': a 3-move route through a parked partner fell behind
+			# the node bound on Beginner).
 			if CoopSearch.idle_partner and placement_useful(pos) \
 					and CoopSearch.node_key(node["partner_at"]) != CoopSearch.node_key(pos):
 				var parked: Dictionary = node.duplicate()
@@ -636,7 +652,7 @@ class Searcher:
 				var parked_key: String = _key_of(parked)
 				if not seen.has(parked_key):
 					seen[parked_key] = int(node["ticks"])
-					queue.append(parked)
+					queue.insert(head, parked)
 					placements += 1
 			for macro: Dictionary in macros:
 				if not _macro_fits(macro, node):
@@ -655,8 +671,11 @@ class Searcher:
 				else:
 					config = _config(pos, int(macro["facing"]), macro_hand, PARTNER_IDLE if ride else PARTNER_EGG,
 						NOWHERE if ride else node["partner_at"])
+				var simulated_before: int = simulated
 				var outcome: Dictionary = run(config, prefix + (macro["flags"] as PackedInt32Array), goals, prefix.size(),
 						pos if changed else NOWHERE, events)
+				if CoopSearch.collect_stats:
+					CoopSearch.stat_run(macro, simulated - simulated_before, changed, outcome.is_empty())
 				if outcome.is_empty():
 					continue
 				var ticks: int = int(node["ticks"]) + int(outcome["ticks"])
@@ -689,6 +708,8 @@ class Searcher:
 				var cell: Vector2i = Vector2i(Tuning.to_cell(rest.x), Tuning.to_cell(rest.y - 1))
 				if fresh and area.has_point(cell):
 					queue.append(child)
+					if CoopSearch.collect_stats:
+						CoopSearch.stat_new(macro)
 		return {"reached": false, "ticks": -1, "detail": "", "nodes": head, "runs": runs, "simulated": simulated,
 			"replayed": replayed, "placements": placements}
 
@@ -727,24 +748,28 @@ class Searcher:
 				hand = int(event[2])
 		return hand
 
-	## Whether `macro` is worth a run from `node`: strikes where something to hit is near, throws where something to
-	## throw at is in range, the partner ride moves (a regression check since G33) only from an unchanged node under a
-	## ledge.
+	## Whether `macro` is worth a run from `node`: strikes where something to hit is near on the side he strikes,
+	## throws where something to throw at is in range on the side he throws, the partner ride moves (a regression check
+	## since G33) only from an unchanged node under a ledge while the engine allows a ride on an idle head.
 	func _macro_fits(macro: Dictionary, node: Dictionary) -> bool:
 		match str(macro.get("kind", "move")):
 			"strike":
-				return target_near(node["pos"], STRIKE_REACH_CELLS)
+				return target_near(node["pos"], STRIKE_REACH_CELLS, int(macro["facing"]))
 			"throw":
-				return target_near(node["pos"], THROW_REACH_CELLS)
+				return target_near(node["pos"], THROW_REACH_CELLS, int(macro["facing"]))
 			"partner":
-				return CoopSearch.idle_partner and (node["prefix"] as PackedInt32Array).is_empty() \
-						and partner_useful(node["pos"])
+				# Only while the engine still lets a hero ride an idle head (CoopSearch.idle_partner_carries; not yet
+				# probed in this process: tried) - since G33 it does not, so they would reach nothing.
+				return CoopSearch.idle_partner and CoopSearch._ride_probe != 0 \
+						and (node["prefix"] as PackedInt32Array).is_empty() and partner_useful(node["pos"])
 		return true
 
 
 ## Solo-impossibility search of gate `gate` of the co-op level `level_id` in `difficulty` (the contract of
 ## tests/test_coop_gates.gd): {"reached": bool (true = one hero got to the far cell, or a static rule is broken, or
-## the gate cannot be searched), "bound": BOUND_TICKS, "windows": [{"what", "window", "solo_min"}], "detail": String,
+## the gate cannot be searched), "bound": BOUND_TICKS, "windows": [{"what", "window", "solo_min"[, "slot_bound": true]}]
+## ("slot_bound": a rule one player can never meet - the daze once the engine binds it to the other slot, G47 - exempt
+## from the solo_min - 4 cap), "detail": String,
 ## "starts": Array of start cells, "explored": resting points searched, "runs": macro runs, "flood": bool (the
 ## diagnostic of [method flood_reaches])}.
 ## With [member use_file_cache] (and [member use_cache]) a result is kept in FILE_CACHE_DIR under a key of everything
@@ -764,28 +789,106 @@ static func search_gate(level_id: StringName, difficulty: int, gate: String) -> 
 			return cached
 	var started: int = Time.get_ticks_msec()
 	var result: Dictionary = search_data(data, difficulty, gate)
+	var seconds: float = (Time.get_ticks_msec() - started) / 1000.0
+	if not str(result.get("detail", "")).begins_with("unproven"):
+		record_cost(level_id, difficulty, gate, seconds, int(result.get("simulated", 0)))
 	if key != "" and not str(result.get("detail", "")).begins_with("unproven"):
-		result["seconds"] = (Time.get_ticks_msec() - started) / 1000.0
+		result["seconds"] = seconds
 		_file_cache_write(key, result)
 	return result
+
+
+# --- Spreading the gate table over processes (tools/world_coop_gates.sh) ------------------------------------------------
+
+## Where [method record_cost] keeps the last measured cost of every gate (one small file per gate; build/ is not
+## versioned).
+const COST_DIR: String = "res://build/coop_search_cache/costs"
+## The cost a gate without a measurement is given in [method order_by_cost] (seconds: about the dearest gates of
+## phase 3, so a new gate is searched among the first and the cheap known ones fill the end).
+const UNKNOWN_COST_SECONDS: float = 120.0
+
+
+static func _gate_label(level_id: StringName, difficulty: int, gate: String) -> String:
+	return "%s__%s__%d" % [level_id, gate.validate_filename(), difficulty]
+
+
+## Keep the cost of the latest real search of a gate ([method search_gate]; a cached read does not count): seconds of
+## wall time and ticks simulated (the ticks do not depend on the load of the machine).
+static func record_cost(level_id: StringName, difficulty: int, gate: String, seconds: float, ticks: int) -> void:
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(COST_DIR))
+	var file: FileAccess = FileAccess.open(COST_DIR.path_join(_gate_label(level_id, difficulty, gate) + ".txt"),
+			FileAccess.WRITE)
+	if file != null:
+		file.store_string("%.1f %d\n" % [seconds, ticks])
+		file.close()
+
+
+## The last recorded cost of a gate in seconds (-1 when it was never searched here).
+static func gate_cost(level_id: StringName, difficulty: int, gate: String) -> float:
+	var path: String = COST_DIR.path_join(_gate_label(level_id, difficulty, gate) + ".txt")
+	if not FileAccess.file_exists(path):
+		return -1.0
+	var parts: PackedStringArray = FileAccess.get_file_as_string(path).strip_edges().split(" ")
+	return parts[0].to_float() if not parts.is_empty() and parts[0].is_valid_float() else -1.0
+
+
+## The entries of `table` ([method gate_table]) dearest first (by [method gate_cost]; a gate never searched counts
+## UNKNOWN_COST_SECONDS; ties keep the table order): the order in which queue workers take them, so the long searches
+## start first and the short ones fill the gaps at the end (the wall time of N workers is then close to the total over
+## N).
+static func order_by_cost(table: Array) -> Array:
+	var keyed: Array = []
+	for i: int in table.size():
+		var entry: Dictionary = table[i]
+		var cost: float = gate_cost(entry["level"], int(entry["difficulty"]), str(entry["gate"]))
+		keyed.append([UNKNOWN_COST_SECONDS if cost < 0.0 else cost, i])
+	keyed.sort_custom(func(a: Array, b: Array) -> bool: return a[0] > b[0] or (a[0] == b[0] and a[1] < b[1]))
+	var result: Array = []
+	for pair: Array in keyed:
+		result.append(table[int(pair[1])])
+	return result
+
+
+## Claim a gate for this process in the work queue `queue_dir` (an OS or res:// folder shared by the workers of one
+## run): true for exactly one caller per gate and queue - the claim is the creation of a folder named after the gate,
+## which the file system makes atomic. A worker searches only what it claimed, so N workers share the table without a
+## fixed split (tools/world_coop_gates.sh; any program that loops over the table can use it the same way).
+static func claim_gate(queue_dir: String, level_id: StringName, difficulty: int, gate: String) -> bool:
+	var root: String = ProjectSettings.globalize_path(queue_dir) if queue_dir.begins_with("res://") else queue_dir
+	DirAccess.make_dir_recursive_absolute(root)
+	return DirAccess.make_dir_absolute(root.path_join(_gate_label(level_id, difficulty, gate))) == OK
 
 
 ## Where [method search_gate] keeps its results (one JSON file per key; build/ is not versioned).
 const FILE_CACHE_DIR: String = "res://build/coop_search_cache"
 ## The search's own version in the cache key (bump it when a result's meaning changes without a code change).
-const FILE_CACHE_VERSION: String = "v3.0"
+const FILE_CACHE_VERSION: String = "v3.1"
 ## The folders whose files make the simulation (their contents are the code fingerprint).
 const FINGERPRINT_DIRS: Array[String] = ["res://scripts", "res://scenes", "res://resources"]
 const FINGERPRINT_EXTENSIONS: Array[String] = ["gd", "tscn", "tres", "json", "cfg"]
+## Folders of FINGERPRINT_DIRS that no gate's search world runs - the screens and the HUD, the versus referee, the bots
+## and their baked arena graphs, the development tools - left out of the fingerprint so that their frequent edits
+## (a bot re-bake, a HUD change) do not throw every cached gate away. The sim code names a few of their classes in
+## comments and presentation only (Hud's G35 contract, UiKit on sign boards - not in a search world -, UiPlayers'
+## colours of effects); the bosses are the exception (the Chieftains drive themselves with the bots' code and graphs,
+## the weak points answer the HUD): a level holding a `bosses/` record keys on the full fingerprint.
+const FINGERPRINT_SKIP: Array[String] = [
+	"res://scripts/ui", "res://scenes/ui", "res://resources/ui", "res://scripts/world/versus", "res://scripts/core/bots",
+	"res://resources/bots", "res://scripts/core/dev",
+]
 
 static var _fingerprint: String = ""
+static var _fingerprint_full: String = ""
 
 
-## The key of a search result: md5 over the search version, the code fingerprint ([method code_fingerprint]), the
-## level file's text, its `coop_of` base file's text (the static rules read its kind), the difficulty, the gate, and
-## the partner model.
+## The key of a search result: md5 over the search version, the code fingerprint ([method code_fingerprint]; the full
+## one when the level holds a boss), the level file's text, its `coop_of` base file's text (the static rules read its
+## kind), the difficulty, the gate, and the partner model.
 static func file_cache_key(path: String, data: LevelData, difficulty: int, gate: String) -> String:
-	var parts: PackedStringArray = PackedStringArray([FILE_CACHE_VERSION, code_fingerprint(),
+	var bosses: bool = false
+	for record: Dictionary in data.entity_records():
+		bosses = bosses or String(record["id"]).begins_with("bosses/")
+	var parts: PackedStringArray = PackedStringArray([FILE_CACHE_VERSION, code_fingerprint(bosses),
 		FileAccess.get_file_as_string(path)])
 	var base: String = str(data.value("coop_of"))
 	if base != "":
@@ -795,23 +898,32 @@ static func file_cache_key(path: String, data: LevelData, difficulty: int, gate:
 	return "|".join(parts).md5_text()
 
 
-## The md5 of every script, scene and resource file of the simulation (FINGERPRINT_DIRS) and project.godot, taken
-## once per run: any change anywhere makes every cached result stale.
-static func code_fingerprint() -> String:
-	if _fingerprint != "":
+## The md5 of every script, scene and resource file of the simulation (FINGERPRINT_DIRS without FINGERPRINT_SKIP;
+## with `full` every file of FINGERPRINT_DIRS) and project.godot, taken once per run: any change in them makes every
+## cached result stale.
+static func code_fingerprint(full: bool = false) -> String:
+	if full and _fingerprint_full != "":
+		return _fingerprint_full
+	if not full and _fingerprint != "":
 		return _fingerprint
 	var files: PackedStringArray = PackedStringArray(["res://project.godot"])
 	for dir_path: String in FINGERPRINT_DIRS:
-		_collect_files(dir_path, files)
+		_collect_files(dir_path, files, full)
 	files.sort()
 	var parts: PackedStringArray = PackedStringArray()
 	for file: String in files:
 		parts.append("%s=%s" % [file, FileAccess.get_md5(file)])
-	_fingerprint = ";".join(parts).md5_text()
-	return _fingerprint
+	var md5: String = ";".join(parts).md5_text()
+	if full:
+		_fingerprint_full = md5
+	else:
+		_fingerprint = md5
+	return md5
 
 
-static func _collect_files(dir_path: String, into: PackedStringArray) -> void:
+static func _collect_files(dir_path: String, into: PackedStringArray, full: bool = true) -> void:
+	if not full and FINGERPRINT_SKIP.has(dir_path):
+		return
 	var dir: DirAccess = DirAccess.open(dir_path)
 	if dir == null:
 		return
@@ -819,7 +931,7 @@ static func _collect_files(dir_path: String, into: PackedStringArray) -> void:
 		if FINGERPRINT_EXTENSIONS.has(file_name.get_extension()):
 			into.append(dir_path.path_join(file_name))
 	for sub: String in dir.get_directories():
-		_collect_files(dir_path.path_join(sub), into)
+		_collect_files(dir_path.path_join(sub), into, full)
 
 
 static func _file_cache_read(key: String) -> Dictionary:
@@ -840,8 +952,11 @@ static func _file_cache_read(key: String) -> Dictionary:
 	var windows: Array = []
 	for window: Variant in result.get("windows", []):
 		if window is Dictionary:
-			windows.append({"what": str(window.get("what", "")), "window": int(window.get("window", 0)),
-				"solo_min": int(window.get("solo_min", 0))})
+			var record: Dictionary = {"what": str(window.get("what", "")), "window": int(window.get("window", 0)),
+				"solo_min": int(window.get("solo_min", 0))}
+			if bool(window.get("slot_bound", false)):
+				record["slot_bound"] = true
+			windows.append(record)
 	result["windows"] = windows
 	result["cached"] = true
 	return result
@@ -886,13 +1001,17 @@ static func search_data(data: LevelData, difficulty: int, gate: String) -> Dicti
 	# 2. The search in the search world.
 	var grid: TileGrid = grid_at_rest(data, difficulty)
 	var area: Rect2i = gate_area(tablet, grid)
-	# The daze measurements build a search level of their own: before this one (they never nest).
+	# The daze measurements and the engine probes build a search level of their own: before this one (they never
+	# nest; each is measured once per process).
 	clock = Time.get_ticks_usec()
 	for record: Dictionary in data.entity_records():
 		var id: String = String(record["id"])
 		var daze: bool = str(record["params"].get("coop", "")) == "daze" or id == "enemies/raptor"
 		if daze and Spawner.category(StringName(id)) == "enemies" and LevelText.applies_to(record["params"], difficulty):
 			measure_daze_solo_min(id)
+			daze_slot_bound()
+	if idle_partner:
+		idle_partner_carries()
 	profile_add(&"daze", clock)
 	var starts: Array[Vector2i] = start_points(data, difficulty, tablet, grid)
 	for start: Vector2i in starts:
@@ -1149,6 +1268,48 @@ static func profile_add(part: StringName, since_usec: int) -> void:
 
 static func profile_reset() -> void:
 	profile = {}
+	stats = {}
+
+
+## tools/coop_search.gd --stats: per macro group (its name without the side) the runs, ticks, runs from changed nodes
+## (with a replay), runs that ended in nothing (died, down, no rest) and the new resting points they found.
+static var collect_stats: bool = false
+static var stats: Dictionary = {}
+
+
+static func _stat_row(macro: Dictionary) -> Array:
+	var group: String = str(macro["name"]).trim_suffix(" R").trim_suffix(" L")
+	for side: String in ["R", "L"]:
+		for steps: String in ["4", "10", "24", "48"]:
+			if group == "walk %s%s" % [side, steps]:
+				group = "walk %s" % steps
+	if not stats.has(group):
+		stats[group] = [0, 0, 0, 0, 0]
+	return stats[group]
+
+
+static func stat_run(macro: Dictionary, ticks: int, from_changed: bool, empty: bool) -> void:
+	var row: Array = _stat_row(macro)
+	row[0] += 1
+	row[1] += ticks
+	row[2] += 1 if from_changed else 0
+	row[3] += 1 if empty else 0
+
+
+static func stat_new(macro: Dictionary) -> void:
+	_stat_row(macro)[4] += 1
+
+
+## The [member stats] as text lines, the costliest group first.
+static func stats_report() -> PackedStringArray:
+	var rows: Array = []
+	for group: String in stats:
+		rows.append([group] + (stats[group] as Array))
+	rows.sort_custom(func(a: Array, b: Array) -> bool: return int(a[2]) > int(b[2]))
+	var lines: PackedStringArray = PackedStringArray()
+	for row: Array in rows:
+		lines.append("%-18s runs %5d  ticks %7d  changed %5d  empty %5d  new %4d" % row)
+	return lines
 
 
 ## Explore results of [method search_data] (see [method _explore_key] and [method world_records]): the same grid at
@@ -1548,9 +1709,16 @@ static func measure_windows(data: LevelData, difficulty: int, area: Rect2i, sear
 			caps[key] = mini(int(caps.get(key, capped)), capped)
 		if Spawner.category(StringName(id)) == "enemies" and area.has_point(cell) \
 				and (str(params.get("coop", "")) == "daze" or id == "enemies/raptor"):
-			windows.append({"what": "daze %s at %d,%d" % [id, cell.x, cell.y],
+			# G47: once the engine makes the daze slot-bound (only another slot than the bouncer's hurts it), one player
+			# can never use it, whatever its window: the record is "slot_bound" (exempt from the solo_min - 4 cap).
+			var bound: bool = daze_slot_bound()
+			var daze_window: Dictionary = {"what": "daze %s at %d,%d%s" % [id, cell.x, cell.y,
+				" (slot-bound, G47)" if bound else ""],
 				"window": CoopTraits.capped_window(PartyTuning.daze_ticks(difficulty), params),
-				"solo_min": measure_daze_solo_min(id)})
+				"solo_min": measure_daze_solo_min(id)}
+			if bound:
+				daze_window["slot_bound"] = true
+			windows.append(daze_window)
 		if id == "objects/plate" and params.has("name") and str(params.get("mode", "")).begins_with("timed:"):
 			plates[str(params["name"])] = record
 		if id == "objects/column" and (params.has("rise_while") or params.has("sink_while")):
@@ -1752,3 +1920,115 @@ static func _daze_run(searcher: Searcher, target: EnemyBase, start: Vector2i, fa
 		if bounce_tick >= 0 and target.last_hit_tick >= bounce_tick:
 			return target.last_hit_tick - bounce_tick
 	return -1 if bounce_tick >= 0 else DAZE_NO_BOUNCE
+
+
+# =================================================================================================================
+# Engine probes: what the co-op rules of this build allow (measured once per process, before any gate's world is built;
+# the code they measure is part of the result cache's fingerprint, so a cached result never outlives a rule change)
+# =================================================================================================================
+
+## The probes' map: 30 x 16 cells, floor rows 14-15.
+static func _probe_data(id: String) -> LevelData:
+	var rows: PackedStringArray = PackedStringArray()
+	for row: int in 16:
+		rows.append((TileGrid.CH_SOLID_A if row >= 14 else TileGrid.CH_AIR).repeat(30))
+	var text: String = "[meta]\nformat = 2\nid = %s\nkind = coop\nbook = 2\nterrain_a = jungle/terrain_grass\n" % id \
+			+ "music = level_jungle\n[tiles]\n%s\n[entities]\n" % "\n".join(rows)
+	return LevelData.parse(StringName(id), text, "%s.lvl" % id)
+
+
+## A search world of the probes' map (null when the hero scene does not exist).
+static func _probe_world(id: String) -> Searcher:
+	var data: LevelData = _probe_data(id)
+	var searcher: Searcher = Searcher.new()
+	if not searcher.build_world(data, Defs.Difficulty.BEGINNER, grid_at_rest(data, Defs.Difficulty.BEGINNER),
+			Vector2i(0, data.cols)):
+		return null
+	return searcher
+
+
+## 1 / 0 once probed, -1 before ([method idle_partner_carries]).
+static var _ride_probe: int = -1
+
+
+## G33 as built: true when a hero can still ride an idle partner's head - the jump straight up from the spot the idle
+## partner stands on ends in a Totem Ride on him. The `partner` ride macros run only then: since G33 an idle head is
+## passed through (party, PartyDriver._head_contacts), so they could reach nothing; this probe is their regression
+## check - should a ride on an idle head ever come back, the search uses them again at once.
+static func idle_partner_carries() -> bool:
+	if _ride_probe < 0:
+		_ride_probe = 1 if _probe_idle_ride() else 0
+	return _ride_probe == 1
+
+
+static func _probe_idle_ride() -> bool:
+	var searcher: Searcher = _probe_world("coop_search_ride_probe")
+	if searcher == null:
+		return true   # nothing to probe with: keep the macros
+	var start: Vector2i = Vector2i(10 * Tuning.TILE + Tuning.TILE / 2, 14 * Tuning.TILE)
+	searcher.run(searcher._config(start, 1, -1, PARTNER_IDLE, NOWHERE), _repeat(Defs.IN_UP, 9) + _repeat(0, 16), {})
+	var rides: bool = searcher.hero.is_riding_totem()
+	searcher.close()
+	return rides
+
+
+## The daze probe ([method probe_daze]); empty before.
+static var _daze_probe: Dictionary = {}
+
+
+## G47 as built: true when a `daze` record dazed by a hero's head bounce glances that hero's own hits while another
+## slot's hero hurts it (enemies-A's slot-bound daze). Then one player can never use a daze, whatever its window, and
+## the search's daze records are "slot_bound" (exempt from test_coop_gates' solo_min - 4 cap); until then the cap holds.
+static func daze_slot_bound() -> bool:
+	var probe: Dictionary = probe_daze()
+	return bool(probe["dazed"]) and bool(probe["other"]) and not bool(probe["own"])
+
+
+## The daze rule of this build, on a still `coop=daze` target in a co-op search world of two (the bouncer slot 0, an
+## ACTIVE hero of slot 1 beside the target as the control): {"dazed": a head bounce dazed it, "own": the bouncer's own
+## hit is accepted right after his bounce (EnemyBase.accepts_hit_from), "other": slot 1's is}.
+static func probe_daze() -> Dictionary:
+	if not _daze_probe.is_empty():
+		return _daze_probe
+	var result: Dictionary = {"dazed": false, "own": true, "other": false}
+	var searcher: Searcher = _probe_world("coop_search_daze_probe")
+	if searcher == null:
+		_daze_probe = result
+		return result
+	var target: EnemyBase = EnemyBase.new()
+	target.set_box(Vector3i(32, 32, 16))
+	target.spawn_setup(Vector2i(240, 224), {"coop": "daze"})
+	searcher.level.add_child(target)
+	searcher._kept[target.get_instance_id()] = true
+	target.max_hp = 99999
+	target.hp = 99999
+	var hero: PlayerBase = searcher.hero
+	var other: PlayerBase = searcher.partner
+	other.run.reset_energy()
+	other.respawn_at(Vector2i(400, 224))
+	searcher._mark_active(other)
+	hero.run.reset_energy()
+	searcher._mark_active(hero)
+	searcher.driver.set(&"active_mask", 3)
+	searcher.level.refresh_doze()
+	for side: int in [-1, 1]:
+		var dir: int = Defs.IN_RIGHT if side < 0 else Defs.IN_LEFT
+		for distance: int in range(16 + DAZE_MIN_GAP_PX, DAZE_MAX_DISTANCE_PX, DAZE_DISTANCE_STEP_PX):
+			for hold: int in DAZE_HOLDS:
+				searcher._mark_active(other)
+				if _daze_run(searcher, target, Vector2i(240 + side * distance, 224), -side, dir, hold, 0, 0, 0) \
+						== DAZE_NO_BOUNCE:
+					continue
+				var traits: CoopTraits = target.coop_traits()
+				result["dazed"] = traits != null and (not (&"dazed" in traits) or int(traits.get(&"dazed")) > 0)
+				result["own"] = target.accepts_hit_from(hero)
+				result["other"] = target.accepts_hit_from(other)
+				if bool(result["dazed"]):
+					break
+			if bool(result["dazed"]):
+				break
+		if bool(result["dazed"]):
+			break
+	searcher.close()
+	_daze_probe = result
+	return result

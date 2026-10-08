@@ -331,7 +331,7 @@ phase-3 route). The default run keeps the Book I guards (V1.c, V1.d); `tools/sp_
 | 1 | Second-wave versus modes (King of the Feast, Letter Snatch, Egg Heist) | already outside launch | - |
 | 2 | Tablet table mode (two touch players) - **APPLIED at the start of phase 3** (orchestrator): an experimental, hidden prototype | one touch player + pads | ~1 ew |
 | 3 | Unlockable arenas Mesa Rodeo and Cloud Top - built only once the four remaining launch arenas are done and their bot tests green (orchestrator, phase 3) | 8 arenas; those painting unlocks become variants and colours | ~1 ew |
-| 4 | Bots on an arena whose graph fails | that arena ships human-only | per arena |
+| 4 | Bots on an arena whose graph fails | that arena ships human-only in that mode: arena meta `bots` leaves the mode out (DESIGN.md G50; the bot test skips it, no CPU seat there); until the switch is built the arena stays out of `levels/` | per arena |
 | 5 | Chief bot level, deciding-moment replay | Rookie + Hunter; a still frame of the deciding hit | ~1.5 ew |
 | 6 | Shaman (co-op enemy) | Shellbacks in those halls | ~0.5 ew |
 | 7 | Chomper the rex | 6-1 crosses the tar flats by raft; 7-1's urchin beds become drop floes; Mesa Rodeo goes with it | ~3 ew + art |

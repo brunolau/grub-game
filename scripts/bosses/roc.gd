@@ -20,10 +20,15 @@ extends BossBase
 ##    dives it perches again, until its hit points are down to a third.
 ##  - **Phase 3 Storm** (hp <= 1/3): it climbs above the view while lightning strikes the column of a hero
 ##    (`projectiles/boss_bolt`: a darkening cloud marks it BOLT_MARK ticks ahead; struck nest sticks burn), comes down
-##    to cruise over the arena (CRUISE_TICKS), screeches and swoops at a hero, and climbs out again. The hang-glider lies
-##    on the nest (`items/glider`; it comes back when lost): a gliding hero diving onto its back (yvel > 32, from
-##    above) scores the dive ladder (1 000 / 5 000 / 10 000) and the Roc tumbles low over the nest TUMBLE_TICKS; the
-##    third dive brings it down. Weapon hits do nothing in this phase.
+##    to cruise (CRUISE_TICKS), screeches and swoops at a hero, and climbs out again. It cruises over ONE RUNWAY HALF
+##    (DESIGN.md G46; the halves alternate, the right one first): its body wholly in the view and out of the boss bar's
+##    columns, its feet point at least a cell off the nest, its back's top CRUISE_CLEAR_PX under the lowest view top
+##    the camera lock allows (the HUD rule, G35: with the authentic 11-row lock on the arena that is 29 px over the
+##    nest top, 61 px over the floor). The hang-glider lies on the nest (`items/glider`; it comes back when lost): a
+##    gliding hero diving onto its back (yvel > 32, from above) while it cruises or screeches at the cruise spot - the
+##    back is the weak point there, [method get_head_rect] - scores the dive ladder (1 000 / 5 000 / 10 000) and the
+##    Roc tumbles low over the nest TUMBLE_TICKS; the third dive brings it down. Coming down and swooping it is a plain
+##    body (a landing on it bounces). Weapon hits do nothing in this phase.
 ##  - **Defeat**: it tumbles down into the clouds and the fire-starter comes out over the nest.
 ##
 ## Co-op form (a co-op game of two heroes in a `kind = coop` file; hp 250 for phases 1-2). Its rules count only an
@@ -88,7 +93,12 @@ const STORM_HEIGHT: int = 64              ## above the room's top while the ligh
 const BOLTS: int = 3
 const BOLT_PERIOD: int = 33
 const BOLT_MARK: int = 22
-const CRUISE_HEIGHT: int = 40             ## cruise: feet this far over the nest top
+## G46 cruise (DESIGN.md B.5): the back's top this far under the lowest view top (the HUD row's clearance, G35) ...
+const CRUISE_CLEAR_PX: int = 55
+## ... and the boss bar's columns, logical px left / right of the view's centre (ui's fight HUD, Hud.band_rects; the
+## lead's G35 correction): the cruising body stays out of them.
+const BAR_LEFT_PX: int = 53
+const BAR_RIGHT_PX: int = 38
 const CRUISE_SPEED: int = 2
 const CRUISE_TICKS: int = 132
 const TUMBLE_TICKS: int = 24
@@ -123,6 +133,12 @@ var _vel: Vector2i = Vector2i.ZERO        ## dive velocity, v16
 var _acc: Vector2i = Vector2i.ZERO        ## sub-pixel remainder of the dive (v16)
 var _bolts: int = 0
 var _cruise_dir: int = 1
+## G46: the runway half of the next cruise (1 right, 0 left; alternating) and the current cruise's range of feet x
+## and its feet y (set when it comes down).
+var _cruise_half: int = 1
+var _cruise_x0: int = 0
+var _cruise_x1: int = 0
+var _cruise_y: int = 0
 var _held: PlayerBase = null
 var _held_took_control: bool = false
 var _snatch_ticks: int = 0
@@ -244,8 +260,25 @@ func get_storm_hp() -> int:
 	return max_hp - _phases_hp
 
 
-## The weak point this tick (logical px; empty when nothing can hurt it now).
+## The weak point this tick (logical px; empty when nothing can hurt it now): the head or the tail for the weapons
+## ([method _weapon_rect]), and in the storm the back a glider dive must land on while it cruises (G46; read by the HUD's
+## fade and the G35 checks, Hud.weak_point_rects).
 func get_head_rect() -> Rect2i:
+	var back: Rect2i = get_back_rect()
+	return back if back.has_area() else _weapon_rect()
+
+
+## The back a glider dive counts on: the whole body while it cruises or screeches at the cruise spot (phase 3), else
+## empty. Coming down, swooping or climbing it is no weak point (a landing on it bounces; G35 / G46).
+func get_back_rect() -> Rect2i:
+	if _phase3 and (_state == State.CRUISE or _state == State.SWOOP_SCREECH):
+		return get_box()
+	return Rect2i()
+
+
+## The rectangle weapons hit this tick (empty when they cannot): the head band while it perches (or holds a hero), the
+## low head while the beak is buried or it lies stunned, the tail of a co-op tumble while a dive waits for the spotter.
+func _weapon_rect() -> Rect2i:
 	match _state:
 		State.REST, State.WINGS, State.GUST, State.SNATCH:
 			return _rel(HEAD_BAND)
@@ -254,6 +287,53 @@ func get_head_rect() -> Rect2i:
 		State.TUMBLE:
 			return _rel(TAIL) if _dive_pending else Rect2i()
 	return Rect2i()
+
+
+## G46: the range of feet x [x0, x1] and the feet y of a cruise over runway half `half` (1 right, 0 left), for the view
+## now: the body wholly in the view and the room, out of the boss bar's columns (BAR_LEFT_PX / BAR_RIGHT_PX around the
+## view's centre), the feet point at least a cell off the nest; the back's top CRUISE_CLEAR_PX under the lowest view top
+## the camera lock allows. A half without such room is clamped to the view (the level's framing is then wrong - the
+## G35 tests catch it). Returns Vector3i(x0, x1, y).
+func get_cruise_span(half: int) -> Vector3i:
+	_find_nest()
+	var room: Rect2i = _room()
+	var view: Rect2i = Game.level.get_view_rect() if Game.level != null else room
+	var half_w: int = BOX.x >> 1
+	var left: int = maxi(view.position.x, room.position.x) + half_w
+	var right: int = mini(view.end.x, room.end.x) - half_w
+	var centre: int = view.position.x + (view.size.x >> 1)
+	var x0: int = 0
+	var x1: int = 0
+	if half == 1:
+		x0 = maxi(maxi(centre + BAR_RIGHT_PX + half_w, nest_x1 + Tuning.TILE), left)
+		x1 = right
+		x0 = mini(x0, x1)
+	else:
+		x0 = left
+		x1 = mini(mini(centre - BAR_LEFT_PX - half_w, nest_x0 - Tuning.TILE), right)
+		x1 = maxi(x1, x0)
+	return Vector3i(x0, x1, lowest_view_top() + CRUISE_CLEAR_PX + BOX.y)
+
+
+## The lowest view top (logical px) the camera can show during the fight: with a camera lock the lowest view that lock
+## allows (LevelCamera's limits: an area lower than the view is centred, its margin rounded down to whole tiles; never
+## outside a level taller than the view), else the view now.
+func lowest_view_top() -> int:
+	var level: LevelBase = Game.level
+	if level == null:
+		return _room().position.y
+	var view: Rect2i = level.get_view_rect()
+	if not level.is_camera_locked():
+		return view.position.y
+	var lock: Rect2i = level.get_camera_lock()
+	var height: int = view.size.y
+	var top: int = lock.end.y - height
+	if lock.size.y < height:
+		top = lock.position.y - (((height - lock.size.y) / 2) & ~(Tuning.TILE - 1))
+	var level_h: int = level.grid.rows * Tuning.TILE if level.grid != null else 0
+	if level_h > height:
+		top = clampi(top, 0, level_h - height)
+	return top
 
 
 ## The perch on a rim (0 left, 1 right): its feet point.
@@ -289,6 +369,7 @@ func _on_reset() -> void:
 	_rim = 0
 	_bolts = 0
 	_phase3 = false
+	_cruise_half = 1
 	_pilot = null
 	_dive_pending = false
 	_glider_check = 0
@@ -392,7 +473,7 @@ func _ai_tick() -> void:
 			_storm_tick(hero)
 		State.DESCEND:
 			_play(&"fly")
-			if _fly_to(Vector2i(get_nest_center().x, nest_top - CRUISE_HEIGHT), FLY_SPEED):
+			if _fly_to(Vector2i(sim_pos.x, _cruise_y), FLY_SPEED):
 				_set_state(State.CRUISE)
 		State.CRUISE:
 			_cruise_tick()
@@ -658,8 +739,22 @@ func _storm_tick(hero: PlayerBase) -> void:
 			})
 		_bolts += 1
 	if _bolts >= BOLTS and _timer % BOLT_PERIOD == BOLT_PERIOD - 1:
-		teleport(Vector2i(get_nest_center().x, sim_pos.y))
-		_set_state(State.DESCEND)
+		_begin_descent()
+
+
+## G46: it comes down (straight, above the view first) over the runway half of this cruise; the halves alternate.
+func _begin_descent() -> void:
+	var span: Vector3i = get_cruise_span(_cruise_half)
+	_cruise_x0 = span.x
+	_cruise_x1 = span.y
+	_cruise_y = span.z
+	var x: int = _cruise_x1 if _cruise_half == 1 else _cruise_x0
+	teleport(Vector2i(x, sim_pos.y))
+	# Facing the arena's middle (the nest and the heroes); it drifts toward the middle first.
+	_cruise_dir = -1 if _cruise_half == 1 else 1
+	facing = _cruise_dir
+	_cruise_half = 1 - _cruise_half
+	_set_state(State.DESCEND)
 
 
 ## The bolts alternate between the hatched heroes (one hero: always him).
@@ -676,29 +771,30 @@ func _bolt_target() -> PlayerBase:
 	return heroes[_bolts % heroes.size()]
 
 
+## G46: it drifts to and fro over its runway half (feet x in [_cruise_x0, _cruise_x1], CRUISE_SPEED px per tick) at
+## the cruise height, facing the arena's middle; after CRUISE_TICKS it screeches and swoops.
 func _cruise_tick() -> void:
 	_play(&"fly")
-	var room: Rect2i = _room()
-	var left: int = room.position.x + BOX.x
-	var right: int = room.end.x - BOX.x
+	sim_pos.y = _cruise_y
 	sim_pos.x += _cruise_dir * CRUISE_SPEED
-	if sim_pos.x <= left:
-		sim_pos.x = left
+	if sim_pos.x <= _cruise_x0:
+		sim_pos.x = _cruise_x0
 		_cruise_dir = 1
-	elif sim_pos.x >= right:
-		sim_pos.x = right
+	elif sim_pos.x >= _cruise_x1:
+		sim_pos.x = _cruise_x1
 		_cruise_dir = -1
-	facing = _cruise_dir
+	facing = 1 if (_cruise_x0 + _cruise_x1) >> 1 < get_nest_center().x else -1
 	if _timer >= CRUISE_TICKS:
 		_set_state(State.SWOOP_SCREECH)
 		Audio.play_sfx(Sfx.BOSS_ROAR)
 
 
-## A gliding hero dives onto its back (phase 3; GLIDER rule of PHYSICS.md 9: gliding, yvel > 32, from above): he is
-## bumped up, the dive ladder pays, and the Roc tumbles low over the nest. Solo the dive counts at once; co-op it
-## waits for the spotter's strike on the tail.
+## A gliding hero dives onto its back (phase 3; GLIDER rule of PHYSICS.md 9: gliding, yvel > 32, from above) while it
+## cruises or screeches at the cruise spot (its back clear of the HUD there, G46): he is bumped up, the dive ladder
+## pays, and the Roc tumbles low over the nest. Solo the dive counts at once; co-op it waits for the spotter's strike on
+## the tail. Coming down or swooping, a landing on it is the plain bounce of [method _contact_every].
 func _glider_dives() -> void:
-	if not _phase3 or _state == State.TUMBLE or _state == State.STORM or _state == State.CLIMB:
+	if not get_back_rect().has_area():
 		return
 	var level: LevelBase = Game.level
 	if level == null:
@@ -790,7 +886,7 @@ func _dying_tick() -> void:
 ## turns head hits from the nearer hero's side into glances; a hit on the snatching Roc by the partner frees the held
 ## hero; a strike on the tumbling Roc's tail by a hero other than the pilot makes his dive count.
 func _poll_hits() -> void:
-	var weak: Rect2i = get_head_rect()
+	var weak: Rect2i = _weapon_rect()
 	var level: LevelBase = Game.level
 	if weak.size.x <= 0 or level == null:
 		return

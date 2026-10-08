@@ -119,6 +119,51 @@ func test_a_real_time_play_starts_on_the_stages_first_tick() -> void:
 	assert_eq(differences, 0, "the real-time trace is the --fast trace")
 
 
+## The hold is anchored to EVERY stage start, not only the flow's first: a second stage started in the same run (as
+## the campaign flows meet stage after stage) waits for its own `play` too, and both plays replay as with --fast.
+func test_a_real_time_play_anchors_every_stage_of_a_run() -> void:
+	var stage: PackedStringArray = ["start_level test_integration", "wait_ms 300", "expect sim.tick == 0"]
+	var script: String = "\n".join(stage + PackedStringArray(["play 20:R,8:RU,10:R"]) + stage
+			+ PackedStringArray(["play 12:L,8:LU,16:R", "quit"]))
+	var fast: Dictionary = await _run_flow(script, true)
+	var real_time: Dictionary = await _run_flow(script, false)
+	for run: Dictionary in [fast, real_time]:
+		assert_eq(int(run["exit_code"]), 0, "the flow passes: %s" % str(run["failures"]))
+		assert_eq(int(run["checks"]), 4, "each stage's clock stood still until its play")
+	var parts_fast: Array[Array] = _stage_parts(fast["trace"])
+	var parts_real: Array[Array] = _stage_parts(real_time["trace"])
+	assert_eq(parts_fast.size(), 2, "--fast: two stages")
+	assert_eq(parts_real.size(), 2, "real time: two stages")
+	# The old stage may run on (idle) while the next start_level covers it: each play's own ticks are compared.
+	var lengths: Array[int] = [38, 36]
+	for part: int in mini(parts_fast.size(), parts_real.size()):
+		var rows_fast: Array = parts_fast[part]
+		var rows_real: Array = parts_real[part]
+		assert_true(rows_fast.size() >= lengths[part], "--fast played every entry of play %d" % (part + 1))
+		assert_true(rows_real.size() >= lengths[part], "real time played every entry of play %d" % (part + 1))
+		if rows_real.is_empty() or rows_fast.is_empty():
+			continue
+		assert_eq(int(rows_fast[0][2]), 1, "--fast: play %d starts on its stage's tick 1" % (part + 1))
+		assert_eq(int(rows_real[0][2]), 1, "real time: play %d starts on its stage's tick 1" % (part + 1))
+		for i: int in mini(lengths[part], mini(rows_fast.size(), rows_real.size())):
+			if (rows_fast[i] as Array).slice(1) != (rows_real[i] as Array).slice(1):
+				fail("stage %d: real time differs from --fast at row %d: %s / %s" % [part + 1, i, str(rows_real[i]),
+						str(rows_fast[i])])
+				break
+
+
+## Trace rows split where a stage's clock starts again (its tick falls back).
+func _stage_parts(rows: Array) -> Array[Array]:
+	var parts: Array[Array] = []
+	var last_tick: int = 0
+	for row: Array in rows:
+		if parts.is_empty() or int(row[2]) < last_tick:
+			parts.append([])
+		last_tick = int(row[2])
+		parts[parts.size() - 1].append(row)
+	return parts
+
+
 ## wf8_g2_verify #1: an engine error logged while a flow runs fails it, as in the test runner, unless the flow
 ## announced it with `expect_errors`.
 func test_an_engine_error_fails_a_flow() -> void:
@@ -145,6 +190,23 @@ func test_need_skips_a_part_of_a_skeleton_flow() -> void:
 	var whole: Dictionary = await _run_flow(part, true)
 	assert_eq(int(whole["exit_code"]), 4, "a flow without the skeleton mark fails")
 	assert_true(" ".join(whole["failures"]).contains("need: zz_nowhere"), str(whole["failures"]))
+
+
+## A part that stops (here a wait that times out) is cut short like a pending one: the next `section` still runs, so a
+## campaign flow reports every part (Book II Beginner and Expert), and the run fails.
+func test_a_stopped_part_does_not_stop_the_next_section() -> void:
+	var stopped: Dictionary = await _run_flow("\n".join([
+		"section first", "wait_until game.score == 123456789 3", "expect game.score == 123456789",
+		"section second", "expect sim.running == false", "quit",
+	]), true)
+	assert_eq(int(stopped["exit_code"]), 4, "the run fails")
+	# The timed-out wait is one check, the second part's expect the other; the first part's expect never ran.
+	assert_eq(int(stopped["checks"]), 2, "the rest of the first part was skipped, the second part's check ran")
+	var failures: String = " ".join(stopped["failures"])
+	assert_true(failures.contains("stopped at: wait_until game.score == 123456789 3"), failures)
+	assert_false(failures.contains("expect game.score"), "the first part's expect was skipped: %s" % failures)
+	assert_false(failures.contains("sim.running"), "the second part passed: %s" % failures)
+	assert_eq((stopped["pending"] as PackedStringArray).size(), 0, "a stopped part is a failure, not pending")
 
 
 ## Run flow `text` in-process (the runner of `gd.sh play --flow`, without ending the application) and return its

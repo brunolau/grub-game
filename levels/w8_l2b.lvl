@@ -1,0 +1,88 @@
+# Club & Grub - World 8, stage 2b: "Idol Court" (designer D8, Book II "The Far Shore"; Expert only).
+# A short approach along the temple roof (DESIGN.md A.3 / A.6 / B.4, difficulty 8): Cave Painting 11 waits in a
+# chamber under two breakable floor blocks; a checkpoint; then a hole in the roof drops the hero onto the altar of
+# the Idol Court - the fixed screen of GAMEPLAY 13.6 with the Twin Idols in both walls, the 2-row altar in the middle
+# and a ledge at row 11 in front of each idol's jaws. One idol is awake and spits rocks, the other sleeps and drops
+# masonry; strike the open jaws of the awake one (a high strike from its ledge, a forward strike when it slams low).
+# Their fire-starter opens the exit totem on the altar.
+
+[meta]
+format = 2
+id = w8_l2b
+name = "Idol Court"
+kind = sub
+book = 2
+world = 8
+stage = 2
+biome = ruins
+terrain_a = ruins/terrain_carved
+terrain_b = ruins/terrain
+background = temple
+music = level_idol_hall
+min_difficulty = expert
+password_expert = "TW1N"
+bonus_tier = 2
+author = D8
+
+[legend]
+C = objects/checkpoint
+E = objects/exit locked=true
+$ = objects/breakable_block tile=;
+
+[tiles]
+##################################################
+#..............................................###
+#..............................................###
+#..............................................###
+#..@.....................C.....................###
+#############$$#######################..##########
+###########......#############..................##
+###########......#############..................##
+##############################..................##
+##############################..................##
+##############################..................##
+##############################.....--....--.....##
+##############################..................##
+##############################........E.........##
+##############################.......%%%%.......##
+##############################.......%%%%.......##
+##################################################
+
+[entities]
+# the approach: a scarab, a temple raptor, the painting chamber, the checkpoint
+enemies/lurker 9 1 skin=insect range=3 hp=10
+enemies/hopper 20 4 skin=mini_rex_b range=4 hp=10
+items/painting 13.5 7 index=11
+zones/secret 13 7 name=painting_crypt rect=11,6,6,2
+items/food 12 7 index=3
+items/food 15 7 index=4
+items/food 6 3 index=0
+items/food 7 2 index=1
+items/food 8 3 index=2
+items/food 18 3 index=5
+items/food 19 2 index=6
+items/food 31 3 index=7
+items/food 33 2 index=8
+items/food 35 3 index=9
+# the Idol Court: the arena zone is the room (masonry falls over a hero inside it); the record is the Sun Idol
+zones/arena 38 15 name=court rect=29,5,20,12
+bosses/idols 47 15 arena=court hp=7
+# dressing
+props/ruins/brazier_glow 2 4
+props/ruins/column 10 4 layer=back
+props/ruins/idol_head_jade 16 4 layer=back
+props/ruins/column 22 4 layer=back
+props/ruins/brazier_glow 27 4
+props/ruins/urn 30 4
+props/ruins/glyph_tablet 34 4
+props/ruins/jar_a 42 4 layer=back
+props/ruins/skull_big 45 4 layer=back
+props/ruins/bone_pile 14 7
+props/ruins/brazier_glow 37 13
+props/ruins/brazier_glow 40 13
+props/ruins/stalactite 34 6
+props/ruins/drips 44 6
+
+[backwall]
+30 6 18 10 set=a deco=10
+1 1 27 4 set=b deco=15

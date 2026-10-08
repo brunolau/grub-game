@@ -1,0 +1,154 @@
+# Club & Grub - Feast Land E: "Pudding Lagoon" (designer D7, Book II "The Far Shore"), the bonus stage of 7-1.
+# Food-made and enemy-light like Feast Lands A-D (DESIGN.md A.2 / A.6, GAMEPLAY.md 13.2): custard islands under a
+# caramel top (`:` custard floors: the tar rules in a syrup skin), deadly berry syrup between them and wafer rafts
+# on its currents under a rain of fruit; spots in every island. The landing island, the first wafer reach,
+# checkpoint 1 on the jelly island, the fast second reach, checkpoint 2 on the long biscuit island; a hole in it
+# drops into the syrup grotto (a vine climbs back out), where a side current carries a raft to the cove of the Cave
+# Painting (index 18, in a big spot) and a spring throws the hero back up through a hatch; the third reach and the
+# warp home on the last
+# island. Four jelly flyers, no Expert extras, no pits.
+
+[meta]
+format = 2
+id = bonus_e
+name = "Feast Land E"
+kind = bonus
+book = 2
+order = 0
+world = 0
+stage = 0
+biome = feast
+terrain_a = feast/terrain_pudding
+terrain_b = feast/terrain_biscuit
+background = feast
+music = bonus_lagoon
+liquid = syrup
+bonus_tier = 2
+author = D7
+notes = "Bonus stage E, entered from w7_l1 (meta bonus = bonus_e). 60-90 s. No level codes: only the warp leads here."
+
+[legend]
+a = objects/hidden_spot kind=small count=3 contents=food:24,food:25,food:26 look=inset tile=#
+b = objects/hidden_spot kind=small count=3 contents=food:27,food:28,treasure:2 look=inset tile=#
+c = objects/hidden_spot kind=small count=3 contents=food:29,food:30,food:31 look=inset tile=%
+d = objects/hidden_spot kind=small count=2 contents=treasure:4,food:32 look=inset tile=#
+B = objects/hidden_spot kind=big hits=3 contents=giant:3 look=block tile=#
+P = objects/hidden_spot kind=big hits=3 contents=painting:18 look=inset tile=#
+C = objects/checkpoint
+
+[tiles]
+........................................................................................................................................................................................................
+........................................................................................................................................................................................................
+........................................................................................................................................................................................................
+........................................................................................................................................................................................................
+........................................................................................................................................................................................................
+........................................................................................................................................................................................................
+........................................................................................................................................................................................................
+........................................................................................................................................................................................................
+........................................................................................................................................................................................................
+........................................................................................................................................................................................................
+........................................................................................................................................................................................................
+........................................................................................................................................................................................................
+........................................................................................................................................................................................................
+........................................................................................................................................................................................................
+........................................................................................................................................................................................................
+........................................................................................................................................................................................................
+.....................................................##B##..............................................................................................................................................
+....................................................#######.............................................................................................................................................
+.............###....................................#######.................................................%%%%%.................................................................######................
+...@.........###b...........................C.......#######....................................C............%%%%%c................................................................######d...............
+####a##:::::######........................###::::#a#########::::#............................###d##..#################::::###########___::::#..............................#####b##########::::#########
+##################~~~~~~~~~~~~~~~~~~~~~~~~#######################~~~~~~~~~~~~~~~~~~~~~~~~~~~~######..################################..######~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#############################
+##################~~~~~~~~~~~~~~~~~~~~~~~~#######################~~~~~~~~~~~~~~~~~~~~~~~~~~~~#####.....................................######~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#############################
+##################################################################################################.....................................#################################################################
+##################################################################################################.....................................#################################################################
+##################################################################################################.....................................#################################################################
+#######################################################################################################..........................##P####################################################################
+#######################################################################################################~~~~~~~~~~~~~~~~~~~~~~~~~~#######################################################################
+#######################################################################################################~~~~~~~~~~~~~~~~~~~~~~~~~~#######################################################################
+########################################################################################################################################################################################################
+
+[entities]
+# island 1
+props/feast/pudding 2 19 layer=back
+props/feast/cherries 9 19
+props/feast/cream_swirl 14 17
+items/food 6 18 index=33
+items/food 8 17 index=34
+items/food 10 17 index=35
+items/food 12 18 index=36
+# reach 1: a wafer raft in still syrup at the bank, then a slow current; fruit rain over it
+objects/raft 19.5 21 width=4 skin=wafer
+zones/current 21 21 rect=21,21,18,2 dir=r speed=1
+zones/food_rain 18 19 rect=18,11,24,9 period=26 skin=fruit
+enemies/flyer 30 14 skin=jelly left=-4 right=4 speed=24 hp=10
+# island 2: checkpoint 1, the jelly hill and its big spot
+props/feast/jelly_pink 50 19
+props/feast/jelly_green 59 19
+props/feast/wafer_sticks 62 19 layer=back
+enemies/flyer 55 12 skin=jelly left=-5 right=5 speed=24 hp=10
+items/food 46 18 index=37
+items/food 53 14 index=38
+items/food 55 13 index=39
+items/food 57 14 index=40
+items/food 61 18 index=41
+# reach 2: the fast current
+objects/raft 66.5 21 width=4 skin=wafer
+zones/current 68 21 rect=68,21,22,2 dir=r speed=2
+zones/food_rain 65 19 rect=65,11,28,9 period=22 skin=fruit
+# island 3: checkpoint 2; the hole into the syrup grotto
+props/feast/cherries 97 19
+props/feast/cream_swirl 104 19
+props/feast/pudding 110 17 layer=back
+props/feast/jelly_green 124 19
+props/feast/wafer_sticks 128 19 layer=back
+enemies/flyer 115 13 skin=jelly left=-5 right=5 speed=24 hp=10
+items/food 103 18 index=42
+items/food 109 16 index=43
+items/food 111 16 index=44
+items/food 119 18 index=45
+items/food 125 18 index=46
+items/food 137 18 index=47
+# the syrup grotto: a raft on a side current to the cove; the painting in its big spot; a spring home
+zones/secret 100 26 name=syrup_grotto rect=98,22,37,5
+objects/raft 104 27 width=3 skin=wafer
+zones/current 105 27 rect=105,27,24,2 dir=r speed=1
+zones/food_rain 103 26 rect=103,22,26,5 period=30 skin=fruit
+objects/spring 134 25 power=-256
+objects/vine 99 20 length=6
+props/feast/jelly_pink 130 25
+# reach 3
+objects/raft 142.5 21 width=4 skin=wafer
+zones/current 144 21 rect=144,21,25,2 dir=r speed=1
+zones/food_rain 141 19 rect=141,11,30,9 period=26 skin=fruit
+enemies/flyer 157 14 skin=jelly left=-4 right=4 speed=24 hp=10
+# island 4: the cream hill and the warp home
+props/feast/pudding 175 19 layer=back
+props/feast/cream_swirl 181 17
+props/feast/cherries 192 19
+items/warp 196 19
+items/food 173 18 index=12
+items/food 180 16 index=13
+items/food 182 16 index=14
+items/food 188 18 index=15
+items/food 191 18 index=16
+# dressing
+props/feast/jelly_green 5 19
+props/feast/wafer_sticks 19.5 19
+props/feast/cream_swirl 43 19
+props/feast/cherries 47 19
+props/feast/pudding 63.5 19
+props/feast/jelly_pink 94 19
+props/feast/jelly_green 101 19
+props/feast/cherries 116 19
+props/feast/cream_swirl 121 19
+props/feast/jelly_pink 140 19
+props/feast/jelly_green 172 19
+props/feast/wafer_sticks 186 19
+props/feast/jelly_pink 194 19
+props/feast/pudding 198 19
+props/feast/cherries 100.5 25
+props/feast/pudding 126 19
+
+[backwall]
+98 22 37 6 set=a deco=25

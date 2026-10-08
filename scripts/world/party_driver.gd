@@ -116,6 +116,7 @@ func _weapons_step(level: LevelBase) -> void:
 			# A hero who is outside the walls (a teleport, a snap of the view) may still walk back in, never further out.
 			var x: int = hero.sim_pos.x
 			hero._fenced = true
+			hero._fence_clamp = false  # C.13: a step out of the walls is refused (a raft's rails clamp, C.7)
 			hero._fence_left = mini(walls.x, x)
 			hero._fence_right = maxi(walls.y, x + 1)
 	if level.wind != 0 or level.lee_mask != 0 or _lee_sign != 0:
@@ -582,7 +583,10 @@ func is_at_exit(hero: PlayerBase) -> bool:
 	return hero != null and (exit_mask & (1 << clampi(hero.slot, 0, Defs.MAX_PLAYERS - 1))) != 0
 
 
-## True when some hero arrived at the exit and every other hero arrived too or is an egg on the view.
+## True when some hero arrived at the exit and every other hero arrived too or is an egg on the view. IDLE rule (G33,
+## lead designer's ruling of phase 3): the exit waits only for heroes who play - an IDLE hatched hero (PlayerBase.
+## is_idle) on the view counts as present, as an egg on the view does (an AFK partner never blocks the exit; off the
+## view the leash makes him an egg anyway). A hero in his death toss is never present (the totem waits).
 func team_at_exit() -> bool:
 	var level: LevelBase = Game.level
 	if level == null or exit_mask == 0:
@@ -591,7 +595,7 @@ func team_at_exit() -> bool:
 	for hero: PlayerBase in level.contact_order():
 		if is_at_exit(hero):
 			continue
-		if hero.is_down() and not hero.dead and frame.has_point(hero.sim_pos - Vector2i(0, 1)):
+		if (hero.down or hero.idle) and not hero.dead and frame.has_point(hero.sim_pos - Vector2i(0, 1)):
 			continue
 		return false
 	return true

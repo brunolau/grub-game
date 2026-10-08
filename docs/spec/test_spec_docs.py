@@ -510,6 +510,119 @@ class RisingCameraAndLee(unittest.TestCase):
         self.assertIn("a croucher\n  is never idle [G41]", _section(APPENDIX_C, "### C.6"))
         self.assertIn("else build the fallback, a Brace corridor [G41]", LEVEL_DESIGN_15)
 
+    def test_the_footing_follow_is_built_and_the_docs_say_so(self):
+        # world-A built G42 in phase 3: the docs no longer keep G32's "every jump lands higher" as a building rule.
+        cam = _read("scripts/world/level_camera.gd")
+        self.assertRegex(cam, r"var footing_mode: bool")
+        self.assertRegex(cam, r"func _note_footing\(")
+        self.assertRegex(_read("scripts/world/level.gd"), r"footing_mode = rising")
+        self.assertRegex(_read("tests/test_world_book2.gd"), r"func test_the_rising_view_follows_the_footing_not_a_jump")
+        c8 = _section(APPENDIX_C, "### C.8")
+        self.assertIn("built in phase 3 by world-A: `LevelCamera.footing_mode`", c8)
+        self.assertNotIn("Until it is built", c8)
+        self.assertIn("never ask a hero to step down more than 2 rows", _section(LEVEL_DESIGN_15, "### 15.5"))
+        self.assertNotIn("until the footing follow is built", LEVEL_DESIGN_15)
+        self.assertIn("**engine change, built in phase 3 by world-A**", DESIGN)
+        self.assertNotIn("Until world-A confirms it, G32 stays", DESIGN)
+        self.assertIn("never a jump's apex, so a jump in place lands in view [G42]", GAMEPLAY_13.replace("\n  ", " "))
+
+
+def _meta(level_id):
+    """The [meta] keys of a level file (first value wins)."""
+    text = _read("levels/%s.lvl" % level_id)
+    out = {}
+    in_meta = False
+    for line in text.splitlines():
+        if line.startswith("["):
+            in_meta = line.strip() == "[meta]"
+            continue
+        m = re.match(r"^(\w+)\s*=\s*(.*?)\s*$", line) if in_meta else None
+        if m:
+            out.setdefault(m.group(1), m.group(2).strip('"'))
+    return out
+
+
+class BossObjectsAndHumanOnlyArenas(unittest.TestCase):
+    """[G49] a boss's own objects are no gate; [G50] arena meta `bots` is cut 4's switch."""
+
+    def test_the_docs(self):
+        self.assertIn("A boss's own objects are no gate mechanism [G49]", LEVEL_DESIGN_15)
+        self.assertIn("are no gate and carry no tablet [G49]", _section(DESIGN, "### D.8"))
+        self.assertIn("| `bots` | a subset of `modes`, or `none` | every mode of `modes` |", LEVEL_DESIGN_15)
+        self.assertIn("PLAN cut 4\n  [G50]", _section(LEVEL_DESIGN_15, "### 15.8"))
+        self.assertIn("arena meta `bots` leaves the mode out (DESIGN.md G50", PLAN)
+
+    def test_the_colossus_coop_hall_has_its_chains_and_no_tablet(self):
+        path = os.path.join(ROOT, "levels", "w4_l2b_coop.lvl")
+        _pending(self, os.path.exists(path), "DB3: levels/w4_l2b_coop.lvl (waits for world-B's validator rule G49, "
+                 "wf9_db3_to_world_b.txt)")
+        text = _read("levels/w4_l2b_coop.lvl")
+        self.assertGreaterEqual(len(re.findall(r"^objects/plate\b", text, re.M)), 2, "the visor's two chain plates")
+        self.assertNotRegex(text, r"(?m)^objects/x2_tablet\b", "a boss stage's co-op form is its gate: no dummy tablet")
+
+    def test_arena_bots_lists_are_subsets_of_modes(self):
+        for path in sorted(glob.glob(os.path.join(ROOT, "levels", "arena_*.lvl"))):
+            level_id = os.path.basename(path)[:-4]
+            meta = _meta(level_id)
+            if "bots" not in meta:
+                continue
+            modes = set(m.strip() for m in meta.get("modes", "").split(",") if m.strip())
+            bots = meta["bots"].strip()
+            if bots == "none":
+                continue
+            self.assertEqual(set(m.strip() for m in bots.split(",")) - modes, set(),
+                             "%s: `bots` names a mode outside `modes` [G50]" % level_id)
+
+
+class PendingOwnerChanges(unittest.TestCase):
+    """Phase-3 rulings whose code belongs to an owner who has not built them yet: skipped with the request named
+    until the owner's file carries the change, asserted from then on (so the gate table shows what is open)."""
+
+    def test_g33_traits_count_only_active_heroes(self):
+        src = _read("scripts/enemies/coop_traits.gd")
+        _pending(self, "nearest_coop_hero" in src or "counts_for_coop" in src,
+                 "enemies-A (no owner this phase): coop_traits.gd still counts idle heroes - shell bait, lone, "
+                 "count-ins (wf9_lead_design_to_enemies_a.txt #1, wf9_party_to_enemies-A.txt)")
+        shell = src[src.index("SHELL"):] if "SHELL" in src else src
+        self.assertRegex(shell, r"nearest_coop_hero|counts_for_coop")
+
+    def test_g47_the_daze_is_slot_bound(self):
+        src = _read("scripts/enemies/coop_traits.gd")
+        _pending(self, "G47" in src, "enemies-A (no owner this phase): the daze is not slot-bound yet "
+                 "(wf9_lead_design_to_enemies_a.txt #2)")
+        self.assertRegex(src, r"slot")
+
+    def test_g45_a_railed_raft_opens_at_the_bank(self):
+        src = _read("scripts/objects/raft.gd")
+        _pending(self, "G45" in src, "objects-B (no owner this phase): rails open towards a bank; the ride test "
+                 "covers the whole fence (wf9_lead_design_to_objects_b.txt)")
+        self.assertRegex(src, r"bank")
+
+    def test_g53_an_idle_hero_blocks_no_mover(self):
+        self.assertIn("**blocks no mover** [G53]", _section(APPENDIX_C, "### C.10"))
+        self.assertIn("an idle body is no doorstop [G53]", GAMEPLAY_13)
+        self.assertIn("- **No doorstops** [G53]", LEVEL_DESIGN_15)
+        src = _read("scripts/objects/rising_column.gd")
+        blocked = src[src.index("func _blocked_below"):] if "func _blocked_below" in src else src
+        _pending(self, "counts_for_coop" in blocked or "G53" in src,
+                 "objects-A (party): a plate door / slab / boulder does not wait for an idle hero "
+                 "(wf9_lead_design_to_party.txt #2)")
+        self.assertRegex(src, r"counts_for_coop|G53")
+
+    def test_g52_inkjaw_drops_its_key_item_over_an_island(self):
+        src = _read("scripts/bosses/squid.gd")
+        _pending(self, re.search(r"func _drop_origin\(", src) is not None,
+                 "enemies-B: Inkjaw's _drop_origin over the nearest island, a sunk key item back on ground "
+                 "(wf9_lead_design_to_enemies_b.txt #3)")
+        self.assertIn("[G52]", _section(DESIGN, "### B.0"))
+
+    def test_g46_the_roc_cruises_over_one_runway_half(self):
+        # Built by enemies-C in phase 3 (roc.gd, test_enemies_roc.gd); DESIGN G46 says so.
+        src = _read("scripts/bosses/roc.gd")
+        self.assertIn("G46", src)
+        self.assertRegex(_read("tests/test_enemies_roc.gd"), r"(?s)cruise.*weak_point_problem|weak_point_problem.*cruise")
+        self.assertIn("Built in phase 3 by enemies-C (`roc.gd`", DESIGN)
+
 
 def _arena_geometry_from_file(level_id):
     """Rows of an arena file's tiles reduced to collision: solid '#', one-way '-', liquid '~', else '.'."""

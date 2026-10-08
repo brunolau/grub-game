@@ -158,6 +158,34 @@ func test_a_hero_off_the_view_becomes_an_egg_after_the_leash() -> void:
 			"the egg is inside the view")
 
 
+## wf9 DB1 -> player-A: a hero CARRIED past the side of the frame (more than the 20 columns of C.13's off-screen rule,
+## e.g. by a ride platform: his own steps stop at the edge walls) while a partner holds the view is leashed like a hero
+## above or below it - an egg after the leash, no instant "off_screen" death that wipes the team. With nobody holding
+## the view the 1.0 rule still downs him at once.
+func test_a_hero_carried_past_the_side_of_the_view_is_leashed_not_killed() -> void:
+	var level: Level = _load(2)
+	var p2: PlayerBase = level.get_hero(1)
+	var frame: Rect2i = level.get_party_frame()
+	var cell_x: int = frame.position.x >> 4
+	p2.teleport(Vector2i((cell_x + Tuning.DEATH_COLS_FROM_CAMERA + 3) * 16 + 8, FLOOR_Y))
+	Sim.step(1)
+	assert_false(p2.dead, "beside the frame while P1 holds the view: not downed off_screen")
+	assert_false(p2.is_down())
+	var limit: int = PartyTuning.leash_egg_ticks(Defs.Difficulty.BEGINNER)
+	Sim.step(limit)
+	assert_true(p2.is_down(), "the leash made him an egg")
+	assert_false(p2.dead)
+	assert_eq(Game.lives, Tuning.LIVES_START, "no life lost, no team wipe")
+	# Nobody holds the view (P1 an egg): the 1.0 rule.
+	var p1: PlayerBase = level.player
+	p2.hatch(null, 2)
+	p1.go_down(&"voluntary")
+	frame = level.get_party_frame()
+	p2.teleport(Vector2i(((frame.position.x >> 4) + Tuning.DEATH_COLS_FROM_CAMERA + 3) * 16 + 8, FLOOR_Y))
+	Sim.step(1)
+	assert_true(p2.dead, "alone in the tribe: off_screen at once")
+
+
 func test_a_hero_standing_on_a_high_ledge_is_never_leashed() -> void:
 	# 30 rows, the floor's feet at y 416 (row 26); a pillar at columns 12-15 whose top is 8 rows higher (y 288): an
 	# Expert boost ledge. P1 stands on the floor, P2 on the ledge - neither moves for longer than the leash.
@@ -625,6 +653,31 @@ func test_the_team_exit_waits_for_the_partner_or_his_egg_on_the_view() -> void:
 	p2.hatch(null, 2)
 	assert_false(driver.team_at_exit())
 	assert_true(driver.exit_touched(null, p2), "both at the exit")
+
+
+## IDLE rule (G33, lead designer's ruling of phase 3): the exit waits only for heroes who play - an IDLE partner on
+## the view counts as present (as an egg does); off the view, or in his death toss, he does not.
+func test_the_team_exit_does_not_wait_for_an_idle_partner_on_the_view() -> void:
+	var level: Level = _load(2)
+	var p1: PlayerBase = level.player
+	var p2: PlayerBase = level.get_hero(1)
+	var driver: PartyDriver = _driver(level)
+	_hold(0, Defs.IN_SWAP)
+	_hold(1, 0)
+	Sim.step(1)
+	assert_true(p2.is_idle(), "P2's player never pressed anything")
+	assert_false(p1.is_idle())
+	var frame: Rect2i = level.get_party_frame()
+	assert_true(frame.has_point(p2.sim_pos - Vector2i(0, 1)), "P2 stands on the view")
+	assert_true(driver.exit_touched(null, p1), "P1 arrives: the dozing partner on the view counts as present")
+	driver.exit_mask = 0
+	p1.set_control_enabled(true)
+	p2.teleport(Vector2i(frame.end.x + 64, p2.sim_pos.y))
+	assert_false(driver.exit_touched(null, p1), "an idle partner off the view is not there (the leash eggs him)")
+	p2.teleport(Vector2i(p1.sim_pos.x + 32, p1.sim_pos.y))
+	assert_true(driver.team_at_exit(), "back on the view: present")
+	p2.idle = false
+	assert_false(driver.team_at_exit(), "a partner who plays must walk to the totem himself")
 
 
 func test_a_gate_takes_the_partner_along_or_as_an_egg() -> void:

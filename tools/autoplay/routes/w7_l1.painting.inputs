@@ -1,0 +1,5 @@
+# route: level=w7_l1 difficulty=beginner belt=spear ends=none expect=hurts:0,painting:6,secrets:1
+# Featured route of Shell Beach (designer D7): with the spear on the belt, two throws into the bark boards of
+# the drift-log stack behind the landing beach (3 rows apart), up the two spear steps to its top: the Cave
+# Painting (index 6).
+8:L,7:,1:S,10:,6:UF,8:,6:LU,3:L,21:,2:U,6:F,20:,9:U,18:,9:LU,4:L,2:,3:R,20:

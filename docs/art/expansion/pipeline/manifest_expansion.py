@@ -342,7 +342,9 @@ def section_lines(reg=None):
         W("")
         W("Honey Falls (`bonus_d`) and Pudding Lagoon (`bonus_e`): two terrain atlases in the 40-tile layout and "
           "collision of 10.1, and `props/feast/<name>` pictures (`assets/tiles/feast/props/`, no collision). Their "
-          "liquids (`honey`, `syrup`), ':' floors, the soda geyser and the wafer raft are phase-1 files (17.3, 17.10).")
+          "liquids (`honey`, `syrup`), the honey ':' floor, the soda geyser and the wafer raft are phase-1 files "
+          "(17.3, 17.10); phase 3 adds Pudding Lagoon's custard ':' floor (`tiles/feast/syrup_floor.png`, found "
+          "before the berry-syrup floor of 17.10 in a feast-biome level).")
         W("")
         table(["File", "Size", "Pivot", "Use"],
               [[_short(k), _sz(R[k]), _pv(R[k]), R[k].get("note", "")] for k in kfe])

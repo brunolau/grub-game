@@ -160,6 +160,28 @@ class Lab:
 			if is_instance_valid(node) and node.is_queued_for_deletion():
 				node.free()
 
+	## True while some hero's weapon can still land: a strike in progress (PlayerBase.is_striking - a throw leaves the
+	## hand on its last tick), a club box this tick, or a thrown weapon in flight (not spent, not on its way out of the
+	## tree). The searches end a trial once its input is over and this is false: nothing is left that could hurt the
+	## boss, so the hit counts are the same as with the full trial - only the idle tail is skipped.
+	func weapon_live() -> bool:
+		for slot: int in party:
+			var h: PlayerBase = hero(slot)
+			if h != null and (h.is_striking() or h.club_box_active):
+				return true
+		for entity: SimEntity in level.get_kind(Defs.Kind.HERO_PROJECTILE):
+			var shot: ProjectileBase = entity as ProjectileBase
+			if shot != null and not shot.spent and not shot.is_queued_for_deletion():
+				return true
+		return false
+
+	## The index of the last tick of `macro` that holds an input flag (-1 for none).
+	static func last_input(macro: PackedInt32Array) -> int:
+		for i: int in range(macro.size() - 1, -1, -1):
+			if macro[i] != 0:
+				return i
+		return -1
+
 	## DESIGN.md G35: the two extreme views (logical px) the camera can show inside the level's lock - the highest and
 	## leftmost, the lowest and rightmost (the lock limits of the world module's LevelCamera, recomputed here); every
 	## other view lies between them. Empty when no lock holds.
@@ -180,10 +202,19 @@ class Lab:
 			views.append(Rect2i(limits[i], view))
 		return views
 
-	## G35: the least distance (logical px) from the view's top to `rect`'s top over the views the lock allows.
+	## G35: the views a weak point is checked in - the two extreme views the lock allows ([method locked_views]) and the
+	## camera's view of this tick (LevelBase.get_view_rect, as integration's route check reads it: a camera still easing
+	## into the lock shows up here). Empty when no lock holds.
+	func g35_views() -> Array[Rect2i]:
+		var views: Array[Rect2i] = locked_views()
+		if not views.is_empty():
+			views.append(level.get_view_rect())
+		return views
+
+	## G35: the least distance (logical px) from the view's top to `rect`'s top over [method g35_views].
 	func top_clearance(rect: Rect2i) -> int:
 		var least: int = 1 << 20
-		for view: Rect2i in locked_views():
+		for view: Rect2i in g35_views():
 			least = mini(least, rect.position.y - view.position.y)
 		return least
 
@@ -200,15 +231,16 @@ class Lab:
 
 	## DESIGN.md G35 (as corrected, wf9_lead_design_to_all.txt #2): "" when `rect` (a weak point, logical px) passes
 	## ui's rule - Hud.weak_point_problem: wholly inside the view and 24 logical px clear of the fight HUD's band (its
-	## top row everywhere, the boss bar in the middle columns) - in every view the camera lock allows; else why not.
+	## top row everywhere, the boss bar in the middle columns) - in every view the camera lock allows and in the camera's
+	## view of this tick ([method g35_views]); else why not.
 	func hud_clear(rect: Rect2i) -> String:
-		var views: Array[Rect2i] = locked_views()
+		var views: Array[Rect2i] = g35_views()
 		if views.is_empty():
 			return "no camera lock"
 		for view: Rect2i in views:
 			var art: Rect2 = Rect2(Vector2(rect.position - view.position) * Tuning.ART_SCALE,
 					Vector2(rect.size) * Tuning.ART_SCALE)
-			var problem: String = Hud.weak_point_problem(art, Vector2(VIEW_ART))
+			var problem: String = Hud.weak_point_problem(art, Vector2(view.size * Tuning.ART_SCALE))
 			if problem != "":
 				return "%s in the view %s: %s" % [rect, view, problem]
 		return ""
@@ -668,9 +700,9 @@ func test_coop_weak_window_is_shorter_than_the_measured_solo_minimum() -> void:
 func test_the_single_hero_search_cannot_hurt_the_coop_form() -> void:
 	var coop: Dictionary = _search(true, true)
 	var solo: Dictionary = _search(false, false, 20)
-	print("    single-hero search: %d trials (partner idle %d / egg %d trials, counted on %d ticks), co-op form hit %d times; solo form hit %d times in %d trials" % [
-		coop["trials"], coop["idle_trials"], coop["egg_trials"], coop["partner_counted"], coop["hits"], solo["hits"],
-		solo["trials"]])
+	print("    single-hero search: %d trials, %d ticks (partner idle %d / egg %d trials, counted on %d ticks), co-op form hit %d times; solo form hit %d times in %d trials" % [
+		coop["trials"], coop["ticks"], coop["idle_trials"], coop["egg_trials"], coop["partner_counted"], coop["hits"],
+		solo["hits"], solo["trials"]])
 	assert_true(int(coop["trials"]) >= 900)
 	assert_true(int(coop["idle_trials"]) >= 600 and int(coop["egg_trials"]) >= 100, "both partner kinds were tried")
 	assert_eq(int(coop["partner_counted"]), 0, "the partner never counted for a co-op rule (he never pressed anything)")
@@ -964,7 +996,8 @@ func _wake_both() -> void:
 ## something - at a distance on either side, then plays one input macro with one hand weapon. `partner`: a second hero
 ## whose slot never presses anything (IDLE from his first tick, G33) stands where his player could have hatched him, a
 ## different spot each trial ([method _place_partner]), or lies there as an egg. `max_hits` > 0 ends the search at that
-## many hits (the solo form's "not blind" check). Spent projectiles and effects are freed between trials (Lab.flush).
+## many hits (the solo form's "not blind" check). Spent projectiles and effects are freed between trials (Lab.flush),
+## and a trial ends once its input is over and no weapon can still land (Lab.weapon_live): same hits, fewer ticks.
 func _search(coop_form: bool, partner: bool, max_hits: int = 0) -> Dictionary:
 	var boar: Tusker = _open(Defs.Difficulty.BEGINNER, 2 if partner else 1, coop_form)
 	var hero: PlayerBase = _lab.hero()
@@ -972,7 +1005,7 @@ func _search(coop_form: bool, partner: bool, max_hits: int = 0) -> Dictionary:
 	var frame: PackedInt32Array = PackedInt32Array([0, 0]) if partner else PackedInt32Array([0])
 	_lab.step(frame)
 	var result: Dictionary = {"trials": 0, "hits": 0, "first": "", "idle_trials": 0, "egg_trials": 0,
-		"partner_counted": 0}
+		"partner_counted": 0, "ticks": 0}
 	var weapons: Array[int] = [Defs.Weapon.CLUB, Defs.Weapon.HAMMER, Defs.Weapon.AXE, Defs.Weapon.BOOMERANG,
 		Defs.Weapon.SPEAR]
 	var trial: int = 0
@@ -1002,14 +1035,18 @@ func _search(coop_form: bool, partner: bool, max_hits: int = 0) -> Dictionary:
 						_lab.wake(0)
 						var egg: bool = _place_partner(p2, trial, dx)
 						result["egg_trials" if egg else "idle_trials"] = int(result["egg_trials" if egg else "idle_trials"]) + 1
-					for flags: int in macro:
-						frame[0] = flags
+					var last: int = Lab.last_input(macro)
+					for i: int in macro.size():
+						frame[0] = macro[i]
 						if stuck:
 							boar._timer = 0
 						_lab.step(frame)
+						result["ticks"] = int(result["ticks"]) + 1
 						if partner and p2.counts_for_coop():
 							result["partner_counted"] = int(result["partner_counted"]) + 1
 						if boar.hp < boar.max_hp:
+							break
+						if i > last and not _lab.weapon_live():
 							break
 					if boar.hp < boar.max_hp:
 						result["hits"] = int(result["hits"]) + 1

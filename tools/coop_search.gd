@@ -12,7 +12,13 @@ extends SceneTree
 ##   ... -- --profile           where the time of every search went (reset, place, step, sig, build, windows ...)
 ##   ... -- --sim-profile       the tick time by entity script (Sim's development profiler hook)
 ##   ... -- --nodes             print every resting point the search expands (and what its world changed)
+##   ... -- --egg               the partner stays an egg (no idle hatched partner, CoopSearch.idle_partner = false): tells a
+##                              gate one player opens through his idle partner from one he opens alone
+##   ... -- --stats             runs, ticks and new resting points per macro group (what the search spends its time on)
 ##   ... -- --no-cache          no result cache (neither the in-process nor the file cache of CoopSearch)
+##   ... -- --queue=<dir>       a WORKER of a shared queue: take the gates dearest first (CoopSearch.order_by_cost) and
+##                              search only those this process claims in <dir> (CoopSearch.claim_gate) - N workers
+##                              started on the same <dir> share the table without a fixed split (tools/world_coop_gates.sh)
 ## Prints one line per gate (refused / REACHED, seconds, resting points, runs, ticks simulated) and a summary. Exit
 ## code 0 = every gate refused and every window below its solo minimum - 4, 1 = not, 2 = bad arguments.
 ##
@@ -61,6 +67,9 @@ func _run() -> void:
 	var cache: bool = true
 	var sim_profile: SimProfile = null
 	var search_debug: bool = false
+	var stats: bool = false
+	var queue: String = ""
+	var egg: bool = false
 	for argument: String in OS.get_cmdline_user_args():
 		if argument == "--list":
 			listing = true
@@ -70,6 +79,12 @@ func _run() -> void:
 			sim_profile = SimProfile.new()
 		elif argument == "--nodes":
 			search_debug = true
+		elif argument == "--stats":
+			stats = true
+		elif argument == "--egg":
+			egg = true
+		elif argument.begins_with("--queue="):
+			queue = argument.get_slice("=", 1)
 		elif argument == "--no-cache":
 			cache = false
 		elif argument.begins_with("--shard="):
@@ -93,6 +108,9 @@ func _run() -> void:
 	search.set(&"use_cache", cache)
 	search.set(&"debug_nodes", search_debug)
 	search.set(&"use_file_cache", cache)
+	search.set(&"collect_stats", stats)
+	if egg:
+		search.set(&"idle_partner", false)
 	var table: Array = search.call(&"gate_table")
 	if shard.y > 1:
 		table = search.call(&"shard_gates", table, shard.x, shard.y)
@@ -110,9 +128,16 @@ func _run() -> void:
 		return
 	if sim_profile != null:
 		root.get_node("Sim").set(&"_profiler", sim_profile)
+	if queue != "":
+		chosen = search.call(&"order_by_cost", chosen)
 	var failures: int = 0
+	var searched: int = 0
 	var started: int = Time.get_ticks_msec()
 	for entry: Dictionary in chosen:
+		if queue != "" and not bool(search.call(&"claim_gate", queue, entry["level"], int(entry["difficulty"]),
+				str(entry["gate"]))):
+			continue   # another worker has it
+		searched += 1
 		search.call(&"profile_reset")
 		var clock: int = Time.get_ticks_msec()
 		var result: Dictionary = search.call(&"search_gate", entry["level"], entry["difficulty"], entry["gate"])
@@ -121,6 +146,8 @@ func _run() -> void:
 		var reached: bool = bool(result.get("reached", true))
 		var bad_windows: PackedStringArray = PackedStringArray()
 		for window: Dictionary in result.get("windows", []):
+			if bool(window.get("slot_bound", false)):
+				continue   # G34 / G47: one player never meets it, whatever its window (test_coop_gates exempts it too)
 			if int(window["window"]) > int(window["solo_min"]) - 4:
 				bad_windows.append("%s window %d solo_min %d" % [window["what"], window["window"], window["solo_min"]])
 		if reached or not bad_windows.is_empty():
@@ -139,13 +166,16 @@ func _run() -> void:
 			for part: StringName in profile:
 				parts.append("%s %.1f s" % [part, int(profile[part]) / 1000000.0])
 			print("    profile: %s" % ", ".join(parts))
+		if stats:
+			for line: String in search.call(&"stats_report"):
+				print("    %s" % line)
 		if sim_profile != null:
 			print("    sim: %s" % sim_profile.report())
 			sim_profile.calls.clear()
 			sim_profile.parts.clear()
 		# Let the main loop turn: the freed search world's canvas callbacks are flushed (wf8_D5_to_integration #1).
 		await process_frame
-	print("coop_search: %d gate(s) in %.1f s, %d failing" % [chosen.size(), (Time.get_ticks_msec() - started) / 1000.0,
+	print("coop_search: %d gate(s) in %.1f s, %d failing" % [searched, (Time.get_ticks_msec() - started) / 1000.0,
 		failures])
 	_finish(1 if failures > 0 else 0)
 

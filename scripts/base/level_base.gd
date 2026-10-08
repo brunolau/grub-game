@@ -118,6 +118,21 @@ var _dz_more_count: int = 0
 var _dz_scratch: PackedInt32Array = PackedInt32Array()
 var _doze_feet: PackedInt32Array = PackedInt32Array()
 var _doze_views: Array[Rect2i] = []
+## The column index of the DOZING entities (phase-3 performance pass, [method _doze_index_pass]): bucket c holds every
+## dozing entity whose stored doze area touches the grid column c (x >> 6, Tuning.DOZE_GRID_PX); an area wider than
+## DZ_WIDE_COLS columns sits in `_dz_wide` instead. `_dz_ins` keeps per doze slot the columns it is filed under (first,
+## last; -1 = not filed, -2 = in `_dz_wide`). Only dozing entities are filed: a dozing entity's area does not move, and
+## after every decision it lies off every doze rectangle, so a full pass need only look at the awake entities, the
+## noted ones and the dozing ones under a doze rectangle - exactly the slots on which the full scan can act.
+var _dz_buckets: Dictionary = {}
+var _dz_wide: Array[SimEntity] = []
+var _dz_ins: PackedInt32Array = PackedInt32Array()
+## True when the index cannot vouch for every dozing entity (an entity registered while suspended): the next full
+## pass scans every slot ([method _doze_full_pass]) and files what it finds.
+var _dz_scan: bool = false
+var _dz_cands: PackedInt32Array = PackedInt32Array()
+var _dz_mark: PackedByteArray = PackedByteArray()
+const DZ_WIDE_COLS: int = 24
 
 ## PlayerSet bookkeeping: the number of registered heroes (non-null entries of `heroes`), the contact orders of a
 ## party (index r = the heroes in slot order rotated by r; rebuilt when the party changes, so contact_order() never
@@ -212,6 +227,11 @@ func register_entity(entity: SimEntity) -> void:
 		_doze.append(entity)
 		_doze_rects.append_array([0, 0, 0, 0])
 		_doze_known.append(0)
+		_dz_ins.append(-1)
+		_dz_ins.append(-1)
+		_dz_mark.append(0)
+		if entity._sim_suspended:
+			_dz_scan = true  # suspended without the manager: only a scan finds it
 
 
 ## Called by SimEntity when it leaves the tree.
@@ -235,6 +255,7 @@ func unregister_entity(entity: SimEntity) -> void:
 	_awake_remove(entity)
 	var slot: int = entity._doze_slot
 	if slot >= 0 and slot < _doze.size() and _doze[slot] == entity:
+		_dz_unfile(slot)
 		# Swap with the last slot (the order of the doze list does not matter).
 		var last: int = _doze.size() - 1
 		var moved: SimEntity = _doze[last]
@@ -243,9 +264,13 @@ func unregister_entity(entity: SimEntity) -> void:
 		for j: int in 4:
 			_doze_rects[slot * 4 + j] = _doze_rects[last * 4 + j]
 		_doze_known[slot] = _doze_known[last]
+		_dz_ins[slot * 2] = _dz_ins[last * 2]
+		_dz_ins[slot * 2 + 1] = _dz_ins[last * 2 + 1]
 		_doze.resize(last)
 		_doze_rects.resize(last * 4)
 		_doze_known.resize(last)
+		_dz_ins.resize(last * 2)
+		_dz_mark.resize(last)
 	entity._doze_slot = -1
 
 
@@ -1074,6 +1099,8 @@ func _doze_update() -> void:
 	if _doze_full or more_changed or view_left != _dz_view_left or view_top != _dz_view_top \
 			or view_right != _dz_view_right or view_bottom != _dz_view_bottom or hero_left != _dz_hero_left \
 			or hero_top != _dz_hero_top or hero_right != _dz_hero_right or hero_bottom != _dz_hero_bottom:
+		# A forced pass (a respawn: every area unknown) or an entity the index does not know scans every slot.
+		var scan: bool = _doze_full or _dz_scan
 		_doze_full = false
 		_dz_view_left = view_left
 		_dz_view_top = view_top
@@ -1083,8 +1110,12 @@ func _doze_update() -> void:
 		_dz_hero_top = hero_top
 		_dz_hero_right = hero_right
 		_dz_hero_bottom = hero_bottom
-		_doze_notes.clear()
-		_doze_full_pass()
+		if scan:
+			_dz_scan = false
+			_doze_notes.clear()
+			_doze_full_pass()
+		else:
+			_doze_index_pass()
 		return
 	if _doze_notes.is_empty():
 		return
@@ -1136,8 +1167,136 @@ func _doze_full_pass() -> void:
 		if entity._sim_suspended:
 			if not far:
 				_doze_wake_entity(entity)
+			elif _dz_ins[slot * 2] == -1:
+				_dz_file(slot)
 		elif far:
 			_doze_check(slot)
+
+
+## A full pass through the column index ([member _dz_buckets]): the decisions of [method _doze_full_pass], in the same
+## (slot) order, on the slots where that scan can act - every awake entity of the doze list, every entity noted since
+## the last decision (its area is unknown) and every dozing entity filed under a column of a doze rectangle (view, first
+## hero, `_dz_more`). Every other slot holds a dozing entity whose area touches no doze rectangle, which the scan leaves
+## alone too. (Phase-3 performance pass: a long level's full pass looks at about a third of its slots.)
+func _doze_index_pass() -> void:
+	var cands: PackedInt32Array = _dz_cands
+	cands.resize(0)
+	var mark: PackedByteArray = _dz_mark
+	for entity: SimEntity in _awake:
+		var slot: int = entity._doze_slot
+		if slot >= 0 and mark[slot] == 0:
+			mark[slot] = 1
+			cands.append(slot)
+	for entity: SimEntity in _doze_notes:
+		if is_instance_valid(entity):
+			var slot: int = entity._doze_slot
+			if slot >= 0 and slot < mark.size() and _doze[slot] == entity and mark[slot] == 0:
+				mark[slot] = 1
+				cands.append(slot)
+	_doze_notes.clear()
+	for entity: SimEntity in _dz_wide:
+		var slot: int = entity._doze_slot
+		if mark[slot] == 0:
+			mark[slot] = 1
+			cands.append(slot)
+	_dz_collect(_dz_view_left, _dz_view_right)
+	_dz_collect(_dz_hero_left, _dz_hero_right)
+	for r: int in _dz_more_count:
+		_dz_collect(_dz_more[r * 4], _dz_more[r * 4 + 2])
+	cands.sort()
+	for slot: int in cands:
+		mark[slot] = 0
+	# The scan's loop body, slot by slot in slot order.
+	var view_left: int = _dz_view_left
+	var view_top: int = _dz_view_top
+	var view_right: int = _dz_view_right
+	var view_bottom: int = _dz_view_bottom
+	var hero_left: int = _dz_hero_left
+	var hero_top: int = _dz_hero_top
+	var hero_right: int = _dz_hero_right
+	var hero_bottom: int = _dz_hero_bottom
+	var more: PackedInt32Array = _dz_more
+	var more_end: int = _dz_more_count * 4
+	for slot: int in cands:
+		if _doze_known[slot] == 0:
+			_doze_check(slot)
+			continue
+		var k: int = slot * 4
+		var left: int = _doze_rects[k]
+		var right: int = _doze_rects[k + 2]
+		if right <= left:
+			_doze_check(slot)
+			continue
+		var top: int = _doze_rects[k + 1]
+		var bottom: int = _doze_rects[k + 3]
+		var far: bool = (right <= view_left or left >= view_right or bottom <= view_top or top >= view_bottom) \
+				and (right <= hero_left or left >= hero_right or bottom <= hero_top or top >= hero_bottom)
+		if far:
+			var j: int = 0
+			while j < more_end:
+				if not (right <= more[j] or left >= more[j + 2] or bottom <= more[j + 1] or top >= more[j + 3]):
+					far = false
+					break
+				j += 4
+		var entity: SimEntity = _doze[slot]
+		if entity._sim_suspended:
+			if not far:
+				_doze_wake_entity(entity)
+		elif far:
+			_doze_check(slot)
+
+
+## Adds to `_dz_cands` (marked in `_dz_mark`) every filed dozing entity of the grid columns of [left, right) (px).
+func _dz_collect(left: int, right: int) -> void:
+	for col: int in range(left >> 6, ((right - 1) >> 6) + 1):
+		var bucket: Variant = _dz_buckets.get(col)
+		if bucket == null:
+			continue
+		for entity: SimEntity in bucket:
+			var slot: int = entity._doze_slot
+			if _dz_mark[slot] == 0:
+				_dz_mark[slot] = 1
+				_dz_cands.append(slot)
+
+
+## Files the (dozing) entity of `slot` under the grid columns of its stored area.
+func _dz_file(slot: int) -> void:
+	if _dz_ins[slot * 2] != -1:
+		_dz_unfile(slot)
+	var entity: SimEntity = _doze[slot]
+	var k: int = slot * 4
+	var first: int = _doze_rects[k] >> 6
+	var last: int = (_doze_rects[k + 2] - 1) >> 6
+	if _doze_rects[k + 2] <= _doze_rects[k] or last - first + 1 > DZ_WIDE_COLS:
+		_dz_wide.append(entity)
+		_dz_ins[slot * 2] = -2
+		_dz_ins[slot * 2 + 1] = -2
+		return
+	for col: int in range(first, last + 1):
+		var bucket: Variant = _dz_buckets.get(col)
+		if bucket == null:
+			_dz_buckets[col] = [entity]
+		else:
+			(bucket as Array).append(entity)
+	_dz_ins[slot * 2] = first
+	_dz_ins[slot * 2 + 1] = last
+
+
+## Takes the entity of `slot` out of the column index (nothing when it is not filed).
+func _dz_unfile(slot: int) -> void:
+	var first: int = _dz_ins[slot * 2]
+	if first == -1:
+		return
+	var entity: SimEntity = _doze[slot]
+	if first == -2:
+		_dz_wide.erase(entity)
+	else:
+		for col: int in range(first, _dz_ins[slot * 2 + 1] + 1):
+			var bucket: Variant = _dz_buckets.get(col)
+			if bucket != null:
+				(bucket as Array).erase(entity)
+	_dz_ins[slot * 2] = -1
+	_dz_ins[slot * 2 + 1] = -1
 
 
 ## The rectangles of the further views (1..) and heroes (all but `first`) into `_dz_more`, the feet points of every
@@ -1228,6 +1387,8 @@ func _doze_check(slot: int) -> void:
 	if entity._sim_suspended:
 		if not _doze_far(slot):
 			_doze_wake_entity(entity)
+		elif _dz_ins[slot * 2] == -1:
+			_dz_file(slot)
 		return
 	if not _doze_far(slot) or not entity._can_doze():
 		return
@@ -1245,24 +1406,35 @@ func _doze_check(slot: int) -> void:
 	Sim.suspend(entity)
 	entity.set_process_internal(false)
 	_awake_remove(entity)
+	_dz_file(slot)
 
 
 func _doze_store_area(slot: int, area: Rect2i) -> void:
 	var k: int = slot * 4
 	_doze_known[slot] = 1
+	# A dozing entity's area changes only here: it is filed again under the new one (the check that follows wakes it
+	# when the new area is near).
+	var filed: bool = _dz_ins[slot * 2] != -1
+	if filed:
+		_dz_unfile(slot)
 	if area.size.x <= 0 or area.size.y <= 0:
 		_doze_rects[k] = 0
 		_doze_rects[k + 1] = 0
 		_doze_rects[k + 2] = 0
 		_doze_rects[k + 3] = 0
-		return
-	_doze_rects[k] = area.position.x
-	_doze_rects[k + 1] = area.position.y
-	_doze_rects[k + 2] = area.end.x
-	_doze_rects[k + 3] = area.end.y
+	else:
+		_doze_rects[k] = area.position.x
+		_doze_rects[k + 1] = area.position.y
+		_doze_rects[k + 2] = area.end.x
+		_doze_rects[k + 3] = area.end.y
+	if filed:
+		_dz_file(slot)
 
 
 func _doze_wake_entity(entity: SimEntity) -> void:
+	var slot: int = entity._doze_slot
+	if slot >= 0 and slot < _doze.size() and _doze[slot] == entity:
+		_dz_unfile(slot)
 	Sim.resume(entity)
 	entity.set_process_internal(true)
 	if entity._level_awake_slot < 0:

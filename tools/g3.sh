@@ -186,10 +186,16 @@ done
 # coop_gates over the shards: every gate line, the refusals, the reached gates, each shard's verdict.
 shard_logs=("$RUN"/coop_gates_*.log)
 if [ -f "${shard_logs[0]}" ]; then
-	gates="$(grep -h "co-op gates:" "${shard_logs[@]}" | head -1 | sed 's/[^0-9]//g')"
-	refused="$(grep -h ": refused in " "${shard_logs[@]}" | wc -l)"
-	cached="$(grep -h ": refused in .* cached" "${shard_logs[@]}" | wc -l)"
-	reached="$(grep -h ": REACHED in " "${shard_logs[@]}" | sed 's/^ *//; s/: REACHED.*//' | paste -sd ';' -)"
+	# Each shard counts the gate table when it starts; a co-op file that lands while the run is under way shifts the
+	# `index % n` partition, so shards that started on different tables may search a gate twice and miss others.
+	# Gates are therefore counted once by name, and a run whose shards saw different tables is not a proof.
+	gate_counts="$(grep -h "co-op gates:" "${shard_logs[@]}" | sed 's/[^0-9]//g' | sort -n | uniq)"
+	gates="$(echo "$gate_counts" | tail -1)"
+	gates_min="$(echo "$gate_counts" | head -1)"
+	refused="$(grep -h ": refused in " "${shard_logs[@]}" | sed 's/^ *//; s/: refused in.*//' | sort -u | wc -l)"
+	cached="$(grep -h ": refused in .* cached" "${shard_logs[@]}" | sed 's/^ *//; s/: refused in.*//' | sort -u | wc -l)"
+	reached="$(grep -h ": REACHED in " "${shard_logs[@]}" | sed 's/^ *//; s/: REACHED.*//' | sort -u | paste -sd ';' -)"
+	searched="$(grep -h -E ": (refused|REACHED) in " "${shard_logs[@]}" | sed 's/^ *//; s/: \(refused\|REACHED\) in.*//' 		| sort -u | wc -l)"
 	bad=0
 	for log in "${shard_logs[@]}"; do
 		job="$(basename "$log" .log)"
@@ -197,7 +203,10 @@ if [ -f "${shard_logs[0]}" ]; then
 	done
 	worst="$(grep -h -o "in [0-9.]* s" "${shard_logs[@]}" | sed 's/[^0-9.]//g' | sort -n | tail -1)"
 	text="$refused/${gates:-?} gates refused ($cached cached), ${#shard_logs[@]} shard(s), slowest gate ${worst:-?} s"
-	if [ "$bad" -eq 0 ] && [ "$refused" = "${gates:-x}" ]; then
+	if [ -n "$gates" ] && [ "$gates_min" != "$gates" ]; then
+		text="$text; the gate table changed during the run ($gates_min..$gates gates): $searched searched - rerun coop_gates"
+	fi
+	if [ "$bad" -eq 0 ] && [ "$refused" = "${gates:-x}" ] && [ "$gates_min" = "$gates" ]; then
 		note "coop_gates (V3.c)" "PASS $text" 0
 	else
 		note "coop_gates (V3.c)" "FAIL $text; $bad shard(s) red${reached:+; REACHED: $reached}" 1
@@ -216,7 +225,25 @@ if [ -f "$RUN/versus_bots.log" ]; then
 	cells="$(grep -cE '^    [a-z0-9_]+/[a-z_]+: [0-9]+ rounds' "$RUN/versus_bots.log")"
 	launch="$(grep -E '^    arena_[a-z0-9_]+/[a-z_]+: [0-9]+ rounds' "$RUN/versus_bots.log" | sed 's/^ *//; s/:.*//' | paste -sd ' ' -)"
 	red_cells="$(grep '^  - ' "$RUN/versus_bots.log" | grep -oE 'arena_[a-z0-9_]+/[a-z_]+' | sort -u | paste -sd ' ' -)"
+	# G50 / cut 4: a cell the arena's meta `bots` leaves out is human-only - neither green nor red. The inventory names
+	# them (row versus_cells); while the bot test still plays such a cell, its failures do not make the proof red.
+	human=""
+	[ -f "$INV" ] && human="$(grep -m1 '^    G3 | versus_cells |' "$INV" | sed -n 's/.*human-only (cut 4): //p' | xargs)"
+	[ "$human" = "none" ] && human=""
+	if [ $s -eq 1 ] && [ -n "$human" ] && [ -n "$red_cells" ]; then
+		real_red=""
+		for cell in $red_cells; do
+			[[ ", $human," == *", $cell,"* ]] || real_red="$real_red $cell"
+		done
+		failures="$(grep -c '^  - ' "$RUN/versus_bots.log")"
+		named="$(grep '^  - ' "$RUN/versus_bots.log" | grep -cE 'arena_[a-z0-9_]+/[a-z_]+')"
+		if [ -z "$real_red" ] && [ "$failures" = "$named" ]; then
+			s=0
+			v="PASS but for human-only cell(s)"
+		fi
+	fi
 	note "versus_bots (V4.b)" "$v; $cells (arena, mode) cell(s)${red_cells:+, red: $red_cells}" $s
+	[ -n "$human" ] && LINES+=("      human-only (cut 4): $human")
 	[ -n "$launch" ] && LINES+=("      $launch")
 elif wanted versus_bots; then
 	row "versus_bots (V4.b)" "" "not run"

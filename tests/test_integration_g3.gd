@@ -11,9 +11,6 @@ extends RouteTestCase
 ## The proofs themselves are the slow modules: test_book2_routes (V2.a-c), test_coop_routes (V3.a-b), test_coop_gates
 ## (V3.c), test_versus_bots (V4.b), test_campaign_routes (Book I) - tools/g3.sh runs them all.
 
-## Expert-only files of the design (DESIGN.md A.2 mode E; Book I's world 4 and ending): one cell each, the others two.
-const EXPERT_ONLY: Array[StringName] = [&"w4_l1", &"w4_l2", &"w4_l2b", &"ending", &"w8_l1", &"w8_l2", &"w8_l2b",
-	&"w9_l1", &"w9_l1b", &"w9_l2", &"w9_l2b", &"w9_l3", &"ending_b"]
 ## The arenas of DESIGN.md E.5 in table order: the first eight ship at launch, Mesa Rodeo and Cloud Top are the
 ## painting unlocks (cut 3 of PLAN.md 9: built only after the eight are green).
 const ARENAS: Array[StringName] = [&"arena_totem_ring", &"arena_echo_hollow", &"arena_floe_rink", &"arena_cinder_pit",
@@ -43,12 +40,13 @@ func test_g3_inventory() -> void:
 	rows.append(_paintings_row(table))
 	rows.append(_gates_row())
 	rows.append(_arenas_row())
+	rows.append(_versus_cells_row())
 	print("    G3 | row | have | want | state | detail")
 	for row: Array in rows:
 		print("    G3 | %s | %d | %d | %s | %s" % [row[0], row[1], row[2], "complete" if row[3] else "open", row[4]])
 		if require:
 			assert_true(row[3], "G3 %s: %d of %d - %s" % [row[0], row[1], row[2], row[4]])
-	assert_eq(rows.size(), 8, "every G3 content row was counted")
+	assert_eq(rows.size(), 9, "every G3 content row was counted")
 
 
 ## Files of the design that exist (`suffix` "_coop": their co-op files).
@@ -69,13 +67,13 @@ func _cells_row(row: String, table: Dictionary, wanted: Array, suffix: String, p
 	var open: PackedStringArray = PackedStringArray()
 	for base: StringName in wanted:
 		var level_id: StringName = StringName(String(base) + suffix)
-		for mode: String in [BEGINNER, EXPERT] if not EXPERT_ONLY.has(base) else [EXPERT]:
+		for mode: String in [BEGINNER, EXPERT] if not DESIGN_EXPERT_ONLY.has(base) else [EXPERT]:
 			cells += 1
 			var file: String = campaign_route(table, level_id, mode, {})
 			if file != "" and int(table[file].get("players", 1)) == players:
 				have += 1
 			else:
-				open.append("%s%s" % [level_id, "" if mode == BEGINNER or EXPERT_ONLY.has(base) else " (E)"])
+				open.append("%s%s" % [level_id, "" if mode == BEGINNER or DESIGN_EXPERT_ONLY.has(base) else " (E)"])
 	return [row, have, cells, open.is_empty(), "open: " + ", ".join(open) if not open.is_empty() else "all"]
 
 
@@ -115,6 +113,8 @@ func _gates_row() -> Array:
 	var gates: int = 0
 	var short: PackedStringArray = PackedStringArray()
 	var files: int = 0
+	# G49: a boss stage's co-op form is its gate (the visor Colossus's chain plates need no tablet).
+	var boss_forms: PackedStringArray = PackedStringArray()
 	for level_id: StringName in Levels.all_ids():
 		if not Levels.is_coop_level(level_id) or Levels.get_level_kind(Levels.get_coop_base(level_id)) == Levels.KIND_TEST:
 			continue
@@ -122,6 +122,9 @@ func _gates_row() -> Array:
 		var data: LevelData = LevelData.load_file(Levels.get_level_path(level_id))
 		if data == null:
 			continue
+		if data.entity_records().any(func(record: Dictionary) -> bool:
+				return str(record["id"]).begins_with("bosses/")):
+			boss_forms.append(String(level_id))
 		for difficulty: int in [Defs.Difficulty.BEGINNER, Defs.Difficulty.EXPERT]:
 			if not Levels.is_available(level_id, difficulty):
 				continue
@@ -136,8 +139,11 @@ func _gates_row() -> Array:
 			if main and count < MIN_GATES_MAIN:
 				short.append("%s (%s): %d" % [level_id, Defs.difficulty_name(difficulty), count])
 	var complete: bool = short.is_empty() and design_complete(Levels.BOOK_1, true) and design_complete(Levels.BOOK_2, true)
-	return ["x2_gates", gates, gates, complete, "%d co-op file(s); main stages under %d gates: %s" % [files,
-		MIN_GATES_MAIN, ", ".join(short) if not short.is_empty() else "none"]]
+	var detail: String = "%d co-op file(s); main stages under %d gates: %s" % [files, MIN_GATES_MAIN,
+		", ".join(short) if not short.is_empty() else "none"]
+	detail += "; boss stages gated by their co-op form (G49): %s" % (", ".join(boss_forms) if not boss_forms.is_empty()
+		else "none")
+	return ["x2_gates", gates, gates, complete, detail]
 
 
 ## The arenas of DESIGN.md E.5 that exist, each with its bot graph (resources/bots/<id>.json); complete with the eight
@@ -159,6 +165,95 @@ func _arenas_row() -> Array:
 		", ".join(notes) if not notes.is_empty() else "none"]]
 
 
+## The (arena, mode) cells of the arenas in levels/ (meta `modes`), and the human-only ones of cut 4 (G50: meta
+## `bots = <mode list> | none`, default every mode of `modes`; a mode left out has no CPU seat and no bot test). The
+## G3 table lists a human-only cell as "human-only (cut 4)", neither green nor red (tools/g3.sh reads the detail). The
+## row is a count, complete by itself: the bot proof of every other cell is test_versus_bots (V4.b).
+func _versus_cells_row() -> Array:
+	var cells: int = 0
+	var bot_cells: int = 0
+	var human: PackedStringArray = PackedStringArray()
+	for arena: StringName in Levels.get_arenas():
+		var modes: PackedStringArray = arena_modes(arena)
+		var bots: PackedStringArray = arena_bot_modes(arena)
+		for mode: String in modes:
+			cells += 1
+			if bots.has(mode):
+				bot_cells += 1
+			else:
+				human.append("%s/%s" % [arena, mode])
+	return ["versus_cells", bot_cells, cells, true, "human-only (cut 4): %s" % (", ".join(human) if not human.is_empty()
+		else "none")]
+
+
+## The versus modes arena `arena` offers (meta `modes`).
+static func arena_modes(arena: StringName) -> PackedStringArray:
+	return _mode_list(str(Levels.get_value(arena, "modes", "")))
+
+
+## The modes of `arena` the bots play (G50: meta `bots`, a mode list or `none`; default every mode of `modes`).
+static func arena_bot_modes(arena: StringName) -> PackedStringArray:
+	var modes: PackedStringArray = arena_modes(arena)
+	var bots: Variant = Levels.get_value(arena, "bots", null)
+	if bots == null or str(bots).strip_edges() == "":
+		return modes
+	var listed: PackedStringArray = _mode_list(str(bots))
+	var result: PackedStringArray = PackedStringArray()
+	for mode: String in modes:
+		if listed.has(mode):
+			result.append(mode)
+	return result
+
+
+static func _mode_list(text: String) -> PackedStringArray:
+	var result: PackedStringArray = PackedStringArray()
+	for item: String in text.replace(" ", "").split(",", false):
+		if item != "none":
+			result.append(item)
+	return result
+
+
+## G50's switch as the inventory reads it: no key = bots in every mode; a list keeps those modes; `none` keeps none.
+func test_the_human_only_switch_reads_the_arena_meta() -> void:
+	assert_eq(_mode_list("grub_stack, last_caveman"), PackedStringArray(["grub_stack", "last_caveman"]))
+	assert_eq(_mode_list("none"), PackedStringArray())
+	for arena: StringName in Levels.get_arenas():
+		var modes: PackedStringArray = arena_modes(arena)
+		assert_false(modes.is_empty(), "%s lists its modes" % arena)
+		for mode: String in arena_bot_modes(arena):
+			assert_true(modes.has(mode), "%s: a bot mode is one of its modes" % arena)
+		if Levels.get_value(arena, "bots", null) == null:
+			assert_eq(arena_bot_modes(arena), modes, "%s: no `bots` key - bots in every mode" % arena)
+
+
+## The design lists the counts and the campaign runs use (RouteTestCase.DESIGN_FILES / DESIGN_EXPERT_ONLY) agree with
+## every file that has landed: its book, and Expert-only exactly when the registry offers it on Expert alone. A
+## campaign run that passes over a stop whose file is missing reports it (design_missing) instead of passing quietly.
+func test_the_design_lists_match_the_landed_files() -> void:
+	var checked: int = 0
+	for book: int in DESIGN_FILES:
+		for level_id: StringName in DESIGN_FILES[book]:
+			if not Levels.has_level(level_id):
+				continue
+			checked += 1
+			assert_eq(Levels.get_book(level_id), book, "%s is a Book %d file" % [level_id, book])
+			assert_true(Levels.is_available(level_id, Defs.Difficulty.EXPERT), "%s is played on Expert" % level_id)
+			assert_eq(DESIGN_EXPERT_ONLY.has(level_id), not Levels.is_available(level_id, Defs.Difficulty.BEGINNER),
+					"%s: Expert-only in the design list exactly when the file says so" % level_id)
+	assert_true(checked >= 15, "the 15 Book I files at least (%d)" % checked)
+	# Book I solo is complete: no Book I stop is ever passed over; Feast Lands are side trips, never listed.
+	assert_eq(design_missing(Levels.BOOK_1, false, Defs.Difficulty.EXPERT), PackedStringArray(), "Book I solo")
+	for book: int in DESIGN_FILES:
+		for coop: bool in [false, true]:
+			for difficulty: int in [Defs.Difficulty.BEGINNER, Defs.Difficulty.EXPERT]:
+				for missing: String in design_missing(book, coop, difficulty):
+					assert_false(missing.begins_with("bonus_"), "%s is a side trip, not a stop" % missing)
+					assert_false(Levels.has_level(StringName(missing)), "%s is really missing" % missing)
+					if difficulty == Defs.Difficulty.BEGINNER:
+						assert_false(DESIGN_EXPERT_ONLY.has(StringName(missing.trim_suffix("_coop"))),
+								"%s is no Beginner stop" % missing)
+
+
 ## tools/g3.sh is the gate's one command: it runs every slow module of tests/run_tests.gd SLOW_FILES (coop_gates
 ## sharded), the default suite, sp_identity, the inventory and every campaign flow - a slow module added to the runner
 ## and forgotten here would leave the G3 table silently short.
@@ -172,6 +267,12 @@ func test_the_g3_command_runs_every_slow_module() -> void:
 		assert_true(text.contains("test %s\"" % module) or text.contains("test %s " % module) \
 				or text.contains("test %s\n" % module), "tools/g3.sh runs the slow module %s" % module)
 	assert_true(text.contains("COOP_GATES_SHARD=$i/$SHARDS"), "coop_gates runs sharded")
+	# A co-op file landing mid-run shifts the shard partition (seen 03:42-04:10: shards on 28 and 29 gates, 26 searched,
+	# yet 29 "refused" lines): gates are counted once by name, and shards on different tables are no proof.
+	assert_true(text.contains("the gate table changed during the run"), "a shifted gate table is reported")
+	assert_true(text.contains("sort -u | wc -l"), "gates are counted once by name")
+	# G50: human-only (arena, mode) cells are neither green nor red.
+	assert_true(text.contains("human-only (cut 4)"), "the G3 table lists human-only cells")
 	assert_true(text.contains("tools/sp_identity.sh"), "the single-player identity check (V1)")
 	assert_true(text.contains("test integration_g3"), "the content inventory")
 	for flow: String in ["campaign", "campaign_beginner", "campaign_b2", "campaign_coop"]:

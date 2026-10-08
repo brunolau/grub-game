@@ -1104,8 +1104,15 @@ func test_tally_coop_of_every_book_two_stage() -> void:
 			assert_eq(expected, own, "%s: its own backdrop" % level_id)
 		assert_eq(node.get_backdrop().backdrop_id, expected, "%s: the backdrop shows" % level_id)
 		assert_true(node.get_backdrop().get_layer_count() >= 3, "%s: with its layers" % level_id)
-		assert_eq(TallyScreen.ground_for(level_id), str(Levels.get_value(level_id, "terrain_a", "")),
-				"%s: the stage's own ground" % level_id)
+		var terrain: String = str(Levels.get_value(level_id, "terrain_a", ""))
+		if ResourceLoader.exists(UiGround.TERRAIN_DIR + terrain + ".png"):
+			assert_eq(TallyScreen.ground_for(level_id), terrain, "%s: the stage's own ground" % level_id)
+		else:
+			# A terrain art-B has not drawn yet: the tally stands on the biome's set, as the level itself does.
+			var biome: String = str(Levels.get_value(level_id, "biome", "jungle"))
+			assert_eq(TallyScreen.ground_for(level_id), str(LevelData.BIOME_TERRAIN.get(biome, "jungle/terrain_grass")),
+					"%s: the biome's ground while '%s' is not drawn" % [level_id, terrain])
+			print("    note: %s names terrain '%s', not drawn yet: the tally uses its biome's" % [level_id, terrain])
 		assert_true((node.get("_ground") as UiGround).has_atlas(), "%s: its ground atlas" % level_id)
 		assert_null(node.get_munch(), "%s: no Munch in co-op (P2 is Munch)" % level_id)
 		shown.append("%s=%s" % [level_id, expected])
@@ -1267,6 +1274,330 @@ func test_expert_wall_of_a_coop_party() -> void:
 	assert_eq(solo.get_party().size(), 0, "solo: the picture without heroes")
 	await _cleanup()
 	Game.new_game(Defs.Difficulty.BEGINNER)
+
+
+# =================================================================================================================
+# The UI pass (wf9 / PLAN.md 6): every 2.0 screen laid out at 640 x 360 and 800 x 360
+# =================================================================================================================
+
+## The views of the UI pass (art px): the game's base view and the widest one the stretch gives (a 20:9 phone).
+const PASS_VIEWS: Array[Vector2] = [Vector2(640.0, 360.0), Vector2(800.0, 360.0)]
+## Two texts are "over each other" when their glyph boxes share more than this many px in both directions (the line
+## boxes of a pixel face reach past its glyphs; stacked lines may touch).
+const PASS_OVERLAP: float = 3.0
+## Texts and entries the last [method layout_problems] looked at (x: texts, y: buttons and focusable entries).
+static var pass_checked: Vector2i = Vector2i.ZERO
+
+
+## The UI check itself finds what it is for: a text past the view's edge, two texts over each other, a clipped text
+## that cuts its words, an entry past the edge; a transparent text, a text scrolled out of its clipping list and a
+## clean layout pass.
+func test_ui_check_finds_cut_and_overlapping_texts() -> void:
+	var root: Control = Control.new()
+	root.size = Vector2(640.0, 360.0)
+	add_node(root)
+	var clean: Label = UiKit.label("Most Food", UiKit.Style.SMALL)
+	clean.position = Vector2(10.0, 10.0)
+	root.add_child(clean)
+	var hidden: Label = UiKit.label("Not handed out yet", UiKit.Style.SMALL)
+	hidden.position = Vector2(12.0, 12.0)
+	hidden.modulate.a = 0.0
+	root.add_child(hidden)
+	var list: Control = Control.new()
+	list.clip_contents = true
+	list.position = Vector2(10.0, 200.0)
+	list.size = Vector2(200.0, 40.0)
+	root.add_child(list)
+	var scrolled: Label = UiKit.label("Scrolled away", UiKit.Style.SMALL)
+	scrolled.position = Vector2(0.0, 80.0)
+	list.add_child(scrolled)
+	await get_tree().process_frame
+	assert_eq(layout_problems(root), PackedStringArray(), "a clean layout passes")
+	assert_eq(pass_checked, Vector2i(1, 0), "one text looked at; the transparent and the scrolled-away ones do not count")
+	var past: Label = UiKit.label("Leaning Tower", UiKit.Style.SMALL)
+	past.position = Vector2(600.0, 100.0)
+	root.add_child(past)
+	var over: Label = UiKit.label("Butterfingers", UiKit.Style.SMALL)
+	over.position = Vector2(14.0, 12.0)
+	root.add_child(over)
+	var cut: Label = UiKit.label("Longest head-bounce chain", UiKit.Style.SMALL)
+	cut.clip_text = true
+	cut.position = Vector2(10.0, 300.0)
+	root.add_child(cut)
+	cut.size = Vector2(40.0, cut.size.y)
+	var entry: UiButton = UiButton.new("UI_VS_REMATCH")
+	entry.position = Vector2(-30.0, 330.0)
+	root.add_child(entry)
+	await get_tree().process_frame
+	var problems: String = "; ".join(layout_problems(root))
+	assert_true(problems.contains("Leaning Tower") and problems.contains("reaches past"), "past the edge: %s" % problems)
+	assert_true(problems.contains("over each other"), "two texts over each other: %s" % problems)
+	assert_true(problems.contains("is cut"), "a cut text: %s" % problems)
+	assert_true(problems.contains("entry"), "an entry past the edge: %s" % problems)
+	root.queue_free()
+
+
+## The UI pass of the new screens of this file (the versus screens: tests/test_ui_versus.gd): each in a full state, at
+## 640 x 360 and at 800 x 360, has no text or entry past the view's edge, no two texts over each other and no clipped
+## text that cuts its words ([method layout_problems]).
+func test_new_screens_pass_the_ui_check_at_640_and_800() -> void:
+	Save.reset()
+	for index: int in 17:
+		Save.add_painting(index)
+	Settings.set_value(OptionsPanel.KEY_RIVAL_SCORE, true)
+	var states: Array[Dictionary] = [
+		{"name": "mode_select solo B2", "screen": &"mode_select", "book": 2},
+		{"name": "mode_select co-op", "screen": &"mode_select", "coop_slots": true},
+		{"name": "book_select solo", "screen": &"book_select"},
+		{"name": "book_select co-op", "screen": &"book_select", "play_mode": Defs.GameMode.COOP},
+		{"name": "join (two keyboards, a pad)", "screen": &"join", "join": true},
+		{"name": "world_map B2", "screen": &"world_map", "run": [Defs.GameMode.SINGLE, 1, 2],
+			"args": {"level_id": Levels.first_level(Levels.BOOK_2), "book": Levels.BOOK_2}},
+		{"name": "world_map B1 co-op", "screen": &"world_map", "run": [Defs.GameMode.COOP, 2, 1],
+			"args": {"level_id": Levels.first_level(), "book": 1, "mode": Defs.GameMode.COOP}},
+		{"name": "tally co-op w6_l2b", "screen": &"tally", "run": [Defs.GameMode.COOP, 2, 2], "medals": true,
+			"args": {"level_id": &"w6_l2b", "percent": 87}, "settle": 1.2},
+		{"name": "tally solo B2 w5_l1", "screen": &"tally", "run": [Defs.GameMode.SINGLE, 1, 2],
+			"args": {"level_id": &"w5_l1", "percent": 75}, "settle": 1.2},
+		{"name": "expert_wall B2", "screen": &"expert_wall", "run": [Defs.GameMode.SINGLE, 1, 2],
+			"args": {"book": 2, "mode": Defs.GameMode.SINGLE}},
+		{"name": "expert_wall B1 co-op", "screen": &"expert_wall", "run": [Defs.GameMode.COOP, 2, 1],
+			"args": {"book": 1, "mode": Defs.GameMode.COOP}},
+		{"name": "expert_wall B2 co-op", "screen": &"expert_wall", "run": [Defs.GameMode.COOP, 2, 2],
+			"args": {"book": 2, "mode": Defs.GameMode.COOP}},
+		{"name": "the_end B2", "screen": &"the_end", "run": [Defs.GameMode.SINGLE, 1, 2],
+			"args": {"book": 2, "mode": Defs.GameMode.SINGLE, "mural": false}},
+		{"name": "the_end B1 co-op", "screen": &"the_end", "run": [Defs.GameMode.COOP, 2, 1],
+			"args": {"book": 1, "mode": Defs.GameMode.COOP, "mural": false}},
+		{"name": "the_end B2 co-op", "screen": &"the_end", "run": [Defs.GameMode.COOP, 2, 2],
+			"args": {"book": 2, "mode": Defs.GameMode.COOP, "mural": false}},
+		{"name": "the_end mural", "screen": &"the_end", "run": [Defs.GameMode.COOP, 2, 2],
+			"args": {"book": 2, "mode": Defs.GameMode.COOP, "mural": true}},
+		{"name": "unlocks", "screen": &"unlocks", "args": {"back": Flow.SCREEN_TITLE}},
+		{"name": "options", "screen": &"options", "args": {}},
+		{"name": "options: P2's keys", "screen": &"options", "args": {}, "options": "bindings"},
+		{"name": "options: key test", "screen": &"options", "args": {}, "options": "key_test"},
+	]
+	var report: PackedStringArray = PackedStringArray()
+	for state: Dictionary in states:
+		for view: Vector2 in PASS_VIEWS:
+			var node: UiScreen = await _open_pass_state(state)
+			node.size = view
+			if state.has("settle"):
+				# The tally reveals its heading and score lines one after the other.
+				await get_tree().create_timer(float(state["settle"])).timeout
+			if node is TallyScreen:
+				(node as TallyScreen).skip()
+			for frame: int in 3:
+				await get_tree().process_frame
+			if node.has_method(&"_process"):
+				node.call(&"_process", 0.0)
+			await get_tree().process_frame
+			var problems: PackedStringArray = layout_problems(node)
+			assert_true(problems.is_empty(), "%s at %d x %d: %s" % [state["name"], view.x, view.y, "; ".join(problems)])
+			assert_true(pass_checked.x >= 2, "%s: the check saw its texts (%d)" % [state["name"], pass_checked.x])
+			report.append("%s %d: %d texts %d entries%s" % [state["name"], view.x, pass_checked.x, pass_checked.y,
+					"" if problems.is_empty() else " FAIL"])
+			node.queue_free()
+			await get_tree().process_frame
+			await _cleanup()
+			Flow.play_mode = Defs.GameMode.SINGLE
+			Flow.play_book = 1
+			GameInput.set_menu_clusters(false)
+			GameInput.reset_slots()
+	print("    ui pass: %d screen states x %d views: %s" % [states.size(), PASS_VIEWS.size(), ", ".join(report)])
+	Settings.set_value(OptionsPanel.KEY_RIVAL_SCORE, false)
+	Game.new_game(Defs.Difficulty.BEGINNER)
+	Save.reset()
+
+
+## Open a screen of the UI pass in its state (see the states of the test above).
+func _open_pass_state(state: Dictionary) -> UiScreen:
+	if state.has("run"):
+		var run: Array = state["run"]
+		Game.start_run(Defs.Difficulty.BEGINNER, int(run[0]), int(run[1]), int(run[2]))
+		if int(run[1]) > 1:
+			Game.runs[1].palette = &"blue"
+		var args: Dictionary = state.get("args", {})
+		if args.has("level_id"):
+			Game.begin_level(StringName(str(args["level_id"])))
+	else:
+		Game.new_game(Defs.Difficulty.BEGINNER)
+	if state.get("medals", false):
+		for run: PlayerRun in Game.party_runs():
+			run.food = 3
+			run.best_chain = 2
+			run.revives = 1
+			run.bats = 1
+			run.plates = 1
+			run.deaths = 1
+		Game.runs[0].score = 123450
+		Game.runs[1].score = 98760
+		Game.add_tally_item(&"items/food", 2, 100, 0)
+		Game.add_tally_item(&"items/painting", 5, 0, 1)
+	elif str(state.get("screen", "")) == "tally":
+		Game.add_tally_item(&"items/food", 2, 100)
+	Flow.play_book = int(state.get("book", 1))
+	Flow.play_mode = int(state.get("play_mode", Defs.GameMode.SINGLE))
+	if state.get("coop_slots", false):
+		Flow.play_mode = Defs.GameMode.COOP
+		GameInput.assign_slot(0, InputSlot.keyboard(Defs.InputSlotKind.KEYBOARD_LEFT))
+		GameInput.assign_slot(1, InputSlot.keyboard(Defs.InputSlotKind.KEYBOARD_RIGHT))
+	Flow.args = (state.get("args", {}) as Dictionary).duplicate()
+	var node: UiScreen = null
+	if state.get("join", false):
+		node = await _open_join()
+		_key(KEY_SPACE)
+		_key(KEY_KP_0)
+		_pad_button(2, JOY_BUTTON_A)
+		await get_tree().process_frame
+	else:
+		node = await _open(state["screen"])
+	if state.has("options"):
+		var panel: OptionsPanel = node.get("_panel") as OptionsPanel
+		if str(state["options"]) == "bindings":
+			panel.open_bindings(1)
+		else:
+			panel.open_key_test()
+		await get_tree().process_frame
+	return node
+
+
+## What is wrong with the layout of `node` (a screen, or any control) at its present size; empty when nothing. Checked:
+## every text (its glyph box: the label's text width and line height where its alignment puts them) and every button
+## or focusable entry lies inside the view; no two texts lie over each other (more than PASS_OVERLAP px both ways); a
+## text that clips (clip_text or an overrun rule) has room for all of it. A hidden or transparent control (a row whose
+## award is not handed out yet) does not count; inside a clipping container (a scroll list, a ticker) only the part the
+## container shows counts.
+static func layout_problems(node: Control) -> PackedStringArray:
+	var problems: PackedStringArray = PackedStringArray()
+	pass_checked = Vector2i.ZERO
+	var view: Rect2 = Rect2(Vector2.ZERO, node.size).grow(1.0)
+	var origin: Vector2 = node.global_position
+	var texts: Array[Array] = []
+	for found: Node in node.find_children("*", "Control", true, false):
+		var control: Control = found as Control
+		if not control.is_visible_in_tree() or _pass_alpha(control, node) < 0.05:
+			continue
+		var rect: Rect2 = Rect2()
+		var what: String = ""
+		if control is Label:
+			var label: Label = control as Label
+			var text: String = label.atr(label.text).strip_edges()
+			if text == "":
+				continue
+			var cut: String = _pass_cut_text(label, text)
+			if cut != "":
+				problems.append(cut)
+			rect = _pass_text_rect(label)
+			what = "text '%s'" % text.left(24)
+		elif control is BaseButton or control.focus_mode != Control.FOCUS_NONE:
+			rect = control.get_global_rect()
+			what = "entry %s" % control.name
+		else:
+			continue
+		rect = Rect2(rect.position - origin, rect.size)
+		var shown: Variant = _pass_clip(control, node, rect, origin)
+		if shown == null:
+			continue
+		var visible: Rect2 = shown as Rect2
+		if not view.encloses(visible):
+			problems.append("%s at %s reaches past the view %s" % [what, visible, Rect2(Vector2.ZERO, node.size)])
+		if control is Label:
+			texts.append([control, visible, what])
+			pass_checked.x += 1
+		else:
+			pass_checked.y += 1
+	for i: int in texts.size():
+		for j: int in range(i + 1, texts.size()):
+			var a: Control = texts[i][0]
+			var b: Control = texts[j][0]
+			if a.is_ancestor_of(b) or b.is_ancestor_of(a):
+				continue
+			var both: Rect2 = (texts[i][1] as Rect2).intersection(texts[j][1] as Rect2)
+			if both.size.x > PASS_OVERLAP and both.size.y > PASS_OVERLAP:
+				problems.append("%s %s and %s %s lie over each other" % [texts[i][2], texts[i][1], texts[j][2], texts[j][1]])
+	return problems
+
+
+## The opacity `control` is drawn with under `top` (its own and every ancestor's modulate, its self_modulate).
+static func _pass_alpha(control: Control, top: Node) -> float:
+	var alpha: float = control.self_modulate.a
+	var walk: Node = control
+	while walk != null:
+		if walk is CanvasItem:
+			alpha *= (walk as CanvasItem).modulate.a
+		if walk == top:
+			break
+		walk = walk.get_parent()
+	return alpha
+
+
+## The glyph box of `label` on the screen: its text's width (the whole label for wrapped text) and its line height,
+## placed by its alignment.
+static func _pass_text_rect(label: Label) -> Rect2:
+	var rect: Rect2 = label.get_global_rect()
+	if label.autowrap_mode != TextServer.AUTOWRAP_OFF:
+		return rect
+	var need: Vector2 = label.get_minimum_size()
+	if label.clip_text or label.text_overrun_behavior != TextServer.OVERRUN_NO_TRIMMING:
+		need.x = minf(_pass_text_width(label, label.atr(label.text)), rect.size.x)
+	var x: float = rect.position.x
+	match label.horizontal_alignment:
+		HORIZONTAL_ALIGNMENT_CENTER:
+			x += (rect.size.x - need.x) * 0.5
+		HORIZONTAL_ALIGNMENT_RIGHT:
+			x += rect.size.x - need.x
+		HORIZONTAL_ALIGNMENT_FILL:
+			need.x = rect.size.x
+	var y: float = rect.position.y
+	match label.vertical_alignment:
+		VERTICAL_ALIGNMENT_CENTER:
+			y += (rect.size.y - need.y) * 0.5
+		VERTICAL_ALIGNMENT_BOTTOM:
+			y += rect.size.y - need.y
+		VERTICAL_ALIGNMENT_FILL:
+			need.y = rect.size.y
+	return Rect2(Vector2(x, y), need)
+
+
+## The width of `text` in `label`'s face (its settings or theme font, upper-cased where the label is).
+static func _pass_text_width(label: Label, text: String) -> float:
+	var font: Font = label.get_theme_font(&"font")
+	var font_size: int = label.get_theme_font_size(&"font_size")
+	if label.label_settings != null:
+		if label.label_settings.font != null:
+			font = label.label_settings.font
+		font_size = label.label_settings.font_size
+	var shown: String = text.to_upper() if label.uppercase else text
+	return font.get_string_size(shown, HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size).x if font != null else 0.0
+
+
+## A clipping text with less room than its words need ("" when it has the room or does not clip).
+static func _pass_cut_text(label: Label, text: String) -> String:
+	if label.autowrap_mode != TextServer.AUTOWRAP_OFF:
+		return ""
+	if not label.clip_text and label.text_overrun_behavior == TextServer.OVERRUN_NO_TRIMMING:
+		return ""
+	var need: float = _pass_text_width(label, text)
+	if need > label.size.x + 1.0:
+		return "text '%s' is cut (%d px wide for %d px)" % [text.left(24), int(label.size.x), int(ceilf(need))]
+	return ""
+
+
+## The part of `rect` (screen px) that the clipping ancestors of `control` up to `top` show: null when none of it.
+static func _pass_clip(control: Control, top: Control, rect: Rect2, origin: Vector2) -> Variant:
+	var shown: Rect2 = rect
+	var walk: Node = control.get_parent()
+	while walk != null and walk != top.get_parent():
+		if walk is Control and (walk as Control).clip_contents:
+			var clip: Rect2 = (walk as Control).get_global_rect()
+			clip.position -= origin
+			if not shown.intersects(clip):
+				return null
+			shown = shown.intersection(clip)
+		walk = walk.get_parent()
+	return shown
 
 
 ## The classic layout's Strike key of P1 (Left Ctrl since the orchestrator's G1 resolution; the tests follow the

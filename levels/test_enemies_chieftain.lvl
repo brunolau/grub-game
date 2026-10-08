@@ -4,7 +4,9 @@
 # wf9 G35: no standable surface higher than 3 rows, so a chieftain on it stays clear of the HUD), under a 5-row rock
 # crown (ceiling underside 80 px under the room's top, as D9b's w9_l3: no jumping body rises higher), Gorm on the floor and
 # Gulla waiting on the altar (solo: he tags in when Gorm falls; a co-op file would have both fight at once). The
-# arena's floor edges are the Roc perches of the roast thieves. Its bot graph is resources/bots/test_enemies_chieftain
+# arena's floor edges are the Roc perches of the roast thieves. The arena zone locks the camera on rows 0-10 (the
+# authentic 20 x 11 view: its top is the room's top in every lockable view, the floor at its bottom - as w9_l3), so a
+# body jumping under the crown keeps its top 78 px under the view's top (G35). Its bot graph is resources/bots/test_enemies_chieftain
 # .json (core-B's baker), so the chieftains fight on hero physics here; tests/test_enemies_chieftain.gd replays its
 # recorded club routes on this file. No special lies here, so a club route never picks one up. Not part of any
 # campaign (kind = test).
@@ -40,6 +42,6 @@ notes = "PLAN.md P2.3: the Rival Chieftains on hero physics (HeroBot) where the 
 ####################
 
 [entities]
-zones/arena 9 10 name=pyre rect=0,0,20,12 music=boss_chieftains
+zones/arena 9 10 name=pyre rect=0,0,20,11 music=boss_chieftains
 bosses/chieftain 6 10 name=gorm mate=gulla arena=pyre
 bosses/chieftain 9 7 name=gulla mate=gorm arena=pyre drops=trophy

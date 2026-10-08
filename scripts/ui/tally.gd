@@ -671,7 +671,8 @@ func _size_board() -> void:
 
 
 ## A medal's reason ("Longest head-bounce chain") shows only where it fits whole on the board (a narrow view keeps the
-## names alone rather than cut words).
+## names alone rather than cut words). The room is reckoned with every winner's tag of the row, also the ones still
+## hidden (their text measured: a hidden label reports no width), so a reason never gets cut when a tag shows later.
 func _fit_board_infos(board: VBoxContainer) -> void:
 	var font: Font = UiKit.font(UiKit.Style.SMALL)
 	for row: Node in board.get_children():
@@ -682,9 +683,15 @@ func _fit_board_infos(board: VBoxContainer) -> void:
 				var info: Label = child as Label
 				var used: float = 0.0
 				for other: Node in row.get_children():
-					if other != info and other is Control:
-						used += (other as Control).get_combined_minimum_size().x + 4.0
-				var need: float = font.get_string_size(info.text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, UiKit.SIZE_SMALL).x
+					if other == info or not other is Control:
+						continue
+					var width: float = (other as Control).get_combined_minimum_size().x
+					if other is Label:
+						width = maxf(width, font.get_string_size(info.atr((other as Label).text), HORIZONTAL_ALIGNMENT_LEFT,
+								-1.0, UiKit.SIZE_SMALL).x)
+					used += width + 4.0
+				var need: float = font.get_string_size(info.atr(info.text), HORIZONTAL_ALIGNMENT_LEFT, -1.0,
+						UiKit.SIZE_SMALL).x
 				info.visible = used + need <= board.size.x
 
 

@@ -69,8 +69,16 @@ var _problems: ProblemCounter = null
 var _counting: bool = false
 ## G35 (DESIGN.md G-resolutions, wf9_lead_design_to_integration.txt #1.2 / #2): the first tick of a boss fight on which
 ## a weak point that can be struck lies outside the view or less than the clearance under the fight HUD
-## (Hud.weak_point_problem); "" = none. Checked on every tick of every route that fights a boss.
+## (Hud.weak_point_problem); "" = none. Checked on every tick of every route that fights a boss. G35 speaks of the
+## LOCKED view: once the camera is locked and has settled into its lock (LevelBase.is_camera_locked, the view inside
+## the lock rectangle - or around it where the lock is the smaller), only those ticks count (the walk in before the
+## lock and the glide into it are not the fight's framing); a fight the camera never locks is checked on every tick.
 var _weak_problem: String = ""
+## The first problem on a tick without a camera lock, and how many fight ticks were seen in a settled locked view.
+var _weak_problem_free: String = ""
+var _weak_locked_ticks: int = 0
+## Fight ticks the G35 check ran on (2.0 content only).
+var _weak_fight_ticks: int = 0
 ## The HUD script (its static weak-point helpers), loaded at run time: a HUD mid-edit cannot break the route tests.
 var _hud: GDScript = null
 const HUD_SCRIPT: String = "res://scripts/ui/hud.gd"
@@ -282,7 +290,7 @@ func check_expectations(label: String, spec: Dictionary, played: int, before: in
 			label, _count(&"hero_revived")])
 	if party:
 		assert_eq(_doze_problem, "", "%s: no entity dozes inside a view or within reach of a hero (V3.e)" % label)
-	assert_eq(_weak_problem, "", "%s: every boss weak point stays in the view and clear of the fight HUD (G35)" % label)
+	assert_eq(weak_point_verdict(), "", "%s: every boss weak point stays in the view and clear of the fight HUD (G35)" % label)
 	if expect.has("x2_gates"):
 		assert_true(_gates_reached.size() >= int(expect["x2_gates"]), "%s: x2 gates crossed %d of %d (%s)" % [
 			label, _gates_reached.size(), _tablets.size(), str(_gates_reached.keys())])
@@ -374,6 +382,10 @@ const DESIGN_FILES: Dictionary = {
 	2: [&"w5_l1", &"w5_l2", &"w5_l2b", &"bonus_d", &"w6_l1", &"w6_l2", &"w6_l2b", &"w7_l1", &"bonus_e", &"w7_l2",
 		&"w7_l2b", &"w8_l1", &"w8_l2", &"w8_l2b", &"w9_l1", &"w9_l1b", &"w9_l2", &"w9_l2b", &"w9_l3", &"ending_b"],
 }
+## The Expert-only files of the design (DESIGN.md A.2 mode E; Book I's world 4 and ending, Book II's worlds 8-9 and
+## ending): a Beginner run never meets them.
+const DESIGN_EXPERT_ONLY: Array[StringName] = [&"w4_l1", &"w4_l2", &"w4_l2b", &"ending", &"w8_l1", &"w8_l2",
+	&"w8_l2b", &"w9_l1", &"w9_l1b", &"w9_l2", &"w9_l2b", &"w9_l3", &"ending_b"]
 ## Screens a campaign run may end on.
 const CAMPAIGN_ENDS: Array[StringName] = [&"expert_wall", &"the_end"]
 
@@ -390,6 +402,22 @@ static func design_complete(book: int, coop: bool) -> bool:
 		if not Levels.has_level(StringName(String(level_id) + "_coop") if coop else level_id):
 			return false
 	return true
+
+
+## The stages of `book`'s design a campaign run on `difficulty` should play but cannot, because their file (with
+## `coop`: their co-op file) is not there yet: the registry's campaign - and Flow, which passes over a stop without
+## its file, as it does over a stop without a co-op file in co-op - simply leaves them out. Feast Lands are side trips
+## (a warp), not stops, and are not listed.
+static func design_missing(book: int, coop: bool, difficulty: int) -> PackedStringArray:
+	var missing: PackedStringArray = PackedStringArray()
+	for level_id: StringName in DESIGN_FILES.get(book, []):
+		if String(level_id).begins_with("bonus_") \
+				or (difficulty == Defs.Difficulty.BEGINNER and DESIGN_EXPERT_ONLY.has(level_id)):
+			continue
+		var file: StringName = StringName(String(level_id) + "_coop") if coop else level_id
+		if not Levels.has_level(file):
+			missing.append(String(file))
+	return missing
 
 
 ## The route a campaign run plays in stage `level_id` on `mode`: the side route `sides` names for it (a warp into a
@@ -418,7 +446,8 @@ static func campaign_route(table: Dictionary, level_id: StringName, mode: String
 ## warning or error; each map stop is recorded once in the run's save space. The run stops - PENDING, not failed - at
 ## the first stage without its route; `strict` (G3) fails that, and a run of a complete design must end at the expert
 ## wall (Beginner, when the book has Expert stops) or at The End with the book completed (Expert). Returns {"files":
-## the routes played, "stops": map stops entered, "pending": "" or why it stopped, "screen": the last screen,
+## the routes played, "stops": map stops entered, "pending": "" or why it stopped, "passed_over": the design's stops
+## the run could not meet because their file (co-op file) is not there yet (design_missing), "screen": the last screen,
 ## "ticks": ticks played}.
 func play_campaign(book: int, mode: String, party: int, sides: Dictionary = {}, strict: bool = false) -> Dictionary:
 	var coop: bool = party > 1
@@ -463,11 +492,18 @@ func play_campaign(book: int, mode: String, party: int, sides: Dictionary = {}, 
 		else:
 			break
 	outcome["screen"] = Flow.current_screen
-	print("    %s: %d stage(s), %d ticks (%.1f min), score %d, lives %d, screen %s%s\n      routes: %s" % [run_name,
+	# A run that reached its end screen may still have passed over stops whose file has not landed (the registry and
+	# Flow leave them out): that is PENDING too, never a whole book.
+	var missing: PackedStringArray = design_missing(book, coop, difficulty)
+	outcome["passed_over"] = missing
+	print("    %s: %d stage(s), %d ticks (%.1f min), score %d, lives %d, screen %s%s%s\n      routes: %s" % [run_name,
 		(outcome["files"] as Array).size(), outcome["ticks"], int(outcome["ticks"]) / Tuning.TICK_HZ / 60.0,
 		Game.score, Game.lives, Flow.current_screen,
 		"" if outcome["pending"] == "" else " - PENDING: %s" % outcome["pending"],
+		"" if missing.is_empty() else " - PENDING, passed over (file not there yet): %s" % ", ".join(missing),
 		", ".join(PackedStringArray(outcome["files"]))])
+	if strict and not missing.is_empty() and outcome["pending"] == "":
+		fail("%s passes over stops whose file is not there: %s" % [run_name, ", ".join(missing)])
 	for stop: StringName in outcome["stops"]:
 		var cleared: int = int(Save.get_level_result_in(space_key, stop).get("clears", 0))
 		var waiting: bool = outcome["pending"] != "" and stop == (outcome["stops"] as Array).back()
@@ -532,7 +568,7 @@ func _play_campaign_stage(run_name: String, file: String, mode: String, table: D
 	if party:
 		assert_eq(_count(&"party_wiped"), 0, "%s: no team wipe" % label)
 		assert_eq(_doze_problem, "", "%s: no entity dozes inside a view or within reach of a hero (V3.e)" % label)
-	assert_eq(_weak_problem, "", "%s: every boss weak point stays in the view and clear of the fight HUD (G35)" % label)
+	assert_eq(weak_point_verdict(), "", "%s: every boss weak point stays in the view and clear of the fight HUD (G35)" % label)
 	assert_true(Game.lives >= lives, "%s: no life lost (%d -> %d)" % [label, lives, Game.lives])
 	assert_eq(_problems.count, 0, "%s: no engine warning or error (first: %s)" % [label, _problems.first])
 	assert_eq(int(result.get("input_mismatches", 0)), 0, "%s: every slot read its stream" % label)
@@ -578,6 +614,9 @@ func _reset_watch(level_id: StringName, mode: String) -> void:
 	_embers_close.clear()
 	_gates_reached.clear()
 	_weak_problem = ""
+	_weak_problem_free = ""
+	_weak_locked_ticks = 0
+	_weak_fight_ticks = 0
 	_tablets = _x2_tablets(level_id, BEGINNER if mode != EXPERT else EXPERT)
 
 
@@ -620,7 +659,8 @@ func _on_tick(level: LevelBase, stage_tick: int) -> void:
 		_boss_up = stage_tick
 	if _boss_down < 0 and _count(&"boss_defeated") > 0:
 		_boss_down = stage_tick
-	if _weak_problem == "" and _boss_up >= 0 and _boss_down < 0 and _weak_points_apply(level.level_id):
+	if _boss_up >= 0 and _boss_down < 0 and _weak_points_apply(level.level_id):
+		_weak_fight_ticks += 1
 		_check_weak_points(level, stage_tick)
 	for hero: PlayerBase in level.contact_order():
 		if hero.dead:
@@ -649,14 +689,25 @@ static func _weak_points_apply(level_id: StringName) -> bool:
 ## G35: every weak point of every living boss that can be struck this tick (Hud.weak_point_rects: logical px, world
 ## coordinates; an empty rect is one that cannot be struck now) lies wholly inside the view and the clearance under the
 ## fight HUD band (Hud.weak_point_problem, art px in view coordinates, the touch margin: every device). Keeps the first
-## problem.
+## problem of a settled locked view in _weak_problem and the first of an unlocked view in _weak_problem_free (see
+## [method weak_point_verdict]); ticks while the camera glides into its lock are not checked.
 func _check_weak_points(level: LevelBase, stage_tick: int) -> void:
 	if _hud == null:
 		_hud = load(HUD_SCRIPT) as GDScript if ResourceLoader.exists(HUD_SCRIPT) else null
 		if _hud == null or not _hud.can_instantiate():
 			_weak_problem = "the HUD script %s does not load (its weak-point check cannot run)" % HUD_SCRIPT
+			_weak_locked_ticks = maxi(_weak_locked_ticks, 1)
 			return
 	var view: Rect2i = level.get_view_rect()
+	var locked: bool = level.is_camera_locked()
+	if locked:
+		if not view_settled_in_lock(view, level.get_camera_lock()):
+			return
+		_weak_locked_ticks += 1
+		if _weak_problem != "":
+			return
+	elif _weak_problem_free != "":
+		return
 	var view_art: Vector2 = Vector2(view.size * Tuning.ART_SCALE)
 	for entity: SimEntity in level.get_kind(Defs.Kind.BOSS):
 		var boss: EnemyBase = entity as EnemyBase
@@ -667,9 +718,33 @@ func _check_weak_points(level: LevelBase, stage_tick: int) -> void:
 					Vector2(rect.size * Tuning.ART_SCALE))
 			var problem: String = str(_hud.call("weak_point_problem", art, view_art))
 			if problem != "":
-				_weak_problem = "%s on tick %d: weak rect %s (world) in view %s: %s" % [boss.name, stage_tick,
-						str(rect), str(view), problem]
+				var text: String = "%s on tick %d: weak rect %s (world) in %s view %s: %s" % [boss.name, stage_tick,
+						str(rect), "the locked" if locked else "an unlocked", str(view), problem]
+				if locked:
+					_weak_problem = text
+				else:
+					_weak_problem_free = text
 				return
+
+
+## True when `view` has settled into camera lock `lock` (both logical px): on each axis the view lies inside the
+## lock, or - where the lock is the smaller - the lock lies inside the view. A camera outside its lock glides in.
+static func view_settled_in_lock(view: Rect2i, lock: Rect2i) -> bool:
+	for axis: int in 2:
+		var v0: int = view.position[axis]
+		var v1: int = view.end[axis]
+		var l0: int = lock.position[axis]
+		var l1: int = lock.end[axis]
+		var inside: bool = (v0 >= l0 and v1 <= l1) if lock.size[axis] >= view.size[axis] else (l0 >= v0 and l1 <= v1)
+		if not inside:
+			return false
+	return true
+
+
+## G35's verdict for the route just played: "" or the first problem - of the settled locked view when the fight had
+## one, else of the unlocked view (a boss fought without a camera lock is checked on every tick).
+func weak_point_verdict() -> String:
+	return _weak_problem if _weak_locked_ticks > 0 else _weak_problem_free
 
 
 ## PLAN.md 8 V3.e: on a party route no entity dozes while its doze area overlaps a view grown by
@@ -804,3 +879,6 @@ func _print_outcome(label: String, played: int) -> void:
 	print("    %s: %d ticks, score %d, lives %d, hurt %d, deaths %d, eggs %d, wipes %d, paintings %s, x2 gates %d" % [
 		label, played, Game.score, Game.lives, _count(&"hero_hurt"), _count(&"hero_died"), _count(&"hero_down"),
 		_count(&"party_wiped"), str(_paintings.keys()), _gates_reached.size()])
+	if _weak_fight_ticks > 0:
+		print("      G35: %d fight tick(s), %s" % [_weak_fight_ticks, "%d in the settled locked view" % _weak_locked_ticks
+				if _weak_locked_ticks > 0 else "no camera lock - every one checked"])

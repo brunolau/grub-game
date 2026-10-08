@@ -5,9 +5,11 @@ extends TestCase
 ##
 ## Pinned here (DESIGN.md B.0): every punch and sweep shows itself 10+ ticks ahead; every attack can be escaped; hits
 ## never stop or lengthen its clocks (no stun-lock) and count at most once per BOSS_HIT_COOLDOWN; the resting fist is a
-## springboard to the face (and the face is out of reach of any jump from the floor); the club beats the solo form on a
-## scripted route (Beginner and Expert); the co-op twin window is shorter than the measured solo minimum; the
-## single-hero search cannot hurt the co-op form.
+## springboard to the face (since G35 some jumps from the floor reach the face too: counted, not forbidden); every weak
+## point stays clear of the fight HUD (G35); the club beats the solo form on a scripted route (Beginner and Expert); the
+## co-op twin is slot-bound (G34: its window is the difficulty's, one player's measured solo minimum is a fact, not a
+## cap); an IDLE partner counts for no co-op rule (G33); the co-op form is fair to either hero (V3.d); the single-hero
+## search - with an idle hatched partner or an egg as part of the one player's toolkit - cannot hurt the co-op form.
 
 const Lab = preload("res://tests/test_enemies_tusker.gd").Lab
 const LEVEL_PATH: String = "res://levels/test_enemies_mangrove.lvl"
@@ -597,6 +599,40 @@ func test_coop_an_idle_partner_counts_for_nothing() -> void:
 	assert_eq(tree.hp, hp - 1, "P1, on the wrist side now, strikes home")
 
 
+## B.0, the hit cooldown is the boss's: two heroes cannot double the damage. A twin of the two players counts 1; the
+## same two players twin again (both ways round) once the parts' debounce is over but inside BOSS_HIT_COOLDOWN - it
+## counts nothing; after the cooldown the next twin counts. (Stage 3's wrist strikes take the same path, Mangrove._strike,
+## and the same cooldown; with the knuckles facing the nearer hero who counts, two heroes are rarely both on the wrist
+## side anyway.)
+func test_two_heroes_striking_together_count_once() -> void:
+	var tree: Mangrove = _open(Defs.Difficulty.BEGINNER, 2, true)
+	_wake_both()
+	_lab.step(PackedInt32Array([0, 0]))
+	_lab.hero(0).respawn_at(Vector2i(130, 112))
+	_lab.hero(1).respawn_at(Vector2i(150, 112))
+	var hp: int = tree.hp
+	_rest_hand(tree)
+	_shot_at(tree.get_face_box(), 0)
+	_shot_at(tree.get_hand_rect(), 1)
+	_lab.step(PackedInt32Array([0, 0]))
+	assert_eq(tree.hp, hp - 1, "a twin of the two players counts 1")
+	_wait(Mangrove.MANGROVE_PART_DEBOUNCE + 1)
+	assert_true(tree.hit_cooldown > 0, "still inside the boss's cooldown")
+	_rest_hand(tree)
+	_shot_at(tree.get_face_box(), 1)
+	_shot_at(tree.get_hand_rect(), 0)
+	_lab.step(PackedInt32Array([0, 0]))
+	assert_eq(tree.hp, hp - 1, "a second twin inside the cooldown counts nothing")
+	_wait(Tuning.BOSS_HIT_COOLDOWN)
+	Lab.top_up(_lab.hero(0))
+	Lab.top_up(_lab.hero(1))
+	_rest_hand(tree)
+	_shot_at(tree.get_face_box(), 0)
+	_shot_at(tree.get_hand_rect(), 1)
+	_lab.step(PackedInt32Array([0, 0]))
+	assert_eq(tree.hp, hp - 2, "after the cooldown the next twin counts")
+
+
 ## V3.d fairness per hero: whichever hero the boss targets, the punch comes after its 10-tick draw-back and its leaf
 ## falls over HIM from high above; the twin counts whichever hero strikes the face and whichever the hand; either hero
 ## pins the resting fist; in stage 3 either hero strikes the wrist while the other draws the knuckles.
@@ -686,14 +722,17 @@ func test_coop_form_is_fair_to_either_hero() -> void:
 ## toolkit): P1 launched from the springboard (Up held: the co-op fist launches at once) throws a spear, an axe or a
 ## swirling axe at the face and then back at the resting hand, every start of both throws, forward or high, while his
 ## IDLE partner stands where his player could have hatched him (by the resting hand on the upper ledge, on the lower
-## ledge, on the floor) or lies on the floor as an egg. No trial ever twins - though one player's two hits come well
+## ledge, on the floor, on the resting fist - carried, pinning nothing) or lies on the floor as an egg (lead designer's
+## wf9 #4: "the floor of either half, the fist"). No trial ever twins - though one player's two hits come well
 ## inside the 24-tick window, they never pair - and none is faster than MANGROVE_SOLO_MIN_TICKS. Lighter than at G2:
 ## spent throws are freed between trials (Lab.flush) and a trial ends once its hits can no longer fall within a window.
 func test_coop_one_player_never_twins_and_the_solo_minimum_holds() -> void:
 	var measured: Dictionary = _measure_solo_twin()
-	print("    one player from the face to the hand: %d ticks at best (%s); %d trials, %d twins, partner counted on %d ticks" % [
-		measured["best"], measured["how"], measured["trials"], measured["twins"], measured["partner_counted"]])
+	print("    one player from the face to the hand: %d ticks at best (%s); %d trials (partner on the resting fist in %d), %d twins, partner counted on %d ticks" % [
+		measured["best"], measured["how"], measured["trials"], measured["on_fist"], measured["twins"],
+		measured["partner_counted"]])
 	assert_true(int(measured["trials"]) >= 500)
+	assert_true(int(measured["on_fist"]) >= 100, "the dozing partner stood on the resting fist in a fifth of the trials")
 	assert_true(int(measured["best"]) < 100000, "the search reached both parts (it is not blind)")
 	assert_true(int(measured["best"]) >= Mangrove.MANGROVE_SOLO_MIN_TICKS,
 			"MANGROVE_SOLO_MIN_TICKS (%d) is a lower bound of the measured %d" % [Mangrove.MANGROVE_SOLO_MIN_TICKS,
@@ -711,8 +750,8 @@ func test_coop_one_player_never_twins_and_the_solo_minimum_holds() -> void:
 func test_the_single_hero_search_cannot_hurt_the_coop_form() -> void:
 	var coop: Dictionary = _search_fist(true, true)
 	var solo: Dictionary = _search_fist(false, false)
-	print("    single-hero search on the stuck fist: %d trials (partner idle %d / egg %d), co-op form hit %d times; solo form hit %d times" % [
-		coop["trials"], coop["idle_trials"], coop["egg_trials"], coop["hits"], solo["hits"]])
+	print("    single-hero search on the stuck fist: %d trials, %d ticks (partner idle %d / egg %d), co-op form hit %d times; solo form hit %d times" % [
+		coop["trials"], coop["ticks"], coop["idle_trials"], coop["egg_trials"], coop["hits"], solo["hits"]])
 	assert_true(int(coop["idle_trials"]) >= 100 and int(coop["egg_trials"]) >= 20, "both partner kinds were tried")
 	assert_eq(int(coop["partner_counted"]), 0, "the partner never counted")
 	assert_eq(int(coop["hits"]), 0, "one player never strikes the wrist: %s" % coop["first"])
@@ -770,7 +809,8 @@ func _rest_hand(tree: Mangrove) -> void:
 ## of both throws (forward or high): launched from the springboard (Up held through the landing: the co-op fist launches
 ## at once, -224, past the face), and a jump from the lower ledge (since G35 the face, 76-105 px over the floor, and the
 ## hand on its row-5 ledge share a height band). His partner P2 never presses anything (IDLE, G33) and stands, per trial,
-## by the resting hand on the upper ledge, on the lower ledge, on the floor, or lies on the floor as an egg. A trial ends
+## by the resting hand on the upper ledge, on the lower ledge, on the floor, on the resting fist (a dozing rider pins
+## nothing: counted as "partner counted" if he ever did), or lies on the floor as an egg. A trial ends
 ## when both parts were hit, when the first hit lies a whole twin window back with no second one, or when both throws
 ## are over and nothing flies any more.
 func _measure_solo_twin() -> Dictionary:
@@ -780,8 +820,11 @@ func _measure_solo_twin() -> Dictionary:
 	_lab.step(PackedInt32Array([0, 0]))
 	var result: Dictionary = {"best": 100000, "how": "", "trials": 0, "twins": 0, "partner_counted": 0}
 	var window: int = tree.twin_window()
+	# Where his player could have hatched him: by the resting hand on the upper ledge, on the lower ledge, on the floor,
+	# standing on the resting fist (carried, pinning nothing), and - the last - lying on the floor as an egg.
 	var spots: Array[Vector2i] = [Vector2i(tree.hand_rest.x - 36, 80), Vector2i(60, 112), Vector2i(60, 160),
-		Vector2i(150, 160)]
+		Vector2i(tree.fist_rest_x, tree.floor_y - Mangrove.MANGROVE_FIST_BOX.y), Vector2i(150, 160)]
+	var on_fist: int = 0
 	var frame: PackedInt32Array = PackedInt32Array([0, 0])
 	var tries: Array[Dictionary] = []
 	for weapon: int in [Defs.Weapon.SPEAR, Defs.Weapon.AXE, Defs.Weapon.BOOMERANG]:
@@ -851,8 +894,11 @@ func _measure_solo_twin() -> Dictionary:
 					flags = Defs.IN_FIRE | (Defs.IN_UP if high else 0)
 			frame[0] = flags
 			_lab.step(frame)
-			if p2.counts_for_coop():
+			if p2.counts_for_coop() or (tree._standing_mask() & 2) != 0:
 				result["partner_counted"] = int(result["partner_counted"]) + 1
+			if pick == 3 and t == 2 and absi(p2.sim_pos.x - tree.fist_rest_x) <= 20 \
+					and absi(p2.sim_pos.y - (tree.floor_y - Mangrove.MANGROVE_FIST_BOX.y)) <= 2:
+				on_fist += 1
 			if launched < 0 and hero.yvel <= -120:
 				launched = t
 			if face_at < 0 and tree._face_tick >= 0:
@@ -873,20 +919,22 @@ func _measure_solo_twin() -> Dictionary:
 			result["how"] = "weapon %d, %s, throws %d and %d ticks after it%s%s" % [int(one["weapon"]),
 				"a jump from the lower ledge at x %d (Up %d)" % [int(one["x"]), hold] if ledge else "the springboard",
 				first + 1, first + gap + 1, ", the first high" if high_first else "", ", the second high" if high else ""]
+	result["on_fist"] = on_fist
 	return result
 
 
 ## One player (P1) against the stuck fist of stage 3 from both sides, every weapon, forward / high / low strikes standing
 ## and out of jumps. `partner`: P2 never presses anything (IDLE, G33) and stands, per trial, on the floor on the far
 ## side of the fist (nearer to it than P1: the bait a dozing body would be), further out on the far side, on the lower
-## ledge, or lies on the far side as an egg.
+## ledge, or lies on the far side as an egg. A trial ends at the first hit, or once its input is over and no weapon can
+## still land (Lab.weapon_live): same hits, fewer ticks.
 func _search_fist(coop_form: bool, partner: bool) -> Dictionary:
 	var tree: Mangrove = _open(Defs.Difficulty.BEGINNER, 2 if partner else 1, coop_form)
 	var hero: PlayerBase = _lab.hero()
 	var p2: PlayerBase = _lab.hero(1) if partner else null
 	var frame: PackedInt32Array = PackedInt32Array([0, 0]) if partner else PackedInt32Array([0])
 	var result: Dictionary = {"trials": 0, "hits": 0, "first": "", "idle_trials": 0, "egg_trials": 0,
-		"partner_counted": 0}
+		"partner_counted": 0, "ticks": 0}
 	var start_hp: int = tree.stage_hits[tree.stage_hits.size() - 1]
 	for weapon: int in [Defs.Weapon.CLUB, Defs.Weapon.HAMMER, Defs.Weapon.AXE, Defs.Weapon.BOOMERANG,
 			Defs.Weapon.SPEAR]:
@@ -917,6 +965,8 @@ func _search_fist(coop_form: bool, partner: bool) -> Dictionary:
 						result["egg_trials"] = int(result["egg_trials"]) + 1
 					else:
 						result["idle_trials"] = int(result["idle_trials"]) + 1
+				# The last tick with input: 11 for a strike held 12 ticks, 17 for the jump-strike.
+				var last: int = 17 if int(macro[0]) < 0 else int(macro[0]) - 1
 				for t: int in 34:
 					tree._stage = 3
 					tree._fist = Mangrove.Fist.STUCK
@@ -930,8 +980,11 @@ func _search_fist(coop_form: bool, partner: bool) -> Dictionary:
 						flags = 0
 					frame[0] = flags
 					_lab.step(frame)
+					result["ticks"] = int(result["ticks"]) + 1
 					if partner and p2.counts_for_coop():
 						result["partner_counted"] = int(result["partner_counted"]) + 1
+					if tree.hp < start_hp or (t > last and not _lab.weapon_live()):
+						break
 				if tree.hp < start_hp:
 					result["hits"] = int(result["hits"]) + 1
 					if str(result["first"]) == "":

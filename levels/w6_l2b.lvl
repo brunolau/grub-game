@@ -4,7 +4,7 @@
 # thirty rows; checkpoints every 28 rows (the tar restarts six rows under each); the Cave Painting (index 5) at the
 # top of a side vine four cells off the climb. On the landing the rise stops (zones/autoscroll_stop), a checkpoint,
 # then a hole into Old Mangrove's chamber (GAMEPLAY 13.6: 20 x 12, floor row 10, the Guardian in the right wall,
-# root ledges at rows 7 and 4), whose fire-starter opens the exit totem in its corner.
+# root ledges at rows 7 and 5 [G35]), whose fire-starter opens the exit totem in its corner.
 
 [meta]
 format = 2
@@ -48,16 +48,16 @@ E = objects/exit locked=true
 ##.................C...................#
 ##.......----------###..################
 ##.................###..################
-##.................##..............%%%%%
-##.......------....##..............%%%%%
-##.................##..............%%%%%
-##.................##-----.........%%%%%
-##....------.......##..............%%%%%
-##.................##..............%%%%%
-##.................##--------......%%%%%
-##.......------....##..............%%%%%
-##.................##E.............%%%%%
-##.................####################%
+##.................##..............#####
+##.......------....##..............#####
+##.................##..............#####
+##.................##..............#####
+##....------.......##-----.........#####
+##.................##..............#####
+##.................##--------......#####
+##.......------....##..............#####
+##.................##E.............#####
+##.................#####################
 ##....------.......#####################
 ##.................#####################
 ##.................#####################
@@ -200,10 +200,25 @@ props/swamp/glowcaps 26 12
 props/swamp/root_arch 34 12 layer=back
 items/food 33 10 index=27
 items/food 36 10 index=29
-# Old Mangrove's chamber (B.2): the record stands in the floor-level air cell left of the Guardian's wall. Its default
-# drop (the fire-starter) comes out on the floor in front of the trunk (BossBase._drop_origin, G2 integration).
-zones/arena 27 23 name=chamber rect=20,14,20,12
+# Old Mangrove's chamber (B.2, G35): the arena (= the camera lock) is the 11 rows from the ceiling to the floor
+# row - the locked view shows the floor row and 4 px under it, so the face sits as low in the view as the
+# chamber allows; the record stands in the floor-level air cell left of the Guardian's bark wall; its default
+# drop (the fire-starter) comes out on the floor in front of the trunk (BossBase._drop_origin)
+zones/arena 27 23 name=chamber rect=20,14,20,11
 bosses/mangrove 34 23 arena=chamber
+props/swamp/vine_b 38 17 layer=front
+props/swamp/moss_fringe 37 15 layer=front
 
 [backwall]
 21 15 14 9 set=a deco=15
+
+[overrides]
+36 16 a 23
+36 22 a 23
+37 19 a 23
+37 23 a 23
+38 17 a 23
+38 22 a 23
+39 15 a 23
+39 18 a 23
+39 21 a 23

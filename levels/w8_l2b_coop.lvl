@@ -1,0 +1,91 @@
+# Club & Grub - World 8, stage 2b in co-op: "Idol Court" (designer D8). The co-op file of levels/w8_l2b.lvl
+# (DESIGN.md A.6 / B.4 / D.10, LEVEL_DESIGN.md 15.7): the same approach and court with P2's start; the scarab
+# of the approach is a leech (it rides a hero's back; only the partner clubs it off). The Twin Idols wake
+# together in their co-op form, the Twin Hit: each idol is awake only while an active hero stands on its half of
+# the court, and a hit on its open jaws cracks it only when the OTHER hero strikes its twin within the window
+# (12 ticks on Expert). Eight cracks each (the co-op form sets it; no `hp` here). The sub-stage's co-op gate is
+# the boss form (LEVEL_DESIGN.md 15.7.3).
+
+[meta]
+format = 2
+id = w8_l2b_coop
+name = "Idol Court"
+kind = coop
+coop_of = w8_l2b
+coop_base_hash = "74a5eb23c0484d8a1d83f4e8b21276ec42bdd3bfa470c7814839682c5d4e5d97"
+book = 2
+world = 8
+stage = 2
+biome = ruins
+terrain_a = ruins/terrain_carved
+terrain_b = ruins/terrain
+background = temple
+music = level_idol_hall
+min_difficulty = expert
+bonus_tier = 2
+author = D8
+
+[legend]
+C = objects/checkpoint
+E = objects/exit locked=true
+$ = objects/breakable_block tile=;
+
+[tiles]
+##################################################
+#..............................................###
+#..............................................###
+#..............................................###
+#..@.....................C.....................###
+#############$$#######################..##########
+###########......#############..................##
+###########......#############..................##
+##############################..................##
+##############################..................##
+##############################..................##
+##############################.....--....--.....##
+##############################..................##
+##############################........E.........##
+##############################.......%%%%.......##
+##############################.......%%%%.......##
+##################################################
+
+[entities]
+# the approach: a scarab, a temple raptor, the painting chamber, the checkpoint
+enemies/lurker 9 1 skin=insect range=3 hp=10 coop=leech
+enemies/hopper 21 4 skin=mini_rex_b range=4 hp=10
+items/painting 13.5 7 index=11
+zones/secret 13 7 name=painting_crypt rect=11,6,6,2
+items/food 12 7 index=3
+items/food 15 7 index=4
+items/food 6 3 index=0
+items/food 7 2 index=1
+items/food 8 3 index=2
+items/food 18 3 index=5
+items/food 19 2 index=6
+items/food 31 3 index=7
+items/food 33 2 index=8
+items/food 35 3 index=9
+# the Idol Court: the arena zone is the room (masonry falls over a hero inside it); the record is the Sun Idol
+zones/arena 38 15 name=court rect=29,5,20,12
+bosses/idols 47 15 arena=court
+# dressing
+props/ruins/brazier_glow 2 4
+props/ruins/column 10 4 layer=back
+props/ruins/idol_head_jade 16 4 layer=back
+props/ruins/column 22 4 layer=back
+props/ruins/brazier_glow 27 4
+props/ruins/urn 30 4
+props/ruins/glyph_tablet 34 4
+props/ruins/jar_a 42 4 layer=back
+props/ruins/skull_big 45 4 layer=back
+props/ruins/bone_pile 14 7
+props/ruins/brazier_glow 37 13
+props/ruins/brazier_glow 40 13
+props/ruins/stalactite 34 6
+props/ruins/drips 44 6
+# co-op: P2's start
+objects/hero_start 2 4 slot=2
+
+[backwall]
+30 6 18 10 set=a deco=10
+1 1 27 4 set=b deco=15

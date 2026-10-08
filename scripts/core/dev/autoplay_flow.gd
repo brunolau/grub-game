@@ -55,7 +55,9 @@ extends Node
 ##                                    elsewhere (the end of the part before, or a part cut short by `need`), Flow
 ##                                    goes back to the title first (Flow.goto_title); held keys are let go and every
 ##                                    hero is scripted again. Before the title was ever shown (the boot) it does
-##                                    nothing: the part's own lines wait for the title
+##                                    nothing: the part's own lines wait for the title. A part that stops (a wait
+##                                    timed out, a play stalled, a bad command) is cut short the same way: the run
+##                                    goes on at the next `section` and still fails, so every part reports
 ##   need <what> [<what> ...]         content the lines after it need: a level id (Levels.has_level) or a file path
 ##                                    (a route). In a skeleton flow (a `# skeleton:` line, filled in as the content
 ##                                    lands) a missing one ends the part: the run goes on at the next `section` and
@@ -483,19 +485,31 @@ func _run() -> void:
 				continue
 			if not _skeleton:
 				_failures.append("need: %s not there (only a skeleton flow may wait for content)" % ", ".join(missing))
-				break
+				index = _next_section(index, "failed")
+				continue
 			# The part waits for its content: go on at the next section (or end the run).
-			var skipped: int = 0
-			while index < _commands.size() and _commands[index][0] != "section":
-				index += 1
-				skipped += 1
+			var skipped: int = _next_section(index, "") - index
+			index += skipped
 			_pending.append("%s (%d line(s) skipped)" % [", ".join(missing), skipped])
 			print("Autoplay flow: PENDING %s - %d line(s) skipped to the next section" % [", ".join(missing), skipped])
 			continue
 		if not await _execute(command):
 			_failures.append("stopped at: %s" % " ".join(command))
-			break
+			# The sections of a flow are independent parts (each starts at the title): a part that stopped does not
+			# keep the next ones from running - the run still fails.
+			index = _next_section(index, "failed")
 	_finish(EXIT_OK if _failures.is_empty() else EXIT_FAILED)
+
+
+## The index of the first `section` command at or after `index` (the end of the script when there is none). `why`
+## non-empty: print that the rest of the part is skipped for that reason.
+func _next_section(index: int, why: String) -> int:
+	var next: int = index
+	while next < _commands.size() and _commands[next][0] != "section":
+		next += 1
+	if why != "" and next < _commands.size():
+		print("Autoplay flow: part %s - %d line(s) skipped to the next section" % [why, next - index])
+	return next
 
 
 ## Run one command; false ends the script (bad command or a timed-out wait).

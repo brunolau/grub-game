@@ -913,7 +913,8 @@ ever needed** on a main path; specials open shortcuts, secrets and paintings (13
   Water stays deadly (no swimming).
 - **Rising tide** (P-C.8): on `scroll = rising` stages a band of the level's liquid rises from 6 rows under the start
   (or the checkpoint) at `rise_speed` (default 1 px/tick) once the player moves; it kills on touch; the view never
-  scrolls down; `zones/autoscroll_stop` ends it.
+  scrolls down and follows each hero's footing, never a jump's apex, so a jump in place lands in view [G42];
+  `zones/autoscroll_stop` ends it.
 - **Alternating gusts** (P-C.6): negative wind pushes right; `wind_loop` repeats a wind script (9-2, Floe Rink, Cloud
   Top); crouching braces as in 1.0; outside the ice biome the wind shows as gust streaks. **Co-op lee** [G23]: a hero
   up to 64 px downwind of a crouching partner feels no wind, and a jump taken in the lee stays sheltered until he
@@ -1028,7 +1029,8 @@ Beginner 4 / 3 / 3, Expert 6 / 5 / 5.
   to the nearer active hero every tick, so the wrist must be struck from the far side.
 
 **Inkjaw, the Grotto Squid** (`bosses/squid`, `w7_l2b`). Arena: one screen; deadly water across the floor; rock
-islands at cols 2-5, 8-11, 14-17 (surface row 9); one-way root ledges at row 6 over the gaps. It surfaces in gap 6-7
+islands at cols 2-5, 8-11, 14-17 (surface row 9; the outer islands may reach cols 1 / 18, closing the 1-cell water
+strips at the walls [G52]); one-way root ledges at row 6 over the gaps. It surfaces in gap 6-7
 or 12-13 (`Sim.rng`); **22 ticks of bubbles** mark which. Weak point: the top of its head (a high strike from an
 island edge, a bounce from a ledge, a throw). hp: Beginner 150 (6), Expert 225 (9); co-op 187 / 280 [R8].
 - **Phase 1 Surface and Slam**: a tentacle rises over the island next to its target for **12 ticks** (its shadow
@@ -1045,6 +1047,8 @@ island edge, a bounce from a ledge, a throw). hp: Beginner 150 (6), Expert 225 (
   flinch, struck by **two different heroes** - one hero on each flanking island (the count-in plays while an active
   hero stands at each side). Slot-bound, so the flinch is not capped by the measured solo minimum of 20 [G34].
   Phase 3 keeps the solo rule: one paddles, the other strikes.
+- **Defeat**: the fire-starter is thrown from over the island nearest to where it died; a sunk key item comes back on
+  standable ground [G52].
 - Clearing it ends a Beginner run (13.1 expert wall).
 
 **The Twin Idols** (`bosses/idols`, `w8_l2b`, Expert; the Colossus archetype 6.3, 1 per hit). Arena: one fixed screen
@@ -1073,8 +1077,9 @@ take 200 (8 club hits; co-op 250), phase 3 takes **3 glider dives**. Weak point:
   (phase 1) until its hp is at or below a third.
 - **Phase 3 Storm** (hp <= 1/3): lightning strikes cells that a darkening cloud marks **22 ticks** ahead (struck nest
   sticks burn 66 ticks); the Roc climbs above the view and comes down only to cruise and swoop - it cruises over one
-  runway half (never over the nest nor in the boss bar's columns), its feet about 61 px over the floor, so its back's
-  top stays 55 px under the view's top [G46]. **The hang-glider lies on the nest** (it reappears after a death): take off along a runway (24 ticks at speed, 13.2 / 8.4), climb on lift and
+  runway half (never over the nest nor in the boss bar's columns; the halves alternate, the right one first), its feet
+  about 61 px over the floor, so its back's top stays 55 px under the view's top [G46] with the arena's 11-row lock (a
+  taller lock lowers the cruise as far as the view can sink); its wing brushes a hero on the nest's end cells (a bone). **The hang-glider lies on the nest** (it reappears after a death): take off along a runway (24 ticks at speed, 13.2 / 8.4), climb on lift and
   **dive onto its back**; the dive ladder (1 000 / 5 000 / 10 000) counts the three hits; the third brings it down.
 - Defeat: it tumbles into the clouds and coughs up the fire-starter onto the nest.
 - **Co-op**: phase 1 - a wing shield faces the nearer active hero (head hits from that side glance): a pincer on the
@@ -1321,12 +1326,12 @@ one-shot. **Snatcher**: `kind=stinger` after a carry flies back to where it seiz
 | Id | Rule |
 |---|---|
 | `objects/plate name= count=1\|2 mode=hold\|timed:<ticks>\|latch w=<cells>` | `w` [2] cells of floor, anchored at its **left** cell and covering `w` cells to the right; **weight** = active heroes whose feet are over its cells, on its floor or up to 8 px above it and not rising (a screen shake does not release it) + 2 for a mount driven by an active hero + 2 for a heave boulder resting on it; enemies, eggs, idle heroes and a riderless mount weigh 0 [G33]. Pressed while weight >= `count`; `timed:T` stays pressed T ticks after the weight leaves (a stone clock shows it); `latch` stays pressed for good. It sinks 2 px (drawing) and clicks |
-| `objects/column ... rise_while=<plate>[,...]` / `sink_while=` | the 1.0 column driven by plates: while **all** listed plates are pressed it rises (sinks) 1 tile per 4 ticks up to `rise`, and returns at the same rate when released; `shake` defaults to 0 for plate columns. A plate stands **8+ tiles** from its door. One door cannot be opened from both sides: a leapfrog uses two doors in two corridors [G9]. **Door rule**: a driven block (plates, keepers, drums) whose next cell in its direction of travel is solid is a door - the cells it leaves become air (a portcullis rising into a ceiling slot, a slab sinking into the floor); a block moving into air keeps the 1.0 pillar rule. A returning door never moves into a hero: it waits |
+| `objects/column ... rise_while=<plate>[,...]` / `sink_while=` | the 1.0 column driven by plates: while **all** listed plates are pressed it rises (sinks) 1 tile per 4 ticks up to `rise`, and returns at the same rate when released; `shake` defaults to 0 for plate columns. A plate stands **8+ tiles** from its door. One door cannot be opened from both sides: a leapfrog uses two doors in two corridors [G9]. **Door rule**: a driven block (plates, keepers, drums) whose next cell in its direction of travel is solid is a door - the cells it leaves become air (a portcullis rising into a ceiling slot, a slab sinking into the floor); a block moving into air keeps the 1.0 pillar rule. A returning door never moves into an active hero: it waits; an idle hero is pushed out of its way, unharmed - an idle body is no doorstop [G53] |
 | `objects/column trigger=keepers:<name>` | the **keeper door**: rises once when every enemy with `keeper=<name>` is dead. Keepers carry `shell`, `bond` or `daze` and stand in a hall **4 rows high** (the Guard and Shellback art is 54 px tall) [G4]; a keeper door is the bottom cells of a wall that continues above the hall, `rise` = 4 |
 | `objects/column trigger=drums:<bond>`, `objects/gate needs=<bond>` | opened by a drum bond [R10] |
 | `objects/drum bond=<name>` | a hittable (every weapon box, thrown weapon or ball, at most one hit per 6 ticks): the first hit lights it and opens the window; when every drum of the bond is lit within it, the bond succeeds for good (its column rises, its gate unlocks); otherwise all go dark and can be tried again |
 | `objects/seesaw len=<cells> [facing]` | [5]; two end platforms 16 px apart in height around the pivot (the fulcrum at the anchor's feet point, the plank `len * 8` px each side, `facing` names the high end [r]; the low end lies 1 px over the floor, the high end one row higher). Two heroes on one see-saw play ping-pong (the launched hero's landing flips it back); an idle hero's landing flips it and launches nobody [G33]. A body landing on the **high end** (`yvel >= 16` at contact) flips it within 2 ticks and launches whoever stands on the low end with `max(-(yvel + 32) - (64 if hard landing), -288)` (6.5 hard landing; P-C.17 table: 1 tile -128, 4 tiles -272, 5+ tiles -288 = 171 px); a weaker result than -64 only lifts him. Enemies on the low end are thrown off the same way |
-| `objects/boulder_heavy` | a 2 x 2-cell solid tile mover; it moves 1 tile once two active heroes have pushed the same side (grounded, walking into it) on 6 ticks in a row; it falls 1 tile per 2 ticks when unsupported (never onto a hero: it waits); weight 2 on a plate; it plugs a geyser vent it rests on (P-C.6) |
+| `objects/boulder_heavy` | a 2 x 2-cell solid tile mover; it moves 1 tile once two active heroes have pushed the same side (grounded, walking into it) on 6 ticks in a row; it falls 1 tile per 2 ticks when unsupported (never onto an active hero: it waits; an idle one is pushed aside [G53]); weight 2 on a plate; it plugs a geyser vent it rests on (P-C.6) |
 | `objects/pulley a=<platform> b=<platform> range=<rows>` | two linked sprite platforms; weight as plates; the heavier side sinks 2 px/tick and the other rises the same, each at most `range` [3] rows from its start; equal weights do not move |
 | `objects/flower_pot` | stands on a ledge edge; a strike pushes it in the strike's direction (the striker's facing; a thrown weapon's or ball's flight); it slides to its floor's edge or a wall, falls at 2 px/tick and becomes a permanent `objects/spring` (-224) where it lands, 1-2 cells beyond the ledge's face (lost in a liquid, pit or spikes: back on its ledge after a team wipe; a landed spring stays through team wipes). **It reaches 6 rows from the floor it takes root on** (a 105 px rise from the spring's top, 10 px over the floor: 19 px to spare) [G6]. Every boost ledge holds a drop gift: a rolled vine or a flower pot |
 | `objects/x2_tablet gate=<name> far=<col>,<row> [secret]` | a stone tablet carved with two cavemen marks every co-op gate and co-op secret (a sign skin, no HUD); `far` is the cell beyond the gate that the solo search must fail to reach (LEVEL_DESIGN 15.7.6); it lights its marks once an active hero stood in `far`, and stays lit |
