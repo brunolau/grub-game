@@ -17,6 +17,8 @@
 # code_and_options), pass --user-dir=res://build/autoplay_user yourself.
 #
 # GD_TIMEOUT=<seconds> (default 300) limits each Godot run; on timeout only that run's processes are killed.
+# Windowed runs (play) are muted (--audio-driver Dummy) and placed far off-screen (--position 30000,30000) so
+# they never disturb whoever uses the desktop; screenshots still render. GD_VISIBLE=1 shows the window with sound.
 # GODOT=<path> uses another Godot 4.7.2 binary (default: .tools/godot/Godot_v4.7.2-stable_win64_console.exe on
 # Windows, .tools/godot/Godot_v4.7.2-stable_linux.x86_64 on Linux, .tools/godot/Godot.app on macOS).
 set -u
@@ -191,10 +193,12 @@ case "$cmd" in
 	play)
 		import_if_needed
 		acquire_shared
+		quiet=(--audio-driver Dummy --position 30000,30000)
+		[ "${GD_VISIBLE:-0}" = "1" ] && quiet=()
 		if has_user_dir "$@"; then
-			run --path "$ROOT" -- "$@"
+			run --path "$ROOT" "${quiet[@]}" -- "$@"
 		else
-			run --path "$ROOT" -- --user-dir="res://$RUN_USER" "$@"
+			run --path "$ROOT" "${quiet[@]}" -- --user-dir="res://$RUN_USER" "$@"
 		fi
 		;;
 	script)

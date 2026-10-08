@@ -238,6 +238,9 @@ $smokeLog = Join-Path $SmokeDir "smoke.log"
 $smokeArgs = @("--log-file", $smokeLog)
 if ($HeadlessSmoke) {
     $smokeArgs += "--headless"
+} else {
+    # A real window proves the renderer starts; muted and off-screen so it never disturbs the desktop's user.
+    $smokeArgs += @("--audio-driver", "Dummy", "--position", "30000,30000")
 }
 # A development switch rides along: the release build must ignore it.
 $smokeArgs += @("--", "--smoke=$SmokeSeconds", "--autoplay=w1_l1")

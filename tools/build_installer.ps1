@@ -133,7 +133,7 @@ if ($TestInstall) {
     $smokeLog = Join-Path $BuildDir "installer_test_smoke.log"
     $info = New-Object System.Diagnostics.ProcessStartInfo
     $info.FileName = $installedExe
-    $info.Arguments = "--log-file `"$smokeLog`" -- --smoke=4"
+    $info.Arguments = "--log-file `"$smokeLog`" --audio-driver Dummy --position 30000,30000 -- --smoke=4"
     $info.UseShellExecute = $false
     $info.EnvironmentVariables["APPDATA"] = $smokeData
     $game = [System.Diagnostics.Process]::Start($info)
