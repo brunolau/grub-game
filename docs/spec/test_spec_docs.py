@@ -1055,6 +1055,18 @@ class BookOneCoopSecondPart(unittest.TestCase):
         self.assertIn("as built (DB1 [G68]): 'shaft'", d9)
         self.assertIn("- **No bond on a zone spawner** [G68]", _section(LEVEL_DESIGN_15, "#### 15.7.5"))
 
+    def test_every_height_gate_is_eight_rows(self):
+        """[G69] a Totem ledge of 5-6 rows is no gate; 1-2 'treehouse' is an 8-row boost ledge."""
+        row = [line for line in DESIGN.splitlines() if line.startswith("| G69 |")][0]
+        self.assertIn("**every height gate is 8 rows**", row)
+        self.assertIn("**never a gate** [G69]", _section(LEVEL_DESIGN_15, "#### 15.7.2"))
+        self.assertIn("**One height for every height gate** [G69]", _section(LEVEL_DESIGN_15, "#### 15.7.3"))
+        self.assertIn("as built (DB1 [G69]): 'treehouse'", _section(DESIGN, "### D.9"))
+        self.assertEqual(_gd_consts("scripts/core/party_tuning.gd")["BOOST_LEDGE_TILES_BEGINNER"], 8)
+        w12 = _read("levels/w1_l2_coop.lvl")
+        self.assertRegex(w12, r"(?m)^objects/x2_tablet .*\bgate=treehouse\b")
+        self.assertRegex(w12, r"(?m)^objects/vine .*\blength=8 rolled\b")
+
     def test_the_files(self):
         w12 = _read("levels/w1_l2_coop.lvl")
         self.assertRegex(w12, r"(?m)^objects/x2_tablet .*\bgate=shaft\b")

@@ -32,7 +32,7 @@ const READY_SECONDS: float = float(PartyTuning.JOIN_READY_HOLD_TICKS) * Tuning.T
 ## Seconds between "everybody is ready" and the book select (a Look in between takes it back).
 const FINISH_DELAY: float = 0.6
 ## Colours a player can wear, in the order Left / Right steps through them (hero_palettes.json; white is only the
-## jungle-arena swap of green). Gold comes with the Spear Party reward (Save.UNLOCK_SPEAR_PARTY).
+## jungle-arena swap of green). Gold is the 25-painting reward (Save.UNLOCK_GOLD, G60).
 const COLOURS: Array[StringName] = [&"yellow", &"blue", &"pink", &"green"]
 const COLOUR_GOLD: StringName = &"gold"
 const COLOUR_KEYS: Dictionary = {
@@ -598,7 +598,7 @@ static func colour_choices() -> Array[StringName]:
 
 
 ## The loincloth patterns a player can choose now (hero_palettes.json `patterns` whose `unlock` tag is open:
-## UnlockTable.is_pattern_open - the default ones, the eight more once the loincloth reward is open).
+## UnlockTable.is_pattern_open - the default ones, four more with each of the two loincloth rewards [G60]).
 static func pattern_choices() -> PackedInt32Array:
 	var result: PackedInt32Array = PackedInt32Array()
 	for entry: Variant in HeroPalette.meta().get("patterns", []):

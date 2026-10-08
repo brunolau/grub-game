@@ -174,6 +174,9 @@ const BOSS_HP_MAX_DEN: int = 4
 ## The IDLE-PARTNER rule (orchestrator, phase 3; DESIGN.md D.3 [G33]): a co-op hero whose own slot gave no input for
 ## this many ticks (10 s) is IDLE and counts for no co-op rule (PlayerBase.is_idle / counts_for_coop).
 const IDLE_TICKS: int = 243
+## The idle warning (DESIGN.md G58): from this many quiet ticks on a "Zzz soon" bubble shows over a co-op hero - 73
+## ticks (3 s) before he dozes at IDLE_TICKS. Drawing only (HeroParty): no rule reads it.
+const IDLE_WARN_TICKS: int = 170
 const MAIN_MIN_GATES: int = 2                ## co-op gates on the main path of every co-op `main` file
 const SUB_MIN_GATES: int = 1                 ## every co-op `sub` file: a gate or its boss's co-op form
 ## Boost ledges (Shoulder Hop / Totem Ride), tiles over the floor: 8 on both difficulties (G28 / G39).

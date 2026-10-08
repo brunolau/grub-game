@@ -241,6 +241,96 @@ func test_a_batted_ball_unrolls_a_vine_once() -> void:
 	assert_false(vine.unroll(null), "already unrolled")
 
 
+## The coil rule (DESIGN.md G67 (1), PHYSICS.md C.4): in a co-op file a rolled vine unrolls only for a hit from its
+## own level - the hitting hero's feet at most one row under the coil's ledge; any other hit passes the coil.
+func test_in_a_coop_file_the_coil_unrolls_only_for_a_hit_from_its_own_level() -> void:
+	var vine: Vine = _vine_level({"length": 5, "rolled": true})
+	assert_false(Vine.coil_rule_on(), "a solo file: any hit unrolls")
+	var hero: Player = _player(Vector2i(152, vine.top + Vine.COIL_LEVEL_PX + 1))
+	assert_eq(level.get_hero(0), hero)
+	assert_true(vine.hit_from_its_level(hero), "solo: the rule is off wherever the hero stands")
+	level.meta["kind"] = "coop"
+	assert_true(Vine.coil_rule_on(), "a co-op file")
+	assert_false(vine.hit_from_its_level(hero), "his feet 17 px under the ledge: not from its level")
+	assert_false(vine.take_hit(25, hero), "the hit passes the coil: the box is not consumed")
+	assert_false(vine.unrolled, "and nothing unrolls")
+	# A thrown weapon counts by its thrower's feet at the moment it hits; the ball by its own.
+	var axe: ProjectileBase = ProjectileBase.new()
+	axe.from_hero = true
+	axe.owner_slot = 0
+	assert_false(vine.take_hit(25, axe), "his axe from the floor below passes too")
+	assert_false(vine.unroll(hero), "and so does he as a batted ball that is still under the ledge")
+	assert_false(vine.unrolled)
+	hero.teleport(Vector2i(152, vine.top + Vine.COIL_LEVEL_PX))
+	assert_true(vine.hit_from_its_level(hero), "feet y <= top + 16: one row under the ledge still counts")
+	hero.teleport(Vector2i(152, vine.top))
+	assert_true(vine.take_hit(25, axe), "thrown from the ledge the axe unrolls it")
+	assert_true(vine.unrolled)
+	axe.free()
+	# A hit nobody's hero made (a tool, a test) unrolls as before.
+	var second: Vine = _spawn(&"objects/vine", 12, 6, {"rolled": true}) as Vine
+	assert_true(second.take_hit(25, null))
+	level.meta["kind"] = "test"
+
+
+## End to end with the real hero (DB1's probe of 1-2 'treehouse', G67): on the floor 8 rows under a boost ledge he
+## plays the hop jump with a high strike - a low strike, Up from its 8th tick, a high strike from tick 10-16 - whose
+## box reaches 123 px: the coil at the ledge's edge. In a solo file that unrolls the vine (1.0 hittable pass); in a
+## co-op file it never does, and a strike from the ledge still does.
+func test_a_hop_jump_strike_from_the_floor_below_opens_a_solo_coil_and_never_a_coop_one() -> void:
+	for coop: bool in [false, true]:
+		var opened: int = 0
+		var best: int = 0
+		for strike_tick: int in [10, 12, 13, 14, 16]:
+			for x: int in [170, 178, 186]:
+				var vine: Vine = _boost_ledge(coop)
+				var floor_y: int = 11 * Tuning.TILE
+				var hero: Player = _player(Vector2i(x, floor_y))
+				hero.facing = -1
+				var lowest: Array[int] = [floor_y]
+				var tick: Array[int] = [0]
+				GameInput.set_scripted_slot(0, func(_tick: int) -> int:
+					var n: int = tick[0]
+					tick[0] += 1
+					var keys: int = (Defs.IN_FIRE | Defs.IN_DOWN) if n < 8 else Defs.IN_UP
+					if n >= strike_tick and n < strike_tick + 8:
+						keys = Defs.IN_UP | Defs.IN_FIRE
+					return keys)
+				for _i: int in 60:
+					Sim.step(1)
+					lowest[0] = mini(lowest[0], hero.sim_pos.y)
+				GameInput.clear_scripted()
+				best = maxi(best, floor_y - lowest[0])
+				if vine.unrolled:
+					opened += 1
+				if coop and not vine.unrolled:
+					# The same coil from its own level: a hero standing on the ledge strikes it open.
+					hero.teleport(Vector2i(152, vine.top))
+					assert_true(vine.take_hit(25, hero), "from the ledge the coil unrolls")
+				hero.free()
+				level.free()
+				level = null
+		if coop:
+			assert_eq(opened, 0, "a co-op file: no hop-jump strike from the floor below unrolls the coil (15 trials)")
+			assert_true(best >= 70 and best < 7 * Tuning.TILE - Tuning.TILE, "and his feet rise %d px: over a" % best 					+ " standing jump's 64, under the corner catch of even a 7-row ledge (96)")
+		else:
+			# (Solo: the strike that unrolls it is a pogo, and with Up held he grabs the vine and climbs - the way
+			# through the gate that DB1's one-player bot found.)
+			assert_true(opened > 0, "a solo file: the high strike of a hop jump reaches the coil 8 rows up (%d of 15)" % opened)
+
+
+## An 8-row boost ledge (top row 3, cols 6-9) over the floor (row 11: inside the 11 rows of the bare level's view) with
+## a rolled vine at its edge (cell 10, 3).
+func _boost_ledge(coop: bool) -> Vine:
+	var rows: Array = []
+	for row: int in 11:
+		rows.append("......####.........." if row >= 3 and row <= 4 else "....................")
+	rows.append("####################")
+	_rows(rows)
+	level.meta["kind"] = "coop" if coop else "test"
+	return _spawn(&"objects/vine", 10, 3, {"length": 8, "rolled": true}) as Vine
+
+
 # =================================================================================================================
 # Bark boards and spear steps
 # =================================================================================================================

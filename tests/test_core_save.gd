@@ -199,14 +199,15 @@ func test_namespaces_round_trip() -> void:
 
 func test_cave_paintings_and_unlocks() -> void:
 	assert_eq(Save.painting_count(), 0)
-	assert_false(Save.is_unlocked(Save.UNLOCK_MESA_RODEO))
+	assert_false(Save.is_unlocked(Save.UNLOCK_PATTERNS))
 	for index: int in [4, 0, 19, 27]:
 		assert_true(Save.add_painting(index))
 	assert_false(Save.add_painting(19), "found once")
 	assert_eq(Save.get_paintings(), PackedInt32Array([0, 4, 19, 27]))
-	assert_false(Save.is_unlocked(Save.UNLOCK_MESA_RODEO), "4 of 5")
+	assert_false(Save.is_unlocked(Save.UNLOCK_PATTERNS), "4 of 5")
 	Save.add_painting(29)
-	assert_true(Save.is_unlocked(Save.UNLOCK_MESA_RODEO), "5 paintings open Mesa Rodeo")
+	assert_true(Save.is_unlocked(Save.UNLOCK_PATTERNS), "5 paintings open the first four loincloth patterns (G60)")
+	assert_false(Save.is_unlocked(&"mesa_rodeo"), "a reward id of before cut 3 is no reward: never open")
 	assert_false(Save.is_unlocked(Save.UNLOCK_LOINCLOTHS))
 	Save.set_unlock_everything(true)
 	for reward: StringName in Save.UNLOCK_EVERYTHING_REWARDS:

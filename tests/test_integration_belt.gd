@@ -148,9 +148,10 @@ func test_a_belt_that_reaches_the_simulation_is_caught() -> void:
 func test_a_hero_who_stands_idle_on_a_coop_route_is_caught() -> void:
 	var limit: int = PlayerBase.IDLE_TICKS
 	assert_eq(limit, PartyTuning.IDLE_TICKS, "the rule's 243 ticks")
+	var quiet: String = "P2 is idle on tick %d: %d ticks without input of his own "
 	var cases: Array[Array] = [
-		["idle_after_input", "1:L|L,%d:L|" % (limit + 40), "P2 is idle on tick %d: %d ticks without input of his own since his last one" % [limit + 1, limit]],
-		["idle_from_the_start", "%d:L|" % (limit + 40), "P2 is idle on tick %d: %d ticks without input of his own since the stage began" % [limit, limit]],
+		["idle_after_input", "1:L|L,%d:L|" % (limit + 40), quiet % [limit + 1, limit] + "since his last one"],
+		["idle_from_the_start", "%d:L|" % (limit + 40), quiet % [limit, limit] + "since the stage began"],
 		["crouching", "1:L|L,%d:L|D" % (limit + 40), ""],
 		["tapping", "1:L|L,%d:L|,1:L|D,%d:L|" % [limit - 1, limit - 1], ""],
 	]

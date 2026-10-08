@@ -55,8 +55,8 @@ const BUBBLE_Y: float = -100.0
 ## G58 (DESIGN.md D.3, PHYSICS.md C.10 "Idle"; the orchestrator's IDLE UX decision of wf10): from this many ticks without
 ## input of his own a hatched, living co-op hero shows the "Zzz soon" warning bubble, until he is IDLE at
 ## PlayerBase.IDLE_TICKS (243) and the Zzz takes over: 73 ticks = 3 s of warning. Drawing only - no rule reads it.
-## The value is PartyTuning.IDLE_WARN_TICKS's (core-A's table; asked in wf10_lead_design_to_core_a.txt #2): a private
-## constant here until it lands there, tests/test_player_idle.gd pins it.
+## The value is PartyTuning.IDLE_WARN_TICKS's (core-A's table); tests/test_core_expansion.gd pins the two equal and
+## tests/test_player_idle.gd pins the bubble (the literal stays for docs/spec/test_spec_docs.py, which reads it here).
 const IDLE_WARN_TICKS: int = 170
 ## The voluntary egg's keys, held together (PHYSICS.md C.12).
 const VOLUNTEER_KEYS: int = Defs.IN_DOWN | Defs.IN_LOOK
@@ -336,10 +336,12 @@ func _ball_touch_hittables(level: LevelBase) -> void:
 		if _ball_spots.has(entity):
 			continue
 		if entity.has_method(&"coil_rect"):
-			# A rolled vine (objects-B's Vine): its coil box unrolls under the ball (C.4).
+			# A rolled vine (objects-B's Vine): its coil box unrolls under the ball (C.4). In a co-op file a coil
+			# passes a ball that is still under its ledge (G67): that touch is not used up, the ball may reach it again
+			# on a later tick of the flight.
 			if Overlap.rects(box, entity.call(&"coil_rect")) and entity.has_method(&"unroll"):
-				_ball_spots.append(entity)
-				entity.call(&"unroll", hero)
+				if bool(entity.call(&"unroll", hero)) or bool(entity.get(&"unrolled")):
+					_ball_spots.append(entity)
 			continue
 		var hittable: HittableBase = entity as HittableBase
 		if hittable == null or hittable.opened:
@@ -796,10 +798,10 @@ class IdleMark:
 	const WARN_PULSE_TICKS: int = 8
 	const WARN_HURRY_PULSE_TICKS: int = 4
 	const WARN_HURRY_TICKS: int = 24
-	const WARN_DIM_ALPHA: float = 0.4
+	const WARN_DIM_ALPHA: float = 0.55
 	## The bubble's body (art px, this node's origin) and the "z" in it.
-	const WARN_BODY: Rect2 = Rect2(2.0, -22.0, 16.0, 14.0)
-	const WARN_Z_SIZE: float = 6.0
+	const WARN_BODY: Rect2 = Rect2(4.0, -30.0, 22.0, 18.0)
+	const WARN_Z_SIZE: float = 8.0
 
 	## What is drawn (Mode).
 	var mode: int = Mode.HIDDEN
@@ -847,10 +849,10 @@ class IdleMark:
 	## The "Zzz soon" thought bubble: two trail dots rising from the head, a paper bubble with a dark outline and one
 	## small dark "z" in it.
 	func _draw_warning() -> void:
-		draw_rect(Rect2(-3.0, -4.0, 4.0, 4.0), OUTLINE)
-		draw_rect(Rect2(-2.0, -3.0, 2.0, 2.0), PAPER)
-		draw_rect(Rect2(0.0, -9.0, 5.0, 5.0), OUTLINE)
-		draw_rect(Rect2(1.0, -8.0, 3.0, 3.0), PAPER)
+		draw_rect(Rect2(-4.0, -5.0, 5.0, 5.0), OUTLINE)
+		draw_rect(Rect2(-3.0, -4.0, 3.0, 3.0), PAPER)
+		draw_rect(Rect2(0.0, -12.0, 7.0, 7.0), OUTLINE)
+		draw_rect(Rect2(1.0, -11.0, 5.0, 5.0), PAPER)
 		draw_rect(WARN_BODY.grow(1.0), OUTLINE)
 		draw_rect(Rect2(WARN_BODY.position.x - 2.0, WARN_BODY.position.y + 2.0, WARN_BODY.size.x + 4.0,
 				WARN_BODY.size.y - 4.0), OUTLINE)

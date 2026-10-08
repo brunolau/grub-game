@@ -793,11 +793,11 @@ func test_the_end_shows_the_mural() -> void:
 ## The slab and the Cave Painting screen read the same state: found paintings, the next reward and its distance.
 func test_painting_texts_follow_the_save() -> void:
 	Save.reset()
-	assert_eq(UnlocksScreen.next_text(), tr("UI_PAINTINGS_NEXT").format({"count": 5, "reward": tr("UI_REWARD_MESA_RODEO")}))
+	assert_eq(UnlocksScreen.next_text(), tr("UI_PAINTINGS_NEXT").format({"count": 5, "reward": tr("UI_REWARD_PATTERNS")}))
 	for index: int in [0, 1, 2, 20, 21]:
 		Save.add_painting(index)
 	assert_eq(UnlocksScreen.next_text(), tr("UI_PAINTINGS_NEXT").format({"count": 5, "reward": tr("UI_REWARD_LOINCLOTHS")}),
-			"5 found: Mesa Rodeo open, 5 more for the loincloths")
+			"5 found: the first four loincloths open, 5 more for the next four (G60)")
 	assert_eq(UnlocksScreen.mural_region(7), Rect2(24.0, 16.0, 24.0, 16.0), "painting 7 is the mural's piece (1, 1)")
 	assert_eq(UnlocksScreen.mural_region(29), Rect2(120.0, 64.0, 24.0, 16.0), "29 its last piece")
 	assert_eq(UnlocksScreen.reward_icon_region(2, true), Rect2(48.0, 24.0, 24.0, 24.0), "row 1: the lit icon")

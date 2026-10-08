@@ -7,6 +7,9 @@
 # the lower corridor to plate B, P1 climbs the coral shelves and passes the upper corridor; gate 'stack': P1
 # curls on the rock, P2 lobs him onto the shoulder with a high strike (the ball unrolls the vine), P2 climbs
 # it; both to the exit totem. No role stands 243 ticks without input (G33).
+# Re-recorded by the G3 integrator (wf10) with the same bot after gate 'stack' was rebuilt (DESIGN G67 / G69): the
+# rock's step is 7 rows under the shoulder (the rock 2 rows, its step 3), so a lone hero's hop jump no longer reaches
+# it; the pair's lob is the 7-row lob of LEVEL_DESIGN 15.7.2, the vine one cell longer.
 6:R|,6:R|R,6:F|R,4:|R,6:R|R,5:F|R,1:F|F,4:|F,1:R|F,3:R|,1:F|,2:F|R,3:F|F,3:|F,1:|,3:R|,18:R|R,3:R|,3:|,1:R|R
 5:|,3:R|,8:|,2:R|,1:|,1:R|,1:|,1:R|,1:|,1:R|,2:|,1:R|,1:|,1:R|,1:|,1:R|,2:|,1:R|,3:|,1:R|,2:|,1:R|,2:|,6:|R,4:|
 1:|R,4:|,3:|R,8:|,2:|R,1:|,1:|R,1:|,1:|R,1:|,1:|R,2:|,1:|R,3:|,1:|R,3:|,1:L|,1:F|,6:|,1:F|,1:|,1:F|,6:|,1:F|
@@ -25,9 +28,10 @@
 2:R|,4:|,2:RU|,3:RU|R,6:RU|,10:R|,1:|,1:|R,4:L|R,2:L|,2:L|L,4:L|,5:|,5:R|,1:L|,2:|,1:|R,4:R|R,1:L|R,4:|R,1:R|R
 2:R|,1:R|R,1:L|,1:|,1:|R,2:|,1:R|,1:R|R,1:R|,1:R|R,1:L|,1:|R,2:|,1:|R,1:R|,1:R|R,1:R|,1:L|,1:|R,1:|,1:|R,1:|
 1:|R,1:|,1:|R,5:|,12:|L,7:|,7:|R,1:|,1:F|,3:|,7:|L,7:L|,1:L|R,3:L|,1:|L,1:F|L,2:|L,4:|,2:R|,7:R|R,10:|R,4:|
-1:|R,5:|,8:RU|,16:R|,4:|R,3:|,1:L|R,50:|,6:|UF,32:|,8:|RU,12:|R,2:|,2:|L,1:|,2:|L,4:|,1:R|,17:|,6:UF|,4:|,8:RU|
+1:|R,5:|,8:RU|,16:R|,4:|R,3:|,1:L|R,50:|,6:|UF,32:|,8:|RU,12:|R,2:|,2:|L,1:|,2:|L,4:|,1:R|,5:|,6:|UF,4:|,8:RU|
 16:R|,5:|R,2:|,2:L|,3:|,8:|RU,12:|R,1:|,4:|L,4:|,8:RU|,16:R|,4:R|R,3:R|,1:R|R,24:R|,6:R|UF,33:R|,8:R|RU,2:R|R
 2:|R,1:R|R,7:|R,2:|,2:|L,21:|R,6:|,1:|R,2:|,1:|R,65:D|R,7:|,1:|D,6:RU|D,2:R|D,2:|D,3:L|D,5:|D,5:RU|D,1:U|D
-18:|D,26:R|D,20:R|,40:R|R,4:|R,1:R|R,4:|R,1:RU|R,2:RU|,1:RU|R,5:RU|,2:|,4:L|,2:|,2:R|,5:|,5:RU|,6:R|,2:|,4:L|
-1:|,5:R|,7:|RU,2:L|RU,1:L|R,4:|R,1:R|R,1:|,3:|L,1:|,1:|R,1:|,1:DS|,1:D|,8:D|UF,14:|,8:|R,2:L|R,3:|R,7:R|R
-149:|R,1:D|R,149:|R,1:D|R,149:|R,1:D|R,101:|R,3:|,1:|R,5:|,39:|U,1:D|U,9:|U,6:|R,1:|,9:R|,52:R|R
+18:|D,26:R|D,20:R|,40:R|R,4:|R,1:R|R,4:|R,1:RU|R,2:RU|,1:RU|R,5:RU|,2:|,4:L|,2:|,4:R|,5:|,5:RU|,4:R|,1:|,5:L|
+1:|,6:R|,7:|,3:L|,2:|,2:|RU,1:R|RU,6:|RU,6:|R,1:|,5:|L,7:|,5:|R,2:|,2:|R,3:|,1:|R,3:|,1:DS|,1:D|,8:D|UF,18:|
+1:|R,2:R|R,3:|R,1:L|R,2:|R,7:R|R,149:|R,1:D|R,149:|R,1:D|R,149:|R,1:D|R,69:|R,2:|,1:|R,4:|,57:|U,6:|R,1:|,9:R|
+52:R|R

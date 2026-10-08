@@ -61,7 +61,8 @@ SLOT_DEFAULT = {1: ("yellow", "spots"), 2: ("blue", "stripes"), 3: ("pink", "zig
 ARENA_SWAPS = {"jungle": {"green": "white"}, "swamp": {"green": "white"}}   # filled by the biome check below
 
 # ---------------------------------------------------------------------------------------------------- patterns
-# Bits 0-3 are the slot defaults; bits 4-11 the eight patterns that unlock at 10 paintings (DESIGN C.9).
+# Bits 0-3 are the slot defaults; bits 4-7 the four patterns that unlock at 5 paintings, bits 8-11 the four at 10
+# (DESIGN C.9, the ladder after cut 3 [G60]).
 # Each is a function of the pixel's position (lx, ly) from the top-left of that frame's cloth, the cloth size (w, h)
 # and its distance to the cloth edge (edge), evaluated once per frame here and baked into the atlas.
 PATTERNS = [
@@ -526,7 +527,8 @@ def build(write_previews=True):
         "palettes": {n: {r: p[r] for r in ROLES} for n, p in PALETTES.items()},
         "slot_defaults": {"p%d" % s: {"colour": c, "pattern": p} for s, (c, p) in SLOT_DEFAULT.items()},
         "arena_swaps": ARENA_SWAPS,
-        "patterns": [{"index": i, "name": n, "rule": d, "unlock": "default" if i < 4 else "paintings_10"}
+        "patterns": [{"index": i, "name": n, "rule": d,
+                      "unlock": "default" if i < 4 else ("paintings_5" if i < 8 else "paintings_10")}
                      for i, (n, d) in enumerate(PATTERNS)],
         "cloth_window": {"x": wx, "y": wy, "w": ww, "h": wh, "cell_w": CELL[0], "cell_h": CELL[1],
                          "columns": GRID[0], "rows": GRID[1]},

@@ -15,6 +15,8 @@
 #                                                 2 difficulties will (PLAN.md V7's 20-minute target)
 #   COOP_GATES_TIMEOUT=2400 bash tools/world_coop_gates.sh     each process's GD_TIMEOUT (default 3600 s)
 #   COOP_GATES_ROUNDS=3 bash tools/world_coop_gates.sh         most worker rounds of step 1 (default 3)
+#   COOP_GATES_OUT=build/my_gates bash tools/world_coop_gates.sh    another folder for the queue and the logs (two runs
+#                                                              at once must not share one: each empties its queue)
 #
 # QUEUE MODE (the default) - two steps:
 #  1. N workers share one work queue: each runs `bash .tools/gd.sh script res://tools/coop_search.gd --
@@ -48,7 +50,12 @@
 #          processes and 85 % CPU on average), after 70 s waiting for another agent's exclusive gd.sh run;
 #   08:34  the default mode on the 72-gate table: round 1 72 searches in 360 s (mean 57.4 s), round 2 nothing new
 #          (14 s), the test 5 s (all 72 cached) - 6 min 19 s in all, every gate refused.
-# So about 140 gate searches take about 12 minutes on 12 workers.
+# So about 140 gate searches took about 12 minutes on 12 workers - under the 220-point bound of phase 3.
+# Since the G59 search of wf10 (2026-10-09; raised bounds, the continuous-play probes, one gate per process):
+#   00:03  --fresh 12 on the 76-gate table: round 1 76 uncached searches in 799 s (2 h 34 min of search summed: mean
+#          122 s a gate, the dearest 315 s; 50.0 million ticks), round 2 nothing new (33 s), the test 4 s (all 76
+#          cached) - 13 min 56 s in all, other agents' Godot runs beside it. Verdicts of that tree: 40 refused
+#          (exhaustive), 27 refused (bounded), 9 open, 0 unproven.
 set -u
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MODE=queue
@@ -70,8 +77,17 @@ N="${1:-$(( THREADS / 2 ))}"
 [ "$N" -lt 1 ] && N=1
 [ "$N" -gt 16 ] && [ $# -eq 0 ] && N=16
 TMO="${COOP_GATES_TIMEOUT:-3600}"
-OUT="$ROOT/build/coop_gates"
+OUT="${COOP_GATES_OUT:-$ROOT/build/coop_gates}"
+case "$OUT" in
+	/* | ?:*) ;;
+	*) OUT="$ROOT/$OUT" ;;
+esac
 mkdir -p "$OUT"
+# The queue folder as the workers get it: a res:// path inside the project, else the OS path.
+case "$OUT" in
+	"$ROOT"/*) QUEUE_ARG="res://${OUT#"$ROOT"/}/queue" ;;
+	*) QUEUE_ARG="$OUT/queue" ;;
+esac
 START=$(date +%s)
 
 if [ "$MODE" = "shards" ]; then
@@ -124,7 +140,7 @@ worker() {
 	: > "$log"
 	while :; do
 		( cd "$ROOT" && GD_TIMEOUT="$TMO" bash .tools/gd.sh script res://tools/coop_search.gd -- \
-			--queue=res://build/coop_gates/queue --max-gates=1 $extra ) > "$part" 2>&1
+			--queue="$QUEUE_ARG" --max-gates=1 $extra ) > "$part" 2>&1
 		code=$?
 		cat "$part" >> "$log"
 		if grep -q "^coop_search: 0 gate(s)" "$part"; then

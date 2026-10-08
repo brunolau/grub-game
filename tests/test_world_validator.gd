@@ -924,22 +924,24 @@ func test_search_rides_on_an_idle_partner_only_as_the_engine_allows() -> void:
 	probe.close()
 	if rides:
 		assert_true(rest.is_empty(), "a rest on the partner's head is no node (the ride macros play the jump off)")
+	# A 7-row ledge: one row over what a lone hero's hop jump reaches (wf10: 5 and 6 rows fall to it, see
+	# test_search_hop_jump_reaches_six_rows_not_seven), under the 98 px step of a ride.
 	CoopSearch.node_limit = 90
-	var totem: Dictionary = CoopSearch.search_data(_search_level("totem_coop", 8,
-			"objects/x2_tablet 10 13 gate=totem far=16,7"), Defs.Difficulty.BEGINNER, "totem")
+	var totem: Dictionary = CoopSearch.search_data(_search_level("totem_coop", 7,
+			"objects/x2_tablet 10 13 gate=totem far=16,6"), Defs.Difficulty.BEGINNER, "totem")
 	CoopSearch.node_limit = CoopSearch.MAX_NODES
 	if rides:
-		assert_true(bool(totem["reached"]), "6 rows: a ride on the idle partner")
+		assert_true(bool(totem["reached"]), "7 rows: a ride on the idle partner")
 		assert_true(str(totem["detail"]).contains("partner-"), str(totem["detail"]))
 	else:
 		assert_false(bool(totem["reached"]), "G33: an idle head carries no Totem Ride - %s" % totem["detail"])
 	CoopSearch.idle_partner = false
 	CoopSearch.node_limit = 90
-	var alone: Dictionary = CoopSearch.search_data(_search_level("totem_coop", 8,
-			"objects/x2_tablet 10 13 gate=totem far=16,7"), Defs.Difficulty.BEGINNER, "totem")
+	var alone: Dictionary = CoopSearch.search_data(_search_level("totem_coop", 7,
+			"objects/x2_tablet 10 13 gate=totem far=16,6"), Defs.Difficulty.BEGINNER, "totem")
 	CoopSearch.node_limit = CoopSearch.MAX_NODES
 	CoopSearch.idle_partner = true
-	assert_false(bool(alone["reached"]), "6 rows alone, the partner an egg (-64): %s" % alone["detail"])
+	assert_false(bool(alone["reached"]), "7 rows alone, the partner an egg (-64): %s" % alone["detail"])
 
 
 func test_search_hand_is_no_world_change_and_the_wind_blows() -> void:
@@ -1470,6 +1472,16 @@ func test_search_verdicts_name_their_evidence() -> void:
 	assert_eq(Array(unprobed["missing"] as PackedStringArray), ["idle-bait at shellback 12,13"])
 	assert_true(str(unprobed["evidence"]).contains("probes missing: idle-bait at shellback 12,13"),
 			str(unprobed["evidence"]))
+	# The queue ran dry but a replay missed its world (a move was not played): bounded with its probes, not exhaustive.
+	var missed: Dictionary = _raw_result(40, true, "", keeper, all_run)
+	missed["misses"] = 3
+	assert_eq(CoopSearch.judge(missed)["verdict"], CoopSearch.VERDICT_BOUNDED)
+	assert_true(str(CoopSearch.judge(missed)["evidence"]).contains("3 move(s) from changed worlds were not played"),
+			str(CoopSearch.judge(missed)["evidence"]))
+	# The first pass ran dry and the budget ended in the second (only longer replays left): bounded with its probes.
+	var second: Dictionary = _raw_result(200, false, "ticks", keeper, all_run)
+	second["passes"] = 2
+	assert_eq(CoopSearch.judge(second)["verdict"], CoopSearch.VERDICT_BOUNDED, str(CoopSearch.judge(second)["evidence"]))
 	var blind: Dictionary = _raw_result(900, false, "nodes", keeper, all_run)
 	blind["probes_on"] = false
 	assert_eq(CoopSearch.judge(blind)["verdict"], CoopSearch.VERDICT_UNPROVEN, "a bounded search without probes")
@@ -1598,6 +1610,46 @@ func test_search_settles_the_world_and_shares_changed_worlds() -> void:
 	assert_true(bool(latched["reached"]), "a latched door stays open across moves: %s" % str(latched.get("evidence", "")))
 
 
+func test_search_hop_jump_reaches_six_rows_not_seven() -> void:
+	# DB1's finding (wf10 #1): a jump begun in a low strike's hop (Up from the strike's 8th tick) rises 73-82 px, so a
+	# ledge 5 or 6 rows over the floor is no gate for one hero; 7 rows is (and 8, the boost ledge, with room to spare).
+	var six: Dictionary = CoopSearch.search_data(_search_level("hop_six_coop", 8,
+			"objects/x2_tablet 10 13 gate=hop far=16,7"), Defs.Difficulty.BEGINNER, "hop")
+	var seven: Dictionary = CoopSearch.search_data(_search_level("hop_seven_coop", 7,
+			"objects/x2_tablet 10 13 gate=hop far=16,6"), Defs.Difficulty.BEGINNER, "hop")
+	assert_true(bool(six["reached"]), "6 rows: the hop jump (%s)" % str(six.get("evidence", "")))
+	assert_true(str(six["detail"]).contains("low-hop-"), str(six["detail"]))
+	assert_false(bool(seven["reached"]), "7 rows: out of one hero's reach (%s)" % str(seven["detail"]))
+	assert_eq(seven["verdict"], CoopSearch.VERDICT_EXHAUSTIVE)
+	var names: PackedStringArray = PackedStringArray()
+	for macro: Dictionary in CoopSearch.make_macros(true):
+		names.append(str(macro["name"]))
+	for name: String in ["low-hop-jump R", "low-hop-high L", "jump-high R", "climb", "climb-leap L"]:
+		assert_true(names.has(name), "the search plays '%s'" % name)
+
+
+func test_search_reset_respawns_what_a_level_reset_leaves_changed() -> void:
+	# An unrolled vine stays unrolled "through deaths and team wipes" - but not from one move of the search to the
+	# next: the search world spawns it again (before wf10 every later move played with the vine down).
+	var searcher: CoopSearch.Searcher = _search_world(_search_level("leak_coop", 6, "objects/vine 12 12 length=1 rolled"))
+	var strike: PackedInt32Array = CoopSearch._repeat(Defs.IN_RIGHT, 1) + CoopSearch._repeat(Defs.IN_FIRE, 12) 			+ CoopSearch._repeat(0, 12)
+	var unrolled: String = ""
+	for gap: int in [10, 16, 22, 28, 4]:
+		var struck: Dictionary = searcher.run(_config(Vector2i(12 * Tuning.TILE + 8 - gap, 224)), strike, {})
+		if not struck.is_empty() and str(struck["sig"]) != searcher._baseline:
+			unrolled = searcher.sig_changes(str(struck["sig"]))
+			break
+	var leaks_before: int = searcher.leaks
+	var after: Dictionary = searcher.run(_config(Vector2i(40, 224)), CoopSearch._repeat(0, 4), {})
+	var back: bool = not after.is_empty() and str(after["sig"]) == searcher._baseline
+	var leaks_after: int = searcher.leaks
+	searcher.close()
+	assert_true(unrolled.contains("vine 12,12") and unrolled.contains("opened=true"),
+			"a strike unrolls the vine: a changed world (%s)" % unrolled)
+	assert_true(back, "the next move starts in the level-file world again: the vine is rolled")
+	assert_eq(leaks_after - leaks_before, 1, "the search spawned the vine again (a level reset leaves it unrolled)")
+
+
 func test_search_level_spawns_no_effect_and_counts_the_rest() -> void:
 	# Godot's message queue (content's wf10 #1): a search passes no frame, so its level makes no cosmetic node at all.
 	var searcher: CoopSearch.Searcher = _search_world(_search_level("fx_coop", 6, ""))
@@ -1641,10 +1693,10 @@ func test_search_probe_sites_gate_box_and_partner_places() -> void:
 	var near_right: bool = searcher._probe_site(sites, "e9", at, Vector2i(460, 224))
 	var full: bool = searcher._probe_site(sites, "e9", at, Vector2i(520, 224))
 	var out_of_reach: bool = searcher._probe_site({}, "e9", at, Vector2i(400 + 21 * Tuning.TILE, 224))
-	# The parked partner's places: three cells wide.
+	# The parked partner's places: six cells wide (CoopSearch.PARK_KEY_PX).
 	var here: Dictionary = searcher._node(Vector2i(100, 224), 0, "", "", Vector2i(200, 224))
-	var close: Dictionary = searcher._node(Vector2i(100, 224), 0, "", "", Vector2i(230, 224))
-	var apart: Dictionary = searcher._node(Vector2i(100, 224), 0, "", "", Vector2i(260, 224))
+	var close: Dictionary = searcher._node(Vector2i(100, 224), 0, "", "", Vector2i(260, 224))
+	var apart: Dictionary = searcher._node(Vector2i(100, 224), 0, "", "", Vector2i(300, 224))
 	var same_place: bool = searcher._key_of(here) == searcher._key_of(close)
 	var other_place: bool = searcher._key_of(here) != searcher._key_of(apart)
 	searcher.close()
@@ -1659,8 +1711,8 @@ func test_search_probe_sites_gate_box_and_partner_places() -> void:
 	assert_false(left_again, "one near site a side")
 	assert_false(full, "PROBE_SITES at most")
 	assert_false(out_of_reach, "21 cells away: out of reach")
-	assert_true(same_place, "30 px apart: one place of the parked partner")
-	assert_true(other_place, "60 px apart: another place")
+	assert_true(same_place, "60 px apart inside one stretch of six cells: one place of the parked partner")
+	assert_true(other_place, "100 px apart: another place")
 
 
 ## 16 rows of 30 cells, floor rows 14-15.

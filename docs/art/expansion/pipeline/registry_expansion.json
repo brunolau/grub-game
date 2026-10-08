@@ -18820,14 +18820,14 @@
  },
  "assets/ui/unlock_icons.png": {
   "columns": [
-   "mesa_rodeo",
+   "patterns",
    "loincloths",
    "variants",
-   "cloud_top",
    "spear_party",
+   "gold",
    "mural"
   ],
-  "edits": "the rex and the spear reduced 6:1 / 3:1 to silhouettes (the spear leaned 45 degrees by a pixel shear), the other four drawn as 6-10 px glyphs; row 0 carved into the slab's shade (locked), row 1 painted in ochre on a light disc with a gold ring (unlocked; the spear in gold)",
+  "edits": "the spear reduced 3:1 to a silhouette (leaned 45 degrees by a pixel shear), the other five drawn as 6-10 px glyphs (a checked, a fringed and a plain loincloth, the spring, the hand); row 0 carved into the slab's shade (locked), row 1 painted in ochre on a light disc with a gold ring (unlocked; the golden loincloth in gold)",
   "frame": [
    24,
    24
@@ -18838,7 +18838,7 @@
   ],
   "kind": "ui",
   "license": "CC0 1.0",
-  "note": "the six rewards of the Cave Paintings (C.9, Save.UNLOCK_*), column = reward: 0 mesa_rodeo (5 paintings), 1 loincloths (10), 2 variants (15), 3 cloud_top (20), 4 spear_party (25), 5 mural (30). Row 0 = locked (carved; the slab already shows these), row 1 = unlocked: draw cell 6 + k over the slab's mark k (painting_slab.png `icons`) once Save.is_unlocked(reward); also for the unlocks screen and the versus menu",
+  "note": "the six rewards of the Cave Paintings (C.9 / G60, Save.UNLOCK_*), column = reward: 0 patterns (5 paintings), 1 loincloths (10), 2 variants (15), 3 spear_party (20), 4 gold (25), 5 mural (30). Row 0 = locked (carved; the slab already shows these), row 1 = unlocked: draw cell 6 + k over the slab's mark k (painting_slab.png `icons`) once Save.is_unlocked(reward); also for the unlocks screen and the versus menu",
   "origin_packs": [
    "own",
    "superpowers-prehistoric-platformer"
@@ -18849,7 +18849,7 @@
    144,
    48
   ],
-  "source": "silhouettes of shipped sprites/enemies/rex.png and sprites/items/weapon_spear.png; glyphs drawn by the pipeline; the colours of shipped tiles/village/props/stone_tablet.png and the cave-paint ochre"
+  "source": "the silhouette of shipped sprites/items/weapon_spear.png; glyphs drawn by the pipeline; the colours of shipped tiles/village/props/stone_tablet.png and the cave-paint ochre"
  },
  "assets/ui/versus_plate.png": {
   "edits": "an oval clay plate seen from slightly above (the far inner wall in shade, a short tapered foot, 1 px #272018 outline) with its 3 px rim band painted in the colour (fill, shadow on the near side, dark edge, light glint)",

@@ -140,25 +140,25 @@
    "index": 4,
    "name": "checks",
    "rule": "4 px checkerboard",
-   "unlock": "paintings_10"
+   "unlock": "paintings_5"
   },
   {
    "index": 5,
    "name": "dots",
    "rule": "2 x 2 dots on a staggered 5 px grid",
-   "unlock": "paintings_10"
+   "unlock": "paintings_5"
   },
   {
    "index": 6,
    "name": "tiger",
    "rule": "2 px diagonal stripes every 6 px",
-   "unlock": "paintings_10"
+   "unlock": "paintings_5"
   },
   {
    "index": 7,
    "name": "pinstripes",
    "rule": "2 px vertical stripes every 5 px",
-   "unlock": "paintings_10"
+   "unlock": "paintings_5"
   },
   {
    "index": 8,

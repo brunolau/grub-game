@@ -984,6 +984,34 @@ func test_a_versus_bot_keeps_away_from_a_pit() -> void:
 	assert_true(not hero.dead and hero.is_grounded() and worst <= 143 - BotNavigator.FALL_MARGIN_PX + 4,
 			"he waits a little inside the pit's edge (rightmost x %d, at %s)" % [worst, hero.sim_pos])
 	assert_true(hero.sim_pos.x >= 120, "as near his target as the floor allows (%s)" % [hero.sim_pos])
+	# 2b. Stranded on a node whose one link he blocked after two misses: it gets one more try after
+	# RETRY_BLOCKED_TICKS at most (Floe Rink: the wind made the only jump off a floe miss twice and he stood there to
+	# the gong). The stand-in link here goes nowhere, so the try misses and blocks it again.
+	var hop: NavGraph.NavLink = NavGraph.NavLink.new()
+	hop.from = 0
+	hop.to = 1
+	hop.x0 = 100
+	hop.x1 = 143
+	hop.keys = "2:"
+	hop.flags = NavGraph.expand_keys("2:")
+	hop.ticks = 2
+	graph.add_link(hop)
+	graph.rebuild()
+	nav.blocked[hop.id] = true
+	nav._failures[hop.id] = BotNavigator.LINK_FAILURES_TO_BLOCK
+	var retried_at: int = -1
+	var played_before: int = nav.links_played
+	for t: int in BotNavigator.RETRY_BLOCKED_TICKS + 40:
+		Sim.step(1)
+		if retried_at < 0 and nav.links_retried > 0:
+			retried_at = t
+	assert_true(retried_at >= 0 and retried_at <= BotNavigator.RETRY_BLOCKED_TICKS,
+			"the blocked link was opened again (after %d ticks)" % retried_at)
+	assert_eq(nav.links_retried, 1, "once")
+	assert_eq(nav.links_played - played_before, 1, "he tried it")
+	assert_true(nav.blocked.has(hop.id), "it missed again: blocked again (%s)" % [nav.failure_log])
+	assert_true(not hero.dead and graph.node_at(hero.sim_pos) == 0, "and he still stands on his floor")
+	nav.blocked.clear()
 	# 3. Where a wall ends the floor the steering is the plain rule (nothing changes on a closed arena).
 	GameInput.set_scripted_slot(0, func(_tick: int) -> int: return 0)
 	nav.set_target(Vector2i(12, 160), 4)

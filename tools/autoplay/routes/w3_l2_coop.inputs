@@ -8,6 +8,9 @@
 # bounce on the Raptor until the twin leapers are down and jump the ice pits; up the crystal shaft one slab apart;
 # in the skylight cave P2 Shoulder-Hops off P1's head onto the crystal cache for Cave Painting 26 (not the warp) and
 # both walk into the exit (the team exit). Nobody stands 243 ticks without input.
+# Re-recorded in wf10 by party with DB3's bot and its hurt-driven repair search (downs only, 36 attempts, fixes in
+# build/party11): G54 - a head is never a step into rock - refuses the Totem Ride that lifted P1 into the gallery's roof at
+# tick 1105 of the old recording, so the lower gallery plays out differently; 1628 ticks.
 6:|R,5:R|R,1:|R,2:|,1:|R,6:|,11:|R,16:|RU,6:|R,7:R|,4:R|L,5:R|,3:|,1:R|,5:|,8:|F,8:|,8:|F,2:|,1:|L,29:R|L,7:R|
 9:R|R,6:|R,1:R|R,2:|,1:UF|,1:UF|R,6:UF|,8:|,8:UF|,8:|,2:R|,4:R|R,6:UF|R,4:|R,31:R|R,6:R|,1:|R,2:|,1:R|U,7:|U
 4:|,4:UF|,2:UF|U,4:|U,2:UF|U,6:UF|,2:|,6:|R,6:UF|U,2:UF|,2:|,6:|R,8:UF|R,8:|R,15:R|R,3:R|,1:R|R,11:R|,6:R|U
@@ -15,11 +18,13 @@
 1:|R,7:|,4:R|,5:RU|,5:RU|R,3:RU|,1:RU|R,4:RU|,1:R|,3:R|R,1:|R,7:|RU,11:R|RU,1:R|R,3:RU|R,8:RU|,7:RU|R,5:R|R
 1:R|RU,4:|RU,13:R|RU,3:R|R,3:|R,4:|,1:R|R,11:|R,4:|,1:|R,5:|,1:DS|,6:D|F,2:|F,18:|,7:|L,4:L|L,1:|L,5:|,2:R|
 1:|R,2:|,1:|L,1:|F,7:F|F,1:F|,21:|,43:|R,3:RU|R,9:RU|,10:R|,12:R|RU,7:R|R,2:R|,1:R|R,3:R|,4:|,1:|L,2:|,2:R|,6:|
-5:R|R,1:RU|R,13:RU|,11:R|,3:|,9:|R,3:|,1:|R,5:|,4:|R,4:F|R,5:L|R,2:L|,1:L|R,3:L|,3:L|L,2:U|,9:L|,3:|,3:|R,1:R|R
-1:F|R,5:F|RU,5:|RU,4:F|RU,2:F|R,3:|R,4:|F,2:U|F,1:F|,3:|,1:|R,1:R|R,11:R|,6:F|,4:|,2:R|,6:F|,3:|,3:U|,13:R|
-1:R|U,2:|U,12:|,3:U|,82:|,1:L|,3:U|,3:|,3:|U,1:|,3:R|,2:D|,2:U|,21:R|,4:|,7:L|,2:|,17:R|,3:|,3:L|,2:|,5:R|
-14:RU|,15:R|,7:|,45:R|,2:R|U,113:R|,3:U|,41:R|,2:R|U,17:R|,9:R|R,2:R|U,14:R|R,3:|R,1:R|R,5:|R,2:LU|R,4:LU|
-4:LU|L,1:U|L,2:RU|L,1:RU|,1:R|,1:R|R,16:|R,3:|,3:|L,2:|,5:|R,14:|RU,10:|R,7:|,2:|R,3:|,1:|R,14:RU|R,3:R|R,2:|R
-7:|,1:|LU,8:LU|LU,1:LU|U,4:LU|RU,1:LU|R,1:L|R,4:L|,2:|,1:|L,4:|,14:RU|RU,3:R|R,1:R|,2:|,1:R|,6:|,14:LU|LU,5:L|L
-1:L|,7:|,14:RU|RU,4:R|R,2:|,1:R|R,6:|,1:|LU,13:R|LU,5:R|L,1:|L,1:|,1:R|,5:|,1:|RU,13:R|RU,5:R|R,2:|R,1:R|R,6:|R
-1:L|R,35:|R,2:|,1:|R,6:|,1:|L,4:|,3:|LU,8:|U,27:|LU,3:|L,7:|,1:|R,21:R|R,2:R|
+5:R|R,1:RU|R,13:RU|,11:R|,3:|,9:|R,3:|,1:|R,5:|,4:|R,6:F|R,3:|R,1:|,1:L|,1:R|R,3:F|,3:F|L,1:|,3:|R,2:L|R
+14:L|RU,6:F|R,2:|R,2:|F,4:F|F,2:F|,4:|,11:L|,6:|UF,1:|,4:UF|,2:UF|F,4:|F,4:R|,13:R|L,2:|L,8:|,12:R|,16:R|R,5:R|
+6:R|F,11:R|,2:R|L,6:R|UF,4:R|,1:R|L,4:|L,1:|F,5:L|F,2:L|,2:|,6:R|F,4:R|,6:R|L,1:R|,3:|,1:L|,2:L|UF,2:|UF,1:R|UF
+1:|UF,5:R|,2:RU|,1:RU|R,2:RU|F,4:L|F,3:L|,3:L|U,2:L|R,3:R|R,3:R|,3:U|,2:R|,2:U|,2:R|,1:R|L,1:U|L,1:U|,19:R|
+2:|R,1:R|R,6:|R,20:R|R,3:|R,1:R|R,5:|R,1:U|R,4:U|,7:LU|L,2:LU|,1:LU|R,2:U|R,4:|R,5:R|R,2:|R,1:R|R,2:U|R,2:U|
+1:|,3:|L,2:|,5:|R,13:|RU,1:L|RU,2:L|R,4:|R,4:U|R,1:U|UF,5:RU|UF,5:RU|,1:R|,1:R|R,7:|R,3:L|R,4:|R,5:U|R,1:LU|R
+9:LU|,1:L|,1:L|R,1:|R,3:|,3:|U,2:R|U,1:R|LU,4:|LU,5:U|LU,10:RU|,1:R|,1:R|R,4:|R,3:|,1:L|,1:L|R,1:L|,3:|,1:|U
+4:U|U,1:U|RU,9:LU|RU,1:LU|R,1:L|R,1:L|,6:|,1:|L,2:R|L,1:R|,3:|,1:|U,4:U|U,1:U|LU,9:RU|LU,1:RU|L,2:R|L,7:R|
+3:R|R,4:R|,5:R|U,5:R|RU,5:|RU,2:|R,3:L|,4:F|,2:F|L,1:|L,4:|,2:R|,1:R|R,2:R|,5:R|U,10:R|LU,2:R|L,5:R|,2:|,1:R|R
+2:|R,4:|,1:L|U,4:|U,10:|RU,49:|R,2:|,1:|R,6:|,1:|L,4:|,3:|LU,8:|U,27:|LU,3:|L,7:|,1:|R,21:R|R,2:R|

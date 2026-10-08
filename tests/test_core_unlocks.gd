@@ -38,12 +38,21 @@ func test_the_ladder_matches_the_design_and_save() -> void:
 		assert_true(int(entry["paintings"]) > previous, "the ladder climbs")
 		previous = int(entry["paintings"])
 		assert_true(str(entry["text"]).begins_with("UI_REWARD_"), "%s has a text key" % id)
-	assert_eq(UnlockTable.paintings_needed(Save.UNLOCK_MESA_RODEO), 5, "DESIGN.md C.9: 5 = Mesa Rodeo")
+	# The ladder after cut 3 (DESIGN.md C.9 / G60): no arena is a reward.
+	var ladder: Array[StringName] = []
+	for entry: Dictionary in UnlockTable.REWARDS:
+		ladder.append(entry["id"])
+		assert_false(entry.has("arenas"), "%s opens no arena (cut 3: every arena of 2.0 is open)" % entry["id"])
+	assert_eq(ladder, [&"patterns", &"loincloths", &"variants", &"spear_party", &"gold", &"mural"] as Array[StringName])
+	assert_eq(UnlockTable.paintings_needed(Save.UNLOCK_PATTERNS), 5, "DESIGN.md C.9: 5 = four loincloth patterns")
 	assert_eq(UnlockTable.paintings_needed(Save.UNLOCK_LOINCLOTHS), 10)
 	assert_eq(UnlockTable.paintings_needed(Save.UNLOCK_VARIANTS), 15)
-	assert_eq(UnlockTable.paintings_needed(Save.UNLOCK_CLOUD_TOP), 20)
-	assert_eq(UnlockTable.paintings_needed(Save.UNLOCK_SPEAR_PARTY), 25)
+	assert_eq(UnlockTable.paintings_needed(Save.UNLOCK_SPEAR_PARTY), 20)
+	assert_eq(UnlockTable.paintings_needed(Save.UNLOCK_GOLD), 25)
 	assert_eq(UnlockTable.paintings_needed(Save.UNLOCK_MURAL), 30)
+	assert_true(VersusMatch.LOCKED_ARENAS.is_empty(), "G60: no painting arena in 2.0")
+	for arena: StringName in [&"arena_mesa_rodeo", &"arena_cloud_top", &"arena_totem_ring"]:
+		assert_eq(UnlockTable.reward_of_arena(arena), &"", "%s: no reward names an arena" % arena)
 	assert_eq(UnlockTable.paintings_needed(&"no_such_reward"), Tuning.PAINTING_COUNT + 1, "never by paintings")
 	for arena: StringName in VersusMatch.LOCKED_ARENAS:
 		assert_eq(UnlockTable.reward_of_arena(arena), VersusMatch.LOCKED_ARENAS[arena], "VersusMatch agrees: %s" % arena)
@@ -52,7 +61,9 @@ func test_the_ladder_matches_the_design_and_save() -> void:
 	assert_eq(UnlockTable.reward_of_variant(&"giant_rain"), Save.UNLOCK_VARIANTS)
 	assert_eq(UnlockTable.reward_of_variant(&"spear_party"), Save.UNLOCK_SPEAR_PARTY)
 	assert_eq(UnlockTable.reward_of_variant(&"hammer_time"), &"", "open from the start")
-	assert_eq(UnlockTable.reward_of_palette(&"gold"), Save.UNLOCK_SPEAR_PARTY, "the golden loincloth palette at 25")
+	assert_eq(UnlockTable.reward_of_palette(&"gold"), Save.UNLOCK_GOLD, "the golden loincloth palette at 25")
+	assert_eq(UnlockTable.reward_of_pattern("paintings_5"), Save.UNLOCK_PATTERNS)
+	assert_eq(UnlockTable.reward_of_pattern("paintings_10"), Save.UNLOCK_LOINCLOTHS)
 	assert_eq(UnlockTable.reward_of_palette(&"blue"), &"")
 	for variant: StringName in [&"big_bounce", &"lights_out", &"giant_rain", &"spear_party"]:
 		assert_true(VersusMatch.VARIANT_NAMES.has(variant), "%s is a variant name" % variant)
@@ -110,33 +121,35 @@ func test_the_level_files_place_their_paintings_where_the_table_says() -> void:
 
 func test_paintings_open_the_rewards_and_announce_them() -> void:
 	Save.reward_unlocked.connect(_on_reward)
-	assert_false(UnlockTable.is_arena_open(&"arena_mesa_rodeo"), "a fresh profile: Mesa Rodeo is locked")
-	assert_true(UnlockTable.is_arena_open(&"arena_totem_ring"), "a launch arena is open")
+	assert_true(UnlockTable.is_arena_open(&"arena_totem_ring"), "a fresh profile: every arena is open (G60)")
+	assert_true(UnlockTable.is_arena_open(&"arena_tar_pulleys"))
 	assert_false(UnlockTable.is_variant_open(&"big_bounce"))
 	assert_true(UnlockTable.is_variant_open(&"gusty"))
 	assert_true(UnlockTable.is_pattern_open("default"))
+	assert_false(UnlockTable.is_pattern_open("paintings_5"))
 	assert_false(UnlockTable.is_pattern_open("paintings_10"))
 	assert_false(UnlockTable.is_pattern_open("no_such_tag"))
 	assert_false(UnlockTable.is_palette_open(&"gold"))
 	assert_true(UnlockTable.is_palette_open(&"pink"))
-	assert_eq(UnlockTable.next_reward(), {"id": Save.UNLOCK_MESA_RODEO, "missing": 5})
+	assert_eq(UnlockTable.next_reward(), {"id": Save.UNLOCK_PATTERNS, "missing": 5})
 	_find(4)
 	assert_eq(_rewards, [] as Array[StringName], "four paintings open nothing")
 	assert_eq(UnlockTable.next_reward()["missing"], 1)
 	Save.add_painting(4)
-	assert_eq(_rewards, [Save.UNLOCK_MESA_RODEO] as Array[StringName], "the fifth painting opens Mesa Rodeo")
-	assert_true(UnlockTable.is_arena_open(&"arena_mesa_rodeo"))
+	assert_eq(_rewards, [Save.UNLOCK_PATTERNS] as Array[StringName], "the fifth painting opens four loincloths")
+	assert_true(UnlockTable.is_pattern_open("paintings_5"), "checks, dots, tiger, pinstripes")
+	assert_false(UnlockTable.is_pattern_open("paintings_10"), "the other four wait for 10")
 	Save.add_painting(4)
 	assert_eq(_rewards.size(), 1, "a painting found again announces nothing")
 	_find(10)
-	assert_eq(_rewards, [Save.UNLOCK_MESA_RODEO, Save.UNLOCK_LOINCLOTHS] as Array[StringName])
-	assert_true(UnlockTable.is_pattern_open("paintings_10"), "the eight patterns")
+	assert_eq(_rewards, [Save.UNLOCK_PATTERNS, Save.UNLOCK_LOINCLOTHS] as Array[StringName])
+	assert_true(UnlockTable.is_pattern_open("paintings_10"), "all eight patterns")
 	Save.unlock(Save.UNLOCK_VARIANTS)
 	_find(15)
 	assert_eq(_rewards.size(), 2, "a reward opened by hand is not announced again")
 	Save.set_unlock_everything(true)
 	_find(25)
-	assert_eq(_rewards.size(), 2, "Unlock everything had opened Cloud Top and Spear Party already")
+	assert_eq(_rewards.size(), 2, "Unlock everything had opened Spear Party and the golden loincloth already")
 	assert_true(UnlockTable.is_palette_open(&"gold"))
 	assert_false(UnlockTable.is_mural_open(), "the mural is the campaign's: Unlock everything never opens it")
 	_find(30)
@@ -144,7 +157,7 @@ func test_paintings_open_the_rewards_and_announce_them() -> void:
 	assert_true(UnlockTable.is_mural_open())
 	assert_eq(UnlockTable.next_reward(), {})
 	assert_eq(UnlockTable.open_rewards().size(), UnlockTable.REWARDS.size())
-	assert_eq(UnlockTable.rewards_between(4, 15), [Save.UNLOCK_MESA_RODEO, Save.UNLOCK_LOINCLOTHS, Save.UNLOCK_VARIANTS]
+	assert_eq(UnlockTable.rewards_between(4, 15), [Save.UNLOCK_PATTERNS, Save.UNLOCK_LOINCLOTHS, Save.UNLOCK_VARIANTS]
 			as Array[StringName])
 
 
@@ -158,14 +171,15 @@ func test_the_pattern_tags_of_the_hero_palettes_are_known() -> void:
 	assert_true(data is Dictionary)
 	if not data is Dictionary:
 		return
-	var locked: int = 0
+	var locked: Dictionary = {}
 	for pattern: Variant in (data as Dictionary).get("patterns", []):
 		var tag: String = str((pattern as Dictionary).get("unlock", UnlockTable.PATTERN_DEFAULT))
 		assert_true(tag == UnlockTable.PATTERN_DEFAULT or UnlockTable.reward_of_pattern(tag) != &"",
 				"pattern tag %s has a reward" % tag)
 		if tag != UnlockTable.PATTERN_DEFAULT:
-			locked += 1
-	assert_eq(locked, 8, "DESIGN.md C.9: eight loincloth patterns open with 10 paintings")
+			locked[tag] = int(locked.get(tag, 0)) + 1
+	assert_eq(locked, {"paintings_5": 4, "paintings_10": 4},
+			"DESIGN.md C.9 / G60: four loincloth patterns open with 5 paintings, four more with 10")
 	var palettes: Variant = (data as Dictionary).get("palettes", {})
 	assert_true(palettes is Dictionary and (palettes as Dictionary).has("gold"), "the golden palette exists")
 
@@ -176,15 +190,14 @@ func test_the_versus_match_offers_only_open_content() -> void:
 	for choice: Dictionary in choices:
 		var closed: bool = [&"big_bounce", &"lights_out", &"giant_rain", &"spear_party"].has(choice["name"])
 		assert_eq(bool(choice["open"]), not closed, "%s open from the start: %s" % [choice["name"], not closed])
-		assert_eq(int(choice["paintings"]), 0 if not closed else (15 if choice["name"] != &"spear_party" else 25))
-	assert_eq(VersusMatch.arena_paintings_needed(&"arena_cloud_top"), 20, "the arena screen's count")
-	assert_eq(VersusMatch.arena_paintings_needed(&"arena_totem_ring"), 0)
+		assert_eq(int(choice["paintings"]), 0 if not closed else (15 if choice["name"] != &"spear_party" else 20))
+	for arena: StringName in [&"arena_totem_ring", &"arena_tar_pulleys", &"arena_colossus_hall"]:
+		assert_eq(VersusMatch.arena_paintings_needed(arena), 0, "%s needs no painting (G60)" % arena)
 	var versus_match: VersusMatch = VersusMatch.new()
 	versus_match.variants = PackedStringArray(["gusty", "big_bounce", "lasers", "gusty"])
 	versus_match.begin_match(3)
 	assert_eq(versus_match.variants, PackedStringArray(["gusty"]), "closed, unknown and repeated variants go")
 	_find(16)
-	assert_eq(VersusMatch.arena_paintings_needed(&"arena_cloud_top"), 4)
 	versus_match.variants = PackedStringArray(["big_bounce"])
 	versus_match.begin_match(3)
 	assert_eq(versus_match.variants, PackedStringArray(["big_bounce"]), "open with 15 paintings")

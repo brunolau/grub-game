@@ -1529,6 +1529,13 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
   still lands in view (8 px over its bottom edge; a bigger room would put the ledge under 6-2b's painting nook, six
   rows down, out of the view that never sinks - the off-screen rule of 10.3 kills there) and a partner up to 6 rows
   lower is on the view too (farther behind he is the leash's and the band's case: an egg, C.13).
+- **Footing room for two** [G65] (**decided, not built** when the G3 follow-up round closed: as built the view
+  follows the highest footing alone, and 6-2b's Beginner pair - P2 one ledge behind P1 - loses P2 to the leash
+  three times in the climb): in a party the view's top does not rise above `lowest footing - 160` px (10 rows; the
+  trailing hatched hero stays in view), the leader's room shrinking from 72 px down to 64 px (4 rows) and no
+  further - `want = min(max(high - 72, low - 160), high - 64)` while `low - high <= view height - 64`, else
+  `high - 72` (the footings do not fit one view: the view goes with the leader, the partner is the leash's and the
+  band's case). The band's own rise (the `min(candidate, band_top + 16 - 176, previous)` above) is unchanged.
 - **Head peek** [G65] (`LevelCamera.head_peek`, **drawing only** - the simulation never reads it; wake-ups, the
   off-screen rule, edge walls and the leash use the camera's own position): in a rising climb the **drawn** view
   looks up over the simulated one so that the highest head of the tribe stays `HEAD_ROOM_PX` = **33 px** (the band's

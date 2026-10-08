@@ -94,7 +94,7 @@ var _slab: PaintingSlab = null
 ## The stone slab of the Far Shore map (DESIGN.md A.1 / C.9), small enough for the open sea under the stops: the 30
 ## paintings as the pieces of the mural they assemble (art-A's `ui/mural.png`, half size: a found painting shows its
 ## piece, a missing one its empty socket), the count on a dark plate, the six rewards (`ui/unlock_icons.png`, half size,
-## lit once open; the next one framed in gold) and the line under them, "3 more: Mesa Rodeo arena" - a line longer
+## lit once open; the next one framed in gold) and the line under them, "3 more: Four new loincloths" - a line longer
 ## than the slab scrolls through it like a ticker ([member line]).
 class PaintingSlab:
 	extends Control

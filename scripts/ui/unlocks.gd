@@ -9,9 +9,9 @@ extends UiScreen
 ## the six carved reward marks light up (`ui/unlock_icons.png`) as their rewards open. The focused socket names where
 ## its painting hides ("5-1 Red Mesa Trail", "Co-op: 1-1 ...") and whether it was found, and shows its own picture at 2x
 ## on a stone left of the slab (`ui/paintings.png`; a carved "?" while it is missing). Under the slab the reward
-## ladder of C.9 - 5 Mesa Rodeo, 10 loincloths, 15 variants, 20 Cloud Top, 25 Spear Party and gold, 30 the mural - each
-## "Unlocked!" or the paintings it needs (found paintings, a reward opened by hand or Options > Versus > "Unlock
-## everything"). Paintings are saved per profile across modes, so this screen reads only Save and UnlockTable.
+## ladder of C.9 [G60] - 5 four loincloths, 10 four more, 15 variants, 20 Spear Party, 25 the golden loincloth, 30 the
+## mural - each "Unlocked!" or the paintings it needs (found paintings, a reward opened by hand or Options > Versus >
+## "Unlock everything"). Paintings are saved per profile across modes, so this screen reads only Save and UnlockTable.
 ##
 ## Args: {"back": StringName} - the screen "back" returns to: the versus lobby (Flow.open_versus_lobby: seats and ready
 ## flags kept), else the title (Flow.goto_title). Reached from the versus lobby's "Cave Paintings" button; the Far
@@ -50,8 +50,8 @@ const COL_GROOVE: Color = Color("70604a")
 const COL_SOCKET: Color = Color("b99f7c")
 ## The text keys of the rewards (UnlockTable.REWARDS "text"), listed here as well so that the locale checks see them.
 const REWARD_KEYS: Dictionary = {
-	&"mesa_rodeo": "UI_REWARD_MESA_RODEO", &"loincloths": "UI_REWARD_LOINCLOTHS", &"variants": "UI_REWARD_VARIANTS",
-	&"cloud_top": "UI_REWARD_CLOUD_TOP", &"spear_party": "UI_REWARD_SPEAR_PARTY", &"mural": "UI_REWARD_MURAL",
+	&"patterns": "UI_REWARD_PATTERNS", &"loincloths": "UI_REWARD_LOINCLOTHS", &"variants": "UI_REWARD_VARIANTS",
+	&"spear_party": "UI_REWARD_SPEAR_PARTY", &"gold": "UI_REWARD_GOLD", &"mural": "UI_REWARD_MURAL",
 }
 
 ## The socket that has the focus (painting index).
@@ -320,7 +320,7 @@ static func reward_text(reward: StringName) -> String:
 	return TranslationServer.translate(key)
 
 
-## The line under the slab: "3 more: Mesa Rodeo arena", or "Every painting found!" (UnlockTable.next_reward).
+## The line under the slab: "3 more: Four new loincloths", or "Every painting found!" (UnlockTable.next_reward).
 static func next_text() -> String:
 	var next: Dictionary = UnlockTable.next_reward()
 	if next.is_empty():

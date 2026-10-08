@@ -48,7 +48,6 @@ x = objects/hidden_spot kind=small count=2 contents=food:44,food:45 look=inset t
 y = objects/hidden_spot kind=big hits=3 contents=giant:0 tile=%
 z = objects/hidden_spot kind=small count=2 contents=food:22,food:23 tile=%
 v = objects/hidden_spot kind=small count=2 contents=code_stone:1,treasure:11 tile=#
-w = objects/breakable_block hits=2 contents=food:35 tile=;
 K = objects/container skin=crate contents=food:5,food:12,food:17
 p = objects/container skin=pot contents=food:26,heart
 P = objects/container skin=pot contents=code_stone:2,food:31
@@ -127,8 +126,8 @@ Y = enemies/hopper skin=mini_rex range=5 hp=10
 ............................................#......#......................i.....................
 .................................kk.........#......#............................................
 ..............................-----.........#......#............................................
-............................................w.H....#............................................
-.......................................jj...w..u...#......................i.S...................
+..............................................H....#............................................
+.......................................jj......u...#......................i.S...................
 ....................................%%%%%%%%########............................................
 ....................................%%%%%%%%########.............T..kkk...................P..s..
 ............................................########..........%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -374,8 +373,10 @@ objects/hero_start 2 105 slot=2
 # at the deck's edge (its coil 13 cells from the far cell) and it unrolls down to the mound for his partner. It was a
 # 6-row Totem ledge: a lone hero's hop jump (a jump begun in a low strike's hop, a high strike on the way) lifts his
 # feet 82 px, 2 px into that ledge's corner catch (DB1's probes, build/db1/p6/logs/tree_lowhighL.log) - 8 rows leave
-# 30 px. The coil is safe from below by the coil rule of DESIGN G67 (a hit from its own level only). A checkpoint on
-# the forest floor.
+# 30 px (DESIGN G69). OPEN UNTIL THE COIL RULE OF DESIGN G67 (1) IS BUILT (a co-op coil unrolls only for a hit from
+# its own level; not in scripts/objects/vine.gd yet): the same hop jump with a high strike reaches 123 px and clubs
+# the coil from the mound (build/db1/p6/logs/t8_lowhigh.log), as at every rolled-vine drop gift of the game. A
+# checkpoint on the forest floor.
 objects/checkpoint 31 105
 objects/sign 29 105 text=SIGN_COOP_W1_TOTEM
 objects/x2_tablet 33 105 gate=treehouse far=27,93
@@ -390,9 +391,11 @@ items/weapon 31 90 kind=axe
 # and lifts his partner to the ledge (the plate 9 tiles from its stone). Both climb the vine that hangs from the
 # shaft's mouth to the trunk top; its foot ends 16 px over the ledge (9 rows over the floor: a grab from the floor
 # would need the feet 112 px up). A checkpoint on the deck before it, one on the trunk top behind it.
-# No rolled vine here and nothing to club or bounce on in the shaft (a lone hero's feet rise 73-80 px with a jump
-# begun in a strike's hop and 114 px with a club pogo off a floor spot - DB1's probes, build/db1/p6): the trunk
-# room's inset spot (code stone 1, treasure 11) moved from the shaft floor (46,46) to the big branch (53,36), and the
+# No rolled vine here and nothing to club or bounce on in or at the shaft (DESIGN G67: no hittable and no enemy
+# within 7 cells of a height gate's foot - a lone hero's feet rise 73-82 px with a jump begun in a strike's hop and
+# 114 px with a club pogo off one hittable; DB1's probes, build/db1/p6): the cracked bark of the solo file's trunk
+# room (two breakable blocks at 44,44-45) is an open doorway here, the trunk room's inset spot (code stone 1,
+# treasure 11) moved from the shaft floor (46,46) to the big branch (53,36), and the
 # solo file's pterodactyl (enemies/harrier at 32,36, over the twigs left of the deck) is left out (LEVEL_DESIGN
 # 15.7.1 #4 / G22: no record that hands a lone hero a bounce at a height gate) - once woken it circles its target
 # through scenery, into the shaft too, and a head bounce with Up rises 105 px (probe: 220 px over the shaft floor).

@@ -1,6 +1,9 @@
 # route: level=w7_l1_coop difficulty=expert players=2 ends=exit after=tally expect=wipes:0,x2_gates:2,min_checkpoints:4,letters:3
 # The Expert two-stream route of Shell Beach in co-op (designer D7; the same duo macros as the
 # Beginner route). Club only, no S.
+# Re-recorded by the G3 integrator (wf10) with the same bot after gate 'stack' was rebuilt (DESIGN G67 / G69): the
+# rock's step is 7 rows under the shoulder (the rock 2 rows, its step 3), so a lone hero's hop jump no longer reaches
+# it; the pair's lob is the 7-row lob of LEVEL_DESIGN 15.7.2, the vine one cell longer.
 6:R|,6:R|R,6:F|R,4:|R,6:R|R,5:F|R,1:F|F,4:|F,1:R|F,3:R|,1:F|,2:F|R,3:F|F,3:|F,1:|,3:R|,18:R|R,3:R|,3:|,1:R|R
 5:|,3:R|,8:|,2:R|,1:|,1:R|,1:|,1:R|,1:|,1:R|,2:|,1:R|,1:|,1:R|,1:|,1:R|,2:|,1:R|,3:|,1:R|,2:|,1:R|,2:|,6:|R,4:|
 1:|R,4:|,3:|R,8:|,2:|R,1:|,1:|R,1:|,1:|R,1:|,1:|R,2:|,1:|R,3:|,1:|R,3:|,1:L|,1:F|,6:|,1:F|,1:|,1:F|,6:|,1:F|
@@ -23,7 +26,7 @@
 43:|,6:|UF,100:|,1:D|,23:|,6:|UF,120:|,1:D|,3:|,6:|UF,133:|,6:|UF,1:|,1:D|,8:RU|,16:R|,5:|R,2:|,1:L|,6:UF|,7:|
 2:L|,31:|,6:|UF,4:|,8:|RU,12:|R,1:|,4:|L,4:|,1:R|,31:|,6:|UF,18:|,4:|F,1:L|F,1:F|F,5:F|,5:|,8:RU|,18:R|,4:R|R
 3:R|,1:R|R,4:R|,8:R|RU,12:R|R,2:R|,2:R|L,7:R|R,14:|R,6:|,1:|R,2:|,1:|R,65:D|R,7:|,1:|D,6:RU|D,3:R|D,2:|D,2:L|D
-5:|D,4:RU|D,2:U|D,18:|D,26:R|D,20:R|,40:R|R,4:|R,1:R|R,4:|R,1:RU|R,2:RU|,1:RU|R,5:RU|,2:|,4:L|,2:|,2:R|,5:|
-5:RU|,6:R|,2:|,4:L|,1:|,5:R|,7:|RU,2:L|RU,1:L|R,4:|R,1:R|R,1:|,3:|L,1:|,1:|R,1:|,1:DS|,1:D|,8:D|UF,14:|,8:|R
-2:L|R,3:|R,7:R|R,149:|R,1:D|R,149:|R,1:D|R,149:|R,1:D|R,101:|R,3:|,1:|R,5:|,39:|U,1:D|U,9:|U,6:|R,1:|,9:R|
-52:R|R
+5:|D,4:RU|D,2:U|D,18:|D,26:R|D,20:R|,40:R|R,4:|R,1:R|R,4:|R,1:RU|R,2:RU|,1:RU|R,5:RU|,2:|,4:L|,2:|,4:R|,5:|
+5:RU|,4:R|,1:|,5:L|,1:|,6:R|,7:|,3:L|,2:|,2:|RU,1:R|RU,6:|RU,6:|R,1:|,5:|L,7:|,5:|R,2:|,2:|R,3:|,1:|R,3:|,1:DS|
+1:D|,8:D|UF,18:|,1:|R,2:R|R,3:|R,1:L|R,2:|R,7:R|R,149:|R,1:D|R,149:|R,1:D|R,149:|R,1:D|R,69:|R,2:|,1:|R,4:|
+57:|U,6:|R,1:|,9:R|,52:R|R

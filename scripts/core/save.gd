@@ -42,24 +42,26 @@ const BOOKS: Array[int] = [1, 2]
 
 ## Rewards of the Cave Paintings (DESIGN.md C.9), for [method is_unlocked]: each needs a number of paintings
 ## (Tuning.PAINTING_UNLOCK_*).
-const UNLOCK_MESA_RODEO: StringName = &"mesa_rodeo"     ## arena 9
-const UNLOCK_LOINCLOTHS: StringName = &"loincloths"     ## eight loincloth patterns for P1-P4
+## The ladder after cut 3 (DESIGN.md G60): no arena is a reward. An id a file holds that is no reward any more (a
+## development save's `mesa_rodeo` / `cloud_top`) is ignored: [method is_unlocked] asks only for the ids below.
+const UNLOCK_PATTERNS: StringName = &"patterns"         ## four loincloth patterns for P1-P4
+const UNLOCK_LOINCLOTHS: StringName = &"loincloths"     ## four more loincloth patterns
 const UNLOCK_VARIANTS: StringName = &"variants"         ## versus variants Big Bounce, Lights Out, Giant Rain
-const UNLOCK_CLOUD_TOP: StringName = &"cloud_top"       ## arena 10
-const UNLOCK_SPEAR_PARTY: StringName = &"spear_party"   ## variant Spear Party and the golden loincloth palette
+const UNLOCK_SPEAR_PARTY: StringName = &"spear_party"   ## variant Spear Party
+const UNLOCK_GOLD: StringName = &"gold"                 ## the golden loincloth palette
 const UNLOCK_MURAL: StringName = &"mural"               ## the mural that ends The Long Raft Home
 ## Paintings each reward needs.
 const UNLOCK_PAINTINGS: Dictionary = {
-	UNLOCK_MESA_RODEO: Tuning.PAINTING_UNLOCK_MESA_RODEO,
+	UNLOCK_PATTERNS: Tuning.PAINTING_UNLOCK_PATTERNS,
 	UNLOCK_LOINCLOTHS: Tuning.PAINTING_UNLOCK_LOINCLOTHS,
 	UNLOCK_VARIANTS: Tuning.PAINTING_UNLOCK_VARIANTS,
-	UNLOCK_CLOUD_TOP: Tuning.PAINTING_UNLOCK_CLOUD_TOP,
 	UNLOCK_SPEAR_PARTY: Tuning.PAINTING_UNLOCK_SPEAR_PARTY,
+	UNLOCK_GOLD: Tuning.PAINTING_UNLOCK_GOLD,
 	UNLOCK_MURAL: Tuning.PAINTING_UNLOCK_MURAL,
 }
 ## Rewards that Options > Versus > "Unlock everything" opens (the versus content; the mural stays the campaign's).
 const UNLOCK_EVERYTHING_REWARDS: Array[StringName] = [
-	UNLOCK_MESA_RODEO, UNLOCK_LOINCLOTHS, UNLOCK_VARIANTS, UNLOCK_CLOUD_TOP, UNLOCK_SPEAR_PARTY,
+	UNLOCK_PATTERNS, UNLOCK_LOINCLOTHS, UNLOCK_VARIANTS, UNLOCK_SPEAR_PARTY, UNLOCK_GOLD,
 ]
 
 ## Directory of the save file. Tests point it at `res://build/...` so they never touch real user data.

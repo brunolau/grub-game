@@ -370,20 +370,20 @@ msgstr "Unlocked!"
 msgid "UI_PAINTINGS_EVERYTHING"
 msgstr "Unlock everything is on."
 
-msgid "UI_REWARD_MESA_RODEO"
-msgstr "Mesa Rodeo arena"
+msgid "UI_REWARD_PATTERNS"
+msgstr "Four new loincloths"
 
 msgid "UI_REWARD_LOINCLOTHS"
-msgstr "Eight new loincloths"
+msgstr "Four more loincloths"
 
 msgid "UI_REWARD_VARIANTS"
 msgstr "Big Bounce, Lights Out, Giant Rain"
 
-msgid "UI_REWARD_CLOUD_TOP"
-msgstr "Cloud Top arena"
-
 msgid "UI_REWARD_SPEAR_PARTY"
-msgstr "Spear Party and gold"
+msgstr "Spear Party"
+
+msgid "UI_REWARD_GOLD"
+msgstr "Golden loincloth"
 
 msgid "UI_REWARD_MURAL"
 msgstr "The cave mural"

@@ -302,22 +302,26 @@ verdict lines (world-B, `CoopSearch.gate_verdict`) and their table (integration,
 files and the table (8 / 8), and Tar Pulleys with bots in Grub Stack and Hot Rock on core-B's pulley links (Last
 Caveman Standing human-only there); G61 (bosses: every co-op fight 47-83 s on its recorded route, the Expert stages 0-6
 hurts, re-measured unchanged by the lead designer after the resume; the route headers pin the band); G54's hero-side
-guards (`test_player_g54` 9 / 9 in the lead designer's run) and the docked raft's 7 px strip (party). Rulings of the resumed run, DESIGN.md G63-G68: the 1.0 death rule
+guards (`test_player_g54` 9 / 9 in the lead designer's run) and the docked raft's 7 px strip (party). Rulings of the resumed run, DESIGN.md G63-G69: the 1.0 death rule
 stays, so an enemy takes `hp` / 25 + 1 club strikes (a 100-hp keeper five, not four), a repeat tick of a swing is
 used up, the splitting swing never hurts the record's half again (G63); the Rival Chieftains' crow carries a "HA!"
 bubble, built by bosses, `test_enemies_chieftain` 27 / 27 (G64); the rising view keeps the highest footing 72 px
-under its top and the drawn view looks up for a jumper's head, so 6-2b's climber is never behind the HUD band (G65,
+under its top and the drawn view looks up for a jumper's head, so 6-2b's solo climber is never drawn behind the HUD band (G65,
 party's rule on the lead designer's requirements; LD 15.5's step-down rule becomes 6 rows); a flying keeper holds its
 perch (G66); the lone hero's real reach - the hop jump, the pogo jump, a 123 px strike reach - and the coil rule: in
 a co-op file a rolled vine unrolls only for a hit from its own level (G67, on DB1's one-player probes); DB1's 1-2
-'shaft' (an 8-row boost ledge with a plate-driven lift stone, no pulley) and his other deviations accepted (G68).
+'shaft' (an 8-row boost ledge with a plate-driven lift stone, no pulley) and his other deviations accepted (G68);
+every height gate is 8 rows - a Totem ledge of 5-6 rows is inside a lone hop jump, and 1-2 'treehouse' is rebuilt
+as a boost ledge (G69).
 **Open when the lead designer closed** (each named in its DESIGN row): **the coil rule of G67 is not built** (the
 vine has no owner in the round; party, asked, declined: not its file) - until it is, the rolled-vine drop gift of eleven co-op files can
 be struck down from the floor below by a player who knows the hop jump, and the search does not play that move yet,
 so the verdicts of those height gates say less than they read; world-B's G59 probes found
 `w9_l1b_coop` 'stormwall' **open** (one hero leads the first keeper Harrier to the second and kills both inside the
-bond window) - G66 asks enemies-A for the perch rule, which was not in the tree and not answered when the lead
-designer closed; world-B's full verdict table (exhaustive
+bond window) - G66's perch rule is built since (enemies-A; `test_enemies_coop` 48 / 48 in the lead designer's
+run, the pair's route unchanged), but world-B's re-run of the gate had not been posted; G65's co-op clause -
+the rising view must wait for the lower partner - is decided and not built: as built 6-2b's Beginner reference
+pair loses its second hero to the leash three times in the climb (`w6_l2b_coop.inputs`, 0 before the rule); world-B's full verdict table (exhaustive
 / bounded + probes / open / unproven per gate) had not been posted, so G62's 'root', 'dune' and 'seagate' are still
 "unproven"; the painting ladder of G60 is not built (no core-A, art-A or ui agent ran: the game still names the two
 cut arenas as rewards); `w3_l2_coop.inputs` (Beginner), which [G54]'s guard moved, was still being re-recorded by

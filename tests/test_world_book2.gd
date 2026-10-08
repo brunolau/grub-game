@@ -794,10 +794,10 @@ func test_a_pair_climbing_side_by_side_both_stay_under_the_band() -> void:
 	assert_eq(seen["sank"], 0)
 
 
-func test_a_pair_two_ledges_apart_stays_on_the_rising_view() -> void:
+func test_a_pair_two_ledges_apart_shares_the_rising_view() -> void:
 	# One hero climbs as fast as he can; the other does the same 40 ticks later - one or two ledges (up to six rows)
-	# behind all the way.
-	# The view rests on the LEADER's footing - whichever slot he is - and its six rows under him hold the partner.
+	# behind all the way. G65's co-op clause: the view rises for the LEADER's footing - whichever slot he is - but holds
+	# the trailing footing at most 10 rows under its top; the leader's room shrinks instead, to four rows at six apart.
 	for leader_slot: int in 2:
 		var rows: PackedStringArray = _ledge_shaft(70)
 		var level: Level = _load("scroll = rising\nrise_speed = 4", rows, "objects/hero_start 14 68 slot=2", 2)
@@ -811,12 +811,9 @@ func test_a_pair_two_ledges_apart_stays_on_the_rising_view() -> void:
 		for hero: PlayerBase in [lead, trail]:
 			assert_false(hero.dead or hero.down, who + "P%d is still climbing" % (hero.slot + 1))
 			assert_eq(seen["below"][hero.slot], 0, who + "P%d was never under the view" % (hero.slot + 1))
-			assert_eq(seen["leash"][hero.slot], 0, who + "P%d was never leashed" % (hero.slot + 1))
-			assert_true(seen["feet"][hero.slot] >= 8, who + "P%d's feet never left the top of the view" % (hero.slot + 1))
-		assert_true(seen["settled"][leader_slot] >= HUD_BAND_PX, who + "standing, his head is under the band (%d)"
-				% seen["settled"][leader_slot])
-		assert_true(seen["drawn"][leader_slot] >= HUD_BAND_PX, who + "drawn, his head never in the band (%d)"
-				% seen["drawn"][leader_slot])
+			assert_eq(seen["egg"][hero.slot], 0, who + "P%d was never an egg" % (hero.slot + 1))
+		assert_eq(seen["leash"][1 - leader_slot], 0, who + "the trailing hero was never leashed")
+		assert_true(seen["settled"][1 - leader_slot] >= HUD_BAND_PX, who + "the trailing hero stands under the band")
 		assert_eq(seen["sank"], 0)
 		# Both stop.
 		for slot: int in 2:
@@ -826,16 +823,18 @@ func test_a_pair_two_ledges_apart_stays_on_the_rising_view() -> void:
 		assert_true(lead.grounded and trail.grounded)
 		var apart: int = trail.sim_pos.y - lead.sim_pos.y
 		assert_true(apart == 3 * Tuning.TILE or apart == 6 * Tuning.TILE, who + "one or two ledges apart at rest (%d px)" % apart)
-		assert_eq(lead.sim_pos.y - frame.pos.y, LevelCamera.FOOTING_ROOM_PX, who + "the view rests on his footing")
-		assert_true(trail.sim_pos.y - frame.pos.y <= frame.rows * Tuning.TILE, who + "his partner's feet are on the view")
+		assert_true(trail.sim_pos.y - frame.pos.y <= LevelCamera.FOOTING_KEEP_LOW_PX, who + "his partner at most 10 rows under the top")
+		assert_true(lead.sim_pos.y - frame.pos.y >= LevelCamera.FOOTING_LEAD_MIN_PX, who + "he keeps four rows of room (%d px)"
+				% (lead.sim_pos.y - frame.pos.y))
 		level.free()
 		Sim.stop()
 		Game.new_game(Defs.Difficulty.BEGINNER)
 
 
 func test_the_rising_view_goes_with_the_leader_when_his_partner_stays_behind() -> void:
-	# P2 never climbs (he taps Look: awake, but he stays on the floor). The view goes with P1; once P2 is seven rows
-	# behind he is under it: the leash makes him an egg while P1 climbs on. The leader is never the one who pays.
+	# P2 never climbs (he taps Look: awake, but he stays on the floor). Up to six rows the pair shares the view; from
+	# there it goes with P1 and P2 sinks under it: the leash makes him an egg while P1 climbs on. The leader is never
+	# the one who pays.
 	var rows: PackedStringArray = _ledge_shaft(70)
 	var level: Level = _load("scroll = rising\nrise_speed = 4", rows, "objects/hero_start 14 68 slot=2", 2)
 	var p1: PlayerBase = level.player
@@ -844,10 +843,10 @@ func test_the_rising_view_goes_with_the_leader_when_his_partner_stays_behind() -
 		return Defs.IN_UP if slot == 0 else (Defs.IN_LOOK if t % 50 == 0 else 0)
 	)
 	assert_false(p1.dead or p1.down, "the leader climbs on")
-	assert_eq(seen["leash"][0], 0, "and was never off the view")
-	assert_eq(seen["egg"][0], 0)
-	assert_true(seen["feet"][0] >= 8, "his feet never over the view's top (%d)" % seen["feet"][0])
-	assert_true(seen["settled"][0] >= HUD_BAND_PX, "standing, his head is under the band (%d)" % seen["settled"][0])
+	assert_eq(seen["egg"][0], 0, "and was never an egg")
+	assert_true(seen["feet"][0] >= 0, "his feet never over the view's top (%d)" % seen["feet"][0])
+	assert_true(seen["settled"][0] >= LevelCamera.FOOTING_LEAD_MIN_PX - HERO_HEIGHT_PX, "standing, his head is %d px under the top at least"
+			% seen["settled"][0])
 	assert_true(seen["leash"][1] >= PartyTuning.leash_egg_ticks(Game.difficulty) - 1, "the hero left behind was leashed ...")
 	assert_true(seen["egg"][1] > 0, "... and became an egg (his partner plays on)")
 	assert_false((level.party_driver as PartyDriver).wipe_pending, "no team wipe")

@@ -214,6 +214,12 @@ func test_spawner_keeps_runtime_scenes_and_releases_the_previous_level() -> void
 	Spawner.load_scene(&"player/player")
 	Spawner.retain_only([&"enemies/walker"])
 	assert_false(Spawner._cache.has(&"bosses/brute"), "a scene the next level does not use is released")
+	# ... but its scripts stay loaded until the engine shuts down: 4.7.2 leaks a script that dies while the script
+	# language runs (co-op 4-2 into 4-2b left textures and RIDs "still in use at exit"; wf10, the G3 follow-up).
+	var brute_script: Script = load("res://scripts/bosses/brute.gd") as Script
+	assert_true(Spawner._kept_scripts.has(brute_script), "the released scene's node script is kept for the session")
+	assert_true(Spawner._kept_scripts.has(brute_script.get_base_script()), "and its base scripts")
+	assert_true(Spawner.kept_script_count() >= 2)
 	assert_true(Spawner._cache.has(&"enemies/walker"), "a scene the next level uses stays")
 	assert_true(Spawner._cache.has(&"player/player"), "the hero stays")
 	assert_true(Spawner._cache.has(&"items/bone"), "runtime scenes stay")

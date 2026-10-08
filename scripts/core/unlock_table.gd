@@ -4,7 +4,7 @@ extends RefCounted
 ##
 ## One place for every module that asks about the paintings and what they open: where painting n hides
 ## ([constant PAINTING_LEVELS], [method painting_file], [method paintings_of]), the reward ladder ([constant REWARDS]:
-## the paintings each reward needs and the arenas, variants, loincloth patterns, palettes and the mural it opens) and
+## the paintings each reward needs and the variants, loincloth patterns, palettes and the mural it opens) and
 ## whether a piece of content is open now ([method is_arena_open], [method is_variant_open], [method is_pattern_open],
 ## [method is_palette_open], [method is_mural_open]). Save keeps the state - the found paintings (Save.add_painting,
 ## profile-wide across modes), the rewards opened by hand (Save.unlock) and Options > Versus > "Unlock everything"
@@ -23,22 +23,24 @@ const PAINTING_LEVELS: Array[StringName] = [
 ## solo files and their co-op twins.
 const COOP_ONLY_FROM: int = Tuning.PAINTING_BOOK2_COUNT
 
-## The rewards in the order they open (DESIGN.md C.9). Each: "id" (Save.UNLOCK_*), "paintings" (found paintings that
-## open it, Save.UNLOCK_PAINTINGS), "text" (its translation key, locale/en.po), and what it opens: "arenas" (level ids,
-## VersusMatch keeps them out of Random / Party Mix until open), "variants" (VersusMatch.variants names), "patterns" (the
-## `unlock` tag of the loincloth patterns of assets/sprites/player/palettes/hero_palettes.json), "palettes"
-## (PlayerRun.palette names), "mural" (the cave mural that ends The Long Raft Home).
+## The rewards in the order they open (DESIGN.md C.9, the ladder after cut 3 [G60]: 5 = four loincloth patterns, 10 =
+## four more, 15 = three variants, 20 = Spear Party, 25 = the golden loincloth, 30 = the mural). Each: "id"
+## (Save.UNLOCK_*), "paintings" (found paintings that open it, Save.UNLOCK_PAINTINGS), "text" (its translation key,
+## locale/en.po), and what it opens: "variants" (VersusMatch.variants names), "patterns" (the `unlock` tags of the
+## loincloth patterns of assets/sprites/player/palettes/hero_palettes.json), "palettes" (PlayerRun.palette names),
+## "mural" (the cave mural that ends The Long Raft Home). No reward opens a level: each of the 8 versus levels of 2.0
+## is open from the start (a list of level ids under the key the reward_of_arena method reads would lock them again,
+## should a later version want that).
 const REWARDS: Array[Dictionary] = [
-	{"id": &"mesa_rodeo", "paintings": Tuning.PAINTING_UNLOCK_MESA_RODEO, "text": "UI_REWARD_MESA_RODEO",
-		"arenas": [&"arena_mesa_rodeo"]},
+	{"id": &"patterns", "paintings": Tuning.PAINTING_UNLOCK_PATTERNS, "text": "UI_REWARD_PATTERNS",
+		"patterns": ["paintings_5"]},
 	{"id": &"loincloths", "paintings": Tuning.PAINTING_UNLOCK_LOINCLOTHS, "text": "UI_REWARD_LOINCLOTHS",
 		"patterns": ["paintings_10"]},
 	{"id": &"variants", "paintings": Tuning.PAINTING_UNLOCK_VARIANTS, "text": "UI_REWARD_VARIANTS",
 		"variants": [&"big_bounce", &"lights_out", &"giant_rain"]},
-	{"id": &"cloud_top", "paintings": Tuning.PAINTING_UNLOCK_CLOUD_TOP, "text": "UI_REWARD_CLOUD_TOP",
-		"arenas": [&"arena_cloud_top"]},
 	{"id": &"spear_party", "paintings": Tuning.PAINTING_UNLOCK_SPEAR_PARTY, "text": "UI_REWARD_SPEAR_PARTY",
-		"variants": [&"spear_party"], "palettes": [&"gold"]},
+		"variants": [&"spear_party"]},
+	{"id": &"gold", "paintings": Tuning.PAINTING_UNLOCK_GOLD, "text": "UI_REWARD_GOLD", "palettes": [&"gold"]},
 	{"id": &"mural", "paintings": Tuning.PAINTING_UNLOCK_MURAL, "text": "UI_REWARD_MURAL", "mural": true},
 ]
 ## The `unlock` tag of a loincloth pattern that is open from the start (hero_palettes.json).

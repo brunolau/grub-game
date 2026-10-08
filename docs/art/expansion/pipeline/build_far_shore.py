@@ -754,7 +754,25 @@ def build_slab_image(icons_locked):
 
 
 # ---------------------------------------------------------------------------------------------------- unlock icons
-UNLOCK_ORDER = ["mesa_rodeo", "loincloths", "variants", "cloud_top", "spear_party", "mural"]
+# The painting ladder after cut 3 (DESIGN G60: Mesa Rodeo and Cloud Top are not in 2.0): 5 = four loincloth patterns,
+# 10 = four more, 15 = the variants, 20 = Spear Party, 25 = the golden loincloth, 30 = the mural.
+UNLOCK_ORDER = ["patterns", "loincloths", "variants", "spear_party", "gold", "mural"]
+GLYPH_CLOTH_CHECKS = ["##########",
+                      "#.#.#.#.##",
+                      "##.#.#.#.#",
+                      ".#.#.#.##.",
+                      ".##.#.#.#.",
+                      "..#.#.##..",
+                      "..##.#.#..",
+                      "...####..."]
+GLYPH_CLOTH_PLAIN = ["##########",
+                     "##########",
+                     ".########.",
+                     ".########.",
+                     "..######..",
+                     "..######..",
+                     "...####...",
+                     "....##...."]
 GLYPH_CLOTH = ["##########",
                "#.##.###.#",
                "##########",
@@ -779,7 +797,6 @@ GLYPH_CLOUD = ["....####....",
 
 
 def unlock_masks():
-    rex = silhouette("sprites/enemies/rex.png", 0, (152, 112), 6)
     spear = crop_mask(reduce_mask(mask_of(trim(asset("sprites/items/weapon_spear.png"))), 3))
     sp = np.zeros((spear.shape[0], spear.shape[0]), bool)                 # the spear leaned 45 degrees
     for y in range(spear.shape[0]):
@@ -788,8 +805,8 @@ def unlock_masks():
                 X = spear.shape[0] - 1 - y + x - spear.shape[1] // 2
                 if 0 <= X < sp.shape[1]:
                     sp[y, X] = True
-    return [rex, glyph_mask(GLYPH_CLOTH), glyph_mask(GLYPH_SPRING), glyph_mask(GLYPH_CLOUD), crop_mask(sp),
-            glyph_mask(GLYPH_HAND)]
+    return [glyph_mask(GLYPH_CLOTH_CHECKS), glyph_mask(GLYPH_CLOTH), glyph_mask(GLYPH_SPRING), crop_mask(sp),
+            glyph_mask(GLYPH_CLOTH_PLAIN), glyph_mask(GLYPH_HAND)]
 
 
 def unlock_icon(k, lit):
@@ -806,7 +823,7 @@ def unlock_icon(k, lit):
     h, w = m.shape
     x0, y0 = (ICON - w) // 2, (ICON - h) // 2
     if lit:
-        col, groove = (rgb("#c97d10"), OCHRE_D) if UNLOCK_ORDER[k] == "spear_party" else (OCHRE, OCHRE_D)
+        col, groove = (rgb("#c97d10"), OCHRE_D) if UNLOCK_ORDER[k] == "gold" else (OCHRE, OCHRE_D)
         stamp(a, m, x0, y0, col, groove)
     else:
         stamp(a, m, x0, y0, SAND["d"])
@@ -819,13 +836,14 @@ def build_unlock_icons():
     sheet = strip(locked + lit, cols=6)
     save(sheet, "ui/unlock_icons.png", kind="ui", frame=[ICON, ICON], grid=[6, 2], section="far_shore",
          columns=UNLOCK_ORDER,
-         source="silhouettes of shipped sprites/enemies/rex.png and sprites/items/weapon_spear.png; glyphs drawn by "
-                "the pipeline; the colours of shipped tiles/village/props/stone_tablet.png and the cave-paint ochre",
-         edits="the rex and the spear reduced 6:1 / 3:1 to silhouettes (the spear leaned 45 degrees by a pixel "
-               "shear), the other four drawn as 6-10 px glyphs; row 0 carved into the slab's shade (locked), row 1 "
-               "painted in ochre on a light disc with a gold ring (unlocked; the spear in gold)",
-         note="the six rewards of the Cave Paintings (C.9, Save.UNLOCK_*), column = reward: 0 mesa_rodeo (5 "
-              "paintings), 1 loincloths (10), 2 variants (15), 3 cloud_top (20), 4 spear_party (25), 5 mural (30). "
+         source="the silhouette of shipped sprites/items/weapon_spear.png; glyphs drawn by the pipeline; the "
+                "colours of shipped tiles/village/props/stone_tablet.png and the cave-paint ochre",
+         edits="the spear reduced 3:1 to a silhouette (leaned 45 degrees by a pixel shear), the other five drawn as "
+               "6-10 px glyphs (a checked, a fringed and a plain loincloth, the spring, the hand); row 0 carved into "
+               "the slab's shade (locked), row 1 painted in ochre on a light disc with a gold ring (unlocked; the "
+               "golden loincloth in gold)",
+         note="the six rewards of the Cave Paintings (C.9 / G60, Save.UNLOCK_*), column = reward: 0 patterns (5 "
+              "paintings), 1 loincloths (10), 2 variants (15), 3 spear_party (20), 4 gold (25), 5 mural (30). "
               "Row 0 = locked (carved; the slab already shows these), row 1 = unlocked: draw cell 6 + k over the "
               "slab's mark k (painting_slab.png `icons`) once Save.is_unlocked(reward); also for the unlocks screen "
               "and the versus menu")

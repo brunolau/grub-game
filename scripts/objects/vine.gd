@@ -13,6 +13,13 @@ extends HittableBase
 ## for the rest of the stage, through deaths and team wipes (like an opened spot). It is the solo shortcut opener and
 ## the co-op "way back" drop gift (DESIGN.md D.5).
 ##
+## **The coil rule** (DESIGN.md G67 (1), PHYSICS.md C.4): in a co-op file the coil unrolls only for a hit FROM ITS OWN
+## LEVEL - the hitting hero's feet y (the thrower's when a thrown weapon hits, the ball's for a batted hero) is
+## `<= top + COIL_LEVEL_PX`, `top` being the ledge the coil lies on. Any other hit passes the coil ([method take_hit]
+## returns false: the box is not consumed, nothing unrolls): a lone hero's hop jump with a high strike (reach 123 px)
+## or a thrown special from the floor below no longer opens the drop gift of a boost ledge. Solo files keep "any hit
+## unrolls" ([method coil_rule_on]; `w5_l2` holds the only solo rolled vine).
+##
 ## Owner: objects-B (docs/expansion/PLAN.md 4.1). Kind HITTABLE (so weapons find the coil); it never counts as a hidden
 ## spot (no completion count, no Events.hidden_spot_opened). Picture: sprites/objects/vine.png (ASSET_MANIFEST 17.3:
 ## 8 x 11 cells of 32 x 32 art px, one row per LevelData.BIOMES biome; columns 0 top, 1 / 2 segments, 3 tip, 4-6 the
@@ -20,6 +27,9 @@ extends HittableBase
 
 ## Ticks of the unroll animation; the vine can be grabbed once it ran.
 const UNROLL_TICKS: int = 8
+## The coil rule [G67]: a hero hits the coil "from its own level" while his feet are at most this far under the top of
+## its anchor cell (one row; a hero standing on the coil's ledge has feet y == top).
+const COIL_LEVEL_PX: int = Tuning.TILE
 const SHEET: Texture2D = preload("res://assets/sprites/objects/vine.png")
 const SHEET_COLUMNS: int = 8
 const CELL_ART: int = 32
@@ -128,10 +138,48 @@ static func level_has_vines(level: LevelBase) -> bool:
 
 # --- Unrolling --------------------------------------------------------------------------------------------------------
 
+## True where the coil rule of G67 holds: a co-op file (`kind = coop`), or any level played by a co-op party (the test
+## beds). False in every solo file and in versus - there any hit unrolls, as in 1.0's hittable pass.
+static func coil_rule_on() -> bool:
+	var level: LevelBase = Game.level
+	if level == null:
+		return false
+	if str(level.meta.get("kind", "")) == "coop":
+		return true
+	return Game.mode == Defs.GameMode.COOP and level.hero_count() > 1
+
+
+## The hero a hit by `source` belongs to: the hero himself (his club, his mount's bite, his own body as a batted
+## ball) or the thrower of a hero projectile (Defs.hitter_slot would name a ball's batter - the coil rule asks for the
+## ball). Null for anything else (a tool's or a test's direct call).
+func _hitting_hero(source: SimEntity) -> PlayerBase:
+	if source == null or not is_instance_valid(source):
+		return null
+	if source is PlayerBase:
+		return source as PlayerBase
+	if source.get_kind() == Defs.Kind.HERO_PROJECTILE and Game.level != null:
+		var slot: Variant = source.get(&"owner_slot")
+		return Game.level.get_hero(int(slot)) if slot is int else null
+	return null
+
+
+## The coil rule [G67]: may a hit by `source` unroll the coil? Always outside [method coil_rule_on] and for a hit
+## no hero made; under the rule only while the hitting hero's feet are at most COIL_LEVEL_PX under the coil's ledge
+## (`sim_pos.y <= top + COIL_LEVEL_PX`).
+func hit_from_its_level(source: SimEntity) -> bool:
+	if not coil_rule_on():
+		return true
+	var hero: PlayerBase = _hitting_hero(source)
+	return hero == null or hero.sim_pos.y <= top + COIL_LEVEL_PX
+
+
 ## Unroll a rolled vine (a weapon hit or a batted ball, `source` the hero or his weapon). True when it unrolled now;
-## false when it already hangs.
+## false when it already hangs - or, in a co-op file, when the hit did not come from the coil's own level
+## ([method hit_from_its_level], G67: the hit passes, nothing changes).
 func unroll(source: SimEntity = null) -> bool:
 	if unrolled:
+		return false
+	if not hit_from_its_level(source):
 		return false
 	_doze_wake_now()
 	unrolled = true
@@ -161,7 +209,8 @@ func is_hit_by(origin: Vector2i) -> bool:
 
 
 ## A weapon reached the coil: it unrolls (the box is consumed). Never a hidden spot: no completion count, no
-## Events.hidden_spot_opened, no flood fill.
+## Events.hidden_spot_opened, no flood fill. In a co-op file a hit from below the coil's level passes it (G67: false,
+## the box goes on to whatever lies behind).
 func take_hit(_power: int, source: SimEntity) -> bool:
 	return unroll(source)
 

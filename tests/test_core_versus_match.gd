@@ -4,7 +4,8 @@ extends TestCase
 
 const ARENA_A: StringName = &"zz_arena_a"
 const ARENA_B: StringName = &"zz_arena_b"
-const ARENA_LOCKED: StringName = &"arena_cloud_top"
+## A third arena. Until cut 3 (DESIGN.md G60) an arena of this id waited for 20 paintings; no arena is locked in 2.0.
+const ARENA_C: StringName = &"arena_cloud_top"
 
 var _added: Array[StringName] = []
 
@@ -214,7 +215,7 @@ func test_spawns_rotate_and_bots_have_their_own_seeds() -> void:
 func test_arena_picks_follow_the_match_seed_and_the_unlocks() -> void:
 	_add_arena(ARENA_A, 4, "grub_stack,hot_rock")
 	_add_arena(ARENA_B, 2, "clubball")
-	_add_arena(ARENA_LOCKED, 4, "grub_stack")
+	_add_arena(ARENA_C, 4, "grub_stack")
 	_add_arena(&"test_zz_dev_arena", 4, "grub_stack")
 	var versus_match: VersusMatch = _two_humans()
 	for id: StringName in VersusMatch.available_arenas(2):
@@ -225,10 +226,9 @@ func test_arena_picks_follow_the_match_seed_and_the_unlocks() -> void:
 	var grub: Array[StringName] = VersusMatch.available_arenas(2, Defs.VersusMode.GRUB_STACK)
 	assert_true(grub.has(ARENA_A))
 	assert_false(grub.has(ARENA_B), "it does not list Grub Stack")
-	assert_false(grub.has(ARENA_LOCKED), "Cloud Top waits for its paintings")
+	assert_true(grub.has(ARENA_C), "no arena waits for paintings (G60: cut 3 left no painting arena)")
 	assert_false(VersusMatch.available_arenas(3, Defs.VersusMode.CLUBBALL).has(ARENA_B), "built for two")
-	Save.unlock(Save.UNLOCK_CLOUD_TOP)
-	assert_true(VersusMatch.available_arenas(2, Defs.VersusMode.GRUB_STACK).has(ARENA_LOCKED), "unlocked")
+	assert_true(VersusMatch.LOCKED_ARENAS.is_empty(), "G60")
 	for id: StringName in VersusMatch.LOCKED_ARENAS:
 		assert_true(Save.UNLOCK_PAINTINGS.has(VersusMatch.LOCKED_ARENAS[id]), "%s waits for a Save reward" % id)
 	versus_match.arena = ARENA_B

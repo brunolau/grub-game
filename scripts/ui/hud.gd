@@ -17,7 +17,7 @@ extends Control
 ## arrow with the stone countdown of the leash ([HudEdgeArrows]). In versus the campaign rows give way to the corner
 ## panels, the sundial and the round banners of [HudVersus]. World text that must not sit under a party panel (sign
 ## boards) asks [method clear_of_panels]. A Cave Painting that opens a reward (Save.reward_unlocked) shows a notice
-## under the HUD row for a few seconds ("Unlocked: Mesa Rodeo arena"), below the hint panel while one shows.
+## under the HUD row for a few seconds ("Unlocked: Four new loincloths"), below the hint panel while one shows.
 ## Phase 3: in a boss fight the HUD keeps to the fight band (BAND_HEIGHT: in co-op the letters give way and P2's panel
 ## moves up into their row) and fades what a fighting boss's weak point is behind; designers keep weak points
 ## WEAK_POINT_CLEARANCE px below the band ([method band_rects], [method weak_point_problem]).

@@ -66,7 +66,7 @@ expect game.lives == 2
 expect game.score == 0
 expect game.weapon == 0
 
-# --- w5_l1, by its painting route (it ends with the spear in hand) -----------------------------------------------------
+# --- w5_l1, by its painting route (it ends with the spear in hand) ----------------------------------------------------
 # As the headless twin (tests/test_book2_routes.gd CAMPAIGN_SIDES): the painting on the way, the spear picked up, a
 # swap for the club line, the spear back in hand before the exit (w5_l1.painting.inputs, weapon_end:spear).
 need w5_l1 tools/autoplay/routes/w5_l1.painting.inputs

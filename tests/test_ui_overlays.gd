@@ -1074,9 +1074,9 @@ func test_hud_versus_follows_the_number_of_players() -> void:
 func test_hud_shows_a_reward_notice() -> void:
 	var hud: Hud = await _overlay(Flow.HUD_SCENE) as Hud
 	assert_false(hud.is_reward_visible())
-	Save.reward_unlocked.emit(&"mesa_rodeo")
+	Save.reward_unlocked.emit(&"patterns")
 	assert_true(hud.is_reward_visible())
-	assert_eq(hud.reward_text, tr("UI_HUD_REWARD").format({"reward": tr("UI_REWARD_MESA_RODEO")}))
+	assert_eq(hud.reward_text, tr("UI_HUD_REWARD").format({"reward": tr("UI_REWARD_PATTERNS")}))
 	assert_false(hud.reward_text.contains("{"), "the reward's own text: %s" % hud.reward_text)
 	await get_tree().process_frame
 	await get_tree().process_frame

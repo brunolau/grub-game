@@ -353,11 +353,11 @@ func test_rules_screen() -> void:
 	Save.reset()
 
 
-## The arena select: thumbnails (a mini map of the arena file), a locked arena shows the paintings it needs and cannot
-## be chosen, the focused card is the match's arena, confirm starts the match.
+## The arena select: thumbnails (a mini map of the arena file), no arena waits for paintings (cut 3 applied, DESIGN.md
+## G60: a fresh profile may choose every card and none shows a painting count), the focused card is the match's arena,
+## confirm starts the match.
 func test_arena_screen() -> void:
 	Save.reset()
-	_inject_locked_arena()
 	var versus_match: VersusMatch = _two_humans()
 	versus_match.mode = Defs.VersusMode.GRUB_STACK
 	versus_match.ready_all()
@@ -366,15 +366,12 @@ func test_arena_screen() -> void:
 	var cards: Array[VersusArenaScreen.ArenaCard] = node.get_cards()
 	assert_eq(cards[0].arena, VersusMatch.ARENA_RANDOM)
 	assert_eq(cards[-1].arena, VersusMatch.ARENA_PARTY_MIX)
-	var locked: VersusArenaScreen.ArenaCard = node.get_card(LOCKED_ARENA)
-	assert_not_null(locked, "a closed arena is shown")
-	assert_true(locked.locked)
-	assert_eq(locked.needs, Tuning.PAINTING_UNLOCK_MESA_RODEO, "with the paintings its reward needs")
-	locked.grab_focus()
-	assert_ne(versus_match.arena, LOCKED_ARENA, "a locked card never becomes the arena")
-	assert_true(node.get_info_text().contains(str(Tuning.PAINTING_UNLOCK_MESA_RODEO)))
-	node.choose(LOCKED_ARENA)
-	assert_false(node.leaving, "a locked arena cannot be chosen")
+	assert_true(cards.size() >= 4, "Random, the Grub Stack arenas, Party Mix")
+	for card: VersusArenaScreen.ArenaCard in cards:
+		assert_false(card.locked, "%s: no arena is locked on a fresh profile (G60)" % card.arena)
+		assert_eq(card.needs, 0, "%s shows no painting count" % card.arena)
+	for cut: StringName in [&"arena_mesa_rodeo", &"arena_cloud_top"]:
+		assert_null(node.get_card(cut), "%s is not in 2.0" % cut)
 	var image: Image = VersusArenaScreen.mini_map(ARENA)
 	assert_not_null(image, "a mini map of the arena")
 	if image != null:
@@ -987,20 +984,6 @@ func _four_players(mode: int) -> VersusMatch:
 # =================================================================================================================
 # Helpers
 # =================================================================================================================
-
-## An arena behind a painting reward (UnlockTable: the Mesa Rodeo), injected into the registry for one test.
-const LOCKED_ARENA: StringName = &"arena_mesa_rodeo"
-
-
-func _inject_locked_arena() -> void:
-	if Levels.has_level(LOCKED_ARENA):
-		return
-	var text: String = "[meta]\nformat = 2\nid = arena_mesa_rodeo\nname = \"Mesa Rodeo\"\nkind = arena\nbiome = canyon\n" \
-			+ "players = 4\nmodes = grub_stack,last_caveman\nwrap = none\n"
-	Levels._meta[LOCKED_ARENA] = Levels.parse_meta(text)
-	Levels._paths[LOCKED_ARENA] = Levels.get_level_path(ARENA)
-	Levels._index_campaign()
-
 
 func _remove_injected() -> void:
 	Levels.rescan()

@@ -146,8 +146,9 @@ func test_book2_rules_in_tuning() -> void:
 	assert_ints_eq(Tuning.RAFT_WIDTHS, [3, 4])
 	assert_eq(Tuning.RISE_SPEED, Tuning.V16_PER_PX, "1 px per tick")
 	assert_eq(Tuning.PAINTING_BOOK2_COUNT, 20)
-	var unlocks: Array[int] = [Tuning.PAINTING_UNLOCK_MESA_RODEO, Tuning.PAINTING_UNLOCK_LOINCLOTHS,
-		Tuning.PAINTING_UNLOCK_VARIANTS, Tuning.PAINTING_UNLOCK_CLOUD_TOP, Tuning.PAINTING_UNLOCK_SPEAR_PARTY,
+	# The ladder after cut 3 (DESIGN.md G60): patterns, loincloths, variants, Spear Party, gold, the mural.
+	var unlocks: Array[int] = [Tuning.PAINTING_UNLOCK_PATTERNS, Tuning.PAINTING_UNLOCK_LOINCLOTHS,
+		Tuning.PAINTING_UNLOCK_VARIANTS, Tuning.PAINTING_UNLOCK_SPEAR_PARTY, Tuning.PAINTING_UNLOCK_GOLD,
 		Tuning.PAINTING_UNLOCK_MURAL]
 	assert_ints_eq(unlocks, [5, 10, 15, 20, 25, 30])
 	assert_eq(unlocks[unlocks.size() - 1], Tuning.PAINTING_COUNT)
@@ -286,6 +287,8 @@ func test_party_helpers_per_difficulty() -> void:
 	assert_eq(PartyTuning.boost_ledge_tiles(b), 8, "G39: 8 rows on Beginner too")
 	assert_eq(PartyTuning.IDLE_TICKS, 243, "G33: the idle partner, 10 s")
 	assert_eq(PlayerBase.IDLE_TICKS, PartyTuning.IDLE_TICKS)
+	assert_eq(PartyTuning.IDLE_WARN_TICKS, 170, "G58: the \"Zzz soon\" bubble shows 73 ticks (3 s) before the doze")
+	assert_eq(HeroParty.IDLE_WARN_TICKS, PartyTuning.IDLE_WARN_TICKS, "the bubble draws by the table's value")
 	assert_eq(PartyTuning.boost_ledge_tiles(e), 8)
 	assert_false(PartyTuning.lone_trait_on(b))
 	assert_true(PartyTuning.lone_trait_on(e))

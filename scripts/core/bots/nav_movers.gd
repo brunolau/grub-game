@@ -355,6 +355,9 @@ func _clear_links_from(from: int) -> void:
 			last = p
 		if open:
 			ranges.append(last)
+		if ranges.size() < 3:
+			# It lands in no still state at all: an empty range (lo > hi), so that no bot plans with it.
+			ranges.append_array(PackedInt32Array([1, 0]))
 		if not everywhere:
 			link.clear_at = ranges
 			clear_count += 1

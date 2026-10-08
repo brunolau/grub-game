@@ -819,9 +819,10 @@ func _check_party_idle(level: LevelBase, stage_tick: int) -> void:
 		if hero == null or hero.dead or hero.is_down():
 			continue
 		if hero.input_idle_ticks >= PlayerBase.IDLE_TICKS:
-			_idle_problem = "P%d is idle on tick %d: %d ticks without input of his own %s (at %s) - hold Down or tap a key on such a stretch" % [
+			_idle_problem = "P%d is idle on tick %d: %d ticks without input of his own %s (at %s) - %s" % [
 				hero.slot + 1, stage_tick, hero.input_idle_ticks,
-				"since his last one" if hero.gave_input else "since the stage began", str(hero.sim_pos)]
+				"since his last one" if hero.gave_input else "since the stage began", str(hero.sim_pos),
+				"hold Down or tap a key on such a stretch"]
 			return
 
 

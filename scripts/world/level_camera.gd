@@ -79,6 +79,16 @@ var footing_watch: bool = false
 ##    that ledge 3 rows under the view, where the 1.0 off-screen rule kills (PHYSICS.md 10.3).
 ## The head of a JUMPING hero is kept under the band by the drawn view instead ([method head_peek]): no rule reads it.
 const FOOTING_ROOM_PX: int = 72
+## A PARTY shares the room (G65's co-op clause, the lead designer's ruling of wf10): the view does not rise for the
+## highest footing beyond the point where the LOWEST footing of the tribe would lie more than FOOTING_KEEP_LOW_PX
+## under its top (10 rows: the top line of the authentic view's bottom row, inside the tribe's frame whatever the
+## camera's pixel) - the trailing partner stays in view and the leader's room shrinks instead, down to
+## FOOTING_LEAD_MIN_PX (4 rows: his head 29 px under the top; what a jump needs is the drawn view's business). Only
+## footings farther apart than that (more than FOOTING_KEEP_LOW_PX - FOOTING_LEAD_MIN_PX = 96 px, six rows - no view
+## holds both) are followed by the leader alone, his full room: the hero left behind is then the leash's and the
+## band's case (C.13, C.8), never the leader's.
+const FOOTING_KEEP_LOW_PX: int = 10 * Tuning.TILE
+const FOOTING_LEAD_MIN_PX: int = 4 * Tuning.TILE
 ## Draw-only (never read by the simulation): the room the drawn view keeps over a hero's head in a rising climb - the
 ## HUD band's 31 px and 2 px of air - and how far it may look up over the simulated view for it (4 rows: a standing
 ## jump from the footing room needs 52 px, a 105 px launch gets its feet 4 px inside).
@@ -714,9 +724,12 @@ func footing_of(hero: PlayerBase) -> int:
 ## view UP (the band's rule, [method apply_rising], keeps it from sinking and makes it rise at least with the band):
 ##  - the view's top wants to be FOOTING_ROOM_PX above the HIGHEST footing of the tribe - whichever hero that is, not
 ##    one anchor's: every hero then has his whole body under the HUD band while he stands, walks or climbs, and the
-##    feet of a standing jump stay in view. A partner up to six rows lower is on the view too (104 px are left under
-##    the leader's footing); one who falls farther behind drops out of it - the leash's and the band's case (C.13, C.8:
-##    an egg while his partner plays on), never the leader's;
+##    feet of a standing jump stay in view;
+##  - a party shares that room: the view never rises so far that the LOWEST footing would lie more than
+##    FOOTING_KEEP_LOW_PX under its top - a partner up to 88 px lower costs the leader nothing, from there to six rows
+##    (96 px) the leader's room shrinks to FOOTING_LEAD_MIN_PX; footings farther apart than six rows fit no view: it
+##    then goes with the leader (his full room) and the hero left behind drops out of it - the leash's and the band's
+##    case (C.13, C.8: an egg while his partner plays on), never the leader's;
 ##  - it rises by the speed of 12.2's fast curve for the distance left (1 to 16 px per tick, Tuning.cam_v_speed): a
 ##    hero who lands on a ledge three rows up has his head under the band after 2 ticks and the view at rest after 9.
 ## A footing is never a jump's apex, so a jump in place raises nothing and lands in view (G42).
@@ -724,9 +737,15 @@ func _follow_footing() -> void:
 	if _tribe.is_empty():
 		return
 	var high: int = 1 << 30
+	var low: int = -(1 << 30)
 	for hero: PlayerBase in _tribe:
-		high = mini(high, footing_of(hero))
-	var want: int = maxi(high - FOOTING_ROOM_PX, _min.y)
+		var y: int = footing_of(hero)
+		high = mini(high, y)
+		low = maxi(low, y)
+	var want: int = high - FOOTING_ROOM_PX
+	if low - high <= FOOTING_KEEP_LOW_PX - FOOTING_LEAD_MIN_PX:
+		want = maxi(want, low - FOOTING_KEEP_LOW_PX)  # the trailing footing stays in view; the leader's room shrinks
+	want = maxi(want, _min.y)
 	if pos.y <= want:
 		return
 	var distance: int = pos.y - want

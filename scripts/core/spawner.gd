@@ -108,7 +108,36 @@ static func retain_only(ids: Array[StringName]) -> void:
 		var category_name: String = category(id)
 		if ids.has(id) or category_name == "player" or RUNTIME_CATEGORIES.has(category_name):
 			continue
+		_keep_scripts(_cache[id])
 		_cache.erase(id)
+
+
+## The scripts of every scene the cache dropped, kept until the engine shuts down. Godot 4.7.2 does not take a
+## GDScript apart cleanly when its last reference goes while the script language is running: a stage that used rising
+## columns, a Walker and a Shaman, left for a stage that uses neither (co-op 4-2 into 4-2b), made the engine report
+## leaked textures, RIDs and "resources still in use" at exit. The same scripts die cleanly at shutdown, so a dropped
+## scene leaves its node scripts (and their base scripts) here - a few kB each; the scene and its textures are dropped
+## as before (the G3 follow-up round: build/engine_requests/wf10_integration_to_core-A.txt #1).
+static var _kept_scripts: Dictionary = {}
+
+
+static func _keep_scripts(scene: PackedScene) -> void:
+	if scene == null:
+		return
+	var state: SceneState = scene.get_state()
+	for node: int in state.get_node_count():
+		for property: int in state.get_node_property_count(node):
+			if state.get_node_property_name(node, property) != &"script":
+				continue
+			var script: Script = state.get_node_property_value(node, property) as Script
+			while script != null and not _kept_scripts.has(script):
+				_kept_scripts[script] = true
+				script = script.get_base_script()
+
+
+## How many scripts [method retain_only] and [method clear_cache] keep for the session (tests).
+static func kept_script_count() -> int:
+	return _kept_scripts.size()
 
 
 ## Load every scene of RUNTIME_CATEGORIES once (the level loader calls it next to preload_ids): an effect, item or
@@ -126,6 +155,8 @@ static func preload_runtime() -> void:
 
 ## Drop the cache (level change, tests).
 static func clear_cache() -> void:
+	for id: StringName in _cache.keys():
+		_keep_scripts(_cache[id])
 	_cache.clear()
 	_missing.clear()
 	_runtime_loaded = false

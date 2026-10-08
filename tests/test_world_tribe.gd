@@ -337,6 +337,8 @@ func test_the_rising_band_pulls_the_view_up_and_it_never_sinks() -> void:
 # =================================================================================================================
 
 const ROOM: int = LevelCamera.FOOTING_ROOM_PX
+const KEEP_LOW: int = LevelCamera.FOOTING_KEEP_LOW_PX
+const LEAD_MIN: int = LevelCamera.FOOTING_LEAD_MIN_PX
 ## The HUD band on any device (logical px: Hud.band_rects with the touch margin, 14 + 48 art px) and the hero's height.
 const BAND_PX: int = 31
 const HERO_PX: int = 35
@@ -375,6 +377,11 @@ func test_the_footing_room_and_what_it_buys() -> void:
 	assert_true(ROOM - HERO_PX > BAND_PX, "standing: his head %d px under the top - under the band" % (ROOM - HERO_PX))
 	assert_true(ROOM - 64 >= 8, "the highest standing jump (64 px): the feet stay 8 px inside the view")
 	assert_true(VIEW_PX - ROOM >= 6 * Tuning.TILE + 8, "six rows under the footing are in view (the 6-2b painting nook)")
+	# A party: the trailing footing at most 10 rows under the top, the leader's room 4 rows at least - six rows apart.
+	assert_eq(KEEP_LOW, 10 * Tuning.TILE)
+	assert_eq(LEAD_MIN, 4 * Tuning.TILE)
+	assert_eq(KEEP_LOW - LEAD_MIN, 6 * Tuning.TILE, "a pair shares the view up to six rows apart")
+	assert_eq(LEAD_MIN - HERO_PX, 29, "the leader's head at the limit: 29 px under the top")
 	# The draw-only peek supplies what a jump needs over that: 33 px over the head, at most 4 rows.
 	assert_eq(LevelCamera.HEAD_ROOM_PX, BAND_PX + 2)
 	assert_eq(LevelCamera.HEAD_PEEK_MAX_PX, 4 * Tuning.TILE)
@@ -463,7 +470,7 @@ func test_a_vine_climber_is_followed_as_he_rises() -> void:
 	assert_eq(camera.pos.y, _a.sim_pos.y - ROOM)
 
 
-func test_a_party_is_followed_by_its_highest_footing() -> void:
+func test_a_party_shares_the_rising_view_up_to_six_rows_apart() -> void:
 	# Together on one ledge: as one hero.
 	var camera: LevelCamera = _rising_camera(40)
 	_at(camera, _a, 8)
@@ -473,30 +480,48 @@ func test_a_party_is_followed_by_its_highest_footing() -> void:
 	# Whoever climbs ahead - P1 is the 1.0 anchor (the lower slot), so P2 leading is the case the old follow missed.
 	for leader: PlayerBase in [_b, _a]:
 		var other: PlayerBase = _a if leader == _b else _b
-		for rows_apart: int in [1, 3, 6]:
+		for apart: int in [16, 48, 80, 88, 92, 96]:
 			other.sim_pos.y = FLOOR_Y
 			leader.sim_pos.y = FLOOR_Y
 			camera.pos.y = FLOOR_Y - ROOM
 			camera.prev = camera.pos
 			camera.tick_group(_party)
-			leader.sim_pos.y = FLOOR_Y - rows_apart * Tuning.TILE
+			leader.sim_pos.y = FLOOR_Y - apart
 			_settle(camera, true)
-			var who: String = "P%d leads by %d row(s)" % [leader.slot + 1, rows_apart]
-			assert_eq(leader.sim_pos.y - camera.pos.y, ROOM, who + ": the view rests on his footing")
-			assert_true(leader.sim_pos.y - HERO_PX - camera.pos.y > BAND_PX, who + ": his head under the band")
-			assert_true(other.sim_pos.y - camera.pos.y <= VIEW_PX, who + ": his partner is on the view")
-		# Seven rows behind the partner is under the view: the leash's and the band's case, never the leader's.
+			var who: String = "P%d leads by %d px" % [leader.slot + 1, apart]
+			var lead_room: int = leader.sim_pos.y - camera.pos.y
+			var trail: int = other.sim_pos.y - camera.pos.y
+			# Up to 88 px the leader has his full room; from there the trailing footing is held 10 rows under the top
+			# and the leader's room shrinks - to 4 rows at six rows apart.
+			assert_eq(lead_room, mini(ROOM, KEEP_LOW - apart), who + ": the leader's room")
+			assert_true(trail <= KEEP_LOW, who + ": the trailing footing in view (%d px under the top)" % trail)
+			assert_true(lead_room >= LEAD_MIN, who + ": the leader keeps four rows")
+			assert_true(lead_room - HERO_PX >= 29, who + ": his head %d px under the top" % (lead_room - HERO_PX))
+		# One px more than six rows: no view holds both with room for the leader - it follows him, whichever slot he is.
 		other.sim_pos.y = FLOOR_Y
-		leader.sim_pos.y = FLOOR_Y - 7 * Tuning.TILE
+		leader.sim_pos.y = FLOOR_Y
+		camera.pos.y = FLOOR_Y - ROOM
+		camera.prev = camera.pos
+		camera.tick_group(_party)
+		leader.sim_pos.y = FLOOR_Y - (KEEP_LOW - LEAD_MIN) - 1
 		_settle(camera, true)
-		assert_eq(leader.sim_pos.y - camera.pos.y, ROOM)
-		assert_true(other.sim_pos.y - camera.pos.y > VIEW_PX, "seven rows behind: under the view")
+		assert_eq(leader.sim_pos.y - camera.pos.y, ROOM, "P%d leads by 97 px: the view gives him his full room" % (leader.slot + 1))
+		assert_eq(other.sim_pos.y - camera.pos.y, ROOM + 97, "the hero left behind sinks to the view's bottom edge and under it")
 	# The view never comes down when the leader drops back.
 	var top: int = camera.pos.y
 	_a.sim_pos.y = FLOOR_Y
 	_b.sim_pos.y = FLOOR_Y
 	assert_eq(_settle(camera, true), [] as Array[int])
 	assert_eq(camera.pos.y, top)
+	# A partner far above (he was carried, he warped): the view runs to him at 16 px per tick; it never waits below.
+	camera.pos.y = FLOOR_Y - ROOM
+	camera.prev = camera.pos
+	camera.tick_group(_party)
+	_b.sim_pos.y = FLOOR_Y - 11 * Tuning.TILE
+	var steps: Array[int] = _settle(camera, true)
+	assert_eq(steps[0], 16)
+	assert_eq(camera.pos.y, _b.sim_pos.y - ROOM)
+	_b.sim_pos.y = FLOOR_Y
 
 
 func test_a_partners_jump_or_egg_does_not_move_the_rising_view() -> void:

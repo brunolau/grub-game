@@ -428,12 +428,13 @@ const TELEGRAPH_MIN_TICKS: int = 10      ## every boss attack and versus hazard 
 const PAINTING_COUNT: int = 30           ## items/painting index 0..29: 0-19 Book II levels, 20-29 Book I co-op
 const PAINTING_BOOK2_COUNT: int = 20
 const PAINTING_POINTS: int = 5000        ## displayed points per painting
-## Paintings found (per profile, across modes) that unlock each reward. [D C.9]
-const PAINTING_UNLOCK_MESA_RODEO: int = 5     ## arena 9
-const PAINTING_UNLOCK_LOINCLOTHS: int = 10    ## eight loincloth patterns for P1-P4
+## Paintings found (per profile, across modes) that unlock each reward. [D C.9] The ladder after cut 3 (DESIGN.md
+## G60: Mesa Rodeo and Cloud Top are not in 2.0, so no arena is a reward).
+const PAINTING_UNLOCK_PATTERNS: int = 5       ## four loincloth patterns for P1-P4 (checks, dots, tiger, pinstripes)
+const PAINTING_UNLOCK_LOINCLOTHS: int = 10    ## four more (diamonds, waves, sash, trim)
 const PAINTING_UNLOCK_VARIANTS: int = 15      ## Big Bounce, Lights Out, Giant Rain
-const PAINTING_UNLOCK_CLOUD_TOP: int = 20     ## arena 10
-const PAINTING_UNLOCK_SPEAR_PARTY: int = 25   ## the Spear Party variant and the golden loincloth palette
+const PAINTING_UNLOCK_SPEAR_PARTY: int = 20   ## the Spear Party variant
+const PAINTING_UNLOCK_GOLD: int = 25          ## the golden loincloth palette
 const PAINTING_UNLOCK_MURAL: int = 30         ## the mural at the end of The Long Raft Home
 
 

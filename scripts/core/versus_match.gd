@@ -28,12 +28,10 @@ const ARENA_PARTY_MIX: StringName = &"party_mix"
 const LAUNCH_MODES: Array[int] = [
 	Defs.VersusMode.GRUB_STACK, Defs.VersusMode.LAST_CAVEMAN, Defs.VersusMode.HOT_ROCK, Defs.VersusMode.CLUBBALL,
 ]
-## Arenas that a painting reward unlocks (DESIGN.md C.9): arena id -> the Save.UNLOCK_* reward (Save.is_unlocked). The
-## same as UnlockTable.REWARDS "arenas" (a test keeps them equal); UnlockTable is the table to ask.
-const LOCKED_ARENAS: Dictionary = {
-	&"arena_mesa_rodeo": &"mesa_rodeo",
-	&"arena_cloud_top": &"cloud_top",
-}
+## Arenas that a painting reward unlocks: arena id -> the Save.UNLOCK_* reward (Save.is_unlocked). Empty since cut 3
+## (DESIGN.md G60: the two painting arenas are not in 2.0 - every arena is open from the start); the same as
+## UnlockTable.REWARDS "arenas" (a test keeps them equal); UnlockTable is the table to ask.
+const LOCKED_ARENAS: Dictionary = {}
 ## The variant names of DESIGN.md E.4 (the `variants` rule; world-B's VersusRules.VARIANTS applies them). Big Bounce,
 ## Lights Out, Giant Rain and Spear Party open with paintings (UnlockTable.is_variant_open).
 const VARIANT_NAMES: Array[StringName] = [
