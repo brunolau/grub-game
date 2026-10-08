@@ -1,30 +1,31 @@
 # route: level=w1_l1_coop difficulty=expert players=2 ends=exit after=tally expect=hurts:0,eggs:0,wipes:0,x2_gates:2,min_checkpoints:5,min_kills:15
 # w1_l1_coop "Vine Bridges" for two - expert two-stream route proof (designer DB1; ticks:P1|P2, keys L R U D F K S;
 # docs/LEVEL_DESIGN.md 15.9). Written as duo segments: P2 often replays the keys of P1 a few ticks later.
+# Edited by enemies-A (wf10) for G57 (one hit per strike in co-op files): the tough blue hopper by the crate
+# now really takes two blows - P1's third strike there comes 6 ticks later (ticks 635-642), as it hops at him.
 # P2 steps up beside P1 (their starts are a cell apart).
 4:|R,36:|
 # The first walker
-12:R|,16:R|R,10:|R,2:R|R,6:R|,4:|,6:|R,2:R|R,10:R|,4:R|R,4:|R,8:RU|R,4:RU|,12:R|RU,6:|R,6:R|R,6:F|
-2:F|R,4:|R,2:|F,6:R|F,2:R|,4:|,8:|R,4:|
+12:R|,16:R|R,10:|R,2:R|R,6:R|,4:|,6:|R,2:R|R,10:R|,4:R|R,4:|R,8:RU|R,4:RU|,12:R|RU,6:|R,6:R|R,6:F|,2:F|R,4:|R
+2:|F,6:R|F,2:R|,4:|,8:|R,4:|
 # The turtle trough: each hero bounces over the turtles in turn.
 28:|,22:RU|,14:U|,18:R|,8:|,14:RU|,4:R|,22:|,22:|RU,14:|U,18:|R,8:|,14:|RU,4:|R,40:|
 # Expert: the loner hopper stays put while the pair keeps together: club it
 6:R|,28:R|R,6:|R,6:F|,2:F|F,6:|F,4:|,6:F|,2:F|F,6:|F,4:|,6:F|,2:F|F,6:|F,24:|
 # Expert: the tough blue hopper by the crate takes two blows
-6:R|,26:R|R,10:|,8:F|,8:|,8:F|,6:|,2:|R,3:F|R,5:F|,35:|
+6:R|,26:R|R,10:|,8:F|,8:|,8:F|,6:|,5:|R,3:|,8:F|,29:|
 # Up onto the second vine bridge and off its far end; the cracked wall of the tunnel takes two blows
-12:R|,8:R|R,12:RU|R,2:RU|RU,12:R|RU,14:R|R,8:|R,4:R|R,8:R|,2:R|R,4:|R,8:F|R,4:|,2:|F,6:F|F,2:F|,4:|
-8:|F,8:|
+12:R|,8:R|R,12:RU|R,2:RU|RU,12:R|RU,14:R|R,8:|R,4:R|R,8:R|,2:R|R,4:|R,8:F|R,4:|,2:|F,6:F|F,2:F|,4:|,8:|F,8:|
 # Through the tunnel to the first checkpoint
 12:R|,28:R|R,12:|R,6:|
 # Gate 1 (hop): at the foot of the 8-row ledge P2 jumps on P1's head holding Jump (Shoulder Hop), strikes the coiled vine at the edge down and P1 climbs it; both walk on to the bridge (closed-loop macros of the G2 integration, build/g2/rec; the rest of the route is DB1's, unchanged)
-18:|U,14:|RU,6:|R,3:|,4:|L,2:|,1:|L,2:|,1:|L,2:|,1:|L,2:|,1:|L,2:|,1:|L,2:|,1:|L,2:|,1:|L,2:|,1:|L
-2:|,1:|L,2:|,1:|L,2:|,1:|L,2:|,8:|F,19:|,1:U|,28:U|R,7:U|,1:U|R,28:U|,30:R|,7:|,1:R|,2:|,1:R|,10:|
+18:|U,14:|RU,6:|R,3:|,4:|L,2:|,1:|L,2:|,1:|L,2:|,1:|L,2:|,1:|L,2:|,1:|L,2:|,1:|L,2:|,1:|L,2:|,1:|L,2:|,1:|L,2:|
+1:|L,2:|,1:|L,2:|,8:|F,19:|,1:U|,28:U|R,7:U|,1:U|R,28:U|,30:R|,7:|,1:R|,2:|,1:R|,10:|
 # Expert: three bats over the lake - high strikes from the bridges, waiting for each; the island checkpoint
-12:|,10:UF|,2:|,4:|UF,6:RU|UF,6:RU|,6:RU|RU,12:R|RU,2:R|R,12:|R,57:|,10:UF|,2:|,4:|UF,4:R|UF,2:RU|UF
-6:RU|,4:RU|R,10:RU|RU,10:R|RU,2:RU|RU,10:RU|R,8:RU|RU,8:R|RU,4:RU|RU,8:RU|R,10:RU|RU,1:R|RU,11:|RU
-1:|R,72:|,10:UF|,2:|,6:|UF,4:R|UF,8:R|,1:R|R,12:RU|R,10:RU|RU,6:R|RU,1:RU|RU,5:R|RU,6:R|R,1:R|RU
-8:R|R,12:RU|R,12:RU|RU,12:R|RU,46:R|R,12:|R,8:|
+12:|,10:UF|,2:|,4:|UF,6:RU|UF,6:RU|,6:RU|RU,12:R|RU,2:R|R,12:|R,57:|,10:UF|,2:|,4:|UF,4:R|UF,2:RU|UF,6:RU|
+4:RU|R,10:RU|RU,10:R|RU,2:RU|RU,10:RU|R,8:RU|RU,8:R|RU,4:RU|RU,8:RU|R,10:RU|RU,1:R|RU,11:|RU,1:|R,72:|,10:UF|
+2:|,6:|UF,4:R|UF,8:R|,1:R|R,12:RU|R,10:RU|RU,6:R|RU,1:RU|RU,5:R|RU,6:R|R,1:R|RU,8:R|R,12:RU|R,12:RU|RU,12:R|RU
+46:R|R,12:|R,8:|
 # Expert: the tough snapper on the hollow hill takes two blows - both club it from just outside its reach
 3:R|R,1:|R,3:F|R,1:F|,4:F|F,4:|F,6:|,4:F|,4:F|F,4:|F,6:|,4:F|,4:F|F,4:|F,16:|,26:R|,22:|
 # Expert: P2 comes down close behind - the loner hoppers stay put while the pair keeps together; P1 clubs the blue hopper twice
@@ -40,8 +41,7 @@
 # Side by side, both climb the branches straight up (checkpoint 3 at the top)
 140:U|U,10:|
 # The canopy road leads back to the left: P1 clubs the tough hopper of the first treetop (Expert: three blows) and walks onto plate pa, P2 follows
-6:R|,8:|,10:L|,12:LU|,8:LF|,4:LU|,6:|,4:L|,2:F|,6:F|R,8:|,8:F|L,6:|L,2:|LU,8:F|LU,14:|LU,6:|,10:L|
-60:|
+6:R|,8:|,10:L|,12:LU|,8:LF|,4:LU|,6:|,4:L|,2:F|,6:F|R,8:|,8:F|L,6:|L,2:|LU,8:F|LU,14:|LU,6:|,10:L|,60:|
 # Gate 2 (plates): P1 holds plate pa, door D1 of the lower corridor opens and P2 walks through to plate pb; door D2 of the upper corridor opens, P1 jumps into it and walks through; P2 steps aside before P1 drops down.
 66:|L,14:|,4:L|,10:LU|,4:L|,10:|,2:L|,30:L|L,8:L|,30:|
 # On along the vine bridge to the last treetop (the Shellback sign)

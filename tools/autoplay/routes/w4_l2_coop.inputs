@@ -7,15 +7,17 @@
 # the keep tower for Cave Painting 28; P1 waits at drum B by the tower while P2 jumps the spike well and climbs
 # onto the drum ledge: both strike on the count of three and the portcullis rises for good (gate 'drums'); both
 # reach the exit (the team exit). Club only, no S; nobody stands 243 ticks without input.
+# Re-recorded by enemies-A (wf10) for G57 (one hit per strike in co-op files: a swing hurts a given enemy once,
+# so a 25-hp enemy takes two strikes) with the same closed-loop bot.
 40:R|R,4:R|,1:R|R,7:R|,4:|,1:R|,4:|,14:R|,8:RU|,6:R|,12:|,10:RU|,10:R|,7:|,6:|R,1:R|R,2:R|,1:UF|R,5:UF|,1:|
-1:|L,2:|,5:R|R,9:|R,8:|RU,6:|R,12:|,10:|RU,10:|R,13:|,3:|R,4:|,1:|R,39:R|R,2:R|,1:R|R,2:R|,3:|,1:R|,1:|,1:|L
-5:|,2:L|,7:|,2:R|,9:|,10:RU|,9:R|,1:|,4:L|,3:|,10:RU|,9:R|,2:|,4:L|,5:|R,1:R|R,2:|R,4:R|,1:R|R,4:R|,2:R|RU
-3:|RU,1:R|RU,4:|RU,1:|R,8:RU|R,1:RU|,3:RU|L,1:R|L,3:R|,10:R|RU,6:R|R,3:|R,1:|,3:|L,2:L|L,9:L|,2:|,13:|R,2:|
-1:|R,6:|,12:|RU,51:|R,3:|,1:|R,2:|,10:U|,7:|,12:RU|,2:|,4:L|,1:|,26:R|,3:R|R,7:|R,4:R|R,7:R|,3:|,1:R|,7:|,2:L|
-3:|,23:R|,12:|,3:R|,14:|,14:RU|,7:R|,2:|,1:R|,8:|,11:|R,4:|,3:R|,7:|,4:U|,10:RU|,5:R|,37:|,1:R|,1:R|RU,6:|RU
-4:U|RU,3:RU|RU,7:RU|R,6:R|R,2:|R,1:L|R,4:|,2:L|,6:|,2:R|,31:|,1:R|,1:R|R,2:|R,4:|,3:U|,1:U|U,3:RU|U,7:RU|RU
-3:R|RU,3:R|R,1:|R,4:|,1:|R,1:|,3:L|,4:|,3:R|R,2:R|,1:R|R,4:R|,4:R|U,2:|RU,1:R|RU,7:|RU,3:|R,2:|,1:|R,6:|,1:|R
-2:R|R,3:R|,1:R|R,3:R|,4:R|U,10:R|RU,13:R|R,7:R|,36:R|R,6:|R,1:R|R,2:|R,1:L|R,45:|R,2:|,1:|R,6:|,1:|L,4:|,3:|LU
-8:|U,27:|LU,6:|,6:|R,3:|,1:|R,5:|,1:|R,5:R|R,3:|,1:R|,5:|,1:L|,8:|,8:|L,7:|,15:|R,10:|RU,22:|R,6:|,1:|R,2:|
-7:|U,9:|RU,4:|,1:|R,4:|,1:|F,7:F|F,1:F|,2:|,17:L|L,7:|,14:R|R,4:RU|,1:RU|R,5:RU|,37:R|,7:|,19:R|R,3:|R,1:R|R
-2:|R,8:|,7:R|,46:R|R,12:RU|R,2:R|R,12:R|RU,27:R|R
+1:|L,2:|,6:UF|R,4:|R,4:R|R,1:R|RU,7:|RU,6:|R,12:|,10:|RU,10:|R,13:|,3:|R,4:|,1:|R,39:R|R,2:R|,1:R|R,2:R|,3:|
+1:R|,1:|,1:|L,5:|,2:L|,7:|,2:R|,9:|,10:RU|,9:R|,1:|,4:L|,3:|,10:RU|,9:R|,2:|,4:L|,5:|R,1:R|R,2:|R,4:R|,1:R|R
+4:R|,2:R|RU,3:|RU,1:R|RU,4:|RU,1:|R,8:RU|R,1:RU|,3:RU|L,1:R|L,3:R|,10:R|RU,6:R|R,3:|R,1:|,3:|L,2:L|L,9:L|,2:|
+13:|R,2:|,1:|R,6:|,12:|RU,51:|R,3:|,1:|R,2:|,10:U|,7:|,12:RU|,2:|,4:L|,1:|,26:R|,3:R|R,7:|R,4:R|R,7:R|,3:|,1:R|
+7:|,2:L|,3:|,23:R|,12:|,3:R|,14:|,14:RU|,7:R|,2:|,1:R|,8:|,11:|R,4:|,3:R|,7:|,4:U|,10:RU|,5:R|,37:|,1:R|,1:R|RU
+6:|RU,4:U|RU,3:RU|RU,7:RU|R,6:R|R,2:|R,1:L|R,4:|,2:L|,6:|,2:R|,31:|,1:R|,1:R|R,2:|R,4:|,3:U|,1:U|U,3:RU|U
+7:RU|RU,3:R|RU,3:R|R,1:|R,4:|,1:|R,1:|,3:L|,4:|,3:R|R,2:R|,1:R|R,4:R|,4:R|U,2:|RU,1:R|RU,7:|RU,3:|R,2:|,1:|R
+6:|,1:|R,2:R|R,3:R|,1:R|R,3:R|,4:R|U,10:R|RU,13:R|R,7:R|,36:R|R,6:|R,1:R|R,2:|R,1:L|R,45:|R,2:|,1:|R,6:|,1:|L
+4:|,3:|LU,8:|U,27:|LU,6:|,6:|R,3:|,1:|R,5:|,1:|R,5:R|R,3:|,1:R|,5:|,1:L|,8:|,8:|L,7:|,15:|R,10:|RU,22:|R,6:|
+1:|R,2:|,7:|U,9:|RU,4:|,1:|R,4:|,1:|F,7:F|F,1:F|,2:|,17:L|L,7:|,14:R|R,4:RU|,1:RU|R,5:RU|,37:R|,7:|,19:R|R,3:|R
+1:R|R,2:|R,8:|,7:R|,46:R|R,12:RU|R,2:R|R,12:R|RU,27:R|R

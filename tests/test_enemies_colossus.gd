@@ -1271,6 +1271,7 @@ func test_coop_visor_only_in_a_coop_game_of_two_on_a_coop_file() -> void:
 	assert_true(colossus.is_coop_form())
 	assert_eq(colossus.max_hp, 16, "24 -> 16 (x2/3, wf10 boss balance)")
 	assert_eq(colossus.max_hp, 24 * Colossus.COOP_HP_NUM / Colossus.COOP_HP_DEN)
+	assert_eq([colossus._phase_hp(0), colossus._phase_hp(1)], [2, -6], "its pauses shorten after 14 hits taken (wf10)")
 	assert_eq(colossus.get_plates().size(), 2, "the hall's two plates")
 	assert_eq(colossus.get_live_plate(), colossus.get_plates()[0], "the left chain glows first")
 	_coop_teardown()

@@ -13,11 +13,11 @@ extends RefCounted
 ## Where each rule hooks in, in tick order (Defs.Phase):
 ##  - WEAPONS (a hero's weapon pass -> EnemyBase.take_hit): [method skips_hit] (the leech host's own boxes pass
 ##    through it), [method accepts_hit] (EnemyBase.accepts_hit_from: the front of a `shell`, an undazed `daze` and
-##    every hit on a `heavy` that no Brace Wall staggers glance), [method repeats_strike] (a `heavy` takes one hit
-##    per strike), [method absorbs_hit] (the first hit splits a `split` record without damage; a partner's hit frees
-##    a grabbed hero or clubs a leech off - those hits count).
-##  - deaths that are no weapon hit (EnemyBase.kill, burst_into_items, on_glider_stomp): [method refuses_death] (a
-##    `heavy` dies of nothing while no Brace Wall staggers it: no kill-all, grenade, feast or glider dive).
+##    every hit on a `heavy` that no Brace Wall has dazed glance, G57), [method absorbs_hit] (the first hit splits a
+##    `split` record without damage; a partner's hit frees a grabbed hero or clubs a leech off - those hits count).
+##    G57's one hit per strike is EnemyBase's (every enemy of a co-op party, trait or not; [method strike_key]).
+##  - deaths that are no weapon hit (EnemyBase.kill, burst_into_items, on_glider_stomp): [method refuses_death] (G57:
+##    a `heavy` dies of nothing while no Brace Wall has it dazed: no kill-all, grenade, feast or glider dive).
 ##  - ENEMIES: [method pre_ai] before the archetype's `_ai_tick()` - true when the trait ran the tick itself (the
 ##    regrow, a daze, the daze hop, the grab carry, the leech ride, the split run); [method post_ai] after it (the
 ##    shell turns to the nearer hero, the Brace Wall test); a dead `bond` / `split` record runs [method dead_tick]
@@ -47,7 +47,7 @@ var enemy: EnemyBase = null
 var kind: int = Defs.CoopTrait.NONE
 
 ## `daze` / `heavy`: ticks left dazed (a `daze` record after a head bounce, a `heavy` one after a Brace Wall): only
-## then do hits count (a `daze` record: from every side; a `heavy` one: at all - the heavy-keeper ruling, G3).
+## then do hits count (a `daze` record: another slot's than the bouncer's, G47; a `heavy` one: any at all, G57).
 var dazed: int = 0
 ## `bond` / `split`: ticks left of the harmless regrow (intangible, blinking, no AI).
 var regrow: int = 0
@@ -81,8 +81,6 @@ var _strikers: int = 0
 var _dazer_slot: int = -1
 ## `heavy`: its run before the Brace Wall stopped it (given back when the daze ends).
 var _run_xvel: int = 0
-## `heavy` (one hit per strike): per player slot, the [method strike_key] of the strike that last hurt it (-1 = none).
-var _strike_keys: PackedInt64Array = PackedInt64Array()
 ## `grab`: where it seized the hero (it flies back there after the drop), flying back, ticks held without a perch,
 ## true when it switched the held hero's control off itself.
 var _home: Vector2i = Vector2i.ZERO
@@ -120,8 +118,6 @@ static func create(p_enemy: EnemyBase) -> CoopTraits:
 	traits.enemy = p_enemy
 	traits.kind = p_enemy.coop_trait
 	traits._read_params(p_enemy.spawn_params)
-	traits._strike_keys.resize(Defs.MAX_PLAYERS)
-	traits._strike_keys.fill(-1)
 	return traits
 
 
@@ -229,8 +225,9 @@ func accepts_hit(source: SimEntity) -> bool:
 		Defs.CoopTrait.SHELL:
 			return not enemy._hit_from_front(source)
 		Defs.CoopTrait.HEAVY:
-			# The heavy-keeper ruling (G3): hurt ONLY while a Brace Wall of two active heroes staggers it - its back
-			# glances too, so a lone player (who can run under or hop over it) never wears it down.
+			# G57 (heavy keepers): hurt ONLY while a Brace Wall of two active heroes has it dazed - then from every
+			# side; every other hit glances, its back too, so a lone player (who can run under or hop over it) never
+			# wears it down.
 			return dazed > 0
 		Defs.CoopTrait.DAZE:
 			# G47: the daze is slot-bound - only a hero of another slot than the bouncer's hurts it.
@@ -238,29 +235,13 @@ func accepts_hit(source: SimEntity) -> bool:
 	return true
 
 
-## One hit per strike (the heavy-keeper ruling, G3; a `heavy` record of a co-op party): an accepted hit from player
-## slot `slot` that belongs to the same strike as the last one of that slot that hurt it is used up without damage
-## (true: EnemyBase.take_hit consumes it - the pogo and the clank of the hero's side stay as they are); any other hit
-## is remembered as that slot's last strike (false: it hurts). Without it a club box that overlaps it on five ticks of
-## one swing would take five hits, and `hp` would not mean "this many strikes".
-func repeats_strike(slot: int, source: SimEntity) -> bool:
-	if kind != Defs.CoopTrait.HEAVY or slot < 0 or slot >= _strike_keys.size() or not party_on():
-		return false
-	var key: int = strike_key(source)
-	if key < 0:
-		return false
-	if _strike_keys[slot] == key:
-		return true
-	_strike_keys[slot] = key
-	return false
-
-
-## The strike a weapon hit from `source` belongs to: for a hero's club box (Player: `club_box_active` while his weapon
-## pass tests it), the Sim.total_ticks on which his strike script started - `strike_tick` counts the script's ticks
-## (player-A's Player), so Sim.total_ticks - strike_tick is the same on every tick of one swing and new for the next
-## (a held FIRE re-swings from strike_tick 0). -1 for every other source: a thrown weapon is used up by its one hit, the
-## batted ball hits an enemy once per flight, and a bare PlayerBase (tests) has no strike script - each such hit is a
-## strike of its own.
+## G57 one hit per strike (EnemyBase._repeats_strike, every enemy of a co-op party): the strike instance a weapon hit
+## from `source` belongs to, for a hero's melee box (Player: `club_box_active` while his weapon pass tests it) - the
+## Sim.total_ticks on which his strike script started: `strike_tick` counts the script's ticks (player-A's Player), so
+## Sim.total_ticks - strike_tick is the same on every tick of one swing and new for the next (a held FIRE re-swings from
+## strike_tick 0). -1 for every other source, which is an instance of its own by its own rules: a thrown weapon is used
+## up by its one hit (ProjectileBase.consume), the batted ball hits an enemy once per flight (the party component), a
+## mount's bite once per bite, a head bounce never hurts; a bare PlayerBase (tests) has no strike script.
 static func strike_key(source: SimEntity) -> int:
 	var hero: PlayerBase = source as PlayerBase
 	if hero == null or not hero.club_box_active:
@@ -272,8 +253,8 @@ static func strike_key(source: SimEntity) -> int:
 
 
 ## True while it may not die of anything but a weapon hit it accepted: a `heavy` record of a co-op party that no Brace
-## Wall staggers (the heavy-keeper ruling, G3: "damaged ONLY while staggered") shrugs off a kill-all, a grenade, a
-## feast's bite and a glider dive. Everything else: false (its archetype's deaths).
+## Wall has dazed (G57: "damaged ONLY while so dazed") shrugs off a kill-all, a grenade, a feast's or a mount's bite
+## and glider dives. Everything else: false (its archetype's deaths).
 func refuses_death() -> bool:
 	return kind == Defs.CoopTrait.HEAVY and dazed <= 0 and party_on()
 
@@ -347,7 +328,6 @@ func on_reset() -> void:
 		enemy.tangible = _saved_tangible
 	dazed = 0
 	_dazer_slot = -1
-	_strike_keys.fill(-1)
 	regrow = 0
 	died_tick = -1
 	sealed = false

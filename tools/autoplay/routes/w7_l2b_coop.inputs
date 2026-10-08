@@ -1,4 +1,4 @@
-# route: level=w7_l2b_coop difficulty=beginner players=2 ends=exit after=expert_wall expect=wipes:0,painting:8,unlocked:true,fight_ticks:1092..2185
+# route: level=w7_l2b_coop difficulty=beginner players=2 ends=exit after=expert_wall expect=wipes:0,painting:8,unlocked:true,fight_ticks:1093..2185
 # The Beginner two-stream route of Squid Grotto in co-op (designer D7; P1|P2, build/d7/bot_w7_l2b_coop.gd
 # with the duo pilot build/d7/squid_duo2.gd). Club only, no S. The painting nook, the floes (P2 one floe
 # behind), the roof hole; the co-op Inkjaw's Tentacle Lock: both wait on the middle island while it dives,

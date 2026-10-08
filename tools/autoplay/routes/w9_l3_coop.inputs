@@ -1,16 +1,45 @@
-# route: level=w9_l3_coop difficulty=expert players=2 ends=trophy after=level:ending_b_coop expect=wipes:0,eggs:0,painting:16,secrets:1,min_checkpoints:2
+# route: level=w9_l3_coop difficulty=expert players=2 ends=trophy after=level:ending_b_coop expect=wipes:0,eggs:0,painting:16,secrets:1,min_checkpoints:2,max_hurts:6,fight_ticks:1093..2185
 # The Expert two-stream route of Chieftains' Pyre in co-op (designer D9b; recorded from build/d9b/bot_w9_l3_coop.gd,
 # P1|P2): both climb (P2 a step behind), P1 opens the chieftains' tent (Cave Painting 16) while P2 keeps watch, both
 # go up the chimney into the pyre hall; each hero fights with enemies-C's club pilot: when a chieftain is an egg the
 # hero nearer to it smashes it while the other keeps the surviving chieftain busy within 64 px (B.6), then P1 takes
 # the Great Roast. Both heroes give input all the time (a waiting role taps Down; no 243 quiet ticks). Club only.
+# Re-recorded in wf10 (bosses) with the same bot after the boss balance of the co-op pair: 5 pips each, both reel
+# 110 ticks after a counted hit on either, and they crow 330 ticks after a blow of theirs lands (Chieftain.COOP_*);
+# fight 45-90 s and at most 6 hurts on this Expert route.
 43:L|L,2:|L,5:|,2:R|,2:R|R,2:|R,7:|,9:LU|,3:LU|L,1:L|L,6:L|,12:L|LU,31:L|L,6:F|L,4:|L,1:L|L,2:F|L,4:F|F,2:|F
-2:|,2:L|,1:L|L,5:F|L,1:F|F,4:|F,1:L|F,4:F|,1:F|L,1:F|F,4:|F,1:L|F,4:F|,1:F|L,1:F|F,4:|F,1:L|F,4:L|,91:L|L,2:|L
-5:|,2:U|,1:U|R,5:U|,1:U|R,64:U|,5:R|L,3:R|,3:|,1:R|,3:|R,4:|,73:|U,1:|R,194:R|R,1:R|,5:|,1:|R,1:|,1:R|,1:|R,1:|
-73:U|,3:L|R,2:|R,7:|,1:|L,2:|,73:|U,1:|R,2:L|R,3:|,1:F|,18:|,1:F|,18:|,1:F|,16:|,1:|D,18:|,4:L|,16:|,1:|L
+2:|,2:L|,1:L|L,6:L|F,4:L|,3:L|L,6:L|F,4:L|,1:L|L,6:L|F,4:L|,1:L|L,6:L|F,4:L|,23:L|L,1:|L,1:L|L,1:|L,1:L|L,1:|L
+1:L|L,7:|L,62:U|L,7:U|,1:U|R,53:U|,5:R|L,3:R|,3:|,1:R|,3:|R,4:|,73:|U,1:|R,194:R|R,1:R|,5:|,1:|R,1:|,1:R|,1:|R
+1:|,73:U|,3:L|R,2:|R,7:|,1:|L,2:|,73:|U,1:|R,2:L|R,3:|,1:F|,18:|,1:F|,18:|,1:F|,16:|,1:|D,18:|,4:L|,16:|,1:|L
 16:L|L,1:|L,7:|,1:|L,32:L|L,1:|L,6:|,12:U|,11:|,7:U|,1:U|L,1:U|,3:U|L,4:|L,7:L|L,2:|L,5:R|L,5:R|F,1:|F,8:L|
-1:L|R,1:L|L,4:L|R,1:|L,1:|R,1:|L,1:|,1:R|,1:L|,3:R|F,1:L|F,1:R|F,1:L|F,1:R|,1:L|,1:R|,1:L|,1:R|,1:L|,4:R|,2:L|R
-2:|R,1:D|R,1:|R,1:|,1:R|,1:L|L,2:R|L,1:L|L,2:F|L,2:F|,2:F|R,5:|R,1:R|R,1:L|D,1:R|,1:L|,3:R|,4:R|R,1:L|R,1:|R
-4:F|R,2:F|,1:|,4:|L,6:R|L,2:R|,1:L|,2:|R,2:|L,1:|R,1:|L,3:F|L,1:F|,2:F|R,5:|R,1:R|R,1:L|R,1:|R,1:F|R,1:F|,4:F|L
-4:|L,3:|,1:|R,3:F|R,3:F|,5:|,2:R|L,1:|L,1:|D,3:|,7:L|L,1:|,1:R|R,1:L|R,6:F|R,1:L|,4:|,13:L|,1:|,11:R|,1:R|D
-5:R|,1:|,8:L|,2:|,6:R|,3:|,2:L|,1:|,7:RU|
+1:L|R,1:L|L,4:L|R,1:L|L,1:|R,1:|L,4:|,1:R|,1:L|,1:R|,1:L|,1:R|,1:L|,1:R|,1:L|,2:R|,1:L|,1:R|,1:L|,5:R|,8:R|L
+2:R|,4:R|R,3:R|L,1:L|L,4:|L,1:|R,3:|,5:|R,4:|,1:D|,12:|,1:R|,6:R|R,3:R|,1:L|L,1:R|L,1:L|L,1:|R,1:R|L,1:L|R
+1:R|L,1:L|R,1:R|L,1:L|R,1:R|F,1:L|F,2:R|F,1:L|F,1:R|F,1:L|,1:R|,1:L|,1:R|,1:L|,1:R|L,1:L|R,1:R|,1:L|,1:R|,1:L|
+1:R|,1:L|,1:R|,1:L|,13:R|,5:R|L,1:R|R,2:R|,1:R|D,1:R|,4:R|R,3:R|,1:L|,5:|,1:D|,6:|,1:R|,1:L|,1:R|,1:L|,1:R|R
+1:L|R,2:R|R,1:R|D,1:R|,4:L|,1:R|,2:L|,1:R|,5:|,1:D|,6:|,7:L|,1:R|,1:|D,2:|,6:|L,1:F|L,1:F|R,4:F|F,2:|F,5:|,7:L|
+1:R|,1:|D,14:|,1:D|,2:|,6:|L,1:R|L,1:|R,1:|,1:|R,2:R|R,4:|R,3:|,1:|L,1:|R,1:|L,1:|R,1:|L,1:|R,1:|L,1:|R,1:D|L
+1:|L,1:|R,1:|L,1:|R,1:|L,1:|R,1:|L,1:|R,1:|L,1:|R,1:|L,1:|R,1:|L,1:|R,1:|L,1:|R,1:L|L,1:R|R,1:L|L,1:R|R,1:L|L
+1:R|R,1:L|L,1:R|R,1:L|L,1:R|R,1:|L,1:|R,1:|,1:D|,13:|,2:|L,4:L|L,1:L|R,1:R|F,5:F|F,1:F|,13:|,4:L|,1:R|D,2:R|
+1:L|,1:R|,1:L|,5:|,1:R|,1:|,1:L|,3:R|,2:L|,2:L|R,2:R|R,1:L|R,4:|R,5:L|R,5:L|,2:L|R,2:|R,2:|,1:R|,1:L|,4:R|
+1:L|R,1:R|R,1:L|R,5:|R,7:R|R,1:L|R,9:|R,1:D|R,5:|R,9:|,1:|D,1:F|,5:F|F,1:|F,4:|,1:R|,1:|,1:|L,1:R|R,2:R|L,3:R|R
+1:R|L,1:R|R,1:R|L,6:R|,1:R|D,5:R|,9:|,1:D|,4:|,6:|R,1:R|R,1:R|L,2:R|,1:R|D,5:R|,1:|R,1:|L,5:|R,1:L|R,1:R|R
+3:L|R,3:R|R,1:L|R,3:|R,4:L|R,1:L|L,1:L|D,11:L|,8:L|R,3:|R,3:R|R,5:L|R,1:|R,2:R|R,1:R|L,6:R|F,1:|,17:L|,1:R|
+1:R|D,5:R|,3:|,5:L|,1:L|R,1:L|L,1:R|R,7:|R,1:|L,3:|,16:|L,7:L|L,1:R|L,1:L|L,1:R|L,16:|L,5:|,1:D|R,1:|L,2:|R
+2:L|R,1:L|L,1:L|R,1:L|L,3:L|,1:R|,1:L|,1:R|L,1:|L,6:F|F,5:|,1:R|L,3:R|,6:L|L,2:L|,2:|,1:|R,1:|L,4:|R,1:L|L
+1:L|R,1:L|L,5:L|,1:L|R,1:L|L,2:L|R,4:L|L,1:L|R,2:L|,9:R|,1:L|D,6:L|,1:L|L,5:R|L,2:L|L,1:R|L,1:R|R,1:R|L,1:R|R
+6:R|,5:|,1:|D,8:|,9:|R,1:L|R,4:|R,2:L|R,6:F|R,4:|R,1:|,3:|L,1:|R,5:|L,1:D|L,1:|L,1:|R,2:|,10:|R,7:R|R,1:L|R
+7:|R,1:D|R,1:|R,2:R|R,11:R|,1:R|D,6:R|,7:R|L,1:L|R,1:L|L,2:L|R,2:L|L,1:L|R,1:R|,1:L|,1:R|,1:L|R,1:R|R,1:L|R
+4:R|R,1:L|R,1:R|R,1:|R,1:|L,6:|,4:L|,1:R|R,1:L|R,1:R|R,1:|R,1:F|L,5:F|F,1:|F,5:|,1:|R,1:L|L,1:L|R,7:R|R,2:|R
+1:R|R,1:L|L,3:L|,1:L|R,1:L|L,2:L|R,1:L|L,1:L|R,1:L|L,2:L|R,1:L|L,1:|R,1:|L,2:R|R,1:R|L,1:|R,1:|L,2:L|R,1:L|L
+1:L|R,1:L|L,1:|R,1:R|R,1:R|L,1:R|R,1:R|L,2:R|R,1:R|L,1:R|R,1:R|L,2:R|R,1:R|L,1:R|R,1:R|L,2:R|R,1:R|L,1:R|R
+1:R|L,2:R|R,1:R|L,1:|R,1:|L,2:|R,1:|L,1:|R,1:|L,2:|R,1:|L,1:|R,1:|L,1:D|R,1:|R,1:|L,1:|R,1:|L,2:|R,1:|L,1:|R
+1:|L,2:|R,1:|L,1:|R,1:|L,2:|R,1:|L,1:|R,1:|L,2:|R,1:|L,1:|R,1:|L,2:|R,1:F|L,5:F|F,1:|F,5:|,1:|R,1:|L,2:|R,1:|L
+1:|R,1:|L,2:|R,1:|L,1:|R,1:|L,1:|R,1:|L,1:|R,1:|L,3:|,1:|L,1:L|L,4:L|,1:R|,10:|,1:|D,1:|,3:|R,1:|L,5:R|L,7:RU|L
+3:RU|R,9:|R,1:|D,7:R|,10:|,3:R|,1:|L,1:|R,1:R|L,1:R|R,1:R|,1:R|L,1:R|R,1:R|L,1:|R,1:L|D,1:L|L,1:L|R,1:L|L,1:L|R
+2:R|L,4:F|L,2:F|,5:|R,4:L|R,2:L|,3:L|L,2:L|R,1:|R,1:|L,1:R|R,1:R|L,2:|,3:L|,1:L|R,1:|L,1:|R,1:|L,1:R|R,1:R|L
+1:R|,1:R|R,1:R|L,1:R|R,1:R|L,1:R|,1:R|R,1:R|L,1:R|R,1:R|L,1:R|,1:L|R,1:L|L,1:L|R,1:L|L,1:L|,1:|R,1:|L,8:R|R
+2:|R,1:L|L,1:L|R,1:L|L,1:L|R,1:L|L,2:L|R,1:L|L,1:L|R,1:L|L,1:L|R,1:L|L,1:L|R,1:L|L,1:L|R,1:L|L,1:L|R,1:L|L
+2:L|R,1:L|L,1:L|R,1:L|L,1:|R,1:|L,1:R|R,1:R|L,1:R|R,1:R|L,1:R|R,1:R|L,2:R|R,1:R|L,1:R|R,1:R|L,1:R|R,1:R|L,1:R|R
+1:R|L,1:R|R,1:R|L,1:R|R,1:R|L,6:R|R,1:|R,6:F|R,2:|R,1:|L,2:|,3:L|,1:R|,1:F|L,5:F|R,8:|R,6:F|R,5:|R,4:L|R,6:L|
+7:L|L,3:|,1:R|R,2:R|L,7:R|,2:|,1:D|,14:|,1:|D,1:|,1:|R,6:R|R,1:R|L,3:|,1:L|,1:R|,1:L|,1:R|,3:L|,2:R|L,1:L|L
+3:|L,23:L|L,5:F|F,2:R|,4:|,18:R|,1:|,4:L|,1:|,1:RU|D,8:RU|

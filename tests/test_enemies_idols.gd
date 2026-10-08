@@ -487,24 +487,89 @@ func test_coop_a_twin_hit_within_the_window_cracks_both() -> void:
 
 func test_coop_a_rage_crosses_the_targets() -> void:
 	var idols: Idols = _coop_fight(Vector2i(100, 160), Vector2i(220, 160))
-	for crack: int in Idols.RAGE_EVERY:
+	for crack: int in Idols.COOP_RAGE_EVERY:
+		_until_jaws_open(idols, Vector2i(100, 160), Vector2i(220, 160))
 		_club_by(_hero, idols.get_head_rect(Idols.MOON))
 		_club_by(_p2, idols.get_head_rect(Idols.SUN))
 		Sim.step(1)
 		_hero.club_box_active = false
 		_p2.club_box_active = false
 		Sim.step(Idols.HURT_TICKS)
-	assert_eq(idols.hp, 16 - 2 * Idols.RAGE_EVERY)
+	assert_eq(idols.hp, 16 - 2 * Idols.COOP_RAGE_EVERY)
 	var raged: bool = idols.get_state() == Idols.State.RAGE
-	for tick: int in 80:
+	var rage_ticks: int = 0
+	for tick: int in 400:
 		if raged and idols.get_state() != Idols.State.RAGE:
 			break
 		Sim.step(1)
+		_hold_heroes(Vector2i(100, 160), Vector2i(220, 160))
 		raged = raged or idols.get_state() == Idols.State.RAGE
-	assert_true(raged, "every 4th twin crack: both rage")
+		if idols.get_state() == Idols.State.RAGE:
+			rage_ticks += 1
+	assert_true(raged, "every 2nd twin crack (wf10): both rage")
+	assert_true(rage_ticks >= Idols.COOP_RAGE_TICKS - 2, "for %d ticks" % rage_ticks)
 	assert_true(idols.is_crossed(), "then each idol aims at the far half")
 	assert_eq(idols._target_of(Idols.MOON), _p2, "the Moon now aims at the Sun's hero")
 	assert_eq(idols._target_of(Idols.SUN), _hero)
+
+
+## wf10 boss balance (co-op Idols harder): a twin crack SHUTS both jaws - a twin on them glances - until the idols have
+## spat again (the end of the next spit step); then the next twin cracks them. Solo: no shut jaws.
+func test_coop_a_twin_crack_shuts_the_jaws_until_they_have_spat() -> void:
+	var idols: Idols = _coop_fight(Vector2i(100, 160), Vector2i(220, 160))
+	_until_jaws_open(idols, Vector2i(100, 160), Vector2i(220, 160))
+	_club_by(_hero, idols.get_head_rect(Idols.MOON))
+	_club_by(_p2, idols.get_head_rect(Idols.SUN))
+	Sim.step(1)
+	_hero.club_box_active = false
+	_p2.club_box_active = false
+	assert_eq(idols.hp, 14, "a twin crack")
+	assert_false(idols.jaws_open(Idols.MOON) or idols.jaws_open(Idols.SUN), "both jaws shut")
+	assert_true(idols.is_open(Idols.MOON) and idols.is_open(Idols.SUN), "though both are awake")
+	Sim.step(Idols.HURT_TICKS)
+	_hold_heroes(Vector2i(100, 160), Vector2i(220, 160))
+	if not idols.jaws_open(Idols.MOON):
+		_club_by(_hero, idols.get_head_rect(Idols.MOON))
+		_club_by(_p2, idols.get_head_rect(Idols.SUN))
+		Sim.step(1)
+		_hero.club_box_active = false
+		_p2.club_box_active = false
+		assert_eq(idols.hp, 14, "a twin on shut jaws glances")
+	var spat: bool = false
+	var opened: bool = false
+	for tick: int in 400:
+		Sim.step(1)
+		_hold_heroes(Vector2i(100, 160), Vector2i(220, 160))
+		spat = spat or idols.get_state() == Idols.State.SPIT
+		if idols.jaws_open(Idols.MOON):
+			opened = true
+			assert_true(spat, "they open only after a spit")
+			assert_ne(idols.get_state(), Idols.State.SPIT, "at the end of the spit step")
+			break
+	assert_true(opened, "open again")
+	_club_by(_hero, idols.get_head_rect(Idols.MOON))
+	_club_by(_p2, idols.get_head_rect(Idols.SUN))
+	Sim.step(1)
+	assert_eq(idols.hp, 12, "the next twin cracks them")
+
+
+## Step until both co-op jaws are open (the heroes held at their spots, unhurt).
+func _until_jaws_open(idols: Idols, p1: Vector2i, p2: Vector2i) -> void:
+	for tick: int in 600:
+		if idols.jaws_open(Idols.MOON) and idols.jaws_open(Idols.SUN) and idols._cooldown[Idols.MOON] == 0 				and idols._cooldown[Idols.SUN] == 0:
+			return
+		Sim.step(1)
+		_hold_heroes(p1, p2)
+	assert_true(false, "the jaws never opened")
+
+
+func _hold_heroes(p1: Vector2i, p2: Vector2i) -> void:
+	for pair: Array in [[_hero, p1], [_p2, p2]]:
+		var hero: PlayerBase = pair[0]
+		hero.run.hearts = Tuning.ENERGY_START
+		hero.hit_timer = 0
+		if hero.sim_pos != pair[1]:
+			hero.teleport(pair[1])
 
 
 func test_coop_rocks_are_aimed_at_the_hero_on_each_side() -> void:

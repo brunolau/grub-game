@@ -915,6 +915,18 @@ class CoopBossBalance(unittest.TestCase):
         self.assertIn("**Balance** [G61]", _section(GAMEPLAY_13, "### 13.6", r"\n### "))
         self.assertIn("| Co-op boss fights | 45-90 s", _section(GAMEPLAY_13, "### 13.11"))
 
+    ROUTES = ["w2_l2b_coop.inputs", "w2_l2b_coop.expert.inputs", "w4_l2b_coop.inputs", "w5_l2b_coop.inputs",
+              "w5_l2b_coop.expert.inputs", "w6_l2b_coop.inputs", "w6_l2b_coop.expert.inputs", "w7_l2b_coop.inputs",
+              "w7_l2b_coop.expert.inputs", "w8_l2b_coop.inputs", "w9_l2b_coop.inputs", "w9_l3_coop.inputs"]
+
+    def test_every_coop_boss_route_pins_the_band(self):
+        # Built in the follow-up round (bosses, wf10): the route test (check_expectations) enforces the pins.
+        for name in self.ROUTES:
+            head = _read("tools/autoplay/routes/" + name).splitlines()[0]
+            self.assertIn("fight_ticks:1093..2185", head, name)
+            if "difficulty=expert" in head:
+                self.assertRegex(head, r"\b(max_hurts:[0-6]|hurts:[0-6])\b", name)
+
 
 class DeviationsReviewed(unittest.TestCase):
     """[G62] the four deviations accepted; Chomper two seats is no gate kind; the files carry the gates named."""

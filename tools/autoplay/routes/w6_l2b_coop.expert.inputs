@@ -1,4 +1,4 @@
-# route: level=w6_l2b_coop difficulty=expert players=2 ends=exit after=tally expect=wipes:0,x2_gates:1,unlocked:true,fight_ticks:1092..2185,max_hurts:6
+# route: level=w6_l2b_coop difficulty=expert players=2 ends=exit after=tally expect=wipes:0,x2_gates:1,unlocked:true,fight_ticks:1093..2185,max_hurts:6
 # The Expert two-stream route of Heart of the Mangrove in co-op (designer D6; recorded from
 # build/d6/bot_w6_l2b_coop2.gd, P1|P2; club only, never S): up the trunk ahead of the rising tar, P2 one ledge behind
 # P1; gate 'vent' - both into the vent room, both heave the boulder four tiles onto the two deadly tar vents (one hero

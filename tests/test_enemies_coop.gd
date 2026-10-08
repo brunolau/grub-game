@@ -602,8 +602,15 @@ func test_an_unbraced_heavy_glances_everywhere_and_dies_of_nothing_else() -> voi
 	assert_eq(_count_fx(&"fx/hit_stars"), sparks + 1, "with the glance's spark")
 	assert_true(bull.take_hit(100, _hero))
 	assert_eq(bull.hp, 100, "a charged one too")
+	_hero.teleport(Vector2i(bull.sim_pos.x, 120))
+	bull.take_hit(25, _hero)
+	assert_eq(bull.hp, 100, "from above (a pogo on its back)")
+	_hero.teleport(Vector2i(300, 160))
 	bull.take_hit(20, _shot(Vector2i(300, 150), -208, 0))
 	assert_eq(bull.hp, 100, "and a throw at its back")
+	_p2.teleport(Vector2i(bull.sim_pos.x - 20, 160))
+	bull.take_hit(25, _p2)
+	assert_eq(bull.hp, 100, "and the partner in front")
 	bull.kill(&"kill_all", _hero)
 	assert_false(bull.dead, "a kill-all leaves it alive")
 	bull.burst_into_items()
@@ -713,20 +720,61 @@ func test_a_staggered_heavy_takes_one_hit_per_strike() -> void:
 	p2.free()
 
 
-## Other traits keep a hit per tick (the ruling is the heavy's): a `shell` record's back takes every tick of a swing.
-func test_one_hit_per_strike_is_the_heavys_rule_only() -> void:
+## G57 (2): in a co-op party EVERY enemy - with a trait or without - takes one hit per strike: one club swing held
+## over a 100-hp walker for 6 ticks takes 25, two swings 50; the back of a `shell` record the same. In single-player
+## (and versus) the 1.0 hit lands on every tick a box overlaps.
+func test_every_coop_enemy_takes_one_hit_per_strike_and_solo_keeps_the_tick_hit() -> void:
+	var plain: EnemyBase = _enemy(&"enemies/walker", Vector2i(220, 160), {"speed": 0, "hp": 100})
 	var shell: EnemyBase = _enemy(&"enemies/walker", Vector2i(160, 160), {"coop": "shell", "speed": 0, "hp": 100})
 	_hero.teleport(Vector2i(130, 160))
 	_p2.teleport(Vector2i(400, 160))
 	Sim.step(2)
+	assert_null(plain.coop_traits(), "a plain 1.0 record")
 	assert_eq(shell.facing, -1)
-	var behind: PlayerBase = _striker(1, Vector2i(190, 160))
-	for tick: int in 3:
-		_swing(behind, tick + 1)
-		shell.take_hit(25, behind)
+	var p1: PlayerBase = _striker(0, Vector2i(200, 160))
+	var p2: PlayerBase = _striker(1, Vector2i(190, 160))
+	for tick: int in 6:
+		_swing(p1, tick + 1)
+		_swing(p2, tick + 1)
+		plain.take_hit(25, p1)
+		shell.take_hit(25, p2)
 		Sim.step(1)
-	assert_eq(shell.hp, 25, "three ticks of one swing at its back: three hits")
-	behind.free()
+	assert_eq(plain.hp, 75, "one swing held over it for 6 ticks: 25")
+	assert_eq(shell.hp, 75, "a shell's back: one hit for the swing too")
+	for tick: int in 6:
+		_swing(p1, tick + 1)
+		plain.take_hit(25, p1)
+		Sim.step(1)
+	assert_eq(plain.hp, 50, "two swings: 50")
+	# The repeat ticks are used up (one target per box per tick, as in 1.0): the box does not go on to an enemy behind.
+	var front: EnemyBase = _enemy(&"enemies/walker", Vector2i(250, 160), {"speed": 0, "hp": 100})
+	var behind: EnemyBase = _enemy(&"enemies/walker", Vector2i(256, 160), {"speed": 0, "hp": 100})
+	Sim.step(1)
+	for tick: int in 3:
+		_swing(p1, tick + 1)
+		assert_true(front.take_hit(25, p1) or behind.take_hit(25, p1), "tick %d: the box is used up" % tick)
+		Sim.step(1)
+	assert_eq([front.hp, behind.hp], [75, 100], "one swing over two enemies: the front one, once")
+	# A party of one (the co-op rules collapse) and single-player: the 1.0 per-tick hit.
+	_p2.free()
+	for tick: int in 3:
+		_swing(p1, tick + 1)
+		plain.take_hit(25, p1)
+		Sim.step(1)
+	assert_eq(plain.hp, -25, "a party of one: three ticks, three hits (dead)")
+	assert_true(plain.dead)
+	Game.new_game(Defs.Difficulty.BEGINNER)
+	assert_eq(Game.mode, Defs.GameMode.SINGLE)
+	var solo: EnemyBase = _enemy(&"enemies/walker", Vector2i(240, 160), {"speed": 0, "hp": 100})
+	Sim.step(1)
+	for tick: int in 3:
+		_swing(p1, tick + 1)
+		solo.take_hit(25, p1)
+		Sim.step(1)
+	assert_eq(solo.hp, 25, "single-player: every tick of a swing hits (1.0)")
+	assert_true(solo._strike_keys.is_empty(), "no strike memory outside a co-op party")
+	p1.free()
+	p2.free()
 
 
 # =================================================================================================================

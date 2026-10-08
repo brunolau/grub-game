@@ -90,7 +90,52 @@ func test_coop_the_arm_guard_turns_the_target_heros_hits_away() -> void:
 	assert_eq(brute._target_hero(), _p2)
 	_shot(brute.get_head_rect(), 0)
 	Sim.step(1)
-	assert_eq(brute.hp, 30, "and now P1's throw counts: the roles swap with every hit")
+	assert_eq(brute.hp, 55, "wf10: its head is covered after a counted hit - P1's throw glances")
+	brute._set_state(Brute.State.JUMP)
+	Sim.step(1)
+	_shot(brute.get_head_rect(), 0)
+	Sim.step(1)
+	assert_eq(brute.hp, 30, "its chest beat uncovers it: now P1's throw counts - the roles swap with every hit")
+
+
+## wf10 boss balance: the co-op Brute counts club hits - a charged blow (or any weapon's power) takes 25 - and after a
+## counted hit its head is COVERED: blows glance with a clank, it watches the whole BRUTE_WATCH_TICKS without anger
+## (also late in the fight) and uncovers when it beats its chest. The solo Brute keeps the power of every blow.
+func test_coop_counts_club_hits_and_covers_its_head_until_its_chest_beat() -> void:
+	var brute: Brute = _coop_fight(Defs.Difficulty.EXPERT, Vector2i(330, 160), Vector2i(470, 160))
+	var full: int = brute.hp
+	assert_eq(full, EnemyTuning.BRUTE_HP * 5 / 4, "the test den's 64 x 5/4 (w2_l2b_coop: 187 / 312 = 8 / 13 club hits)")
+	_club_by(_p2, brute.get_head_rect())
+	_p2.club_power = 100
+	Sim.step(1)
+	_p2.club_box_active = false
+	assert_eq(brute.hp, full - Brute.COOP_HIT_POWER, "a charged blow counts one club hit")
+	assert_true(brute._cover, "then the head is covered")
+	brute.hp = 40
+	var stars: int = _count_fx(&"fx/hit_stars")
+	var watched: int = 0
+	var uncovered: int = -1
+	for tick: int in EnemyTuning.BRUTE_STAGGER_TICKS + EnemyTuning.BRUTE_WATCH_TICKS + 30:
+		if tick % 12 == 0:
+			_club_by(_hero, brute.get_head_rect())
+		Sim.step(1)
+		_hero.club_box_active = false
+		_hero.run.hearts = Tuning.ENERGY_START
+		_p2.run.hearts = Tuning.ENERGY_START
+		if brute.get_state() == Brute.State.WATCH:
+			watched += 1
+		if uncovered < 0 and not brute._cover:
+			uncovered = tick
+			assert_eq(brute.get_state(), Brute.State.JUMP, "the chest beat uncovers it")
+		if uncovered < 0:
+			assert_eq(brute.hp, 40, "tick %d: every blow on the covered head glances" % tick)
+	assert_true(_count_fx(&"fx/hit_stars") > stars, "with sparks")
+	assert_true(uncovered >= 0, "it uncovers")
+	assert_true(watched >= EnemyTuning.BRUTE_WATCH_TICKS - 2, "under 60 hit points it still watched %d ticks" % watched)
+	var solo: Brute = _coop_brute(Defs.Difficulty.EXPERT, false, Vector2i(330, 160), Vector2i(470, 160))
+	solo.start_fight()
+	Sim.step(1)
+	assert_false(solo.is_coop_form())
 
 
 func test_coop_a_totem_ride_rider_strikes_over_the_guard() -> void:

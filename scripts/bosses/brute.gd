@@ -25,8 +25,8 @@ extends BossBase
 ## 2.0 co-op form (DESIGN.md B.7, GAMEPLAY.md 13.6; enemies-C, PLAN.md P2.3) - only in a co-op game of two heroes on a
 ## co-op file (`kind = coop`: w2_l2b_coop); everywhere else, a party of one included, the Brute above runs unchanged:
 ##  - hit points x5/4 (64 -> 80; PartyTuning.BOSS_HP_MAX_NUM / DEN), counted in club hits: every counted head hit takes
-##    COOP_HIT_POWER (25, charged or not), then its head is covered for COOP_COVER_TICKS - every blow glances (wf10 boss
-##    balance: 45-90 s for a pair);
+##    COOP_HIT_POWER (25, charged or not), then its head is covered - it watches BRUTE_WATCH_TICKS and uncovers at its
+##    next chest beat; every blow on the covered head glances (wf10 boss balance: 45-90 s for a pair);
 ##  - it targets whoever hit it last (before the first hit, or when he is down: the nearest ACTIVE hero -
 ##    LevelBase.nearest_coop_hero, hatched and not idle, DESIGN.md G33 - so a dozing partner never draws the guard);
 ##  - its **arm guard** faces its target: every head hit of the target hero glances off (a clank and a spark), a club
@@ -59,11 +59,11 @@ const GRAB_FREE_SHIELD_TICKS: int = 44   ## a freed or released hero blinks this
 ## wf10 boss balance (orchestrator: a co-op boss fight lasts 45-90 s for a competent pair; DB2's duo beat the co-op
 ## Brute in 6 s Beginner / 10 s Expert with two / four charged blows of 100): in the co-op form every counted head hit
 ## takes COOP_HIT_POWER - one club hit, charged or not, whatever the weapon - so its hit points count club hits
-## (Beginner 187 = 8, Expert 312 = 13; x5/4 of the solo club hits, B.0), and after each counted hit it covers its head
-## for COOP_COVER_TICKS (its hit cooldown): every blow glances (a clank) until it has fought on that long. During a
-## Grab the partner's blow still frees the held hero at once. (tune)
+## (Beginner 187 = 8, Expert 312 = 13; x5/4 of the solo club hits, B.0), and after each counted hit it COVERS its head
+## (every blow glances, a clank): staggered, it watches the whole BRUTE_WATCH_TICKS (no anger) and uncovers when it
+## next beats its chest - the jump routine's taunt or the Grab's beat, the 1.0 telegraphs. During a Grab the partner's blow still
+## frees the held hero at once. (tune)
 const COOP_HIT_POWER: int = 25
-const COOP_COVER_TICKS: int = 110
 
 ## Left and right limits of the feet point, logical px (level parameters `left` / `right`, absolute columns).
 var left_x: int = 0
@@ -88,6 +88,8 @@ var _hold_left: int = 0
 var _hold_ticks: int = 0
 var _wriggle_dir: int = 0
 var _grab_cooldown: int = 0
+## wf10: the head is covered after a counted hit until the next chest beat (co-op only).
+var _cover: bool = false
 
 
 func _default_skin() -> String:
@@ -252,6 +254,13 @@ func _ai_tick() -> void:
 
 func _watch_tick(hero: PlayerBase) -> void:
 	_play(&"idle")
+	if _coop and _cover:
+		# 2.0 co-op (wf10): covered after a counted hit, it watches the whole BRUTE_WATCH_TICKS (no anger, no skipping
+		# the watch late in the fight), then beats its chest - which uncovers its head.
+		if _counter >= EnemyTuning.BRUTE_WATCH_TICKS:
+			_raise_anger()
+			_set_state(State.JUMP)
+		return
 	if hp < EnemyTuning.BRUTE_SKIP_WATCH_HP:
 		_set_state(State.JUMP)
 		return
@@ -375,6 +384,9 @@ func _set_state(state: int) -> void:
 	_state = state
 	_counter = 0
 	_punch_rest = 0
+	if state == State.JUMP or state == State.GRAB_BEAT:
+		# 2.0 co-op (wf10): the chest beat uncovers the head.
+		_cover = false
 
 
 func _raise_anger() -> void:
@@ -424,7 +436,7 @@ func _on_head_hit(power: int, hero: PlayerBase) -> void:
 	if dead or _state == State.DYING:
 		return
 	if _coop:
-		hit_cooldown = COOP_COVER_TICKS
+		_cover = true
 	_raise_anger()
 	if hero != null and hero.run.has_glider:
 		hero.set_glider(false)
@@ -493,6 +505,7 @@ func _coop_reset() -> void:
 	_hold_ticks = 0
 	_wriggle_dir = 0
 	_grab_cooldown = 0
+	_cover = false
 	_coop = false
 	max_hp = _solo_hp
 	hp = max_hp
@@ -550,10 +563,10 @@ func _guarded(hitter: PlayerBase, target: PlayerBase) -> bool:
 	return hitter == target and not over_guard
 
 
-## Co-op: the head is covered - the hit cooldown runs (COOP_COVER_TICKS after a counted hit) and nobody is held (the
-## partner's blow during a Grab frees the held hero at once).
+## Co-op: the hit cooldown runs, or the head is covered (a counted hit, until the next chest beat) and nobody is held
+## (the partner's blow during a Grab frees the held hero at once).
 func _covered() -> bool:
-	return hit_cooldown > 0 and _held == null
+	return hit_cooldown > 0 or (_cover and _held == null)
 
 
 func _guard_glance(level: LevelBase, point: Vector2i) -> void:
@@ -773,3 +786,4 @@ func _hurt_hero(hero: PlayerBase) -> bool:
 		return false
 	_anger = maxi(_anger - (EnemyTuning.BRUTE_ANGER_CALM_BASE - speed_class), 0)
 	return true
+

@@ -1,10 +1,17 @@
-# route: level=w8_l2b_coop difficulty=expert players=2 ends=exit after=tally expect=min_checkpoints:1,painting:11,boss_hits:16,unlocked:true
+# route: level=w8_l2b_coop difficulty=expert players=2 ends=exit after=tally expect=min_checkpoints:1,painting:11,boss_hits:16,unlocked:true,max_hurts:6,fight_ticks:1093..2185
+# The two-stream Expert route of Idol Court in co-op (designer D8; recorded from build/d8/bot_w8_l2b_coop.gd with the
+# idols duo pilot, P1|P2): the painting crypt, the Raptor pincer, the drop into the court; the co-op Twin Idols - P1
+# holds the Moon's half, P2 the Sun's, both strike the open jaws on the same tick (a twin crack, G34).
+# Re-recorded in wf10 (bosses; a copy of the bot whose pilot waits for open jaws and lets spat rocks pass,
+# build/bosses10/d8/) after the boss balance that made the co-op Idols harder: a twin crack shuts both jaws until the
+# idols have spat again (Idols.jaws_open), and they rage every 2nd crack for 88 ticks; fight 45-90 s, <= 6 hurts.
 8:R|R,2:R|,1:R|R,1:R|,5:|,2:|R,4:R|R,3:F|R,1:|R,1:|F,1:|R,7:R|R,2:R|,1:R|R,3:R|,7:|,1:DF|,20:|,1:DF|,2:|,1:|K
 4:|,10:R|,1:|,4:R|,6:|,5:L|,7:|,3:R|,4:|,5:L|,7:|,2:R|,1:|,1:|K,1:R|,2:|,9:R|,6:|,1:R|,2:|,4:L|,13:|,11:RU|
 1:U|,1:|,3:L|,2:|R,3:R|R,2:R|,1:UF|,1:UF|R,4:UF|,4:|,3:R|,8:|RU,6:|R,10:|,5:R|,2:|,1:R|,6:|,14:R|R,2:|R,1:R|R
 6:|R,1:R|R,7:R|,34:R|R,1:|R,2:|L,15:|,3:L|,2:|,5:|R,3:R|R,2:|,1:|R,2:|,1:|R,11:|,2:|R,6:|,1:|R,14:L|R,2:L|
-1:L|R,5:L|,1:R|,1:L|,4:|,4:R|,2:|,1:L|,8:|,9:UF|UF,41:|,9:UF|UF,27:|,9:UF|UF,27:|,9:UF|UF,25:|,9:UF|UF,80:|
-9:UF|UF,25:|,9:UF|UF,25:|,8:UF|UF,20:|,1:UF|,1:|,1:R|,8:RU|,17:R|,2:RU|,1:RU|K,5:RU|,14:R|,8:RU|,1:R|,8:RU|
-1:R|,8:RU|,1:R|,8:RU|,1:R|,4:RU|,1:RU|K,3:RU|,1:R|,8:RU|,1:R|,8:RU|,1:R|,8:RU|,1:R|,8:RU|,1:R|,8:RU|,1:R|,8:RU|
-1:R|,1:RU|,1:RU|K,6:RU|,1:R|,8:RU|,1:R|,8:RU|,1:R|,8:RU|,1:R|,8:RU|,1:R|,6:RU|,1:RU|UF,1:RU|,1:R|L,8:RU|LU
-1:R|L,8:RU|L,1:R|L,7:RU|L,1:RU|LU,1:R|LU,6:RU|LU,2:RU|L,1:R|R,1:RU|L
+1:L|R,5:L|,1:R|,1:L|,4:|,4:R|,2:|,1:L|,8:|,9:UF|UF,88:|,9:UF|UF,200:|,1:D|D,7:|,9:UF|UF,1:|,8:|U,78:|,9:UF|UF
+1:|,8:|U,36:|,8:|U,16:|,8:|U,123:|,1:D|,70:|,9:UF|UF,86:|,9:UF|UF,141:|,9:UF|UF,57:|,8:UF|UF,20:|,1:UF|,1:|
+1:R|,8:RU|,17:R|,2:RU|,1:RU|K,5:RU|,14:R|,8:RU|,1:R|,8:RU|,1:R|,8:RU|,1:R|,8:RU|,1:R|,4:RU|,1:RU|K,3:RU|,1:R|
+8:RU|,1:R|,8:RU|,1:R|,8:RU|,1:R|,8:RU|,1:R|,8:RU|,1:R|,8:RU|,1:R|,1:RU|,1:RU|K,6:RU|,1:R|,8:RU|,1:R|,8:RU|,1:R|
+8:RU|,1:R|,8:RU|,1:R|,6:RU|,1:RU|UF,1:RU|,1:R|L,8:RU|LU,1:R|L,8:RU|L,1:R|L,7:RU|L,1:RU|LU,1:R|LU,6:RU|LU,2:RU|L
+1:R|R,1:RU|L

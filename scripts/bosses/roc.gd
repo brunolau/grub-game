@@ -68,6 +68,10 @@ const GUST_TICKS: int = 66
 const GUST_WIND: int = 48
 const GUSTS: int = 3
 const FEATHER_PERIOD: int = 11
+## Co-op (wf10 boss balance: the Expert route of a co-op boss costs at most 6 hurts; D9a's duo took 7 in the Storm
+## Nest, four of them feathers): the gust drops a feather every FEATHER_PERIOD x this ticks - a third as many over
+## two heroes as over one (D9a's duo then took 3; x2 played out to 9). (tune)
+const COOP_FEATHER_SLOWDOWN: int = 3
 ## Flight (px per tick per axis).
 const FLY_SPEED: int = 3
 const TAKEOFF_HEIGHT: int = 72            ## circling height over the nest top
@@ -507,7 +511,7 @@ func _perch(rim: int) -> void:
 
 func _gust_tick(hero: PlayerBase) -> void:
 	_play(&"fly")
-	if _timer % FEATHER_PERIOD == 1:
+	if _timer % (FEATHER_PERIOD * (COOP_FEATHER_SLOWDOWN if _coop else 1)) == 1:
 		var slot: int = hero.slot if hero != null else 0
 		_spawn_optional(FEATHER_ID, sim_pos, {"rain": true, "skin": "feather", "rain_slot": slot})
 	if _timer < GUST_TICKS:
@@ -1137,3 +1141,4 @@ func _room() -> Rect2i:
 		return level.get_camera_lock()
 	var centre: Vector2i = get_nest_center()
 	return Rect2i(centre.x - (Tuning.VIEW_W >> 1), nest_top - 8 * Tuning.TILE, Tuning.VIEW_W, Tuning.VIEW_H)
+

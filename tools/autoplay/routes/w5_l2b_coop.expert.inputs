@@ -1,4 +1,4 @@
-# route: level=w5_l2b_coop difficulty=expert players=2 ends=exit after=tally expect=eggs:0,wipes:0,painting:2,unlocked:true
+# route: level=w5_l2b_coop difficulty=expert players=2 ends=exit after=tally expect=eggs:0,wipes:0,painting:2,unlocked:true,fight_ticks:1093..2185,max_hurts:6
 # The Expert two-stream route of Tusker's Wallow in co-op (designer D5; P1|P2, recorded from closed-loop duo macros
 # and a duo bot, build/d5). Club only, no S (belt invariance). The co-op Tusker (DESIGN.md B.1): while it lies open
 # it faces the nearer caveman, so one hero stands at its head and the other clubs its leafy rump; in phase 3 both

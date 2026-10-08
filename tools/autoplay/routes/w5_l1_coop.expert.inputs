@@ -1,6 +1,8 @@
 # route: level=w5_l1_coop difficulty=expert players=2 ends=exit after=tally expect=max_hurts:1,eggs:0,wipes:0,x2_gates:3,min_checkpoints:4,min_kills:9
 # The Expert two-stream route of Red Mesa Trail in co-op (designer D5; one key set per player: P1|P2; recorded from
-# closed-loop duo macros, build/d5). Both heroes keep the club (no S), so the belt-invariance runner sees the same
+# closed-loop duo macros, build/d5; re-recorded from the same macro in wf10 - the old stream took 3 Roller hurts on
+# the wf10 tree - build/content/rec). Both
+# heroes keep the club (no S), so the belt-invariance runner sees the same
 # digests whatever special rides on either belt. All three co-op gates are crossed together:
 # 'hop' (Shoulder Hop + the rolled vine), 'plates' (leapfrog plate doors), 'gully' (two Shellback pincers).
 # The beach, the tortoises, the rattler, checkpoint 1, the arch, the tortoise after it (side by side, P2 behind)
@@ -25,8 +27,9 @@
 # Through the keeper door, past checkpoint 4: P2 closes up behind P1
 31:R|R,26:R|,7:|
 # Both up the long slope side by side: the Rollers roll down and are jumped
-24:R|R,83:|,9:U|U,12:|,26:R|R,21:|,9:U|U,9:|,15:R|R,1:|
+24:R|R,83:|,9:U|U,12:|,26:R|R,21:|,9:U|U,9:|,10:R|R,28:|,9:U|U,10:|,6:R|R
 # P1 clubs the tortoise on the mesa top while P2 waits, jumping the Rollers
-5:R|,6:|,8:F|,3:|,9:|U,18:|,6:F|
+7:|,1:R|,2:|,3:R|,2:|,2:R|,3:|,2:R|,2:|,2:R|,4:|,4:R|,7:|,1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|
+2:|,1:R|,6:F|
 # Both on along the mesa top, jumping the Rollers; P1 clubs the last tortoise, both into the exit totem
-1:|,4:R|,5:|,5:|U,4:U|U,5:U|,6:|,9:|R,19:R|R,2:R|,7:|,1:R|,6:F|,28:R|R
+10:R|,4:R|R,7:|R,1:R|R,3:F|R,3:F|,27:R|R

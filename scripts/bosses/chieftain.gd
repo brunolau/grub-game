@@ -5,7 +5,9 @@ extends BossBase
 ## the one whose name sorts first (Gorm) leads: he runs the pair's phase machine and gives both their orders.
 ##
 ## **The phase machine** (one per pair, in the lead). Energy: PIPS (4) each, one pip per counted hit of any weapon (the
-## body is the weak point; BOSS_HIT_COOLDOWN per chieftain). Every attack is announced by a "HUP!" and a
+## body is the weak point; BOSS_HIT_COOLDOWN per chieftain); the co-op pair COOP_PIPS (5) each, both REEL for
+## COOP_REEL_TICKS after a counted hit on either (blows on them glance) and CROW for COOP_CROW_TICKS after a blow of
+## theirs lands (nothing of theirs hurts) - wf10 boss balance. Every attack is announced by a "HUP!" and a
 ## TELEGRAPH_TICKS (14) crouch. A chieftain's phase is his own pips:
 ##  - **P1 Raiders** (4-3 pips): flank and strike, jump on a crouching hero's head; the target is the hero farther from
 ##    the view centre (the `lone` rule of 13.9.5; one hero: him).
@@ -75,6 +77,16 @@ static var hero_bot_enabled: bool = true
 
 # --- Private tuning (enemies-C; to move into EnemyTuning with enemies-A) -----------------------------------------------
 const PIPS: int = 4                        ## [G 13.6]
+## wf10 boss balance (orchestrator: a co-op boss fight lasts 45-90 s for a competent pair and costs at most 6 hurts on
+## its Expert route; D9b's duo knocked both co-op chieftains out in 8 s - every club on a body counted, a pip per 22
+## ticks each): the co-op pair has COOP_PIPS each (x5/4 of PIPS, B.0); a counted hit on either sends BOTH REELING for
+## COOP_REEL_TICKS (their hit cooldown: every blow on them glances, a clank, while they fight on - so the pips fall one
+## at a time, the pair's ten in turn); and when a blow, stomp or batted ball of theirs lands on a hero, the pair
+## CROWS for COOP_CROW_TICKS - nothing of theirs hurts meanwhile (two Chief-level bodies on two heroes cost D9b's duo
+## 19 hurts in 76 s without it; with it 5 in 59 s). (tune)
+const COOP_PIPS: int = 5
+const COOP_REEL_TICKS: int = 110
+const COOP_CROW_TICKS: int = 330
 const TELEGRAPH_TICKS: int = 14            ## the HUP! crouch [G 13.6]
 const DAZE_TICKS: int = 30                 ## a batted chief lies dazed [G 13.6]
 const EGG_TICKS_SOLO: int = 132            ## [G 13.6]
@@ -138,6 +150,8 @@ var _thief_wait: int = 0
 var _egg_timer: int = 0
 var _egg_hits: int = 0
 var _egg_gap: int = 0
+## Co-op (wf10): ticks left of the pair's crowing after one of their blows landed (nothing of theirs hurts).
+var _crow: int = 0
 var _done: bool = false
 var _hup: Label = null
 var _hup_ticks: int = 0
@@ -289,6 +303,7 @@ func start_fight() -> void:
 		return
 	_resolve_mate()
 	_coop = _coop_form_wanted()
+	max_hp = COOP_PIPS if _coop and not spawn_params.has("hp") else max_hp
 	hp = max_hp
 	_find_arena()
 	if is_lead():
@@ -313,6 +328,7 @@ func _on_reset() -> void:
 	_act = Act.IDLE
 	_act_timer = 0
 	_attack_gap = 0
+	_crow = 0
 	_routine_timer = 0
 	_thief_wait = 0
 	_egg_timer = 0
@@ -358,6 +374,8 @@ func _ai_tick() -> void:
 			return
 	if hit_cooldown > 0:
 		hit_cooldown -= 1
+	if _glance_ticks > 0:
+		_glance_ticks -= 1
 	if _attack_gap > 0:
 		_attack_gap -= 1
 	if _hup_ticks > 0:
@@ -1133,11 +1151,18 @@ func _poll_hits() -> void:
 		if projectile != null and not projectile.spent and Overlap.rects(projectile.get_box(), weak):
 			projectile.consume()
 			if hit_cooldown > 0:
+				if _coop:
+					_reel_glance(level, weak.get_center())
 				return
 			slot = projectile.owner_slot
 			break
 	if slot < 0:
 		if hit_cooldown > 0:
+			if _coop:
+				for hero: PlayerBase in level.contact_order():
+					if hero.club_box_active and Overlap.rects(hero.club_box, weak):
+						_reel_glance(level, hero.club_box.intersection(weak).get_center())
+						break
 			return
 		for hero: PlayerBase in level.contact_order():
 			if hero.club_box_active and Overlap.rects(hero.club_box, weak):
@@ -1159,6 +1184,20 @@ func _poll_hits() -> void:
 		_body.hit_timer = maxi(_body.hit_timer, Tuning.HIT_STUN_MIN + BOT_FLINCH_TICKS)
 		_show_hup(false)
 	apply_boss_hit(1)
+	if _coop and not dead:
+		# wf10: the pair reels - no counted hit on either for COOP_REEL_TICKS (blows glance).
+		hit_cooldown = COOP_REEL_TICKS
+		if mate != null and is_instance_valid(mate) and not mate.dead:
+			mate.hit_cooldown = maxi(mate.hit_cooldown, COOP_REEL_TICKS)
+
+
+## Co-op (wf10): a blow on a reeling chieftain glances - a clank and a spark, at most one per GLANCE_TICKS.
+func _reel_glance(level: LevelBase, point: Vector2i) -> void:
+	if _glance_ticks > 0:
+		return
+	_glance_ticks = GLANCE_TICKS
+	Audio.play_sfx(Sfx.CLUB_HIT_SCENERY)
+	level.spawn_fx(&"fx/hit_stars", point)
 
 
 ## The club box (and the stomp of a falling chieftain) against the heroes: one bone and the boss knock-back. A batted
@@ -1169,6 +1208,10 @@ func _attack_heroes() -> void:
 		return
 	var box: Rect2i = get_attack_box()
 	var ball: bool = _act == Act.BALL
+	if _coop and _crow > 0:
+		# wf10: the pair crows after a blow landed - no blow, stomp or ball of theirs hurts meanwhile.
+		_crow -= 1
+		return
 	# A stomp only after an announced leap / stomp jump (every attack is telegraphed).
 	var stomping: bool = yvel > 0 and _act == Act.LEAP
 	if _bot_on and _body != null:
@@ -1177,12 +1220,12 @@ func _attack_heroes() -> void:
 		if hero.dead or hero.is_down() or hero.is_immune() or hero.is_feasting():
 			continue
 		if box.size.x > 0 and Overlap.rects(box, hero.get_box()):
-			touch_hero(hero)
+			_touch(hero)
 			continue
 		if not ball and not stomping:
 			continue
 		if Overlap.body(self, hero, self) and (ball or Overlap.stomp):
-			touch_hero(hero)
+			_touch(hero)
 			if ball:
 				continue
 			if _bot_on and _body != null:
@@ -1490,3 +1533,15 @@ class RoastDrawing:
 		draw_circle(Vector2(0.0, -10.0), 10.0, Color(0.6, 0.32, 0.14))
 		draw_circle(Vector2(-4.0, -14.0), 4.0, Color(0.85, 0.55, 0.3))
 		draw_line(Vector2(8.0, -14.0), Vector2(16.0, -22.0), Color(0.95, 0.92, 0.85), 3.0)
+
+
+
+## A chieftain's blow, stomp or ball meets a hero: one bone and the boss knock-back (BossBase.touch_hero). Co-op (wf10):
+## a blow that lands makes the pair crow for COOP_CROW_TICKS.
+func _touch(hero: PlayerBase) -> bool:
+	var hurt: bool = touch_hero(hero)
+	if hurt and _coop:
+		_crow = COOP_CROW_TICKS
+		if mate != null and is_instance_valid(mate):
+			mate._crow = maxi(mate._crow, COOP_CROW_TICKS)
+	return hurt

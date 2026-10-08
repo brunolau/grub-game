@@ -5,9 +5,9 @@
 # pb and trapdoor 2 rises for A (a leapfrog of two doors, LEVEL_DESIGN 15.7.3). Gate 2 "den": the low passage from the
 # fourth chamber into the Dark Deep is a keeper hall, 4 rows high, held by two Shellback turtles (one hero hops over a
 # turtle and baits its shell, the partner clubs its back); their door opens when both are dead. Leeches lurk in the
-# dark beyond; the Expert stinger of the shaft is a loner; the other turtles are Shellbacks too, and every special lies
-# in pairs. x2 secret: at the foot of the Echo Shaft a channel of black water runs under the rock - only a Batter Up
-# line drive crosses it, to a cracked wall and the Deep Pantry with Cave Painting 22 (a gate brings the batter back).
+# dark beyond; the Expert stinger of the shaft is a loner; the other turtles are Shellbacks too (not the Expert one on the
+# plateau), and every special lies in pairs. x2 secret: at the foot of the Echo Shaft a channel of black water runs
+# under the rock - only a Batter Up line drive crosses it, to a cracked wall and the Deep Pantry with Cave Painting 22 (a gate brings the batter back).
 
 [meta]
 format = 2
@@ -124,7 +124,9 @@ p = items/food index=31
 
 [entities]
 enemies/walker 28 15 skin=turtle_b left=-4 right=3 coop=shell
-enemies/walker 36 15 skin=turtle_b left=-3 right=2 expert coop=shell
+# wf10: the Expert turtle beside the plateau's Shellback is a plain walker - two Shellback beats 6 px apart under
+# the low ledge left no pair a way past both.
+enemies/walker 36 15 skin=turtle_b left=-3 right=2 expert
 enemies/dangler 39 9 skin=bat depth=80 speed=2
 objects/hidden_spot 31 15 kind=small count=3 contents=food:25,food:20,treasure:1 prop=cave/rock_big
 items/letter 44 6 index=0

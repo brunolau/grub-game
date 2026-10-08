@@ -24,6 +24,51 @@ func after_each() -> void:
 
 
 # =================================================================================================================
+# wf10 boss balance (orchestrator, DESIGN.md G61): every co-op boss fight 45-90 s, at most 6 hurts on its Expert route
+# =================================================================================================================
+
+## The two-stream co-op routes of the boss stages, by stage: [Beginner route or "", Expert route].
+const COOP_BOSS_ROUTES: Dictionary = {
+	"w2_l2b_coop": ["w2_l2b_coop.inputs", "w2_l2b_coop.expert.inputs"],
+	"w4_l2b_coop": ["", "w4_l2b_coop.inputs"],
+	"w5_l2b_coop": ["w5_l2b_coop.inputs", "w5_l2b_coop.expert.inputs"],
+	"w6_l2b_coop": ["w6_l2b_coop.inputs", "w6_l2b_coop.expert.inputs"],
+	"w7_l2b_coop": ["w7_l2b_coop.inputs", "w7_l2b_coop.expert.inputs"],
+	"w8_l2b_coop": ["", "w8_l2b_coop.inputs"],
+	"w9_l2b_coop": ["", "w9_l2b_coop.inputs"],
+	"w9_l3_coop": ["", "w9_l3_coop.inputs"],
+}
+const ROUTE_DIR: String = "res://tools/autoplay/routes/"
+
+
+## Every co-op boss route declares its fight inside 45-90 s (`fight_ticks`, Events.boss_started -> boss_defeated) and
+## every Expert one at most 6 hurts (`max_hurts` / `hurts`); tests/test_coop_routes.gd (slow module) replays each route
+## and checks it keeps what its header says. Measured in wf10 (build/bosses10/measure.gd) - see each header.
+func test_every_coop_boss_route_pins_a_45_to_90_second_fight() -> void:
+	var low: int = ceili(45.0 * Tuning.TICK_HZ)
+	var high: int = Tuning.seconds_to_ticks(90.0)
+	for stage: String in COOP_BOSS_ROUTES:
+		for index: int in 2:
+			var file: String = str(COOP_BOSS_ROUTES[stage][index])
+			if file == "":
+				continue
+			var path: String = ROUTE_DIR + file
+			assert_true(FileAccess.file_exists(path), "%s exists" % file)
+			var spec: Dictionary = Autoplay.parse_route_header(FileAccess.get_file_as_string(path))
+			assert_eq(str(spec.get("level", "")), stage, "%s plays %s" % [file, stage])
+			assert_eq((spec.get("errors", PackedStringArray()) as PackedStringArray).size(), 0, "%s: a clean header" % file)
+			var expect: Dictionary = spec.get("expect", {})
+			assert_true(expect.has("fight_ticks"), "%s pins its fight length" % file)
+			if expect.has("fight_ticks"):
+				var band: Array = expect["fight_ticks"]
+				assert_true(int(band[0]) >= low and int(band[1]) <= high, "%s: fight %s within 45-90 s (%d..%d)" % [
+					file, str(band), low, high])
+			if index == 1:
+				var cap: int = int(expect.get("max_hurts", expect.get("hurts", 999)))
+				assert_true(cap <= 6, "%s (Expert): at most 6 hurts (%d)" % [file, cap])
+
+
+# =================================================================================================================
 # The Brute
 # =================================================================================================================
 

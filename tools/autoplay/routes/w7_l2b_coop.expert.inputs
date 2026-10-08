@@ -1,4 +1,4 @@
-# route: level=w7_l2b_coop difficulty=expert players=2 ends=exit after=tally expect=wipes:0,painting:8,unlocked:true,max_hurts:6,fight_ticks:1092..2185
+# route: level=w7_l2b_coop difficulty=expert players=2 ends=exit after=tally expect=wipes:0,painting:8,unlocked:true,max_hurts:6,fight_ticks:1093..2185
 # The Expert two-stream route of Squid Grotto in co-op (designer D7; the same duo pilot). No S.
 # Re-recorded in wf10 (bosses; build/bosses10/d7/, the same bot with the pilot's slam margin widened) after the boss
 # balance: co-op hit points 225 (were 280), the co-op lock stays up 66 ticks (Squid.SQUID_COOP_UP_TICKS); fight

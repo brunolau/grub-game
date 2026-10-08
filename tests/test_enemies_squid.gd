@@ -79,6 +79,8 @@ func test_inkjaw_reads_its_grotto_and_surfaces_after_its_bubbles() -> void:
 		_fresh()
 		var other: Squid = _open(int(case[0]), 1, bool(case[1]))
 		assert_eq(other.max_hp, int(case[2]))
+		# wf10 boss balance: the co-op lock keeps it up 66 ticks (phases 1 and 2); the solo form 44.
+		assert_eq(other.up_ticks(), Squid.SQUID_COOP_UP_TICKS if bool(case[1]) else Squid.SQUID_UP_TICKS)
 
 
 ## G52: the fire-starter is thrown from over the island nearest to where Inkjaw died, a cell over its top - a key item

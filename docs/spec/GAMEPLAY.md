@@ -978,7 +978,15 @@ each declares its doze rule; Book I never spawns them). Defaults `hp` [25], `sco
   one hero with every weapon plus an idle hatched partner placed anywhere he could be hatched - cannot beat it.
   **Balance** [G61] (until the P4.5 playtests): a co-op fight lasts 45-90 s (1 093-2 185 ticks, boss bar to lethal
   blow) on its recorded routes and costs at most 6 hurts (both heroes) on its Expert route; the baseline and the
-  direction each form must move are DESIGN.md B.0's table (only Tusker is inside the band at G3).
+  direction each form must move are DESIGN.md B.0's table (only Tusker is inside the band at G3). **As retuned in the
+  follow-up round** (wf10; every co-op form inside the band, re-measured on the re-recorded routes; DESIGN.md B.1-B.7):
+  the co-op Brute takes one club hit's worth per counted head hit (charged or not) and covers his head until his next
+  chest beat; the visor Colossus has hp x2/3 of its solo form (16); Old Mangrove's co-op stages take 3 + 2 (Beginner) /
+  4 + 3 (Expert) hits, its hand and fist keeping time in stage 1; Inkjaw stays up 66 ticks while the lock holds and
+  its co-op Expert form has 225 hp; the Twin Idols shut both jaws after a twin crack until they spat again and rage
+  after every 2nd crack for 88 ticks; the Roc's co-op gusts drop a third as many feathers; the Rival Chieftains have 5
+  pips each, both reel 110 ticks after a counted hit on either and crow 330 ticks (harmless) after a blow of theirs
+  lands. Tusker is unchanged.
 - **Weak points clear of the HUD** [G35]: the HUD band of a boss fight is the top row - 31 px deep on a phone or
   tablet, 27 on a computer; in co-op the letters give way and P2's panel moves up into it while a boss bar shows - and,
   in the boss bar's columns (53 px left to 38 px right of the view's centre), down to 48 px (`Hud.band_rects`). Every

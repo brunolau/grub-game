@@ -2,11 +2,12 @@
 # The co-op file of levels/w1_l2.lvl (kind = coop, coop_of, coop_base_hash; never edit the solo file). Gate 1
 # "treehouse": the floor lift is gone - the first tree house stands 6 rows over a root mound at its foot, and only a
 # Totem Ride and a jump (or a Shoulder Hop) get one hero up; he clubs the coiled vine at the deck's edge down for the
-# other. Gate 2 "pulley": the upper branches of the trunk climb are gone; the way to the trunk top leads through the
-# trunk room, now a shaft with two pans on a pulley - one partner stands on the counterweight pan while the other hops
-# on the lift pan, rising a little with every hop (the pans move only while the lift is unloaded), steps off to a
-# ledge and unrolls a vine down to the counterweight's pit. The Feast Land A warp in the crow's nest waits in a cage
-# that twin drums open (one on the trunk top, one on the big branch). Bonded leapers in two pits of the lower deck, a
+# other. Gate 2 "shaft": the upper branches of the trunk climb are gone; the way to the trunk top leads through the
+# trunk room, now a shaft whose ledge is 8 rows over its floor - too high for a Totem Ride jump: one hero lands on his
+# partner's head holding Up (the Shoulder Hop) or jumps just after him from his head (the Totem launch), and up there
+# unrolls a vine for him; a hanging vine takes both to the trunk top (the wf10 redesign of the pulley). The Feast
+# Land A warp in the crow's nest waits in a cage
+# that twin drums open (one on the trunk top, one on the big branch). Leapers in two pits of the lower deck, a
 # Snatcher bat over the big branch, Shellback turtles, lone stingers and the pterodactyl; the x2 secret is the treetop
 # cache over the village deck, 8 rows up: a charged Batter Up lob (crouch to charge, then the high strike) reaches
 # it - Cave Painting 21.
@@ -30,7 +31,7 @@ liquid = water
 bonus = bonus_a
 bonus_tier = 0
 author = DB1
-notes = "Co-op 1-2: Totem ledge to the tree house (rolled vine back), pulley in the trunk shaft, drum-caged warp, bonded leapers, Snatcher bat, treetop cache by charged lob (painting 21)."
+notes = "Co-op 1-2: Totem ledge to the tree house (rolled vine back), Shoulder Hop ledge in the trunk shaft, drum-caged warp, two leaper pits, Snatcher bat, treetop cache by charged lob (painting 21)."
 
 [legend]
 a = objects/hidden_spot kind=small count=3 contents=food:6,food:11,code_stone:0 look=inset tile=#
@@ -112,15 +113,15 @@ A = enemies/harrier skin=pterodactyl range=6 hp=10 coop=lone
 ..............................................j.................................................
 ...........................................................#########............................
 .................................................CB........#########............................
-............................................#..#####............................................
-............................................#......#............................................
-............................................###....#............................................
+............................................#...####............................................
 ............................................#......#............................................
 ............................................#......#............................................
-............................................#..##..#....jj..........r.k.........................
+............................................#......#............................................
+............................................#......#............................................
+............................................#......#....jj..........r.k.........................
 ................................A...........#......######################.......................
 ............................................#......######################.......................
-............................................#......#............................................
+............................................#..##..#............................................
 ......................................f.....#......#............................................
 ....................................-----...#......#.......................................%%%%.
 ............................................#......#......................i.....................
@@ -128,13 +129,13 @@ A = enemies/harrier skin=pterodactyl range=6 hp=10 coop=lone
 ..............................-----.........#......#............................................
 ............................................w.H....#............................................
 .......................................jj...w..u...#......................i.S...................
-....................................%%%%%%%%##v##..#............................................
-....................................%%%%%%%%#####..#.............T..kkk...................P..s..
-............................................#####..#..........%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-............................................#####..#..........%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-............###############.................#####..#............................................
-............###############.................#####..#............................................
-................E.....E.....................#####..#............................................
+....................................%%%%%%%%##v#####............................................
+....................................%%%%%%%%########.............T..kkk...................P..s..
+............................................########..........%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+............................................########..........%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+............###############.................########............................................
+............###############.................########............................................
+................E.....E.....................########............................................
 ............................................########.........g..................................
 ............................................########............................................
 ............................................########............................................
@@ -208,7 +209,7 @@ zones/secret 48 20 name=crow_nest rect=44,17,8,5
 enemies/stinger 35 38 skin=insect_b range=4 hp=10 expert coop=lone
 enemies/flyer 62 33 skin=bat_b left=-4 right=4 hp=10 expert
 enemies/stinger 70 57 skin=insect_b range=4 hp=25 expert coop=lone
-enemies/leaper 67 73 skin=dragon_b pause=100 hp=25 expert coop=bond bond=squirrels
+enemies/leaper 67 73 skin=dragon_b pause=100 hp=25 expert
 enemies/snapper 66 83 skin=plant_b hp=25 expert
 enemies/hopper 71 95 skin=mini_rex_b range=4 hp=25 expert
 props/village/hut_bone 20 81
@@ -376,17 +377,17 @@ objects/x2_tablet 33 105 gate=treehouse far=27,93
 objects/vine 40 94 length=6 rolled
 # Specials in pairs: a second axe floats over the tree house deck (a jump takes it).
 items/weapon 31 90 kind=axe
-# Gate 2 "pulley": two pans in the trunk shaft. The counterweight pan (pa) hangs over its pit, the lift pan (pb) by
-# the shaft's left wall; the lift rises only while its rider is in the air and the counterweight loaded, 7 rows at
-# most, so the ledge it serves (row 35) is 11 rows over the shaft floor. The rolled vine at the ledge's edge is the way
-# up for the counterweight (coil 12 cells from the far cell on the big branch). A checkpoint on the deck before it.
+# Gate 2 "shaft" (wf10 redesign of the pulley, which no pair could play with the tribe camera: a 7-row counterweight
+# put the partners 14 rows apart and the rising pan left the view; nor could anyone leave its ledge, 2 rows under the
+# trunk top): the shaft's ledge (row 38) is 8 rows over its floor - out of reach of a Totem Ride jump (98 px), so one
+# hero needs the Shoulder Hop (Up held as he lands on his partner's head: 140 px) or a Totem launch; up there he clubs
+# the coiled vine at the ledge's edge down for his partner, and both climb the vine that hangs from the shaft's mouth
+# (its foot 1 row under the ledge, 4 rows over the floor: out of a jump's reach). A checkpoint on the deck before it.
 objects/checkpoint 39 45
-objects/sign 41 45 text=SIGN_COOP_W1_PULLEY
-objects/x2_tablet 48 45 gate=pulley far=61,35
-objects/platform 49.5 45 name=pa mode=ride
-objects/platform 45.5 45 name=pb mode=ride
-objects/pulley 47.5 33 a=pa b=pb range=7
-objects/vine 49 35 length=17 rolled
+objects/sign 41 45 text=SIGN_COOP_W1_SHAFT
+objects/x2_tablet 48 45 gate=shaft far=61,35
+objects/vine 49 38 length=8 rolled
+objects/vine 47 30 length=9
 # The Feast Land A warp waits in a cage in the crow's nest: its door rises when both drums of 'nest' are struck
 # within the window (one on the trunk top, one on the big branch, 5 columns and 6 rows apart, on no throw line of
 # the other: G36). The bat over the trunk top still bounces a hero up to the nest, where the tablet stands by the cage
@@ -396,9 +397,10 @@ objects/x2_tablet 49 21 gate=nest far=44,21
 objects/drum 51 29 bond=nest
 objects/drum 56 35 bond=nest
 objects/column 45 21 size=1,2 rise=2 trigger=drums:nest
-# Bonded leapers of the lower right deck: one in each pit.
-enemies/leaper 67 73 skin=dragon hp=10 coop=bond bond=squirrels
-enemies/leaper 73 73 skin=dragon hp=10 coop=bond bond=squirrels
+# Leapers of the lower right deck: one in each pit (wf10: no longer bonded - a leaper is a spawner whose record never
+# dies, so a bond of leapers could never seal and its copies regrew for ever; the deck is crossed in their pauses).
+enemies/leaper 67 73 skin=dragon hp=10
+enemies/leaper 73 73 skin=dragon hp=10
 # The Snatcher bat over the big branch: it seizes a hero who touches it from below and carries him to the branch's
 # end (perch) - the partner frees him with any hit.
 enemies/snatcher 63 30 kind=dangler depth=64 hp=10 perch=73,35

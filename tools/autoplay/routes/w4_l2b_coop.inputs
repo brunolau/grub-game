@@ -1,4 +1,4 @@
-# route: level=w4_l2b_coop difficulty=expert players=2 ends=trophy after=level:ending_coop expect=hurts:0,eggs:0,wipes:0,boss_hits:16,fight_ticks:1092..2185
+# route: level=w4_l2b_coop difficulty=expert players=2 ends=trophy after=level:ending_coop expect=hurts:0,eggs:0,wipes:0,boss_hits:16,fight_ticks:1093..2185
 # The Expert two-stream route of Colossus Hall in co-op, the visor Colossus (designer DB3; P1|P2, keys L R U D F K S;
 # recorded from closed-loop duo macros with a hurt-driven repair search, build/db3/bot_w4_l2b_coop.gd). P2 walks over
 # the axe on the floor, P1 jumps for the one hanging three rows up; both drop into the hall. The hero nearer to the

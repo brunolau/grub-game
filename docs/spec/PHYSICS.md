@@ -1643,7 +1643,8 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
   open (Tusker's co-op form: 66, GAMEPLAY 13.6); neither hero is touched. A lone croucher is trampled (the normal hurt,
   10.1). **A heavy takes damage only during that daze** [G57]: any hero box, projectile, ball or head bounce that
   would hurt a `heavy` enemy while it is not brace-dazed glances (clank and spark, no damage, no knock-back; a bounce
-  still bounces the hero); while it is brace-dazed every side counts.
+  still bounces the hero, a glancing club still gives its pogo); while it is brace-dazed every side counts. Nor does
+  it die of anything else while not brace-dazed: a kill-all, a grenade, a feast or mount bite, a glider dive.
 - **One hit per strike** (co-op files only) [G57]: an enemy (not a boss: bosses keep `BOSS_HIT_COOLDOWN`) takes at
   most one hit from one **strike instance** - a hero's melee strike from its first damaging box to its last (the 1.0
   test hit on every tick a box overlapped: 100 hp fell in 4-5 ticks), one projectile for its whole flight, one ball

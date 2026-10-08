@@ -29,7 +29,7 @@ extends BossBase
 ## the idol only if
 ## its twin is struck within the twin window (PartyTuning.window_ticks: 24 Beginner / 12 Expert) by a hero of ANOTHER
 ## slot (G34: one hero's throw plus his own strike never twin): both crack together (one hit each), else the lone hit
-## fades. Every RAGE_EVERY-th twin crack both rage, then their targets swap (each spits at the hero on the far half and
+## fades. Every COOP_RAGE_EVERY-th (2nd) twin crack both rage for COOP_RAGE_TICKS (wf10), then their targets swap (each spits at the hero on the far half and
 ## drops masonry over him). Hits per idol: 8 (7 solo).
 ##
 ## Rules of B.0 kept: every attack shows its pose 10+ ticks ahead (the open jaws before a rock, the slam and the
@@ -58,9 +58,14 @@ const HITS_PER_IDOL: int = 7
 const HITS_PER_IDOL_COOP: int = 8
 ## Every this many counted hits (solo) / twin cracks (co-op) both idols rage.
 const RAGE_EVERY: int = 4
+## Co-op (wf10 boss balance: co-op Idols harder): both rage every COOP_RAGE_EVERY-th twin crack, for COOP_RAGE_TICKS
+## (the Colossus rage's rock and drops at its ticks 10, 18 and 28; armoured all along), then their targets cross. (tune)
+const COOP_RAGE_EVERY: int = 2
+const COOP_RAGE_TICKS: int = 88
 ## Co-op (wf10 boss balance): after a twin crack both jaws stay shut until the idols have spat again - the end of the
-## first spit step that begins this long or longer after the crack (one twin per spit came every 35-80 ticks). (tune)
-const COOP_SHUT_MIN_TICKS: int = 66
+## first spit step that begins this long or longer after the crack (0: the next spit; 66 cost D8's duo a rock on
+## every twin, the jaws opening as the rock left them). (tune)
+const COOP_SHUT_MIN_TICKS: int = 0
 ## Ticks between two hits that may count on the same idol (its hurt pose; the Colossus' own cooldown).
 const HURT_TICKS: int = EnemyTuning.COLOSSUS_HURT_TICKS
 ## Co-op: a hit on open jaws waits this long at most for its twin (PartyTuning.window_ticks overrides it); a pending
@@ -343,7 +348,7 @@ func _ai_tick() -> void:
 				for idol: int in 2:
 					if _rage_dropper(idol):
 						_drop_masonry(idol)
-			if _timer >= EnemyTuning.COLOSSUS_RAGE_TICKS:
+			if _timer >= (COOP_RAGE_TICKS if _coop else EnemyTuning.COLOSSUS_RAGE_TICKS):
 				_end_rage()
 	_update_poses()
 
@@ -451,7 +456,7 @@ func _coop_hit(idol: int, slot: int) -> void:
 		if dead:
 			return
 		_counted += 1
-		if _counted % RAGE_EVERY == 0:
+		if _counted % COOP_RAGE_EVERY == 0:
 			_rage_due = true
 		return
 	_pending[idol] = now

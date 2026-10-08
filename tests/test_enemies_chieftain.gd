@@ -244,15 +244,46 @@ func test_coop_both_fight_and_the_mate_runs_to_hatch_the_egg() -> void:
 	assert_eq(_gorm.get_pips_left(), 1)
 
 
+## wf10 boss balance: the co-op pair has COOP_PIPS (5) each; a counted hit on either makes BOTH reel for
+## COOP_REEL_TICKS (blows on them glance, so their ten pips fall one at a time), and a blow of theirs that lands makes
+## BOTH crow for COOP_CROW_TICKS (nothing of theirs hurts meanwhile). The solo pair keeps 4 pips and no reel or crow.
+func test_coop_the_pair_reels_together_and_crows_after_a_blow() -> void:
+	_pyre(true)
+	_start()
+	assert_eq([_gorm.get_max_pips(), _gulla.get_max_pips()], [Chieftain.COOP_PIPS, Chieftain.COOP_PIPS], "5 pips each")
+	_club(_gorm.get_weak_rect())
+	Sim.step(1)
+	_hero.club_box_active = false
+	assert_eq(_gorm.hp, Chieftain.COOP_PIPS - 1, "a pip")
+	assert_true(_gorm.hit_cooldown >= Chieftain.COOP_REEL_TICKS - 1 and _gulla.hit_cooldown >= Chieftain.COOP_REEL_TICKS - 1,
+			"both reel")
+	_club_by(_p2, _gulla.get_weak_rect())
+	Sim.step(1)
+	_p2.club_box_active = false
+	assert_eq(_gulla.hp, Chieftain.COOP_PIPS, "a blow on the reeling mate glances")
+	_keep_alive()
+	_hero.hit_timer = 0
+	assert_true(_gorm._touch(_hero), "Gorm's blow lands")
+	assert_eq([_gorm._crow, _gulla._crow], [Chieftain.COOP_CROW_TICKS, Chieftain.COOP_CROW_TICKS], "both crow")
+	var hearts: int = _p2.run.hearts
+	_p2.hit_timer = 0
+	_gulla._attack_heroes()
+	assert_eq(_p2.run.hearts, hearts, "a crowing chieftain hurts nobody")
+
+
 func test_coop_an_egg_hatches_by_itself_after_66_ticks() -> void:
 	_pyre(true)
 	_start()
 	_gulla.hp = 1
 	_gorm.hp = 1
 	_club(_gorm.get_weak_rect())
-	_club_by(_p2, _gulla.get_weak_rect())
 	Sim.step(1)
 	_hero.club_box_active = false
+	# wf10: a counted hit on either co-op chieftain makes BOTH reel (Chieftain.COOP_REEL_TICKS) - lift Gulla's for P2.
+	assert_true(_gulla.hit_cooldown >= Chieftain.COOP_REEL_TICKS - 1, "the pair reels together (%d)" % _gulla.hit_cooldown)
+	_gulla.hit_cooldown = 0
+	_club_by(_p2, _gulla.get_weak_rect())
+	Sim.step(1)
 	_p2.club_box_active = false
 	assert_eq([_gorm.life, _gulla.life], [Chieftain.Life.EGG, Chieftain.Life.EGG], "both eggs at once")
 	Sim.step(Chieftain.EGG_TICKS_COOP)
@@ -907,12 +938,14 @@ func _on_defeated(boss: BossBase) -> void:
 	_defeated.append(boss)
 
 
-## Recorded by test_the_club_pilot_still_wins_on_the_test_level with CHIEF_ROUTE=1 (Beginner, Expert).
+## Recorded by test_the_club_pilot_still_wins_on_the_test_level with CHIEF_ROUTE=1 (Beginner, Expert); re-recorded in
+## wf10 (bosses) - the solo form is unchanged, but the hero / bot code of this round no longer let the old inputs win.
 const ROUTE_BEGINNER: String = (
-	"8:R,6:F,21:,6:F,5:,5:R,10:RU,8:,6:F,7:,1:L,1:R,3:L,32:,1:R,4:,6:F,1:,6:F,8:,10:R,6:F,9:,6:F,8:,6:F"
+	"8:R,6:F,21:,6:F,5:,5:R,10:RU,8:,6:F,8:,1:L,1:R,3:L,32:,1:R,6:F,11:,11:R,6:F,8:,6:F,8:,6:F"
 )
 const ROUTE_EXPERT: String = (
-	"8:R,6:F,21:,6:F,5:,5:R,10:RU,8:,6:F,7:,1:L,1:R,3:L,32:,20:RU,47:,20:RU,10:,1:L,6:F,5:,2:R,1:L,1:R,20:," +
-	"10:LU,14:,7:L,10:,5:L,6:F,5:,3:R,1:L,11:,6:F,6:,6:L,10:LU,10:,20:RU,13:,14:R,6:F,22:,6:F,46:,15:L,6:F,5:," +
-	"10:LU,34:,7:R,10:RU,4:,3:R,10:,6:F,5:,2:R,1:,6:F,5:,3:L,6:F,13:,7:R,1:L,1:,4:F"
+	"8:R,6:F,21:,6:F,5:,5:R,10:RU,8:,6:F,8:,1:L,1:R,3:L,30:,20:RU,15:,10:LU,23:,20:RU,15:,10:LU,16:,5:L,1" +
+	"0:LU,47:,3:L,20:,10:LU,14:,1:R,6:F,5:,1:L,1:R,1:L,1:R,1:L,1:R,7:L,10:,10:RU,14:,4:L,10:,7:L,10:LU,13" +
+	":,29:R,6:F,22:,6:F,13:,6:F,1:,1:L,6:F,8:,6:F,8:,6:F,5:,1:R,1:L,1:R,1:L,1:R,1:L,1:R,24:L,1:R,6:F,5:,1" +
+	"0:R,10:RU,16:,14:R,6:F,20:,6:F,46:,15:L,4:F"
 )

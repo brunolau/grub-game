@@ -1,25 +1,27 @@
 # route: level=w9_l2_coop difficulty=expert players=2 ends=exit after=level:w9_l2b_coop expect=wipes:0,x2_gates:2,min_checkpoints:5
 # The two-stream Expert route of The Roc's Spire in co-op (designer D9a; recorded from closed-loop macros,
-# build/d9a/bot_w9_l2_coop.gd, P1|P2): the gust gaps in the lulls, the drop clouds one hero at a time, gates
-# 'brace' (both step into the sunken hall while its Bull Rex sleeps; a Brace Wall stops its charge and both
-# strike its dazed head), the cloud hall's tribesman and Roller,
-# gate 'drive' (P2 curls at the edge, P1 charges and bats him across; P2's latch plate sinks the slab bridge).
+# build/d9a/bot_w9_l2_coop.gd; re-recorded by enemies-A for the heavy-keeper ruling of G3 with
+# build/enemies_a10/bot_w9_l2_coop_ea.gd, P1|P2): the gust gaps in the lulls, the drop clouds one hero at a time,
+# gate 'brace' (the Bull Rex wakes and charges; while it is still 100 px off both step down from the mouth into
+# the sunken hall and crouch side by side 8 px apart: the Brace Wall stops it dead, and both strike its dazed
+# head - the first strike, charged by the crouch, takes its 25 hp; its back counts for nobody), the cloud
+# hall's tribesman and Roller (P2 jumps the first valley gap once P1 left its landing), gate 'drive' (P2 curls
+# at the edge, P1 charges and bats him across; P2's latch plate sinks the slab bridge).
 24:R|,5:R|R,2:R|,4:R|UF,2:|UF,4:|,1:|R,9:RU|R,10:R|R,1:|R,4:L|R,8:R|R,7:R|,20:R|D,7:|D,67:D|D,9:RU|RU,14:R|R
 1:|R,3:R|R,6:R|UF,4:R|,32:R|R,4:R|,3:|,34:|D,25:D|D,6:UF|D,3:|D,32:D|D,9:|RU,10:|R,1:|,4:|L,40:|R,2:|,1:|R,7:|
 36:D|,66:D|D,9:RU|,7:R|,2:|,4:L|,2:|,1:R|,2:|,9:RU|,13:R|,2:|,9:RU|,14:R|,36:|D,66:D|D,9:|RU,9:|R,2:|,4:|L,3:|
 9:|RU,13:|R,2:|,9:|RU,12:|R,1:|,1:|L,1:|,35:D|,66:D|D,9:RU|,10:R|,1:|,5:L|,1:|,1:R|,2:|,9:RU|,14:R|,1:|,4:L|
 2:|,9:RU|,9:R|,1:R|D,4:R|,1:|,13:R|D,4:RU|D,76:R|D,9:R|RU,6:R|R,6:|R,2:|,4:|L,2:|,9:|RU,14:|R,1:|,4:|L,2:|
 9:|RU,10:|R,2:|,3:|L,1:|R,77:R|R,4:RU|R,5:R|R,5:R|D,1:D|D,4:|,9:RU|,5:R|,2:|,4:L|,1:|,4:|RU,11:|R,5:|,9:|RU
-2:|R,1:|,1:|L,4:R|L,3:|L,2:L|L,1:R|R,4:|R,1:|,5:|L,1:|R,8:|,1:|D,1:D|D,1:D|,11:|,6:F|F,1:F|,9:R|R,1:D|R,1:D|D
-3:R|R,1:R|D,1:R|R,2:D|R,1:R|D,12:R|R,6:R|F,9:R|RU,6:R|R,4:R|D,2:R|R,4:RU|R,5:RU|RU,3:R|RU,1:|RU,3:L|R,2:L|,1:|L
-3:R|,1:R|RU,5:|RU,3:RU|RU,6:RU|R,1:R|R,2:R|,4:R|L,1:R|,2:|R,3:R|R,1:R|,1:R|L,3:R|R,6:F|R,1:|F,4:R|F,8:R|RU
-1:|RU,7:|R,6:|L,6:|R,1:|,19:R|,8:R|R,6:F|R,1:|R,10:R|R,2:R|UF,3:D|UF,1:R|UF,3:R|,1:R|D,1:R|R,3:R|D,20:R|R
-12:R|D,1:F|D,5:F|,4:RU|,4:RU|R,1:RU|L,8:R|,1:R|R,1:R|L,1:R|R,1:R|L,1:R|R,4:L|R,2:L|UF,4:R|UF,1:R|,1:R|RU,2:L|RU
-4:|RU,2:L|RU,1:L|R,4:|R,3:R|R,1:|R,1:R|R,5:|R,3:RU|,1:RU|L,5:RU|D,2:R|D,1:R|UF,7:R|,1:|UF,4:L|UF,1:|UF,3:|,1:R|
-11:R|R,6:|UF,1:|,2:D|,1:D|D,11:D|R,6:D|UF,3:D|,1:D|D,6:D|R,8:D|D,1:D|L,28:D|D,9:RU|RU,9:R|R,1:R|,1:|,1:|L,3:L|L
-5:UF|,1:UF|R,4:|R,3:R|R,5:F|R,1:F|,1:|,1:R|,1:R|R,5:R|,2:R|RU,3:L|RU,3:|RU,1:L|RU,1:L|R,9:|R,1:|,4:|L,10:|R,1:|
-19:R|,3:R|R,2:|R,21:D|R,45:D|D,9:RU|RU,10:R|R,1:|,6:R|,6:|,1:R|,2:|,1:R|,2:|,8:UF|,16:|,8:UF|,16:|,8:UF|,16:|
-50:D|D,13:L|D,1:|D,1:L|D,1:|D,10:|,9:RU|,4:R|,1:|,5:L|,7:|,11:R|,2:|,1:R|,6:|,8:R|,4:|,1:R|,4:|,2:|R,2:L|R,8:|R
-1:R|R,6:F|R,1:|R,4:|,1:|R,10:|,3:|R,3:|D,6:D|D,7:D|R,4:D|D,1:D|R,5:D|D,29:R|D,38:R|R,2:|R,1:R|R,6:|R,1:L|R,2:|R
-1:R|R,9:D|R,1:D|,3:|,1:|R,4:|,1:|DS,1:D|DS,2:D|D,6:F|D,2:F|,6:|,2:R|,6:|,25:|R,39:D|D,27:R|D,17:R|,6:|,1:R|D
-2:|,9:R|,12:R|R,1:R|,1:|,6:|R,4:R|R
+2:|R,1:|,1:|L,4:R|L,6:R|R,2:|R,1:L|R,2:L|,3:L|L,1:R|L,1:D|L,1:D|R,15:D|D,4:F|F,1:|R,32:R|R,1:F|R,4:F|F,2:RU|F
+1:RU|,4:RU|R,2:RU|D,1:R|D,6:R|R,1:F|R,3:|R,7:|RU,2:D|RU,2:D|R,1:D|,1:RU|,8:RU|L,2:R|L,2:R|,2:|,1:L|,3:L|RU
+4:|RU,2:RU|RU,7:RU|R,8:R|R,1:|R,5:L|R,1:|R,4:R|R,2:R|F,2:|F,2:L|F,1:L|,1:L|R,2:|R,2:R|R,6:R|L,3:R|R,1:R|,3:R|R
+32:R|,3:R|R,6:F|R,1:|R,2:R|R,1:D|R,9:RU|R,3:R|R,1:R|D,1:R|F,9:R|RU,1:R|R,2:D|R,2:R|R,1:D|R,12:R|R,5:R|F,2:R|
+3:R|R,1:L|R,2:F|D,3:F|R,1:F|D,1:|R,2:R|R,2:D|R,1:|R,13:R|R,6:F|R,1:|R,1:R|R,6:R|F,1:R|,4:R|R,3:|,3:R|R,7:|R
+5:RU|R,4:RU|,9:R|,2:|,4:L|,5:|,10:R|,3:R|D,3:|D,1:R|D,5:|D,79:D|D,9:RU|RU,10:R|R,1:|,1:L|,3:L|L,2:R|,5:R|R
+6:F|R,1:|,4:R|,1:|,1:|R,1:|,1:R|,2:R|RU,7:|RU,10:|R,2:|,3:|L,9:|R,1:|,19:R|,1:R|R,7:|R,17:D|R,52:D|D,9:RU|RU
+9:R|R,2:|,3:R|L,3:R|,6:|,1:R|,2:|,1:R|,2:|,8:UF|,16:|,8:UF|,16:|,8:UF|,16:|,50:D|D,13:L|D,1:|D,1:L|D,1:|D,4:|
+9:RU|,4:R|,1:|,5:L|,1:|,14:R|,7:|,9:R|,6:|,1:R|,2:|,22:|R,2:|,1:|R,7:|,15:R|,14:R|D,24:R|R,1:D|R,1:R|R,5:D|R
+1:R|R,4:D|R,1:R|R,4:D|R,1:R|R,4:D|R,1:R|R,4:D|R,1:R|R,4:|R,1:R|R,2:|R,10:D|R,6:|R,6:|,1:|R,2:|,1:|R,2:|,1:|DS
+1:D|DS,2:D|D,6:F|D,2:F|,6:|,2:R|,2:|,1:R|,3:|,2:|R,1:R|R,22:|R,24:|,15:D|D,42:R|D,1:D|D,1:R|D,7:D|D,1:|,8:R|
+13:R|R,1:|,5:|R,1:R|R,2:|R,4:R|R
