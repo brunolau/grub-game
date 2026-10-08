@@ -25,11 +25,20 @@ extends RefCounted
 ## at (the geyser's first spout tick, objects-B's Geyser.cycle_at); the bot waits in the window until then.
 ## **Mover links** (`cond` = [mover, dx, dy, mx, my]): the take-off is verified with the mover `dx, dy` px away from
 ## its level-start place and moving by `mx, my` px per tick; the bot waits in the window until the live mover is there.
+## **Pulley lifts** (core-B wf10; a mover with "pulley", "side", "limit"): the two lifts of one objects/pulley share
+## one state, the pulley's offset p (the `a` lift, side +1, is p px below its start, `b`, side -1, p px above; |p| <=
+## limit). Their links are verified at every still p (PartyTuning.PULLEY_SPEED_PX apart): links onto a lift with the
+## pulley still at p and nobody on it; links off a lift with the hero standing on it at p, the pulley held still (an
+## equal weight on the other side; at the lift's bottom his own weight holds it there); a link between two other nodes
+## that touched a lift on the way (a hop off its top) carries the state it was verified in. `cond` = [mover, 0, side * p,
+## 0, 0]. A bot plans only with the pulley links of the state the pulley will rest in (BotNavigator, [method
+## pulley_rest]).
 ##
 ## JSON format (FORMAT 2; FORMAT 1 = the G1 graphs: no weights, timing or movers, still read):
 ##   {"format": 2, "level": id, "source_sha256": sha256 of the level text (CRLF read as LF), "difficulty": name,
 ##    "cols": int, "rows": int, "wrap": "none" | "lr" | "tb", "weights": [classes baked], "clip": [c, r, w, h] or [],
-##    "movers": [{"key", "id", "col", "row", "kind", "x", "y", "part", "top"[, "period"]}],
+##    "movers": [{"key", "id", "col", "row", "kind", "x", "y", "part", "top"[, "period"][, "pulley", "side",
+##               "limit"]}],
 ##    "baker": {"version", "candidates", "simulated_ticks", "verified_starts", "rejected"},
 ##    "nodes": [{"id", "row", "y", "x0", "x1", "ice"[, "mover"]}],
 ##    "links": [{"id", "from", "to", "kind", "x0", "x1", "dir", "keys", "ticks", "land_x0", "land_x1", "weight"
@@ -250,7 +259,7 @@ static func from_dict(data: Dictionary) -> NavGraph:
 			}
 			# Where the baker found it (NavMoversLive matches the live entity by them): spawn feet point, part index,
 			# the part's box top-left at the level start.
-			for key: String in ["x", "y", "part", "period"]:
+			for key: String in ["x", "y", "part", "period", "pulley", "side", "limit"]:
 				if entry.has(key):
 					mover[key] = int(entry[key])
 			if entry.get("top") is Array and (entry["top"] as Array).size() >= 2:
@@ -473,6 +482,28 @@ func add_mover(key: String, id: String, col: int, row: int, kind: StringName) ->
 ## The mover key of a level entity: "<id>@<col>,<row>" (its spawn cell).
 static func mover_key(id: StringName, col: int, row: int) -> String:
 	return "%s@%d,%d" % [id, col, row]
+
+
+## True when mover `index` is a pulley lift (its links are keyed by the pulley's offset).
+func is_pulley_lift(index: int) -> bool:
+	return index >= 0 and index < movers.size() and movers[index].has("pulley")
+
+
+## Where a pulley at offset `p` comes to rest (objects-B's Pulley): the heavier side sinks to its limit, equal weights
+## stay. `weight_a` / `weight_b`: the weights on its `a` / `b` lift.
+static func pulley_rest(p: int, weight_a: int, weight_b: int, limit: int) -> int:
+	if weight_a > weight_b:
+		return limit
+	if weight_b > weight_a:
+		return -limit
+	return p
+
+
+## The pulley offset a pulley-lift link `link` was verified at (its cond's dy times the lift's side).
+func link_pulley_offset(link: NavLink) -> int:
+	if link.cond.size() < 5 or not is_pulley_lift(link.cond[0]):
+		return 0
+	return link.cond[2] * int(movers[link.cond[0]].get("side", 1))
 
 
 # =================================================================================================================

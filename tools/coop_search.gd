@@ -75,6 +75,9 @@ func _run() -> void:
 	var queue: String = ""
 	var egg: bool = false
 	var repeat: int = 1
+	var node_limit: int = -1
+	var tick_limit: int = -1
+	var no_probes: bool = false
 	for argument: String in OS.get_cmdline_user_args():
 		if argument == "--list":
 			listing = true
@@ -99,6 +102,22 @@ func _run() -> void:
 			repeat = count.to_int()
 		elif argument == "--no-cache":
 			cache = false
+		elif argument == "--no-probes":
+			no_probes = true
+		elif argument.begins_with("--ticks="):
+			var budget: String = argument.get_slice("=", 1)
+			if not budget.is_valid_int() or budget.to_int() < 1:
+				print("coop_search: bad --ticks (want a count of 1 or more)")
+				_finish(2)
+				return
+			tick_limit = budget.to_int()
+		elif argument.begins_with("--nodes="):
+			var limit: String = argument.get_slice("=", 1)
+			if not limit.is_valid_int() or limit.to_int() < 1:
+				print("coop_search: bad --nodes (want a count of 1 or more)")
+				_finish(2)
+				return
+			node_limit = limit.to_int()
 		elif argument.begins_with("--shard="):
 			var parts: PackedStringArray = argument.get_slice("=", 1).split("/")
 			if parts.size() != 2 or not parts[0].is_valid_int() or not parts[1].is_valid_int():
@@ -121,6 +140,12 @@ func _run() -> void:
 	search.set(&"debug_nodes", search_debug)
 	search.set(&"use_file_cache", cache)
 	search.set(&"collect_stats", stats)
+	if node_limit > 0:
+		search.set(&"node_limit", node_limit)
+	if tick_limit > 0:
+		search.set(&"tick_limit", tick_limit)
+	if no_probes:
+		search.set(&"probes", false)
 	if egg:
 		search.set(&"idle_partner", false)
 	var table: Array = search.call(&"gate_table")
@@ -152,6 +177,7 @@ func _run() -> void:
 				copies.append(twin)
 		chosen = copies
 	var failures: int = 0
+	var verdicts: Dictionary = {}
 	var searched: int = 0
 	var gate_seconds: float = 0.0
 	var started: int = Time.get_ticks_msec()
@@ -184,6 +210,8 @@ func _run() -> void:
 			"REACHED" if reached else "refused", seconds, int(result.get("explored", 0)), int(result.get("runs", 0)),
 			int(result.get("simulated", 0)), int(result.get("replayed", 0)),
 			", cached" if bool(result.get("cached", false)) else ""])
+		for line: String in search.call(&"report_lines", result):
+			print("    %s" % line)
 		if reached:
 			print("    %s" % result.get("detail", ""))
 		for line: String in bad_windows:
@@ -203,8 +231,8 @@ func _run() -> void:
 			sim_profile.parts.clear()
 		# Let the main loop turn: the freed search world's canvas callbacks are flushed (wf8_D5_to_integration #1).
 		await process_frame
-	print("coop_search: %d gate(s) in %.1f s (%.1f s searching), %d failing" % [searched,
-		(Time.get_ticks_msec() - started) / 1000.0, gate_seconds, failures])
+	print("coop_search: %d gate(s) in %.1f s (%.1f s searching), %d failing; verdicts %s" % [searched,
+		(Time.get_ticks_msec() - started) / 1000.0, gate_seconds, failures, str(verdicts)])
 	_finish(1 if failures > 0 else 0)
 
 

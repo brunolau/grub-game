@@ -4,9 +4,11 @@ extends EnemyBase
 ## heavy-charger skin, built for the Brace corridor (LEVEL_DESIGN.md 15.7.3: a 4-row hall between walls). It wakes by
 ## the view like any enemy (not the edge rusher's one-shot run in from a screen away) and runs at its target at
 ## `speed` along the ground with gravity; a wall turns it round, and so does its target falling
-## EnemyTuning.BULL_TURN_PX behind it. With two heroes its front glances, and only a Brace Wall stops it: two
-## crouching heroes side by side stop it dead and daze it 44 ticks with its head open (CoopTraits, PHYSICS.md C.10);
-## a lone croucher is trampled. Only in co-op files; a party of one meets a plain charger that can be hit anywhere.
+## EnemyTuning.BULL_TURN_PX behind it. With two heroes (the heavy-keeper ruling, G3) every hit glances - front and back
+## - and nothing else harms it either, until a Brace Wall stops it: two active heroes crouching side by side stop it
+## dead and daze it 44 ticks with its head open (CoopTraits, PHYSICS.md C.10), and only then does a hit count - one per
+## strike, so its `hp` is the number of strikes it takes (hp 25: two strikes with the club). A lone croucher is
+## trampled. Only in co-op files; a party of one meets a plain charger that can be hit anywhere.
 ## Doze rule (ARCHITECTURE.md 11.1): the default one.
 ##
 ## Parameters: `speed` v16 [64], `skin` [rex_b], `hp` [25], `score` [4]; `coop=` overrides the preset's trait.

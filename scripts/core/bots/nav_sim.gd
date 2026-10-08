@@ -23,6 +23,8 @@ const GEYSER_ID: StringName = &"objects/geyser"
 ## Movers: platforms a hero rides (respawned fresh for every run, in file order).
 const MOVER_IDS: Array[StringName] = [&"objects/platform", &"objects/drop_platform", &"objects/seesaw",
 		&"objects/pulley"]
+## The pulley among them (two named objects/platform lifts moved by the weights on them).
+const PULLEY_ID: StringName = &"objects/pulley"
 ## A landing counts once the hero stood this many consecutive ticks (the hard-landing hop lifts him once more).
 const SETTLE_GROUNDED_TICKS: int = 2
 ## Ticks after the landing in which he must settle on the landing node.
@@ -68,6 +70,10 @@ class Outcome:
 	var mover_states: Array[PackedInt32Array] = []
 	## Ticks simulated.
 	var ticks: int = 0
+	## Mover parts ([member NavSim.mover_parts] indices) he rode on any tick of the run, in the order first ridden, and
+	## those he rode after he had left the ground (a bounce on a lift, a landing on a platform).
+	var rode: PackedInt32Array = PackedInt32Array()
+	var rode_after_air: PackedInt32Array = PackedInt32Array()
 
 
 ## The level used by the sim: one fixed view over the whole grid (an arena is one screen).
@@ -124,7 +130,21 @@ var movers: Array[SimEntity] = []
 var mover_parts: Array[Dictionary] = []
 ## Box position of every part at the level start (after the spawn), the frame of mover offsets.
 var part_homes: Array[Vector2i] = []
+## The pulleys among the movers (objects-B's Pulley, fresh every run; index = order of the pulley records), and per
+## mover part the pulley that drives it (-1 = none) and its side: +1 for the pulley's `a` (it sinks by the pulley's
+## offset), -1 for `b` (it rises by as much). Its travel limit in px: [member pulley_limits] per pulley.
+var pulleys: Array[SimEntity] = []
+var part_pulley: PackedInt32Array = PackedInt32Array()
+var part_side: PackedInt32Array = PackedInt32Array()
+var pulley_limits: PackedInt32Array = PackedInt32Array()
+## The pulley state the next runs start from (core-B wf10, displaced lifts): pulley index -> offset px (Pulley.offset:
+## its `a` lift that far below its level-start place, `b` as far above), set with no hero on the lifts before the
+## run's preroll. `pulley_frozen`: the pulleys stand still during the run (no weight moves them: as with an equal
+## weight on the other lift, the state of a rider who waits on a displaced lift).
+var pulley_preset: Dictionary = {}
+var pulley_frozen: bool = false
 var _wrap_driver: WrapDriver = null
+var _detached: Array[Node] = []
 
 var _springs: Array[SimEntity] = []
 var _flags: PackedInt32Array = PackedInt32Array()
@@ -192,7 +212,35 @@ func setup(parent: Node, level_id: StringName, grid: TileGrid, meta: Dictionary,
 	part_homes.clear()
 	for part: Dictionary in mover_parts:
 		part_homes.append((part["entity"] as SimEntity).get_box().position)
+	_map_pulleys()
 	return true
+
+
+## Which mover parts the level's pulleys drive (by the platform names `a` / `b` of each objects/pulley record).
+func _map_pulleys() -> void:
+	part_pulley.resize(mover_parts.size())
+	part_pulley.fill(-1)
+	part_side.resize(mover_parts.size())
+	part_side.fill(0)
+	pulley_limits.clear()
+	var pulley: int = 0
+	for record: Dictionary in mover_records:
+		if record["id"] != PULLEY_ID:
+			continue
+		var params: Dictionary = record["params"]
+		pulley_limits.append(maxi(int(params.get("range", PartyTuning.PULLEY_RANGE_ROWS)), 1) * Tuning.TILE)
+		for i: int in mover_parts.size():
+			var own: Dictionary = mover_records[int(mover_parts[i]["mover"])]["params"]
+			var name: String = str(own.get("name", ""))
+			if name == "" or int(mover_parts[i]["part"]) >= 0:
+				continue
+			if name == str(params.get("a", "")):
+				part_pulley[i] = pulley
+				part_side[i] = 1
+			elif name == str(params.get("b", "")):
+				part_pulley[i] = pulley
+				part_side[i] = -1
+		pulley += 1
 
 
 ## world-B's arena wrap step (VersusArena.wrap_hero) as a callable; invalid when that class does not exist.
@@ -215,6 +263,7 @@ func teardown() -> void:
 	if level != null and is_instance_valid(level):
 		level.get_parent().remove_child(level)
 		level.free()
+	_free_detached()
 	level = null
 	hero = null
 	_wrap_driver = null
@@ -223,6 +272,9 @@ func teardown() -> void:
 	movers.clear()
 	mover_parts.clear()
 	mover_records.clear()
+	pulleys.clear()
+	pulley_preset = {}
+	pulley_frozen = false
 	Sim.manual = _prev_manual
 	Game.mode = _prev_mode
 	Game.party = _prev_party
@@ -245,6 +297,8 @@ func run(start: Vector2i, flags: PackedInt32Array, max_ticks: int, geyser: int =
 	var outcome: Outcome = Outcome.new()
 	_reset_world()
 	_arm_geysers(geyser)
+	if not pulley_preset.is_empty() or pulley_frozen:
+		_preset_pulleys()
 	if preroll > 0:
 		roll_movers(preroll)
 	hero.respawn_at(start)
@@ -275,6 +329,13 @@ func run(start: Vector2i, flags: PackedInt32Array, max_ticks: int, geyser: int =
 		if hero.dead:
 			outcome.died = true
 			break
+		if hero.on_platform:
+			var ridden: int = part_index(platform_under(hero))
+			if ridden >= 0:
+				if not outcome.rode.has(ridden):
+					outcome.rode.append(ridden)
+				if airborne and not outcome.rode_after_air.has(ridden):
+					outcome.rode_after_air.append(ridden)
 		# A rider of a platform keeps yvel 1 (the ride rule holds him 1 px into its top): he stands all the same.
 		var standing: bool = hero.is_grounded() and (hero.yvel == 0 or hero.on_platform) \
 				and (airborne or hero.xvel == 0 or hero.on_platform)
@@ -310,6 +371,42 @@ func run(start: Vector2i, flags: PackedInt32Array, max_ticks: int, geyser: int =
 	outcome.geysered = _geyser_launches() != spouts
 	GameInput.clear_scripted_slot(0)
 	return outcome
+
+
+## Put every pulley of [member pulley_preset] at its offset (no hero on the lifts; the lifts move by the pulley's
+## own one-shot step: Pulley.offset and MovingPlatform.pulley_dy) and let them come to a stand; then, with
+## [member pulley_frozen], take the pulleys out of the level (the lifts stay driven by them, so their own motion stays
+## off, and nothing moves them during the run). Three ticks with the hero parked: the pulleys take their lifts over,
+## the lifts move, they stand.
+func _preset_pulleys() -> void:
+	roll_movers(1)
+	for index: int in pulleys.size():
+		var pulley: SimEntity = pulleys[index]
+		if pulley == null or not pulley_preset.has(index):
+			continue
+		var limit: int = pulley_limits[index] if index < pulley_limits.size() else 0
+		var p: int = clampi(int(pulley_preset[index]), -limit, limit)
+		var a: SimEntity = pulley.call(&"platform_a") as SimEntity
+		var b: SimEntity = pulley.call(&"platform_b") as SimEntity
+		if a == null or b == null:
+			continue
+		pulley.set(&"offset", p)
+		a.set(&"pulley_dy", p)
+		b.set(&"pulley_dy", -p)
+	roll_movers(2)
+	if pulley_frozen:
+		for pulley: SimEntity in pulleys:
+			if pulley != null and pulley.get_parent() == level:
+				level.remove_child(pulley)
+				_detached.append(pulley)
+
+
+## Free the pulleys [method _preset_pulleys] took out of the level.
+func _free_detached() -> void:
+	for node: Node in _detached:
+		if is_instance_valid(node):
+			node.free()
+	_detached.clear()
 
 
 ## Run the movers `ticks` ticks without the hero (he is parked and suspended meanwhile).
@@ -454,12 +551,14 @@ func _reset_world() -> void:
 			continue
 		level.remove_child(child)
 		child.free()
+	_free_detached()
 	_spawn_movers()
 
 
 func _spawn_movers() -> void:
 	movers.clear()
 	mover_parts.clear()
+	pulleys.clear()
 	for index: int in mover_records.size():
 		var record: Dictionary = mover_records[index]
 		var params: Dictionary = (record["params"] as Dictionary).duplicate()
@@ -467,6 +566,8 @@ func _spawn_movers() -> void:
 				params), params)
 		var entity: SimEntity = node as SimEntity
 		movers.append(entity)
+		if record["id"] == PULLEY_ID:
+			pulleys.append(entity)
 		if entity == null:
 			continue
 		if entity is PlatformBase:

@@ -55,6 +55,13 @@ var _path: PackedInt32Array = PackedInt32Array()
 var _path_from: int = -1
 var _path_age: int = 0
 var _failures: Dictionary = {}
+# Links not to plan with on a level with pulley lifts (core-B wf10): [member blocked] plus the pulley links of every
+# pulley state but the one the pulley will rest in for this hero ([method update_movers]); "" = none (plan with
+# `blocked` alone).
+var _avoid: Dictionary = {}
+var _avoid_key: String = ""
+var _pulley_links: PackedInt32Array = PackedInt32Array()
+var _pulley_graph: NavGraph = null
 var _last_x: int = -(1 << 30)
 var _still: int = 0
 var _hop: int = 0
@@ -83,6 +90,46 @@ func reset() -> void:
 	_hop = 0
 	_wait = 0
 	_last_x = -(1 << 30)
+	_avoid = {}
+	_avoid_key = ""
+
+
+## Pulley lifts (core-B wf10, wf9_da_to_core_b.txt #1): plan only with the pulley links of the state the pulley will
+## rest in - links onto a lift (and moves that hop off one) at the offset it rests at with this hero off it, links off
+## a lift at the offset it rests at with him on that lift (NavMoversLive.pulley_plan). Call once per tick after
+## `live.update()` and [method set_weight_class]; a level without pulley lifts costs nothing.
+func update_movers(hero: PlayerBase, live: NavMoversLive) -> void:
+	if graph == null or live == null or not live.has_pulleys():
+		_avoid_key = ""
+		return
+	if _pulley_graph != graph:
+		_pulley_graph = graph
+		_pulley_links = PackedInt32Array()
+		for candidate: NavGraph.NavLink in graph.links:
+			if candidate.cond.size() >= 5 and graph.is_pulley_lift(candidate.cond[0]):
+				_pulley_links.append(candidate.id)
+	var plan: Dictionary = live.pulley_plan(hero)
+	var key: String = "%s|%d|%d" % [plan, weight_class, blocked.size()]
+	if key == _avoid_key:
+		return
+	_avoid_key = key
+	_avoid = blocked.duplicate()
+	for id: int in _pulley_links:
+		var candidate: NavGraph.NavLink = graph.links[id]
+		var mover: int = candidate.cond[0]
+		if not plan.has(mover):
+			continue
+		var want: Vector2i = plan[mover]
+		var p: int = want.y if graph.nodes[candidate.from].mover == mover else want.x
+		if graph.link_pulley_offset(candidate) != p or candidate.cond[3] != 0 or candidate.cond[4] != 0:
+			_avoid[id] = true
+	# The planned path may use a pulley link of the old state: plan again.
+	_path = PackedInt32Array()
+
+
+## The links the searches leave out: [member blocked], plus the pulley links of other states ([method update_movers]).
+func search_blocked() -> Dictionary:
+	return _avoid if _avoid_key != "" else blocked
 
 
 ## Switch to the links known to work for weight class `p_class` (NavGraph.WEIGHT_*).
@@ -148,7 +195,7 @@ func cost_to(hero: PlayerBase, pos: Vector2i) -> int:
 		to = graph.node_below(pos)
 	if to < 0:
 		return NavGraph.UNREACHABLE
-	return graph.path_cost(from, hero.sim_pos.x, to, pos.x, blocked, search_class())
+	return graph.path_cost(from, hero.sim_pos.x, to, pos.x, search_blocked(), search_class())
 
 
 ## One search from the hero to every node (NavGraph.reach_from with this bot's class and blocked links).
@@ -158,7 +205,7 @@ func reach(hero: PlayerBase) -> Dictionary:
 	var from: int = node_of(hero)
 	if from < 0:
 		from = graph.node_for(hero.sim_pos)
-	return graph.reach_from(from, hero.sim_pos.x, blocked, search_class())
+	return graph.reach_from(from, hero.sim_pos.x, search_blocked(), search_class())
 
 
 ## The flags for this tick (`tick` = the tick about to run, Sim.tick of GameInput.sample()).
@@ -177,7 +224,7 @@ func step(hero: PlayerBase, tick: int) -> int:
 	var here: int = graph.node_at(hero.sim_pos, hero.on_platform)
 	if here < 0:
 		# On a floor the graph does not know (a sliver by a wall): walk toward the target, hop when stuck.
-		return _unstick(hero, walk_to(hero, target.x, tolerance))
+		return _unstick(hero, _off_graph_flags(hero))
 	if here == target_node:
 		_path = PackedInt32Array()
 		_wait = 0
@@ -185,7 +232,7 @@ func step(hero: PlayerBase, tick: int) -> int:
 		return walk_to(hero, clampi(target.x, graph.node_x0(node), graph.node_x1(node)), tolerance)
 	_path_age += 1
 	if _path.is_empty() or _path_from != here or _path_age >= REPLAN_TICKS:
-		_path = graph.find_path(here, hero.sim_pos.x, target_node, target.x, blocked, search_class())
+		_path = graph.find_path(here, hero.sim_pos.x, target_node, target.x, search_blocked(), search_class())
 		_path_from = here
 		_path_age = 0
 	if _path.is_empty():
@@ -212,6 +259,25 @@ func step(hero: PlayerBase, tick: int) -> int:
 	var half: int = maxi((x1 - x0) / 2, 0)
 	var flags: int = walk_to(hero, (x0 + x1) / 2, half)
 	return _unstick(hero, flags)
+
+
+## Off the graph on the ground: walk toward the target; when that asks for nothing (the target straight above him) and
+## he stands on the floor row of a node just beyond its end (a sliver between the node's end and a wall face under a
+## slab, wf9_da_to_core_b.txt #2), walk back onto that node. On a head or a body he stays (a brain may keep him there).
+func _off_graph_flags(hero: PlayerBase) -> int:
+	var flags: int = walk_to(hero, target.x, tolerance)
+	if flags != 0 or graph == null or hero.on_platform:
+		return flags
+	var near: int = graph.nearest_node(hero.sim_pos)
+	if near < 0:
+		return 0
+	var node: NavGraph.NavNode = graph.nodes[near]
+	if node.mover >= 0 or node.row != (hero.sim_pos.y >> 4):
+		return 0
+	var x: int = hero.sim_pos.x
+	if x >= node.x0 and x <= node.x1:
+		return 0
+	return walk_to(hero, clampi(x, node.x0, node.x1), 0)
 
 
 ## True when the hero is in the state a link from `node` was verified from (NavSim.is_settled; on a mover node he
@@ -321,6 +387,8 @@ func _fail(failed: NavGraph.NavLink, _hero: PlayerBase, what: String) -> void:
 	_failures[failed.id] = count
 	if count >= LINK_FAILURES_TO_BLOCK:
 		blocked[failed.id] = true
+		if _avoid_key != "":
+			_avoid[failed.id] = true
 
 
 ## True when another living hero's body overlaps this one's (a body bump or a head to stand on changes the move: the

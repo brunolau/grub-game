@@ -29,12 +29,13 @@ extends BossBase
 ##     burrowing bugs (an `enemies/digger skin=lizard` zone record it raises over its room) come up around the heroes,
 ##     and every punch sends the bugs that are up back down.
 ## Co-op form (`kind = coop` files or `form=coop`): stages 1 and 2 merge - the face and the resting hand must both be
-## struck within the twin window, by the two heroes (one hero's two hits never twin), a twin hit counting 1 (Beginner 5,
-## Expert 7 [R8]); the window is PartyTuning.window_ticks (24 Beginner / 12 Expert): a slot-bound twin rule is exempt
+## struck within the twin window, by the two heroes (one hero's two hits never twin), a twin hit counting 1 (Beginner 3,
+## Expert 4; wf10 boss balance - 5 / 7 [R8] took a duo 116 / 170 s, the target is 45-90 s); the window is PartyTuning.window_ticks (24 Beginner / 12 Expert): a slot-bound twin rule is exempt
 ## from the solo_min cap (DESIGN.md G34 - one player never strikes with two heroes; MANGROVE_SOLO_MIN_TICKS stays a
-## measured fact). A hero landing on the resting fist without Up held stands on it and PINS it (no punch) until it
-## flings him off (-160) after MANGROVE_PIN_TICKS; with Up held it launches him at once (-224). Stage 3 (Beginner 3,
-## Expert 6): the knuckle armour of the stuck fist turns to the nearer hero every tick - only a hit from the far side
+## measured fact). The hand and the fist keep time in stage 1 (wf10): the hand's ledge shake waits until the fist has
+## rested MANGROVE_COOP_SHAKE_AFTER_REST ticks, and the fist rests through the hand's whole cycle. A hero landing on the resting fist without Up held stands on it and PINS it (no punch) until it
+## flings him off (-160) after MANGROVE_PIN_TICKS; with Up held it launches him at once (-224). Stage 3 (Beginner 2,
+## Expert 3): the knuckle armour of the stuck fist turns to the nearer hero every tick - only a hit from the far side
 ## (the wrist) counts.
 ## IDLE rule (DESIGN.md G33 / G34): the pin, the knuckles' "nearer hero" and both twin halves count only a hero for whom
 ## PlayerBase.counts_for_coop() holds (alive, hatched, not idle). A dozing partner still stands on the resting fist (a
@@ -63,8 +64,10 @@ const ARM_LINKS: int = 6
 # --- Tuning [D B.2] [G 13.6] (tune) ---------------------------------------------------------------------------------
 const MANGROVE_HITS_BEGINNER: Array[int] = [4, 3, 3]   ## hits per stage (face, hand, fist)
 const MANGROVE_HITS_EXPERT: Array[int] = [6, 5, 5]
-const MANGROVE_COOP_HITS_BEGINNER: Array[int] = [5, 3] ## co-op: twin hits, then the fist (*tune*)
-const MANGROVE_COOP_HITS_EXPERT: Array[int] = [7, 6]
+## Co-op: twin hits, then the fist (*tune*). wf10 boss balance (orchestrator: a co-op boss fight lasts 45-90 s for a
+## competent pair): [5, 3] / [7, 6] took D6's duo 116 / 170 s - a twin waits for the resting hand AND a pinned fist.
+const MANGROVE_COOP_HITS_BEGINNER: Array[int] = [3, 2]
+const MANGROVE_COOP_HITS_EXPERT: Array[int] = [4, 3]
 ## The face's feet point this far over the floor: its weak rect lies 6-35 px higher, 76-105 px over the floor - at most
 ## 105 so that it stays 24 px under the fight HUD in the B.2 chamber (DESIGN.md G35 as corrected; it was 106, the rect
 ## at 112-141 px, under the HUD). The resting fist's -160 launch passes it on the way up. [own]
@@ -91,6 +94,8 @@ const MANGROVE_SHAKE_TICKS: int = 14         ## the ledge shake before the upper
 const MANGROVE_HAND_SPEED: int = 8           ## px per tick of the sweep and the retreat [own]
 const MANGROVE_HAND_REST_TICKS: int = 44     ## the hand rests on the ledge this long
 const MANGROVE_HAND_PAUSE: int = 66          ## ticks between the hand's retreat and its next ledge shake [own]
+## Co-op stage 1 (wf10): the hand's ledge shake waits until the fist has rested this long (time to board it). (tune)
+const MANGROVE_COOP_SHAKE_AFTER_REST: int = 44
 ## The resting hand's fingers hang this far below the ledge top; it sweeps (and draws back) with its box's bottom on the
 ## ledge top and sinks onto the edge when it comes to rest [own]
 const MANGROVE_HAND_SINK: int = 12
@@ -137,6 +142,8 @@ var _stage: int = 0
 var _fist: int = Fist.REST
 var _fist_timer: int = 0
 var _fist_len: int = 0
+## Co-op stage 1 (wf10): the hand came and went while the fist rests (it may burst again).
+var _rest_saw_hand: bool = true
 var _fist_x: int = 0
 var _fist_from: int = 0
 var _burst_left: int = 0
@@ -365,6 +372,7 @@ func _reset_parts() -> void:
 	_stage = 0
 	_fist = Fist.REST
 	_fist_timer = 0
+	_rest_saw_hand = false
 	_fist_len = MANGROVE_FIRST_REST
 	_fist_x = fist_rest_x
 	_burst_left = 0
@@ -468,7 +476,7 @@ func _fist_tick(target: PlayerBase) -> void:
 				return
 			_pinned = 0
 			_pin_mask = 0
-			if _fist_timer >= _fist_len:
+			if _fist_timer >= _fist_len and not _fist_waits_for_hand():
 				_start_burst()
 		Fist.DRAW:
 			_fist_x = _fist_from + (fist_draw_x - _fist_from) * mini(_fist_timer, MANGROVE_DRAW_TICKS) \
@@ -510,6 +518,8 @@ func _fist_tick(target: PlayerBase) -> void:
 func _set_fist(state: int) -> void:
 	_fist = state
 	_fist_timer = 0
+	if state == Fist.REST:
+		_rest_saw_hand = false
 
 
 func _start_burst() -> void:
@@ -623,7 +633,7 @@ func _hand_tick_update() -> void:
 	match _hand:
 		Hand.AWAY:
 			_hand_pos = hand_home
-			if active and _hand_timer >= MANGROVE_HAND_PAUSE:
+			if active and _hand_timer >= MANGROVE_HAND_PAUSE and not _hand_waits_for_fist():
 				_set_hand(Hand.SHAKE)
 				Audio.play_sfx(Sfx.QUAKE)
 		Hand.SHAKE:
@@ -651,6 +661,21 @@ func _hand_tick_update() -> void:
 			_hand_pos = _step_toward(_hand_pos, hand_home, MANGROVE_HAND_SPEED)
 			if _hand_pos == hand_home:
 				_set_hand(Hand.AWAY)
+				if _fist == Fist.REST:
+					_rest_saw_hand = true
+
+
+## Co-op stage 1 (wf10 boss balance): the twin needs the resting hand and the resting fist (the springboard / pin) at
+## once, so the two keep time - the hand's ledge shake waits until the fist has rested MANGROVE_COOP_SHAKE_AFTER_REST
+## ticks, and a resting fist starts its next burst only after the hand has come and gone (it rests through one whole
+## hand cycle). Every hand cycle is then a twin chance, announced by the fist coming to rest; with free-running clocks
+## D6's duo waited 330-660 ticks for one. Solo: never.
+func _hand_waits_for_fist() -> bool:
+	return coop_form and _stage == 1 and (_fist != Fist.REST or _fist_timer < MANGROVE_COOP_SHAKE_AFTER_REST)
+
+
+func _fist_waits_for_hand() -> bool:
+	return coop_form and _stage == 1 and not _rest_saw_hand
 
 
 func _set_hand(state: int) -> void:

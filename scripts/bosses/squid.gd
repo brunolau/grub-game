@@ -6,10 +6,12 @@ extends BossBase
 ## A squid in a one-screen grotto whose floor is deadly water with rock islands; it surfaces in a gap between two
 ## islands. Place the record in a water gap at the water surface row (the cell above the surface `~`): the gaps it
 ## surfaces in are found in that row of its room (`zones/arena`) - every run of 1-3 `~` cells between two islands.
-## Hit points (club 25, charged x4): Beginner 150, Expert 225; the co-op form 187 / 280 [R8] (`hp` overrides).
+## Hit points (club 25, charged x4): Beginner 150, Expert 225; the co-op form 187 / 225 (280 [R8] until wf10's boss
+## balance; `hp` overrides).
 ##
 ## A surfacing: DIVE (under water, untouchable; 66 ticks, the first 44), BUBBLES 22 ticks over the gap it picked
-## (Sim.rng; the telegraph of where it comes up), RISE 6 ticks, UP 44 ticks, SINK 6 ticks. While UP:
+## (Sim.rng; the telegraph of where it comes up), RISE 6 ticks, UP 44 ticks (66 while the co-op lock holds, wf10),
+## SINK 6 ticks. While UP:
 ##  - Surface and Slam: a tentacle rises over its target's spot (clamped to SQUID_SLAM_REACH px from the squid) for
 ##    12 ticks, its shadow marking the landing (the telegraph), then slams: a boss-body box (a bone and the
 ##    knock-back) for 4 ticks, shake 4.
@@ -67,7 +69,9 @@ const SQUID_ART_SINK_PX: int = 13
 const SQUID_HP_BEGINNER: int = 150
 const SQUID_HP_EXPERT: int = 225
 const SQUID_COOP_HP_BEGINNER: int = 187      ## [R8]
-const SQUID_COOP_HP_EXPERT: int = 280
+## wf10 boss balance (orchestrator: co-op Inkjaw Expert easier; a co-op boss fight lasts 45-90 s): 280 [R8] took D7's
+## duo 173 s and 18 hurts; 225 (the solo Expert value, 9 club hits).
+const SQUID_COOP_HP_EXPERT: int = 225
 const SQUID_HP_PER_PIP: int = 25
 const SQUID_PHASE2_PERCENT: int = 60
 const SQUID_PHASE3_PERCENT: int = 30
@@ -76,6 +80,11 @@ const SQUID_DIVE_TICKS: int = 66             ## under water between surfacings
 const SQUID_BUBBLE_TICKS: int = 22           ## bubbles mark the gap it comes up in
 const SQUID_RISE_TICKS: int = 6              ## coming up / going down (untouchable) [own]
 const SQUID_UP_TICKS: int = 44               ## it stays up this long
+## Co-op, while the Tentacle Lock holds (phases 1 and 2): it stays up this long (wf10 boss balance, co-op Inkjaw
+## easier). With 44 ticks a flanker had to dodge the slam (it lands on UP ticks 14-17) and still strike his tentacle and
+## the open head before it sank - D7's duo opened the lock on one surfacing of three and was slammed on most of them.
+## The 22 extra ticks come after the slam: wait it out, then strike. Phase 3 (the solo rule) keeps SQUID_UP_TICKS.
+const SQUID_COOP_UP_TICKS: int = 66
 const SQUID_TENTACLE_AT: int = 2             ## UP tick on which the tentacle starts to rise [own]
 const SQUID_TENTACLE_RISE_TICKS: int = 12    ## the slam's telegraph (its shadow marks the landing)
 const SQUID_SLAM_TICKS: int = 4              ## the slam box lives this long
@@ -269,6 +278,11 @@ func get_flinch(side: int) -> int:
 
 func get_open_ticks() -> int:
 	return _open
+
+
+## How long this surfacing stays up: SQUID_COOP_UP_TICKS while the co-op lock holds, else SQUID_UP_TICKS.
+func up_ticks() -> int:
+	return SQUID_COOP_UP_TICKS if _locked() else SQUID_UP_TICKS
 
 
 ## The co-op flinch window of this game: 24 Beginner / 16 Expert, uncapped (G34: a slot-bound twin rule).
@@ -484,7 +498,7 @@ func _up_tick(target: PlayerBase) -> void:
 		if _jaws == 0:
 			_spit(target)
 			_jaws = -1
-	if _timer >= SQUID_UP_TICKS:
+	if _timer >= up_ticks():
 		_state = State.SINK
 		_timer = 0
 		_slam_timer = -1

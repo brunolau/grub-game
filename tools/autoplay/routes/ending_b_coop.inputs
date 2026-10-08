@@ -1,12 +1,13 @@
 # route: level=ending_b_coop difficulty=expert players=2 ends=exit after=the_end expect=wipes:0,eggs:0,painting:19,secrets:1
-# The two-stream route of The Long Raft Home in co-op (designer D9b; recorded from build/d9b/bot_ending_b.gd, P1|P2):
-# P1 drops aboard from the hatch planks and makes room, then P2 drops (he waited on the wooden plank); P1 pushes off,
-# opens the big spot in the calm pool under the arch (Cave Painting 19) and paddles on; each rider crouches for a tick
-# whenever he has been quiet for 140 ticks (input of his own: never 243 quiet ticks, G33); both riders touch the
-# welcome totem as the raft docks (the team exit).
+# The two-stream route of The Long Raft Home in co-op (designer D9b; recorded from build/d9b/bot_ending_b.gd, P1|P2;
+# re-recorded for the beach exit by content in wf10 from its copy build/content/d9b/bot_ending_b.gd): P1 drops aboard
+# from the hatch planks and makes room, then P2 drops (he waited on the wooden plank); P1 pushes off, opens the big
+# spot in the calm pool under the arch (Cave Painting 19) and paddles on; each rider crouches for a tick whenever he
+# has been quiet for 140 ticks (input of his own: never 243 quiet ticks, G33); the raft docks at the home beach, its
+# rails open over the sand (G45) and both riders walk off to the welcome totem (the team exit), P2 behind P1.
 14:R|R,2:R|,2:|,1:|R,1:|,1:R|,4:|,11:D|,4:|,4:R|,2:|,3:|R,2:|,1:|R,4:|,11:|D,5:|,1:L|,8:F|,6:|,8:F|,6:|,8:F|
 6:|,1:R|,90:|,1:|D,48:|,1:D|,90:|,1:|D,48:|,1:D|,90:|,1:|D,48:|,1:D|,90:|,1:|D,48:|,1:D|,90:|,1:|D,48:|,1:D|
 90:|,1:|D,48:|,1:D|,90:|,1:|D,48:|,1:D|,90:|,1:|D,48:|,1:D|,90:|,1:|D,48:|,1:D|,90:|,1:|D,48:|,1:D|,90:|,1:|D
 48:|,1:D|,90:|,1:|D,48:|,1:D|,90:|,1:|D,48:|,1:D|,90:|,1:|D,48:|,1:D|,90:|,1:|D,48:|,1:D|,68:|,1:UF|,13:|,1:UF|
 7:|,1:|D,5:|,1:UF|,133:|,1:|D,71:|,1:L|,8:F|,6:|,8:F|,6:|,8:F|,6:|,8:F|,6:|,8:F|,3:|,1:|D,2:|,8:F|,6:|,1:R|
-122:|,1:|D,16:|,1:D|,122:|,1:|D,16:|,1:D|,37:|
+122:|,1:|D,16:|,1:D|,122:|,1:|D,16:|,1:D|,50:|,12:R|,16:R|R

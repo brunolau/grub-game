@@ -1,7 +1,8 @@
 # Club & Grub - Book II ending: "The Long Raft Home" in co-op (designer D9b, Book II "The Far Shore").
 # The co-op file of ending_b (DESIGN.md D.8 #1 / D.10, LEVEL_DESIGN.md 15.7): one raft for two - both drop aboard from
-# the hoard's jetty, its rails hold both - and the welcome totem is the team exit (both riders touch it as the raft
-# docks). An ending needs only the team exit: no gates, no enemies, no traits. P2 starts beside P1 on the spur.
+# the hoard's jetty, its rails hold both until the raft docks at the home beach and opens them (G45) - and the
+# welcome totem on the beach is the team exit (both riders walk off the raft onto the sand to it). An ending needs
+# only the team exit: no gates, no enemies, no traits. P2 starts beside P1 on the spur.
 
 [meta]
 format = 2
@@ -9,7 +10,7 @@ id = ending_b_coop
 name = "The Long Raft Home"
 kind = coop
 coop_of = ending_b
-coop_base_hash = "12781b0e4076d65d3ddacaa094a99a66e82a2ae7b635cf10f8cdaccdefa8d472"
+coop_base_hash = "c5fca7ea8d75e07331cfc2ba95c622489bccbe9582a8e2ce98b91740c514932e"
 book = 2
 world = 0
 stage = 0
@@ -41,8 +42,8 @@ author = D9b
 .........##....................................................................................................................................#########................................
 ..@......##....................................................................................................................................#########................................
 ######-__........................................................................................................................................................................../%%%%
-######..................................................................................................................................................................-........./%%%%%
-######.....................................................................................................................................................................|..../#######
+######............................................................................................................................................................................/%%%%%
+######........................................................................................................................................................................../#######
 ######~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~############
 ######~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~############
 ######~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~############
@@ -57,7 +58,7 @@ objects/sign 3 15 text=SIGN_RAFT_BOARD
 objects/sign 6 15 text=SIGN_RAFT_PUSH
 objects/raft 8 19 rails width=4 skin=log
 zones/current 77 19 rect=9,19,137,1 dir=r speed=1
-zones/current 159 19 rect=147,19,25,1 dir=r speed=1
+zones/current 158 19 rect=147,19,23,1 dir=r speed=1
 props/sky/nest_broken 9.5 3 layer=back
 props/sky/feather_a 4 15
 props/sky/feather_c 0.5 15
@@ -94,12 +95,12 @@ zones/secret 147 16 name=arch rect=143,16,9,3
 objects/hidden_spot 147 16 kind=big hits=3 contents=painting:19 prop=coast/drip_cap
 props/coast/drips 145 16
 props/coast/drips 149.5 16
-# --- the home beach: the welcome totem on its jetty plank (the exit), the village behind it
-objects/exit 168 16
-props/canyon/driftwood_log 168 18 layer=back
+# --- the home beach: the raft docks at its bank and opens its rails (G45); the welcome totem (the exit) one cell
+# up the sand (a rider steps off the raft onto the beach to touch it), the feast and the village behind it
+objects/exit 173 18
 props/coast/palm_tall 172 18 layer=back
-props/coast/feast_spit 173 18
-props/coast/feast_table 175.5 18
+props/coast/feast_spit 175 18
+props/coast/feast_table 176.5 18
 objects/npc 177 17 kind=kid facing=l
 props/village/watchtower 179 16 layer=back
 objects/npc 180 15 kind=elder facing=l

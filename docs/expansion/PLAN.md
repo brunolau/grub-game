@@ -18,7 +18,7 @@ for that phase; nobody else edits it.
 | Gate **G1** | vertical slice: `w5_l1` solo + co-op, `w1_l1_coop`, Totem Ring Grub Stack with bots; pair playtests | all | | |
 | **2 Entities, bosses, UI** | new enemies and traits, 6 bosses + 2 co-op forms, LCS / Hot Rock / Clubball, bots per mode, versus screens, map page, all art and music | parallel owners (table 4.1) | ~7 weeks | ~38 ew |
 | Gate **G2** | every id of DESIGN's appendix exists with tests; every boss proven solo and refused by the solo search in co-op; 4 modes x 3 arenas with bots | | | |
-| **3 Content and proofs** | 20 Book II levels (solo + co-op files), 15 Book I co-op files, 10 arenas + bot graphs, all routes | 8 level designers + integration | ~9 weeks (starts in phase 2 for worlds 5-6) | ~37.5 ew |
+| **3 Content and proofs** | 20 Book II levels (solo + co-op files), 15 Book I co-op files, 8 arenas + bot graphs (cut 3 applied), all routes | 8 level designers + integration | ~9 weeks (starts in phase 2 for worlds 5-6) | ~37.5 ew |
 | Gate **G3** | content complete, every route and bot test green | | | |
 | **4 QA and release 2.0** | full runs, performance on the A53, devices, audio listen, licences, exports | integration, core, all owners on call | ~4 weeks | ~5 ew |
 | **Total** | | | **~6-7 months** | **~130 ew (plus or minus 30 %)** |
@@ -246,8 +246,10 @@ ships human-only, see cut list 4).
 Integration keeps `test_book2_routes` / `test_coop_routes` / `test_coop_gates` and the end-to-end campaign tests
 (Book II per difficulty, co-op Book I and II per difficulty, headless twins of the new flows) green throughout.
 
-**Gate G3**: 20 Book II files + 35 co-op files + 10 arenas; 31 solo club routes, about 6 featured routes, 57 two-stream
-co-op routes, belt invariance on all, every x2 gate refused by the search, every (arena, mode) bot test green.
+**Gate G3**: 20 Book II files + 35 co-op files + 8 arenas (cut 3 applied [G60]); 31 solo club routes, about 6 featured
+routes, 57 two-stream co-op routes, belt invariance on all, every x2 gate refused by the search - exhaustively, or
+bounded with every probe of its kind (DESIGN.md G59; a bounded search alone is "unproven") - every (arena, mode) bot
+test green or the mode human-only (cut 4), every co-op boss fight inside DESIGN.md G61's band.
 
 **G3 integration (2026-10-08, `bash tools/g3.sh`, run dir `build/g3/run_g3final2`)**: content 20 / 20 Book II files,
 35 / 35 co-op files, 31 / 31 solo route cells, 6 / 6 featured routes, paintings 20 / 20, x2 gates 76 / 76 (9-3 and the
@@ -273,6 +275,17 @@ flow runner's boss bot slots, the coconut, w5_l1_coop's bond (G36), w9_l2's feas
 completed it early in the Expert campaign), bonus_a_coop's route. **Gate G3 is not reached**: the three DB1 co-op files
 need their routes; open besides: G54 (a head as a step into rock), the raft's drag clock while dozing, the 5-1 spear
 route for the Feast Land D warp (D5), Floe Rink's see-saw floes (G51) and Tar Pulleys' CPUs (core-B).
+
+**G3 verification and the follow-up round (2026-10-08)**: the G3 verifier (`build/engine_requests/wf9_g3_verify_*`)
+failed the gate on more than the DB1 routes: one hero passes `w9_l2_coop` 'brace' and kills `w3_l1_coop`'s 'lake'
+keeper (a Bull Rex runs under a jumping hero; one strike hit on every tick), and the cached "76 / 76 refused" was a
+node bound. The orchestrator's decisions of the follow-up round are DESIGN.md G57-G61 - heavy keepers hurt only while
+brace-dazed and one hit per strike in co-op files (G57), the idle warning and "crouch" plate signs (G58), refusals
+that name their evidence (G59), cut 3 applied with the lead designer's painting ladder, Echo Hollow without its
+walls and dangler, Floe Rink Grub Stack only, Tar Pulleys' bots only on green pulley links (G60), and co-op boss
+fights of 45-90 s with at most 6 hurts on Expert (G61, baseline in DESIGN B.0: only Tusker is inside the band at G3);
+the lead designer's review of the designers' deviations is G62 (all four accepted; Chomper two seats is no gate kind).
+The rulings went to the owners as `build/engine_requests/wf10_lead_design_to_*.txt`.
 
 ---
 
@@ -319,7 +332,12 @@ c. Requiredness: `tests/test_coop_gates.gd` runs the solo-impossibility search o
    gate's far marker; window and daze values must be below the measured solo minimum minus 4 ticks. The partner a lone
    player has is modelled: an egg drifting after him, or his idle hatched partner placed anywhere he could be hatched,
    who counts for no co-op rule (DESIGN.md D.3 [G33]); a bond one thrown special hits twice in one throw is a build
-   error (G36).
+   error (G36). **A refusal names its evidence** (orchestrator after G3, DESIGN.md G59): per gate and difficulty the
+   table says **refused (exhaustive)** - the frontier emptied below the bound, or the static reach rule - or **refused
+   (bounded)** - the raised bound of at least 660 resting points, uncached, AND every continuous-play probe of the
+   gate's kind failed (hop-over, charge-under, idle-bait, thrown-special and plates; LEVEL_DESIGN 15.7.6) - or
+   **open** (reached by a search, probe or replay; red). A search that stopped at its bound without its probes is
+   **unproven**, never "refused".
 d. Bosses: each `test_enemies_<boss>.gd` asserts the co-op form is not beatable by the single-hero search - one hero
    plus an idle hatched partner placed anywhere he could be hatched (G33) - runs the fairness checks per hero, and pins
    every weak point at least 72 px under the locked view's top (DESIGN.md B.0 [G35]).
@@ -358,11 +376,11 @@ phase-3 route). The default run keeps the Book I guards (V1.c, V1.d); `tools/sp_
 |---|---|---|---|
 | 1 | Second-wave versus modes (King of the Feast, Letter Snatch, Egg Heist) | already outside launch | - |
 | 2 | Tablet table mode (two touch players) - **APPLIED at the start of phase 3** (orchestrator): an experimental, hidden prototype | one touch player + pads | ~1 ew |
-| 3 | Unlockable arenas Mesa Rodeo and Cloud Top - built only once the four remaining launch arenas are done and their bot tests green (orchestrator, phase 3) | 8 arenas; those painting unlocks become variants and colours | ~1 ew |
+| 3 | Unlockable arenas Mesa Rodeo and Cloud Top - built only once the four remaining launch arenas are done and their bot tests green (orchestrator, phase 3) - **APPLIED after G3** (orchestrator, DESIGN.md G60): not in 2.0 | 8 arenas; those painting unlocks become variants and colours (the ladder of DESIGN.md C.9: 5 and 10 loincloth patterns, 20 Spear Party, 25 gold) | ~1 ew |
 | 4 | Bots on an arena whose graph fails | that arena ships human-only in that mode: arena meta `bots` leaves the mode out (DESIGN.md G50; the bot test skips it, no CPU seat there); until the switch is built the arena stays out of `levels/` | per arena |
 | 5 | Chief bot level, deciding-moment replay | Rookie + Hunter; a still frame of the deciding hit | ~1.5 ew |
 | 6 | Shaman (co-op enemy) | Shellbacks in those halls | ~0.5 ew |
-| 7 | Chomper the rex | 6-1 crosses the tar flats by raft; 7-1's urchin beds become drop floes; Mesa Rodeo goes with it | ~3 ew + art |
+| 7 | Chomper the rex | 6-1 crosses the tar flats by raft; 7-1's urchin beds become drop floes (Mesa Rodeo is cut already, cut 3) | ~3 ew + art |
 | 8 | Rival Chieftains on hero physics | Brute-style state machine on `rival.png`, same phases | ~1 ew |
 | 9 | Clubball | three launch modes; Coconut Cove stays as an arena for them | ~1.5 ew |
 | 10 | Rafts and currents | `objects/platform mode=ride` over water in 6-1, 7-1, Feast Land E, the ending; Inkjaw's phase 3 becomes sinking islands | ~1.5 ew |

@@ -64,6 +64,9 @@ const DEFAULT_SHOT_PERIOD: int = 24
 const TRACE_COLUMNS: int = 6
 const DEFAULT_HOLD_TICKS: int = 12
 const SETTLE_FRAMES: int = 4
+## Most frames a run waits after another stage took over for Flow to finish that stage's transition before it quits
+## ([method _finish_after_takeover]; an instant transition takes two or three, a timed one about a second).
+const TAKEOVER_SETTLE_FRAMES: int = 240
 ## The switches a release build honours; every other one needs a debug build.
 const RELEASE_SWITCHES: PackedStringArray = ["smoke"]
 const SMOKE_MIN_SECONDS: float = 0.1
@@ -720,7 +723,7 @@ func _on_tick_finished(tick: int) -> void:
 				_level_id])
 		_write_trace()
 		print("Autoplay: %d ticks played, %d screenshots saved" % [_trace_rows(), _shots_saved])
-		_finish(0)
+		_finish_after_takeover()
 		return
 	var level: LevelBase = Game.level
 	if level != null and level.player != null:
@@ -804,7 +807,132 @@ func _write_trace() -> void:
 	file.close()
 
 
+## Quit after another stage took over. In a fast run the harness steps the clock every frame, also while Flow is still
+## putting the new stage together (Sim.step ignores Sim.frozen), so the takeover is seen on a tick of the new stage
+## before Flow's scene change has finished (overlays, level extras, the opening cover). Quitting from inside that tick
+## left the scene change suspended, and the engine reported leaked textures, fonts, scenes and scripts at exit
+## (w4_l2_coop -> w4_l2b_coop, G3). So the run waits - at most TAKEOVER_SETTLE_FRAMES frames - until the transition
+## has finished, lets one more frame pass and only then quits.
+func _finish_after_takeover() -> void:
+	print("Autoplay: takeover diag: Flow.busy=%s in_tick=%s" % [Flow.busy, Sim.is_in_tick()])
+	for i: int in TAKEOVER_SETTLE_FRAMES:
+		if not Flow.busy:
+			break
+		await get_tree().process_frame
+	if Flow.busy:
+		push_warning("Autoplay: the stage that took over did not finish its transition in %d frames" %
+				TAKEOVER_SETTLE_FRAMES)
+	await get_tree().process_frame
+	_finish(0)
+
+
+func _exit_tree() -> void:
+	if OS.get_environment("AUTOPLAY_REFDUMP") == "":
+		return
+	var probe: RefCounted = RefCounted.new()
+	var now: int = (probe.get_instance_id() & 0x7FFFFFFFFFFFFFFF) >> 24
+	print("REFPROBE now validator %d slot %d" % [now, probe.get_instance_id() & 0xFFFFFF])
+	for v: int in range(maxi(now - 12000, 1), now + 1):
+		for slot: int in range(1900, 2100):
+			var id: int = (v << 24) | slot | (1 << 63)
+			var obj: Object = instance_from_id(id)
+			if obj == null or not (obj is RefCounted) or obj.get_class() != "RefCounted":
+				continue
+			var scr: Script = obj.get_script() as Script
+			var text: String = "REFPROBE found v=%d slot=%d script=%s" % [v, slot, scr.resource_path if scr != null else "-"]
+			if scr != null:
+				for prop: Dictionary in obj.get_property_list():
+					if int(prop["usage"]) & PROPERTY_USAGE_SCRIPT_VARIABLE != 0:
+						text += " %s=%s" % [prop["name"], str(obj.get(prop["name"])).left(80)]
+			print(text)
+
+
+func _diag_dump() -> void:
+	if OS.get_environment("AUTOPLAY_REFDUMP") == "":
+		return
+	var seen: Dictionary = {}
+	for node: Node in get_tree().root.get_children():
+		_diag_walk(node, node.name, 0, seen)
+	var stack: Array[Node] = [get_tree().root]
+	while not stack.is_empty():
+		var n: Node = stack.pop_back()
+		seen.erase(n.get_instance_id())
+		_diag_walk(n, str(n.get_path()), 0, seen)
+		for c: Node in n.get_children(true):
+			stack.append(c)
+	var statics: Dictionary = {
+		"res://scripts/core/bots/bot_brain.gd": ["_stand_cache"], "res://scripts/core/bots/bot_senses.gd": ["test_referee"],
+		"res://scripts/core/bots/hero_bot.gd": ["_warned"], "res://scripts/core/bots/nav_graph.gd": ["_cache"],
+		"res://scripts/core/spawner.gd": ["_cache", "_missing"], "res://scripts/core/versus_match.gd": ["bot_factory"],
+		"res://scripts/enemies/enemy_skin.gd": ["_cache"], "res://scripts/fx/fx_font.gd": ["_font"],
+		"res://scripts/objects/sign_board.gd": ["_front"],
+		"res://scripts/player/hero_palette.gd": ["_meta", "_shader", "_materials", "_luts", "_key_lut", "_cloth"],
+		"res://scripts/player/player.gd": ["_spear"], "res://scripts/ui/hud_atlas.gd": ["_texture", "_groups"],
+		"res://scripts/ui/ui_kit.gd": ["_fonts", "_textures", "_theme"], "res://scripts/world/level_lights.gd": ["_textures"],
+		"res://scripts/world/versus/arena.gd": ["_file_cache"], "res://scripts/world/versus/referee.gd": ["_current"],
+		"res://scripts/world/coop_search.gd": ["_explore_cache", "_daze_cache", "_daze_probe"],
+	}
+	for path: String in statics:
+		var scr: Script = load(path) as Script
+		for member: String in statics[path]:
+			var value: Variant = scr.get(member)
+			print("REFSTATIC %s.%s = %s" % [path.get_file(), member, type_string(typeof(value))])
+			_diag_walk(value, path.get_file() + "::" + member, 1, seen)
+
+
+func _diag_walk(value: Variant, path: String, depth: int, seen: Dictionary) -> void:
+	if depth > 4:
+		return
+	if value is Object:
+		var obj: Object = value
+		if not is_instance_valid(obj):
+			return
+		var id: int = obj.get_instance_id()
+		if seen.has(id):
+			return
+		seen[id] = true
+		if obj is RefCounted:
+			var scr: Script = obj.get_script() as Script
+			print("REFDUMP %d %s %s %s" % [id, obj.get_class(), scr.resource_path if scr != null else "-", path])
+		if obj is Node and depth > 0:
+			return
+		for prop: Dictionary in obj.get_property_list():
+			if int(prop["usage"]) & PROPERTY_USAGE_SCRIPT_VARIABLE == 0:
+				continue
+			_diag_walk(obj.get(prop["name"]), path + "." + str(prop["name"]), depth + 1, seen)
+	elif value is Array:
+		var i: int = 0
+		for item: Variant in value:
+			_diag_walk(item, "%s[%d]" % [path, i], depth + 1, seen)
+			i += 1
+	elif value is Dictionary:
+		for key: Variant in value:
+			_diag_walk(value[key], "%s{%s}" % [path, str(key)], depth + 1, seen)
+
+
 func _finish(exit_code: int) -> void:
+	_diag_dump()
+	if OS.get_environment("AUTOPLAY_CLEAR") != "":
+		print("Autoplay: diag clear %s" % OS.get_environment("AUTOPLAY_CLEAR"))
+		if OS.get_environment("AUTOPLAY_CLEAR").contains("spawner"):
+			Spawner.clear_cache()
+		if OS.get_environment("AUTOPLAY_CLEAR").contains("skin"):
+			(load("res://scripts/enemies/enemy_skin.gd") as Script).get("_cache").clear()
+		if OS.get_environment("AUTOPLAY_CLEAR").contains("all"):
+			var statics: Dictionary = {
+				"res://scripts/enemies/enemy_skin.gd": ["_cache"], "res://scripts/fx/fx_font.gd": ["_font"],
+				"res://scripts/ui/hud_atlas.gd": ["_texture", "_groups"],
+				"res://scripts/ui/ui_kit.gd": ["_fonts", "_textures", "_theme"],
+				"res://scripts/world/level_lights.gd": ["_textures"],
+			}
+			for path: String in statics:
+				var scr: Script = load(path) as Script
+				for member: String in statics[path]:
+					var value: Variant = scr.get(member)
+					if value is Dictionary:
+						(value as Dictionary).clear()
+					else:
+						scr.set(member, null)
 	_done = true
 	GameInput.clear_scripted()
 	finished.emit(exit_code)

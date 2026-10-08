@@ -153,7 +153,7 @@ class ConstantsMatchCode(unittest.TestCase):
          "scripts/core/party_tuning.gd",
          {"TOTEM_HEAD_PX": 35, "TOTEM_REST_PX": 34, "TOTEM_FOOT_REACH_PX": 16, "TOTEM_JUMP_OFF_YVEL": -16,
           "TOTEM_CARRIER_JUMP_SHIFT": 1, "TOTEM_DROP_LOCK_TICKS": 12}),
-        ("| Brace | 16 px apart, heavy dazed 44 |", "scripts/core/party_tuning.gd",
+        ("| Brace | 16 px apart, heavy dazed 44 (hurt only then [G57]) |", "scripts/core/party_tuning.gd",
          {"BRACE_GAP_PX": 16, "BRACE_DAZE_TICKS": 44}),
         ("| Curl | 66 ticks, box 24 x 20", "scripts/core/party_tuning.gd",
          {"CURL_MAX_TICKS": 66, "CURL_BOX_W": 24, "CURL_BOX_H": 20}),
@@ -708,7 +708,8 @@ class ArenasAsBuilt(unittest.TestCase):
 
     ARENAS = {"Totem Ring": "arena_totem_ring", "Cinder Pit": "arena_cinder_pit", "Echo Hollow": "arena_echo_hollow",
               "Coconut Cove": "arena_coconut_cove", "Sky Picnic": "arena_sky_picnic",
-              "Colossus Hall": "arena_colossus_hall", "Floe Rink": "arena_floe_rink"}
+              "Colossus Hall": "arena_colossus_hall", "Floe Rink": "arena_floe_rink",
+              "Tar Pulleys": "arena_tar_pulleys"}
 
     def test_sketches_equal_the_files(self):
         for name, level_id in self.ARENAS.items():
@@ -733,6 +734,209 @@ class ArenasAsBuilt(unittest.TestCase):
             if m:
                 self.assertEqual(set(m.group(1).split(",")) - {"grub_stack", "last_caveman"}, set(),
                                  "Colossus Hall offers a mode G43 excludes")
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# The G3 follow-up round (DESIGN.md G57-G62, 2026-10-08, build/engine_requests/wf10_lead_design_to_*.txt)
+# ---------------------------------------------------------------------------------------------------------------------
+
+def _po_entries(rel):
+    """msgid -> msgstr of a .po file (single-line entries, as the level locale files are written)."""
+    out = {}
+    msgid = None
+    for line in _read(rel).splitlines():
+        m = re.match(r'^msgid "(.*)"$', line)
+        if m:
+            msgid = m.group(1)
+            continue
+        m = re.match(r'^msgstr "(.*)"$', line)
+        if m and msgid:
+            out[msgid] = m.group(1)
+            msgid = None
+    return out
+
+
+class HeavyKeepersAndOneHitPerStrike(unittest.TestCase):
+    """[G57] a heavy is hurt only while brace-dazed; in co-op files one strike hurts a given enemy once."""
+
+    def test_the_documents(self):
+        self.assertIn("it can be **damaged only while so dazed**", _section(DESIGN, "### D.6"))
+        self.assertIn("**One hit per strike** [G57]", _section(DESIGN, "### D.6"))
+        self.assertIn("the only time anyone can hurt a heavy [G57]", _section(DESIGN, "### D.4"))
+        c10 = _section(APPENDIX_C, "### C.10")
+        self.assertIn("**A heavy takes damage only during that daze** [G57]", c10)
+        self.assertIn("- **One hit per strike** (co-op files only) [G57]", c10)
+        self.assertIn("it is **damaged only while so dazed**", _section(GAMEPLAY_13, "#### 13.9.5"))
+        self.assertIn("**One hit per strike** [G57]", _section(GAMEPLAY_13, "#### 13.9.4"))
+        self.assertIn("**The brace is the only way to hurt it** [G57]", _section(LEVEL_DESIGN_15, "#### 15.7.3"))
+        self.assertIn("- **`hp` counts strikes in co-op files** [G57]", _section(LEVEL_DESIGN_15, "#### 15.7.5"))
+        for name, text in (("DESIGN", DESIGN), ("GAMEPLAY 13", GAMEPLAY_13)):
+            self.assertNotIn("| `heavy` (heavy) | front hits glance", text, name)
+            self.assertNotIn("| `heavy` | front hits glance", text, name)
+
+    def test_the_code(self):
+        sources = "".join(_read(rel) for rel in ("scripts/base/enemy_base.gd", "scripts/enemies/coop_traits.gd"))
+        _pending(self, "G57" in sources, "enemies-A: a heavy glances unless brace-dazed; one hit per strike in co-op "
+                 "files (wf10_lead_design_to_enemies_a.txt #1)")
+        self.assertRegex(sources, r"(?i)brace")
+
+
+class IdleWarningAndPlateSigns(unittest.TestCase):
+    """[G58] held keys count every tick; the "Zzz soon" bubble from tick 170; plate signs say crouch; 243 stays."""
+
+    PLATE_SIGNS = {
+        "locale/levels/en/coop_b1.po": ["SIGN_COOP_W1_PLATES", "SIGN_COOP_W2_HATCH"],
+        "locale/levels/en/coop_b2.po": ["SIGN_COOP_W2_LIFT", "SIGN_COOP_W3_CAVE"],
+        "locale/levels/en/coop_b3.po": ["SIGN_COOP_W4_PLATES", "SIGN_COOP_W4_VISOR"],
+        "locale/levels/en/w5.po": ["SIGN_W5_COOP_PLATES", "SIGN_W5_COOP_SANDGATE"],
+        "locale/levels/en/w7.po": ["SIGN_W7_COOP_PLATES", "SIGN_W7_COOP_SEAGATE"],
+        "locale/levels/en/w8.po": ["SIGN_W8_COOP_STAIRS", "SIGN_W8_COOP_ROOMS"],
+    }
+
+    def test_the_documents(self):
+        d3 = _section(DESIGN, "### D.3")
+        self.assertIn("**A held key is input on every tick it is held** [G58]", d3)
+        self.assertIn("From his **170th** quiet tick a **\"Zzz soon\"\n  warning bubble**", d3)
+        self.assertIn("**\"Crouch on\n  a plate to hold it\"** [G58]", d3)
+        c10 = _section(APPENDIX_C, "### C.10")
+        self.assertIn("**A held flag is input on every tick it is held**", c10)
+        self.assertIn("`input_idle_ticks >= 170` (`IDLE_WARN_TICKS`)", c10)
+        self.assertIn("\"Zzz soon\" bubble from 170, Zzz from 243 [G58]", _section(APPENDIX_C, "### C.16"))
+        self.assertIn("**a held key counts on every tick it is held** [G58]", _section(GAMEPLAY_13, "#### 13.9.2"))
+        self.assertIn("- **Plate signs say \"crouch\"** [G58]", _section(LEVEL_DESIGN_15, "### 15.6"))
+        self.assertIn("- **The warning** [G58]", _section(LEVEL_DESIGN_15, "#### 15.7.9"))
+
+    def test_held_keys_count_every_tick_in_code(self):
+        src = _read("scripts/base/player_base.gd")
+        body = src[src.index("func note_own_input"):]
+        body = body[:body.index("\nfunc ")]
+        self.assertRegex(body, r"if flags != 0:\s*\n\s*input_idle_ticks = 0")
+        self.assertEqual(_gd_consts("scripts/base/player_base.gd").get("IDLE_TICKS"), 243)
+
+    def test_the_warning_bubble_in_code(self):
+        party = _gd_consts("scripts/core/party_tuning.gd")
+        src = _read("scripts/player/hero_party.gd")
+        _pending(self, "IDLE_WARN" in src or "G58" in src, "party: the \"Zzz soon\" bubble from the 170th quiet tick "
+                 "(wf10_lead_design_to_party.txt #1)")
+        if "IDLE_WARN_TICKS" in party:
+            self.assertEqual(party["IDLE_WARN_TICKS"], 170)
+        self.assertEqual(party.get("IDLE_TICKS", 243), 243)
+
+    def test_plate_signs_say_crouch(self):
+        stale = []
+        for rel, keys in self.PLATE_SIGNS.items():
+            entries = _po_entries(rel)
+            for key in keys:
+                self.assertIn(key, entries, "%s: %s is gone - update this table" % (rel, key))
+                if "rouch" not in entries[key]:
+                    stale.append(key)
+        _pending(self, not stale, "the locale owners: plate signs still without \"crouch\": %s "
+                 "(wf10_lead_design_to_designers.txt #1)" % ", ".join(stale))
+
+
+class RefusalsNameTheirEvidence(unittest.TestCase):
+    """[G59] refused = exhaustive, or bounded with every probe of the gate's kind; else unproven."""
+
+    def test_the_documents(self):
+        ld = _section(LEVEL_DESIGN_15, "#### 15.7.6")
+        self.assertIn("**\"Refused\" names its evidence** [G59]", ld)
+        for verdict in ("| **refused (exhaustive)** |", "| **refused (bounded)** |", "| **unproven** |", "| **open** |"):
+            self.assertIn(verdict, ld)
+        for probe in ("**hop-over**", "**charge-under**", "**idle-bait**", "**thrown-special**", "**plates**"):
+            self.assertIn(probe, ld)
+        self.assertIn("**\"Refused\" names its evidence** [G59]", _section(DESIGN, "### D.8"))
+        self.assertIn("**A refusal names its evidence**", PLAN)
+        self.assertIn("at least **660 resting points, uncached**", ld)
+
+
+class CutThreeApplied(unittest.TestCase):
+    """[G60] 8 arenas, the painting ladder, Echo Hollow, Floe Rink and Tar Pulleys as decided."""
+
+    LADDER = [("patterns", 5), ("loincloths", 10), ("variants", 15), ("spear_party", 20), ("gold", 25), ("mural", 30)]
+
+    def test_the_documents(self):
+        self.assertIn("### E.5 Arenas: 8 single screens (cut 3 applied [G60])", DESIGN)
+        self.assertIn("**APPLIED after G3**", PLAN)
+        for text in (_section(DESIGN, "### C.9"), _section(GAMEPLAY_13, "### 13.7")):
+            flat = text.replace("\n  ", " ")
+            self.assertIn("5 = four loincloth patterns for P1-P4", flat)
+            self.assertIn("20 = variant Spear Party", flat)
+            self.assertIn("25 = the golden loincloth palette", flat)
+            self.assertNotIn("Mesa Rodeo arena;", flat)
+            self.assertNotIn("20 = Cloud Top", flat)
+        self.assertIn("Eight single-screen arenas", _section(GAMEPLAY_13, "#### 13.10.9"))
+        self.assertNotIn("Ten single-screen arenas", GAMEPLAY_13)
+        self.assertIn("- **The 8 arenas of 2.0** [G37] [G60]", _section(LEVEL_DESIGN_15, "### 15.8"))
+
+    def test_the_arena_files(self):
+        for cut in ("arena_mesa_rodeo", "arena_cloud_top"):
+            self.assertFalse(os.path.exists(os.path.join(ROOT, "levels", cut + ".lvl")), "%s is cut [G60]" % cut)
+        self.assertEqual(_meta("arena_floe_rink").get("modes"), "grub_stack", "Floe Rink ships Grub Stack only")
+        echo = _read("levels/arena_echo_hollow.lvl")
+        self.assertNotIn("regrow", _meta("arena_echo_hollow"), "Echo Hollow's regrowing walls are dropped")
+        self.assertNotRegex(echo, r"(?m)^enemies/", "Echo Hollow's dangler springboard is dropped")
+        tar = _meta("arena_tar_pulleys")
+        if tar.get("bots", "") != "none":
+            # Bots only on green pulley links (core-B): the modes it names must be a subset of its modes.
+            modes = set(tar.get("modes", "").split(","))
+            self.assertEqual(set(tar.get("bots", tar.get("modes", "")).split(",")) - modes, set())
+
+    def test_the_reward_table_in_code(self):
+        table = _read("scripts/core/unlock_table.gd")
+        _pending(self, "arena_mesa_rodeo" not in table and "arena_cloud_top" not in table,
+                 "core-A: the painting ladder of G60 (wf10_lead_design_to_core_a.txt #1)")
+        rewards = table[table.index("const REWARDS"):]
+        ids = re.findall(r'\{"id": &"(\w+)"', rewards[:rewards.index("\n]")])
+        self.assertEqual(ids, [r for r, _n in self.LADDER])
+        self.assertNotIn("arena_", rewards[:rewards.index("\n]")])
+
+    def test_the_pattern_tags(self):
+        data = _read("assets/sprites/player/palettes/hero_palettes.json")
+        tags = dict(re.findall(r'"name"\s*:\s*"(\w+)"[^}]*?"unlock"\s*:\s*"(\w+)"', data))
+        _pending(self, tags.get("checks") == "paintings_5", "art-A: checks, dots, tiger, pinstripes tagged "
+                 "paintings_5 (wf10_lead_design_to_art_a.txt #1)")
+        for name in ("checks", "dots", "tiger", "pinstripes"):
+            self.assertEqual(tags.get(name), "paintings_5", name)
+        for name in ("diamonds", "waves", "sash", "trim"):
+            self.assertEqual(tags.get(name), "paintings_10", name)
+
+
+class CoopBossBalance(unittest.TestCase):
+    """[G61] every co-op fight 45-90 s on its recorded routes, at most 6 hurts on Expert; the baseline table."""
+
+    def test_the_documents(self):
+        b0 = _section(DESIGN, "### B.0").replace("\n  ", " ")
+        self.assertIn("lasts **45-90 s** (1 093-2 185 ticks)", b0)
+        self.assertIn("costs **at most 6 hurts** on its Expert route", b0)
+        rows = _table_rows(_section(DESIGN, "### B.0"), "| Co-op form (stage) |")
+        self.assertEqual([r[0].split(" (")[0] for r in rows],
+                         ["Brute", "visor Colossus", "Tusker", "Old Mangrove", "Inkjaw", "Twin Idols", "Storm Roc",
+                          "Rival Chieftains"])
+        self.assertIn("**Balance** [G61]", _section(GAMEPLAY_13, "### 13.6", r"\n### "))
+        self.assertIn("| Co-op boss fights | 45-90 s", _section(GAMEPLAY_13, "### 13.11"))
+
+
+class DeviationsReviewed(unittest.TestCase):
+    """[G62] the four deviations accepted; Chomper two seats is no gate kind; the files carry the gates named."""
+
+    def test_the_documents(self):
+        appendix = DESIGN[DESIGN.index("## Appendix: G1 and phase-2 resolutions"):]
+        row = [line for line in appendix.splitlines() if line.startswith("| G62 |")][0]
+        self.assertIn("**all four accepted**", row)
+        for gate in ("'cliff'", "'root'", "'dune'", "'seagate'"):
+            self.assertIn(gate, row)
+        self.assertIn("~~Chomper two-seat stretch~~", _section(DESIGN, "### D.8"))
+        self.assertIn("| ~~Chomper two seats~~ | **retired as a gate kind** [G62]", LEVEL_DESIGN_15)
+        d10 = _section(DESIGN, "### D.10")
+        for gate in ("('root'", "('dune'", "('seagate')"):
+            self.assertIn(gate, d10)
+
+    def test_the_files(self):
+        for level_id, gate in (("w4_l1_coop", "cliff"), ("w6_l1_coop", "root"), ("w7_l1_coop", "dune"),
+                               ("w7_l2_coop", "seagate")):
+            self.assertRegex(_read("levels/%s.lvl" % level_id), r"(?m)^objects/x2_tablet .*\bgate=%s\b" % gate)
+        self.assertNotRegex(_read("levels/w7_l1_coop.lvl"), r"(?m)^objects/(mount|rex_pen)\b")
+        self.assertRegex(_read("levels/w6_l1_coop.lvl"), r"(?m)^objects/mount .*\bwild\b")
 
 
 class Hygiene(unittest.TestCase):

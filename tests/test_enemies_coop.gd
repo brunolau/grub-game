@@ -584,6 +584,151 @@ func test_a_lone_croucher_is_no_brace_wall() -> void:
 	assert_true(leftmost < 150, "it walked through them")
 
 
+## The heavy-keeper ruling (G3 verifier: one hero let the Bull Rex charge under his jump and clubbed its back): a
+## `heavy` record is hurt ONLY while a Brace Wall staggers it - its back glances like its front, a throw at its back
+## too, and no other death takes it (kill-all, grenade, a feast's bite, glider dives); braced, its back counts. A party
+## of one still meets the plain archetype.
+func test_an_unbraced_heavy_glances_everywhere_and_dies_of_nothing_else() -> void:
+	var bull: EnemyBase = _enemy(&"enemies/walker", Vector2i(260, 160),
+			{"coop": "heavy", "skin": "rex_b", "left": -10, "right": 0, "facing": "l", "hp": 100})
+	_hero.teleport(Vector2i(300, 160))
+	_p2.teleport(Vector2i(60, 160))
+	Sim.step(2)
+	assert_eq(bull.facing, -1, "it walks left, at P2")
+	assert_false(bull._hit_from_front(_hero), "P1 stands behind it")
+	var sparks: int = _count_fx(&"fx/hit_stars")
+	assert_true(bull.take_hit(25, _hero), "a strike at its back is used up ...")
+	assert_eq(bull.hp, 100, "... and glances: no Brace Wall staggers it")
+	assert_eq(_count_fx(&"fx/hit_stars"), sparks + 1, "with the glance's spark")
+	assert_true(bull.take_hit(100, _hero))
+	assert_eq(bull.hp, 100, "a charged one too")
+	bull.take_hit(20, _shot(Vector2i(300, 150), -208, 0))
+	assert_eq(bull.hp, 100, "and a throw at its back")
+	bull.kill(&"kill_all", _hero)
+	assert_false(bull.dead, "a kill-all leaves it alive")
+	bull.burst_into_items()
+	assert_false(bull.dead, "a grenade too")
+	for dive: int in Tuning.GLIDER_DIVE_KILLS_ON:
+		bull.on_glider_stomp(_hero)
+	assert_false(bull.dead, "and glider dives")
+	assert_eq(bull.dive_count, 0)
+	_hero.feast = 30
+	assert_false(bull._shows_food(), "a feast does not show it as food ...")
+	bull.kill(&"feast", _hero)
+	assert_false(bull.dead, "... nor eat it")
+	_hero.feast = 0
+	# Braced: its back counts (one hit per strike: a bare hero's take_hit is a strike of its own).
+	_crouch(_p2, Vector2i(150, 160))
+	_crouch(_hero, Vector2i(150 + PartyTuning.BRACE_GAP_PX, 160))
+	assert_true(_step_until(func() -> bool: return bull.coop_traits().dazed > 0, 120) > 0, "the Brace Wall stops it")
+	_hero.state = Defs.HeroState.IDLE
+	_hero.teleport(Vector2i(bull.sim_pos.x + 30, 160))
+	bull.take_hit(25, _hero)
+	assert_eq(bull.hp, 75, "staggered, its back is open")
+	bull.take_hit(25, _p2)
+	assert_eq(bull.hp, 50, "and its front")
+	assert_false(bull.coop_traits().refuses_death(), "staggered, it can die")
+	bull.burst_into_items()
+	assert_true(bull.dead, "a grenade now takes it")
+
+
+## An idle partner is no half of the Brace Wall, so a lone player never staggers a heavy - and never hurts it.
+func test_a_lone_player_never_hurts_a_heavy_beside_his_idle_partner() -> void:
+	var bull: EnemyBase = _enemy(&"enemies/walker", Vector2i(260, 160),
+			{"coop": "heavy", "skin": "rex_b", "left": -10, "right": 0, "facing": "l", "hp": 25})
+	_crouch(_hero, Vector2i(150, 160))
+	_crouch(_p2, Vector2i(150 + PartyTuning.BRACE_GAP_PX, 160))
+	_p2.idle = true
+	for tick: int in 120:
+		Sim.step(1)
+		assert_eq(bull.coop_traits().dazed, 0, "a dozing partner braces nothing")
+		if bull.sim_pos.x < 140:
+			break
+	assert_true(bull.sim_pos.x < 150, "it walked through them")
+	_hero.state = Defs.HeroState.IDLE
+	for side: int in [-30, 30]:
+		_hero.teleport(Vector2i(bull.sim_pos.x + side, 160))
+		bull.take_hit(25, _hero)
+		bull.take_hit(25, _hero)
+	assert_eq(bull.hp, 25, "front or back, every strike glances")
+	assert_false(bull.dead)
+
+
+## One hit per strike (the heavy-keeper ruling): a club box that overlaps a staggered heavy on several ticks of one
+## swing hurts it once; the partner's swing on the same ticks is a strike of its own, a new swing (strike_tick from 1
+## again) another, a thrown weapon one each. So `hp` counts strikes: hp 25 takes two club strikes. A party of one
+## (the plain archetype, 1.0) takes a hit on every tick.
+func test_a_staggered_heavy_takes_one_hit_per_strike() -> void:
+	var bull: EnemyBase = _enemy(&"enemies/walker", Vector2i(260, 160),
+			{"coop": "heavy", "skin": "rex_b", "speed": 0, "facing": "l", "hp": 100})
+	Sim.step(2)
+	assert_true(bull.brace_stop(_hero, _p2), "staggered by a Brace Wall")
+	var p1: PlayerBase = _striker(0, Vector2i(240, 160))
+	var p2: PlayerBase = _striker(1, Vector2i(280, 160))
+	for tick: int in 5:
+		_swing(p1, tick + 1)
+		_swing(p2, tick + 1)
+		assert_true(bull.take_hit(25, p1), "every tick of the swing is used up (the pogo stays)")
+		assert_true(bull.take_hit(25, p2))
+		Sim.step(1)
+	assert_eq(bull.hp, 50, "five ticks of two swings: one hit each")
+	_swing(p1, 1)
+	assert_true(bull.take_hit(25, p1))
+	assert_eq(bull.hp, 25, "P1's next swing is a new strike")
+	Sim.step(1)
+	_swing(p1, 2)
+	bull.take_hit(25, p1)
+	assert_eq(bull.hp, 25, "its second tick is not")
+	bull.take_hit(20, _shot(Vector2i(240, 150), 208, 0))
+	assert_eq(bull.hp, 5, "a throw hits once (it is used up)")
+	assert_false(bull.dead)
+	_swing(p2, 1)
+	bull.take_hit(25, p2)
+	assert_true(bull.dead, "the strike that takes it below zero kills it")
+	# hp 25: two club strikes.
+	var small: EnemyBase = _enemy(&"enemies/walker", Vector2i(290, 160),
+			{"coop": "heavy", "skin": "rex_b", "speed": 0, "facing": "l"})
+	Sim.step(1)
+	small.brace_stop(_hero, _p2)
+	for tick: int in 3:
+		_swing(p1, tick + 1)
+		small.take_hit(25, p1)
+		Sim.step(1)
+	assert_eq(small.hp, 0, "one strike leaves the default 25 hp at 0 ...")
+	assert_false(small.dead)
+	_swing(p1, 1)
+	small.take_hit(25, p1)
+	assert_true(small.dead, "... the second kills")
+	# A party of one: the plain walker takes a hit on every tick of a swing (1.0).
+	var plain: EnemyBase = _enemy(&"enemies/walker", Vector2i(200, 160),
+			{"coop": "heavy", "speed": 0, "facing": "l", "hp": 100})
+	Sim.step(1)
+	_p2.free()
+	for tick: int in 3:
+		_swing(p1, tick + 1)
+		plain.take_hit(25, p1)
+		Sim.step(1)
+	assert_eq(plain.hp, 25, "a party of one: three ticks, three hits")
+	p1.free()
+	p2.free()
+
+
+## Other traits keep a hit per tick (the ruling is the heavy's): a `shell` record's back takes every tick of a swing.
+func test_one_hit_per_strike_is_the_heavys_rule_only() -> void:
+	var shell: EnemyBase = _enemy(&"enemies/walker", Vector2i(160, 160), {"coop": "shell", "speed": 0, "hp": 100})
+	_hero.teleport(Vector2i(130, 160))
+	_p2.teleport(Vector2i(400, 160))
+	Sim.step(2)
+	assert_eq(shell.facing, -1)
+	var behind: PlayerBase = _striker(1, Vector2i(190, 160))
+	for tick: int in 3:
+		_swing(behind, tick + 1)
+		shell.take_hit(25, behind)
+		Sim.step(1)
+	assert_eq(shell.hp, 25, "three ticks of one swing at its back: three hits")
+	behind.free()
+
+
 # =================================================================================================================
 # lone
 # =================================================================================================================
@@ -964,6 +1109,27 @@ func _crouch(hero: PlayerBase, pos: Vector2i) -> void:
 	hero.state = Defs.HeroState.CROUCH
 	hero.grounded = true
 	hero.set_box(Tuning.HERO_BOX_CROUCH)
+
+
+## A bare hero with the strike-script counter of player-A's Player (`strike_tick`, read by CoopTraits.strike_key);
+## never in the tree (the caller frees it).
+class Striker:
+	extends PlayerBase
+
+	var strike_tick: int = 0
+
+
+func _striker(p_slot: int, pos: Vector2i) -> PlayerBase:
+	var striker: Striker = Striker.new()
+	striker.slot = p_slot
+	striker.sim_pos = pos
+	return striker
+
+
+## `hero` tests a club box in this tick's weapon pass, `into` ticks into his strike script.
+func _swing(hero: PlayerBase, into: int) -> void:
+	hero.club_box_active = true
+	hero.set(&"strike_tick", into)
 
 
 ## A thrown weapon of the hero of `owner` at `pos` flying with `p_xvel`.

@@ -1269,7 +1269,8 @@ func test_coop_visor_only_in_a_coop_game_of_two_on_a_coop_file() -> void:
 		return
 	var colossus: Colossus = _visor_hall(true, true)
 	assert_true(colossus.is_coop_form())
-	assert_eq(colossus.max_hp, 30, "24 -> 30 (x5/4)")
+	assert_eq(colossus.max_hp, 16, "24 -> 16 (x2/3, wf10 boss balance)")
+	assert_eq(colossus.max_hp, 24 * Colossus.COOP_HP_NUM / Colossus.COOP_HP_DEN)
 	assert_eq(colossus.get_plates().size(), 2, "the hall's two plates")
 	assert_eq(colossus.get_live_plate(), colossus.get_plates()[0], "the left chain glows first")
 	_coop_teardown()
@@ -1294,16 +1295,16 @@ func test_coop_the_plate_holder_lifts_the_visor_and_only_the_other_hero_hurts_it
 	assert_false(colossus.is_visor_up(), "nobody on the glowing plate: the visor is down")
 	_head_shot(colossus, 1)
 	Sim.step(1)
-	assert_eq(colossus.hp, 30, "a throw glances off the visor")
+	assert_eq(colossus.hp, 16, "a throw glances off the visor")
 	_p1.teleport(Vector2i(PLATE_LEFT_X, 160))
 	Sim.step(2)
 	assert_true(colossus.is_visor_up(), "P1 on the glowing plate lifts it")
 	_head_shot(colossus, 0)
 	Sim.step(1)
-	assert_eq(colossus.hp, 30, "the holder's own throw does not count")
+	assert_eq(colossus.hp, 16, "the holder's own throw does not count")
 	_head_shot(colossus, 1)
 	Sim.step(1)
-	assert_eq(colossus.hp, 29, "P2's throw counts one")
+	assert_eq(colossus.hp, 15, "P2's throw counts one")
 	assert_eq(colossus.last_hitter, _p2)
 	_coop_teardown()
 
@@ -1323,14 +1324,14 @@ func test_coop_a_dozing_hero_on_the_plate_lifts_no_visor() -> void:
 	assert_null(colossus._holder(), "nobody holds it")
 	_head_shot(colossus, 0)
 	Sim.step(1)
-	assert_eq(colossus.hp, 30, "P1's throw glances off the visor")
+	assert_eq(colossus.hp, 16, "P1's throw glances off the visor")
 	_p2.idle = false
 	Sim.step(2)
 	assert_true(colossus.is_visor_up(), "P2 plays again: up")
 	Sim.step(Tuning.BOSS_HIT_COOLDOWN)
 	_head_shot(colossus, 0)
 	Sim.step(1)
-	assert_eq(colossus.hp, 29, "P1's throw counts")
+	assert_eq(colossus.hp, 15, "P1's throw counts")
 	_coop_teardown()
 
 
@@ -1530,7 +1531,7 @@ func test_coop_the_single_hero_search_cannot_hurt_the_visor_colossus() -> void:
 			for start: int in starts:
 				_coop_episode(_p1, weapon, Vector2i(start, 160), _throw_and_step(start))
 				_coop_episode(_p1, weapon, Vector2i(start, 160), _coop_random(rng, 120))
-				assert_eq(colossus.hp, 30, "partner %d, weapon %d from x %d: nothing counts" % [partner_x, weapon,
+				assert_eq(colossus.hp, colossus.max_hp, "partner %d, weapon %d from x %d: nothing counts" % [partner_x, weapon,
 						start])
 	assert_false(colossus.dead)
 	_p2_spot = Vector2i(-1, -1)

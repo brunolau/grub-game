@@ -456,7 +456,18 @@ func kill(cause: StringName) -> void:
 
 ## Bounce off an enemy or boss head (PHYSICS.md 9): yvel is set, fall_ticks cleared, the hero is lifted by
 ## `depth` px (the penetration reported by Overlap.depth).
-func bounce(yvel_v16: int, depth: int = 0) -> void:
+## 2.0 G54 (PHYSICS.md C.10 "a head is never a step into rock"): when the lift would put his box into a solid cell
+## ([method body_in_rock] at his feet lifted by `depth`), he is not lifted: he slides off the head instead
+## ([method slide_off_head]; `head` = the body he bounced on, optional - found by the overlap test when not given) and
+## the bounce is cut to the free room under the ceiling ([method cut_to_room]). Book I has no head under a ceiling
+## closer than a hero's height, so this never acts in a Book I route (tools/sp_identity.sh).
+func bounce(yvel_v16: int, depth: int = 0, head: SimEntity = null) -> void:
+	if depth > 0 and body_in_rock(sim_pos.x, sim_pos.y - depth):
+		slide_off_head(head, sim_pos.y - depth)
+		yvel = cut_to_room(yvel_v16, free_room(sim_pos.x, sim_pos.y))
+		fall_ticks = 0
+		grounded = false
+		return
 	yvel = yvel_v16
 	fall_ticks = 0
 	grounded = false
@@ -725,13 +736,21 @@ func land_on_partner(partner: PlayerBase) -> int:
 		return HEAD_NONE
 	var depth: int = Overlap.depth
 	if partner.down:
-		bounce(Tuning.BOUNCE_YVEL, depth)
+		bounce(Tuning.BOUNCE_YVEL, depth, partner)
 		partner.hatch(self, PartyTuning.hatch_hearts(Game.difficulty))
 		return HEAD_HATCH
 	if holds_up():
+		# G54: a hop whose lift would put his box into rock is no head contact - he passes through his partner (heroes
+		# never block each other), as off an idle head.
+		if body_in_rock(sim_pos.x, sim_pos.y - depth):
+			return HEAD_NONE
 		shoulder_hop(partner, depth)
 		return HEAD_HOP
 	if partner.curl != CURL_NONE:
+		return HEAD_NONE
+	# G54: no Totem Ride whose resting place on the head (y = K.y - 34) would put his box into rock: he passes through
+	# (a falling hero swinging under the ledge his partner walks on is never lifted into it - DB3's 4-1 zigzags).
+	if body_in_rock(sim_pos.x, partner.sim_pos.y - PartyTuning.TOTEM_REST_PX):
 		return HEAD_NONE
 	start_totem_ride(partner)
 	return HEAD_RIDE
@@ -787,6 +806,7 @@ func carry_totem() -> bool:
 		end_totem_ride()
 		return false
 	var moved: int = 0
+	var old_y: int = sim_pos.y
 	if dx != 0 and x_commit_allows(sim_pos.x + dx):
 		sim_pos.x += dx
 		moved = dx
@@ -799,9 +819,16 @@ func carry_totem() -> bool:
 		var row: int = Tuning.to_cell(sim_pos.y)
 		var toward: int = signi(dx) if dx != 0 else signi(xvel)
 		var probe_col: int = Tuning.to_cell(sim_pos.x + Tuning.WALL_PROBE * toward)
-		if level.grid.side_at(probe_col, row - 1) == TileGrid.SIDE_WALL \
-				or level.grid.ceiling_at(Tuning.to_cell(sim_pos.x), row - Tuning.HEAD_PROBE_ROWS) == TileGrid.CEILING_SOLID:
+		var scrape: bool = level.grid.side_at(probe_col, row - 1) == TileGrid.SIDE_WALL \
+				or level.grid.ceiling_at(Tuning.to_cell(sim_pos.x), row - Tuning.HEAD_PROBE_ROWS) == TileGrid.CEILING_SOLID
+		# G54: a carry that would put his box into a solid cell is a scrape too, and he is never lifted into it: he stays
+		# at the height he had and his rise is cut to the free room there (he slides off the head).
+		var rock: bool = grid_rock_at(level.grid, sim_pos.x, sim_pos.y)
+		if scrape or rock:
 			sim_pos.x -= moved
+			if rock and sim_pos.y < old_y:
+				sim_pos.y = old_y
+				yvel = cut_to_room(yvel, free_room(sim_pos.x, sim_pos.y))
 			end_totem_ride()
 			on_platform = false
 			grounded = false
@@ -835,6 +862,161 @@ func throw_off_totem_rider() -> void:
 	rider.end_totem_ride()
 	if is_instance_valid(rider):
 		rider.launch(0, PartyTuning.TOTEM_THROW_OFF_YVEL)
+
+
+# --- 2.0 G54: a head is never a step into rock (PHYSICS.md C.10; DESIGN.md G54) ---------------------------------------
+# When standing on, riding or bouncing off a head (an enemy's, a boss body's, a hero's) would put a hero's box into a
+# solid cell, he slides off that head instead (away from the rock, else the nearer side) and the bounce is cut to the
+# free room under the ceiling. The hero side of it: [method bounce] (every head bounce - enemies, bosses, a hatched
+# egg), [method land_on_partner] (Shoulder Hop and Totem Ride start: he passes through his partner) and [method
+# carry_totem] (a carry into rock is a scrape and lifts nobody). The corner slip of PHYSICS.md 11.2 #5 only moves him
+# sideways inside his wall-probe row (it never changes y), so with these three no head lifts a hero into rock any more
+# and no slip lifts him either (the w9_l3 crown juggle and the 4-1 zigzag lift both started with a head lift). Each
+# guard acts only when its result would be in rock, so a Book I hero (no head under a ceiling closer than his height)
+# never meets it.
+
+## How far [method slide_off_head] looks sideways for a place off the head (px).
+const G54_SLIDE_MAX_PX: int = 64
+
+
+## G54: true when this hero with his feet point at (x, y) would have his box in a solid cell ([method grid_rock_at] on
+## the level's grid). Without a level: false.
+func body_in_rock(x: int, y: int) -> bool:
+	var level: LevelBase = Game.level
+	if level == null or level.grid == null:
+		return false
+	return grid_rock_at(level.grid, x, y)
+
+
+## G54: true when a hero box with its feet point at (x, y) lies in a solid cell of `grid` as the hero's tile collision
+## sees his body (PHYSICS.md 11.2): in his feet column, the wall-probe row `row - 1` or the head-probe row `row - 2`
+## holds a wall (SIDE 1) or a solid ceiling, or his feet are inside a full block (`y` not on its top edge, a cell with
+## no surface profile: tar and slopes are stood in). One-way ledges (`-` / `=`) are no rock.
+static func grid_rock_at(grid: TileGrid, x: int, y: int) -> bool:
+	var col: int = x >> 4
+	var row: int = y >> 4
+	if _rock_cell(grid, col, row - 1) or _rock_cell(grid, col, row - Tuning.HEAD_PROBE_ROWS):
+		return true
+	return (y & 15) != 0 and _rock_cell(grid, col, row) and grid.profile_at(col, row) == TileGrid.PROFILE_NONE
+
+
+static func _rock_cell(grid: TileGrid, col: int, row: int) -> bool:
+	return grid.side_at(col, row) == TileGrid.SIDE_WALL \
+			or (grid.flags_at(col, row) & TileGrid.FLAG_CEILING_MASK) == TileGrid.CEILING_SOLID
+
+
+## G54: how many px this hero could rise from the feet point (x, y) before his box would be in a solid cell
+## ([method body_in_rock]); 0 when it is in one already. At most 256 (no ceiling in reach).
+func free_room(x: int, y: int) -> int:
+	var level: LevelBase = Game.level
+	if level == null or level.grid == null:
+		return 256
+	for d: int in 257:
+		if grid_rock_at(level.grid, x, y - d):
+			return maxi(d - 1, 0)
+	return 256
+
+
+## G54: the height (px) a launch with `v` v16 upwards rises (the integration of PHYSICS.md 6.2: y += floor16(yvel),
+## then gravity, until it no longer rises). 0 for v >= 0.
+static func rise_px(v: int) -> int:
+	var y: int = 0
+	var rise: int = 0
+	while v < 0:
+		y += v >> 4
+		rise = maxi(rise, -y)
+		v += Tuning.GRAVITY
+	return rise
+
+
+## G54: `yvel_v16` cut so that its rise ([method rise_px]) fits into `room` px (whole gravity steps, never downwards
+## from it: a fall keeps its speed).
+static func cut_to_room(yvel_v16: int, room: int) -> int:
+	var v: int = yvel_v16
+	while v < 0 and rise_px(v) > room:
+		v = mini(v + Tuning.GRAVITY, 0)
+	return v
+
+
+## G54: this hero leaves `head` (the body under his feet; null = the first enemy, boss or hatched partner whose body his
+## box overlaps from above, found by the overlap test) sideways at his current height: to the side away from the rock
+## his lift would have met at `lifted_y` (rock beside his column there on one side only), else the nearer side of the
+## head's box (his facing on a tie); the other side when that one is walled. He moves to the first x at which his box no
+## longer overlaps the head's (Overlap.test, the halved width of 2.2), at most G54_SLIDE_MAX_PX away, never across a
+## wall in his wall-probe row nor into a cell of rock, never outside his x commit rule. No place found: he stays.
+func slide_off_head(head: SimEntity, lifted_y: int) -> void:
+	var level: LevelBase = Game.level
+	if level == null or level.grid == null:
+		return
+	if head == null:
+		head = _head_under(level)
+	if head == null:
+		return
+	var grid: TileGrid = level.grid
+	var rock_left: bool = grid_rock_at(grid, sim_pos.x - Tuning.TILE, lifted_y)
+	var rock_right: bool = grid_rock_at(grid, sim_pos.x + Tuning.TILE, lifted_y)
+	var side: int = 0
+	if rock_left and not rock_right:
+		side = 1
+	elif rock_right and not rock_left:
+		side = -1
+	else:
+		var head_left: int = head.sim_pos.x - head.box_xo
+		var to_left: int = sim_pos.x - head_left
+		var to_right: int = head_left + head.box_w - sim_pos.x
+		side = -1 if to_left < to_right else (1 if to_right < to_left else (facing if facing != 0 else 1))
+	var x: int = _slide_target(grid, head, side)
+	if x == sim_pos.x:
+		x = _slide_target(grid, head, -side)
+	sim_pos.x = x
+
+
+## The first x from this hero's feet towards `side` at which his box is off `head` (see [method slide_off_head]), or
+## his own x when there is none. "Off" is tested with the widest hero box (Tuning.HERO_BOX_HURT, 48 x 32 with x offset
+## 24: every pose fits in it), so no pose of his next ticks puts him back on that head. A step is refused by a wall in
+## his wall-probe row (`row - 1`, as his own x step), by his x commit rule, and by rock ([method grid_rock_at]) unless
+## he stands in rock already where he is (a 1.0 overhang over his head: walking under it is no worse there).
+func _slide_target(grid: TileGrid, head: SimEntity, side: int) -> int:
+	var row: int = sim_pos.y >> 4
+	var in_rock_here: bool = grid_rock_at(grid, sim_pos.x, sim_pos.y)
+	for d: int in range(1, G54_SLIDE_MAX_PX + 1):
+		var x: int = sim_pos.x + side * d
+		if grid.side_at(x >> 4, row - 1) == TileGrid.SIDE_WALL or not x_commit_allows(x) \
+				or (not in_rock_here and grid_rock_at(grid, x, sim_pos.y)):
+			return sim_pos.x
+		var saved_stomp: bool = Overlap.stomp
+		var saved_depth: int = Overlap.depth
+		var wide: Vector3i = Tuning.HERO_BOX_HURT
+		var on_head: bool = Overlap.test(x, sim_pos.y, wide.x, maxi(box_h, wide.y), wide.z, head.sim_pos.x,
+				head.sim_pos.y, head.box_w, head.box_h, head.box_xo, false, yvel, 1)
+		Overlap.stomp = saved_stomp
+		Overlap.depth = saved_depth
+		if not on_head:
+			return x
+	return sim_pos.x
+
+
+## The body this hero's box overlaps from above (the lower of the two): the first enemy, boss or other hatched hero in
+## that order, null when none. Overlap's results are kept.
+func _head_under(level: LevelBase) -> SimEntity:
+	var saved_stomp: bool = Overlap.stomp
+	var saved_depth: int = Overlap.depth
+	var found: SimEntity = null
+	for kind: int in [Defs.Kind.ENEMY, Defs.Kind.BOSS]:
+		for entity: SimEntity in level.get_kind(kind):
+			var enemy: EnemyBase = entity as EnemyBase
+			if found != null or entity == self or entity.sim_pos.y < sim_pos.y or (enemy != null and enemy.dead):
+				continue
+			if Overlap.body(self, entity, self):
+				found = entity
+	if found == null:
+		for other: PlayerBase in level.contact_order():
+			if other != self and not other.dead and other.sim_pos.y >= sim_pos.y and Overlap.body(self, other, self):
+				found = other
+				break
+	Overlap.stomp = saved_stomp
+	Overlap.depth = saved_depth
+	return found
 
 
 func _totem_bookkeeping() -> void:

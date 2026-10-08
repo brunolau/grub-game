@@ -258,7 +258,8 @@ func is_targetable() -> bool:
 ## [method accepts_hit_from] refuses glances (consumed, no damage: a shell's front); every other hit goes through
 ## [method _on_hit_by] first. With the defaults this is the 1.0 hit.
 ## Co-op traits (PLAN.md P1.8): a leech's host's own weapons pass through it (false, not consumed); the first hit of a
-## whole `split` record splits it without damage (CoopTraits.absorbs_hit).
+## whole `split` record splits it without damage (CoopTraits.absorbs_hit); a `heavy` record takes one hit per strike -
+## the later ticks of a swing that already hurt it are used up without anything happening (CoopTraits.repeats_strike).
 func take_hit(power: int, source: SimEntity) -> bool:
 	if not is_targetable():
 		return false
@@ -270,6 +271,8 @@ func take_hit(power: int, source: SimEntity) -> bool:
 		last_hit_tick = Sim.total_ticks
 	if not accepts_hit_from(source):
 		_on_hit_refused(source)
+		return true
+	if _traits != null and _traits.repeats_strike(slot, source):
 		return true
 	_on_hit_by(slot, power)
 	if _traits != null and _traits.absorbs_hit(slot, source):
@@ -304,8 +307,11 @@ func on_bounced(hero: PlayerBase) -> int:
 	return 0
 
 
-## The hero dive-stomped it with the hang-glider: 1 000 / 5 000 / 10 000 points, the third stomp kills.
+## The hero dive-stomped it with the hang-glider: 1 000 / 5 000 / 10 000 points, the third stomp kills. 2.0: a
+## `heavy` record of a co-op party that no Brace Wall staggers takes nothing from it (CoopTraits.refuses_death).
 func on_glider_stomp(hero: PlayerBase) -> void:
+	if _traits != null and _traits.refuses_death():
+		return
 	var index: int = mini(dive_count, Tuning.GLIDER_DIVE_SCORES.size() - 1)
 	_credit_points(hero, Tuning.GLIDER_DIVE_SCORES[index])
 	Game.add_score(Tuning.GLIDER_DIVE_SCORES[index])
@@ -383,8 +389,12 @@ func _bounce_multiplier(count: int) -> int:
 ## `cause`: &"weapon", &"feast", &"kill_all", &"glider", &"boss". `killer` may be null.
 ## An enemy that stole a heart bursts into its bones and one eaten during the feast vanishes; every other awake
 ## enemy is thrown away from the killer in an arc and falls off the screen.
+## 2.0: a `heavy` record of a co-op party that no Brace Wall staggers dies of no cause but a weapon hit it accepted
+## (CoopTraits.refuses_death: a kill-all, a feast's bite, a mount's bite leave it alive).
 func kill(cause: StringName, killer: SimEntity = null) -> void:
 	if dead:
+		return
+	if cause != &"weapon" and _traits != null and _traits.refuses_death():
 		return
 	var was_awake: bool = awake
 	dead = true
@@ -415,9 +425,12 @@ func kill(cause: StringName, killer: SimEntity = null) -> void:
 	_doze_note()
 
 
-## Grenade: vanish into `count` random bonus items, no score.
+## Grenade: vanish into `count` random bonus items, no score. 2.0: not a `heavy` record of a co-op party that no
+## Brace Wall staggers (CoopTraits.refuses_death).
 func burst_into_items(count: int = Tuning.GRENADE_ITEMS_PER_ENEMY) -> void:
 	if dead:
+		return
+	if _traits != null and _traits.refuses_death():
 		return
 	dead = true
 	for i: int in count:
@@ -897,9 +910,12 @@ func _refresh_visual() -> void:
 		_show_bone_shield(not food and not dead and bone_shielded())
 
 
-## True while the enemy is drawn as food (feast mode, GAMEPLAY.md 5.3; a party: while any hero feasts).
+## True while the enemy is drawn as food (feast mode, GAMEPLAY.md 5.3; a party: while any hero feasts). 2.0: never a
+## `heavy` record of a co-op party that cannot be eaten now (CoopTraits.refuses_death).
 func _shows_food() -> bool:
 	if not awake or not tangible or not contact_hurts:
+		return false
+	if _traits != null and _traits.refuses_death():
 		return false
 	var level: LevelBase = Game.level
 	return level != null and level.any_hero_feasting()

@@ -1,28 +1,27 @@
-# route: level=w6_l2b_coop difficulty=beginner players=2 ends=exit after=tally expect=wipes:0,x2_gates:1,unlocked:true
+# route: level=w6_l2b_coop difficulty=beginner players=2 ends=exit after=tally expect=wipes:0,x2_gates:1,unlocked:true,fight_ticks:1092..2185
 # The Beginner two-stream route of Heart of the Mangrove in co-op (designer D6; recorded from
 # build/d6/bot_w6_l2b_coop2.gd, P1|P2; club only, never S): up the trunk ahead of the rising tar, P2 one ledge behind
 # P1; gate 'vent' - both into the vent room, both heave the boulder four tiles onto the two deadly tar vents (one hero
-# alone only strains), both up over it and the step; the climb to the landing; then the co-op Old Mangrove (5 twin
-# hits, then 3 on the stuck fist): P1 jumps from the lower root ledge onto the resting fist without Jump held and pins
+# alone only strains), both up over it and the step; the climb to the landing; then the co-op Old Mangrove (3 twin
+# hits, then 2 on the stuck fist): P1 jumps from the lower root ledge onto the resting fist without Jump held and pins
 # it, hops on it and clubs the face while P2, on the lower ledge under the hand's resting place (crouched while it
 # sweeps), high-strikes the resting hand on his hop - the twin; in stage 3 P2 stands on the lower ledge just left of
 # the stuck fist (the nearer hero: the knuckle armour turns to him) and P1 drops through the ledge's rotten hatch cells
 # on the wrist side, clubbing the fist on the way down; the fire-starter and the team exit. No role waits 243 ticks
 # without input (G33).
+# Re-recorded in wf10 (bosses) with a copy of D6's bot (build/bosses10/bot_w6_l2b_coop3.gd: its hand / fist forecasts
+# follow the new co-op rule) after the boss balance: fewer co-op hits (Beginner 3 + 2, Expert 4 + 3) and, in stage 1,
+# hand and fist keep time (Mangrove._hand_waits_for_fist / _fist_waits_for_hand); fight 45-90 s pinned by fight_ticks.
 2:R|R,13:R|,6:|,1:R|,2:|,1:R|,2:|,16:U|,20:U|R,2:U|,1:U|R,6:U|,1:U|L,2:U|,203:U|U,14:L|U,7:|U,16:U|U,4:L|U,6:|U
 1:R|U,1:R|L,6:|L,1:R|L,2:|L,4:U|L,12:U|,16:|U,4:U|L,6:U|,2:U|R,4:U|,2:L|,1:L|R,2:L|,3:L|U,34:|U,1:|R,1:R|R,9:R|
 7:|,40:R|R,1:|,8:RU|,1:R|,3:R|RU,1:|RU,4:R|RU,3:R|R,1:R|,1:R|L,4:R|R,4:|R,1:R|R,2:|R,2:|,4:U|,1:U|R,11:U|,4:L|
 6:|,2:R|,3:|,16:U|,4:L|R,6:L|,2:L|U,7:|U,1:R|U,5:|U,1:R|U,2:|L,2:U|L,6:U|,2:U|R,6:U|,5:L|U,7:|U,4:U|U,12:U|
-12:U|L,7:U|,1:U|R,5:U|,1:U|R,2:U|,16:U|U,5:U|L,7:U|,284:U|U,30:R|U,42:|U,26:|R,8:|,4:R|,7:|,25:|R,1:|L,5:|,1:L|
-1:|,3:|L,2:L|L,10:|L,2:|,12:R|R,2:|,3:R|R,7:|,1:R|,1:R|L,2:R|,3:R|L,3:|L,3:|,2:|R,1:L|R,2:|,3:L|R,1:L|L,2:L|
-1:R|,2:|,3:R|,2:|,3:R|,2:|,2:L|,1:R|,60:|,41:D|D,67:|,2:|R,2:|,2:|L,3:|R,3:|L,3:|R,1:|L,2:|,1:|R,1:|L,1:|R,1:|L
-1:|R,5:|L,3:|,4:|R,1:|L,22:|,41:D|D,82:|,7:R|,7:RU|,8:R|,2:|,4:L|,2:|,4:R|,9:|,41:|D,2:U|,5:F|UF,2:|UF,19:|
-2:U|,5:F|UF,2:|UF,13:|,6:L|,7:LU|,7:L|,10:|,2:R|,43:|,41:D|D,5:|R,10:|L,1:|,9:|R,8:|L,8:|R,2:|L,2:|,4:|L,2:|
-6:|R,2:|,6:|L,3:|,2:|R,1:|L,30:|,7:R|,7:RU|,8:R|,2:|,1:|D,3:L|D,4:|D,2:R|D,1:|D,1:R|D,5:|D,1:L|D,5:|D,1:R|D
-17:|D,2:U|,5:F|UF,2:|UF,19:|,2:U|,5:F|UF,2:|UF,37:|,6:L|,7:LU|,7:L|,10:|,2:R|,19:|,41:D|D,125:|,41:D|D,106:|
-3:|R,6:|L,1:|,5:|R,1:|L,3:|,41:D|D,82:|,7:R|,7:RU|,8:R|,3:|,3:L|,7:|,3:R|,5:|,41:|D,2:U|,5:F|UF,2:|UF,19:|,2:U|
-5:F|UF,2:|UF,23:|,5:L|,7:LU|,7:L|,10:|,1:R|,35:|,41:D|D,82:|,7:R|,7:RU|,8:R|,3:|,3:L|,7:|,3:R|,5:|,41:|D,2:U|
-5:F|UF,2:|UF,19:|,5:L|,7:LU|,7:L|,10:|,1:R|,31:|,7:R|,7:RU|,8:R|,3:|,3:L|,7:|,1:R|,2:R|D,39:|D,2:U|,5:F|UF
-1:|UF,8:|R,2:|,4:|L,1:|R,4:|,5:L|,7:LU|,7:L|,4:|,4:R|,8:|,5:R|,1:L|,2:|,4:L|,98:|,1:|D,45:|,4:D|,6:F|,94:|,1:|D
-54:|,1:F|,94:|,1:|D,31:|,4:D|,6:F|,108:|,1:|D,40:|,1:F|,48:|,4:D|,6:F|,50:|,1:|D,63:|,3:L|R,8:R|R,3:L|R,4:L|L
-2:R|L,7:L|L,19:R|L,27:L|L
+12:U|L,7:U|,1:U|R,5:U|,1:U|R,2:U|,16:U|U,5:U|L,7:U|,284:U|U,30:R|U,42:|U,26:|R,8:|,4:R|,7:|,16:|R,1:L|R,7:|R
+1:|L,4:|,1:L|L,4:|L,4:L|L,3:|,1:|L,29:|,16:R|R,1:|R,6:|,2:R|,6:R|L,2:|L,3:|,3:|R,3:L|R,1:L|L,3:L|,1:R|,4:|,2:R|
+125:|,8:R|,6:RU|,1:RU|D,8:R|,2:|,4:L|,3:|,3:R|,1:|,2:R|,4:|D,2:L|D,1:R|D,34:|D,2:U|,5:F|UF,2:|UF,19:|,2:U|
+5:F|UF,2:|UF,28:|,6:L|,7:LU|,7:L|,10:|,1:R|,23:|,1:|R,1:|L,1:|R,1:|L,1:|R,1:|L,1:|R,1:|L,1:|R,1:|L,1:|R,3:|
+1:R|R,1:R|L,1:R|R,1:R|L,1:R|R,3:R|L,2:RU|L,2:RU|,3:RU|R,3:R|R,1:R|L,4:R|,2:|,4:L|,3:|,3:R|,1:|,2:R|,4:|D,2:L|D
+1:R|D,34:|D,2:U|,5:F|UF,2:|UF,19:|,2:U|,5:F|UF,2:|UF,28:|,6:L|,7:LU|,7:L|,10:|,1:R|,37:|,8:R|,7:RU|,8:R|,2:|
+4:L|,3:|,3:R|,1:|,2:R|,4:|D,2:L|D,1:R|D,34:|D,2:U|,5:F|UF,1:|UF,7:|R,12:|,6:L|,7:LU|,7:L|,4:|,4:R|,8:|,5:R|
+1:L|,4:|,2:L|,89:|,1:|D,48:|,4:D|,6:F|,91:|,1:|D,57:|,1:F|,83:|,4:D|,4:F|,1:F|D,1:F|,114:|,3:L|R,8:R|R,3:L|R
+4:L|L,2:R|L,7:L|L,19:R|L,27:L|L

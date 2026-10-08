@@ -27,11 +27,12 @@
 #   tests/test_versus_bots.gd (12 seeds x 4 rounds, four Hunters). Phase 3: the symmetric big spot (two cells) took
 #   Grub Stack from 15 points worst (one cell in col 9: the left floor spawn led; in col 10 the right one did) to 8;
 #   Hot Rock 8, LCS 12 (re-measured with the darkness pulse, same numbers).
-# - Not built (phase 3, DA - balance): the `$` walls that grow back (`regrow = 364`) and the dangler springboard
-#   (`enemies/dangler`, world-B's neutral springboard). Every placement measured put the right floor spawn ahead in
-#   Grub Stack (48-58 % of 48 rounds): `$` columns under the side shelves (cols 3 / 16, rows 8-9), with or without the
-#   dangler over the shaft (x 160, rows 1-3), and the dangler alone; spawns one cell in or out did not even it out
-#   (variants and numbers: build/engine_requests/wf9_da_to_lead_design.txt).
+# - Dropped from 2.0 (PLAN.md cut 3 as applied in wf10, the orchestrator's decision): the `$` walls that grow back
+#   (`regrow`) and the dangler springboard (`enemies/dangler`, world-B's neutral springboard) - they broke spawn
+#   fairness. Every placement measured in phase 3 put the right floor spawn ahead in Grub Stack (48-58 % of 48
+#   rounds): `$` columns under the side shelves (cols 3 / 16, rows 8-9), with or without the dangler over the shaft
+#   (x 160, rows 1-3), and the dangler alone; spawns one cell in or out did not even it out (variants and numbers:
+#   build/engine_requests/wf9_da_to_lead_design.txt). The arena's signature is the darkness pulse alone.
 # - Bot graph: resources/bots/arena_echo_hollow.json, baked with core-B's tool after every edit of this file:
 #   bash .tools/gd.sh script res://tools/bots/bake_nav.gd -- arena_echo_hollow
 

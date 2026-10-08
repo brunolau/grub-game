@@ -24,7 +24,9 @@ extends BossBase
 ##
 ## 2.0 co-op form (DESIGN.md B.7, GAMEPLAY.md 13.6; enemies-C, PLAN.md P2.3) - only in a co-op game of two heroes on a
 ## co-op file (`kind = coop`: w2_l2b_coop); everywhere else, a party of one included, the Brute above runs unchanged:
-##  - hit points x5/4 (64 -> 80; PartyTuning.BOSS_HP_MAX_NUM / DEN);
+##  - hit points x5/4 (64 -> 80; PartyTuning.BOSS_HP_MAX_NUM / DEN), counted in club hits: every counted head hit takes
+##    COOP_HIT_POWER (25, charged or not), then its head is covered for COOP_COVER_TICKS - every blow glances (wf10 boss
+##    balance: 45-90 s for a pair);
 ##  - it targets whoever hit it last (before the first hit, or when he is down: the nearest ACTIVE hero -
 ##    LevelBase.nearest_coop_hero, hatched and not idle, DESIGN.md G33 - so a dozing partner never draws the guard);
 ##  - its **arm guard** faces its target: every head hit of the target hero glances off (a clank and a spark), a club
@@ -54,6 +56,14 @@ const GRAB_WRIGGLE_TICKS: int = 4        ## each Left / Right press in turn shor
 const GRAB_HOLD_TICKS: int = 132         ## a hold ends after this long at most (tune)
 const GRAB_COOLDOWN_TICKS: int = 132     ## ticks between two grabs (tune)
 const GRAB_FREE_SHIELD_TICKS: int = 44   ## a freed or released hero blinks this long (the grab trait's rule)
+## wf10 boss balance (orchestrator: a co-op boss fight lasts 45-90 s for a competent pair; DB2's duo beat the co-op
+## Brute in 6 s Beginner / 10 s Expert with two / four charged blows of 100): in the co-op form every counted head hit
+## takes COOP_HIT_POWER - one club hit, charged or not, whatever the weapon - so its hit points count club hits
+## (Beginner 187 = 8, Expert 312 = 13; x5/4 of the solo club hits, B.0), and after each counted hit it covers its head
+## for COOP_COVER_TICKS (its hit cooldown): every blow glances (a clank) until it has fought on that long. During a
+## Grab the partner's blow still frees the held hero at once. (tune)
+const COOP_HIT_POWER: int = 25
+const COOP_COVER_TICKS: int = 110
 
 ## Left and right limits of the feet point, logical px (level parameters `left` / `right`, absolute columns).
 var left_x: int = 0
@@ -406,11 +416,15 @@ func _update_box() -> void:
 			set_box(EnemyTuning.BRUTE_BOX_STAND)
 
 
-## A club or thrown weapon hit the head.
+## A club or thrown weapon hit the head. 2.0 co-op (wf10): one club hit's worth, then the head is covered.
 func _on_head_hit(power: int, hero: PlayerBase) -> void:
+	if _coop:
+		power = COOP_HIT_POWER
 	apply_boss_hit(power)
 	if dead or _state == State.DYING:
 		return
+	if _coop:
+		hit_cooldown = COOP_COVER_TICKS
 	_raise_anger()
 	if hero != null and hero.run.has_glider:
 		hero.set_glider(false)
@@ -504,18 +518,21 @@ func _coop_poll(target: PlayerBase) -> int:
 		if _guarded(level.get_hero(projectile.owner_slot), target):
 			_guard_glance(level, head.get_center())
 			return 0
-		if hit_cooldown > 0:
+		if _covered():
+			_guard_glance(level, head.get_center())
 			return 0
 		_note_hitter(level, projectile.owner_slot)
 		return projectile.power
-	if hit_cooldown > 0:
-		return 0
 	for hero: PlayerBase in level.contact_order():
 		if hero == _held or not hero.club_box_active or not Overlap.rects(hero.club_box, head):
 			continue
 		if _guarded(hero, target):
 			_guard_glance(level, hero.club_box.intersection(head).get_center())
 			continue
+		if _covered():
+			# wf10: the head is covered after a counted hit (the hit cooldown): the blow glances.
+			_guard_glance(level, hero.club_box.intersection(head).get_center())
+			return 0
 		hero.notify_weapon_hit()
 		_note_hitter(level, hero.slot)
 		return hero.club_power
@@ -531,6 +548,12 @@ func _guarded(hitter: PlayerBase, target: PlayerBase) -> bool:
 		return hitter == _held
 	var over_guard: bool = hitter.is_riding_totem() and hitter.totem_carrier.counts_for_coop()
 	return hitter == target and not over_guard
+
+
+## Co-op: the head is covered - the hit cooldown runs (COOP_COVER_TICKS after a counted hit) and nobody is held (the
+## partner's blow during a Grab frees the held hero at once).
+func _covered() -> bool:
+	return hit_cooldown > 0 and _held == null
 
 
 func _guard_glance(level: LevelBase, point: Vector2i) -> void:

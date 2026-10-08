@@ -1,14 +1,14 @@
 {
   "format": 2,
   "level": "arena_floe_rink",
-  "source_sha256": "6ba28aba9499bd1dac1f5ec00cb5c2e70e6aab0c838090e64ff16ac73f6953d5",
+  "source_sha256": "105da40cded2176f76a2d2087383790614fec0debe21ad1edc4527218f914820",
   "difficulty": "beginner",
   "cols": 20,
   "rows": 12,
   "wrap": "none",
   "weights": [0,1,2],
   "clip": [],
-  "baker": {"candidates":20740,"rejected":0,"simulated_ticks":476176,"verified_starts":1026,"version":3},
+  "baker": {"candidates":20740,"rejected":0,"simulated_ticks":476183,"verified_starts":1026,"version":3},
   "movers": [
   ],
   "nodes": [

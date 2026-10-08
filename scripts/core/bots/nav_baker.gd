@@ -60,6 +60,9 @@ var _memo_ticks: Dictionary = {}
 var _memo_land: Dictionary = {}
 var _memo_sprung: Dictionary = {}
 var _memo_walked: Dictionary = {}
+# The pulley-lift part the run rode on the way (-1 = none) and that part's state at the take-off.
+var _memo_touch: Dictionary = {}
+var _memo_state: Dictionary = {}
 var _scripts: Array[PackedInt32Array] = []
 var _script_keys: PackedStringArray = PackedStringArray()
 var _script_dirs: PackedInt32Array = PackedInt32Array()
@@ -138,6 +141,8 @@ func _clear_memo() -> void:
 	_memo_land.clear()
 	_memo_sprung.clear()
 	_memo_walked.clear()
+	_memo_touch.clear()
+	_memo_state.clear()
 
 
 # =================================================================================================================
@@ -336,11 +341,26 @@ func _land_node(from: int, s: int, x: int, geyser: int = -1) -> int:
 	# Landings on a platform are the mover pass's (NavMovers: they need the platform's state).
 	if outcome.platform != null or (landed >= 0 and graph.nodes[landed].mover >= 0):
 		landed = -1
+	# A move that rode a pulley lift on the way (a hop off its top: wf9_da_to_core_b.txt #1) holds only while the
+	# pulley is where it was (its level-start state): the link gets that lift's state as its cond ([method _add_link]);
+	# a lift without a node cannot carry one, so the move is not kept.
+	var touch: int = -1
+	if landed >= 0:
+		for part: int in outcome.rode:
+			if part < sim.part_pulley.size() and sim.part_pulley[part] >= 0:
+				touch = part
+				break
+		if touch >= 0 and (movers == null or movers.mover_of_part(touch) < 0):
+			landed = -1
+			touch = -1
 	_memo[key] = landed
 	_memo_ticks[key] = outcome.landing_tick
 	_memo_land[key] = outcome.pos.x
 	_memo_sprung[key] = outcome.sprung
 	_memo_walked[key] = outcome.walked
+	_memo_touch[key] = touch
+	_memo_state[key] = outcome.mover_states[touch] if touch >= 0 and touch < outcome.mover_states.size() \
+			else PackedInt32Array()
 	return landed
 
 
@@ -494,6 +514,8 @@ func _widen(from: int, to: int, s: int, seed_x: int, geyser: int, limits: Vector
 	var land1: int = -(1 << 30)
 	var sprung: bool = false
 	var walked: bool = true
+	var touch: int = -1
+	var touch_state: PackedInt32Array = PackedInt32Array()
 	for x: int in range(x0, x1 + 1):
 		var key: String = "%d:%d:%d:%d" % [geyser, from, s, x]
 		_land_node(from, s, x, geyser)
@@ -502,10 +524,17 @@ func _widen(from: int, to: int, s: int, seed_x: int, geyser: int, limits: Vector
 		land1 = maxi(land1, int(_memo_land[key]))
 		sprung = sprung or bool(_memo_sprung[key])
 		walked = walked and bool(_memo_walked[key])
-	return {
+		if touch < 0 and int(_memo_touch.get(key, -1)) >= 0:
+			touch = int(_memo_touch[key])
+			touch_state = _memo_state[key]
+	var window: Dictionary = {
 		"script": s, "x0": x0, "x1": x1, "ticks": ticks, "land_x0": land0, "land_x1": land1, "sprung": sprung,
 		"walked": walked,
 	}
+	if touch >= 0:
+		window["touch"] = touch
+		window["touch_state"] = touch_state
+	return window
 
 
 func _add_link(from: int, to: int, window: Dictionary, geyser: int) -> void:
@@ -540,6 +569,12 @@ func _add_link(from: int, to: int, window: Dictionary, geyser: int) -> void:
 		link.kind = NavGraph.KIND_DROP
 	else:
 		link.kind = NavGraph.KIND_WALK
+	if window.has("touch"):
+		var state: PackedInt32Array = window["touch_state"]
+		var mover: int = movers.mover_of_part(int(window["touch"])) if movers != null else -1
+		if mover < 0 or state.size() < 4:
+			return
+		link.cond = PackedInt32Array([mover, state[0], state[1], state[2], state[3]])
 	verified_starts += link.x1 - link.x0 + 1
 	graph.add_link(link)
 

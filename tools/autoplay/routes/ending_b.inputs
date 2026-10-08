@@ -1,8 +1,10 @@
 # route: level=ending_b difficulty=expert ends=exit after=the_end expect=painting:19,secrets:1,hurts:0
-# The route of The Long Raft Home (designer D9b; recorded from build/d9b/bot_ending_b.gd): along the hoard's jetty,
-# crouch on the hatch planks to drop onto the docked raft, three strikes towards the shore push it into the current,
-# the credits drift past; in the calm pool under the arch three high strikes open the big spot (Cave Painting 19),
-# six strokes paddle on, and the raft docks at the home beach past the welcome totem.
+# The route of The Long Raft Home (designer D9b; recorded from build/d9b/bot_ending_b.gd, re-recorded for the beach
+# exit by content in wf10 from its copy build/content/d9b/bot_ending_b.gd): along the hoard's jetty, crouch on the
+# hatch planks to drop onto the docked raft, three strikes towards the shore push it into the current, the credits
+# drift past; in the calm pool under the arch three high strikes open the big spot (Cave Painting 19), six strokes
+# paddle on; the raft docks at the home beach, its rails open over the sand (G45) and Grub walks off to the welcome
+# totem.
 16:R,4:,1:R,4:,11:D,4:,1:L,8:F,6:,8:F,6:,8:F,6:,1:R,149:,1:D,149:,1:D,149:,1:D,149:,1:D,149:,1:D,149:,1:D,149:
 1:D,149:,1:D,149:,1:D,149:,1:D,149:,1:D,149:,1:D,149:,1:D,149:,1:D,68:,4:R,1:UF,13:,1:UF,13:,1:UF,205:,1:L,8:F
-6:,8:F,6:,8:F,6:,8:F,6:,8:F,6:,8:F,6:,1:R,149:,1:D,114:
+6:,8:F,6:,8:F,6:,8:F,6:,8:F,6:,8:F,6:,1:R,149:,1:D,149:,1:D,5:,10:R

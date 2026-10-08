@@ -75,7 +75,7 @@ func test_inkjaw_reads_its_grotto_and_surfaces_after_its_bubbles() -> void:
 	assert_true(squid.gaps.has(squid.get_spot()), "it came up in a gap")
 	assert_true(up_at > 0)
 	for case: Array in [[Defs.Difficulty.EXPERT, false, 225], [Defs.Difficulty.BEGINNER, true, 187],
-			[Defs.Difficulty.EXPERT, true, 280]]:
+			[Defs.Difficulty.EXPERT, true, 225]]:
 		_fresh()
 		var other: Squid = _open(int(case[0]), 1, bool(case[1]))
 		assert_eq(other.max_hp, int(case[2]))

@@ -27,11 +27,11 @@
 # - Cookpots: two (4-player arena), on the upper ledges (cols 5 / 14).
 # - Spawns (rotate every round; 2 players use 1 and 2): 1 and 2 on the floor (cols 13 / 6), 3 and 4 on the upper
 #   ledges' inner ends (cols 7 / 12).
-# - Modes: Grub Stack only for now - its bot set is green (core-B's tests/test_versus_bots.gd, 12 seeds x 4 rounds,
-#   four Hunters; DA's phase-3 run: 2 points worst). E.5's default, Last Caveman Standing, is NOT listed: no layout of
-#   phase 3 got its set inside +/-15 points (ten fixed-floe layouts and gust scripts measured 17-50 points worst: a
-#   four-way ring-out rink is decided in the first seconds of each round); it is listed again - with meta `bots` (G50)
-#   leaving it out while the bots cannot play it fairly - once core-B's test honours `bots`.
+# - Modes: Grub Stack only - 2.0 ships Floe Rink with Grub Stack alone (PLAN.md cut 3 as applied in wf10, the
+#   orchestrator's decision; DESIGN.md E.5). Its bot set is green (core-B's tests/test_versus_bots.gd, 12 seeds x 4
+#   rounds, four Hunters; DA's phase-3 run: 2 points worst). E.5's first default, Last Caveman Standing, is not
+#   offered (nor Hot Rock): no layout of phase 3 got its set inside +/-15 points (ten fixed-floe layouts and gust
+#   scripts measured 17-50 points worst: a four-way ring-out rink is decided in the first seconds of each round).
 # - Bot graph: resources/bots/arena_floe_rink.json, baked with core-B's tool after every edit of this file:
 #   bash .tools/gd.sh script res://tools/bots/bake_nav.gd -- arena_floe_rink
 

@@ -228,6 +228,7 @@ func produce(tick: int) -> int:
 		idle_ticks += 1
 	_last_pos = hero.sim_pos
 	nav.set_weight_class(brain.nav_class(hero, level))
+	nav.update_movers(hero, movers)
 	if brain.needs_thinking(tick) or (tick + slot) % VersusTuning.BOT_GOAL_PERIOD_TICKS == 0:
 		brain.think(hero, level, tick)
 	var flags: int = brain.act(hero, level, tick)

@@ -8,9 +8,10 @@
 # raft's row before the beach, no vine. The current rests in a calm pool under the rock arch at the spire's foot (a
 # sign says so): the raft stops there until a rider paddles on, so the high strikes at the big spot in the arch's
 # underside, 3 rows over the water, never leave a hopping rider behind - three of them drop Cave Painting 19 (missing
-# it fails nothing). The raft stops at the home beach; the welcome totem stands on a jetty plank over the last
-# water, where every rider touches it: the tally, then THE END (the cave mural when all 30 paintings are found), the
-# credits and the title.
+# it fails nothing). The current ends at the home beach and the raft drifts the last pixel against its bank: at
+# rest there its rails open over the beach (DESIGN.md G45) and the rider walks off onto the sand to the welcome
+# totem one cell up the sand: the tally, then THE END (the cave mural when all 30 paintings are found), the
+# credits and the title. (Until G45 was built the totem stood on a jetty plank over the last water.)
 
 [meta]
 format = 2
@@ -50,8 +51,8 @@ author = D9b
 .........##....................................................................................................................................#########................................
 ..@......##....................................................................................................................................#########................................
 ######-__........................................................................................................................................................................../%%%%
-######..................................................................................................................................................................-........./%%%%%
-######.....................................................................................................................................................................|..../#######
+######............................................................................................................................................................................/%%%%%
+######........................................................................................................................................................................../#######
 ######~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~############
 ######~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~############
 ######~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~############
@@ -65,7 +66,7 @@ objects/sign 3 15 text=SIGN_RAFT_BOARD
 objects/sign 6 15 text=SIGN_RAFT_PUSH
 objects/raft 8 19 rails width=4 skin=log
 zones/current 77 19 rect=9,19,137,1 dir=r speed=1
-zones/current 159 19 rect=147,19,25,1 dir=r speed=1
+zones/current 158 19 rect=147,19,23,1 dir=r speed=1
 props/sky/nest_broken 9.5 3 layer=back
 props/sky/feather_a 4 15
 props/sky/feather_c 0.5 15
@@ -102,12 +103,12 @@ zones/secret 147 16 name=arch rect=143,16,9,3
 objects/hidden_spot 147 16 kind=big hits=3 contents=painting:19 prop=coast/drip_cap
 props/coast/drips 145 16
 props/coast/drips 149.5 16
-# --- the home beach: the welcome totem on its jetty plank (the exit), the village behind it
-objects/exit 168 16
-props/canyon/driftwood_log 168 18 layer=back
+# --- the home beach: the raft docks at its bank and opens its rails (G45); the welcome totem (the exit) one cell
+# up the sand (a rider steps off the raft onto the beach to touch it), the feast and the village behind it
+objects/exit 173 18
 props/coast/palm_tall 172 18 layer=back
-props/coast/feast_spit 173 18
-props/coast/feast_table 175.5 18
+props/coast/feast_spit 175 18
+props/coast/feast_table 176.5 18
 objects/npc 177 17 kind=kid facing=l
 props/village/watchtower 179 16 layer=back
 objects/npc 180 15 kind=elder facing=l

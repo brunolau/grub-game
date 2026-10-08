@@ -1294,7 +1294,7 @@ func _contact_pass() -> void:
 		if stomp and yvel >= 0:
 			if is_gliding():
 				var dive: bool = yvel > Tuning.GLIDER_DIVE_MIN_YVEL_EXCL
-				bounce(Tuning.GLIDER_BUMP_YVEL, depth)
+				bounce(Tuning.GLIDER_BUMP_YVEL, depth, enemy)
 				if dive:
 					enemy.on_glider_stomp(self)
 			else:
@@ -1308,7 +1308,8 @@ func _contact_pass() -> void:
 
 func _bounce_on(enemy: EnemyBase, depth: int) -> void:
 	var up_held: bool = (_raw_flags & Defs.IN_UP) != 0
-	bounce(Tuning.BOUNCE_YVEL_UP if up_held else Tuning.BOUNCE_YVEL, depth)
+	# 2.0 G54: the head is passed, so a lift into rock slides him off this enemy (PlayerBase.bounce).
+	bounce(Tuning.BOUNCE_YVEL_UP if up_held else Tuning.BOUNCE_YVEL, depth, enemy)
 	var multiplier: int = enemy.on_bounced(self)
 	Audio.play_sfx(Sfx.BOUNCE)
 	_spawn_fx(FX_RING, sim_pos)

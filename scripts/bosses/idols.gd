@@ -22,9 +22,11 @@ extends BossBase
 ## also takes the slam steps. Both broken: defeat (the fire-starter and the bonus burst).
 ##
 ## Co-op form ("Twin Hit"; a co-op game of two heroes in a `kind = coop` file): both idols wake together, each facing
-## the hero on its own half of the room. An idol is awake - its jaws open, its spits and slams - only while a hero who
+## the hero on its own half of the room. An idol is awake - it spits and slams - only while a hero who
 ## COUNTS (PlayerBase.counts_for_coop: hatched and not idle, DESIGN.md G33) stands on its half; with nobody of the kind
-## on its side it sleeps, armoured (an egg or a dozing partner wakes nothing). A hit on open jaws cracks the idol only if
+## on its side it sleeps, armoured (an egg or a dozing partner wakes nothing). A twin crack shuts both jaws until the
+## idols have spat again (wf10 boss balance, [method jaws_open]); a hit on shut jaws glances. A hit on open jaws cracks
+## the idol only if
 ## its twin is struck within the twin window (PartyTuning.window_ticks: 24 Beginner / 12 Expert) by a hero of ANOTHER
 ## slot (G34: one hero's throw plus his own strike never twin): both crack together (one hit each), else the lone hit
 ## fades. Every RAGE_EVERY-th twin crack both rage, then their targets swap (each spits at the hero on the far half and
@@ -56,6 +58,9 @@ const HITS_PER_IDOL: int = 7
 const HITS_PER_IDOL_COOP: int = 8
 ## Every this many counted hits (solo) / twin cracks (co-op) both idols rage.
 const RAGE_EVERY: int = 4
+## Co-op (wf10 boss balance): after a twin crack both jaws stay shut until the idols have spat again - the end of the
+## first spit step that begins this long or longer after the crack (one twin per spit came every 35-80 ticks). (tune)
+const COOP_SHUT_MIN_TICKS: int = 66
 ## Ticks between two hits that may count on the same idol (its hurt pose; the Colossus' own cooldown).
 const HURT_TICKS: int = EnemyTuning.COLOSSUS_HURT_TICKS
 ## Co-op: a hit on open jaws waits this long at most for its twin (PartyTuning.window_ticks overrides it); a pending
@@ -101,6 +106,11 @@ var _moon_pos: Vector2i = Vector2i.ZERO
 var _moon_placed: bool = false
 var _per_idol: int = HITS_PER_IDOL
 var _coop: bool = false
+## Co-op (wf10): both jaws shut after a twin crack (the Sim tick of the crack; -1 = open), until the end of a spit step
+## that began COOP_SHUT_MIN_TICKS or more after it.
+var _shut: bool = false
+var _shut_tick: int = -1
+var _spit_began: int = -1
 var _moon_sprite: Sprite2D = null
 var _moon_skin: EnemySkin = null
 var _sun_skin: EnemySkin = null
@@ -201,6 +211,17 @@ func is_open(idol: int) -> bool:
 	return _role[idol] == Role.AWAKE
 
 
+## True when a hit on this idol's head counts now: [method is_open] and, in the co-op form, jaws that are not shut
+## (wf10 boss balance: co-op Idols harder - with jaws open whenever a hero stood on each half, D8's duo cracked all 8
+## twins in 19 s, one every 35-50 ticks): a twin crack SHUTS both jaws until the idols have spat again (the end of the
+## next spit step of the loop), so the pair cracks them at most twice per attack loop, each time after dodging the
+## rocks the spit aimed at them. Solo: [method is_open].
+func jaws_open(idol: int) -> bool:
+	if not is_open(idol):
+		return false
+	return not (_coop and _shut)
+
+
 ## The y of the floor's top under the idols (their feet point stands on it).
 func get_floor_y() -> int:
 	return sim_pos.y
@@ -234,6 +255,9 @@ func _on_reset() -> void:
 	_rage_due = false
 	_counted = 0
 	_crossed = false
+	_shut = false
+	_shut_tick = -1
+	_spit_began = -1
 	_configure_form()
 	for idol: int in 2:
 		_hurt[idol] = 0
@@ -347,7 +371,7 @@ func _poll_hits() -> void:
 		if _role[idol] == Role.BROKEN:
 			continue
 		var head: Rect2i = get_head_rect(idol)
-		var open: bool = is_open(idol)
+		var open: bool = jaws_open(idol)
 		var projectiles: Array[SimEntity] = level.get_kind(Defs.Kind.HERO_PROJECTILE)
 		var hit_slot: int = -1
 		var hit_hero: PlayerBase = null
@@ -411,13 +435,15 @@ func _coop_hit(idol: int, slot: int) -> void:
 		_cooldown[idol] = HURT_TICKS
 		_crack(idol)
 		return
-	if _pending[twin] >= 0 and now - _pending[twin] < _window() and is_open(twin) and _pending_slot[twin] != slot:
+	if _pending[twin] >= 0 and now - _pending[twin] < _window() and jaws_open(twin) and _pending_slot[twin] != slot:
 		_pending[idol] = -1
 		_pending[twin] = -1
 		_pending_slot[idol] = -1
 		_pending_slot[twin] = -1
 		_cooldown[idol] = HURT_TICKS
 		_cooldown[twin] = HURT_TICKS
+		_shut = true
+		_shut_tick = now
 		_crack(idol)
 		if dead:
 			return
@@ -505,6 +531,7 @@ func _begin_attack() -> void:
 			_hurt[idol] = 0
 			_set_pose(idol, &"spit" if spit else &"slam")
 	if spit:
+		_spit_began = Sim.total_ticks
 		Audio.play_sfx(Sfx.BOSS_SPIT)
 
 
@@ -521,6 +548,8 @@ func _takes_step(idol: int, spit: bool) -> bool:
 
 
 func _end_attack(advance: bool) -> void:
+	if _state == State.SPIT and _spit_began - _shut_tick >= COOP_SHUT_MIN_TICKS:
+		_shut = false
 	if advance:
 		_step = (_step + 1) % LOOP.size()
 	for idol: int in 2:
@@ -813,7 +842,7 @@ func _update_poses() -> void:
 		elif _hurt[idol] > 0:
 			_hurt[idol] -= 1
 			_set_pose(idol, &"hurt")
-		elif not is_open(idol) and _has_sleep(idol):
+		elif not jaws_open(idol) and _has_sleep(idol):
 			_set_pose(idol, &"sleep")
 		else:
 			_set_pose(idol, &"idle")

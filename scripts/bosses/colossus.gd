@@ -23,7 +23,8 @@ extends BossBase
 ##
 ## 2.0 co-op form, the **visor** (DESIGN.md B.7, GAMEPLAY.md 13.6; enemies-C, PLAN.md P2.3) - only in a co-op game of two
 ## heroes on a co-op file (`kind = coop`: w4_l2b_coop); everywhere else, a party of one included, the statue above
-## runs unchanged. Hit points x5/4 (24 -> 30). A stone visor covers its face; the two `objects/plate` of the hall (the
+## runs unchanged. Hit points x2/3 (24 -> 16, 4 pips; wf10 boss balance: the x5/4 form took a duo 137 s, the target is
+## 45-90 s), its idle pauses shortening after 14 hits taken (as the x5/4 form's did). A stone visor covers its face; the two `objects/plate` of the hall (the
 ## left-most and the right-most plate inside its room) hold its chains, and the visor is up only while an ACTIVE hero
 ## (PlayerBase.counts_for_coop: hatched, not idle - DESIGN.md G33) stands on the plate whose chain glows
 ## (Plate.holder_mask, its last weight test, which weighs no dozing hero; checked here too). Thrown weapons only, as
@@ -60,6 +61,13 @@ var _rage_due: bool = false
 # 2.0 co-op form (every field keeps its default in a party of one).
 ## Co-op rock aim: a rock leaves the jaws flat and lands about this many ticks later.
 const COOP_ROCK_FALL_TICKS: int = 12
+## Co-op hit points = the solo hit points x COOP_HP_NUM / COOP_HP_DEN (24 -> 16). wf10 boss balance (orchestrator: a
+## co-op boss fight lasts 45-90 s for a competent pair): with x5/4 (30) the visor fight took DB3's duo 137 s, every
+## role swap costing a walk across the hall; 16 hits take the same duo about 70 s. (tune)
+const COOP_HP_NUM: int = 2
+const COOP_HP_DEN: int = 3
+## Co-op idle phases: the pauses shorten after this many hits taken (the x5/4 form's 30 - 16 and 30 - 8). (tune)
+const COOP_PHASE_TAKEN: Array[int] = [14, 22]
 var _coop: bool = false
 var _solo_hp: int = 0
 ## The hall's two plates (left-most, right-most) and the index of the one whose chain glows.
@@ -314,12 +322,23 @@ func _end_attack(advance: bool) -> void:
 		_begin_idle()
 
 
-## Idle pause before the next attack: the loop's value shortened by the phase (above 16 hit points, above 8, last 8).
+## Idle pause before the next attack: the loop's value shortened by the phase (above 16 hit points, above 8, last 8;
+## 2.0 co-op: after 14 and 22 hits taken, see _phase_hp).
 func _idle_length() -> int:
 	var phase: int = 0
-	while phase < EnemyTuning.COLOSSUS_PHASE_HP.size() and hp <= EnemyTuning.COLOSSUS_PHASE_HP[phase]:
+	while phase < EnemyTuning.COLOSSUS_PHASE_HP.size() and hp <= _phase_hp(phase):
 		phase += 1
 	return EnemyTuning.COLOSSUS_IDLE_TICKS[_step] * EnemyTuning.COLOSSUS_PHASE_PERCENT[phase] / 100
+
+
+## The hit points at or under which idle phase `phase` + 1 starts: EnemyTuning.COLOSSUS_PHASE_HP (solo, unchanged);
+## the co-op form after the hits TAKEN at which the x5/4 visor form (30) reached them - 14 and 22 (COOP_PHASE_TAKEN):
+## the 16-hit visor fight shortens its pauses for its last two hits only (the holder dodges rocks aimed at him and
+## every rage is a walk across the hall; DB3's duo route was recorded on these pauses).
+func _phase_hp(phase: int) -> int:
+	if not _coop:
+		return EnemyTuning.COLOSSUS_PHASE_HP[phase]
+	return max_hp - COOP_PHASE_TAKEN[phase]
 
 
 ## A rock from the open jaws, to the left with a random speed (2.0 co-op: a speed aimed at the plate holder).
@@ -431,7 +450,7 @@ func _neutral_tick() -> void:
 		_play(&"idle")
 
 
-## The co-op form in a co-op game of two or more heroes on a co-op file: hit points x5/4, the plates of the hall.
+## The co-op form in a co-op game of two or more heroes on a co-op file: hit points x2/3 (wf10), the plates of the hall.
 func _configure_form() -> void:
 	var level: LevelBase = Game.level
 	var want: bool = level != null and Game.mode == Defs.GameMode.COOP and level.hero_count() > 1 \
@@ -439,7 +458,7 @@ func _configure_form() -> void:
 	if want == _coop:
 		return
 	_coop = want
-	max_hp = _solo_hp * PartyTuning.BOSS_HP_MAX_NUM / PartyTuning.BOSS_HP_MAX_DEN if _coop else _solo_hp
+	max_hp = maxi(_solo_hp * COOP_HP_NUM / COOP_HP_DEN, 1) if _coop else _solo_hp
 	hp = max_hp
 	_live = 0
 	_plates.clear()

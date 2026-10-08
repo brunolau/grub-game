@@ -57,8 +57,11 @@ extends RefCounted
 
 ## Game ticks a single hero is allowed per path (LEVEL_DESIGN.md 15.7.6: 1 457 ticks *(tune)*).
 const BOUND_TICKS: int = 1457
-## Resting points explored at most per search (a compute bound).
-const MAX_NODES: int = 220
+## Resting points explored at most per search (a compute bound; with MAX_TICKS, see there).
+const MAX_NODES: int = 1500
+## Resting points of a window's travel search on the bare grid ([method travel_ticks]: the least ticks between two
+## spots; it stops at the first arrival, so the bound only matters for a spot it cannot reach).
+const WINDOW_NODES: int = 220
 ## After a macro's inputs end the hero has this long to come to rest (else the macro is dropped).
 const SETTLE_TICKS: int = 48
 ## Resting points closer than this (px, on the same y) are one node.
@@ -120,6 +123,43 @@ const HERO_MAX_PX_PER_TICK: int = 6
 const STRIKE_REACH_SPOT_COLS: int = 2
 ## The specials a hero may hold for a throw (every belt special of the reference hero).
 const THROW_WEAPONS: Array[int] = [Defs.Weapon.AXE, Defs.Weapon.BOOMERANG, Defs.Weapon.SPEAR]
+## The continuous-play probe families (orchestrator's SEARCH decision, wf10; [method Searcher.probe_battery]).
+const PROBE_HOP_OVER: String = "hop-over"
+const PROBE_CHARGE_UNDER: String = "charge-under"
+const PROBE_IDLE_BAIT: String = "idle-bait"
+const PROBE_THROWN: String = "thrown-special"
+const PROBE_PLATES: String = "plates"
+const PROBE_EGG: String = "egg placement"
+const PROBE_FAMILIES: Array[String] = [PROBE_HOP_OVER, PROBE_CHARGE_UNDER, PROBE_IDLE_BAIT, PROBE_THROWN,
+	PROBE_PLATES, PROBE_EGG]
+## Plate races: ticks on the plate before the run for the door, and the px before the door where he jumps or crawls.
+const PROBE_RACE_WAITS: Array[int] = [0, 40, 120]
+const PROBE_RACE_PX: Array[int] = [16, 48]
+## Ticks a probe's policy plays (then the hero lets go and comes to rest within SETTLE_TICKS).
+const PROBE_TICKS: int = 420
+## A probe's end (a changed world) replays this long a prefix at most, and so may its descendants.
+const PROBE_PREFIX_TICKS: int = 1100
+## Nodes per probe target that run its battery (the partner still an egg; the starts first).
+const PROBE_SITES: int = 2
+## Changed worlds a site's probes hand to the BFS at most (each costs a replay per later move).
+const PROBE_SEEDS_PER_SITE: int = 6
+## A probe target is in reach of a node within this many cells (x, y).
+const PROBE_REACH_CELLS: Vector2i = Vector2i(20, 6)
+## Duels: the gap (px, hero feet to the enemy's box) at which he jumps, and the UP holds.
+const PROBE_TRIGGERS_PX: Array[int] = [4, 24, 44, 72]
+const PROBE_HOLDS: Array[int] = [4, 9, 12]
+## Idle-bait: ticks the hero stands first (the enemy goes for the parked partner), and how much farther than the bait
+## gap the lure spots lie.
+const PROBE_LURE_WAITS: Array[int] = [0, 60]
+const PROBE_LURE_EXTRA_PX: Array[int] = [0, 48, 112]
+## Thrown specials: px from the plate's centre where he throws.
+const PROBE_THROW_PX: Array[int] = [24, 64, 128]
+## Leaps at the far cell: run-up ticks away from it first, and the px before its column where he jumps.
+const PROBE_LEAP_RUNUPS: Array[int] = [0, 24]
+const PROBE_LEAP_PX: Array[int] = [16, 48, 80]
+## The search's default compute bounds (wf10: raised from 220 resting points): resting points expanded and ticks
+## simulated per gate, whichever comes first; a search whose queue runs dry first is EXHAUSTIVE.
+const MAX_TICKS: int = 1500000
 ## Properties of a record entity that the world signature reads (when it has them).
 const PROBE_PROPS: Array[StringName] = [
 	&"dead", &"collected", &"opened", &"state", &"pressed", &"risen", &"triggered", &"high_side", &"succeeded",
@@ -223,6 +263,399 @@ class SearchWind:
 			_index += 1
 
 
+## A continuous-play probe's input policy ([method Searcher.probe_run]): the hero's flags tick by tick, decided from
+## the world it reads. [member family] names the gate kind it probes (PROBE_FAMILIES), [member label] its parameters.
+class ProbePolicy:
+	extends RefCounted
+
+	var family: String = ""
+	var label: String = ""
+	## The far cell's centre x (px): where the GO phase heads.
+	var far_x: int = 0
+	var _hops: int = 0
+	var _blocked: int = 0
+	var _go_jump: int = 0
+
+	func begin(_searcher: Searcher) -> void:
+		pass
+
+	## The flags of tick `t` (from 0), or -1 when the probe is over (the hero lets go and comes to rest).
+	func next(_searcher: Searcher, _t: int) -> int:
+		return -1
+
+	static func dir_flag(dir: int) -> int:
+		return Defs.IN_RIGHT if dir > 0 else (Defs.IN_LEFT if dir < 0 else 0)
+
+	## True after the hero pressed a side for a few ticks without moving (a step, a wall): time for a hop.
+	func blocked(hero: PlayerBase, pressing: bool) -> bool:
+		_blocked = _blocked + 1 if pressing and hero.is_grounded() and hero.xvel == 0 else 0
+		return _blocked >= 4
+
+	## The GO phase: on toward the far cell, a full jump whenever a step or wall stops him (a crude navigator - its
+	## rest point goes to the BFS, which does the real navigation from there).
+	func go(hero: PlayerBase) -> int:
+		var dir: int = signi(far_x - hero.sim_pos.x)
+		if _go_jump > 0:
+			_go_jump -= 1
+			return Defs.IN_UP | dir_flag(dir)
+		if blocked(hero, dir != 0):
+			_blocked = 0
+			_go_jump = 9
+			return Defs.IN_UP | dir_flag(dir)
+		return dir_flag(dir)
+
+
+## HOP-OVER / CHARGE-UNDER / IDLE-BAIT: walk at a role enemy (a keeper, a shell, a heavy, any trait or bond enemy);
+## jump when it is `trigger_px` away (on over it, `steer` 1; straight up so that a charging heavy runs under, 0); land
+## behind it, turn and strike its back (forward or low, `low` also pogo-strikes on the way down) while it is in reach,
+## jumping again (at most 3 times) when it comes at him; once it is dead, GO for the far cell. `wait` ticks standing
+## first: the lure (an idle partner parked beside it draws it - plain targeting still picks him).
+class DuelPolicy:
+	extends ProbePolicy
+
+	enum Phase { WAIT, APPROACH, JUMP, STRIKE, GO }
+	const STRIKE_CYCLE: int = 14
+	const STRIKE_CYCLES_MAX: int = 18
+	const HOPS_MAX: int = 3
+
+	var target_index: int = -1
+	var trigger_px: int = 24
+	var hold: int = 9
+	var steer: int = 1
+	var low: bool = false
+	var wait: int = 0
+	var _target: EnemyBase = null
+	var _phase: int = Phase.WAIT
+	var _since: int = 0
+	var _dir: int = 1
+	var _cycles: int = 0
+	var _cycle_tick: int = 0
+
+	func begin(searcher: Searcher) -> void:
+		_target = searcher.entity_at(target_index) as EnemyBase
+		_phase = Phase.WAIT
+		_since = 0
+		_hops = 0
+		_cycles = 0
+		_cycle_tick = 0
+		_blocked = 0
+		_go_jump = 0
+
+	func _enter(phase: int) -> void:
+		_phase = phase
+		_since = 0
+		_cycle_tick = 0
+
+	func _gone() -> bool:
+		return _target == null or not is_instance_valid(_target) or _target.dead
+
+	## Px between the hero's feet point and the target's near box edge.
+	func _gap(hero: PlayerBase) -> int:
+		return maxi(absi(_target.sim_pos.x - hero.sim_pos.x) - _target.box_w / 2, 0)
+
+	func _coming(hero: PlayerBase) -> bool:
+		return _target.xvel != 0 and signi(_target.xvel) == signi(hero.sim_pos.x - _target.sim_pos.x)
+
+	func next(searcher: Searcher, _t: int) -> int:
+		var hero: PlayerBase = searcher.hero
+		_since += 1
+		if _phase != Phase.GO and _gone():
+			_enter(Phase.GO)
+		match _phase:
+			Phase.WAIT:
+				if _since > wait:
+					_enter(Phase.APPROACH)
+				return 0
+			Phase.APPROACH:
+				_dir = signi(_target.sim_pos.x - hero.sim_pos.x)
+				if _dir == 0:
+					_dir = hero.facing
+				if _gap(hero) <= trigger_px:
+					_enter(Phase.JUMP)
+					return Defs.IN_UP | dir_flag(_dir * steer)
+				if blocked(hero, true):
+					_blocked = 0
+					return Defs.IN_UP | dir_flag(_dir)
+				return dir_flag(_dir)
+			Phase.JUMP:
+				var air: int = dir_flag(_dir * steer)
+				if _since <= hold:
+					return Defs.IN_UP | air
+				if hero.is_grounded() and _since > hold + 1:
+					_enter(Phase.STRIKE)
+					return 0
+				return air | (Defs.IN_DOWN | Defs.IN_FIRE if low else 0)
+			Phase.STRIKE:
+				var toward: int = signi(_target.sim_pos.x - hero.sim_pos.x)
+				if toward == 0:
+					toward = hero.facing
+				if _hops < HOPS_MAX and _coming(hero) and _gap(hero) <= trigger_px and hero.is_grounded():
+					_hops += 1
+					_dir = toward
+					_enter(Phase.JUMP)
+					return Defs.IN_UP | dir_flag(_dir * steer)
+				if _gap(hero) > 20 and _cycle_tick == 0:
+					return dir_flag(toward)
+				var step: int = _cycle_tick
+				_cycle_tick = (_cycle_tick + 1) % STRIKE_CYCLE
+				if step == 0:
+					_cycles += 1
+					if _cycles > STRIKE_CYCLES_MAX:
+						_enter(Phase.GO)
+						return 0
+					return dir_flag(toward) if hero.facing != toward else 0
+				if step <= 10:
+					return Defs.IN_FIRE | (Defs.IN_DOWN if low and (_cycles & 1) == 0 else 0)
+				return 0
+		return go(hero)
+
+
+## THROWN-SPECIAL PLATES: walk toward a plate until `distance` px from its centre, throw the special in his hand at it
+## (or a jump-throw), then GO through its door for the far cell - a plate weighs only active heroes (and a boulder),
+## so the door must stay shut; the probe asks the engine, continuous with the run for the door.
+class ThrowPolicy:
+	extends ProbePolicy
+
+	enum Phase { APPROACH, THROW, FOLLOW, GO }
+
+	var spot_x: int = 0
+	var distance: int = 32
+	var jump: bool = false
+	## After the throw: a duel with this target (a keeper struck from behind after a throw), or -1.
+	var duel: DuelPolicy = null
+	## After the throw: walk to this x and strike there (the other drum of a bond), or -1.
+	var strike_x: int = -1
+	var _phase: int = Phase.APPROACH
+	var _since: int = 0
+	var _toward: int = 1
+
+	func begin(searcher: Searcher) -> void:
+		_phase = Phase.APPROACH
+		_since = 0
+		_blocked = 0
+		_go_jump = 0
+		if duel != null:
+			duel.far_x = far_x
+			duel.begin(searcher)
+
+	func next(searcher: Searcher, _t: int) -> int:
+		var hero: PlayerBase = searcher.hero
+		_since += 1
+		match _phase:
+			Phase.APPROACH:
+				_toward = signi(spot_x - hero.sim_pos.x)
+				if _toward == 0:
+					_toward = hero.facing
+				if absi(spot_x - hero.sim_pos.x) <= distance or _since > 240 or blocked(hero, true):
+					_phase = Phase.THROW
+					_since = 0
+					return dir_flag(_toward)
+				return dir_flag(_toward)
+			Phase.THROW:
+				if _since > 30:
+					_phase = Phase.FOLLOW if duel != null or strike_x >= 0 else Phase.GO
+					_since = 0
+					return 0
+				if jump:
+					if _since <= 6:
+						return Defs.IN_UP | dir_flag(_toward)
+					return (dir_flag(_toward) | Defs.IN_FIRE) if _since <= 12 else 0
+				return Defs.IN_FIRE if _since <= 6 else 0
+			Phase.FOLLOW:
+				if duel != null:
+					return duel.next(searcher, _t)
+				var dir: int = signi(strike_x - hero.sim_pos.x)
+				if absi(strike_x - hero.sim_pos.x) > 20 and _since < 200:
+					if blocked(hero, true):
+						_blocked = 0
+						return Defs.IN_UP | dir_flag(dir)
+					return dir_flag(dir)
+				var step: int = _since % 14
+				if _since > 260:
+					_phase = Phase.GO
+				return Defs.IN_FIRE if step >= 1 and step <= 10 else 0
+		return go(hero)
+
+
+## PLATES: onto a plate, `wait` ticks on it (the door rises; a `timed:` clock starts when he leaves), then a race for its
+## door at full speed - straight, or a jump / a crawl `trigger_px` before the door (under a closing column) - and on
+## for the far cell. With the idle partner parked on the plate or in the door's way (IDLE-BAIT: the doorstop of G53).
+class RacePolicy:
+	extends ProbePolicy
+
+	enum Phase { TO_PLATE, WAIT, RUN, MOVE, GO }
+	enum Mode { RUN, JUMP, CRAWL }
+
+	var plate_x: int = 0
+	var door_x: int = 0
+	var wait: int = 0
+	var mode: int = Mode.RUN
+	var trigger_px: int = 32
+	var _phase: int = Phase.TO_PLATE
+	var _since: int = 0
+	var _dir: int = 1
+
+	func begin(_searcher: Searcher) -> void:
+		_phase = Phase.TO_PLATE
+		_since = 0
+		_blocked = 0
+		_go_jump = 0
+
+	func next(searcher: Searcher, _t: int) -> int:
+		var hero: PlayerBase = searcher.hero
+		_since += 1
+		match _phase:
+			Phase.TO_PLATE:
+				var dir: int = signi(plate_x - hero.sim_pos.x)
+				if absi(plate_x - hero.sim_pos.x) <= 4 or _since > 240:
+					_phase = Phase.WAIT
+					_since = 0
+					return 0
+				if blocked(hero, dir != 0):
+					_blocked = 0
+					return Defs.IN_UP | dir_flag(dir)
+				return dir_flag(dir)
+			Phase.WAIT:
+				if _since > wait:
+					_phase = Phase.RUN
+					_since = 0
+					_dir = signi(door_x - hero.sim_pos.x)
+					if _dir == 0:
+						_dir = hero.facing
+				return 0
+			Phase.RUN:
+				if mode != Mode.RUN and absi(door_x - hero.sim_pos.x) <= trigger_px:
+					_phase = Phase.MOVE
+					_since = 0
+				elif (hero.sim_pos.x - door_x) * _dir > Tuning.TILE or _since > 160:
+					_phase = Phase.GO
+				else:
+					return dir_flag(_dir)
+				return Defs.IN_UP | dir_flag(_dir) if _phase == Phase.MOVE and mode == Mode.JUMP else dir_flag(_dir)
+			Phase.MOVE:
+				if _since > 40:
+					_phase = Phase.GO
+					return 0
+				if mode == Mode.JUMP:
+					return Defs.IN_UP | dir_flag(_dir) if _since <= 9 else dir_flag(_dir)
+				return Defs.IN_DOWN | dir_flag(_dir)
+		return go(hero)
+
+
+## HOP-OVER of a ledge or gap gate: `back_up` ticks away from the far cell (a run-up), then at full speed toward it and
+## a jump `trigger_px` before its column (UP held `hold` ticks, on toward it in the air), then GO - momentum the macros
+## (each from rest, a 6-tick run-up at most) never carry.
+class LeapPolicy:
+	extends ProbePolicy
+
+	enum Phase { BACK, RUN, JUMP, GO }
+
+	var trigger_px: int = 32
+	var hold: int = 9
+	var back_up: int = 0
+	var _phase: int = Phase.BACK
+	var _since: int = 0
+	var _dir: int = 1
+
+	func begin(searcher: Searcher) -> void:
+		_phase = Phase.BACK
+		_since = 0
+		_blocked = 0
+		_go_jump = 0
+		_dir = signi(far_x - searcher.hero.sim_pos.x)
+		if _dir == 0:
+			_dir = searcher.hero.facing
+
+	func next(searcher: Searcher, _t: int) -> int:
+		var hero: PlayerBase = searcher.hero
+		_since += 1
+		match _phase:
+			Phase.BACK:
+				if _since > back_up:
+					_phase = Phase.RUN
+					_since = 0
+				else:
+					return dir_flag(-_dir)
+				return dir_flag(_dir)
+			Phase.RUN:
+				if absi(far_x - hero.sim_pos.x) <= trigger_px or _since > 200:
+					_phase = Phase.JUMP
+					_since = 0
+					return Defs.IN_UP | dir_flag(_dir)
+				return dir_flag(_dir)
+			Phase.JUMP:
+				if _since <= hold:
+					return Defs.IN_UP | dir_flag(_dir)
+				if hero.is_grounded() and _since > hold + 1:
+					_phase = Phase.GO
+					return 0
+				return dir_flag(_dir)
+		return go(hero)
+
+
+## EGG PLACEMENT: walk past a spot so that the drifting egg (PartyTuning.EGG_OFFSET_X / _Y behind and over his feet)
+## comes over it, wait for the drift, turn and hatch it there with a strike (or a jump-strike) - the REAL egg and hatch
+## (pop, landing), not a placement - then duel the nearest role enemy with the hatched idle partner where he fell
+## (the lure), else GO.
+class EggPolicy:
+	extends ProbePolicy
+
+	enum Phase { APPROACH, SETTLE, HATCH, AFTER }
+
+	var spot_x: int = 0
+	var jump_strike: bool = false
+	var duel: DuelPolicy = null
+	var _phase: int = Phase.APPROACH
+	var _since: int = 0
+	var _dir: int = 1
+
+	func begin(searcher: Searcher) -> void:
+		_phase = Phase.APPROACH
+		_since = 0
+		_blocked = 0
+		_go_jump = 0
+		if duel != null:
+			duel.far_x = far_x
+			duel.begin(searcher)
+
+	func next(searcher: Searcher, t: int) -> int:
+		var hero: PlayerBase = searcher.hero
+		_since += 1
+		match _phase:
+			Phase.APPROACH:
+				if _since == 1:
+					_dir = signi(spot_x - hero.sim_pos.x)
+					if _dir == 0:
+						_dir = hero.facing
+				# The egg trails EGG_OFFSET_X behind him: he stops that far past the spot.
+				if (hero.sim_pos.x - spot_x) * _dir >= -PartyTuning.EGG_OFFSET_X or _since > 240 \
+						or blocked(hero, true):
+					_phase = Phase.SETTLE
+					_since = 0
+					return 0
+				return dir_flag(_dir)
+			Phase.SETTLE:
+				if _since >= 30:
+					_phase = Phase.HATCH
+					_since = 0
+				return 0
+			Phase.HATCH:
+				var back: int = dir_flag(-_dir)
+				if _since > 24 or not searcher.partner.is_down():
+					_phase = Phase.AFTER
+					_since = 0
+					return 0
+				if _since == 1:
+					return back
+				if jump_strike:
+					return Defs.IN_UP | back if _since <= 5 else (back | Defs.IN_FIRE if _since <= 14 else 0)
+				return Defs.IN_FIRE if _since <= 12 else 0
+			Phase.AFTER:
+				if duel != null:
+					return duel.next(searcher, t)
+		return go(hero)
+
+
 ## One search: a level with the real hero, scripted from macros; with [method build_world] the file's entities and
 ## the partner (an egg or an idle hero) in a co-op game of two.
 class Searcher:
@@ -264,14 +697,38 @@ class Searcher:
 	var _baseline: String = ""
 	## Feet points (logical px) of what strikes and throws can act on.
 	var _targets: Array[Vector2i] = []
-	## Feet points of the co-op mechanisms and trait enemies where parking the idle partner is tried
+	## Feet points of the keeper / trait / bond enemies where parking the idle partner is tried
 	## ([method placement_useful]).
 	var _partner_targets: Array[Vector2i] = []
+	## Feet points of the co-op mechanisms (plates, see-saws, pulleys and their lifts, heave boulders, drums): parking
+	## the idle partner there is tried only while the engine counts an idle hero on a plate
+	## ([method CoopSearch.idle_partner_weighs]).
+	var _mechanism_targets: Array[Vector2i] = []
 	## Spots beside every keeper and `shell` enemy of the world, in front of it and behind it within club reach
 	## ([method bait_spots]): the idle partner is parked there from every start (lead designer's wf9 #5).
 	var _bait_spots: Array[Vector2i] = []
 	## The level's wind script, when the file has one ([class SearchWind]).
 	var _wind: SearchWind = null
+	## Indices into the world's entities of the role enemies (keeper, trait, bond) and of the plates: the targets of
+	## the continuous-play probes ([method probe_battery]).
+	var _probe_enemies: Array[int] = []
+	var _probe_plates: Array[int] = []
+	## ... of the drums, of the door columns (rise_while / sink_while / trigger) and of the other co-op mechanisms
+	## (see-saws, heave boulders, pulleys and named platforms - a pulley's lifts).
+	var _probe_drums: Array[int] = []
+	var _probe_doors: Array[int] = []
+	var _probe_mechs: Array[int] = []
+	## The probes of the last [method explore] per family (PROBE_FAMILIES): {"runs", "sites", "kills" (runs in which a
+	## role enemy died), "seeds" (their end states handed to the BFS), "dead" (runs in which the hero died or went
+	## down), "reached"}.
+	var probe_stats: Dictionary = {}
+
+	## The world entity at `index` (null when there is none any more).
+	func entity_at(index: int) -> SimEntity:
+		if index < 0 or index >= _entities.size():
+			return null
+		var entity: SimEntity = _entities[index]
+		return entity if entity != null and is_instance_valid(entity) else null
 
 	## Build a bare level from `grid` (no entity but the hero). False when the hero scene does not exist.
 	func build(level_id: StringName, meta: Dictionary, grid: TileGrid) -> bool:
@@ -339,10 +796,24 @@ class Searcher:
 			_kept[node.get_instance_id()] = true
 			if CoopSearch.is_target(id):
 				_targets.append(node.sim_pos)
-			if CoopSearch.is_partner_target(record):
+			if CoopSearch.is_mechanism_target(record):
+				_mechanism_targets.append(node.sim_pos)
+			elif CoopSearch.is_partner_target(record) \
+					or node is EnemyBase and CoopSearch.has_coop_role(node as EnemyBase):
 				_partner_targets.append(node.sim_pos)
 			if node is EnemyBase:
 				_bait_spots.append_array(bait_spots(node as EnemyBase))
+				if CoopSearch.has_coop_role(node as EnemyBase):
+					_probe_enemies.append(_entities.size() - 1)
+			elif node is Plate:
+				_probe_plates.append(_entities.size() - 1)
+			elif id == "objects/drum":
+				_probe_drums.append(_entities.size() - 1)
+			elif id == "objects/column" and (params.has("rise_while") or params.has("sink_while")
+					or params.has("trigger")):
+				_probe_doors.append(_entities.size() - 1)
+			elif CoopSearch.is_mechanism_target(record) or id == "objects/platform" and params.has("name"):
+				_probe_mechs.append(_entities.size() - 1)
 		hero = level.spawn(PLAYER_ID, Vector2i(Tuning.TILE * 2, Tuning.TILE * 2), {}) as PlayerBase
 		partner = level.spawn(PLAYER_ID, Vector2i(Tuning.TILE * 3, Tuning.TILE * 2), {"slot": PARTNER_SLOT}) \
 				as PlayerBase
@@ -457,6 +928,16 @@ class Searcher:
 	## rest), "sig"}; {} when he died, went down or did not come to rest.
 	func run(config: Dictionary, flags: PackedInt32Array, goals: Dictionary, skip: int = 0,
 			expect: Vector2i = NOWHERE, events: Array = []) -> Dictionary:
+		_begin(config)
+		_flags = flags
+		var clock: int = Time.get_ticks_usec()
+		var outcome: Dictionary = _play(flags, goals, skip, expect, events)
+		CoopSearch.profile_add(&"step", clock)
+		return _at_rest(outcome)
+
+	## The start of a run: the world reset (a search world), the hero at config's start with its facing and hand, the
+	## partner placed, the wind restarted; the input clock starts on the next tick.
+	func _begin(config: Dictionary) -> void:
 		runs += 1
 		var clock: int = Time.get_ticks_usec()
 		if world:
@@ -481,14 +962,14 @@ class Searcher:
 			level.refresh_doze()
 			if _wind != null:
 				_wind.restart()
-		_flags = flags
 		_first_tick = Sim.tick + 1
 		CoopSearch.profile_add(&"place", clock)
-		clock = Time.get_ticks_usec()
-		var outcome: Dictionary = _play(flags, goals, skip, expect, events)
-		CoopSearch.profile_add(&"step", clock)
+
+	## A run's outcome at rest completed: its world signature (a search world); {} when he rests where a fresh run
+	## cannot put him back (on the idle partner's head); a rest on a platform is a changed node.
+	func _at_rest(outcome: Dictionary) -> Dictionary:
 		if outcome.has("pos") and world:
-			clock = Time.get_ticks_usec()
+			var clock: int = Time.get_ticks_usec()
 			outcome["sig"] = signature()
 			CoopSearch.profile_add(&"sig", clock)
 		if outcome.has("pos") and hero.is_riding_totem():
@@ -536,6 +1017,79 @@ class Searcher:
 				else:
 					still = 0
 		return {}
+
+	## A CONTINUOUS-PLAY PROBE (orchestrator's SEARCH decision, wf10): one run from a reset world whose inputs `policy`
+	## decides tick by tick from what it reads in the world (a charging heavy, a keeper's back, a plate, the egg) for at
+	## most PROBE_TICKS ticks, then the hero lets go and comes to rest. No world reset between its phases, momentum
+	## carried - what the macros (each from rest, in a world reset to the level file) cannot express. The inputs it
+	## played are deterministic, so its end is a node like a macro's: the BFS replays them as the node's prefix.
+	## {"goal": true, "ticks", "played"} when the feet point entered a cell of `goals`; at rest {"pos", "ticks",
+	## "played", "sig"}; {"dead": true} when he died or went down; {} when he did not come to rest. "kills" counts the
+	## role enemies of the world that died in it (the probe's diagnostic).
+	func probe_run(config: Dictionary, policy: ProbePolicy, goals: Dictionary) -> Dictionary:
+		_begin(config)
+		_flags = PackedInt32Array()
+		var clock: int = Time.get_ticks_usec()
+		var alive_before: int = _role_enemies_alive()
+		policy.begin(self)
+		var still: int = 0
+		var done: bool = false
+		var t: int = 0
+		var outcome: Dictionary = {}
+		while t < PROBE_TICKS + SETTLE_TICKS:
+			var flag: int = 0
+			if not done and t < PROBE_TICKS:
+				flag = policy.next(self, t)
+				if flag < 0:
+					done = true
+					flag = 0
+			else:
+				done = true
+			_flags.append(flag)
+			Sim.step(1)
+			t += 1
+			simulated += 1
+			if hero.dead or hero.is_down():
+				outcome = {"dead": true, "ticks": t}
+				break
+			var cell: Vector2i = Vector2i(Tuning.to_cell(hero.sim_pos.x), Tuning.to_cell(hero.sim_pos.y - 1))
+			if goals.has(cell):
+				outcome = {"goal": true, "ticks": t, "cell": cell, "played": _flags.duplicate()}
+				break
+			if done:
+				if hero.is_grounded() and hero.yvel == 0 and hero.xvel == 0:
+					still += 1
+					if still >= 2:
+						outcome = {"pos": hero.sim_pos, "ticks": t, "played": _flags.duplicate(), "sig": ""}
+						break
+				else:
+					still = 0
+		CoopSearch.profile_add(&"probe", clock)
+		outcome["kills"] = maxi(alive_before - _role_enemies_alive(), 0)
+		if outcome.has("pos"):
+			outcome = _at_rest(outcome)
+			if not outcome.is_empty():
+				outcome["kills"] = maxi(alive_before - _role_enemies_alive(), 0)
+		return outcome
+
+	## The role enemies of the world that are dead now ("<id> at c,r" each; for the probe report).
+	func dead_role_enemies() -> String:
+		var parts: PackedStringArray = PackedStringArray()
+		for i: int in _entities.size():
+			var entity: SimEntity = entity_at(i)
+			if entity is EnemyBase and CoopSearch.has_coop_role(entity as EnemyBase) and (entity as EnemyBase).dead:
+				parts.append("%s at %d,%d (%s)" % [_records[i]["id"], int(_records[i]["col"]), int(_records[i]["row"]),
+					String((entity as EnemyBase).death_cause) if &"death_cause" in entity else "?"])
+		return ", ".join(parts)
+
+	## Role enemies (keeper, trait, bond) of the world alive now.
+	func _role_enemies_alive() -> int:
+		var count: int = 0
+		for entity: SimEntity in _entities:
+			if entity is EnemyBase and is_instance_valid(entity) and CoopSearch.has_coop_role(entity as EnemyBase) \
+					and not (entity as EnemyBase).dead:
+				count += 1
+		return count
 
 	func _apply_event(event: Array) -> void:
 		match str(event[1]):
@@ -597,11 +1151,20 @@ class Searcher:
 					return true
 		return false
 
-	## True when parking the idle partner at `pos` is worth a node of its own: a co-op mechanism (plate, see-saw, pulley
-	## lift, heave boulder, drum) or a keeper / trait / bond enemy within THROW_REACH_CELLS. Since G33 none of them
-	## counts him, so these nodes are the search's regression check of the IDLE rule in the objects and traits.
+	## True when parking the idle partner at `pos` is worth a node of its own: a keeper / trait / bond enemy within
+	## THROW_REACH_CELLS (enemies still pick an idle hero as their target - G33's "plain enemy targeting may pick him" -
+	## so he can lure one), or a co-op mechanism (plate, see-saw, pulley lift, heave boulder, drum) there while
+	## [method CoopSearch.idle_partner_weighs] finds the engine counting an idle hero on a plate. Since G33 the
+	## mechanisms do not count him (objects-A), so those placements would only copy the graph (w7_l2_coop 'seagate':
+	## 652 of 682 nodes were parked copies); the probe is their regression check - should a plate ever weigh an idle
+	## hero again, the search parks him at the mechanisms at once.
 	func placement_useful(pos: Vector2i) -> bool:
-		for target: Vector2i in _partner_targets:
+		if _near_any(_partner_targets, pos):
+			return true
+		return CoopSearch.idle_partner_weighs() and _near_any(_mechanism_targets, pos)
+
+	func _near_any(targets: Array[Vector2i], pos: Vector2i) -> bool:
+		for target: Vector2i in targets:
 			if absi(target.x - pos.x) <= THROW_REACH_CELLS.x * Tuning.TILE \
 					and absi(target.y - pos.y) <= THROW_REACH_CELLS.y * Tuning.TILE:
 				return true
@@ -642,11 +1205,26 @@ class Searcher:
 	## open where he stands - so a `place partner` step parks him at the node, and every later move starts with him
 	## there). From every start the partner is also parked at each bait spot inside the area ([method bait_spots]: in
 	## front of and behind every keeper and shell enemy, within club reach) before the hero moves.
-	## Returns {"reached", "ticks", "detail", "nodes", "runs", "simulated", "replayed", "placements"}.
-	func explore(starts: Array[Vector2i], goals: Dictionary, area: Rect2i, bound: int, max_nodes: int) -> Dictionary:
+	## With `probes` (the gate search) the CONTINUOUS-PLAY PROBES run too ([method _run_probes]): from the first
+	## PROBE_SITES nodes (with the partner still an egg, the starts first) within reach of each role enemy, plate and the
+	## far cell, every policy of its families; a probe that enters the far cell reaches it, and its end at rest joins the
+	## queue as a node (a changed world right after the node being expanded, so a dead keeper's open door is searched on
+	## at once). The search stops at `max_nodes` expanded nodes or `tick_budget` simulated ticks; "exhausted" says the
+	## queue ran dry first: every resting point the macros and probes reach inside the area within `bound` ticks was
+	## expanded - the refusal is exhaustive over the search's moves, not bounded.
+	## Returns {"reached", "ticks", "detail", "nodes", "runs", "simulated", "replayed", "placements", "queued",
+	## "exhausted", "stopped" ("" / "nodes" / "ticks"), "parked", "changed"}.
+	func explore(starts: Array[Vector2i], goals: Dictionary, area: Rect2i, bound: int, max_nodes: int,
+			tick_budget: int = 1 << 40, probes: bool = false) -> Dictionary:
 		var queue: Array[Dictionary] = []
 		var seen: Dictionary = {}
+		var sites: Dictionary = {}
+		var simulated_start: int = simulated
 		placements = 0
+		probe_stats = {}
+		if probes:
+			for family: String in PROBE_FAMILIES:
+				probe_stats[family] = {"runs": 0, "sites": 0, "kills": 0, "seeds": 0, "dead": 0, "reached": false}
 		for start: Vector2i in starts:
 			var first: Dictionary = _node(start, 0, "start %d,%d" % [start.x, start.y], _baseline, NOWHERE)
 			if not seen.has(_key_of(first)):
@@ -664,7 +1242,14 @@ class Searcher:
 						queue.append(baited)
 						placements += 1
 		var head: int = 0
-		while head < queue.size() and head < max_nodes:
+		var stopped: String = ""
+		while head < queue.size():
+			if head >= max_nodes:
+				stopped = "nodes"
+				break
+			if simulated - simulated_start >= tick_budget:
+				stopped = "ticks"
+				break
 			var node: Dictionary = queue[head]
 			head += 1
 			var pos: Vector2i = node["pos"]
@@ -673,6 +1258,10 @@ class Searcher:
 				return _found(int(node["ticks"]), str(node["path"]), head)
 			var prefix: PackedInt32Array = node["prefix"]
 			var changed: bool = not prefix.is_empty()
+			if probes and not changed and node["partner_at"] == NOWHERE:
+				var hit: Dictionary = _run_probes(node, queue, seen, sites, goals, area, bound, head)
+				if not hit.is_empty():
+					return hit
 			if CoopSearch.debug_nodes:
 				print("  node %d at %s t%d prefix %d partner %s: %s%s" % [head - 1, str(pos), int(node["ticks"]),
 					prefix.size(), str(node["partner_at"]), str(node["path"]).right(90), "" if not changed else " | "
@@ -723,38 +1312,458 @@ class Searcher:
 				var path: String = "%s > %s" % [node["path"], macro["name"]]
 				if outcome.has("goal"):
 					return _found(ticks, path, head)
-				var rest: Vector2i = outcome["pos"]
-				var sig: String = outcome["sig"]
-				var child: Dictionary
-				if sig == _baseline:
-					# Back in the level-file world: the next moves start from a reset world (the partner stays parked).
-					child = _node(rest, ticks, path, sig, node["partner_at"])
-				else:
-					# The world changed for good: the child replays the run from its last unchanged ancestor.
-					var played: PackedInt32Array = outcome["played"]
-					if played.size() > MAX_PREFIX_TICKS:
-						continue
-					child = _node(rest, ticks, path, sig, _partner_spot(config, events))
-					child["config"] = config
-					child["events"] = events
-					child["prefix"] = played
-					child["hand_now"] = _hand_after(config, events)
-				var key: String = _key_of(child)
-				if seen.has(key) and int(seen[key]) <= ticks:
-					continue
-				var fresh: bool = not seen.has(key)
-				seen[key] = ticks
-				var cell: Vector2i = Vector2i(Tuning.to_cell(rest.x), Tuning.to_cell(rest.y - 1))
-				if fresh and area.has_point(cell):
-					queue.append(child)
-					if CoopSearch.collect_stats:
-						CoopSearch.stat_new(macro)
+				if _offer(queue, seen, area, node, outcome, ticks, path, config, events,
+						node["partner_at"] if str(outcome["sig"]) == _baseline else _partner_spot(config, events),
+						int(node.get("cap", MAX_PREFIX_TICKS)), -1) and CoopSearch.collect_stats:
+					CoopSearch.stat_new(macro)
 		return {"reached": false, "ticks": -1, "detail": "", "nodes": head, "runs": runs, "simulated": simulated,
-			"replayed": replayed, "placements": placements}
+			"replayed": replayed, "placements": placements, "queued": queue.size() - head,
+			"exhausted": head >= queue.size(), "stopped": stopped, "parked": _count_parked(queue, head),
+			"changed": _count_changed(queue, head)}
+
+	## A child of `node` from a run's `outcome` at rest (`ticks` on the path so far, `path` its text, played with
+	## `config` and `events`; `partner_at` where the idle partner stands for its later moves): queued when its key is
+	## new and it rests inside `area`. An unchanged world (the level file's) makes a plain node; a changed one replays
+	## the run as its prefix - at most `cap` ticks of it (MAX_PREFIX_TICKS; a probe's end and its descendants
+	## PROBE_PREFIX_TICKS). `at` >= 0 inserts it there in the queue (a probe's changed world: searched on at once),
+	## else it is appended. True when it was queued.
+	func _offer(queue: Array[Dictionary], seen: Dictionary, area: Rect2i, node: Dictionary, outcome: Dictionary,
+			ticks: int, path: String, config: Dictionary, events: Array, partner_at: Vector2i, cap: int,
+			at: int) -> bool:
+		var rest: Vector2i = outcome["pos"]
+		var sig: String = outcome["sig"]
+		var child: Dictionary
+		if sig == _baseline:
+			# Back in the level-file world: the next moves start from a reset world (the partner stays parked).
+			child = _node(rest, ticks, path, sig, partner_at)
+		else:
+			# The world changed for good: the child replays the run from its last unchanged ancestor.
+			var played: PackedInt32Array = outcome["played"]
+			if played.size() > cap:
+				return false
+			child = _node(rest, ticks, path, sig, partner_at)
+			child["config"] = config
+			child["events"] = events
+			child["prefix"] = played
+			child["hand_now"] = _hand_after(config, events)
+			child["cap"] = cap
+		var key: String = _key_of(child)
+		if seen.has(key) and int(seen[key]) <= ticks:
+			return false
+		var fresh: bool = not seen.has(key)
+		seen[key] = ticks
+		var cell: Vector2i = Vector2i(Tuning.to_cell(rest.x), Tuning.to_cell(rest.y - 1))
+		if not fresh or not area.has_point(cell):
+			return false
+		if at >= 0 and at <= queue.size():
+			queue.insert(at, child)
+		else:
+			queue.append(child)
+		return true
+
+	## The continuous-play probes from `node` (an unchanged node, the partner still an egg): for every probe target in
+	## reach of it ([method probe_targets] inside `area`, within PROBE_REACH_CELLS) that has had fewer than PROBE_SITES
+	## sites, every policy of [method probe_battery]. Each run is counted for its family and target (the coverage
+	## [method CoopSearch.gate_verdict] checks: a bounded refusal needs every probe of its gate kind at every target).
+	## A probe entering a cell of `goals` is the search's answer (returned, "probe <family> ..." in the path); its end
+	## at rest is offered as a child of `node` (a changed world inserted right after the node, at most
+	## PROBE_SEEDS_PER_SITE of them per site). {} when none reached.
+	func _run_probes(node: Dictionary, queue: Array[Dictionary], seen: Dictionary, sites: Dictionary,
+			goals: Dictionary, area: Rect2i, bound: int, head: int) -> Dictionary:
+		var pos: Vector2i = node["pos"]
+		var far: Vector2i = goals.keys()[0] if goals.size() == 1 else NOWHERE
+		for target: String in probe_targets(area, far):
+			var at: Vector2i = probe_target_point(target, far)
+			if at == NOWHERE or absi(at.x - pos.x) > PROBE_REACH_CELLS.x * Tuning.TILE \
+					or absi(at.y - pos.y) > PROBE_REACH_CELLS.y * Tuning.TILE:
+				continue
+			if int(sites.get(target, 0)) >= PROBE_SITES:
+				continue
+			sites[target] = int(sites.get(target, 0)) + 1
+			var seeds: int = 0
+			var counted: Dictionary = {}
+			for item: Array in probe_battery(target, pos, far):
+				var config: Dictionary = item[0]
+				var policy: ProbePolicy = item[1]
+				var stats: Dictionary = probe_stats[policy.family]
+				if not counted.has(policy.family):
+					counted[policy.family] = true
+					stats["sites"] = int(stats["sites"]) + 1
+				var covered: Dictionary = stats.get("targets", {})
+				covered[target] = int(covered.get(target, 0)) + 1
+				stats["targets"] = covered
+				var outcome: Dictionary = probe_run(config, policy, goals)
+				stats["runs"] = int(stats["runs"]) + 1
+				stats["kills"] = int(stats["kills"]) + (1 if int(outcome.get("kills", 0)) > 0 else 0)
+				if int(outcome.get("kills", 0)) > 0 and not stats.has("kill"):
+					stats["kill"] = "%s from %d,%d: %s dead%s" % [policy.label, pos.x, pos.y, dead_role_enemies(),
+						"" if not outcome.has("dead") else " (and the hero)"]
+				if CoopSearch.debug_nodes:
+					print("    probe %s (%s) from %s: %s" % [policy.family, policy.label, str(pos),
+						"GOAL" if outcome.has("goal") else ("dead" if outcome.has("dead") else ("rest %s%s" % [
+						str(outcome.get("pos", "-")), " changed" if str(outcome.get("sig", _baseline)) != _baseline
+						else "" ]) if outcome.has("pos") else "no rest")])
+				if outcome.has("dead"):
+					stats["dead"] = int(stats["dead"]) + 1
+				if outcome.has("goal"):
+					stats["reached"] = true
+					var reach_ticks: int = int(node["ticks"]) + int(outcome["ticks"])
+					return _found(reach_ticks, "%s > probe %s (%s): far cell in %d ticks of continuous play" % [
+						node["path"], policy.family, policy.label, int(outcome["ticks"])], head)
+				if not outcome.has("pos"):
+					continue
+				var ticks: int = int(node["ticks"]) + int(outcome["ticks"])
+				if ticks > bound:
+					continue
+				var changed_world: bool = str(outcome["sig"]) != _baseline
+				if changed_world and seeds >= PROBE_SEEDS_PER_SITE:
+					continue
+				if not changed_world and _partner_spot(config, []) != NOWHERE:
+					continue   # a plain resting point with the partner parked: the bait starts' copies cover those
+				var path: String = "%s > probe %s (%s)" % [node["path"], policy.family, policy.label]
+				if _offer(queue, seen, area, node, outcome, ticks, path, config, [], _partner_spot(config, []),
+						PROBE_PREFIX_TICKS, head if changed_world else -1):
+					stats["seeds"] = int(stats["seeds"]) + 1
+					seeds += 1 if changed_world else 0
+		return {}
+
+	## The probe targets of the world inside `area` (by the cell of their feet point): "e<index>" every role enemy,
+	## "p<index>" every plate, "o<index>" every door column, "d<index>" every drum, "m<index>" every other co-op
+	## mechanism (see-saw, heave boulder, pulley, named platform), "f" the far cell (leaps).
+	func probe_targets(area: Rect2i, far: Vector2i) -> PackedStringArray:
+		var result: PackedStringArray = PackedStringArray()
+		for group: Array in [["e", _probe_enemies], ["p", _probe_plates], ["o", _probe_doors], ["d", _probe_drums],
+				["m", _probe_mechs]]:
+			for index: int in group[1]:
+				var entity: SimEntity = entity_at(index)
+				if entity != null and area.has_point(Vector2i(Tuning.to_cell(entity.sim_pos.x),
+						Tuning.to_cell(entity.sim_pos.y - 1))):
+					result.append("%s%d" % [group[0], index])
+		if far != NOWHERE:
+			result.append("f")
+		return result
+
+	## The feet point of probe target `target` ([method probe_targets]; a plate's centre; the far cell's bottom
+	## centre for "f"); NOWHERE when it is gone.
+	func probe_target_point(target: String, far: Vector2i) -> Vector2i:
+		if target == "f":
+			return Vector2i(far.x * Tuning.TILE + Tuning.TILE / 2, (far.y + 1) * Tuning.TILE)
+		var entity: SimEntity = entity_at(target.substr(1).to_int())
+		if entity is Plate:
+			var plate: Plate = entity
+			return Vector2i((plate.left_px() + plate.right_px()) / 2, plate.floor_y())
+		return entity.sim_pos if entity != null else NOWHERE
+
+	## The gate kinds of the G59 table (LEVEL_DESIGN 15.7.6) that the targets in `area` make, and per probe family the
+	## targets a bounded refusal needs it to have run at: {"kinds": PackedStringArray, "required": {family:
+	## PackedStringArray of targets}}. A role enemy makes a keeper door (hop-over, idle-bait, thrown-special at it) or,
+	## a `heavy`, a Brace corridor (hop-over, charge-under, idle-bait); a plate, see-saw, heave boulder or pulley a
+	## plate-door kind (idle-bait and thrown-special at it, plates races from every plate, thrown-special through every
+	## door); a drum twin drums (thrown-special); nothing of these a ledge or gap (hop-over and idle-bait leaps at the far
+	## cell).
+	func probe_requirements(area: Rect2i, far: Vector2i) -> Dictionary:
+		var kinds: PackedStringArray = PackedStringArray()
+		var required: Dictionary = {}
+		for family: String in PROBE_FAMILIES:
+			required[family] = []
+		var targets: PackedStringArray = probe_targets(area, far)
+		var mechanism: bool = false
+		for target: String in targets:
+			var kind: String = target.substr(0, 1)
+			var entity: SimEntity = entity_at(target.substr(1).to_int()) if target != "f" else null
+			match kind:
+				"e":
+					var heavy: bool = entity is EnemyBase and (entity as EnemyBase).coop_trait == Defs.CoopTrait.HEAVY
+					var name: String = "brace corridor" if heavy else "keeper door"
+					if not kinds.has(name):
+						kinds.append(name)
+					(required[PROBE_HOP_OVER] as Array).append(target)
+					(required[PROBE_IDLE_BAIT] as Array).append(target)
+					if heavy:
+						(required[PROBE_CHARGE_UNDER] as Array).append(target)
+					else:
+						(required[PROBE_THROWN] as Array).append(target)
+				"p", "m":
+					mechanism = true
+					(required[PROBE_IDLE_BAIT] as Array).append(target)
+					(required[PROBE_THROWN] as Array).append(target)
+					if kind == "p":
+						(required[PROBE_PLATES] as Array).append(target)
+				"o":
+					(required[PROBE_THROWN] as Array).append(target)
+				"d":
+					if not kinds.has("twin drums"):
+						kinds.append("twin drums")
+					(required[PROBE_THROWN] as Array).append(target)
+		if mechanism:
+			kinds.append("plate door / pulley / see-saw / boulder")
+		if kinds.is_empty():
+			kinds.append("ledge or gap")
+			(required[PROBE_HOP_OVER] as Array).append("f")
+			(required[PROBE_IDLE_BAIT] as Array).append("f")
+		return {"kinds": kinds, "required": required}
+
+	## The door columns (feet points) a plate at entity `index` drives (rise_while= / sink_while= name it).
+	func plate_doors(index: int) -> Array[Vector2i]:
+		var result: Array[Vector2i] = []
+		var name: String = str((_records[index]["params"] as Dictionary).get("name", ""))
+		if name == "":
+			return result
+		for door: int in _probe_doors:
+			var params: Dictionary = _records[door]["params"]
+			var names: PackedStringArray = LevelText.to_list(str(params.get("rise_while", ""))) \
+					+ LevelText.to_list(str(params.get("sink_while", "")))
+			var entity: SimEntity = entity_at(door)
+			if names.has(name) and entity != null:
+				result.append(entity.sim_pos)
+		return result
+
+	## Every probe of target `target` from the resting point `pos` (the far cell `far`): [config, policy] pairs, by
+	## the G59 table (LEVEL_DESIGN 15.7.6):
+	##  - a role enemy: HOP-OVER duels (CHARGE-UNDER - straight up - for a `heavy`) over PROBE_TRIGGERS_PX x
+	##    PROBE_HOLDS x on-over / straight-up x forward / low (pogo) strikes; IDLE-BAIT duels with the idle partner
+	##    parked at each of [method lure_spots] (in front of and behind it, near and far: the bait, the second
+	##    croucher), standing PROBE_LURE_WAITS first; THROWN-SPECIAL: every special from PROBE_THROW_PX, standing and
+	##    jumping, then the duel; EGG PLACEMENT: the egg hatched for real in front of and behind it, then the duel;
+	##  - a plate: PLATES races to each door it drives (PROBE_RACE_WAITS on the plate, then straight / a jump / a
+	##    crawl at the door) - with the idle partner on the plate or in the door's way (IDLE-BAIT, the doorstop);
+	##    THROWN-SPECIAL throws at it; EGG PLACEMENT over it;
+	##  - a door: THROWN-SPECIAL throws through its gap, then GO;
+	##  - a drum: THROWN-SPECIAL throws at it, then the other drums of its bond struck with the club;
+	##  - another mechanism: THROWN-SPECIAL throws at it; IDLE-BAIT leaps with the idle partner on it / beside it;
+	##  - the far cell: HOP-OVER leaps (PROBE_LEAP_RUNUPS run-ups, a jump PROBE_LEAP_PX before its column) and IDLE-BAIT
+	##    leaps with the idle partner at the take-off spot (under the ledge, at the gap's lip).
+	func probe_battery(target: String, pos: Vector2i, far: Vector2i) -> Array:
+		var items: Array = []
+		var far_x: int = far.x * Tuning.TILE + Tuning.TILE / 2
+		var at: Vector2i = probe_target_point(target, far)
+		var dir: int = signi(at.x - pos.x)
+		if dir == 0:
+			dir = 1
+		var bait: bool = CoopSearch.idle_partner
+		if target == "f":
+			for back_up: int in PROBE_LEAP_RUNUPS:
+				for trigger: int in PROBE_LEAP_PX:
+					for hold: int in PROBE_HOLDS:
+						items.append([_config(pos, dir, -1, PARTNER_EGG, NOWHERE),
+							_leap(PROBE_HOP_OVER, far_x, trigger, hold, back_up)])
+			if bait:
+				for trigger: int in PROBE_LEAP_PX:
+					var spot: Vector2i = _floor_spot(Vector2i(far_x - dir * trigger, pos.y))
+					if spot == NOWHERE:
+						continue
+					for hold: int in PROBE_HOLDS:
+						var leap: LeapPolicy = _leap(PROBE_IDLE_BAIT, far_x, trigger, hold, 0)
+						leap.label += " partner at %d,%d" % [spot.x, spot.y]
+						items.append([_config(pos, dir, -1, PARTNER_EGG, spot), leap])
+			return items
+		var index: int = target.substr(1).to_int()
+		var kind: String = target.substr(0, 1)
+		var enemy: EnemyBase = entity_at(index) as EnemyBase if kind == "e" else null
+		# THROWN-SPECIAL at every target (a keeper then dueled, a drum's bond mates then clubbed).
+		for weapon: int in THROW_WEAPONS:
+			for distance: int in PROBE_THROW_PX:
+				for jump: bool in [false, true]:
+					var throw: ThrowPolicy = ThrowPolicy.new()
+					throw.family = PROBE_THROWN
+					throw.far_x = far_x
+					throw.spot_x = at.x
+					throw.distance = distance
+					throw.jump = jump
+					if enemy != null:
+						throw.duel = _duel(PROBE_THROWN, index, far_x, PROBE_TRIGGERS_PX[1], 9, 1, false, 0)
+					elif kind == "d":
+						throw.strike_x = _bond_mate_x(index)
+					throw.label = "%s %sthrow from %d px at %s" % [["club", "hammer", "axe", "swirl", "spear"][weapon],
+						"jump-" if jump else "", distance, _target_name(index)]
+					items.append([_config(pos, dir, weapon, PARTNER_EGG, NOWHERE), throw])
+		match kind:
+			"e":
+				if enemy == null:
+					return items
+				var heavy: bool = enemy.coop_trait == Defs.CoopTrait.HEAVY
+				for trigger: int in PROBE_TRIGGERS_PX:
+					for hold: int in PROBE_HOLDS:
+						for steer: int in [1, 0]:
+							for low: bool in [false, true]:
+								items.append([_config(pos, dir, -1, PARTNER_EGG, NOWHERE), _duel(PROBE_CHARGE_UNDER
+									if heavy and steer == 0 else PROBE_HOP_OVER, index, far_x, trigger, hold, steer, low,
+									0)])
+				if not bait:
+					return items
+				for spot: Vector2i in lure_spots(enemy):
+					for wait: int in PROBE_LURE_WAITS:
+						for trigger: int in [PROBE_TRIGGERS_PX[0], PROBE_TRIGGERS_PX[PROBE_TRIGGERS_PX.size() - 1]]:
+							for steer: int in [1, 0]:
+								var duel: DuelPolicy = _duel(PROBE_IDLE_BAIT, index, far_x, trigger, 9, steer, false,
+									wait)
+								duel.label += " partner at %d,%d" % [spot.x, spot.y]
+								items.append([_config(pos, dir, -1, PARTNER_EGG, spot), duel])
+				for side: int in [-1, 1]:
+					var spot_x: int = enemy.sim_pos.x + side * (enemy.box_w / 2 + BAIT_GAP_PX)
+					for jump_strike: bool in [false, true]:
+						items.append([_config(pos, dir, -1, PARTNER_EGG, NOWHERE), _egg_policy(spot_x, far_x,
+							jump_strike, index)])
+			"p":
+				var doors: Array[Vector2i] = plate_doors(index)
+				if doors.is_empty():
+					doors.append(Vector2i(far_x, at.y))
+				for door: Vector2i in doors:
+					for wait: int in PROBE_RACE_WAITS:
+						for mode: int in [RacePolicy.Mode.RUN, RacePolicy.Mode.JUMP, RacePolicy.Mode.CRAWL]:
+							for trigger: int in ([0] if mode == RacePolicy.Mode.RUN else PROBE_RACE_PX):
+								items.append([_config(pos, dir, -1, PARTNER_EGG, NOWHERE),
+									_race(PROBE_PLATES, at.x, door.x, far_x, wait, mode, trigger)])
+					if bait:
+						# The idle partner on the plate, and in the door's way on both sides (the doorstop, G53).
+						var spots: Array[Vector2i] = [at]
+						for side: int in [-1, 1]:
+							var by_door: Vector2i = _floor_spot(door + Vector2i(side * Tuning.TILE, 0))
+							if by_door != NOWHERE:
+								spots.append(by_door)
+						spots.append(door)
+						for spot: Vector2i in spots:
+							for wait: int in [PROBE_RACE_WAITS[0], PROBE_RACE_WAITS[PROBE_RACE_WAITS.size() - 1]]:
+								var race: RacePolicy = _race(PROBE_IDLE_BAIT, at.x, door.x, far_x, wait,
+									RacePolicy.Mode.RUN, 0)
+								race.label += " partner at %d,%d" % [spot.x, spot.y]
+								items.append([_config(pos, dir, -1, PARTNER_EGG, spot), race])
+				if bait:
+					for jump_strike: bool in [false, true]:
+						items.append([_config(pos, dir, -1, PARTNER_EGG, NOWHERE), _egg_policy(at.x, far_x,
+							jump_strike, -1)])
+			"m":
+				if bait:
+					for offset: int in [0, -Tuning.TILE, Tuning.TILE]:
+						var spot: Vector2i = at + Vector2i(offset, 0)
+						for trigger: int in PROBE_LEAP_PX:
+							var leap: LeapPolicy = _leap(PROBE_IDLE_BAIT, far_x, trigger, 9, 0)
+							leap.label += " partner at %d,%d (%s)" % [spot.x, spot.y, _target_name(index)]
+							items.append([_config(pos, dir, -1, PARTNER_EGG, spot), leap])
+		return items
+
+	## A feet point on the floor at or just under `spot` (its cell or the 3 rows below), not inside a wall; NOWHERE
+	## when there is none.
+	func _floor_spot(spot: Vector2i) -> Vector2i:
+		var grid: TileGrid = level.grid
+		var col: int = Tuning.to_cell(spot.x)
+		var row: int = Tuning.to_cell(spot.y - 1)
+		for down: int in 4:
+			var r: int = row + down
+			if not grid.in_bounds(col, r + 1) or grid.side_at(col, r) == TileGrid.SIDE_WALL:
+				return NOWHERE
+			if TileGrid.is_ground(grid.floor_at(col, r + 1)):
+				return Vector2i(spot.x, (r + 1) * Tuning.TILE)
+		return NOWHERE
+
+	## The x of the nearest other drum of the drum at entity `index`'s bond (-1 when it has none).
+	func _bond_mate_x(index: int) -> int:
+		var bond: String = str((_records[index]["params"] as Dictionary).get("bond", ""))
+		var me: SimEntity = entity_at(index)
+		var best: int = -1
+		for other: int in _probe_drums:
+			var entity: SimEntity = entity_at(other)
+			if other == index or entity == null or me == null:
+				continue
+			if str((_records[other]["params"] as Dictionary).get("bond", "")) != bond:
+				continue
+			if best < 0 or absi(entity.sim_pos.x - me.sim_pos.x) < absi(best - me.sim_pos.x):
+				best = entity.sim_pos.x
+		return best
+
+	func _target_name(index: int) -> String:
+		if index < 0 or index >= _records.size():
+			return "?"
+		return "%s %d,%d" % [String(_records[index]["id"]).get_file(), int(_records[index]["col"]),
+			int(_records[index]["row"])]
+
+	func _leap(family: String, far_x: int, trigger: int, hold: int, back_up: int) -> LeapPolicy:
+		var leap: LeapPolicy = LeapPolicy.new()
+		leap.family = family
+		leap.far_x = far_x
+		leap.trigger_px = trigger
+		leap.hold = hold
+		leap.back_up = back_up
+		leap.label = "leap run-up %d, jump %d px before the far column, hold %d" % [back_up, trigger, hold]
+		return leap
+
+	func _race(family: String, plate_x: int, door_x: int, far_x: int, wait: int, mode: int,
+			trigger: int) -> RacePolicy:
+		var race: RacePolicy = RacePolicy.new()
+		race.family = family
+		race.far_x = far_x
+		race.plate_x = plate_x
+		race.door_x = door_x
+		race.wait = wait
+		race.mode = mode
+		race.trigger_px = trigger
+		race.label = "race plate %d -> door %d, %d ticks on it, %s" % [plate_x, door_x, wait,
+			["straight", "jump %d px before the door" % trigger, "crawl %d px before the door" % trigger][mode]]
+		return race
+
+	func _duel(family: String, index: int, far_x: int, trigger: int, hold: int, steer: int, low: bool,
+			wait: int) -> DuelPolicy:
+		var duel: DuelPolicy = DuelPolicy.new()
+		duel.family = family
+		duel.target_index = index
+		duel.far_x = far_x
+		duel.trigger_px = trigger
+		duel.hold = hold
+		duel.steer = steer
+		duel.low = low
+		duel.wait = wait
+		duel.label = "%s at %d px hold %d%s%s%s" % ["jump on over it" if steer == 1 else "jump straight up", trigger,
+			hold, ", low / pogo strikes" if low else "", ", wait %d" % wait if wait > 0 else "",
+			" vs %s" % String(_records[index]["id"]) if index >= 0 and index < _records.size() else ""]
+		return duel
+
+	## An EGG-PLACEMENT probe: the egg hatched over `spot_x`, then a duel with the role enemy `index` (-1: GO).
+	func _egg_policy(spot_x: int, far_x: int, jump_strike: bool, index: int) -> EggPolicy:
+		var egg: EggPolicy = EggPolicy.new()
+		egg.family = PROBE_EGG
+		egg.far_x = far_x
+		egg.spot_x = spot_x
+		egg.jump_strike = jump_strike
+		if index >= 0:
+			egg.duel = _duel(PROBE_EGG, index, far_x, 24, 9, 1, false, 30)
+		egg.label = "egg hatched over x %d by a %s%s" % [spot_x, "jump-strike" if jump_strike else "strike",
+			", then a duel" if index >= 0 else ""]
+		return egg
+
+	## Where the idle partner is parked for an IDLE-BAIT probe of `enemy`: on its floor in front of it and behind it,
+	## BAIT_GAP_PX clear of its box and PROBE_LURE_EXTRA_PX farther (a lure the enemy turns to or runs at), on a floor
+	## and not in a wall.
+	func lure_spots(enemy: EnemyBase) -> Array[Vector2i]:
+		var result: Array[Vector2i] = []
+		var grid: TileGrid = level.grid
+		for side: int in [-1, 1]:
+			for extra: int in PROBE_LURE_EXTRA_PX:
+				var spot: Vector2i = enemy.sim_pos + Vector2i(side * (enemy.box_w / 2 + BAIT_GAP_PX + extra), 0)
+				var col: int = Tuning.to_cell(spot.x)
+				var body_row: int = Tuning.to_cell(spot.y - 1)
+				if grid.in_bounds(col, body_row) and grid.side_at(col, body_row) != TileGrid.SIDE_WALL \
+						and TileGrid.is_ground(grid.floor_at(col, Tuning.to_cell(spot.y))):
+					result.append(spot)
+		return result
 
 	func _found(ticks: int, path: String, nodes: int) -> Dictionary:
 		return {"reached": true, "ticks": ticks, "detail": path, "nodes": nodes, "runs": runs, "simulated": simulated,
-			"replayed": replayed, "placements": placements}
+			"replayed": replayed, "placements": placements, "queued": 0, "exhausted": false, "stopped": "found",
+			"parked": 0, "changed": 0}
+
+	## Nodes among the first `head` of `queue` that start with the idle partner parked.
+	func _count_parked(queue: Array[Dictionary], head: int) -> int:
+		var count: int = 0
+		for i: int in mini(head, queue.size()):
+			count += 1 if queue[i]["partner_at"] != NOWHERE else 0
+		return count
+
+	## Nodes among the first `head` of `queue` whose world differs from the level file's (a replayed prefix).
+	func _count_changed(queue: Array[Dictionary], head: int) -> int:
+		var count: int = 0
+		for i: int in mini(head, queue.size()):
+			count += 0 if (queue[i]["prefix"] as PackedInt32Array).is_empty() else 1
+		return count
 
 	## A node of [method explore]: an unchanged one (no prefix) unless "config" / "events" / "prefix" are filled in.
 	func _node(pos: Vector2i, ticks: int, path: String, sig: String, partner_at: Vector2i) -> Dictionary:
@@ -837,6 +1846,105 @@ static func search_gate(level_id: StringName, difficulty: int, gate: String) -> 
 	return result
 
 
+## G59 (orchestrator, LEVEL_DESIGN 15.7.6): a bounded refusal counts only with at least this many resting points
+## expanded (the raised bound of the G3 verifier).
+const BOUNDED_MIN_NODES: int = 660
+
+
+## The G59 verdict of a [method search_gate] result: {"verdict": "open" | "refused (exhaustive)" |
+## "refused (bounded)" | "unproven", "evidence": String, "missing": PackedStringArray ("<family> at <target>" for
+## every probe its gate kind needs that did not run)}.
+##  - open: the search or a probe reached the far cell, or a static rule is broken (red, the cause named);
+##  - refused (exhaustive): the frontier emptied below the bound - every resting point the macros and probes reach
+##    inside the gate's area within BOUND_TICKS was expanded;
+##  - refused (bounded): stopped at the bound after at least BOUNDED_MIN_NODES resting points AND every probe family
+##    its gate kinds need ran at every target that needs it (probe_requirements) and none reached the far cell;
+##  - unproven: bounded below BOUNDED_MIN_NODES, or a needed probe did not run (its target never in reach of a probe
+##    site), or the gate could not be searched.
+## A cached result is the stored result of exactly this search (the cache key holds the level file, its base file,
+## the simulation's code, the bounds and the probe switch), so it carries the same evidence as an uncached run.
+static func gate_verdict(result: Dictionary) -> Dictionary:
+	var detail: String = str(result.get("detail", ""))
+	var missing: PackedStringArray = PackedStringArray()
+	if detail.begins_with("unproven"):
+		return {"verdict": "unproven", "evidence": detail, "missing": missing}
+	if bool(result.get("reached", true)):
+		return {"verdict": "open", "evidence": detail, "missing": missing}
+	var explored: int = int(result.get("explored", 0))
+	if bool(result.get("exhausted", false)):
+		return {"verdict": "refused (exhaustive)", "evidence": "the frontier emptied after %d resting points" % explored,
+			"missing": missing}
+	var probes_found: Dictionary = result.get("probes", {})
+	var required: Dictionary = result.get("probes_required", {})
+	var counts: PackedStringArray = PackedStringArray()
+	for family: String in PROBE_FAMILIES:
+		var stats: Dictionary = probes_found.get(family, {})
+		var covered: Dictionary = stats.get("targets", {})
+		var needed: Array = required.get(family, [])
+		for target: Variant in needed:
+			if int(covered.get(str(target), 0)) == 0:
+				missing.append("%s at %s" % [family, str(target)])
+		if not needed.is_empty() or int(stats.get("runs", 0)) > 0:
+			counts.append("%s 0/%d" % [family, int(stats.get("runs", 0))])
+	if not bool(result.get("probes_on", true)):
+		missing.append("every probe (the search ran without probes)")
+	var bound: String = "bounded at %d resting points (%s bound%s)" % [explored, str(result.get("stopped", "node")),
+		", %d queued" % int(result.get("queued", 0))]
+	if explored < BOUNDED_MIN_NODES:
+		return {"verdict": "unproven", "evidence": "%s, below the %d G59 asks; probes %s" % [bound, BOUNDED_MIN_NODES,
+			", ".join(counts)], "missing": missing}
+	if not missing.is_empty():
+		return {"verdict": "unproven", "evidence": "%s; probes missing: %s" % [bound, ", ".join(missing)],
+			"missing": missing}
+	return {"verdict": "refused (bounded)", "evidence": "%s; probes %s" % [bound, ", ".join(counts)],
+		"missing": missing}
+
+
+## The one-line G59 verdict of a gate: "GATE <level> <difficulty> <gate>: <verdict> (<evidence>)".
+static func verdict_line(level_id: StringName, difficulty: int, gate: String, result: Dictionary) -> String:
+	var verdict: Dictionary = gate_verdict(result)
+	return "GATE %s %s %s: %s (%s)%s" % [level_id, Defs.difficulty_name(difficulty).to_lower(), gate,
+		verdict["verdict"], verdict["evidence"], " [cached]" if bool(result.get("cached", false)) else ""]
+
+
+## The per-gate report of a [method search_gate] result (orchestrator's SEARCH decision, wf10; G59): the verdict, how
+## far the search went (EXHAUSTIVE: the queue ran dry - every resting point the macros and probes reach inside the
+## gate's area within BOUND_TICKS was expanded; BOUNDED: stopped at the node or tick bound with nodes still queued),
+## the gate kinds, and one line per probe family: the runs, the sites (nodes it ran from), the runs in which a role
+## enemy died, the end states handed to the search, the runs in which the hero died - or "no target".
+static func report_lines(result: Dictionary) -> PackedStringArray:
+	var lines: PackedStringArray = PackedStringArray()
+	var verdict: Dictionary = gate_verdict(result)
+	lines.append("verdict: %s - %s" % [verdict["verdict"], verdict["evidence"]])
+	var detail: String = str(result.get("detail", ""))
+	if detail.begins_with("static rule") or detail.begins_with("unproven"):
+		lines.append("search: not run (%s)" % detail)
+		return lines
+	if bool(result.get("exhausted", false)):
+		lines.append("search: EXHAUSTIVE - the queue ran dry after %d resting points (%d runs, %d ticks; %d parked-partner, %d changed-world nodes)" 				% [int(result.get("explored", 0)), int(result.get("runs", 0)), int(result.get("simulated", 0)),
+				int(result.get("parked", 0)), int(result.get("changed", 0))])
+	elif not bool(result.get("reached", false)):
+		lines.append("search: BOUNDED - stopped at the %s bound after %d resting points (%d still queued; limits %d nodes / %d ticks; %d runs, %d ticks)" 				% [str(result.get("stopped", "node")), int(result.get("explored", 0)), int(result.get("queued", 0)),
+				int(result.get("node_limit", node_limit)), int(result.get("tick_limit", tick_limit)),
+				int(result.get("runs", 0)), int(result.get("simulated", 0))])
+	lines.append("gate kinds: %s" % ", ".join(PackedStringArray(result.get("gate_kinds", []))))
+	var probes_found: Dictionary = result.get("probes", {})
+	var required: Dictionary = result.get("probes_required", {})
+	for family: String in PROBE_FAMILIES:
+		var stats: Dictionary = probes_found.get(family, {})
+		var needed: int = (required.get(family, []) as Array).size()
+		if stats.is_empty() or int(stats.get("runs", 0)) == 0:
+			lines.append("probe %s: %s" % [family, "no target in the gate's area" if needed == 0
+				else "NOT RUN (%d targets need it)" % needed])
+			continue
+		lines.append("probe %s: %d runs at %d targets from %d sites (%d needed), %d with a role enemy killed, %d ends searched on, %d hero deaths%s" 				% [family, int(stats.get("runs", 0)), (stats.get("targets", {}) as Dictionary).size(),
+				int(stats.get("sites", 0)), needed, int(stats.get("kills", 0)), int(stats.get("seeds", 0)),
+				int(stats.get("dead", 0)), ", REACHED the far cell" if bool(stats.get("reached", false)) else ""])
+		if stats.has("kill"):
+			lines.append("    first kill: %s" % str(stats["kill"]))
+	return lines
+
+
 # --- Spreading the gate table over processes (tools/world_coop_gates.sh) ------------------------------------------------
 
 ## Where [method record_cost] keeps the last measured cost of every gate (one small file per gate; build/ is not
@@ -901,7 +2009,7 @@ static func claim_gate(queue_dir: String, level_id: StringName, difficulty: int,
 ## Where [method search_gate] keeps its results (one JSON file per key; build/ is not versioned).
 const FILE_CACHE_DIR: String = "res://build/coop_search_cache"
 ## The search's own version in the cache key (bump it when a result's meaning changes without a code change).
-const FILE_CACHE_VERSION: String = "v3.1"
+const FILE_CACHE_VERSION: String = "v4.0"
 ## The folders whose files make the simulation (their contents are the code fingerprint).
 const FINGERPRINT_DIRS: Array[String] = ["res://scripts", "res://scenes", "res://resources"]
 const FINGERPRINT_EXTENSIONS: Array[String] = ["gd", "tscn", "tres", "json", "cfg"]
@@ -932,8 +2040,14 @@ static func file_cache_key(path: String, data: LevelData, difficulty: int, gate:
 	if base != "":
 		var base_path: String = level_path(StringName(base))
 		parts.append(FileAccess.get_file_as_string(base_path) if FileAccess.file_exists(base_path) else "")
-	parts.append("%d|%s|%s" % [difficulty, gate, "idle" if idle_partner else "egg"])
+	parts.append("%d|%s|%s|%s" % [difficulty, gate, "idle" if idle_partner else "egg", bounds_text()])
 	return "|".join(parts).md5_text()
+
+
+## The search's compute bounds and probe switch as text (part of both cache keys: a result found under other bounds is
+## never read back as this one).
+static func bounds_text() -> String:
+	return "n%d t%d %s" % [node_limit, tick_limit, "probes" if probes else "no-probes"]
 
 
 ## True when the search world of `gate` in `difficulty` spawns a boss: a `bosses/` record among
@@ -1066,6 +2180,7 @@ static func search_data(data: LevelData, difficulty: int, gate: String) -> Dicti
 			daze_slot_bound()
 	if idle_partner:
 		idle_partner_carries()
+		idle_partner_weighs()
 	profile_add(&"daze", clock)
 	var starts: Array[Vector2i] = start_points(data, difficulty, tablet, grid)
 	for start: Vector2i in starts:
@@ -1075,7 +2190,7 @@ static func search_data(data: LevelData, difficulty: int, gate: String) -> Dicti
 	var world_columns: Vector2i = world_columns_of(area, starts, grid)
 	var key: String = _explore_key(grid, data.resolved_meta(difficulty), starts, far, area) + "|" \
 			+ str(world_records(data, difficulty, world_columns).hash()) + ("|idle" if idle_partner else "|egg") \
-			+ "|d%d" % difficulty
+			+ "|d%d" % difficulty + "|%s" % bounds_text()
 	var found: Dictionary = {}
 	if use_cache and _explore_cache.has(key):
 		found = _explore_cache[key]
@@ -1086,7 +2201,14 @@ static func search_data(data: LevelData, difficulty: int, gate: String) -> Dicti
 			return _unproven(result, "the hero scene %s does not exist" % PLAYER_ID)
 		profile_add(&"build", clock)
 		clock = Time.get_ticks_usec()
-		found = searcher.explore(starts, {far: true}, area, BOUND_TICKS, node_limit)
+		found = searcher.explore(starts, {far: true}, area, BOUND_TICKS, node_limit, tick_limit, probes)
+		found["probes"] = searcher.probe_stats.duplicate(true)
+		var needs: Dictionary = searcher.probe_requirements(area, far)
+		found["gate_kinds"] = Array(needs["kinds"] as PackedStringArray)
+		var required: Dictionary = {}
+		for family: String in needs["required"]:
+			required[family] = (needs["required"][family] as Array).duplicate()
+		found["probes_required"] = required
 		profile_add(&"explore", clock)
 		searcher.close()
 		_explore_cache[key] = found
@@ -1096,6 +2218,17 @@ static func search_data(data: LevelData, difficulty: int, gate: String) -> Dicti
 	result["simulated"] = int(found.get("simulated", 0))
 	result["replayed"] = int(found.get("replayed", 0))
 	result["placements"] = int(found.get("placements", 0))
+	result["queued"] = int(found.get("queued", 0))
+	result["exhausted"] = bool(found.get("exhausted", false))
+	result["stopped"] = str(found.get("stopped", ""))
+	result["parked"] = int(found.get("parked", 0))
+	result["changed"] = int(found.get("changed", 0))
+	result["probes"] = found.get("probes", {})
+	result["gate_kinds"] = found.get("gate_kinds", [])
+	result["probes_required"] = found.get("probes_required", {})
+	result["probes_on"] = probes
+	result["node_limit"] = node_limit
+	result["tick_limit"] = tick_limit
 	if result["reached"]:
 		result["detail"] = "one hero reached %d,%d in %d ticks: %s" % [far.x, far.y, int(found["ticks"]),
 			found["detail"]]
@@ -1208,13 +2341,26 @@ static func world_keeps(id: String) -> bool:
 ## the nodes are the regression check of the IDLE rule): plates, see-saws, pulleys and their lifts, heave boulders,
 ## drums, and keeper, trait or bond enemies.
 static func is_partner_target(record: Dictionary) -> bool:
-	var id: String = String(record["id"])
+	if is_mechanism_target(record):
+		return true
 	var params: Dictionary = record["params"]
+	return params.has("keeper") or params.has("coop") or params.has("bond")
+
+
+## True when `enemy` (spawned in a search world) has a co-op role: a keeper, a trait (also one its archetype gives it
+## without a `coop=` parameter, as the Bull Rex's `heavy`) or a bond.
+static func has_coop_role(enemy: EnemyBase) -> bool:
+	return enemy.keeper != &"" or enemy.coop_trait != Defs.CoopTrait.NONE or enemy.spawn_params.has("bond")
+
+
+## The co-op mechanisms among [method is_partner_target]: plates, see-saws, pulleys and their lifts, heave boulders,
+## drums (parking the idle partner there matters only while the engine counts an idle hero on a plate,
+## [method idle_partner_weighs]).
+static func is_mechanism_target(record: Dictionary) -> bool:
+	var id: String = String(record["id"])
 	if id in ["objects/plate", "objects/seesaw", "objects/pulley", "objects/boulder_heavy", "objects/drum"]:
 		return true
-	if id == "objects/platform" and params.has("pulley"):
-		return true
-	return params.has("keeper") or params.has("coop") or params.has("bond")
+	return id == "objects/platform" and (record["params"] as Dictionary).has("pulley")
 
 
 ## True when a strike or a throw can act on a record of `id` (enemies, every hittable object, bark boards, boulders,
@@ -1378,6 +2524,11 @@ static var use_file_cache: bool = true
 ## Resting points a gate search may expand (MAX_NODES; unit tests of the search's mechanics lower it to stay quick -
 ## a refusal under a smaller bound proves less, never more).
 static var node_limit: int = MAX_NODES
+## Ticks a gate search may simulate (MAX_TICKS; the macros, their replays and the probes) - a deterministic work bound
+## (the same code and file stop at the same node on any machine).
+static var tick_limit: int = MAX_TICKS
+## False: no continuous-play probes in [method search_data] (unit tests of the macros alone).
+static var probes: bool = true
 ## False: the search world's partner is only ever an egg (no `partner` macros) - to tell a gate that one player opens
 ## with an idle partner from one he opens alone (tests, tools).
 static var idle_partner: bool = true
@@ -1842,7 +2993,7 @@ static func pair_lower_bound(a: Vector2i, b: Vector2i) -> int:
 static func travel_ticks(starts: Array[Vector2i], goals: Dictionary, area: Rect2i, searcher: Searcher) -> int:
 	if starts.is_empty() or goals.is_empty():
 		return BOUND_TICKS
-	var found: Dictionary = searcher.explore(starts, goals, area, BOUND_TICKS, MAX_NODES)
+	var found: Dictionary = searcher.explore(starts, goals, area, BOUND_TICKS, WINDOW_NODES)
 	return int(found["ticks"]) if found["reached"] else BOUND_TICKS
 
 
@@ -1981,19 +3132,19 @@ static func _daze_run(searcher: Searcher, target: EnemyBase, start: Vector2i, fa
 # the code they measure is part of the result cache's fingerprint, so a cached result never outlives a rule change)
 # =================================================================================================================
 
-## The probes' map: 30 x 16 cells, floor rows 14-15.
-static func _probe_data(id: String) -> LevelData:
+## The probes' map: 30 x 16 cells, floor rows 14-15 (with the entity lines `entities`).
+static func _probe_data(id: String, entities: String = "") -> LevelData:
 	var rows: PackedStringArray = PackedStringArray()
 	for row: int in 16:
 		rows.append((TileGrid.CH_SOLID_A if row >= 14 else TileGrid.CH_AIR).repeat(30))
 	var text: String = "[meta]\nformat = 2\nid = %s\nkind = coop\nbook = 2\nterrain_a = jungle/terrain_grass\n" % id \
-			+ "music = level_jungle\n[tiles]\n%s\n[entities]\n" % "\n".join(rows)
+			+ "music = level_jungle\n[tiles]\n%s\n[entities]\n%s\n" % ["\n".join(rows), entities]
 	return LevelData.parse(StringName(id), text, "%s.lvl" % id)
 
 
 ## A search world of the probes' map (null when the hero scene does not exist).
-static func _probe_world(id: String) -> Searcher:
-	var data: LevelData = _probe_data(id)
+static func _probe_world(id: String, entities: String = "") -> Searcher:
+	var data: LevelData = _probe_data(id, entities)
 	var searcher: Searcher = Searcher.new()
 	if not searcher.build_world(data, Defs.Difficulty.BEGINNER, grid_at_rest(data, Defs.Difficulty.BEGINNER),
 			Vector2i(0, data.cols)):
@@ -2024,6 +3175,40 @@ static func _probe_idle_ride() -> bool:
 	var rides: bool = searcher.hero.is_riding_totem()
 	searcher.close()
 	return rides
+
+
+## 1 / 0 once probed, -1 before ([method idle_partner_weighs]).
+static var _weigh_probe: int = -1
+
+
+## G33 as built in the objects: true when an IDLE hero standing on a plate weighs on it (the plate's weight or press
+## while only the idle partner stands there, the lone hero far away). The search parks the idle partner at the co-op
+## mechanisms only then ([method Searcher.placement_useful]); since G33 the plates (and the pulleys, see-saws, boulders
+## and drums, built together by objects-A) count no idle hero, so those parked copies of the graph could reach
+## nothing - this probe is their regression check.
+static func idle_partner_weighs() -> bool:
+	if _weigh_probe < 0:
+		_weigh_probe = 1 if _probe_idle_weight() else 0
+	return _weigh_probe == 1
+
+
+static func _probe_idle_weight() -> bool:
+	var searcher: Searcher = _probe_world("coop_search_weight_probe", "objects/plate 20 13 name=probe mode=hold")
+	if searcher == null:
+		return true   # nothing to probe with: keep the placements
+	var plate: Plate = null
+	for entity: SimEntity in searcher._entities:
+		if entity is Plate:
+			plate = entity as Plate
+	if plate == null:
+		searcher.close()
+		return true
+	var on_plate: Vector2i = Vector2i(plate.left_px() + Tuning.TILE, plate.floor_y())
+	searcher.run(searcher._config(Vector2i(3 * Tuning.TILE, 14 * Tuning.TILE), 1, -1, PARTNER_IDLE, on_plate),
+			_repeat(0, 24), {})
+	var weighs: bool = plate.weight > 0 or plate.pressed or plate.presses > 0
+	searcher.close()
+	return weighs
 
 
 ## The daze probe ([method probe_daze]); empty before.

@@ -1,7 +1,12 @@
-# route: level=w5_l1 difficulty=beginner ends=none expect=hurts:0,painting:0,secrets:1,weapon_end:spear
-# Featured route of Red Mesa Trail (designer D5): the Cave Painting (index 0) on the spire top, two spear steps up.
-# The Beginner line to checkpoint 1, up onto the ledge for the spear, a high throw into the first bark board, onto
-# its step, onto the spire's base, a high throw into the second board on the tower, onto that step and the tower top.
+# route: level=w5_l1 difficulty=beginner ends=exit after=tally expect=hurts:0,painting:0,secrets:1,min_checkpoints:4,min_kills:8,min_score:20000,weapon_end:spear
+# Featured route of Red Mesa Trail (designer D5; extended to the exit for the Book II campaign, recorded from
+# closed-loop macros, build/content): the Cave Painting (index 0) on the spire top, two spear steps up, and the stage
+# finished with the spear on the belt, so a Beginner run carries it into 5-2 for the Feast Land D warp
+# (w5_l2.warp.inputs, belt=spear). The Beginner line to checkpoint 1, up onto the ledge for the spear, a high throw
+# into the first bark board, onto its step, onto the spire's base, a high throw into the second board on the tower,
+# onto that step and the tower top; then a swap puts the club back in the hand (the spear rides on the belt), the
+# club line runs on to the exit totem, and a last swap walks out with the spear in hand. S is pressed only after the
+# spear is picked up, so the belt-invariance runner sees the same digests whatever special rode on the belt before.
 # The beach, the first tortoise, the rattler, the second tortoise (as the club route)
 77:R,8:F,2:,6:R,8:RU,12:R,6:,10:R,6:,6:R,8:F,2:,16:R,8:F,2:
 # checkpoint 1, up through the ledge for the spear, a step back from the spire
@@ -10,3 +15,15 @@
 6:UF,12:,2:RU,10:U,10:,5:RU,9:U,10:
 # high throw into the tower's board, onto its step, onto the tower top, the painting
 6:UF,12:,2:RU,12:U,10:,6:RU,10:U,10:,6:R,20:
+# Swap: the club back in the hand, the spear on the belt; off the tower's east side to the canyon floor
+1:S,9:,4:R,31:
+# the first Roller jumped as it rolls in
+2:,2:R,5:,9:U,15:,24:R
+# up the mesa steps to checkpoint 2, over the crevasse, the plateau tortoise
+4:R,10:RU,6:R,14:RU,22:R,10:RU,28:R,14:RU,8:R,7:,6:F
+# the lower tunnel, checkpoint 3, the plateau Roller jumped, down the long slope, the plain tortoise
+56:R,20:,9:U,26:,63:R,7:,6:F
+# into the gully: two tortoises, out under the mesa wall past checkpoint 4
+42:R,7:,1:R,2:,1:R,2:,3:R,4:,1:R,2:,1:R,2:,1:R,2:,1:R,2:,1:R,2:,1:R,2:,1:R,1:,8:F,7:,19:R,7:,1:R,6:F
+# the long climb: the Rollers rolling down jumped, the last tortoise, the spear back in the hand, the exit totem
+114:R,21:,9:U,9:,9:R,24:,9:U,14:,41:R,7:,1:R,2:,1:R,2:,1:R,2:,1:R,2:,1:R,2:,6:F,8:,1:RS,11:R

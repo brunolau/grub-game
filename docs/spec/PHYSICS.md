@@ -1486,7 +1486,9 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
   leaves the raft - until the raft is stopped by a bank (its leading edge against a floor cell of its surface row,
   step 3): then the fence opens on that side over the bank's floor, so a rider walks off onto the beach, where his floor contact unrails him (phase 3, D9b's
   `ending_b` [G45]). The ride test must carry a railed rider over the whole fenced width (no strip at the bow where the
-  halved-width overlap of 11.4 drops him into the liquid).
+  halved-width overlap of 11.4 drops him into the liquid) and, once the fence is open towards a bank, over the whole
+  deck up to the bank's edge: a rider standing anywhere over the deck is carried (content's wf10 finding: a 7 px
+  strip between the closed fence's line and the deck's end drowned a rider who stopped there; objects-B asked).
 - `dir = u|d` currents move only floating dropped items. Dropped items whose feet are in a current's `~` cell float
   at the surface and drift with it.
 - Water stays deadly (7.8); in co-op a fall is an egg (C.12).
@@ -1587,8 +1589,11 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
   != 0`; the egg's nudge counts), capped at 243 (`IDLE_TICKS`, 10 s); a hatch, a carry, a bump, a launch, a
   respawn, a checkpoint and a team wipe never reset it. A hero is **idle** while `input_idle_ticks >= 243` or while
   his slot has held no flag since he entered the level (a level start, a join, a restart at the checkpoint): an
-  untouched partner never counts, not even in the first 243 ticks. He is drawn dozing ("Zzz", drawing only) once
-  `input_idle_ticks` reaches 243 on a hatched living hero, until his next input. Never in single-player or versus.
+  untouched partner never counts, not even in the first 243 ticks. **A held flag is input on every tick it is held**
+  [G58]: the count restarts on each tick his sampled flags are not 0, so a crouch held on a plate (DOWN), a held
+  direction or a held button keeps him active indefinitely. From `input_idle_ticks >= 170` (`IDLE_WARN_TICKS`) to 242
+  a **"Zzz soon" warning bubble** is drawn over a hatched living hero [G58]; from 243 he is drawn dozing ("Zzz"),
+  until his next input. Both are drawing only: no rule reads them. Never in single-player or versus.
 - **Active**: hatched (in `H`) and not idle (`PlayerBase.counts_for_coop()`); for the Shoulder Hop also: his own
   slot held some input flag since he last became hatched (the level start, a team-wipe respawn, a hatch by a box, a
   stomp or a checkpoint; `PartyDriver.is_active`, the G1 rule - a partner who is not idle but has not pressed
@@ -1636,7 +1641,14 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
   whose rule says so) overlaps an active hero H in the crouch state (5, not crawl) whose partner is also active and in
   the crouch state, both grounded, `|H.x - partner.x| <= 16`: the heavy stops dead (`xvel = 0`) and is **dazed 44 ticks** with its head
   open (Tusker's co-op form: 66, GAMEPLAY 13.6); neither hero is touched. A lone croucher is trampled (the normal hurt,
-  10.1).
+  10.1). **A heavy takes damage only during that daze** [G57]: any hero box, projectile, ball or head bounce that
+  would hurt a `heavy` enemy while it is not brace-dazed glances (clank and spark, no damage, no knock-back; a bounce
+  still bounces the hero); while it is brace-dazed every side counts.
+- **One hit per strike** (co-op files only) [G57]: an enemy (not a boss: bosses keep `BOSS_HIT_COOLDOWN`) takes at
+  most one hit from one **strike instance** - a hero's melee strike from its first damaging box to its last (the 1.0
+  test hit on every tick a box overlapped: 100 hp fell in 4-5 ticks), one projectile for its whole flight, one ball
+  flight (C.11, as before), one head bounce. A new strike (a new attack start, a new throw) is a new instance, so `hp`
+  counts strikes. In single-player and in versus the 1.0 per-tick test is unchanged.
 
 ### C.11 Curl and Batter Up
 
@@ -1800,9 +1812,10 @@ Owner of each table: `Tuning` (core: hero and world rules), `PartyTuning` (core,
 | Mount | C.9 table | | C.9 | MountTuning |
 | Totem | head 35 / rest 34 px; foot reach 16 px; jump-off 16 over the carry; impulses `>> 1`; drop lock 12 *(tune)* | | C.10 | PartyTuning |
 | Shoulder Hop | -224 (= `Tuning.BOUNCE_YVEL_UP`), active partner only | v16 | C.10 | PartyTuning |
-| Idle | 243 ticks without input of his own (or none since entering the level); Zzz from 243 | ticks | C.10 | PartyTuning (`PlayerBase.IDLE_TICKS` until core-A adds it) |
+| Idle | 243 ticks without input of his own (or none since entering the level; a held flag is input every tick); "Zzz soon" bubble from 170, Zzz from 243 [G58] | ticks | C.10 | PartyTuning (`IDLE_TICKS`; `IDLE_WARN_TICKS` asked of core-A) |
 | Lee | 64 px downwind, 16 px vertical *(tune)* | px | C.6 | PartyDriver (PartyTuning asked) |
-| Brace | 16 px apart, heavy dazed 44 | | C.10 | PartyTuning |
+| Brace | 16 px apart, heavy dazed 44 (hurt only then [G57]) | | C.10 | PartyTuning |
+| One hit per strike | co-op files: one hit per enemy per strike instance [G57] | | C.10 | enemies (`EnemyBase`) |
 | Curl | 66 ticks, box 24 x 20 *(tune)* | | C.11 | PartyTuning |
 | Bat | line +/-144, -128; lob +/-32, -240; grounder +/-96 for 32 ticks; charged x3/2; ball power 25 on `hp < 50` *(tune all)* | | C.11 | PartyTuning |
 | Egg | box 24 x 24; drift 2 (6 beyond 64 px); nudge 1; offset (-24, -48); Expert return 243 at 6 px/tick *(tune)* | | C.12 | PartyTuning |

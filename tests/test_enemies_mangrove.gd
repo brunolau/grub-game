@@ -75,10 +75,10 @@ func test_mangrove_reads_its_chamber_and_counts_hits_by_stage() -> void:
 	assert_eq(expert.max_hp, 16, "Expert 6 + 5 + 5")
 	_fresh()
 	var coop: Mangrove = _open(Defs.Difficulty.BEGINNER, 2, true)
-	assert_eq(coop.max_hp, 8, "co-op Beginner: 5 twin hits + 3")
+	assert_eq(coop.max_hp, 5, "co-op Beginner: 3 twin hits + 2 (wf10 boss balance)")
 	_fresh()
 	var coop_expert: Mangrove = _open(Defs.Difficulty.EXPERT, 2, true)
-	assert_eq(coop_expert.max_hp, 13, "co-op Expert: 7 twin hits + 6")
+	assert_eq(coop_expert.max_hp, 7, "co-op Expert: 4 twin hits + 3 (wf10 boss balance)")
 	assert_true(coop_expert.max_hp * PartyTuning.BOSS_HP_MAX_DEN <= 16 * PartyTuning.BOSS_HP_MAX_NUM)
 
 
@@ -464,6 +464,11 @@ func test_coop_pin_and_fling() -> void:
 	var p1: PlayerBase = _lab.hero(0)
 	_wake_both()
 	_lab.step(PackedInt32Array([0, 0]))
+	# wf10: the co-op hand's ledge shake waits until the fist has rested MANGROVE_COOP_SHAKE_AFTER_REST ticks (and its
+	# own pause ran out) - here both are over, so the hand comes at once and rests while he pins the fist.
+	tree._fist_timer = maxi(tree._fist_timer, Mangrove.MANGROVE_COOP_SHAKE_AFTER_REST)
+	if tree.get_hand_state() == Mangrove.Hand.AWAY:
+		tree._hand_timer = maxi(tree._hand_timer, Mangrove.MANGROVE_HAND_PAUSE)
 	tree._fist_len = tree._fist_timer + 30
 	p1.respawn_at(Vector2i(204, 120))
 	var stood: int = 0
@@ -497,13 +502,44 @@ func test_coop_pin_and_fling() -> void:
 	assert_true(launched, "Up held: launched at once")
 
 
+## wf10 boss balance: in co-op stage 1 the hand and the fist keep time - the hand's ledge shake waits until the fist
+## has rested MANGROVE_COOP_SHAKE_AFTER_REST ticks, and a resting fist bursts again only after the hand came and went -
+## so every hand rest is a twin chance (the resting fist under it). The solo hand (stage 2) keeps its free clock.
+func test_coop_hand_and_fist_keep_time() -> void:
+	var tree: Mangrove = _open(Defs.Difficulty.BEGINNER, 2, true)
+	_wake_both()
+	var rests: int = 0
+	var bursts: int = 0
+	var was_rest: bool = false
+	var was_fist: int = tree.get_fist_state()
+	for t: int in 2400:
+		_lab.step(PackedInt32Array([0, 0]))
+		var hand_rest: bool = tree.get_hand_state() == Mangrove.Hand.REST
+		if hand_rest:
+			assert_eq(tree.get_fist_state(), Mangrove.Fist.REST, "tick %d: the hand rests over a resting fist" % t)
+		if tree.get_hand_state() == Mangrove.Hand.SHAKE and tree._hand_timer == 0:
+			assert_eq(tree.get_fist_state(), Mangrove.Fist.REST, "tick %d: the shake starts over a resting fist" % t)
+			assert_true(tree._fist_timer >= Mangrove.MANGROVE_COOP_SHAKE_AFTER_REST,
+					"tick %d: after %d ticks of rest" % [t, tree._fist_timer])
+		if hand_rest and not was_rest:
+			rests += 1
+		if tree.get_fist_state() == Mangrove.Fist.DRAW and was_fist == Mangrove.Fist.REST:
+			bursts += 1
+		was_rest = hand_rest
+		was_fist = tree.get_fist_state()
+	print("    co-op stage 1: %d hand rests, %d bursts in 2400 ticks" % [rests, bursts])
+	assert_true(rests >= 8, "a hand rest every cycle (%d)" % rests)
+	assert_true(bursts >= rests - 1, "the fist still punches between them (%d bursts)" % bursts)
+	assert_eq(tree.get_stage(), 1, "nobody struck")
+
+
 ## Stage 3: the knuckle armour of the stuck fist turns to the nearer hero every tick; only the far hero's strike on the
 ## wrist counts.
 func test_coop_stage_3_only_the_far_hero_strikes_the_wrist() -> void:
 	var tree: Mangrove = _open(Defs.Difficulty.BEGINNER, 2, true)
 	var p1: PlayerBase = _lab.hero(0)
 	var p2: PlayerBase = _lab.hero(1)
-	tree.hp = 3
+	tree.hp = Mangrove.MANGROVE_COOP_HITS_BEGINNER[1]
 	_wake_both()
 	_lab.step(PackedInt32Array([0, 0]))
 	assert_eq(tree.get_stage(), 3)
@@ -515,10 +551,10 @@ func test_coop_stage_3_only_the_far_hero_strikes_the_wrist() -> void:
 	assert_eq(tree.get_fist_facing(), -1, "the knuckles face P1, the nearer")
 	_shot_at(tree.get_fist_rect(), 0)
 	_lab.step(PackedInt32Array([0, 0]))
-	assert_eq(tree.hp, 3, "P1's hit on the knuckles glances")
+	assert_eq(tree.hp, Mangrove.MANGROVE_COOP_HITS_BEGINNER[1], "P1's hit on the knuckles glances")
 	_shot_at(tree.get_fist_rect(), 1)
 	_lab.step(PackedInt32Array([0, 0]))
-	assert_eq(tree.hp, 2, "P2's on the wrist counts")
+	assert_eq(tree.hp, Mangrove.MANGROVE_COOP_HITS_BEGINNER[1] - 1, "P2's on the wrist counts")
 
 
 ## G33: a dozing partner counts for none of Old Mangrove's co-op rules. A twin half "struck" by a hero who no longer
@@ -548,6 +584,7 @@ func test_coop_an_idle_partner_counts_for_nothing() -> void:
 	tree._set_fist(Mangrove.Fist.REST)
 	tree._fist_x = tree.fist_rest_x
 	tree._fist_len = 30
+	tree._rest_saw_hand = true  # wf10: as if the hand had come and gone in this rest (the keep-time rule)
 	p1.respawn_at(Vector2i(40, 160))
 	p2.respawn_at(Vector2i(204, 120))
 	var stood: int = 0
@@ -649,6 +686,7 @@ func test_coop_form_is_fair_to_either_hero() -> void:
 		tree._held_target = null
 		tree._set_fist(Mangrove.Fist.REST)
 		tree._fist_len = tree._fist_timer + 2
+		tree._rest_saw_hand = true  # wf10: as if the hand had come and gone in this rest (the keep-time rule)
 		var drew: int = 0
 		var leaf: SimEntity = null
 		for t: int in 20:

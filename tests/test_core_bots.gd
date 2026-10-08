@@ -117,6 +117,62 @@ B = objects/spawn_point index=2
 [entities]
 """
 
+## Two ride platforms on one objects/pulley (range 3) beside two side ledges (core-B wf10: the lifts of Tar Pulleys).
+const PULLEY_ARENA: String = """[meta]
+format = 2
+id = test_core_bots_pulley
+kind = arena
+players = 2
+modes = last_caveman
+biome = jungle
+[legend]
+P = objects/platform name=pa mode=ride
+Q = objects/platform name=pb mode=ride
+W = objects/pulley a=pa b=pb range=3
+B = objects/spawn_point index=2
+[tiles]
+|..................|
+|..................|
+|..................|
+|.........W........|
+|..................|
+|..................|
+|##.P......Q...####|
+|..................|
+|..................|
+|.@..............B.|
+####################
+####################
+[entities]
+"""
+
+## A block standing on the floor (cols 8-11, rows 6-9): the floor node left of it ends 9 px short of its face (the
+## wall probe), and a hero knocked into that sliver stands off the graph under the block's top (wf9_da_to_core_b #2).
+const SLIVER_ARENA: String = """[meta]
+format = 2
+id = test_core_bots_sliver
+kind = arena
+players = 2
+modes = last_caveman
+biome = jungle
+[legend]
+B = objects/spawn_point index=2
+[tiles]
+|..................|
+|..................|
+|..................|
+|..................|
+|..................|
+|..................|
+|........####......|
+|........####......|
+|........####......|
+|.@......####....B.|
+####################
+####################
+[entities]
+"""
+
 ## The tier arena's graph as JSON text, baked once for the whole file (a bake simulates thousands of hero runs; text,
 ## not the graph itself, so that nothing is left over at exit).
 static var _tier_json: String = ""
@@ -595,6 +651,174 @@ func test_bot_rides_the_moving_platform_across() -> void:
 	assert_true(rode, "on the platform")
 	assert_eq(bot.nav.links_failed, 0, "; ".join(bot.nav.failure_log))
 	bot.uninstall()
+
+
+# =================================================================================================================
+# Pulley lifts (core-B wf10, wf9_da_to_core_b.txt #1) and the off-graph sliver (#2)
+# =================================================================================================================
+
+func test_pulley_states_and_rest_rule() -> void:
+	var offsets: PackedInt32Array = NavMovers.pulley_offsets(48)
+	assert_eq(offsets.size(), 49, "every still state of a 3-row pulley, 2 px apart (%s)" % [offsets])
+	assert_eq(offsets[0], -48)
+	assert_eq(offsets[24], 0)
+	assert_eq(offsets[48], 48)
+	for i: int in range(1, offsets.size()):
+		assert_eq(offsets[i] - offsets[i - 1], PartyTuning.PULLEY_SPEED_PX)
+	# objects-B's Pulley: the heavier side sinks to its limit, equal weights stay where they are.
+	assert_eq(NavGraph.pulley_rest(10, 1, 0, 48), 48)
+	assert_eq(NavGraph.pulley_rest(10, 0, 2, 48), -48)
+	assert_eq(NavGraph.pulley_rest(10, 1, 1, 48), 10)
+	assert_eq(NavGraph.pulley_rest(-6, 0, 0, 48), -6)
+	for p: int in [-48, -2, 0, 30]:
+		var preset: int = NavMovers.encode_preset(1, p)
+		assert_eq(NavMovers.preset_pulley(preset), 1)
+		assert_eq(NavMovers.preset_offset(preset), p)
+
+
+func test_sim_presets_and_holds_a_pulley() -> void:
+	var data: LevelData = LevelData.parse(&"test_core_bots_pulley", PULLEY_ARENA)
+	var sim: NavSim = NavSim.new()
+	assert_true(sim.setup(self, &"test_core_bots_pulley", data.build_grid(0), data.resolved_meta(0),
+			data.entity_records()))
+	assert_eq(sim.pulleys.size(), 1, "one pulley")
+	assert_eq(Array(sim.part_pulley), [0, 0], "both platforms hang from it")
+	assert_eq(Array(sim.part_side), [1, -1], "pa sinks by the offset, pb rises by it")
+	assert_eq(Array(sim.pulley_limits), [48], "range 3")
+	var home: Vector2i = sim.part_homes[0]
+	# Nobody on the lifts: they stand where the preset put them.
+	sim.pulley_preset = {0: 32}
+	var parked: NavSim.Outcome = sim.run(NavSim.PARK, PackedInt32Array(), 0)
+	assert_eq(parked.mover_states[0], PackedInt32Array([0, 32, 0, 0]), "pa 32 px down, still")
+	assert_eq(parked.mover_states[1], PackedInt32Array([0, -32, 0, 0]), "pb 32 px up, still")
+	# A rider on pa: free, his weight sinks it to its limit; held (an equal weight on pb), it stays.
+	var on_lift: Vector2i = Vector2i(home.x + 24, home.y + 32 + NavMovers.RIDE_SINK_PX)
+	var neutral: PackedInt32Array = PackedInt32Array()
+	neutral.resize(24)
+	neutral.fill(0)
+	var free: NavSim.Outcome = sim.run(on_lift, neutral, 48)
+	sim.pulley_frozen = true
+	var held: NavSim.Outcome = sim.run(on_lift, neutral, 48)
+	sim.pulley_preset = {}
+	sim.pulley_frozen = false
+	assert_false(free.died or held.died, "he rides, alive")
+	assert_eq(held.pos.y, on_lift.y, "the held lift stays at 32 px")
+	assert_eq(free.pos.y, home.y + 48 + NavMovers.RIDE_SINK_PX, "the free lift sinks to its limit")
+	assert_true(held.rode.has(0) and free.rode.has(0), "both runs rode pa (%s / %s)" % [held.rode, free.rode])
+	# Without a preset the run starts at the level start, as before.
+	var start: NavSim.Outcome = sim.run(NavSim.PARK, PackedInt32Array(), 0)
+	assert_eq(start.mover_states[0], PackedInt32Array([0, 0, 0, 0]))
+	sim.teardown()
+
+
+## A NavMoversLive whose pulley plan is given (the navigator's side of the pulley rule).
+class _FixedPulleys:
+	extends NavMoversLive
+
+	var plan: Dictionary = {}
+
+	func has_pulleys() -> bool:
+		return true
+
+	func pulley_plan(_hero: PlayerBase) -> Dictionary:
+		return plan
+
+
+func test_navigator_plans_with_the_resting_pulley_state() -> void:
+	# A floor (node 0) and two pulley lifts (nodes 1 = side +1 `a`, 2 = side -1 `b`, limit 48).
+	var graph: NavGraph = NavGraph.new()
+	graph.level_id = &"test_core_bots_pulley_plan"
+	for entry: Array in [[10, 8, 311, -1], [6, 84, 123, 0], [6, 196, 235, 1]]:
+		var node: NavGraph.NavNode = NavGraph.NavNode.new()
+		node.row = int(entry[0])
+		node.y = node.row * 16
+		node.x0 = int(entry[1])
+		node.x1 = int(entry[2])
+		if int(entry[3]) >= 0:
+			var mover: int = graph.add_mover("objects/platform@%d,6" % int(entry[3]), "objects/platform", 6, 6,
+					NavGraph.MOVER_RIDER)
+			graph.movers[mover]["pulley"] = 0
+			graph.movers[mover]["side"] = 1 if int(entry[3]) == 0 else -1
+			graph.movers[mover]["limit"] = 48
+			node.mover = mover
+		graph.add_node(node)
+	# [from, to, cond]: onto a at p 0 and 48, off a at p 48 and 0, onto b at p 48 (b is 48 px up), a plain floor link.
+	var specs: Array = [[0, 1, [0, 0, 0, 0, 0]], [0, 1, [0, 0, 48, 0, 0]], [1, 0, [0, 0, 48, 0, 0]],
+			[1, 0, [0, 0, 0, 0, 0]], [0, 2, [1, 0, -48, 0, 0]], [0, 0, []]]
+	for spec: Array in specs:
+		var link: NavGraph.NavLink = NavGraph.NavLink.new()
+		link.from = int(spec[0])
+		link.to = int(spec[1])
+		link.x0 = 40
+		link.x1 = 60
+		link.keys = "3:RU,10:R"
+		link.ticks = 13
+		link.cond = PackedInt32Array(spec[2])
+		graph.add_link(link)
+	graph.rebuild()
+	assert_true(graph.is_pulley_lift(0) and graph.is_pulley_lift(1))
+	assert_eq(graph.link_pulley_offset(graph.links[4]), 48, "b's dy -48 is pulley offset 48")
+	var nav: BotNavigator = BotNavigator.new(graph)
+	var live: _FixedPulleys = _FixedPulleys.new()
+	# The pulley rests at 0 with the hero off the lifts; on `a` his weight takes it to 48.
+	live.plan = {0: Vector2i(0, 48), 1: Vector2i(0, -48)}
+	nav.update_movers(null, live)
+	var avoid: Dictionary = nav.search_blocked()
+	assert_false(avoid.has(0), "onto a at the resting state")
+	assert_true(avoid.has(1), "not onto a at another state")
+	assert_false(avoid.has(2), "off a where his weight takes it")
+	assert_true(avoid.has(3), "not off a at the state it leaves under him")
+	assert_true(avoid.has(4), "not onto b at 48 while the pulley rests at 0")
+	assert_false(avoid.has(5), "a floor link is never left out")
+	# Someone heavy stands on `a`: the pulley will rest at 48 for him too.
+	live.plan = {0: Vector2i(48, 48), 1: Vector2i(48, 48)}
+	nav.update_movers(null, live)
+	avoid = nav.search_blocked()
+	assert_true(avoid.has(0) and not avoid.has(1) and not avoid.has(4), "the links of the 48 state (%s)" % [avoid])
+	# A blocked link stays out; a level without pulleys plans with `blocked` alone.
+	nav.blocked[5] = true
+	nav.update_movers(null, live)
+	assert_true(nav.search_blocked().has(5))
+	nav.update_movers(null, NavMoversLive.new())
+	assert_true(nav.search_blocked() == nav.blocked, "no pulleys: the blocked links alone")
+
+
+func test_bot_walks_out_of_a_sliver_under_a_block() -> void:
+	# The floor left of the block ends 9 px short of its face (x 118); the block's top is a node 6 rows up.
+	var graph: NavGraph = NavGraph.new()
+	graph.level_id = &"test_core_bots_sliver"
+	for entry: Array in [[10, 24, 118], [6, 128, 191], [10, 201, 295]]:
+		var node: NavGraph.NavNode = NavGraph.NavNode.new()
+		node.row = int(entry[0])
+		node.y = node.row * 16
+		node.x0 = int(entry[1])
+		node.x1 = int(entry[2])
+		graph.add_node(node)
+	graph.rebuild()
+	NavGraph.cache(graph)
+	var level: Level = _load_arena_text(2, &"test_core_bots_sliver", SLIVER_ARENA)
+	if level == null:
+		return
+	var hero: PlayerBase = level.get_hero(0)
+	GameInput.set_scripted_slot(0, func(_tick: int) -> int: return 0)
+	GameInput.set_scripted_slot(1, func(_tick: int) -> int: return 0)
+	hero.respawn_at(Vector2i(122, 160))
+	Sim.step(4)
+	assert_eq(graph.node_at(hero.sim_pos), -1, "he stands in the sliver, off the graph (%s)" % [hero.sim_pos])
+	var nav: BotNavigator = BotNavigator.new(graph)
+	nav.set_target(Vector2i(hero.sim_pos.x, 96), 4)
+	assert_eq(nav.target_node, 1, "the target is the block's top straight above him")
+	var flags: int = nav.step(hero, Sim.tick + 1)
+	assert_eq(flags & (Defs.IN_LEFT | Defs.IN_RIGHT), Defs.IN_LEFT, "he walks back onto the floor node")
+	GameInput.set_scripted_slot(0, func(tick: int) -> int: return nav.step(hero, tick))
+	var back: bool = false
+	for t: int in 40:
+		Sim.step(1)
+		if graph.node_at(hero.sim_pos) == 0:
+			back = true
+			break
+	assert_true(back, "back on the graph (stands at %s)" % [hero.sim_pos])
+	GameInput.clear_scripted()
 
 
 # =================================================================================================================

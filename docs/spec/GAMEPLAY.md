@@ -915,12 +915,12 @@ ever needed** on a main path; specials open shortcuts, secrets and paintings (13
   (or the checkpoint) at `rise_speed` (default 1 px/tick) once the player moves; it kills on touch; the view never
   scrolls down and follows each hero's footing, never a jump's apex, so a jump in place lands in view [G42];
   `zones/autoscroll_stop` ends it.
-- **Alternating gusts** (P-C.6): negative wind pushes right; `wind_loop` repeats a wind script (9-2, Floe Rink, Cloud
-  Top); crouching braces as in 1.0; outside the ice biome the wind shows as gust streaks. **Co-op lee** [G23]: a hero
+- **Alternating gusts** (P-C.6): negative wind pushes right; `wind_loop` repeats a wind script (9-2, Floe Rink, the
+  Roc's gale); crouching braces as in 1.0; outside the ice biome the wind shows as gust streaks. **Co-op lee** [G23]: a hero
   up to 64 px downwind of a crouching partner feels no wind, and a jump taken in the lee stays sheltered until he
   lands - the "lee leapfrog" over gust gaps of up to 3 tiles, a co-op comfort, never a gate (the first hero over
-  crosses unsheltered, as a lone hero can) [G55]. **Lightning** (`zones/lightning`, `period` [66]; 9-1b,
-  Cloud Top): a darkening cloud marks a hero's column 22 ticks before the bolt (the target alternates between the
+  crosses unsheltered, as a lone hero can) [G55]. **Lightning** (`zones/lightning`, `period` [66]; 9-1b;
+  the cut Cloud Top arena [G60] would have used it): a darkening cloud marks a hero's column 22 ticks before the bolt (the target alternates between the
   heroes inside; eggs are never struck); a bolt hurts like an enemy (a glider is lost instead of a heart); cue
   `Sfx.LIGHTNING_STRIKE`. **Drop clouds / crumbling clouds / driftwood floes** are 1.0 drop platforms in new skins.
 - **Food rain** (`zones/food_rain period skin=food|fruit`, Feast Land E, `ending_b`): the ember-rain zone of 4-1
@@ -942,7 +942,8 @@ ever needed** on a main path; specials open shortcuts, secrets and paintings (13
   need 4 rows of air.
 - Co-op **two seats**: the first hero to sit drives (move, hop, bite); a partner who lands on his back is the
   **gunner** - he cannot move, but strikes and throws both ways with his own belt (Left / Right turn him). A hit throws
-  both off. Used in 6-1, 7-1 and the Mesa Rodeo arena.
+  both off. The two seats are a co-op set piece, not a gate (one rider crosses whatever the mount crosses [G62]).
+  Used in 6-1 and 7-1 (the co-op 7-1 has no pen); the Mesa Rodeo arena is cut [G60].
 
 ### 13.5 Book II enemies
 
@@ -975,6 +976,9 @@ each declares its doze rule; Book I never spawns them). Defaults `hp` [25], `sco
   hero is nobody [G33]). A rule that needs two different heroes' hits is not capped by the measured solo minimum: its
   window is the difficulty value (13.9.3). It resets only on a team wipe; its test asserts that the single-hero search -
   one hero with every weapon plus an idle hatched partner placed anywhere he could be hatched - cannot beat it.
+  **Balance** [G61] (until the P4.5 playtests): a co-op fight lasts 45-90 s (1 093-2 185 ticks, boss bar to lethal
+  blow) on its recorded routes and costs at most 6 hurts (both heroes) on its Expert route; the baseline and the
+  direction each form must move are DESIGN.md B.0's table (only Tusker is inside the band at G3).
 - **Weak points clear of the HUD** [G35]: the HUD band of a boss fight is the top row - 31 px deep on a phone or
   tablet, 27 on a computer; in co-op the letters give way and P2's panel moves up into it while a boss bar shows - and,
   in the boss bar's columns (53 px left to 38 px right of the view's centre), down to 48 px (`Hud.band_rects`). Every
@@ -1144,9 +1148,11 @@ take 200 (8 club hits; co-op 250), phase 3 takes **3 glider dives**. Weak point:
   ones are saved per profile across modes (`Save.add_painting`); one found before shows as an outline and pays its
   points again without counting twice.
 - Never on a main path: behind `$` walls, up spear steps, at vine tops, inside a big spot, behind x2 gates.
-- **Unlocks** (Far Shore map slab and the Versus menu): 5 = Mesa Rodeo arena; 10 = eight loincloth patterns for P1-P4;
-  15 = variants Big Bounce, Lights Out, Giant Rain; 20 = Cloud Top arena; 25 = variant Spear Party and a golden
-  loincloth palette; 30 = the mural that ends The Long Raft Home. Options > Versus > "Unlock everything" exists.
+- **Unlocks** (Far Shore map slab and the Versus menu) [G60]: 5 = four loincloth patterns for P1-P4 (checks, dots,
+  tiger, pinstripes); 10 = four more (diamonds, waves, sash, trim); 15 = variants Big Bounce, Lights Out, Giant Rain;
+  20 = variant Spear Party; 25 = the golden loincloth palette; 30 = the mural that ends The Long Raft Home (reward ids
+  `patterns`, `loincloths`, `variants`, `spear_party`, `gold`, `mural`). No arena is locked (cut 3 applied: Mesa Rodeo
+  and Cloud Top are not in 2.0). Options > Versus > "Unlock everything" exists.
 
 ### 13.8 Audio
 
@@ -1202,8 +1208,10 @@ sub-stage keeps its first half's music, a co-op file its solo file's.
 - **An egg is no springboard** [G1]: the head bounce that hatches an egg is -64 (10 px) with or without Up.
 - **The idle partner** [G33] (P-C.10): a hatched hero is **idle** while his own player has given no input for 243
   ticks (10 s), or none since he entered the level (a level start, a join, a restart at the checkpoint). Only his own
-  input resets it (an egg's nudge counts); a hatch, carry, bump, launch, respawn, checkpoint or team wipe never does.
-  After 243 quiet ticks he is drawn dozing ("Zzz") until his next input. An idle hero counts for **no co-op rule**:
+  input resets it (an egg's nudge counts); **a held key counts on every tick it is held** [G58] (a crouch held on a
+  plate keeps him active); a hatch, carry, bump, launch, respawn, checkpoint or team wipe never does. From his 170th
+  quiet tick a **"Zzz soon" bubble** warns over his head; after 243 quiet ticks he is drawn dozing ("Zzz") until his
+  next input. Every co-op plate sign says "Crouch on a plate to hold it" [G58]. An idle hero counts for **no co-op rule**:
   no weight on plates and pulley lifts, no see-saw launch, no x2 tablet light, no count-in, no bait or "nearer hero"
   for a trait or a boss, no brace, no lee, no duo move - a hero passes through his head, Up held or not (no Shoulder
   Hop, no Totem Ride; a ride ends when carrier or rider becomes idle). He is still a body: enemies may target and hurt
@@ -1231,7 +1239,7 @@ sub-stage keeps its first half's music, a co-op file its solo file's.
 | **Shoulder Hop** | land on an **active** partner's head with Up held: bounce -224, feet reach 140 px over the floor | stand still / one held jump |
 | **Totem Ride** | land on an **active** partner without Up (not curled, not mounted): ride his head; his jumps are halved; the rider strikes (high strike 61-77 px over the floor), jumps off (Up; a jump timed 1-5 ticks after the carrier's reaches 8+ tiles - measured against the carrier's rise, so his halved hop never sheds the rider) or drops (Down + Jump) | walk / strike |
 | **Batter Up** | Down + Swap curls a hero (up to 66 ticks); the partner's strike launches him: forward line drive 153 px, high lob 120 px up, low grounder 192 px, charged x1.5; a line drive or a lob stops where it lands; the ball breaks `$` blocks, opens spots it touches, knocks enemies with hp < 50 | curl / aim and strike |
-| **Brace Wall** | two crouching active heroes within 16 px stop a `heavy` dead and daze it 44 ticks with its head open; a lone croucher is trampled | crouch / crouch and line up |
+| **Brace Wall** | two crouching active heroes within 16 px stop a `heavy` dead and daze it 44 ticks with its head open - the only time a heavy can be hurt [G57]; a lone croucher is trampled | crouch / crouch and line up |
 | **Egg Hatch** | 13.9.2 | be carried / strike the egg |
 
 - **Windows** (twin drums, bonds, split halves, twin boss hits, the tentacle flinch): **24 ticks on Beginner, 12 on
@@ -1256,7 +1264,10 @@ sub-stage keeps its first half's music, a co-op file its solo file's.
   the Mimic's nearer hero) counts only active heroes [G33]. Despawn only when far from both heroes. Zone spawners (types 0, 10, 11, 12)
   alternate between the heroes inside their zone (slot order); their `max` is x1.5 (rounded down). The active cap stays 12. Each
   hero's stolen heart bursts as 6 bones for the team (an enemy that hurt both releases 12). Enemies reset only on a
-  team wipe. Hit points are unchanged (two heroes already deal double damage).
+  team wipe. Hit points are unchanged (two heroes already deal double damage). **One hit per strike** [G57] (P-C.10):
+  one strike - a club swing for every tick its boxes stay out, a thrown special for its whole flight, a ball flight, a
+  head bounce - damages a given enemy at most once, so `hp` counts strikes (a 100-hp keeper takes four club strikes);
+  bosses keep their hit cooldown; solo files keep the 1.0 per-tick hit.
 - Per archetype:
 
 | Archetype | Co-op base behaviour | Traits used in layouts |
@@ -1290,7 +1301,7 @@ of the enemy records carry a trait, and every enemy guarding a main-path chokepo
 | `shell` | the shield faces the nearer active hero **every tick** (no active hero near: the nearest hatched one); a hit from that side (striker's x, or a projectile flying into the shield; `abs(dx) < 4` counts as front) glances with a clank and a spark; back hits count | one hero is always in front |
 | `bond` | records with the same `bond=<name>`: when one dies a window opens; every other record of the bond must die before it closes, or the dead ones **regrow** at their anchors with full hp (a 22-tick regrow, harmless) | targets are out of one hero's reach within the window, and no thrown special hits two members in one throw [G36] |
 | `daze` | when any active hero within 48 px (and 32 px vertically) starts a strike, it hops away from him (`xvel` +/-64, `yvel` -96 *(tune)*); it hops over a thrown weapon coming at it within 48 px (`yvel` -128); a head bounce **dazes** it 14 ticks (Beginner) / 12 (Expert); only a dazed one can be hurt, and only by a hero of another slot than the one whose bounce dazed it (his hits glance; slot-bound, so not capped by the solo minimum [G47]); other hits glance | the bouncer cannot hurt his own daze |
-| `heavy` | front hits glance; it is stopped only by a **Brace Wall** (P-C.10), which dazes it 44 ticks with its head open (hits from any side count while dazed) | needs two braced bodies |
+| `heavy` | it is stopped only by a **Brace Wall** (P-C.10), which dazes it 44 ticks with its head open; it is **damaged only while so dazed** (then hits from any side count) - every other hit glances: front, back, from above, thrown, a ball, a bounce [G57] | needs two braced bodies (it runs under a jumping hero, so a lone hero who lands behind it gains nothing) |
 | `lone` | while the two active heroes are within 64 px of each other on both axes it keeps away (it does not dive, charge or rise; flyers circle 32 px wider); otherwise it targets the hero farther from the view centre (ties -> the higher slot) [R9]. Off on Beginner (plain targeting) | staying together is the defence |
 | `grab` | a hero who touches it from below (his feet below its feet point) or whom it dives onto is **seized** instead of hurt: he cannot move or strike, and it carries him towards its perch (`perch=c,r`, a pit-side cell) at 1 px/tick, dropping him there; the partner frees him with any hit on it (the hit counts; the freed hero falls with 44 ticks of immunity) | a grabbed hero cannot strike |
 | `leech` | it lands on a hero's back (instead of hurting) and drains one bone per 44 ticks; only the partner's weapon reaches it (the host's own boxes skip it); alone it falls off after 220 ticks | a hero cannot hit his own back |
@@ -1325,7 +1336,7 @@ in. hp [25], score index 5.
 **As built** [G11]: the Book I Shellback (`skin=turtle|turtle_b`) is a Walker with the shell trait (walker speed 32
 and score, no Guard clock); the bone sheet stays a Guard. **Bull Rex** wakes by the view (not the edge rusher's
 trigger), runs at its target at `speed` [64], turns round when it overran its target by 48 px or at a wall; never
-one-shot. **Snatcher**: `kind=stinger` after a carry flies back to where it seized the hero, then home to its anchor
+one-shot; hurt only while a Brace Wall has it dazed [G57]. **Snatcher**: `kind=stinger` after a carry flies back to where it seized the hero, then home to its anchor
 (2 px/tick) and hovers; `kind=dangler` takes up its thread at its line again. **Tar Splitter** is the walker form.
 
 #### 13.9.7 Co-op objects
@@ -1510,17 +1521,17 @@ who holds it 194 ticks).
 
 #### 13.10.9 Arenas and sudden deaths
 
-Ten single-screen arenas, 8 at launch (DESIGN.md E.5; building rules LEVEL_DESIGN 15.8): Totem Ring (jungle, wrap
-left-right, Grub Stack), Echo Hollow (cave, wrap top-bottom, Hot Rock), Floe Rink (ice, open sides, LCS), Cinder Pit
-(volcano, LCS), Tar Pulleys (swamp, Grub Stack), Coconut Cove (coast, Clubball), Sky Picnic (Feast Land, wrap
-top-bottom, **no deaths**, Hot Rock / Grub Stack), Colossus Hall (keep, Grub Stack and LCS only; the neutral Colossus
-takes no hits and spits at the crowned leader every 243 ticks with its jaws open 10 ticks ahead - in LCS at the hero
-with the most hearts, no spit on a tie [G43]), Mesa Rodeo (5 paintings; Chomper starts penned and is
-released at every multiple of 728 round ticks while he waits penned, after a 22-tick rumble - his picture shakes and
-the quake cue plays, no screen shake; once out he waits for a rider and stays out; his rider's bite bites rivals
-(Grub Stack: spill 3); a stomp on the rider unseats him - thrown off, no stun - and Chomper stays out for the
-stomper; only a hit sends him back to his pen for the next release [G20]), Cloud Top (20 paintings). Mesa Rodeo and
-Cloud Top are built only once the other eight are done and green [G37]. Arenas are 20 x 12 cells (LEVEL_DESIGN 15.8);
+Eight single-screen arenas (DESIGN.md E.5; building rules LEVEL_DESIGN 15.8; cut 3 applied [G60]): Totem Ring
+(jungle, wrap left-right, Grub Stack), Echo Hollow (cave, wrap top-bottom, Hot Rock; the darkness pulse is its
+signature - the regrowing walls and the dangler springboard are dropped), Floe Rink (ice, open sides, **Grub Stack
+only**), Cinder Pit (volcano, LCS), Tar Pulleys (swamp, Grub Stack; human-only unless core-B's pulley links make its
+bot tests green), Coconut Cove (coast, Clubball), Sky Picnic (Feast Land, wrap top-bottom, **no deaths**, Hot Rock /
+Grub Stack), Colossus Hall (keep, Grub Stack and LCS only; the neutral Colossus takes no hits and spits at the crowned
+leader every 243 ticks with its jaws open 10 ticks ahead - in LCS at the hero with the most hearts, no spit on a tie
+[G43]). Mesa Rodeo and Cloud Top are **not in 2.0** [G37] [G60]; Chomper's arena rules stay in the code, unused
+(Chomper starts penned and is released at every multiple of 728 round ticks while he waits penned, after a 22-tick
+rumble; his rider's bite bites rivals; a stomp on the rider unseats him and Chomper stays out for the stomper; only
+a hit sends him back to his pen [G20]). Arenas are 20 x 12 cells (LEVEL_DESIGN 15.8);
 the Totem Ring, Cinder Pit, Echo Hollow and Coconut Cove as built at G2 are drawn in DESIGN.md E.5 [G14] [G31]; the
 modes each arena supports are its `modes` meta key. Arena signatures run by the referee (phase 3 [G43]; LEVEL_DESIGN
 15.2 / 15.8): `dark_pulse` (night for the first 73 ticks of every period, heroes glow), `regrow` (a broken `$` block
@@ -1589,6 +1600,7 @@ records every change in DESIGN.md, then here and in PHYSICS Appendix C.
 | Roller walk / range / uncurl, Guard patrol, Mimic daze, Shaman speed, split run | 32 v16, 4 rows, 154; 24 v16; 22; 48 v16; 48 v16 for 22 | enemy tests and playtests |
 | Mount food bonus, wild rex pace | 500; 16 v16 | 6-1 playtests |
 | Boss fill-ins (Tusker idles and arcs, Mangrove launch and co-op stage hits, Inkjaw dive, blob arc and current, Roc wind) | 13.6 | each boss test (telegraphs, escapability, no stun-lock, club beats the solo form) |
+| Co-op boss fights | 45-90 s (1 093-2 185 ticks) on the recorded routes; at most 6 hurts on the Expert route [G61] | the co-op forms' pace (DESIGN.md B.0 baseline table), then the P4.5 pair playtests |
 | Versus weight, body bump, teammate bump, giant bonk daze | P-C.14; 12 ticks | bot soak, playtests |
 | Hot Rock first pick and re-pick delay | 66 / 66 ticks | playtests |
 | Coconut roll loss | 2 v16 per tick | Clubball bot tests |

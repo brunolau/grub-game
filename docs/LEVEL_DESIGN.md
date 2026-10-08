@@ -560,7 +560,7 @@ height with high strikes. Thrown weapons (axe, boomerang) fly 13 px/tick and als
 
 ## 15. Co-op and Book II
 
-Building the 2.0 content: the 20 Book II files, the 35 co-op files and the 10 versus arenas. The design is
+Building the 2.0 content: the 20 Book II files, the 35 co-op files and the 8 versus arenas (cut 3 applied [G60]). The design is
 `docs/expansion/DESIGN.md`; the rules are `docs/spec/GAMEPLAY.md` 13 and `docs/spec/PHYSICS.md` Appendix C
 ("P-C.n"); the plan and the per-level recipe are `docs/expansion/PLAN.md` 6. Sections 1-14 still hold. **The 15 Book I
 files and their 72 route files are frozen: never edit them** (a guard test checks their hashes).
@@ -572,8 +572,8 @@ files and their 72 route files are frozen: never edit them** (a guard test check
   letters, specials and painting indices: GAMEPLAY 13.2).
 - Co-op: `levels/<id>_coop.lvl` for every one of the 35 stages (`w1_l1_coop` ... `ending_b_coop`).
 - Arenas: `levels/arena_<name>.lvl` (`arena_totem_ring`, `arena_echo_hollow`, `arena_floe_rink`, `arena_cinder_pit`,
-  `arena_tar_pulleys`, `arena_coconut_cove`, `arena_sky_picnic`, `arena_colossus_hall`, `arena_mesa_rodeo`,
-  `arena_cloud_top`).
+  `arena_tar_pulleys`, `arena_coconut_cove`, `arena_sky_picnic`, `arena_colossus_hall`; `arena_mesa_rodeo` and
+  `arena_cloud_top` are cut from 2.0 [G60]).
 - New files are `format = 2` (format-1 files load unchanged). Sign texts go into your own locale file
   (`locale/levels/en/<world>.po`, keys `SIGN_W5_*`), not into `locale/en.po`.
 - **Briefs**: the exact phase-3 targets of worlds 6-9, Feast Land E and the Long Raft Home (size, meta, codes,
@@ -601,7 +601,7 @@ files and their 72 route files are frozen: never edit them** (a guard test check
 | `wind` | `tick:value,...` | | values may be negative (wind to the right) |
 | `wind_loop` | ticks | `0` | the wind script restarts every that many ticks (alternating gusts); in an arena the referee drives it, synced to the round |
 | `dark_pulse` | `<period>[:<night>]` | none | arenas: from round tick `period` on, the first `night` [73] ticks of every period are night (heroes glow; 22-tick fade as the telegraph) - Echo Hollow `486` [G43] |
-| `regrow` | ticks | `0` | arenas: a broken `$` block grows back that long after it broke (a ghost block first, solid only when no hero overlaps the cell) - Echo Hollow `364` [G43] |
+| `regrow` | ticks | `0` | arenas: a broken `$` block grows back that long after it broke (a ghost block first, solid only when no hero overlaps the cell) - built by world-B [G43]; no 2.0 arena uses it (Echo Hollow's walls are dropped [G60]) |
 | `ember_lane` | `<col>,<width>[,<period>]` | none | arenas: an ember drifts down a random column of the lane every `period` [66] round ticks after a glow at its start; its touch is an arena hit - Cinder Pit [G43] |
 | `biome` | + `canyon` `swamp` `coast` `ruins` `sky` | | default terrain, backdrop and music of the new worlds |
 
@@ -730,6 +730,9 @@ every hero glows warm and every prop whose name holds "glow" (`swamp/props/glowc
   row, the boss bar, P2's panel and the versus corners) and show one at a time: two signs a few columns apart are
   fine, but give each idea one short sign. `tests/test_ui_signs.gd` guards `locale/en.po`; check your own `.po` the
   same way.
+- **Plate signs say "crouch"** [G58]: every co-op sign that teaches a hold plate tells the holder to crouch - "Crouch
+  on a plate to hold it" (e.g. "Crouch on a plate to hold its door open - then swap!"): a holder who just stands goes
+  idle after 243 ticks and the plate lets go; a held Down is input on every tick.
 - **Boss arenas** as section 10, one walled screen each; the geometry of every arena is in GAMEPLAY 13.6. **Weak points
   clear of the HUD** [G35]: lock the camera on 11 rows whose last row is the arena floor (a taller lock lets the view
   float: then every view it allows must pass - the boss tests check both extremes, the route tests every settled
@@ -790,8 +793,8 @@ and keepers).
 | **Heave boulder** | `objects/boulder_heavy` with 3+ cells of floor behind the pushed side and 2+ rows of air; it fills a 2-cell gap, plugs a vent (`objects/geyser deadly`) or presses a plate |
 | **Pulley** | `objects/pulley` with two `objects/platform mode=ride` 4+ cells apart; the rider's target `range` rows above his platform's start. Keep rider and counterweight within about 7 rows of each other (`range` 3 at most): while the rider is in the air the view is anchored on the standing counterweight (rows 4-9 of the view), and a lift off the view carries nobody - a range-6 pulley drops its rider through his own lift (D9a, 9-1). Reach a higher target from a co-op ledge over the risen lift. The same holds for a vertical co-op climb: give drop clouds a twin beside each step so both climb side by side |
 | **Keeper door** | `objects/column trigger=keepers:<name>` behind a hall **exactly 4 rows high** (the Guard and Shellback art is 54 px tall); its keepers (`keeper=<name>`) carry `shell`, `bond` or `daze`. Keepers meant for a pincer stand still (`speed=0`: a walker with left = right = 0 still sways about 30 px); bait about 30 px in front, the striker's way in about 40 px behind [G5] |
-| **Brace corridor** | a `heavy` (Bull Rex) in a 4-row-high hall between walls. A heavy presses against the wall nearest its target, so the heroes must step into the corridor while it is NOT pressing at their way in (asleep out of view at the far end, or far away): a corridor whose entrance is where the heavy stops makes every entry a trample; a brace across a step is impossible (the body overlap lends the leftmost box half its width) - keep the braced floor flat (DB2, 3-1) [G55] |
-| **Chomper two seats** | a mounted stretch where only the gunner can clear the way (Leeches, a Snatcher) over ground a hero on foot cannot cross (spikes with no run-up) |
+| **Brace corridor** | a `heavy` (Bull Rex) in a 4-row-high hall between walls. **The brace is the only way to hurt it** [G57]: every hit glances unless a Brace Wall has it dazed (44 ticks), and a co-op strike hurts it once, so `hp` / 25 is the number of club strikes two heroes must land in braced dazes (it wakes, turns and charges again for the next brace). The 4-row hall does not stop it running under a jumping hero (G3 verifier) - the damage rule is the gate, not the hall. A heavy presses against the wall nearest its target, so the heroes must step into the corridor while it is NOT pressing at their way in (asleep out of view at the far end, or far away): a corridor whose entrance is where the heavy stops makes every entry a trample; a brace across a step is impossible (the body overlap lends the leftmost box half its width) - keep the braced floor flat (DB2, 3-1) [G55] |
+| ~~Chomper two seats~~ | **retired as a gate kind** [G62]: a mount crosses a 6-cell spike bed with one rider in about 24 ticks and the Leeches only drain bones (D6), so whatever the gunner clears, a lone rider outruns. The two seats stay a co-op set piece (6-1); 6-1 and 7-1 built A.6's fallbacks (a boost ledge, leapfrog plate doors) |
 | ~~Lee gap~~ | **retired as a gate kind** [G55]: the lee shelters only the second hero (the croucher already stands past the gap), so whatever carries the first hero over a gust gap carries a lone hero too - it can never be solo-impossible (DB2). The lee stays a co-op comfort taught by a sign; build a Brace corridor, a line drive or a keeper hall where a gate is needed (the search ran the wind - world-B's `SearchWind` - so this is a rule of the move, not of the proof [G41]) |
 
 #### 15.7.4 x2 tablets
@@ -818,6 +821,12 @@ gate (D.8 #1).
   `grab` needs a `perch=c,r` next to a pit. `lone` is off on Beginner: do not make a gate out of it. Snappers have no
   co-op rule of their own (bait-and-bite was dropped [G10] [G40]): pair them with `bond`. Every trait rule that asks
   for "the nearer hero" (a shield, a keeper's bait, `lone`'s pair) counts only active heroes [G33].
+- **`hp` counts strikes in co-op files** [G57]: one strike (a swing, a throw, a ball flight, a bounce) hurts a given
+  enemy once, so a keeper with `hp=100` takes four club strikes - set keeper `hp` for the time the hall should take,
+  not for safety (the 1.0 test hit on every tick a box overlapped and made `hp` meaningless).
+- **`heavy`** (Bull Rex) [G57]: hurt only while a Brace Wall has it dazed - wherever a heavy stands it is a brace
+  gate. Give it a flat floor of 3+ cells in its charge path where two heroes can crouch side by side, and keep it off
+  the only path of a stretch that is not meant to be one.
 - **Keeper and Guard halls are exactly 4 rows high** (4 rows of air, a ceiling above; orchestrator resolution at
   phase 1: the Guard and Shellback art is 54 logical px tall): nobody can jump or bounce over a keeper to get past
   it. The search (15.7.6) still proves it, because a hero can land on a short enemy's head even there.
@@ -854,6 +863,28 @@ the partner on one side of a keeper, walk the long way round to the other - can 
 with the replay's cause named, whatever the table says; keep the replay as a regression probe that must fail once the
 cause is fixed (world-B's `probe_hatches` for [G53], D8's idle-bait bots for the shell facing of [G33]). If the cause is
 engine code that does not follow the spec, the design stays and the code is fixed - do not redesign around it.
+
+**"Refused" names its evidence** [G59] (orchestrator, after the G3 verifier found 68 of 76 cached refusals stopped
+AT the 220 bound and an uncached 660 bound reached `w9_l2_coop` 'brace'). The gate table gives every gate and
+difficulty one verdict:
+
+| Verdict | Evidence |
+|---|---|
+| **refused (exhaustive)** | the search's frontier emptied below its bound - every resting point it can reach was expanded (`w4_l1_coop` 'cliff': 11 of 660) - or the static reach rule shows that no chain of feet cells reaches `far` (15.7.8 "Solo search") |
+| **refused (bounded)** | the raised bound - at least **660 resting points, uncached** - was hit, AND every continuous-play probe its gate kind needs (below) failed: no world reset between moves, the real hero and the file's entities, each probe swept over its timings |
+| **unproven** | a bounded search without its probes: neither green nor red - the G3 table lists it as unproven |
+| **open** | any search, probe or replay reached `far`: red, with the cause named |
+
+| Gate kind | Probes a bounded refusal needs |
+|---|---|
+| Keeper door (`shell`, `bond`, `daze` keepers) | **hop-over** (jumps and bounces over and onto every keeper of the hall), **idle-bait** (the idle partner in front of and behind each keeper), **thrown-special** (every special from every spot the lone hero reaches, at each keeper; both members of a bond) |
+| Brace corridor (`heavy`) | **hop-over**, **charge-under** (the heavy woken and baited to run under a jumping hero, who lands behind it and strikes - the 'brace' finding), **idle-bait** (the idle partner as the second croucher, as bait) |
+| Plate door, leapfrog, pulley, see-saw, heave boulder | **idle-bait** (the idle partner on every plate, lift and see-saw end and in every door's and boulder's way: the doorstop [G53]), **plates** (race every door from its plate - off the plate and through before the column closes - and every `timed:` clock), **thrown-special** (specials through every door gap) |
+| Twin drums | **thrown-special** (every special from every reachable spot at every drum; a `pair_solo_min` of 0 is a build error [G36]) |
+| Boost, Totem and lob ledge, Batter Up gap | **hop-over** (bounces off every enemy that can wander into the static reach, the idle partner's head, a corner catch), **idle-bait** (the idle partner placed under the ledge or at the gap's lip) |
+
+world-B builds the probes and prints the verdict per gate (`tests/test_coop_gates.gd`, `tools/world_coop_gates.sh`);
+a designer whose gate is "unproven" asks world-B for its probes rather than raising the bound again.
 
 #### 15.7.7 Two heroes on one camera
 
@@ -925,8 +956,13 @@ he dozes ("Zzz" after 243 quiet ticks) and counts for no co-op rule (plates, lif
 count-ins, bait, braces, the lee, duo moves, boss rules). Only his own input wakes him; a hatch, a carry, a bump or a
 team wipe does not. What it means for a level:
 - **No role waits 243+ ticks without input.** Time each gate so the waiting role waits well under 10 s once
-  understood (D.8: a gate takes under about 30 s in all), or let him wait doing something: a plate holder may crouch
-  (Down held is input) or walk on the plate; prefer `timed:` / `latch` plates where a hold would be long.
+  understood (D.8: a gate takes under about 30 s in all), or let him wait doing something: a plate holder crouches
+  (a held key is input on **every tick** it is held [G58], so a crouch holds a plate for as long as he likes) or walks
+  on the plate; prefer `timed:` / `latch` plates where a hold would be long.
+- **The warning** [G58]: from his 170th quiet tick a "Zzz soon" bubble shows over a hero (3 s before he dozes at 243);
+  the game warns the player, so the level does not have to.
+- **Plate signs say "crouch"** [G58]: every co-op sign that teaches a hold plate says "Crouch on a plate to hold it"
+  (15.6); the plate signs of phase 3 said "Stand on a plate" and are reworded by their locale files' owners.
 - **Two-stream routes**: a stream that stands still for 243+ ticks on a plate, under a rider or at a see-saw breaks
   the replay. Hold Down (crouch) on such stretches when recording; `test_coop_routes` tells.
 - **Teach it once**: the egg and tablet signs at the first checkpoint of 1-1 and 5-1 co-op may add "Asleep? Press
@@ -979,13 +1015,16 @@ team wipe does not. What it means for a level:
 - **Movers and bots** (DA, phase 3 [G51]): the bots' links of a see-saw or a pulley lift are baked for its level-start
   state only, so a bot left on a flipped plank or a moved lift stands there; and a see-saw end over a liquid cell kills
   its rider (and tips a lander into it within 2 ticks - no telegraph). Keep both ends of an arena see-saw over
-  standable ground; until the baker covers every state, build Floe Rink with fixed floes and Tar Pulleys only if its
-  set is green.
-- **Order** [G37]: Floe Rink, Tar Pulleys, Sky Picnic and Colossus Hall first; Mesa Rodeo and Cloud Top only once those
-  four are done and their bot tests green. Colossus Hall plays Grub Stack and Last Caveman Standing only (the neutral
-  statue spits at the crowned leader / the hero with the most hearts).
-- Layouts and sketches: DESIGN.md E.5 (Totem Ring, Cinder Pit, Echo Hollow and Coconut Cove as built at G2; the Tar
-  Pulleys sketch).
+  standable ground; until the baker covers every state, build Floe Rink with fixed floes; Tar Pulleys ships with
+  `bots = none` (human-only) unless core-B's pulley links - a lift's links baked for every state it can stand in -
+  make its bot tests green in its modes [G60].
+- **The 8 arenas of 2.0** [G37] [G60]: cut 3 is applied - Mesa Rodeo and Cloud Top are not in 2.0. Floe Rink plays
+  **Grub Stack only** (`modes = grub_stack`); Echo Hollow's signature is the darkness pulse alone (its regrowing `$`
+  walls and dangler springboard broke spawn fairness in every placement and are dropped: no `regrow`, no enemy record);
+  Colossus Hall plays Grub Stack and Last Caveman Standing only (the neutral statue spits at the crowned leader / the
+  hero with the most hearts).
+- Layouts and sketches: DESIGN.md E.5 (Totem Ring, Cinder Pit, Echo Hollow and Coconut Cove as built at G2; Sky
+  Picnic, Colossus Hall, Floe Rink and Tar Pulleys as built in phase 3).
 
 ### 15.9 Route files and headers
 
@@ -1017,6 +1056,8 @@ New routes describe themselves in a header instead of a `ROUTES` entry. The head
 - **Recording**: `--record=<file>` (debug builds) writes every slot's sampled flags and a header skeleton: two people
   play the stage with pads in the windowed game and the file is a tick-exact proof.
 - Counts at G3: 31 solo club routes (11 Beginner + 20 Expert cells), about 6 featured routes, 57 co-op routes.
+  A co-op boss route also measures its fight: 45-90 s from the boss bar to the lethal blow, at most 6 hurts on
+  Expert (DESIGN.md B.0 [G61]); re-record it when the co-op form is retuned.
 
 ### 15.10 Checklist additions
 
@@ -1025,8 +1066,11 @@ New routes describe themselves in a header instead of a `ROUTES` entry. The head
 - [ ] Co-op: `coop_of` / `coop_base_hash` set; P2 start; 2+ gates on the main path (1 for a sub-stage), each with a
       tablet and a drop gift; a third of the enemies with traits, every chokepoint guard with one; keeper halls 4 rows
       high; flower pots landing at most 6 rows under the ledge they serve; `window=` set on capped records; validator
-      `--coop` clean; `bash .tools/gd.sh test coop_gates` refuses every gate solo; co-op routes for both difficulties.
+      `--coop` clean; `bash .tools/gd.sh test coop_gates` refuses every gate solo - exhaustive, or bounded with every
+      probe of its kind [G59]; co-op routes for both difficulties.
 - [ ] Co-op (phase 3): no bond that one thrown special hits twice in one throw [G36]; no role in a two-stream route
       standing 243+ ticks without input [G33]; a boss arena's weak points 55 px under the view's top (72 px in the boss bar's columns) [G35].
+- [ ] Co-op (G3 follow-up): every heavy on a flat floor a pair can brace on, keeper `hp` set as strikes [G57]; plate
+      signs say "crouch" [G58].
 - [ ] Signs: every text at most 3 board lines (about 60 characters); the music context of the 15.2 table.
 - [ ] Arena: 20 x 12, row 0 empty, spawns for `players`, cookpots, bot graph baked and its bot test green per mode.
