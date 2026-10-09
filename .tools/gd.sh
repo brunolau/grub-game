@@ -9,9 +9,10 @@
 #   bash .tools/gd.sh raw <godot args...>         Godot with exactly these arguments (exclusive)
 #
 # Concurrency: runs are SHARED (many at once) while Godot's import cache is up to date. An import is
-# EXCLUSIVE: it waits for running Godot processes to finish and blocks new ones meanwhile. The import runs
-# automatically before any command when an asset / .import file changed or a new script appeared since the last
-# import. After adding or renaming a class_name in an EXISTING script, run "bash .tools/gd.sh import" yourself.
+# EXCLUSIVE: it blocks new runs and waits for the runs that started in the last GD_IMPORT_WAIT minutes
+# (default 3; older runs have finished loading and are not waited for). The import runs automatically before any
+# command when an asset / .import file changed or a new class_name script appeared since the last import. After
+# adding or renaming a class_name in an EXISTING script, run "bash .tools/gd.sh import" yourself.
 # Every test / play run gets its own save + settings folder (build/run_users/<id>, deleted afterwards), so
 # parallel runs never share user data. To keep user data across runs (e.g. the options_persist flow after
 # code_and_options), pass --user-dir=res://build/autoplay_user yourself.
@@ -35,6 +36,7 @@ LOCK="$BUILD/.godot_lock"
 READERS="$BUILD/.godot_readers"
 STAMP="$BUILD/.import_stamp"
 TMO="${GD_TIMEOUT:-300}"
+IMPORT_WAIT="${GD_IMPORT_WAIT:-3}"
 RUN_ID="$$_${RANDOM}${RANDOM}"
 MARKER="$READERS/$RUN_ID"
 RUN_USER="build/run_users/$RUN_ID"
@@ -96,9 +98,11 @@ release_shared() {
 
 acquire_exclusive() {
 	gate
-	# Wait for running readers; markers older than two timeouts belong to dead runs.
-	while [ -n "$(ls -A "$READERS" 2>/dev/null)" ]; do
-		find "$READERS" -type f -mmin +12 -delete 2>/dev/null
+	# Wait only for runs that started in the last IMPORT_WAIT minutes: they may still be loading. An older run has
+	# loaded what it uses and does not hold an import back (a 15-minute route module would otherwise stall every
+	# other run behind the waiting import). Markers older than an hour belong to dead runs.
+	find "$READERS" -type f -mmin +60 -delete 2>/dev/null
+	while [ -n "$(find "$READERS" -type f -mmin "-$IMPORT_WAIT" 2>/dev/null | head -1)" ]; do
 		sleep 1
 	done
 }
@@ -126,7 +130,8 @@ run() {
 	return "$rc"
 }
 
-# Import is needed for new or changed assets / import settings and for new scripts (no .uid yet). Edits of
+# Import is needed for new or changed assets / import settings and for new scripts that declare a class_name
+# (no .uid yet). A new script without class_name (a test, a tool) loads by path and needs none. Edits of
 # existing scripts and scenes are picked up at run time; after adding or renaming a class_name in an existing
 # script, run "gd.sh import" yourself.
 needs_import() {
@@ -135,7 +140,7 @@ needs_import() {
 	local f
 	while IFS= read -r f; do
 		case "$f" in
-			*.gd) [ -f "$ROOT/$f.uid" ] || return 0 ;;
+			*.gd) [ -f "$ROOT/$f.uid" ] || ! grep -qE '^class_name[[:space:]]' "$ROOT/$f" || return 0 ;;
 			*.tscn | *.tres | *.lvl | *.inputs | *.flow | *.md | *.cfg | *.py | *.json | *.txt | *.uid | *.ps1 | *.sh) ;;
 			*) return 0 ;;
 		esac
