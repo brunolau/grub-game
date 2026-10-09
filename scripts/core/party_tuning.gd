@@ -184,6 +184,16 @@ const IDLE_WARN_TICKS: int = 170
 ## pogo. 12 cells: an Up bounce taken just outside the ward (-224 v16: 28 ticks back down to the head's height, 140 px
 ## at the walk cap of 5 px a tick) comes down inside the margin, before the gate's own columns. (tune)
 const WARD_MARGIN_CELLS: int = 12
+## The GRACE of a stomp in a ward (phase 4 ruling Q4, DESIGN.md G87; Player._ward_heads_check): the enemy a hero of a
+## co-op party stomped in a ward does not hurt him during that fall, and for this many ticks after the first tick on
+## which he has ground, a platform, a carrier, a vine or a saddle under him again - then its body is a body like any
+## other (standing inside a keeper is no shelter). 12 ticks: 60 px at the walk cap of 5 px a tick, wider than the
+## widest keeper's body, so a hero who lands and walks on never pays. (tune)
+const WARD_GRACE_TICKS: int = 12
+## NO DEAD END BESIDE AN IDLE PARTNER (phase 4 ruling Q3, DESIGN.md G86; PartyDriver._wipe_check): while a hero whose
+## player plays is an egg and every hatched hero of the party is IDLE (IDLE_TICKS), a clock runs; after this many
+## such ticks in a row (3 s) the team is wiped to its checkpoint, as when both are down. 0 = the rule is off. (tune)
+const IDLE_WIPE_TICKS: int = 73
 const MAIN_MIN_GATES: int = 2                ## co-op gates on the main path of every co-op `main` file
 const SUB_MIN_GATES: int = 1                 ## every co-op `sub` file: a gate or its boss's co-op form
 ## Boost ledges (Shoulder Hop / Totem Ride), tiles over the floor: 8 on both difficulties (G28 / G39).

@@ -42,7 +42,8 @@ extends SimEntity
 ## [method in_feast_rush], [method lids_closed], [method bank_from] / [method bank_from_stack], [method is_banking],
 ## [method walk_cap_of], [method round_length], [method round_ticks_left], [method round_wins_of], [method team_of],
 ## [method food_value], [method weight_class], [method hurts_of], [method cap_ticks_left], [method cap_winners],
-## signal [signal stack_changed]; round control: [method begin_round], [method start_round_now], [method end_round].
+## [method ended_by_cap], signal [signal stack_changed]; round control: [method begin_round],
+## [method start_round_now], [method end_round].
 
 ## A hero's stack, bank or both changed (HUD, stack display).
 signal stack_changed(slot: int, stack: int, banked: int)
@@ -118,6 +119,8 @@ var sudden_death_at: int = -1
 ## VersusTuning.SUDDEN_DEATH_CAP_TICKS after its sudden death started. On that tick the round ends whoever still stands
 ## ([method cap_winners]).
 var cap_at: int = -1
+## True once the hard cap ended this round ([method ended_by_cap]).
+var _capped: bool = false
 
 # --- Per slot (index = player slot) -------------------------------------------------------------------------------
 var _stack: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
@@ -294,6 +297,7 @@ func begin_round(index: int) -> void:
 	sudden_death = VersusSuddenDeath.new(self, level)
 	sudden_death_at = _sudden_death_start()
 	cap_at = -1
+	_capped = false
 	level.set_wind(0)
 	level.set_darkness(rules.has(VersusRules.LIGHTS_OUT))
 	var spawns: Array[Vector2i] = VersusArena.spawn_points(level)
@@ -809,6 +813,30 @@ func cap_winners() -> PackedInt32Array:
 		if _side_key(slot) == best_key:
 			winners.append(slot)
 	return winners
+
+
+## True when the hard cap ended this round (ruling R8, DESIGN.md G78) - the gong fell on the cap's tick with more
+## than one side standing - and false for every other gong (the last one standing, also on the cap's own tick; a
+## clock; a goal) and while a round runs. True from the gong on, so a listener of Events.round_ended may ask.
+func ended_by_cap() -> bool:
+	return phase == PHASE_OVER and _capped
+
+
+## "TIME!" - the round banner of a round the hard cap ended (the orchestrator's phase-4 ruling; G78 had left the
+## reason unsaid). Presentation only, and nothing without a HUD (headless tests, the bot tools): the versus HUD's own
+## banner (HudVersus.show_banner, reached as a sign board reaches the HUD: by its group and a method's name) shows
+## "TIME!" in the alarm colour of "SUDDEN DEATH!" with the result line the HUD wrote at the gong - the winner, or its
+## "Draw!" - as the second line, for as long as that line would have stayed. Called deferred from the cap's tick.
+func _call_time() -> void:
+	if not is_inside_tree() or not ended_by_cap():
+		return
+	var hud: Node = get_tree().get_first_node_in_group(Defs.GROUP_HUD)
+	var banner: Object = hud.call(&"get_versus") as Object if hud != null and hud.has_method(&"get_versus") else null
+	if banner == null or not banner.has_method(&"show_banner"):
+		return
+	var result: Variant = banner.get(&"banner_text")
+	banner.call(&"show_banner", tr("UI_VS_TIME"), HudAtlas.COL_RUSH, UiKit.Style.HUD, HudVersus.RESULT_SECONDS,
+			str(result) if result is String else "")
 
 
 ## [method time_left_ticks] by the bots' name (core-B).
@@ -1612,7 +1640,10 @@ func _round_step() -> void:
 					_finish(standing)
 				elif cap_at >= 0 and round_ticks >= cap_at:
 					# Ruling R8: the hard cap. Nobody outlasts the sudden death by hiding from it.
+					_capped = true
 					_finish(cap_winners())
+					# "TIME!" (phase 4): after every listener of the gong, so the HUD's result line is there to keep.
+					_call_time.call_deferred()
 		PHASE_GOLDEN:
 			round_ticks += 1
 			signatures.wind_step()

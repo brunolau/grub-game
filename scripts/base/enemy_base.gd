@@ -133,6 +133,9 @@ var _hurt_slots: int = 0
 ## 2.0 co-op, G57 one hit per strike: per player slot, the CoopTraits.strike_key of the strike that last hurt it (-1 =
 ## none); empty until a co-op party first hits it (never allocated in single-player or versus).
 var _strike_keys: PackedInt64Array = PackedInt64Array()
+## 2.0 phase 4, Q2 (DESIGN.md G85) - DRAWING ONLY: true while its sprite wears the ward mark ([method
+## _show_ward_mark]: fx/WardMark's shared material). Written by [method _refresh_visual] alone; no rule reads it.
+var _ward_marked: bool = false
 
 static var _warned_skins: Dictionary[String, bool] = {}
 
@@ -955,6 +958,12 @@ func _refresh_visual() -> void:
 	_sprite.modulate = FLASH_COLOR if (flash & EnemyTuning.FLASH_PERIOD_MASK) != 0 else Color.WHITE
 	if _bone_sprite != null or _bone_shield_tick >= Sim.total_ticks - 1:
 		_show_bone_shield(not food and not dead and bone_shielded())
+	# 2.0 phase 4, Q2 (DESIGN.md G85), drawing only: the ward mark. One bool test in every level that shows none
+	# (single-player, versus, the search's world: LevelBase.ward_marks is false there).
+	var level: LevelBase = Game.level
+	if _ward_marked or (level != null and level.ward_marks):
+		_show_ward_mark(level != null and level.ward_marks and not food and wears_ward_mark()
+				and level.in_ward(sim_pos.x))
 
 
 ## True while the enemy is drawn as food (feast mode, GAMEPLAY.md 5.3; a party: while any hero feasts). 2.0 (G57):
@@ -1129,6 +1138,28 @@ func _away_from(killer: SimEntity) -> int:
 	if killer.sim_pos.x == sim_pos.x:
 		return killer.facing
 	return 1 if sim_pos.x > killer.sim_pos.x else -1
+
+
+## 2.0 phase 4, Q2 (DESIGN.md G85), a query for the picture only: true when this is an enemy a hero could come down
+## on - the test of the hero's contact pass (PHYSICS.md 10.1) without the view: an ordinary enemy (not a boss, whose
+## body no ward covers), awake, alive, touchable and one whose touch counts (no decoration). Such an enemy wears the
+## ward mark while its feet column is in a ward of a co-op party's level ([method is_ward_marked]).
+func wears_ward_mark() -> bool:
+	return awake and not dead and tangible and contact_hurts and get_kind() == Defs.Kind.ENEMY
+
+
+## True while the ward mark is drawn on it (tests, tools; drawing only).
+func is_ward_marked() -> bool:
+	return _ward_marked
+
+
+## The ward mark on or off (cosmetic): fx/WardMark's one shared material on the sprite - chalk war paint over every
+## frame of every sheet. Written only when it changes.
+func _show_ward_mark(on: bool) -> void:
+	if on == _ward_marked:
+		return
+	_ward_marked = on
+	_sprite.material = WardMark.material() if on else null
 
 
 ## The Shaman's bone over its head (cosmetic): shown while [method bone_shielded].

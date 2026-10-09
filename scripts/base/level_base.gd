@@ -171,6 +171,11 @@ var _driver_handles_deaths: bool = false
 ## (left, right, left, right ...) for [method in_ward]. Empty in every level without an x2 tablet (all of Book I solo).
 var _wards: Dictionary = {}
 var _ward_spans: PackedInt32Array = PackedInt32Array()
+## Phase 4 ruling Q2 (DESIGN.md G85), DRAWING ONLY: true in a level a co-op party plays - the game's Level sets it
+## beside its PartyDriver; false in single-player, a party of one, versus, the validator's and the search's world. The
+## enemies of such a level wear the ward mark while their feet column is in a ward (EnemyBase._refresh_visual,
+## fx/WardMark: chalk war paint on the sprite). No rule reads it and it changes no simulation value.
+var ward_marks: bool = false
 
 
 func _init() -> void:

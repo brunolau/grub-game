@@ -1215,9 +1215,10 @@ sub-stage keeps its first half's music, a co-op file its solo file's.
 
 - Bones picked up at full energy fly to the partner when he is below full energy. A heart item a full hero touches
   stays for the partner.
-- **Tribe lives**: a life is lost only on a **team wipe** (both heroes down, eggs or dead at once); then both respawn
-  at the checkpoint, spread by slot, and the world resets as in solo (P-C.12). A single down never resets the world,
-  a boss or a gate.
+- **Tribe lives**: a life is lost only on a **team wipe** - both heroes down, eggs or dead at once; the last hero
+  who counts going down beside an idle partner [G76]; or the egg of a hero who plays left 73 ticks beside a hatched
+  partner who is idle [G86] - then both respawn at the checkpoint, spread by slot, and the world resets as in solo
+  (P-C.12). A single down never resets the world, a boss or a gate.
 - **Egg Hatch** (P-C.12): a downed hero plays the death toss and floats in an egg (`egg_kid` roll frames in his
   colour) that drifts after his partner; its owner nudges it Left / Right. The partner hatches it with any hit, a
   thrown weapon or a head bounce; a checkpoint touched by either hero hatches every egg. The hatched hero gets 2 hearts
@@ -1257,6 +1258,12 @@ sub-stage keeps its first half's music, a co-op file its solo file's.
   player is never egged because his partner put the pad down. Nor is he stranded by it: the tribe is wiped - a
   life, both back at the checkpoint - when its **last counting hero** goes down, also beside a hatched idle
   partner (P-C.12).
+- **No dead end beside an idle partner** [G86] (P-C.12): when the partner puts the pad down AFTER a hero became an
+  egg, nobody is left to hatch it. While a hero whose player plays is an egg and no hatched hero counts, a clock
+  runs; after **73 ticks** (3 s, `PartyTuning.IDLE_WIPE_TICKS`) the tribe is wiped to its checkpoint as when both
+  are down. Any input of a hatched hero clears the clock (he counts again and can hatch the egg); the "Zzz" over
+  the dozing hero is the warning. Two pads left on the table never cost a life by this rule: an egg whose own
+  player is idle starts no clock.
 
 #### 13.9.3 Duo moves and windows
 
@@ -1269,17 +1276,20 @@ sub-stage keeps its first half's music, a co-op file its solo file's.
 | **Egg Hatch** | 13.9.2 | be carried / strike the egg |
 
 - **Windows** (twin drums, bonds, split halves, twin boss hits, the tentacle flinch): **24 ticks on Beginner, 12 on
-  Expert**, and never longer than the measured solo minimum minus 4 ticks: `window = min(24 B / 12 E, solo_min - 4)`
-  per placed gate or record (`tests/test_coop_gates.gd` measures `solo_min` with the single-hero search). A record
-  sets its own cap with `window=<ticks>` (bond, split; a daze is slot-bound [G47]): effective = `min(difficulty value, window)`; a bond uses
-  the smallest `window` of its members; one value serves both difficulties [G2]. A rule that needs **two different
+  Expert**. A record sets its own cap with `window=<ticks>` (bond, split; a daze is slot-bound [G47]): effective =
+  `min(difficulty value, window)`; a bond uses the smallest `window` of its members; one value serves both
+  difficulties [G2]. The first design also asked `window = min(24 B / 12 E, solo_min - 4)` per placed gate, with
+  `solo_min` measured by the single-hero search; that cap was the proof until every window became slot-bound (the
+  next bullet) and is none since - the search reads a bond's `solo_min` as "never", and the keys that were set stay
+  valid. A rule that needs **two different
   heroes' own hits** (Old Mangrove's twin, Inkjaw's flinches, the Twin Idols' twin, the Roc's tail strike) is exempt
   from the `solo_min - 4` cap: no single player meets it at any speed, so its window is the difficulty value [G34].
   Every window has an audible count-in (three blips 8 ticks apart, then "go"), counting **active** heroes only [G33]:
   drums while an active hero stands within 40 px of every drum; a bond whose members all live, or the two halves of a
   split, while each member has an active hero within 48 px on both axes and those are not all one hero - once per
-  arrival (again only after the heroes left and came back), silent once the window is open. Nothing needs two inputs on the same tick. The values are kept for phase-3 content; the pair
-  playtests of P4.5 may only shorten them [G3].
+  arrival (again only after the heroes left and came back), silent once the window is open. Nothing needs two inputs on the same tick. 2.0 ships
+  these values (DESIGN.md D.12 [G91]): no pair playtest took place during production [G3], and the pair checks of
+  `docs/expansion/HUMAN_CHECKS.md` [G90] may shorten or lengthen them - no gate rests on a window's length.
 - **Windows are slot-bound** [G72] (P-C.10): a bond, a keeper pair, a drum pair and the halves of a split are met
   only by hits credited to **two different heroes who both count** (hatched, not idle) - never by two hits of one
   hero, however he times or throws them. A hit is credited to its striker, to the thrower of a thrown weapon, to a
@@ -1310,9 +1320,14 @@ sub-stage keeps its first half's music, a co-op file its solo file's.
   both sides (a tablet may say `ward=<left>,<right>`), over all rows - **no enemy gives a hero lift, rest or
   carry**. A hero who comes down on a head there falls on through it: no bounce with or without Up, no standing or
   riding on a head or a back, and a club strike on an enemy gives him no pogo. The stomp still counts against the
-  enemy as anywhere (a Raptor is dazed, the multiplier chain grows), that enemy does not hurt him until he has
-  fallen through it and their bodies have parted, and a dust puff with a dull thud - instead of the ring and the
-  boing - says the head gave nothing. A Snatcher does not seize there (its touch is the plain hurt) and lets go
+  enemy as anywhere (a Raptor is dazed, the multiplier chain grows), that enemy does not hurt him **during that
+  fall, nor for 12 ticks after he lands** (`PartyTuning.WARD_GRACE_TICKS`; sooner over when their bodies part) -
+  after them its body is a body again, so standing inside a keeper is no shelter [G87] - and a dust puff with a
+  dull thud - instead of the ring and the boing - says the head gave nothing. **The enemy shows the ward** [G85]:
+  in a co-op party every enemy whose feet column is in a ward wears the **ward mark**, chalk-white tribal stripes
+  on its body (drawn only; on and off as it crosses the ward's edge; never on a boss, never in solo play), and a
+  sign at the first ward of co-op 1-1 and of co-op 5-1 says "Marked beasts are no stepping stones - use your
+  partner's shoulders!". A Snatcher does not seize there (its touch is the plain hurt) and lets go
   of a hero it carries at the ward's edge. Keepers are enemies; bosses, the partner's shoulders, mounts, rafts,
   lifts, springs and everything that can be clubbed open are as everywhere. Near a gate an enemy is something to
   fight and never something to climb: one hero cannot lead a follower to a ledge and ride it up. Never in
@@ -1404,7 +1419,7 @@ one-shot; hurt only while a Brace Wall has it dazed [G57]. **Snatcher**: `kind=s
 | `objects/boulder_heavy` | a 2 x 2-cell solid tile mover; it moves 1 tile once two active heroes have pushed the same side (grounded, walking into it) on 6 ticks in a row; it falls 1 tile per 2 ticks when unsupported (never onto an active hero: it waits; an idle one is pushed aside [G53]); weight 2 on a plate; it plugs a geyser vent it rests on (P-C.6) |
 | `objects/pulley a=<platform> b=<platform> range=<rows>` | two linked sprite platforms; weight as plates; the heavier side sinks 2 px/tick and the other rises the same, each at most `range` [3] rows from its start; equal weights do not move |
 | `objects/flower_pot` | stands on a ledge edge; a strike pushes it in the strike's direction (the striker's facing; a thrown weapon's or ball's flight); it slides to its floor's edge or a wall, falls at 2 px/tick and becomes a permanent `objects/spring` (-224) where it lands, 1-2 cells beyond the ledge's face (lost in a liquid, pit or spikes: back on its ledge after a team wipe; a landed spring stays through team wipes). **It reaches 6 rows from the floor it takes root on** (a 105 px rise from the spring's top, 10 px over the floor: 19 px to spare) [G6]. Every boost ledge holds a drop gift: a rolled vine or a flower pot |
-| `objects/x2_tablet gate=<name> far=<col>,<row> [secret] [ward=<left>,<right>]` | a stone tablet carved with two cavemen marks every co-op gate and co-op secret (a sign skin, no HUD); `far` is the cell beyond the gate that the solo search must fail to reach (LEVEL_DESIGN 15.7.6); it lights its marks once an active hero stood in `far`, and stays lit. **Its ward** [G73]: the columns from its cell to `far`, 12 cells wider on each side (`ward=` sets the two margins in cells), over all rows - there no enemy gives a hero lift, rest or carry (13.9.4) |
+| `objects/x2_tablet gate=<name> far=<col>,<row> [secret] [ward=<left>,<right>]` | a stone tablet carved with two cavemen marks every co-op gate and co-op secret (a sign skin, no HUD); `far` is the cell beyond the gate that the solo search must fail to reach (LEVEL_DESIGN 15.7.6); it lights its marks once an active hero stood in `far`, and stays lit. **Its ward** [G73]: the columns from its cell to `far`, 12 cells wider on each side (`ward=` sets the two margins in cells), over all rows - there no enemy gives a hero lift, rest or carry, and every enemy standing in it wears the ward mark (13.9.4 [G85]). As built nine tablets carry `ward=`: 1-1 'hop' 34,12; 1-2 'treehouse' 12,62; 2-2 'seesaw' 45,12 and 'lift' 26,12; 4-1 'cliff' 12,29; 5-2 'sandgate' 12,21; 7-1 'stack' 38,12; 8-1 'stairs' 23,12; 9-1 'pulley' 12,17 [G83] |
 | `objects/spring` (pad, cap, a landed flower pot) in co-op | **a launch** [G71]: it throws a hero of a co-op party as high as its `power` (-224: 105 px over its top) and no jump goes on top of it, whatever he was doing when it fired - a low strike begun on a pad with Up held rises what a plain jump onto the pad rises (115 px over the floor), not 256. It arms **the launch hold**: until he next has ground, a platform, a carrier, a vine or a saddle under him no jump starts, no strike hops and no hit gives a pogo; every launch holds the flight the same way (a geyser: 105 px over its vent from every start). Single-player and versus keep the 1.0 bounce |
 | doors, columns and every wall against a hero of a co-op party | **a closed door passes nobody** [G75]: a hero whom an enemy, a partner, a mover, a knock-back or a gust carries into a closed keeper door, a column or any wall from the side - or across it in one go - is put back where he last stood free, on the side he came from; never out on the far side (the 1.0 corner slip carried a hero across a one-cell door column: 9-2's keeper door) |
 | `objects/hero_start slot=2` | P2's start; ignored in solo |
@@ -1432,7 +1447,7 @@ one-shot; hurt only while a Brace Wall has it dazed [G57]. **Snatcher**: `kind=s
 
 | Setting | Co-op Beginner | Co-op Expert |
 |---|---|---|
-| Twin windows | 24 ticks (or solo minimum - 4) | 12 ticks (or solo minimum - 4) |
+| Twin windows (slot-bound [G72]; a record's `window=` may shorten one) | 24 ticks | 12 ticks |
 | Raptor daze | 14 ticks (slot-bound [G47]) | 12 ticks |
 | Leash before the egg | 121 ticks | 73 ticks |
 | Hatch hearts | 2 | 1 |
@@ -1441,6 +1456,8 @@ one-shot; hurt only while a Brace Wall has it dazed [G57]. **Snatcher**: `kind=s
 | Boss grabs (Brute Grab, Roc Snatch) | off | on |
 | Boost ledges | 8 tiles [G39] | 8 tiles |
 | Idle partner (counts for nothing) | 243 ticks without input | 243 ticks without input |
+| The egg of a hero who plays, beside an idle partner | wiped to the checkpoint after 73 ticks [G86] | 73 ticks |
+| Ward: margin, grace after a stomp that gave nothing | 12 cells, 12 ticks [G87] | 12 cells, 12 ticks |
 
 The Beginner wall is unchanged in both books.
 
@@ -1641,15 +1658,17 @@ Lava Lover, Head Case (bonked by a giant bonus), Comeback Caveman, Pacifist. **R
 
 ### 13.11 The *(tune)* register
 
-Every starting value below is used from phase 1 on. Co-op windows, dazes and boss timings were to be tuned in the
-pair playtests at gate G1; G1 passed on its automated criteria without them, so **every value below stays at its
-start for phase-3 content** and the mixed-skill pair playtests move to P4.5 [G3] (no G1 measurement asked for a
-change; player-A's egg bounce, -64, is the only value G1 changed [G1]); windows can only shrink below
-`solo_min - 4`, never exceed it. Versus values are tuned with the headless bot soak
-(1 000 seeded rounds per mode: round length, win rate per spawn within +/-15 %) and human playtests. The lead designer
-records every change in DESIGN.md, then here and in PHYSICS Appendix C.
+**2.0.0 ships every value below as it stands here** [G91]: the binding register with each constant is DESIGN.md
+D.12, pinned against the code by `docs/spec/test_spec_docs.py`. The values were starting values for playtests.
+Co-op windows, dazes and boss timings were to be tuned in pair playtests at gate G1; G1 passed on its automated
+criteria without them and the playtests moved to P4.5 [G3] (player-A's egg bounce, -64, is the only value G1
+changed [G1]); P4.5 is done by people with the finished build - `docs/expansion/HUMAN_CHECKS.md` [G90] names, per
+check, the value to change. Since the windows became slot-bound [G72] no gate's proof rests on their length, so a
+check may shorten or lengthen them; what must be re-proven after a change is D.12's last column. Versus values
+were set with the headless bot sets (win rate per spawn within +/-15 %, claimed on 384 rounds [G80]). The lead
+designer records every change in DESIGN.md D.12 first, then here and in PHYSICS Appendix C.
 
-| Value | Start | Tuned by |
+| Value | 2.0 ships | Checked by |
 |---|---|---|
 | Swap lock-out | 8 ticks | belt playtests: no double swaps from one press |
 | Tar hop impulse ticks / tar air cap | 2 / 32 v16 | 6-1 playtests: tar must feel slow, a 1-tile step out must work |
@@ -1657,7 +1676,7 @@ records every change in DESIGN.md, then here and in PHYSICS Appendix C.
 | Vine re-grab lock | 12 ticks | vine-to-vine leaps |
 | Totem drop lock, egg drift (2 / 6 px), egg nudge | 12 / 2-6 / 1 | P4.5 pair playtests (unchanged at G1) |
 | Curl box, all Batter Up velocities | 24 x 20; P-C.11 | P4.5: gap and lob gates (no Batter Up gate in the G1 slice) |
-| Twin windows / daze | 24 B / 12 E; 14 B / 12 E | P4.5 pair playtests; per record `window=`; a timing window always `<= solo_min - 4` (slot-bound rules - the daze [G47], twin boss hits - are not capped) |
+| Twin windows / daze | 24 B / 12 E; 14 B / 12 E | the pair checks of HUMAN_CHECKS.md; per record `window=`; every window is slot-bound [G72] [G47], so its length is feel and not proof |
 | Lee reach | 64 px downwind, 16 px vertical | 3-1b / 9-2 co-op playtests |
 | `TARGET_HOLD_TICKS` | 22 | co-op enemy feel |
 | Roller walk / range / uncurl, Guard patrol, Mimic daze, Shaman speed, split run | 32 v16, 4 rows, 154; 24 v16; 22; 48 v16; 48 v16 for 22 | enemy tests and playtests |
@@ -1668,7 +1687,9 @@ records every change in DESIGN.md, then here and in PHYSICS Appendix C.
 | Hot Rock first pick and re-pick delay | 66 / 66 ticks | playtests |
 | Coconut roll loss | 2 v16 per tick | Clubball bot tests |
 | Variants and sudden-death cadences | 13.10.8-13.10.9 | playtests |
-| Ward margin [G73] | 12 cells on each side (`ward=` per tablet) | the gate proofs (LEVEL_DESIGN 15.7.6; wider only where a tablet's high ground asks); how the cue reads is a P4.5 pair-playtest question |
+| Ward margin [G73] | 12 cells on each side (`ward=` per tablet: nine as built [G83]) | the gate proofs (LEVEL_DESIGN 15.7.6; wider only where a tablet's high ground asks); how the ward mark [G85] and the cue read is a line of HUMAN_CHECKS.md |
+| Ward grace [G87] | 12 ticks after the landing of a stomp that gave nothing | the party's rule test; the gate proofs replay against it; HUMAN_CHECKS.md (does a hero who lands in a beast get out unhurt?) |
+| Idle partner, its warning, the idle wipe [G33] [G58] [G86] | 243 ticks; "Zzz soon" from 170; an egg beside an idle partner wipes after 73 | HUMAN_CHECKS.md (a holder who waits, a pair that rests on a ride) |
 | Last Caveman Standing hard cap [G78] | 1 457 ticks (60 s) after the sudden death starts | bot soak, playtests |
 | Drawn rounds that end a match [G78] | 3 in a row | playtests |
 | Spawn fairness of an (arena, mode) [G80] | within +/-15 % per spawn, claimed on at least 384 rounds (the bot module's 48-round sets are the regression pin) | the bot soak; Sky Picnic's Grub Stack measured +17.7 and is P4's |

@@ -37,6 +37,9 @@ extends Node
 ##   nothrow=1       club only                              noplace=1     the partner stays an egg
 ##   real=1          in the real game (real_harness.gd)     audit=1       CoopSearch.reset_audit
 ##   tick0=<n>       Sim.tick at the start of every run (default: the search world's, CoopSearch.TICK_BASE)
+##   goal=<col>,<row>   AIM: another goal cell than the tablet's far cell (a cell in the air on the way of a move that
+##                   falls short today); the route found is written like any other and does not reach the far cell -
+##                   how the evidence routes of a rebuilt gate are aimed at its new geometry (wf12; nothing is kept)
 ##   lure=<id part>@<col>,<row>;<wake x,...>;<ride x>       a scripted prefix: wake that follower, lead it to ride x
 ##   prefix=<route file>                                    roots from every 20th tick of a route found elsewhere
 ## Prints `EXPLORE <row>: REACHED the far cell in <t> ticks | NOT reached; <counts>`; a found route goes to `out` as
@@ -118,7 +121,7 @@ func run(arguments: PackedStringArray) -> int:
 	CoopSearch.reset_audit = _arg(args, "audit", "0") == "1"
 	var key: String = ""
 	if keep and not real and whole and not no_throw and not no_place and not args.has("lure") \
-			and not args.has("prefix") and not args.has("tick0"):
+			and not args.has("prefix") and not args.has("tick0") and not args.has("goal"):
 		key = harness.call(&"explore_key", level, difficulty, gate, seed_value, seconds)
 	if key != "" and _arg(args, "fresh", "0") != "1":
 		# The same pass on the same level file and code: its kept result (fresh=1 plays it again).
@@ -146,7 +149,17 @@ func run(arguments: PackedStringArray) -> int:
 		return 2
 	if real and args.has("tickoff"):
 		lib.tick_offset = _arg(args, "tickoff", "0").to_int()
-	far_px = Vector2i(lib.far.x * 16 + 8, lib.far.y * 16 + 16)
+	if args.has("goal"):
+		# AIM (wf12): another goal cell than the tablet's far cell - a cell on the way of a move that falls short on
+		# today's level (the end of a long drop, of a gust jump). The route found is a route of this gate that does
+		# NOT reach its far cell: evidence aimed at the geometry as built. Nothing is kept for the gate test.
+		var goal: PackedStringArray = _arg(args, "goal", "").split(",")
+		if goal.size() != 2 or not goal[0].is_valid_int() or not goal[1].is_valid_int():
+			print("EXPLORE %s %s d%d: goal=<col>,<row> wants two whole numbers" % [level, gate, difficulty])
+			lib.close()
+			return 2
+		lib.far = Vector2i(goal[0].to_int(), goal[1].to_int())
+	far_px =Vector2i(lib.far.x * 16 + 8, lib.far.y * 16 + 16)
 	var label: String = "%s d%d %s%s%s%s%s" % [level, difficulty, gate, " whole" if whole else "",
 		" lure %s" % _arg(args, "lure", "") if args.has("lure") else "", " REAL GAME" if real else "",
 		" club only" if no_throw else ""]

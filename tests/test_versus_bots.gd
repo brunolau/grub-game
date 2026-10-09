@@ -31,7 +31,11 @@ extends TestCase
 ## mover nodes whose every link verifies, the lifts with links at every still state of their pulley (core-B wf10); a
 ## bot gets off and on lifts that a rival holds between their stops; every committed graph with pulley lifts is
 ## verified in full (the last shard; the quick tests check a sample). Bakes and long verifications run in frames
-## (NavBaker's header: one go overflows the engine's callback queue).
+## (NavBaker's header: one go overflows the engine's callback queue). And a shard of the versus soak (PLAN.md 7 P4.1,
+## tools/bots/soak_runner.gd; phase 4): one seeded round on every (mode, arena that lists it, 2 / 3 / 4 players) cell -
+## 54 rounds, CPUs of all three levels on the seats, the game's default rules through a real VersusMatch - with the
+## soak's checks on every tick (no engine error, every round ends, no score against the mode's rules, no hero left
+## outside the arena); about a minute, in the last shard but one. The 4 x 1 000 rounds are `bash tools/bots/soak.sh`.
 
 const LEVEL_SCENE: String = "res://scenes/world/level.tscn"
 const LEVEL_DIR: String = "res://levels"
@@ -499,6 +503,45 @@ func test_two_who_never_move_draw_a_match_after_three_capped_rounds() -> void:
 	assert_eq(played, VersusTuning.DRAW_ROUNDS_TO_END * cap, "3 x 2 914 ticks of play")
 	assert_eq(versus_match.leaders(), PackedInt32Array(), "a drawn match: nobody is named")
 	assert_eq(versus_match.round_wins, PackedInt32Array([0, 0, 0, 0]))
+
+
+## The soak shard plays seeds of its own, beside the thousand of tools/bots/soak.sh (SoakRunner.SEED_BASE 4001 ..).
+const SOAK_RUNNER: String = "res://tools/bots/soak_runner.gd"
+const SOAK_SHARD_SEED: int = 9001
+
+
+func test_a_soak_shard_plays_every_cell_once_without_an_anomaly() -> void:
+	# PLAN.md 7 P4.1: the soak's own round loop and checks (tools/bots/soak_runner.gd), one round per cell - every mode
+	# on every arena that lists it with 2, 3 and 4 CPUs, also where the game seats none (Tar Pulleys' Last Caveman
+	# Standing: the rules are soaked, the bots are the hands). Cell i plays seed SOAK_SHARD_SEED + i as round i %
+	# players, so the spawn rotations differ from cell to cell.
+	var shard: Vector2i = _shard()
+	if shard.x != maxi(shard.y - 2, 0):
+		assert_true(true, "the soak shard runs in the last shard but one")
+		return
+	_free_level()
+	var runner: Node = (load(SOAK_RUNNER) as GDScript).new() as Node
+	add_node(runner)
+	var specs: Array[Dictionary] = []
+	var modes: Dictionary = {}
+	for mode: int in LAUNCH_MODES:
+		for cell: Dictionary in runner.call(&"cells", mode):
+			var spec: Dictionary = cell.duplicate()
+			spec["seed"] = SOAK_SHARD_SEED + specs.size()
+			spec["round"] = specs.size() % int(cell["players"])
+			specs.append(spec)
+			modes[mode] = int(modes.get(mode, 0)) + 1
+	assert_eq(modes.size(), LAUNCH_MODES.size(), "every launch mode has cells (%s)" % [modes])
+	assert_true(specs.size() >= 50, "%d cells: 22 (arena, mode) pairs x 2, 3 and 4 players" % specs.size())
+	var result: Dictionary = await runner.call(&"play_all", specs)
+	assert_eq(int(result["rounds"]), specs.size(), "every cell played its round")
+	assert_eq(int(result["anomalies"]), 0, "no anomaly (each line names the round that replays it: %s)" % [
+		" || ".join(result["anomaly_lines"] as PackedStringArray)])
+	assert_true(int(result["longest"]) <= VersusTuning.CLUBBALL_MATCH_TICKS + ROUND_LIMIT_TICKS,
+			"the longest round ran %d ticks of play" % int(result["longest"]))
+	for line: String in result["lines"]:
+		print("    %s" % line)
+	print("    soak shard: %d rounds, %d ticks, %d ms" % [result["rounds"], result["ticks"], result["ms"]])
 
 
 ## The graph of MOVERS_ROOM, baked once per run (in frames: its pulley sweep is a long bake).

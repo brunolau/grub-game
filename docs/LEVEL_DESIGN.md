@@ -866,7 +866,14 @@ gate (D.8 #1).
 **The ward** [G73] (the engine's rule: PHYSICS C.10). Every tablet - `gate=` and `secret` alike - wards the
 columns from its own cell to its `far` cell, widened by 12 cells on both sides (`PartyTuning.WARD_MARGIN_CELLS`),
 over **all rows** of the level: there no enemy gives a hero of a co-op party lift, rest, carry or a pogo (a stomp
-still counts against the enemy; a dust puff and a thud tell the player). `ward=<left>,<right>` on the record sets
+still counts against the enemy; a dust puff and a thud tell the player). **The enemy shows it** [G85]: in a co-op
+party every enemy whose feet column is in a ward wears the ward mark (chalk-white stripes, drawn only), so a pair
+sees which beasts are no stepping stones before it jumps. Teach it once per book: a sign a few columns inside the
+first ward of 1-1 and of 5-1 co-op, with a marked beast in view ("Marked beasts are no stepping stones - use your
+partner's shoulders!"); do not hide a ward's enemies behind front props where a pair decides to bounce. **The pass
+is short** [G87]: the stomped enemy spares the hero during that fall and for 12 ticks after he lands, then its body
+hurts like any other - never build a spot where a hero must stand inside a beast, and keep 4+ cells of floor beside
+a keeper where a hero who dropped onto it can step out. `ward=<left>,<right>` on the record sets
 the two margins in cells (left = towards column 0; both at least 0). **The margin counts from the gate's high
 ground**: the default presumes that the first standing place leading over the gate is at the tablet; where it
 begins `n` cells before the tablet (or ends `n` cells behind the `far` cell) that side's margin is 12 + `n`. Put
@@ -953,9 +960,10 @@ ledge, a Totem ledge, and over a Batter Up gap: no enemy record that a hero can 
 No bark board within 12 cells of any gate. Plates at least 8 tiles from their doors. Keeper and Guard halls 4 rows
 high. Then **the search**: for every x2 gate a bounded single-hero search on the route tools' simulator, starting at
 the tablet and at the last checkpoint before it, with the club and every special from the belt and Chomper where a pen
-is in the stage, must **fail** to reach the tablet's `far` cell within 1 457 ticks *(tune)*. It also measures
-`solo_min` for every twin window: the window used is `min(24 B / 12 E, solo_min - 4)` (a slot-bound daze is not
-capped [G47]).
+is in the stage, must **fail** to reach the tablet's `far` cell within 1 457 ticks *(tune)*. It measured
+`solo_min` for every twin window while the window used was `min(24 B / 12 E, solo_min - 4)`; since every window is
+slot-bound [G72] [G47] it reads a bond's solo minimum from the engine as "never", and the window is the difficulty
+value or the record's `window=`.
 `test_coop_gates` is a slow module (PLAN 8 V7): a plain `bash .tools/gd.sh test` skips it; run it by name with
 `GD_TIMEOUT=3600 bash .tools/gd.sh test coop_gates` (about 1.5 minutes per gate and difficulty;
 `COOP_GATES_SHARD=<i>/<n>` runs every n-th gate, so n processes share the table) after every change to a co-op file and before you hand one over
@@ -1074,9 +1082,10 @@ What the phase-1 owners and the slice designers settled in code, confirmed by th
 - **Keepers that wait**: Shellbacks / Guards meant for a pincer stand still (`speed=0`): a walker with left = right = 0
   still sways about 30 px, which makes the bait and back-strike distances fickle. Bait about 30 px in front, striker
   about 40 px behind.
-- **Twin drums**: a hit on tick t0 opens a window of W ticks (24 B / 12 E, capped by `solo_min - 4`); the other drums
-  must be hit on t0 .. t0 + W - 1. The count-in plays while an active hero stands within 40 px of every drum. The
-  window values stay as they are for phase 3 (the pair playtests of P4.5 may only shorten them).
+- **Twin drums**: a hit on tick t0 opens a window of W ticks (24 B / 12 E, or the record's `window=`); the other
+  drums must be hit on t0 .. t0 + W - 1, by the other hero - the drums of a bond are lit by two different heroes
+  who both count [G72]. The count-in plays while an active hero stands within 40 px of every drum. 2.0 ships these
+  window values (DESIGN.md D.12 [G91]); the pair checks of `docs/expansion/HUMAN_CHECKS.md` may change them.
 - **x2 tablet**: lights (frame 2) once an active hero stood in its `far` cell, and stays lit.
 - **Team gate**: partners arrive spread behind the hero who entered (eggs when they were more than a view away); a
   gate with `lock=` pulls the party into the locked view. A mounted hero cannot use a gate; the exit totem dismounts.
@@ -1117,6 +1126,12 @@ team wipe does not. What it means for a level:
   after the partner and hatches idle). A two-stream route must not let a stream go idle while the other walks on,
   nor rely on an idle P2 holding the view. The tribe is wiped when its last counting hero goes down, also beside
   a hatched idle partner.
+- **No dead end beside an idle partner** [G86]: while a hero whose player plays is an egg and every hatched hero
+  is idle, a clock runs, and after 73 ticks the tribe is wiped to its checkpoint (a life). For a level it means:
+  a stretch that carries a pair for 13 s without a key - a long raft or lift ride, a slow column - is where it can
+  bite (the rider has no reason to press anything while his partner nudges his egg): where you can, put a
+  checkpoint, which hatches every egg, before such a ride. A two-stream route never has a hatched stream quiet for
+  243 ticks, so no route meets the rule.
 - **No doorstops** [G53]: an idle body blocks no door, slab, column or boulder - they move and push him aside. A
   hold-plate door with floor beside its slab is therefore safe (built by objects-A in phase 3 after world-B's search
   found the doorstop route through w2_l1_coop 'hatches').
@@ -1234,5 +1249,8 @@ New routes describe themselves in a header instead of a `ROUTES` entry. The head
       tablet [G73]; no standing place within 10 + h / 2 cells above a gate's ledge [G74]; a gap gate of a windy
       file 12 cells wide or with a raised far lip [G79]; no route that needs an enemy's head inside a ward, a jump
       on top of a spring [G71], one hero meeting a bond [G72] or an idle partner's view [G76].
+- [ ] Co-op (phase 4): the ward sign at the first ward of 1-1 and 5-1, a marked beast in view of it [G85]; no spot
+      where a hero must stand inside a beast longer than 12 ticks [G87]; where it fits, a checkpoint before a ride of
+      13+ s [G86]; the stage's lines of `docs/expansion/HUMAN_CHECKS.md` read once against the file [G90].
 - [ ] Signs: every text at most 3 board lines (about 60 characters); the music context of the 15.2 table.
 - [ ] Arena: 20 x 12, row 0 empty, spawns for `players`, cookpots, bot graph baked and its bot test green per mode.

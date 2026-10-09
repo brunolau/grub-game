@@ -1,0 +1,23 @@
+# Level codes of Club & Grub 1.0.0 (git tag v1.0.0, levels/*.lvl without the developer levels test_*.lvl):
+# <code as stored> <level id> <difficulty: 0 Beginner, 1 Expert>. tests/test_core_save_1_0.gd checks that 2.0 opens
+# the same stage in the same difficulty for each (also typed with the letter O for the digit 0, I for 1).
+HUT5 ending 1
+V1NE w1_l1 0
+JNGL w1_l1 1
+HUTS w1_l2 0
+AX3S w1_l2 1
+ECHO w2_l1 0
+B4TS w2_l1 1
+B0NE w2_l2 0
+GL1D w2_l2 1
+R0AR w2_l2b 0
+F1ST w2_l2b 1
+SN0W w3_l1 0
+YET1 w3_l1 1
+GALE w3_l1b 0
+BL1Z w3_l1b 1
+GR0T w3_l2 0
+B00M w3_l2 1
+4SHF w4_l1 1
+4OBS w4_l2 1
+4WAL w4_l2b 1

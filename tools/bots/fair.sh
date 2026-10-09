@@ -6,7 +6,11 @@
 #   bash tools/bots/fair.sh <tag> <arena> <mode> <first seed index> <seeds> [seeds per process=3] [extra args]
 #   bash tools/bots/fair.sh sky arena_sky_picnic grub_stack 0 96        the 384 rounds of a fairness claim
 # Seeds are indices into fair_runner.gd's SEEDS (0-11 = the test's own twelve). Logs: build/bots_fair/fair_<tag>_*.log
-# Prints `SUM <tag>: <arena> <mode>, <n> rounds, wins per spawn ...; fair share ..., worst spread <points> points`.
+# Prints `SUM <tag>: <arena> <mode>, <n> rounds, wins per spawn ...; fair share ..., worst spread <points> points`,
+# and before it an `ERRORS <tag>: ...` line when a process logged an engine error (the measurement is void then).
+# A variant of an arena file is measured without touching the shipped one - the extra arguments of fair_runner.gd:
+#   bash tools/bots/fair.sh try arena_sky_picnic grub_stack 0 96 5 "file=res://build/x/arena_sky_picnic.lvl graph=res://build/x/arena_sky_picnic.json"
+# Seed indices 96-191 are a second, independent set of 96 (a claim made on 0-95 is confirmed on them).
 set -u
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TAG="$1"; ARENA="$2"; MODE="$3"; FROM="$4"; COUNT="$5"; PER="${6:-3}"; EXTRA="${7:-}"
@@ -25,6 +29,10 @@ while [ "$i" -lt "$end" ]; do
 	i=$((i + n))
 done
 for pid in "${pids[@]}"; do wait "$pid"; done
+# A process that logged an engine error (a script another hand was editing, a missing autoload) did not play the game
+# as it is: its rounds count for nothing. Say so before the sums.
+bad="$(grep -lE "SCRIPT ERROR|^ERROR:|gd.sh: TIMEOUT" "$LOGS/fair_${TAG}_"*.log 2>/dev/null | wc -l)"
+[ "$bad" -gt 0 ] && echo "ERRORS $TAG: $bad of ${#pids[@]} processes logged an engine error or timed out - this measurement is void (logs: build/bots_fair/fair_${TAG}_*.log)"
 grep -h "^STAT" "$LOGS/fair_${TAG}_"*.log | awk '{ sp = $2; for (k = 3; k <= NF; k++) { split($k, kv, "="); sum[sp " " kv[1]] += kv[2]; names[kv[1]] = k } } END { for (s = 1; s <= 4; s++) { line = "STATSUM spawn " s ":"; n = split("food stolen dropped hits hurts bonks deaths picked best_stack", order, " "); for (i = 1; i <= n; i++) line = line " " order[i] "=" sum["spawn=" s " " order[i]]; print line } }'
 grep -h "^FAIR" "$LOGS/fair_${TAG}_"*.log | awk -v tag="$TAG" '
 {

@@ -15,6 +15,13 @@ extends Node
 ## Paintings and unlocks. A 1.0 file (version 1) is migrated on load into (single, Book I); nothing is lost.
 ## Versus keeps no campaign progress (no namespace is created for it unless a caller writes one).
 ##
+## The file of another version is never written over before it is safe (2.0.0): when [method load_game] reads a
+## save.json (or its backup) whose version is not VERSION, the migration runs in memory and is checked against the
+## file ([method migration_losses]); nothing is written. The first [method save_game] after it copies the file's
+## bytes to `save.v<version>.json` next to it and reads the copy back ([method legacy_backup_path]); only then does
+## it replace save.json, and while that copy cannot be made it writes nothing and returns an error. The game never
+## changes or removes the copy: a player who goes back to 1.0.0 puts it back as save.json.
+##
 ## Layout of save.json, version 2:
 ##   {"version": 2, "high_score": int, "code_stones": [String], "stats": {String: int},
 ##    "paintings": [int], "unlocks": {"all": bool, "rewards": [String]},
@@ -34,6 +41,12 @@ const TEMP_NAME: String = "save.json.tmp"
 const BACKUP_NAME: String = "save.json.bak"
 ## Bump when the layout changes; add a step to _migrate().
 const VERSION: int = 2
+## The untouched copy of a save file of another version, kept beside save.json before 2.0 writes over it:
+## "save.v1.json" is the file 1.0.0 wrote (see [method legacy_backup_name]).
+const LEGACY_BACKUP_NAME: String = "save.v%d.json"
+## A later file of the same old version with other content (the player went back to 1.0.0 and returned) gets a
+## number instead of replacing the first copy: "save.v1.2.json" ... up to this many.
+const LEGACY_BACKUP_MAX: int = 99
 
 ## Modes that keep campaign progress (Defs.GameMode); a namespace exists for each with both books and difficulties.
 const SPACE_MODES: Array[int] = [Defs.GameMode.SINGLE, Defs.GameMode.COOP]
@@ -71,6 +84,16 @@ var storage_dir: String = "user://"
 var report_damage: bool = true
 
 var _data: Dictionary = {}
+## The file of another version that the data was read from (FILE_NAME or BACKUP_NAME; "" = none) and its version,
+## while no untouched copy of it is known to exist: save_game makes that copy first, or writes nothing.
+var _legacy_source: String = ""
+var _legacy_version: int = 0
+## True when the last load_game read a file of another version.
+var _migrated: bool = false
+## Where the untouched copy of the last migrated file is (a path in storage_dir; "" = no file was migrated).
+var _legacy_backup: String = ""
+## What the last migration did not carry over (empty = nothing lost, or no file was migrated).
+var _migration_losses: PackedStringArray = PackedStringArray()
 
 
 func _ready() -> void:
@@ -85,23 +108,48 @@ func set_storage_dir(dir_path: String) -> void:
 
 
 ## Read the save file. A missing file yields a fresh save; a damaged file falls back to the backup, then to a
-## fresh save (never crashes, never blocks the game).
+## fresh save (never crashes, never blocks the game). A file of another version (a 1.0 save) is migrated in
+## memory and checked; reading writes nothing (see [method save_game]).
 func load_game() -> void:
+	_legacy_source = ""
+	_legacy_version = 0
+	_migrated = false
+	_legacy_backup = ""
+	_migration_losses = PackedStringArray()
+	var source: String = FILE_NAME
 	_data = _read(storage_dir + FILE_NAME)
 	if _data.is_empty():
+		source = BACKUP_NAME
 		_data = _read(storage_dir + BACKUP_NAME)
 	if _data.is_empty():
 		_data = _fresh()
 	else:
-		var version: int = int(_data.get("version", 0))
+		var version: int = _int_value(_data.get("version"))
 		if version != VERSION:
+			var original: Dictionary = _data.duplicate(true)
 			_data = _migrate(_data, version)
-		_fill_missing(_data)
+			_fill_missing(_data)
+			if version < VERSION:
+				_migration_losses = _v1_losses(original, _data)
+				for loss: String in _migration_losses:
+					push_error("Save: the migration of %s (version %d) lost %s" % [source, version, loss])
+			_migrated = true
+			_legacy_source = source
+			_legacy_version = version
+		else:
+			_fill_missing(_data)
 	loaded.emit()
 
 
-## Write the save file atomically (temp file, then rename; the previous file becomes the backup).
+## Write the save file atomically (temp file, then rename; the previous file becomes the backup). When the data
+## came from a file of another version, that file is first copied untouched to [method legacy_backup_path]; if the
+## copy cannot be made, nothing is written and ERR_FILE_CANT_WRITE is returned: a 1.0 save is never replaced before
+## it is safe.
 func save_game() -> Error:
+	if not _legacy_source.is_empty() and not _keep_legacy_copy():
+		push_error("Save: %s (version %d) is not written over: its copy %s could not be made" % [
+				storage_dir + _legacy_source, _legacy_version, legacy_backup_name(_legacy_version)])
+		return ERR_FILE_CANT_WRITE
 	_data["version"] = VERSION
 	var file: FileAccess = FileAccess.open(storage_dir + TEMP_NAME, FileAccess.WRITE)
 	if file == null:
@@ -130,6 +178,31 @@ func reset() -> void:
 	_data = _fresh()
 	save_game()
 	loaded.emit()
+
+
+## Name of the untouched copy of a save file of version `version`: "save.v1.json"; `number` > 1 names a later file
+## of that version with other content ("save.v1.2.json").
+static func legacy_backup_name(version: int, number: int = 1) -> String:
+	var base: String = LEGACY_BACKUP_NAME % version
+	return base if number <= 1 else "%s.%d.json" % [base.get_basename(), number]
+
+
+## Path of the untouched copy of the file the last [method load_game] migrated (a 1.0 save: storage_dir +
+## "save.v1.json"), or "" when no file of another version was read or nothing was saved since (the copy is made by
+## the first [method save_game]).
+func legacy_backup_path() -> String:
+	return _legacy_backup
+
+
+## True when the last [method load_game] read a file of another version (and migrated it).
+func was_migrated() -> bool:
+	return _migrated
+
+
+## What the last migration did not carry into the namespaces, one text per item ("unlocked beginner w1_l2"); empty
+## when nothing was lost. Entries of a 1.0 file that 1.0.0 itself could not read (wrong types) are not counted.
+func migration_losses() -> PackedStringArray:
+	return _migration_losses
 
 
 ## True when at least one level beyond the first was reached in any mode (title screen shows "Continue"): in any
@@ -508,6 +581,91 @@ static func _migrate_v1(data: Dictionary) -> void:
 	data.erase("unlocked")
 	data.erase("results")
 	data.erase("completed")
+
+
+# What a version 1 file held that the migrated data does not: the check between the migration and the first write.
+# Only entries 1.0.0 itself could read count (ids as text, results as dictionaries, numbers as numbers).
+static func _v1_losses(original: Dictionary, migrated: Dictionary) -> PackedStringArray:
+	var losses: PackedStringArray = PackedStringArray()
+	var spaces: Dictionary = migrated["spaces"] if migrated.get("spaces") is Dictionary else {}
+	for difficulty: int in [Defs.Difficulty.BEGINNER, Defs.Difficulty.EXPERT]:
+		var difficulty_name: String = Defs.difficulty_name(difficulty)
+		var target: Dictionary = {}
+		if spaces.get(space(Defs.GameMode.SINGLE, 1, difficulty)) is Dictionary:
+			target = spaces[space(Defs.GameMode.SINGLE, 1, difficulty)]
+		var old_unlocked: Variant = _v1_entry(original, "unlocked", difficulty_name)
+		var unlocked: Array = target["unlocked"] if target.get("unlocked") is Array else []
+		if old_unlocked is Array:
+			for id: Variant in old_unlocked:
+				if id is String and not unlocked.has(id):
+					losses.append("unlocked %s %s" % [difficulty_name, id])
+		var old_results: Variant = _v1_entry(original, "results", difficulty_name)
+		var results: Dictionary = target["results"] if target.get("results") is Dictionary else {}
+		if old_results is Dictionary:
+			for id: Variant in old_results:
+				if not old_results[id] is Dictionary:
+					continue
+				var kept: Dictionary = results[str(id)] if results.get(str(id)) is Dictionary else {}
+				for field: String in ["percent", "score", "clears"]:
+					if _int_value(kept.get(field)) < _int_value(old_results[id].get(field)):
+						losses.append("result %s %s %s" % [difficulty_name, id, field])
+		var old_completed: Variant = _v1_entry(original, "completed", difficulty_name)
+		if old_completed is bool and old_completed and not (target.get("completed") is bool and target["completed"]):
+			losses.append("completed %s" % difficulty_name)
+	var stones: Array = migrated["code_stones"] if migrated.get("code_stones") is Array else []
+	if original.get("code_stones") is Array:
+		for stone: Variant in original["code_stones"]:
+			if not stones.has(stone):
+				losses.append("code stone %s" % str(stone))
+	var stats: Dictionary = migrated["stats"] if migrated.get("stats") is Dictionary else {}
+	if original.get("stats") is Dictionary:
+		for stat: Variant in original["stats"]:
+			var old_stat: Variant = original["stats"][stat]
+			if (old_stat is float or old_stat is int) and _int_value(stats.get(stat)) != int(old_stat):
+				losses.append("stat %s" % str(stat))
+	var old_high: Variant = original.get("high_score")
+	if (old_high is float or old_high is int) and _int_value(migrated.get("high_score")) < int(old_high):
+		losses.append("high score")
+	return losses
+
+
+# Copy the file of another version that the data came from, byte for byte, to its legacy name
+# ([method legacy_backup_name]; never over a file with other content: that one keeps its name and this one gets
+# the next number), and read the copy back. True when the copy exists - save_game may then write - or when the
+# source file is gone (nothing is left to protect).
+func _keep_legacy_copy() -> bool:
+	if _legacy_source.is_empty():
+		return true
+	var source_path: String = storage_dir + _legacy_source
+	if not FileAccess.file_exists(source_path):
+		_legacy_source = ""
+		return true
+	var bytes: PackedByteArray = FileAccess.get_file_as_bytes(source_path)
+	if bytes.is_empty():
+		return false
+	for number: int in range(1, LEGACY_BACKUP_MAX + 1):
+		var path: String = storage_dir + legacy_backup_name(_legacy_version, number)
+		if FileAccess.file_exists(path):
+			if FileAccess.get_file_as_bytes(path) == bytes:
+				_legacy_backup = path
+				_legacy_source = ""
+				return true
+			continue
+		var temp_path: String = path + ".tmp"
+		var file: FileAccess = FileAccess.open(temp_path, FileAccess.WRITE)
+		if file == null:
+			return false
+		file.store_buffer(bytes)
+		file.close()
+		var dir: DirAccess = DirAccess.open(storage_dir)
+		if dir == null or FileAccess.get_file_as_bytes(temp_path) != bytes 				or dir.rename(temp_path.get_file(), path.get_file()) != OK 				or FileAccess.get_file_as_bytes(path) != bytes:
+			if dir != null:
+				dir.remove(temp_path.get_file())
+			return false
+		_legacy_backup = path
+		_legacy_source = ""
+		return true
+	return false
 
 
 static func _v1_entry(data: Dictionary, section: String, difficulty_name: String) -> Variant:

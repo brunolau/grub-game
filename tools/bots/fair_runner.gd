@@ -1,7 +1,12 @@
 extends Node
 ## The runner of tools/bots/fair.gd (loaded once the autoloads exist): see fair.gd and fair.sh.
+## A VARIANT of an arena is measured without touching the shipped file: `file=<res path of a .lvl>` plays that text
+## under the arena's id (`arena=`, default the file's base name) and `graph=<res path of its .json>` is its bot graph
+## (bake it once: `bash .tools/gd.sh script res://tools/bots/bake_nav.gd -- --out=<dir> <the .lvl>`). Without `graph=`
+## a text the committed graph was not baked from is baked in this process first (never played on a stale graph). The
+## referee's file records (goals, crate lanes) still come from the shipped file of that id.
 
-## The test's 12 seeds first, then further primes: seed i of a longer set.
+## The test's 12 seeds first, then further primes: seed i of a longer set (192 in all: two sets of 96 = 384 rounds each).
 const SEEDS: PackedInt32Array = [
 	11, 23, 37, 41, 53, 67, 71, 89, 97, 101, 113, 127,
 	131, 137, 139, 149, 151, 157, 163, 167, 173, 179, 181, 191,
@@ -11,6 +16,15 @@ const SEEDS: PackedInt32Array = [
 	409, 419, 421, 431, 433, 439, 443, 449, 457, 461, 463, 467,
 	479, 487, 491, 499, 503, 509, 521, 523, 541, 547, 557, 563,
 	569, 571, 577, 587, 593, 599, 601, 607, 613, 617, 619, 631,
+	# 96 more (phase 4): a second, independent set - `fair.sh <tag> <arena> <mode> 96 96` confirms a claim made on the first.
+	641, 643, 647, 653, 659, 661, 673, 677, 683, 691, 701, 709,
+	719, 727, 733, 739, 743, 751, 757, 761, 769, 773, 787, 797,
+	809, 811, 821, 823, 827, 829, 839, 853, 857, 859, 863, 877,
+	881, 883, 887, 907, 911, 919, 929, 937, 941, 947, 953, 967,
+	971, 977, 983, 991, 997, 1009, 1013, 1019, 1021, 1031, 1033, 1039,
+	1049, 1051, 1061, 1063, 1069, 1087, 1091, 1093, 1097, 1103, 1109, 1117,
+	1123, 1129, 1151, 1153, 1163, 1171, 1181, 1187, 1193, 1201, 1213, 1217,
+	1223, 1229, 1231, 1237, 1249, 1259, 1277, 1279, 1283, 1289, 1291, 1297,
 ]
 
 
@@ -24,9 +38,17 @@ func run(args: PackedStringArray) -> void:
 	var seeds: PackedInt32Array = SEEDS.slice(0, 12)
 	var detail: bool = false
 	var bot_level: int = Defs.BotLevel.HUNTER
+	var file: String = ""
+	var graph_file: String = ""
+	var arena_given: bool = false
 	for arg: String in args:
 		if arg.begins_with("arena="):
 			arena_id = StringName(arg.trim_prefix("arena="))
+			arena_given = true
+		elif arg.begins_with("file="):
+			file = arg.trim_prefix("file=")
+		elif arg.begins_with("graph="):
+			graph_file = arg.trim_prefix("graph=")
 		elif arg.begins_with("mode="):
 			mode_name = arg.trim_prefix("mode=")
 		elif arg.begins_with("seeds="):
@@ -47,8 +69,25 @@ func run(args: PackedStringArray) -> void:
 	add_child(test)
 	test.call(&"_begin_test")
 	test.call(&"before_each")
-	var text: String = FileAccess.get_file_as_string("res://levels/%s.lvl" % arena_id)
+	if file != "" and not arena_given:
+		arena_id = StringName(file.get_file().get_basename())
+	var text: String = FileAccess.get_file_as_string(file if file != "" else "res://levels/%s.lvl" % arena_id)
+	if text.is_empty():
+		print("FAIR %s %s: no level text (%s)" % [arena_id, mode_name, file])
+		return
 	var arena: Dictionary = test.call(&"_arena_entry", arena_id, text)
+	# The graph the bots walk must be the one of THIS text: a given one, the committed one, or a bake of this run.
+	if graph_file != "":
+		var given: NavGraph = NavGraph.load_file(graph_file)
+		if given == null or given.source_sha256 != NavGraph.text_sha256(text):
+			print("FAIR %s %s: %s was not baked from %s" % [arena_id, mode_name, graph_file, file])
+			return
+		((test.get_script() as GDScript).get(&"_baked") as Dictionary)[arena_id] = FileAccess.get_file_as_string(graph_file)
+	else:
+		await test.call(&"_bake_missing", arena)
+	if test.call(&"_graph_for", arena) == null:
+		print("FAIR %s %s: no bot graph for this text" % [arena_id, mode_name])
+		return
 	var players: int = int(arena["players"])
 	var wins: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 	var scores: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])

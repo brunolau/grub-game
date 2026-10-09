@@ -1042,6 +1042,93 @@ func test_no_hard_cap_outside_last_caveman_standing() -> void:
 	assert_eq(referee.round_length(), VersusTuning.stack_round_ticks(3), "whose sundial stays its own")
 
 
+# --- "TIME!": the banner of a round the hard cap ended (phase 4) ----------------------------------------------------------
+
+func test_only_the_gong_of_the_hard_cap_is_ended_by_cap() -> void:
+	_lcs_no_kill(2, [100, 250])
+	var cap: int = VersusTuning.SUDDEN_DEATH_AT_TICKS + VersusTuning.SUDDEN_DEATH_CAP_TICKS
+	assert_false(referee.ended_by_cap(), "a running round")
+	_to_sudden_death()
+	Sim.step(VersusTuning.SUDDEN_DEATH_CAP_TICKS - 1)
+	assert_false(referee.ended_by_cap(), "one tick before the cap")
+	Sim.step(1)
+	assert_eq(referee.round_ticks, cap)
+	assert_true(referee.ended_by_cap(), "the cap's gong")
+	Sim.step(3)
+	assert_true(referee.ended_by_cap(), "and it stays said after the gong")
+	# The next round starts clean; the last one standing on the cap's OWN tick is a win by standing (that rule is
+	# asked first, G78): no "TIME!".
+	_mode(Defs.VersusMode.LAST_CAVEMAN)
+	assert_false(referee.ended_by_cap(), "a new round")
+	_to_sudden_death()
+	referee.round_ticks = referee.cap_at - 1
+	heroes[1].kill(&"liquid")
+	Sim.step(1)
+	assert_eq(referee.phase, VersusReferee.PHASE_OVER)
+	assert_eq(referee.round_ticks, cap, "the gong fell on the cap's tick")
+	assert_eq(referee.winner_slots, PackedInt32Array([0]), "by the last one standing")
+	assert_false(referee.ended_by_cap(), "which is not the cap's doing")
+	# A clock's gong (Grub Stack) and a fuse's (Hot Rock) are never the cap's.
+	_mode(Defs.VersusMode.GRUB_STACK)
+	_give(heroes[0], 3)
+	referee.round_ticks = referee.round_total - 1
+	Sim.step(1)
+	assert_eq(referee.phase, VersusReferee.PHASE_OVER, "the clock ended the Grub Stack round")
+	assert_false(referee.ended_by_cap())
+	_mode(Defs.VersusMode.HOT_ROCK)
+	heroes[1].kill(&"hot_rock")
+	Sim.step(2)
+	assert_eq(referee.phase, VersusReferee.PHASE_OVER, "one left: the Hot Rock round is over")
+	assert_false(referee.ended_by_cap())
+
+
+func test_time_banner_stands_over_the_result_when_the_cap_ends_a_round() -> void:
+	# The versus HUD's own round banner, with the real HUD in the tree: at the cap "TIME!" is the banner and the result
+	# line the HUD wrote at the gong - the winner, or its "Draw!" - stands under it; any other gong keeps its result.
+	assert_true(FileAccess.get_file_as_string("res://locale/en.po").contains("msgid \"UI_VS_TIME\"\nmsgstr \"TIME!\""),
+			"the catalogue has the string")
+	_lcs_no_kill(2, [100, 125])
+	var hud: Hud = (load(Flow.HUD_SCENE) as PackedScene).instantiate() as Hud
+	add_node(hud)
+	await get_tree().process_frame
+	var banner: HudVersus = hud.get_versus()
+	assert_not_null(banner, "the versus HUD")
+	if banner == null:
+		return
+	# 1. P1 hits P2 once, then nobody moves: at the cap P1 took fewer hurts.
+	_to_sudden_death()
+	_box(heroes[0], 1)
+	Sim.step(1)
+	assert_eq(referee.hurts_of(1), 1)
+	referee.round_ticks = referee.cap_at - 1
+	Sim.step(1)
+	assert_true(referee.ended_by_cap())
+	var p1_wins: String = HudVersus.result_text(PackedInt32Array([0]))
+	assert_eq(banner.banner_text, p1_wins, "the HUD's result line on the gong's tick")
+	await get_tree().process_frame
+	assert_eq(banner.banner_text, tr("UI_VS_TIME"), "then \"TIME!\" is the banner")
+	assert_eq(banner.banner_hint, p1_wins, "with the result under it")
+	assert_true(banner.is_banner_visible())
+	# 2. Nobody hurt: "TIME!" over "Draw!".
+	_mode(Defs.VersusMode.LAST_CAVEMAN)
+	_to_sudden_death()
+	referee.round_ticks = referee.cap_at - 1
+	Sim.step(1)
+	assert_eq(referee.winner_slots, PackedInt32Array(), "a draw")
+	await get_tree().process_frame
+	assert_eq(banner.banner_text, tr("UI_VS_TIME"))
+	assert_eq(banner.banner_hint, tr("UI_VS_DRAW"))
+	# 3. A round that the last one standing ends says who won, as ever - also late in the sudden death.
+	_mode(Defs.VersusMode.LAST_CAVEMAN)
+	_to_sudden_death()
+	heroes[1].kill(&"liquid")
+	Sim.step(2)
+	assert_eq(referee.phase, VersusReferee.PHASE_OVER)
+	await get_tree().process_frame
+	assert_eq(banner.banner_text, p1_wins, "no \"TIME!\" without the cap")
+	assert_eq(banner.banner_hint, "")
+
+
 ## Every arena file that lists Last Caveman Standing (the shipped ones and the developer arena), real heroes, the
 ## real referee, the arena's own sudden death: `players` heroes who never press a key. The round must end by the cap.
 func _idle_round(id: StringName, text: String, players: int, round_index: int) -> Dictionary:

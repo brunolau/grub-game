@@ -1,0 +1,28 @@
+{
+  "code_stones": [
+    "w1_l1:3"
+  ],
+  "completed": {
+    "beginner": false,
+    "expert": false
+  },
+  "high_score": 0,
+  "results": {
+    "beginner": {},
+    "expert": {
+      "w1_l1": {
+        "clears": 1,
+        "percent": 54,
+        "score": 124400
+      }
+    }
+  },
+  "stats": {},
+  "unlocked": {
+    "beginner": [],
+    "expert": [
+      "w1_l2"
+    ]
+  },
+  "version": 1
+}

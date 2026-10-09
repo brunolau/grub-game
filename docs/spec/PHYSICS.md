@@ -1272,8 +1272,9 @@ resolutions" (marked **[Gn]**).
 2. **Modes.** "Co-op only" rules run when `Game.mode == COOP` and `hero_count() > 1`; "versus only" rules run in
    `kind = arena` files (`Game.mode == VERSUS`). "Book II" rules are those of C.2-C.9; they apply wherever their tile
    or entity appears (Book II solo, every co-op file, arenas).
-3. **Units** as section 0. *(tune)* marks a playtest starting value: it changes only through DESIGN.md (PLAN 2.5),
-   then here and in its constant (C.16).
+3. **Units** as section 0. *(tune)* marks a value that began as a playtest starting value: it changes only through
+   DESIGN.md (PLAN 2.5), then here and in its constant (C.16). **2.0.0 ships each at the value written here**; the
+   register with every constant is DESIGN.md D.12 [G91].
 4. **The launch primitive** `launch(xvel, yvel)` (new `PlayerBase` member, used by geysers, see-saws, vines, Batter
    Up, dismounts and hatching): each given component is clamped to +/-288 v16 (`PartyTuning.LAUNCH_AXIS_CAP`,
    18 px/tick, the doze reach of ARCHITECTURE 11.1); then `fall_ticks = 0`, `no_jump = 6`, `on_platform = false`,
@@ -1747,10 +1748,16 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
     (-224 / -64), no glider bump, no cut bounce [G54]. The enemy takes the stomp as anywhere, once:
     `on_bounced(hero)` (a `daze` record is dazed, the multiplier chain counts), `on_glider_stomp` for a dive, and
     the multiplier pop-up; `Events.hero_bounced` / `player_bounced` are not sent (he did not bounce).
-  - **The pass** (`Player._ward_heads`): that enemy joins his list of heads that gave nothing, and
-    the contact test of this hero and that enemy is skipped - no hurt from its body, no second stomp - until their
-    boxes no longer overlap (or it dies, sleeps or stops being targetable). Its projectiles and every other enemy
-    are tested as always.
+  - **The pass** (`Player._ward_heads`) [G87]: that enemy joins his list of heads that gave nothing, and
+    the contact test of this hero and that enemy is skipped - no hurt from its body, no second stomp - **during
+    that fall and for at most `PartyTuning.WARD_GRACE_TICKS` = 12 ticks after it**. The fall ends on the first tick
+    on which he has ground, a platform, a carrier, a vine or a saddle under him (the list of the launch hold, C.0
+    #4); the pass ends 12 ticks later, or sooner: when their boxes no longer overlap, or it dies, sleeps or stops
+    being targetable. From then the contact test of the two is the normal one - its body hurts him by 10.1, and a
+    new landing on it from above is a new stomp in the ward (nothing given, `on_bounced` once more, a new pass):
+    standing inside a keeper is no shelter. Its projectiles and every other enemy are tested as always. (Until
+    phase 4 the pass lasted for as long as the boxes overlapped; 12 ticks at the walk cap of 5 px are 60 px, more
+    than the widest keeper's body.)
   - **No rest, no carry**: no enemy is ground, a platform or a carrier for him. The one enemy rule that carries a
     hero is the `grab` trait: a Snatcher does not seize a hero in a ward - its touch there is the plain hurt of
     10.1 - and lets go of one it carries on the tick his feet column enters a ward: the fall of a freed hero,
@@ -1762,6 +1769,13 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
     pogo.
   - **Cue** (drawing and sound only): `fx/dust` at the enemy's head and `Sfx.LAND` on the stomp tick, in place of
     the bounce ring and `Sfx.BOUNCE`.
+  - **The ward mark** (drawing only) [G85]: in a co-op party every enemy a hero could stomp - a record or a
+    spawner's copy, visible, alive and targetable, asleep or awake; never a boss or a boss part, a projectile, a
+    decoration or a mount - is drawn with the ward mark (chalk-white tribal stripes over its body) on every frame
+    on which the cell column of **its own** feet point (`x >> 4`) lies in a ward. No rule reads the mark and it
+    writes nothing: no digest, route or search result changes with it, and it is not drawn in single-player, a
+    party of one, versus or a tool's world. The mark is by the enemy's column and the rule by the hero's, so
+    within about one body width of a ward's first or last column the two can differ.
   Not warded: boss bodies (their stomp rules are their fight's, GAMEPLAY 13.6), a partner's head (above), mounts as
   mounts, platforms, rafts, lifts, see-saws, geysers, springs, vines. In single-player, a party of one and versus
   no ward exists.
@@ -1862,6 +1876,15 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
   respawned hatched at the active checkpoint: slot `s` at the checkpoint x + `24 * s` px towards the side where the
   floor continues (the same x if both sides are blocked), energy 3, zero velocity, hand and belt kept, eggs gone; then
   the camera of 12.5 on P1 and the tribe rules (C.13).
+- **The idle wipe** [G86] (`PartyDriver._wipe_check`, `POST`; co-op only): one counter per party. At the end of a
+  tick it is raised by 1 when (a) some hero of the party is an egg whose own player plays - his `input_idle_ticks`
+  is under `IDLE_TICKS` (the egg's nudge and every held flag are input, C.10) - (b) no hero is in a death toss, and
+  (c) at least one hero is hatched and **every hatched hero is idle** (C.10); on every other tick it is set to 0.
+  When it reaches `PartyTuning.IDLE_WIPE_TICKS` = **73** (3 s *(tune)*; 0 = the rule is off) the team is wiped
+  exactly as above - the curtain, one life, the reset, both hatched at the checkpoint. It closes what the rule
+  above left open: a hero who went idle beside an egg wiped nothing, and that egg waited for ever. An egg whose own
+  player is idle starts no clock (two pads on the table cost no life by this rule), and an idle hero's own egg
+  never wipes a partner who plays.
 
 ### C.13 The tribe camera, edge walls and the leash (co-op)
 
@@ -1974,7 +1997,8 @@ Owner of each table: `Tuning` (core: hero and world rules), `PartyTuning` (core,
 | Respawn spread | 24 per slot | px | C.12 | PartyTuning |
 | Tribe camera | start col 16 / 4 with the rear at col >= 2 / <= 17; stop col 5 / 15 or rear at 1 / 18; edge walls 8 px; standing window: feet at most 9 rows apart, view top in [lowest - 176, highest - 32] | | C.13 | PartyTuning |
 | Leash | 121 B / 73 E | ticks | C.13 | PartyTuning |
-| Ward | margin 12 cells on each side *(tune)* (`ward=<left>,<right>` per tablet); the pass lasts until the boxes part [G73] | cells | C.10 | PartyTuning (`WARD_MARGIN_CELLS`) |
+| Ward | margin 12 cells on each side *(tune)* (`ward=<left>,<right>` per tablet); the pass of a stomp lasts that fall and at most 12 ticks after it *(tune)* [G73] [G87] | cells / ticks | C.10 | PartyTuning (`WARD_MARGIN_CELLS`, `WARD_GRACE_TICKS`) |
+| Idle wipe | 73 (3 s) *(tune)*: the egg of a hero who plays, every hatched hero idle [G86] | ticks | C.12 | PartyTuning (`IDLE_WIPE_TICKS`) |
 | Pull into a locked view | 24 px behind the trigger hero | px | C.13 | PartyTuning |
 | Versus knocks | 64, -128; hammer x3/2; charged 128, -160, ice 3; swirl pop -160 | v16 | C.14 | VersusTuning |
 | Versus hurt | `hit_timer` 43, stun while >= 31 (12 + 30) | ticks | C.14 | VersusTuning |
@@ -1985,6 +2009,7 @@ Owner of each table: `Tuning` (core: hero and world rules), `PartyTuning` (core,
 | Body bump | 1 px/tick; knock at 64: +/-64, -64 *(tune)* | | C.14 | VersusTuning |
 | Spawn shield / respawn | 48 / 48 | ticks | C.14 | VersusTuning |
 | Sudden-death cap (Last Caveman Standing) | 1 457 (60 s) *(tune)* [G78] | ticks | C.14 | VersusTuning (`SUDDEN_DEATH_CAP_TICKS`) |
+| Drawn rounds that end a match | 3 in a row *(tune)*, every mode [G78] | rounds | C.14 | VersusTuning (`DRAW_ROUNDS_TO_END`) |
 | Temporary specials | axe 3, swirling axe 2, spear 3 throws; wrap life 40 ticks | | C.14 | VersusTuning |
 | Weight | 10 -> cap 64; 20 -> cap 48, impulses x3/4 *(tune)* | units, v16 | C.14 | VersusTuning |
 | Hot Rock holder / King carrier caps | 96 / 64 | v16 | C.14 | VersusTuning |

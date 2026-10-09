@@ -337,7 +337,7 @@ static func _world_key_parts(level_id: StringName, p_difficulty: int, gate_name:
 		parts.append(FileAccess.get_file_as_string(base_path) if FileAccess.file_exists(base_path) else "")
 	for script: String in KEY_SCRIPTS:
 		parts.append(FileAccess.get_md5(script))
-	parts.append("%d|%s" % [p_difficulty, gate_name])
+	parts.append("%d|%s%s" % [p_difficulty, gate_name, CoopSearch.rules_off_text()])
 	return parts
 
 

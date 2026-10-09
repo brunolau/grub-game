@@ -5,19 +5,27 @@
 .DESCRIPTION
     1. checks the Godot binary (4.7.2) and the Windows export templates,
     2. imports the project and fails on any import error or warning,
+    2b. runs tools\audit_assets.py (Python 3, standard library only) and fails on any asset without a row in
+       docs\ASSET_MANIFEST.md, any licence that is not CC0 / OFL, any pack missing from the credits or the licence
+       texts (PLAN.md P4.4: the audit is run by the build),
     3. runs the whole headless test suite (tests/run_tests.gd) and fails unless it passes,
     4. exports the "Windows Desktop" preset of export_presets.cfg in release mode to build\windows\ClubAndGrub.exe
-       (game data embedded, no .pck or DLL next to it) and fails on any export error,
+       (game data embedded, no .pck or DLL next to it) and fails on any export error, when the exe does not carry
+       the version of project.godot, or when the export changed export_presets.cfg (it is put back),
     5. starts the exported exe with the release smoke switch (-- --smoke=<seconds>) and fails unless it exits with
-       code 0 and its log is clean. The smoke run gets its own APPDATA under build\windows\smoke, so it never reads
-       or writes the user data of a real installation. It also passes a development switch (--autoplay) and
-       checks that the release build ignores it.
-    6. puts the licence texts next to the exe (build\windows\licenses\: CREDITS.md and every file of
+       code 0, its log is clean and it reports the version of project.godot. The smoke run gets its own APPDATA
+       under build\windows\smoke, so it never reads or writes the user data of a real installation. It also passes
+       a development switch (--autoplay) and checks that the release build ignores it.
+    6. reads the list of files packed inside the exe and lets tests\test_core_release_pack.gd judge it: no
+       developer level, test, tool or recorder, no asset outside docs\ASSET_MANIFEST.md, no file the export filters
+       do not allow, nothing the filters ship missing (the test gets the exe through CLUBANDGRUB_RELEASE_EXE),
+    7. puts the licence texts next to the exe (build\windows\licenses\: CREDITS.md and every file of
        assets\licenses\, the same texts the game shows in Credits > Licences) and packs the release zip
        build\ClubAndGrub-<version>-windows.zip (the exe plus that folder).
 
-    Every failure stops the script with a message and exit code 1. Godot runs share the lock directory
-    build\.godot_lock with .tools/gd.sh, so the script can run while other tools use the project.
+    Every failure stops the script with a message and exit code 1. Godot runs take turns with .tools/gd.sh through
+    the lock directory build\.godot_lock (the import and the export alone, the tests beside other runs), so the
+    script can run while other tools use the project.
 
 .PARAMETER Godot
     Godot 4.7.2 console binary. Default: $env:GODOT, else .tools\godot\Godot_v4.7.2-stable_win64_console.exe,
@@ -33,6 +41,11 @@
 .PARAMETER SkipTests
     Skip step 3. For quick packaging experiments only; never for a build that leaves the machine.
 
+.PARAMETER OutputRoot
+    Folder of the build output (default: build). The exe goes to <OutputRoot>\windows, the zip to
+    <OutputRoot>\ClubAndGrub-<version>-windows.zip. Use another folder (for example build\trial) to try the script
+    without replacing the release files in build\.
+
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File tools\build_windows.ps1
 #>
@@ -41,7 +54,8 @@ param(
     [string]$Godot = "",
     [ValidateRange(1, 120)][int]$SmokeSeconds = 4,
     [switch]$HeadlessSmoke,
-    [switch]$SkipTests
+    [switch]$SkipTests,
+    [string]$OutputRoot = ""
 )
 
 Set-StrictMode -Version Latest
@@ -51,16 +65,27 @@ $GodotVersion = "4.7.2"
 $PresetName = "Windows Desktop"
 $ExeName = "ClubAndGrub.exe"
 $RunTimeoutSeconds = 600
+# The whole default suite (about 1 750 tests) needs more than the import or the export.
+$TestTimeoutSeconds = 1800
 $LockStaleMinutes = 12
+# An import or export waits for the Godot runs that started in the last minutes (they may still be loading), as
+# .tools/gd.sh does.
+$ReaderWaitMinutes = 3
 
 $Root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $BuildDir = Join-Path $Root "build"
-$OutDir = Join-Path $BuildDir "windows"
+if (-not $OutputRoot) { $OutputRoot = $BuildDir }
+if (-not [IO.Path]::IsPathRooted($OutputRoot)) { $OutputRoot = Join-Path $Root $OutputRoot }
+New-Item -ItemType Directory -Force -Path $OutputRoot | Out-Null
+$OutputRoot = (Resolve-Path -LiteralPath $OutputRoot).Path
+$OutDir = Join-Path $OutputRoot "windows"
 $LogDir = Join-Path $OutDir "logs"
 $SmokeDir = Join-Path $OutDir "smoke"
 $ExePath = Join-Path $OutDir $ExeName
 $LicenseDir = Join-Path $OutDir "licenses"
 $LockDir = Join-Path $BuildDir ".godot_lock"
+$ReadersDir = Join-Path $BuildDir ".godot_readers"
+$PresetsPath = Join-Path $Root "export_presets.cfg"
 
 function Write-Step([string]$Text) {
     Write-Host ""
@@ -138,13 +163,49 @@ function Exit-GodotLock {
     Remove-Item -LiteralPath $LockDir -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-# Run Godot while holding the shared lock.
+# Run Godot alone (an import or an export, which write Godot's caches): holds the lock for the whole run, after the
+# runs that started in the last minutes have had time to load.
 function Invoke-Godot([string[]]$Arguments, [string]$LogName) {
     Enter-GodotLock
     try {
+        while (Test-Path -LiteralPath $ReadersDir) {
+            $recent = @(Get-ChildItem -LiteralPath $ReadersDir -File -ErrorAction SilentlyContinue |
+                Where-Object { $_.LastWriteTime -gt (Get-Date).AddMinutes(-$ReaderWaitMinutes) })
+            if ($recent.Count -eq 0) { break }
+            Start-Sleep -Seconds 1
+        }
         return Invoke-Program $script:GodotExe $Arguments (Join-Path $LogDir $LogName) $RunTimeoutSeconds
     } finally {
         Exit-GodotLock
+    }
+}
+
+# Run Godot beside other runs (tests only read the caches): registers as a reader, as ".tools/gd.sh test" does.
+function Invoke-GodotShared([string[]]$Arguments, [string]$LogName, [int]$TimeoutSeconds) {
+    New-Item -ItemType Directory -Force -Path $ReadersDir | Out-Null
+    $marker = Join-Path $ReadersDir "build_windows_$PID"
+    Enter-GodotLock
+    try {
+        Set-Content -LiteralPath $marker -Value "" -Encoding ASCII
+    } finally {
+        Exit-GodotLock
+    }
+    try {
+        return Invoke-Program $script:GodotExe $Arguments (Join-Path $LogDir $LogName) $TimeoutSeconds
+    } finally {
+        Remove-Item -LiteralPath $marker -Force -ErrorAction SilentlyContinue
+    }
+}
+
+# The test suite with its own user folder (saves and settings of the run), removed afterwards.
+function Invoke-Tests([string[]]$TestArguments, [string]$LogName) {
+    $userName = "build_windows_$PID"
+    $userDir = Join-Path $BuildDir "run_users\$userName"
+    try {
+        return Invoke-GodotShared (@("--headless", "--path", $Root, "-s", "res://tests/run_tests.gd", "--",
+            "--user-dir=res://build/run_users/$userName") + $TestArguments) $LogName $TestTimeoutSeconds
+    } finally {
+        Remove-Item -LiteralPath $userDir -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
 
@@ -183,12 +244,29 @@ if ($import.ExitCode -ne 0 -or $problems.Count -gt 0) {
 }
 Write-Host "    clean import"
 
+# --- 2b. asset and licence audit ---------------------------------------------------------------------------------------
+Write-Step "Asset and licence audit (tools\audit_assets.py)"
+$python = Join-Path $Root ".tools\venv\Scripts\python.exe"
+if (-not (Test-Path -LiteralPath $python -PathType Leaf)) {
+    $onPath = Get-Command python -ErrorAction SilentlyContinue
+    if ($null -eq $onPath) {
+        Stop-Build "Python 3 not found (.tools\venv\Scripts\python.exe or python on the PATH): the asset audit cannot run"
+    }
+    $python = $onPath.Source
+}
+$audit = Invoke-Program $python @((Join-Path $Root "tools\audit_assets.py")) (Join-Path $LogDir "audit") 300
+@($audit.Output -split "`r?`n" | Where-Object { $_ -match '^(GAP |ASSET AUDIT:|    )' }) | Select-Object -First 60 |
+    ForEach-Object { Write-Host "    $_" }
+if ($audit.ExitCode -ne 0 -or $audit.Output -notmatch '(?m)^ASSET AUDIT: PASS') {
+    Stop-Build "the asset and licence audit failed (exit code $($audit.ExitCode)); see $LogDir\audit.*.txt"
+}
+
 # --- 3. tests ---------------------------------------------------------------------------------------------------------
 if ($SkipTests) {
     Write-Step "Skipping the test suite (-SkipTests): do not ship this build"
 } else {
     Write-Step "Running the test suite"
-    $tests = Invoke-Godot @("--headless", "--path", $Root, "-s", "res://tests/run_tests.gd") "tests"
+    $tests = Invoke-Tests @() "tests"
     $summary = @($tests.Output -split "`r?`n" | Where-Object { $_ -match '^(TESTS|RESULT):' })
     $summary | ForEach-Object { Write-Host "    $_" }
     if ($tests.ExitCode -ne 0 -or -not ($tests.Output -match '(?m)^RESULT: PASS')) {
@@ -206,7 +284,15 @@ if (Test-Path -LiteralPath $OutDir) {
 if (Test-Path -LiteralPath $LicenseDir) {
     Remove-Item -LiteralPath $LicenseDir -Recurse -Force
 }
+$presetsBefore = [IO.File]::ReadAllBytes($PresetsPath)
 $export = Invoke-Godot @("--headless", "--path", $Root, "--export-release", $PresetName, $ExePath) "export"
+# The editor may write the preset file back (the export path of this run, options in its own order): the file in
+# the repository is the truth, so it is put back and the build stops.
+$presetsAfter = [IO.File]::ReadAllBytes($PresetsPath)
+if ([Convert]::ToBase64String($presetsBefore) -ne [Convert]::ToBase64String($presetsAfter)) {
+    [IO.File]::WriteAllBytes($PresetsPath, $presetsBefore)
+    Stop-Build "the export rewrote export_presets.cfg (restored); see $LogDir\export.*.txt"
+}
 # The first export of a checkout converts every scene to binary (.godot\exported\), and the editor process then
 # reports the scripts it loaded for that as "leaked at exit" / "still in use at exit" while it shuts down, after the
 # pack is written. Later exports reuse the converted scenes and print nothing. These two shutdown lines say nothing
@@ -223,9 +309,18 @@ $extra = @(Get-ChildItem -LiteralPath $OutDir -File | Where-Object { $_.Name -ne
 if ($extra.Count -gt 0) {
     Stop-Build "the export wrote more than one file: $($extra.Name -join ', ') (expected a single $ExeName)"
 }
+$version = [regex]::Match([IO.File]::ReadAllText((Join-Path $Root "project.godot")),
+    '(?m)^config/version="([^"]+)"').Groups[1].Value
+if (-not $version) {
+    Stop-Build "no application/config/version in project.godot"
+}
 $exe = Get-Item -LiteralPath $ExePath
 Write-Host ("    {0} ({1:N1} MB), product {2} {3}" -f $exe.Name, ($exe.Length / 1MB), $exe.VersionInfo.ProductName,
     $exe.VersionInfo.ProductVersion)
+if (-not ([string]$exe.VersionInfo.ProductVersion).StartsWith($version) -or
+        -not ([string]$exe.VersionInfo.FileVersion).StartsWith($version)) {
+    Stop-Build "the exe reports version '$($exe.VersionInfo.ProductVersion)' / '$($exe.VersionInfo.FileVersion)', project.godot says $version"
+}
 
 # --- 5. smoke check of the exported exe -------------------------------------------------------------------------------
 Write-Step "Smoke check: starting the exported game for $SmokeSeconds s"
@@ -267,6 +362,9 @@ if ($logText -notmatch 'Smoke: ran [0-9.]+ s, 0 error\(s\), 0 warning\(s\) logge
 if ($logText -notmatch '\(release build\)') {
     Stop-Build "the exported game is not a release build; see $smokeLog"
 }
+if ($logText -notmatch ('(?m)^Smoke: .* ' + [regex]::Escape($version) + ' \(release build\)')) {
+    Stop-Build "the exported game does not report version $version; see $smokeLog"
+}
 if ($logText -notmatch 'development switches are ignored by release builds') {
     Stop-Build "the release build did not reject the development switch --autoplay; see $smokeLog"
 }
@@ -288,7 +386,25 @@ if (($packedLevels -join ',') -ne ($expectedLevels -join ',')) {
 $campaignLine = [regex]::Match($logText, '(?m)^Smoke: campaign (.*)$')
 Write-Host "    $($packedLevels.Count) levels inside, no developer level; campaign $($campaignLine.Groups[1].Value.Trim())"
 
-# --- 6. licence texts and the release zip -----------------------------------------------------------------------------
+# --- 6. what is inside the exe ----------------------------------------------------------------------------------------
+Write-Step "Checking the files packed inside the exe"
+$realExeVariable = $env:CLUBANDGRUB_RELEASE_EXE
+try {
+    $env:CLUBANDGRUB_RELEASE_EXE = $ExePath
+    $packCheck = Invoke-Tests @("--filter=core_release") "pack_check"
+} finally {
+    $env:CLUBANDGRUB_RELEASE_EXE = $realExeVariable
+}
+$packCheck.Output -split "`r?`n" | Where-Object { $_ -match '^\s+pack: |^(TESTS|RESULT):' } |
+    ForEach-Object { Write-Host "    $($_.Trim())" }
+if ($packCheck.ExitCode -ne 0 -or -not ($packCheck.Output -match '(?m)^RESULT: PASS') -or
+        -not ($packCheck.Output -match '(?m)^\s+pack: .* file\(s\) inside')) {
+    $packCheck.Output -split "`r?`n" | Where-Object { $_ -match '^\s+(FAIL|- )' } | Select-Object -First 40 |
+        ForEach-Object { Write-Host "    $_" -ForegroundColor Red }
+    Stop-Build "the exe holds files a release must not hold, or its file list could not be read; see $LogDir\pack_check.*.txt"
+}
+
+# --- 7. licence texts and the release zip -----------------------------------------------------------------------------
 Write-Step "Licence texts next to the exe and the release zip"
 New-Item -ItemType Directory -Force -Path $LicenseDir | Out-Null
 Copy-Item -LiteralPath (Join-Path $Root "CREDITS.md") -Destination $LicenseDir
@@ -303,12 +419,7 @@ foreach ($required in @("CREDITS.md", "README.md", "godot_engine.txt", "godot_th
         Stop-Build "licence text $required is missing from $LicenseDir"
     }
 }
-$version = [regex]::Match([IO.File]::ReadAllText((Join-Path $Root "project.godot")),
-    '(?m)^config/version="([^"]+)"').Groups[1].Value
-if (-not $version) {
-    Stop-Build "no application/config/version in project.godot"
-}
-$ZipPath = Join-Path $BuildDir "ClubAndGrub-$version-windows.zip"
+$ZipPath = Join-Path $OutputRoot "ClubAndGrub-$version-windows.zip"
 if (Test-Path -LiteralPath $ZipPath) {
     Remove-Item -LiteralPath $ZipPath -Force
 }

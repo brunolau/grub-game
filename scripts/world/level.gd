@@ -732,6 +732,8 @@ func _setup_party() -> void:
 	if is_camera_locked():
 		_frame_logic.lock(get_camera_lock())
 	register_party_driver(PartyDriver.new())
+	# Phase 4 Q2 (DESIGN.md G85, drawing only): in a co-op party's level the enemies in a ward wear the ward mark.
+	ward_marks = true
 	# The egg scouts (DESIGN.md D.3): hidden spots near an egg glint (presentation only).
 	_egg_scout = EggScout.new()
 	add_child(_egg_scout)

@@ -1,0 +1,159 @@
+# Club & Grub 1.0.0 save fixture "mid_beginner" (tests/data/saves_1_0/README.md): a Beginner player in the middle of
+# Book I. Played by the 1.0.0 release (git tag v1.0.0) through its own flow runner, from an empty user folder:
+# Start > Beginner, 1-1 Vine Bridges and 1-2 Canopy Village by their Beginner routes, back to the title, Continue with
+# the level code of 3-1 (SN0W, typed with the letter O), a few steps into Frost Summit, out through the pause menu,
+# then Options: music three steps down, effects one step down, screen shake off, flashes off, "Up jumps" off, and
+# two rebinds - jump on the key V (keyboard, first slot) and look on pad LB (gamepad, first slot). V and LB are
+# inputs that 2.0 gives its new action `swap` by default.
+
+wait_until flow.current_screen == title 600
+wait_until flow.busy == false 600
+wait 40
+expect save.has_progress() == false
+press ui_accept
+wait_until flow.current_screen == mode_select 300
+wait_until flow.busy == false 600
+press ui_accept
+wait_until flow.current_screen == world_map 300
+wait_until flow.busy == false 600
+expect game.difficulty == 0
+
+# --- 1-1 Vine Bridges ------------------------------------------------------------------------------------------------
+expect flow.args.level_id == w1_l1
+wait_until scene.countdown >= 0 600
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w1_l1 600
+wait 2
+play_file tools/autoplay/routes/w1_l1.inputs
+expect events.player_died == 0
+expect events.exit_reached == 1
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+press ui_accept
+wait 20
+press ui_accept
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect save.get_level_result(w1_l1,0).clears == 1
+expect save.is_level_unlocked(w1_l2,0) == true
+
+# --- 1-2 Canopy Village (the plain way out, no warp) -----------------------------------------------------------------
+expect flow.args.level_id == w1_l2
+wait_until scene.countdown >= 0 600
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w1_l2 600
+wait 2
+play_file tools/autoplay/routes/w1_l2.inputs
+expect events.player_died == 0
+expect events.exit_reached == 2
+wait_until flow.current_screen == tally 900
+wait_until flow.busy == false 600
+wait 30
+press ui_accept
+wait 20
+press ui_accept
+wait_until flow.current_screen == world_map 900
+wait_until flow.busy == false 600
+expect save.get_level_result(w1_l2,0).clears == 1
+expect save.is_level_unlocked(w2_l1,0) == true
+expect flow.args.level_id == w2_l1
+wait 20
+
+# --- Back to the title, Continue with the code of 3-1 ---------------------------------------------------------------
+press ui_cancel
+wait_until flow.current_screen == title 600
+wait_until flow.busy == false 600
+wait 20
+press ui_down
+press ui_accept
+wait_until flow.current_screen == code_entry 300
+wait_until flow.busy == false 600
+wait 20
+key S N O W
+wait_until flow.current_screen == world_map 600
+wait_until flow.busy == false 600
+expect flow.args.level_id == w3_l1
+expect game.difficulty == 0
+wait_until scene.countdown >= 0 600
+press ui_accept
+wait_until flow.current_screen == level 900
+wait_until flow.busy == false 600
+wait_until level.level_id == w3_l1 600
+wait 2
+play 40:R
+press pause
+wait 6
+press ui_down
+press ui_down
+press ui_down
+press ui_down
+press ui_accept
+wait 6
+press ui_accept
+wait_until flow.current_screen == title 600
+wait_until flow.busy == false 600
+expect tree.paused == false
+wait 20
+
+# --- Options ---------------------------------------------------------------------------------------------------------
+# Rows: Master, Music, Effects, Fullscreen, VSync, Screen shake, Flashes, Smooth camera, Key bindings >, Up jumps,
+# Vibration, Language, Reset, Erase, Back.
+press ui_down
+press ui_down
+press ui_accept
+wait_until flow.current_screen == options 300
+wait_until flow.busy == false 600
+wait 30
+press ui_down
+press ui_left
+press ui_left
+press ui_left
+press ui_down
+press ui_left
+press ui_down
+press ui_down
+press ui_down
+press ui_accept
+press ui_down
+press ui_accept
+press ui_down
+press ui_down
+press ui_accept
+wait 10
+# The bindings page: Left, Right, Up, Down, Jump, Strike, Look, Pause, Reset, Back.
+press ui_down
+press ui_down
+press ui_down
+press ui_down
+press ui_accept
+wait 6
+key V
+wait 6
+press ui_down
+press ui_down
+press ui_accept
+wait 6
+pad lb
+wait 6
+press ui_cancel
+wait 10
+press ui_down
+press ui_accept
+wait 10
+expect settings.audio/music < 0.6
+expect settings.audio/sfx < 1.0
+expect settings.audio/master == 1.0
+expect settings.video/screen_shake == false
+expect settings.video/flash == false
+expect settings.camera/smooth_follow == false
+expect settings.controls/up_jumps == false
+expect settings.video/fullscreen == false
+press ui_cancel
+wait_until flow.current_screen == title 300
+wait_until flow.busy == false 600
+wait 20

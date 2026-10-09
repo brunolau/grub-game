@@ -488,7 +488,10 @@ class BondsAndCuts(unittest.TestCase):
     def test_bonded_pairs(self):
         self.assertIn("**never where one thrown special\n  hits two members in one throw**", LEVEL_DESIGN_15)
         self.assertIn("- **Bonds** (every \"bonded ... pairs\" below) [G36]", _section(DESIGN, "### A.6"))
-        self.assertIn("is a\n   build error, not a short window [G36]", _section(DESIGN, "### D.8"))
+        # D.8 #4 as [G72] left it: the one-throw line was a build error and is no proof obligation since.
+        d8 = _section(DESIGN, "### D.8")
+        self.assertIn("made a bond\n   on one throw line a build error [G36]", d8)
+        self.assertIn("build error are no proof obligations since", d8)
 
     def test_cut_list(self):
         self.assertIn("**APPLIED at the start of phase 3**", PLAN)

@@ -368,6 +368,29 @@ const ONE_WAY_CATCH_ROWS: int = 7
 const ONE_WAY_REACH_COLS: int = 3
 ## The default margin of a tablet's ward, in cells on both sides (DESIGN.md G73; PartyTuning.WARD_MARGIN_CELLS).
 const WARD_MARGIN_CELLS: int = PartyTuning.WARD_MARGIN_CELLS
+## A LEDGE WITHIN ONE ROW OF A COIL (DESIGN.md G81 "Building rule", G83; LEVEL_DESIGN.md 15.7.3): a rolled vine's coil
+## is opened by a hero who STANDS on its level - feet at most COIL_LEVEL_ROWS row under its ledge - so an x2 secret's
+## ledge at that level, within COIL_REACH_COLS columns of the coil (one view: what a thrown special flies), is a place
+## from which a lone hero opens a gate's vine: it needs the clean foot of a boost ledge at BOTH its open ends.
+const COIL_LEVEL_ROWS: int = 1
+const COIL_REACH_COLS: int = Tuning.VIEW_COLS
+## A PLATE OUT OF THE BATTED HERO'S REACH (DESIGN.md G83 (2); LEVEL_DESIGN.md 15.7.3 "Gust gaps"): the shared view lets
+## a pair stand 290 px (18.1 cells) apart, so a plate on the far bank of the gap its own column bridges may stand at
+## most this many cells from the gap's near lip (the first gap column on the batter's side).
+const PLATE_REACH_CELLS: int = 17
+## THE LONG DROP (DESIGN.md G74; LEVEL_DESIGN.md 15.7.2 / 15.7.3): a running jump from a standing place `h` rows over
+## a ledge carries 7.2 cells + about 0.44 a row, so every place a lift brings a lone hero to - the top of a vine of
+## any length, the top of a blowhole's or a spring's launch, a moving platform's highest point - lies MORE THAN
+## 10 + h / 2 cells from a gate's ledge (12 + 0.6 h in a file with a `wind` script), or the ledge is roofed (solid
+## cells at most LONG_DROP_ROOF_ROWS rows over its whole top). The warning's numbers as whole-number ratios (base,
+## per row, divisor): it warns when cells * divisor <= base + h * per row.
+const LONG_DROP_CALM: Vector3i = Vector3i(20, 1, 2)      # 10 + h / 2
+const LONG_DROP_WIND: Vector3i = Vector3i(60, 3, 5)      # 12 + 0.6 h
+const LONG_DROP_ROOF_ROWS: int = 3
+## A spring's and a geyser's launch in a co-op party: 105 px over the pad's top (DESIGN.md G71) - 7 rows, rounded up.
+const LAUNCH_ROWS: int = 7
+## What lifts a lone hero for the long-drop warning (a rolled vine does not: its coil opens only from its own level).
+const LONG_DROP_LIFTS: Array[String] = ["objects/vine", "objects/geyser", "objects/spring", "objects/platform"]
 ## Ids an arena never holds (LEVEL_DESIGN.md 15.8: no exit, no checkpoint, no co-op objects but see-saws and pulleys).
 const ARENA_FORBIDDEN: Array[String] = [
 	"objects/exit", "objects/checkpoint", "objects/gate", "items/warp", "objects/plate", "objects/drum",
@@ -1139,6 +1162,9 @@ func _check_content(data: LevelData, grid: TileGrid) -> void:
 			if campaign:
 				_check_trait_share(data, records, difficulty)
 			_check_ledge_reach(data, records, tablets, difficulty)
+			_check_secret_feet(data, records, tablets, difficulty)
+			_check_plate_reach(data, records, tablets, difficulty)
+			_check_long_drop(data, records, tablets, difficulty)
 			_check_bonded_pairs(data, records, difficulty)
 		_report_gates(data, records)
 		_check_halls(data, grid, records)
@@ -1861,7 +1887,8 @@ func _check_one_way_ledge(data: LevelData, grid: TileGrid, tablet: Dictionary, d
 ## lift comes down 12 cells further. 1-1 'hop' is the case (the hollow block of columns 90-97: `ward=22,12`). It is
 ## cleared by a `ward=` that puts the top 12+ cells inside - or, where the top does not lead past the gate, by a
 ## comment above the tablet saying why, with the explorer's two passes as the proof (LEVEL_DESIGN.md 15.7.4). No
-## warning where the ward's edge on that side is the map's edge.
+## warning where the ward's edge on that side is the map's edge, and none for the gate's own ledge (the top the far
+## cell stands on) or for a top behind the far cell: those are reached through the gate.
 func _check_ward_edge(data: LevelData, grid: TileGrid, tablet: Dictionary, difficulty: int) -> void:
 	var far: Vector2i = tablet["far"]
 	var cell: Vector2i = tablet["cell"]
@@ -1890,7 +1917,12 @@ func _check_ward_edge(data: LevelData, grid: TileGrid, tablet: Dictionary, diffi
 			var to: int = col
 			while to + 1 < grid.cols and _stands(grid, to + 1, row):
 				to += 1
-			if to - from < 40 and _drop_beside(grid, from - 1, row) >= HIGH_GROUND_ROWS \
+			# The gate's OWN ledge - the floor the far cell stands on - and a top behind the far cell are reached
+			# through the gate: no high ground of its approach (wf12, DESIGN.md G83: 1-2 'treehouse' with a ward's edge
+			# within 12 cells of the tree-house platform had that platform named).
+			var own: bool = (row == top and from <= far.x and far.x <= to) \
+					or (left_side and from > far.x) or (not left_side and to < far.x)
+			if not own and to - from < 40 and _drop_beside(grid, from - 1, row) >= HIGH_GROUND_ROWS \
 					and _drop_beside(grid, to + 1, row) >= HIGH_GROUND_ROWS:
 				var inside: bool = col >= ward.x and col <= ward.y
 				_add(data.path, int(tablet["line"]), WARNING,
@@ -1899,6 +1931,320 @@ func _check_ward_edge(data: LevelData, grid: TileGrid, tablet: Dictionary, diffi
 						"inside" if inside else "outside", ward.x, ward.y, absi(col - edge)])
 				return
 			col = to + 1
+
+
+## The foot columns of the ledge the cell `far` stands on ([method ledge_run]): the column beside each END of the
+## ledge that is open - the ledge ends in air there, within REACH_COLS of the far cell (an end at rock, or a floor
+## that runs on past the reach, has no foot).
+static func ledge_feet(grid: TileGrid, far: Vector2i) -> PackedInt32Array:
+	var feet: PackedInt32Array = PackedInt32Array()
+	var run: Vector2i = ledge_run(grid, far)
+	if run.x < 0:
+		return feet
+	var top: int = far.y + 1
+	for side: int in [-1, 1]:
+		var end: int = run.x if side < 0 else run.y
+		var beside: int = end + side
+		if beside < 0 or beside >= grid.cols or absi(end - far.x) >= REACH_COLS:
+			continue
+		if TileGrid.is_ground(grid.floor_at(beside, top)) or grid.side_at(beside, far.y) == TileGrid.SIDE_WALL:
+			continue
+		feet.append(beside)
+	return feet
+
+
+## True when the record is a rolled vine (`rolled`, `rolled=true`): its coil hangs at the record's cell, the ledge it
+## hangs from is the record's row.
+static func is_rolled_vine(record: Dictionary) -> bool:
+	if String(record["id"]) != "objects/vine":
+		return false
+	var rolled: Variant = (record["params"] as Dictionary).get("rolled", false)
+	return bool(rolled) if rolled is bool else str(rolled) == "true"
+
+
+## THE CLEAN FOOT OF AN x2 SECRET'S LEDGE BESIDE A COIL (DESIGN.md G81 "Building rule", G83; LEVEL_DESIGN.md 15.7.3
+## "the clean foot of a boost ledge holds for every ledge within one row of a gate's coil, an x2 secret's too"). A
+## `secret` tablet's ledge (the floor of its far cell, HEIGHT_GATE_ROWS or more over the tablet) that stands within
+## COIL_LEVEL_ROWS row of a rolled vine's ledge and within COIL_REACH_COLS columns of it is a standing place on the
+## coil's own level: a lone hero who gets onto it unrolls the vine with a throw and climbs it. So no hittable may lie
+## on a floor at most CLEAN_FOOT_ROWS rows under that ledge within CLEAN_FOOT_CELLS of either open end's foot
+## ([method ledge_feet]) - one is his pogo jump (2-2 'lift' fell that way: the x2 bone ledge one row under the lift's
+## terrace, three hittables at its foot). An error, as the clean foot of a gate's own ledge.
+func _check_secret_feet(data: LevelData, records: Array[Dictionary], tablets: Array[Dictionary],
+		difficulty: int) -> void:
+	var grid: TileGrid = data.build_grid(difficulty)
+	for tablet: Dictionary in tablets:
+		if not bool(tablet["secret"]) or tablet["gate"] != "":
+			continue
+		var far: Vector2i = tablet["far"]
+		var cell: Vector2i = tablet["cell"]
+		var run: Vector2i = ledge_run(grid, far)
+		if run.x < 0 or cell.y - far.y < HEIGHT_GATE_ROWS:
+			continue
+		var top: int = far.y + 1
+		var coil: Vector2i = Vector2i(-1, -1)
+		for record: Dictionary in records:
+			if not is_rolled_vine(record) or not LevelText.applies_to(record["params"], difficulty):
+				continue
+			var hung: Vector2i = Vector2i(int(record["col"]), int(record["row"]))
+			if absi(top - hung.y) <= COIL_LEVEL_ROWS and hung.x >= run.x - COIL_REACH_COLS \
+					and hung.x <= run.y + COIL_REACH_COLS:
+				coil = hung
+				break
+		if coil.x < 0:
+			continue
+		var feet: PackedInt32Array = ledge_feet(grid, far)
+		for record: Dictionary in records:
+			var id: String = String(record["id"])
+			if not HITTABLE_IDS.has(id) or not LevelText.applies_to(record["params"], difficulty):
+				continue
+			var at: Vector2i = Vector2i(int(record["col"]), int(record["row"]))
+			var foot: int = -1
+			for foot_col: int in feet:
+				if absi(at.x - foot_col) <= CLEAN_FOOT_CELLS:
+					foot = foot_col
+					break
+			if foot < 0:
+				continue
+			var floor_row: int = _floor_under(grid, at)
+			if floor_row < 0 or floor_row - top < 1 or floor_row - top > CLEAN_FOOT_ROWS:
+				continue
+			_add(data.path, int(record["line"]), ERROR,
+					"'%s' at %d,%d lies on a floor %d rows under the x2 secret's ledge at %d,%d (%s), within %d cells of its foot (column %d), and that ledge stands within one row of the coiled vine at %d,%d: one hittable at a lone hero's feet is his pogo jump onto it (114 px and the corner catch), and from the coil's own level his throw unrolls the vine (G67 the clean foot, G81)" % [
+					id, at.x, at.y, floor_row - top, far.x, far.y, Defs.difficulty_name(difficulty), CLEAN_FOOT_CELLS,
+					foot, coil.x, coil.y])
+
+
+## The floor a hittable lies on: its own cell (inset) or the first floor within two rows under it; -1 when none.
+static func _floor_under(grid: TileGrid, at: Vector2i) -> int:
+	for row: int in range(at.y, mini(at.y + 3, grid.rows)):
+		if grid.in_bounds(at.x, row) and TileGrid.is_ground(grid.floor_at(at.x, row)):
+			return row
+	return -1
+
+
+## A PLATE OUT OF THE BATTED HERO'S REACH (DESIGN.md G83 (2); LEVEL_DESIGN.md 15.7.3 "A slab bridge over a gust gap
+## spans at most 9 cells from the near lip"). A column driven by a plate (`rise_while` / `sink_while`) that hangs
+## over a GAP - columns without a floor at the plate's floor row - bridges it; when the plate stands on the far bank
+## (the gap lies between it and the gate's tablet) somebody is batted or carried over to step on it, and the shared
+## view lets the pair stand 290 px apart: a plate more than PLATE_REACH_CELLS cells from the gap's near lip is out of
+## his reach, whatever a route recorder does. An error (9-2 'drive' was rebuilt for it: 13 cells of tar, a slab of
+## 9, the plate 16 cells from the lip).
+func _check_plate_reach(data: LevelData, records: Array[Dictionary], tablets: Array[Dictionary],
+		difficulty: int) -> void:
+	var grid: TileGrid = data.build_grid(difficulty)
+	var plates: Dictionary = {}
+	for record: Dictionary in records:
+		if String(record["id"]) == "objects/plate" and record["params"].has("name") \
+				and LevelText.applies_to(record["params"], difficulty):
+			plates[str(record["params"]["name"])] = record
+	var named: Dictionary = {}   # one line per plate and column
+	for tablet: Dictionary in tablets:
+		if tablet["gate"] == "":
+			continue
+		var area: Rect2i = _gate_area(tablet)
+		var cell: Vector2i = tablet["cell"]
+		for record: Dictionary in records:
+			if String(record["id"]) != "objects/column" or not LevelText.applies_to(record["params"], difficulty) \
+					or not area.has_point(Vector2i(int(record["col"]), int(record["row"]))):
+				continue
+			var slab: Rect2i = _column_cells(record)
+			for key: String in ["rise_while", "sink_while"]:
+				if not record["params"].has(key):
+					continue
+				for plate_name: String in LevelText.to_list(record["params"][key]):
+					var name_key: String = plate_name.strip_edges()
+					var mark: String = "%s|%d" % [name_key, int(record["line"])]
+					if not plates.has(name_key) or named.has(mark):
+						continue
+					var plate: Rect2i = _plate_cells(plates[name_key])
+					var gap: Vector2i = gap_under(grid, slab, plate.position.y + 1)
+					if gap.x < 0:
+						continue
+					var cells: int = -1
+					var lip: int = -1
+					if plate.position.x > gap.y and cell.x < gap.x:
+						lip = gap.x
+						cells = plate.position.x - gap.x
+					elif plate.end.x - 1 < gap.x and cell.x > gap.y:
+						lip = gap.y
+						cells = gap.y - (plate.end.x - 1)
+					if cells > PLATE_REACH_CELLS:
+						named[mark] = true
+						_add(data.path, int(plates[name_key]["line"]), ERROR,
+								"plate '%s' at %d,%d stands %d cells from the near lip (column %d) of the gap its column bridges (columns %d-%d; the column at line %d): the shared view lets a pair stand 290 px apart, so the hero who is sent over cannot reach a plate more than %d cells from that lip - a slab with its plate on the far bank bridges at most 9 cells of a wider gap (G83)" % [
+								name_key, plate.position.x, plate.position.y, cells, lip, gap.x, gap.y, int(record["line"]),
+								PLATE_REACH_CELLS])
+
+
+## The gap a column's block `slab` hangs over at floor row `floor_row`: the run of columns without a floor there that
+## holds one of the slab's columns, as Vector2i(first column, last column); (-1, -1) when every column of the slab has
+## a floor at that row (a door on its floor) or the run reaches the map's edge (no bank).
+static func gap_under(grid: TileGrid, slab: Rect2i, floor_row: int) -> Vector2i:
+	if floor_row < 0 or floor_row >= grid.rows:
+		return Vector2i(-1, -1)
+	var inside: int = -1
+	for col: int in range(maxi(slab.position.x, 0), mini(slab.end.x, grid.cols)):
+		if not TileGrid.is_ground(grid.floor_at(col, floor_row)):
+			inside = col
+			break
+	if inside < 0:
+		return Vector2i(-1, -1)
+	var first: int = inside
+	while first - 1 >= 0 and not TileGrid.is_ground(grid.floor_at(first - 1, floor_row)):
+		first -= 1
+	var last: int = inside
+	while last + 1 < grid.cols and not TileGrid.is_ground(grid.floor_at(last + 1, floor_row)):
+		last += 1
+	if first == 0 or last == grid.cols - 1:
+		return Vector2i(-1, -1)
+	return Vector2i(first, last)
+
+
+## THE LONG DROP (a warning; DESIGN.md G74, LEVEL_DESIGN.md 15.7.3 "The long drop"): a running jump from a standing
+## place `h` rows over a ledge carries 7.2 cells + about 0.44 a row, and a lone hero gets that high by a lift - a
+## vine of any length, a blowhole, a spring, a moving platform (LONG_DROP_LIFTS; a rolled vine lifts nobody: its coil
+## opens from its own level). For every gate's ledge ([method ledge_run] of its far cell) and every lift on the
+## tablet's side of the far cell, the places the lift brings him to - its own top, and the ends of every top (a run
+## of standing cells) beside it - must lie MORE than 10 + h / 2 cells from the ledge (12 + 0.6 h in a file with a
+## `wind` script), counted as the cells of air between the two; else a warning, unless the ledge is roofed: solid
+## cells at most LONG_DROP_ROOF_ROWS rows over its whole top. 7-1 'stack' fell that way (the warp stack's blowhole
+## and its 15-row kelp vine: 10 rows over the shoulder with 10 cells of air between; rebuilt with 16). It reads lifts
+## only: a place a lone hero WALKS to is the search's and the explorer's to find (the static rules know no reach).
+func _check_long_drop(data: LevelData, records: Array[Dictionary], tablets: Array[Dictionary],
+		difficulty: int) -> void:
+	var grid: TileGrid = data.build_grid(difficulty)
+	var windy: bool = not data.wind_script(difficulty).is_empty()
+	var rule: Vector3i = LONG_DROP_WIND if windy else LONG_DROP_CALM
+	for tablet: Dictionary in tablets:
+		if tablet["gate"] == "":
+			continue
+		var far: Vector2i = tablet["far"]
+		var cell: Vector2i = tablet["cell"]
+		var run: Vector2i = ledge_run(grid, far)
+		if run.x < 0 or ledge_roofed(grid, run, far.y + 1):
+			continue
+		var top: int = far.y + 1
+		var left_side: bool = cell.x <= far.x
+		for record: Dictionary in records:
+			var id: String = String(record["id"])
+			if not LONG_DROP_LIFTS.has(id) or not LevelText.applies_to(record["params"], difficulty) \
+					or is_rolled_vine(record):
+				continue
+			var params: Dictionary = record["params"]
+			if id == "objects/geyser" and params.has("deadly") and bool(params["deadly"]):
+				continue
+			var at: Vector2i = Vector2i(int(record["col"]), int(record["row"]))
+			if (left_side and at.x > far.x) or (not left_side and at.x < far.x):
+				continue   # behind the far cell: reached through the gate
+			# The floor row his feet are level with at the lift's top, and the row of its foot (where he boards it).
+			var lifted: int = at.y
+			var foot: int = at.y + 1
+			if id == "objects/geyser" or id == "objects/spring":
+				lifted = at.y + 1 - LAUNCH_ROWS
+			elif id == "objects/platform":
+				lifted = at.y + 1 - (int(params.get("travel", 0)) + Tuning.TILE - 1) / Tuning.TILE
+			else:
+				foot = at.y + int(params.get("length", 4))
+			# A lift he boards from the approach: its foot no higher than the tablet's floor or the ledge (a lift
+			# that begins above both is boarded from a place beyond the gate, or from another lift's top).
+			if foot < mini(cell.y + 1, top) - 1:
+				continue
+			# A lift that stands on the gate's own ledge is boarded behind the gate (5-2 'sandgate': the vine from
+			# band C up to band D hangs onto the floor the far cell stands on).
+			if at.x >= run.x and at.x <= run.y and absi(foot - top) <= 1:
+				continue
+			var best: Vector3i = Vector3i(-1, 0, 0)   # (cells of air, rows over the ledge, the place's column)
+			for place: Vector2i in _lift_places(grid, at.x, lifted):
+				var h: int = top - place.y
+				if h < 1:
+					continue
+				var between: int = maxi(maxi(run.x - place.x, place.x - run.y) - 1, 0)
+				if between * rule.z <= rule.x + h * rule.y and (best.x < 0 or between < best.x) 						and drop_path(grid, place, run, top):
+					best = Vector3i(between, h, place.x)
+			if best.x >= 0:
+				_add(data.path, int(record["line"]), WARNING,
+						"the long drop onto the ledge of gate '%s' (%s): '%s' at %d,%d lifts a lone hero to a place %d rows over that ledge (columns %d-%d, row %d) with %d cells of air between (from column %d) - a running jump from there carries 7.2 cells + 0.44 a row%s; every such place lies more than %d cells away (%s), or the ledge is roofed %d rows over its whole top [G74]" % [
+						tablet["gate"], Defs.difficulty_name(difficulty), id, at.x, at.y, best.y, run.x, run.y, top,
+						best.x, best.z, " and the file's tailwind 6 px a tick more" if windy else "",
+						(rule.x + best.y * rule.y) / rule.z, "12 + 0.6 h" if windy else "10 + h / 2", LONG_DROP_ROOF_ROWS])
+
+
+## The places a lift in column `col` brings a lone hero to when its top is level with floor row `lifted`, as
+## Vector2i(column, floor row): the lift's own column there, and both ends of every top (a run of standing cells) of
+## the rows `lifted` - 1 .. `lifted` + 1 that begins within 2 columns of it - he steps off a vine onto the ledge it
+## hangs from and walks to its edge.
+static func _lift_places(grid: TileGrid, col: int, lifted: int) -> Array[Vector2i]:
+	var places: Array[Vector2i] = [Vector2i(col, lifted)]
+	for row: int in range(lifted - 1, lifted + 2):
+		for near: int in range(col - 2, col + 3):
+			if not _stands(grid, near, row):
+				continue
+			var from: int = near
+			while from - 1 >= 0 and _stands(grid, from - 1, row):
+				from -= 1
+			var to: int = near
+			while to + 1 < grid.cols and _stands(grid, to + 1, row):
+				to += 1
+			places.append(Vector2i(from, row))
+			places.append(Vector2i(to, row))
+	return places
+
+
+## True when open air leads from the standing place `place` (column, floor row) DOWN to the ledge `run` whose top is
+## floor row `top`: a path of cells without rock that only falls or moves towards the ledge (never up, never away) -
+## from the place itself or from up to 4 rows over it (the top of his jump) to a cell a hero stands in on the ledge.
+## A floor in between ends the fall (he lands there: another standing place, not this drop). The static shape of a
+## long drop: rock between the two - a shaft's wall, a roof - is no line of flight.
+static func drop_path(grid: TileGrid, place: Vector2i, run: Vector2i, top: int) -> bool:
+	var dir: int = 0 if place.x >= run.x and place.x <= run.y else (1 if place.x < run.x else -1)
+	var first: int = mini(place.x, run.x)
+	var last: int = maxi(place.x, run.y)
+	var low: int = top - 1
+	var seen: Dictionary = {}
+	var queue: Array[Vector2i] = []
+	for up: int in 5:
+		var start: Vector2i = Vector2i(place.x, place.y - 1 - up)
+		if start.y < 0 or grid.side_at(start.x, start.y) == TileGrid.SIDE_WALL:
+			break
+		seen[start] = true
+		queue.append(start)
+	var index: int = 0
+	while index < queue.size():
+		var at: Vector2i = queue[index]
+		index += 1
+		if at.y == low and at.x >= run.x and at.x <= run.y:
+			return true
+		var steps: Array[Vector2i] = [Vector2i(at.x, at.y + 1)]
+		if dir != 0:
+			steps.append(Vector2i(at.x + dir, at.y))
+		else:
+			steps.append(Vector2i(at.x - 1, at.y))
+			steps.append(Vector2i(at.x + 1, at.y))
+		for next: Vector2i in steps:
+			if next.x < first or next.x > last or next.y > low or seen.has(next) 					or grid.side_at(next.x, next.y) == TileGrid.SIDE_WALL:
+				continue
+			# Falling into a cell that carries him ends the drop there (a floor between the place and the ledge).
+			if next.y > at.y and TileGrid.is_ground(grid.floor_at(next.x, next.y)):
+				continue
+			seen[next] = true
+			queue.append(next)
+	return false
+
+
+## True when the ledge `run` ([method ledge_run]) with its top at floor row `top` is ROOFED (LEVEL_DESIGN.md 15.7.3
+## "The long drop"): over every one of its columns a solid cell stands at most LONG_DROP_ROOF_ROWS rows of air above
+## the standing room - nobody comes down onto it from a place above.
+static func ledge_roofed(grid: TileGrid, run: Vector2i, top: int) -> bool:
+	for col: int in range(run.x, run.y + 1):
+		var roofed: bool = false
+		for row: int in range(maxi(top - 1 - LONG_DROP_ROOF_ROWS, 0), top - 1):
+			if grid.side_at(col, row) == TileGrid.SIDE_WALL:
+				roofed = true
+				break
+		if not roofed:
+			return false
+	return true
 
 
 ## True when a hero stands in the cell over (col, row): that cell carries him and the cell above it is no wall.

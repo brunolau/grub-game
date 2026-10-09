@@ -1,0 +1,39 @@
+{
+  "code_stones": [
+    "w1_l1:1",
+    "w1_l1:3",
+    "w1_l2:0",
+    "w1_l2:1",
+    "w1_l2:2"
+  ],
+  "completed": {
+    "beginner": false,
+    "expert": false
+  },
+  "high_score": 0,
+  "results": {
+    "beginner": {
+      "w1_l1": {
+        "clears": 1,
+        "percent": 57,
+        "score": 126300
+      },
+      "w1_l2": {
+        "clears": 1,
+        "percent": 71,
+        "score": 450200
+      }
+    },
+    "expert": {}
+  },
+  "stats": {},
+  "unlocked": {
+    "beginner": [
+      "w1_l2",
+      "w2_l1",
+      "w3_l1"
+    ],
+    "expert": []
+  },
+  "version": 1
+}

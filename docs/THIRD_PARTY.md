@@ -77,7 +77,7 @@ Godot imports the TTFs as font resources; the font data is embedded unchanged, s
 | Music Loop Bundle: Free Chiptune Loops, album 'Three Red Hearts' (2.0) | Abstraction (Benjamin Burnes, Tallbeard Studios) | https://tallbeard.itch.io/music-loop-bundle | `music/coop_menu_a.ogg`, `level_mangrove_climb_a.ogg`, `level_sea_caves_a.ogg`, `level_idol_hall_a.ogg`, `bonus_lagoon_a.ogg`, `versus_battle_b.ogg`, `versus_battle_c.ogg` |
 | The War Over A Melon Field - Themes and Jingles; Sandy Seaside; Tropical Fantasy (2.0) | Spring Spring (Julie Damsgaard) | https://opengameart.org/content/the-war-over-a-melon-field-themes-and-jingles, https://opengameart.org/content/sandy-seaside-2, https://opengameart.org/content/tropical-fantasy | `music/versus_lobby_a.ogg`, `versus_results_a.ogg`, `music/level_coast_a.ogg`, `ending_raft_a.ogg` |
 | Suez Crisis Remade; Typhoon's Theme; Egyptian Fortress Boss (2.0; multi-licensed, CC0 taken) | Spring Spring (Julie Damsgaard) | https://opengameart.org/content/suez-crisis-remade, https://opengameart.org/content/typhoons-theme, https://opengameart.org/content/egyptian-fortress-boss | `music/level_gulch_a.ogg`, `level_storm_glide_a.ogg`, `boss_idols_a.ogg` |
-| Boss Battle #1 - #6 [8-bit] (2.0) | nene | https://opengameart.org/content/boss-battle-1-8-bit-re-upload (and the #2, #3, #4, #6 pages) | `music/boss_{tusker,mangrove,inkjaw,roc,chieftains}_a.ogg` |
+| Boss Battle #1 - #6 [8-bit] (2.0) | nene | https://opengameart.org/content/boss-battle-1-8-bit-re-upload, https://opengameart.org/content/boss-battle-2-8-bit-re-upload, https://opengameart.org/content/boss-battle-3-8-bit-re-upload, https://opengameart.org/content/boss-battle-4-8-bit-re-upload, https://opengameart.org/content/boss-battle-6-8-bit | `music/boss_{tusker,mangrove,inkjaw,roc,chieftains}_a.ogg` |
 | Victory (2A03 fanfare) (2.0) | celestialghost8 | https://opengameart.org/content/victory | `music/match_win_a.ogg` |
 | Various Sound Effects (2.0) | Spring Spring | https://opengameart.org/content/various-sound-effects-0 | `sfx/{spear_stick,brace,tar_glug,seesaw}_a.wav` |
 | 8-Bit Sound Effects (2.0) | ctske (Ctskelgysth Inauaruat) | https://opengameart.org/content/8-bit-sound-effects-0 | `sfx/party_join_a.wav` |
@@ -210,6 +210,48 @@ the asset staging area `.tools/asset_candidates` are ignored too and never pushe
   ships.
 - Still no CC-BY, share-alike, non-commercial, AI-generated or ripped material; nothing from Prehistorik / Titus.
 
+### 4.4 Release audit of 2.0 (2026-10-09, phase 4, PLAN P4.4)
+
+- **The audit is a tool now.** `tools/audit_assets.py` (standard-library Python; tests `tools/test_audit_assets.py`)
+  fails on any of: a file under `assets/` without a row in the file ledger (`docs/ASSET_MANIFEST.md` section 18), a
+  row without a file, a row without source pack, author, licence, licence text or changes, a licence other than
+  CC0 1.0 or the SIL Open Font License 1.1, a licence text that is missing from `assets/licenses/` or states another
+  author or licence than the row, a pack that `CREDITS.md`, this file, `assets/licenses/README.md` or the in-game
+  credits roll does not name, a sound / track / font outside `assets/`, an image outside `assets/`, `docs/` and
+  `installer/`, a 1.0 art, sound or font file that differs from the tag `v1.0.0`, a ledger that is not what the
+  pipeline registries give. Section 18 is written by `tools/audit_assets.py --write-ledger`, never by hand.
+- **Inventory (git diff against `v1.0.0`).** 869 files under `assets/` (the 819 `.import` files aside): 393 shipped in
+  1.0.0, 476 added since - 388 PNG, 35 OGG, 30 WAV, 22 licence texts, 1 JSON. No 1.0 art, sound or font changed; the
+  one changed 1.0 file is `assets/licenses/README.md`. Ledger: 803 rows CC0 1.0, 2 rows SIL OFL 1.1 (the two fonts),
+  49 licence texts, 15 rows "own work". 45 source packs are in use; each has its licence text, its `CREDITS.md` row,
+  its line here and its place in the credits roll (the tool parses `CREDITS.md` exactly as `scripts/ui/credits.gd`
+  does).
+- **Own work.** 15 files are Club & Grub's own drawings or data, made by a pipeline script and no pack: the six
+  hero colour tables `sprites/player/palettes/hero_lut_*.png` and `hero_palettes.json`
+  (`build_hero_palettes.py`), seven Feast Land props `tiles/feast/props/{comb_chunk,cream_swirl,honey_drips_a,
+  honey_drips_b,jelly_green,jelly_pink,wafer_sticks}.png` (`build_feast_skins.py`) and `ui/sundial_rush.png`
+  (`build_versus_ui.py`). The pipeline registry labels them "CC0 1.0" like the pack art around them; they are not
+  third-party material, so the ledger calls them "own work" (the project's `LICENSE` covers them). 25 more files
+  mix pack art with parts drawn by the pipeline; they are credited to their packs.
+- **Corrected by this audit.** `CREDITS.md` and section 2.4 named four of nene's five Boss Battle pages only as "and
+  the #2, #3, #4, #6 pages"; all five source URLs are written out now (the licence text had them).
+- **Byte identity re-checked against the staging area.** The 79 audio files and both fonts of 1.0 are SHA-256
+  identical to the staged downloads (the six WAV-only tracks to their recorded OGG transcodes); all 65 audio files
+  of 2.0 match the SHA-256 their registry rows record; the 31 of them whose row says "byte-identical copy" are
+  identical to the staged published files. The 76 tests of the 2.0 art pipeline
+  (`docs/art/expansion/pipeline/test_art_*.py`: files against registry rows, in-memory rebuilds) pass.
+- **Audio by measurement** (`tools/audit_assets.py --audio`; gates `AUDIO_GATES` in the tool). All 51 music files
+  play at -18.0 LUFS at their `AudioTable` volume and no file plays above -1.0 dBTP. The 28 looping tracks of 2.0:
+  sample jump across the loop point 0.01-0.84 times the track's own largest sample steps (1.0: up to 1.50), no hole
+  at a loop point (three loops end on a rest that is shorter than rests inside the same track), no fade-out. One
+  2.0 track is outside what 1.0 ships: `boss_idols_a.ogg`, the published master of "Egyptian Fortress Boss", has
+  1.02 % of its samples at or over full scale (the worst 1.0 track: 0.28 %); it is shipped unchanged and played
+  12 dB down, so the output does not clip - a line of the music listen-through
+  (`docs/expansion/HUMAN_CHECKS.md`). No audio file was changed by this audit: no outlier had a lossless fix.
+- **Not used by any level:** `sprites/enemies/bear.png` and `bear_b.png` (Western FPS 2D; no `skin=bear` in
+  `levels/*.lvl`) ship unused, as do the ten `ui/arena/frame_*.png` (no script draws them, ASSET_MANIFEST 17.9).
+- Still no CC-BY, share-alike, non-commercial, AI-generated or ripped material; nothing from Prehistorik / Titus.
+
 ## 5. Maintenance rules
 
 - **Pipeline.** `CREDITS.md`, `assets/licenses/README.md` and `godot_engine.txt` / `godot_third_party.txt` are
@@ -233,3 +275,11 @@ the asset staging area `.tools/asset_candidates` are ignored too and never pushe
 - **New assets.** Only CC0 or OFL-style licences with saved evidence (`LICENSE_INFO.md` + saved page); add the row to
   `CREDITS.md` (author, source, licence, changes), the licence file to `assets/licenses/`, and the registry entry.
   A CC-BY asset additionally needs its attribution line in the credits roll and the licence link.
+- **The file ledger and the audit.** After any change under `assets/` run `tools/audit_assets.py --write-ledger`
+  (it rewrites section 18 of `docs/ASSET_MANIFEST.md` from the registries and prints "NO ROW" for a file no registry
+  knows - give such a file its registry row, or a line in `EXTRA_FILES` of the tool when a script of this repository
+  builds it), then `tools/audit_assets.py` until it prints "ASSET AUDIT: PASS", and after a change to a sound
+  `tools/audit_assets.py --audio` with the project venv. A 1.0 art, sound or font file must stay byte-identical to
+  the tag `v1.0.0`. `docs/art/pipeline/build_manifest.py` keeps sections 17 and 18 when it rewrites the manifest,
+  but it no longer reproduces the hand edits of sections 1-16 (it gives 653 of their 749 lines): carry them over
+  before running it.

@@ -3541,9 +3541,21 @@ static func file_cache_key(path: String, data: LevelData, difficulty: int, gate:
 ## The search's compute bounds and probe switch as text (part of both cache keys: a result found under other bounds is
 ## never read back as this one).
 static func bounds_text() -> String:
-	return "n%d t%d %s%s%s%s%s%s%s" % [node_limit, tick_limit, "probes" if probes else "no-probes",
+	return "n%d t%d %s%s%s%s%s%s%s%s" % [node_limit, tick_limit, "probes" if probes else "no-probes",
 		"" if carry_hits else " no-hits", "" if settle_world else " no-settle", "" if share_worlds else " no-share",
-		" traits" if carry_traits else "", "" if climb_rests else " no-climb", "" if wind_phases else " no-wind"]
+		" traits" if carry_traits else "", "" if climb_rests else " no-climb", "" if wind_phases else " no-wind",
+		rules_off_text()]
+
+
+## The gate rules switched off for a measurement (PlayerBase.gate_rules_off, the environment variable
+## PRE2_GATE_RULES_OFF) as a part of every result key - of the search's and of the explorer's and the evidence
+## replays' (tools/coop_explore/harness.gd): "" when every rule applies, so the keys of the proof are what they were,
+## and a result found with a rule off is never read back as the gate's (wf12: before, a search or a pass run with the
+## switch set wrote into the proof's own cache).
+static func rules_off_text() -> String:
+	var off: int = PlayerBase.gate_rules_off & (PlayerBase.GATE_R1 | PlayerBase.GATE_R3 | PlayerBase.GATE_R5
+			| PlayerBase.GATE_R6)
+	return "" if off == 0 else " rules-off-%d" % off
 
 
 ## True when the search world of `gate` in `difficulty` spawns a boss: a `bosses/` record among
