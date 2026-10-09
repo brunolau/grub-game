@@ -433,6 +433,65 @@ func test_a_stomp_is_a_landing() -> void:
 	assert_eq(referee.stack_of(0), 1, "and steals")
 
 
+func test_two_heroes_clash_heads_once_a_second_mutual_stomp_of_one_airtime_is_none() -> void:
+	# The release round of phase 4 (DESIGN.md G95), found by the versus soak (tools/bots/soak.sh: Tar Pulleys, Grub
+	# Stack, four CPUs, seed 4008 round 3): two heroes falling at the same height with their bodies overlapping stomp
+	# EACH OTHER on one tick - each lifted a body's height and bounced, both free springboards from then on - and did
+	# it again every 12 ticks: the pair climbed out of the top of the arena until the off-screen rule took both. Two
+	# heroes clash heads ONCE between two ground ticks: the second mutual stomp of an airtime is no stomp at all.
+	_arena(2, [100, 160])
+	_give(heroes[0], 6)
+	_give(heroes[1], 6)
+	var a: PlayerBase = heroes[0]
+	var b: PlayerBase = heroes[1]
+	var at: Vector2i = Vector2i(150, FLOOR_Y - 60)
+	# Falling at 8 px a tick or more "any contact is a stomp" (Tuning.STOMP_MIN_YVEL, the 1.0 body test).
+	var fall: int = Tuning.STOMP_MIN_YVEL
+	a.teleport(at)
+	b.teleport(at + Vector2i(8, 0))
+	for hero: PlayerBase in [a, b]:
+		hero.yvel = fall
+		hero.grounded = false
+	Sim.step(1)
+	assert_true(Overlap.body(a, b), "their bodies overlap")
+	assert_eq([a.yvel, b.yvel], [Tuning.BOUNCE_YVEL, Tuning.BOUNCE_YVEL], "the first clash: both bounce, as before")
+	assert_true(a.sim_pos.y < at.y and b.sim_pos.y < at.y, "and both are lifted (%s, %s)" % [a.sim_pos, b.sim_pos])
+	assert_eq(referee.clashes_refused, 0)
+	# The same pair side by side again before either had ground under his feet: nobody stomps, both fall on.
+	a.teleport(at)
+	b.teleport(at + Vector2i(8, 0))
+	a.yvel = fall
+	b.yvel = fall
+	Sim.step(1)
+	assert_eq([a.yvel, b.yvel], [fall, fall], "the second clash of the airtime: neither bounces")
+	assert_eq([a.sim_pos.y, b.sim_pos.y], [at.y, at.y], "neither is lifted onto the other's head")
+	assert_eq(referee.clashes_refused, 1, "the referee counts the clash it refused")
+	Sim.step(1)
+	assert_eq([a.yvel, b.yvel], [fall, fall], "and so on every later tick of that fall")
+	assert_eq(referee.clashes_refused, 2)
+	# A one-sided stomp is what it was: the rival is not falling, so only `a` lands on a head.
+	b.yvel = 0
+	Sim.step(1)
+	assert_eq(a.yvel, Tuning.BOUNCE_YVEL, "a landing on a head that does not stomp back still bounces")
+	assert_eq(b.yvel, 0)
+	assert_eq(referee.clashes_refused, 2)
+	# Ground under their feet ends the airtime: the next clash is a first one again.
+	a.teleport(Vector2i(100, FLOOR_Y))
+	b.teleport(Vector2i(200, FLOOR_Y))
+	for hero: PlayerBase in [a, b]:
+		hero.yvel = 0
+		hero.grounded = true
+	Sim.step(1)
+	a.teleport(at)
+	b.teleport(at + Vector2i(8, 0))
+	for hero: PlayerBase in [a, b]:
+		hero.yvel = fall
+		hero.grounded = false
+	Sim.step(1)
+	assert_eq([a.yvel, b.yvel], [Tuning.BOUNCE_YVEL, Tuning.BOUNCE_YVEL], "after a landing they clash heads again")
+	assert_eq(referee.clashes_refused, 2)
+
+
 func test_a_hero_squeezed_out_of_the_arenas_side_is_knocked_out() -> void:
 	# Phase 4, found by the versus soak (rules=mix: Echo Hollow, Grub Stack with the sudden-death event, seed 4001
 	# round 0): a Cave-in block settled at the arena's edge beside a hero; one step into its column and the 1.0
@@ -679,6 +738,57 @@ func test_a_tie_drops_the_golden_drumstick() -> void:
 	Sim.step(1)
 	assert_eq(ended.size(), 1)
 	assert_eq(ended[0], PackedInt32Array([1]), "first to grab it wins")
+
+
+func test_the_golden_drumstick_nobody_takes_ends_the_round_drawn_at_the_hard_cap() -> void:
+	# The release round of phase 4 (DESIGN.md G95; ruling R8: no round lasts for ever), found by the versus soak with
+	# rules=mix: on Tar Pulleys under Mayhem the Golden Drumstick fell onto the top of the pulley block and the CPUs
+	# never fetched it - the tie-break had no end. It has the hard cap of Last Caveman Standing now.
+	_arena(2, [100, 250])
+	_give(heroes[0], 4)
+	_give(heroes[1], 4)
+	referee.end_round()
+	assert_eq(referee.phase, VersusReferee.PHASE_GOLDEN)
+	var cap: int = VersusTuning.SUDDEN_DEATH_CAP_TICKS
+	assert_eq(referee.cap_ticks_left(), cap, "the cap is armed as the drumstick falls")
+	assert_eq(referee.round_ticks_left(), cap, "and the HUD's sundial counts it down")
+	assert_eq(referee.round_length(), cap)
+	# Out of both heroes' reach for the whole cap.
+	var golden: CollectibleBase = referee._golden
+	assert_not_null(golden)
+	golden.teleport(Vector2i(170, 40))
+	golden.xvel = 0
+	golden.yvel = 0
+	Sim.step(1)
+	var left: int = referee.cap_ticks_left()
+	assert_eq(left, cap - 1)
+	for tick: int in left - 1:
+		golden.teleport(Vector2i(170, 40))
+		Sim.step(1)
+	assert_eq(referee.phase, VersusReferee.PHASE_GOLDEN, "one tick before the cap: the tie-break still runs")
+	assert_eq(ended.size(), 0)
+	assert_false(referee.ended_by_cap())
+	golden.teleport(Vector2i(170, 40))
+	Sim.step(1)
+	assert_eq(referee.phase, VersusReferee.PHASE_OVER, "the cap: the gong")
+	assert_eq(ended.size(), 1)
+	assert_eq(ended[0], PackedInt32Array(), "nobody took it: the round is drawn")
+	assert_true(referee.ended_by_cap(), "ended by the cap (the HUD shows TIME! over Draw!)")
+	assert_eq([referee.stack_of(0), referee.stack_of(1)], [4, 4], "the tie stands")
+	# A drumstick taken inside the cap wins as before, and that gong is no cap's.
+	referee.begin_round(1)
+	referee.start_round_now()
+	_give(heroes[0], 2)
+	_give(heroes[1], 2)
+	referee.end_round()
+	assert_eq(referee.phase, VersusReferee.PHASE_GOLDEN)
+	golden = referee._golden
+	golden.teleport(heroes[0].sim_pos)
+	golden.age = Tuning.DROPPED_ITEM_NO_PICKUP + 1
+	Sim.step(1)
+	assert_eq(ended.size(), 2)
+	assert_eq(ended[1], PackedInt32Array([0]), "first to grab it wins")
+	assert_false(referee.ended_by_cap())
 
 
 func test_team_wins_count_both_members() -> void:
@@ -1619,6 +1729,49 @@ func test_clubball_a_coconut_wedged_in_a_wall_is_lost_and_drops_in_again() -> vo
 	coconut.yvel = 0
 	Sim.step(VersusClubball.WEDGED_TICKS + VersusTuning.BALL_RESET_TICKS + 1)
 	assert_eq(referee.clubball.wedged_resets, 2)
+	assert_true(coconut.in_play() and coconut.golden, "the golden coconut drops in again, golden")
+
+
+func test_clubball_a_coconut_nobody_strikes_for_15_s_drops_in_again() -> void:
+	# The release round of phase 4 (DESIGN.md G95), found by the versus soak (tools/bots/soak.sh: Coconut Cove, seed
+	# 4075 round 2, four CPUs): the coconut bounced on the roof of the block over a goal mouth and on the heads of
+	# heroes who jumped up beside it, out of every club's reach, never at rest - and the golden coconut, which has no
+	# clock, never ended. A coconut in play that nobody has struck for VersusClubball.UNSTRUCK_TICKS is lost: out of
+	# play, then in again at its drop point; nobody scores, nobody is moved.
+	var coconut: Coconut = _clubball()
+	if coconut == null:
+		return
+	var drop: Vector2i = coconut.drop_point
+	heroes[0].teleport(Vector2i(60, FLOOR_Y))
+	coconut.teleport(Vector2i(200, FLOOR_Y))
+	coconut.xvel = 0
+	coconut.yvel = 0
+	Sim.step(1)
+	assert_true(coconut.in_play())
+	Sim.step(VersusClubball.UNSTRUCK_TICKS - 1 - referee.clubball.unstruck_ticks)
+	assert_true(coconut.in_play(), "one tick before: still in play")
+	assert_eq(referee.clubball.unstruck_ticks, VersusClubball.UNSTRUCK_TICKS - 1)
+	# A shot starts the count again (Coconut.last_shot_tick is what every strike, club and batted teammate moves).
+	coconut.last_shot_tick = Sim.tick
+	Sim.step(1)
+	assert_eq(referee.clubball.unstruck_ticks, 0, "a struck coconut is counted from its shot")
+	assert_true(coconut.in_play())
+	Sim.step(VersusClubball.UNSTRUCK_TICKS - 1)
+	assert_true(coconut.in_play(), "one tick before the 15 s are over")
+	assert_eq(referee.clubball.unstruck_resets, 0)
+	Sim.step(1)
+	assert_false(coconut.in_play(), "lost: out of play")
+	assert_eq(referee.clubball.unstruck_resets, 1)
+	assert_eq([referee.goals_of(1), referee.goals_of(2)], [0, 0], "nobody scores")
+	Sim.step(VersusTuning.BALL_RESET_TICKS)
+	assert_true(coconut.in_play(), "and in again")
+	assert_eq(coconut.sim_pos.x, drop.x, "over its drop point")
+	assert_eq(heroes[0].sim_pos, Vector2i(60, FLOOR_Y), "no kick-off: the heroes stay where they are")
+	assert_eq(referee.phase, VersusReferee.PHASE_PLAY, "the game goes on")
+	# The count runs from the drop-in when nobody strikes at all, and the golden coconut stays golden through it.
+	referee.clubball.start_golden()
+	Sim.step(VersusClubball.UNSTRUCK_TICKS + VersusTuning.BALL_RESET_TICKS + 1)
+	assert_eq(referee.clubball.unstruck_resets, 2)
 	assert_true(coconut.in_play() and coconut.golden, "the golden coconut drops in again, golden")
 
 

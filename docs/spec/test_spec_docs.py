@@ -1487,6 +1487,10 @@ class G3cIntegration(unittest.TestCase):
         self.assertIn("**As built at G3c**", [l for l in self.APPENDIX.splitlines() if l.startswith("| G77 |")][0])
         self.assertIn("**17 952**", [l for l in self.APPENDIX.splitlines() if l.startswith("| G77 |")][0])
         self.assertIn("**33 routes**", [l for l in self.APPENDIX.splitlines() if l.startswith("| G77 |")][0])
+        # The set only grows: 38 at the release (phase 4), and the row says the number the folder holds.
+        self.assertIn("**38 routes**", [l for l in self.APPENDIX.splitlines() if l.startswith("| G77 |")][0])
+        routes = glob.glob(os.path.join(ROOT, "tools", "coop_explore", "evidence", "*.txt"))
+        self.assertEqual(len(routes), 38, "the evidence set of tools/coop_explore/evidence: say a new number in G77")
 
     def test_the_documents(self):
         self.assertIn("**By a hero who stands there** [G81]", _section(APPENDIX_C, "### C.4"))
@@ -1756,16 +1760,22 @@ class PhaseFour(unittest.TestCase):
 
     def test_a_feast_is_no_key_to_a_keeper_door(self):
         """[G92] the lead designer's measurement: a feast kills a shell keeper, a carried kit opens 8-1 'hall' for one
-        hero. Decided: keepers refuse such a death; open until the rule is built or the piece of 8-1 is moved."""
+        hero. Decided: keepers refuse such a death. As released: the engine's rule is not built, the piece of 8-1
+        lies behind the hall's door (the levels owner, phase 4) - and the documents say exactly that."""
         row = self._row(92)
         for text in ("**Measured on the real level**", "**dies only of a weapon hit its trait accepts**",
                      "**Not built at the lead designer's close**", "`items/feast_piece 51 38 index=0`",
-                     "**The bar stands**"):
+                     "**The bar stands**", "**Closed in the level file (phase 4, the levels owner",
+                     "`items/feast_piece 60 40 index=0`", "**The engine's rule is not built in 2.0.0**"):
             self.assertIn(text, row)
         self.assertIn("- **What kills past a trait** [G92]", _section(GAMEPLAY_13, "#### 13.9.5"))
         self.assertIn("**A feast's touch is no hit** [G92]", _section(APPENDIX_C, "### C.10"))
         self.assertIn("- **A feast is no key - keep the pieces away** [G92]", _section(LEVEL_DESIGN_15, "#### 15.7.5"))
-        self.assertIn("**One opening outside the bar is known** [G92]", _section(DESIGN, "### D.8"))
+        d8 = _section(DESIGN, "### D.8")
+        self.assertIn("**Two openings outside the bar were found on the real game in phase 4 and are closed in their "
+                      "level files**", d8.replace("\n   ", " "))
+        self.assertIn("[G92]", d8)
+        self.assertIn("[G96]", d8)
         traits = _read("scripts/enemies/coop_traits.gd")
         body = traits[traits.index("func refuses_death()"):]
         body = body[:body.index("func ", 10)]
@@ -1775,10 +1785,12 @@ class PhaseFour(unittest.TestCase):
         self.assertIsNotNone(door, "the keeper door of w8_l1_coop hall")
         pieces = [float(c) for c in re.findall(r"(?m)^items/feast_piece (\d+(?:\.\d+)?) \d+", level)]
         moved = all(c > int(door.group(1)) + 1 for c in pieces)
-        _pending(self, ruled or moved,
-                 "enemies: a keeper and every shell or daze record refuses a feast, a kill-all, a grenade, a bite and "
-                 "a dive (G92) - or levels: the first feast piece of w8_l1_coop behind the door of its hall "
-                 "(wf12_lead_design_to_orchestrator.txt)")
+        self.assertTrue(ruled or moved, "8-1 'hall': the engine refuses a feast's touch, or no feast piece lies before "
+                        "the door of the hall (G92)")
+        self.assertIn("items/feast_piece 60 40 index=0", level)
+        if ruled:
+            self.fail("CoopTraits.refuses_death now refuses for a shell or a keeper: G92, D.6, D.8, GAMEPLAY 13.9.5, "
+                      "PHYSICS C.10 and LEVEL_DESIGN 15.7.5 still say the engine's rule is not built")
 
     def test_no_sign_inside_a_ward_teaches_a_bounce_on_a_beast(self):
         """[G85] (ruled on the mark's builder's finding) a hint sign copied from a solo file must not tell a pair to
@@ -1809,18 +1821,23 @@ class PhaseFour(unittest.TestCase):
                  "(wf12_lead_design_to_levels.txt #2)" % ", ".join(found))
 
     def test_the_versus_soak_rules(self):
-        """[G93] the three rules the versus soak asked of the referee, accepted as built; [G78] the TIME banner;
-        [G80] Sky Picnic as rebuilt."""
+        """[G93] the three rules the versus soak asked of the referee: two stand as built, the first ("a stomp comes
+        from above") was withdrawn and is not in 2.0.0; [G78] the TIME banner; [G80] Sky Picnic as rebuilt."""
         row = self._row(93)
         for text in ("**a stomp comes from above**", "**Nobody stays outside the arena's sides**",
-                     "**A wedged coconut is lost**", "4 020 rounds", "outside D.12"):
+                     "**A wedged coconut is lost**", "4 020 rounds", "outside D.12",
+                     "**Rule (1) was withdrawn the same day and is not in 2.0.0**"):
             self.assertIn(text, row)
         c14 = _section(APPENDIX_C, "### C.14")
-        for text in ("**A stomp comes from above** [G93]", "**Wedged** [G93]", "| Out of the arena's side [G93] |"):
+        for text in ("**Wedged** [G93]", "| Out of the arena's side [G93] |"):
             self.assertIn(text, c14)
-        self.assertIn("**A stomp comes from above**\n  [G93]", _section(DESIGN, "### E.2"))
         referee = _read("scripts/world/versus/referee.gd")
         clubball = _read("scripts/world/versus/clubball.gd")
+        # The withdrawn rule is in no document as a rule, and not in the code.
+        self.assertNotIn("**A stomp comes from above** [G93]", c14)
+        self.assertNotIn("**A stomp comes from above**\n  [G93]", _section(DESIGN, "### E.2"))
+        self.assertNotIn("comes from above: the stomper's feet", _section(GAMEPLAY_13, "#### 13.10.2"))
+        self.assertNotRegex(referee, r"(?m)^\s*if stomper\.sim_pos\.y >= victim\.sim_pos\.y:")
         _pending(self, "func _squeezed_out" in referee and "WEDGED_TICKS" in clubball,
                  "versus: the soak rules of the referee (wf12_versus_to_lead_design.txt A1-A3)")
         self.assertRegex(clubball, r"(?m)^const WEDGED_TICKS: int = 24\b")
@@ -1831,6 +1848,56 @@ class PhaseFour(unittest.TestCase):
         sky = _read("levels/arena_sky_picnic.lvl")
         _pending(self, "#######*....*#######" in sky, "versus: the big spots of Sky Picnic in the lips of the hole (G80)")
         self.assertIn("row 10   #######*....*#######", _section(DESIGN, "### E.5", r"\n### "))
+
+    def test_the_nets_of_the_release_round(self):
+        """[G95] two heroes clash heads once, a coconut nobody strikes is lost, the Golden Drumstick has the hard cap;
+        [G94] two heroes in a versus match on a phone; [G96] above the map there are no tiles; [G97] Echo Hollow's
+        fairness as measured. Each row, the main body and the code say the same."""
+        for n, texts in (
+                (94, ("`VersusTuning.PLAYERS_MAX_MOBILE` = **2**", "**The value is an estimate", "**The lobby says so**",
+                      "`UI_VS_SEATS_CAP`")),
+                (95, ("**two heroes clash heads once**", "`VersusReferee.HEAD_CLASHES_MAX` = 1",
+                      "**A coconut nobody strikes is lost**", "`VersusClubball.UNSTRUCK_TICKS` = 364",
+                      "**The Golden Drumstick has the hard cap of [G78]**", "**Both soak commands pass**",
+                      "176 of 1 008", "56 passed, 0 failed")),
+                (96, ("**closed in the level file and ruled**", "**The building rule**", "rows 3-4, columns 216-241",
+                      "**The flight is evidence route 38**", "`checkpoint=99`", "**Not built**")),
+                (97, ("**recorded, not fixed; 2.0.0 ships with it**", "40.1 / 17.2 / 21.4 / 21.4 %",
+                      "46.1 / 18.0 / 18.8 / 17.2 %", "39.1", "line V-16"))):
+            row = self._row(n)
+            for text in texts:
+                self.assertIn(text, row, "G%d" % n)
+        referee = _read("scripts/world/versus/referee.gd")
+        clubball = _read("scripts/world/versus/clubball.gd")
+        self.assertRegex(referee, r"(?m)^const HEAD_CLASHES_MAX: int = 1\b")
+        self.assertIn("func _without_ladder(", referee)
+        self.assertRegex(clubball, r"(?m)^const UNSTRUCK_TICKS: int = 364\b")
+        self.assertIn("func _unstruck_step(", clubball)
+        self.assertIn("cap_at = round_ticks + VersusTuning.SUDDEN_DEATH_CAP_TICKS", referee[referee.index("func _start_golden"):])
+        c14 = _section(APPENDIX_C, "### C.14")
+        for text in ("**Two heroes clash heads once** [G95]", "**Unstruck** [G95]"):
+            self.assertIn(text, c14)
+        self.assertIn("**Two heroes clash heads once**\n  [G95]", _section(DESIGN, "### E.2"))
+        self.assertIn("the round is drawn [G95]", _section(DESIGN, "### E.3"))
+        self.assertIn("nobody has struck for 15 s (364 ticks) [G95]", _section(DESIGN, "### E.4"))
+        self.assertIn("**Echo Hollow is not inside**\n  [G97]", _section(DESIGN, "### E.7"))
+        self.assertIn("two heroes clash heads once", _section(GAMEPLAY_13, "#### 13.10.2"))
+        self.assertIn("nobody has struck for 364\n  ticks (15 s)", _section(GAMEPLAY_13, "#### 13.10.6"))
+        # [G94]: the constant, the lobby's line and its text.
+        self.assertRegex(_read("scripts/core/versus_tuning.gd"), r"(?m)^const PLAYERS_MAX_MOBILE: int = 2\b")
+        self.assertRegex(_read("locale/en.po"), r'msgid "UI_VS_SEATS_CAP"\s+msgstr "This device seats \{count\} players\."')
+        self.assertIn("func seats_cap_text()", _read("scripts/ui/versus_lobby.gd"))
+        # [G96]: the roof is in the file, the flight is in the evidence set and names its checkpoint.
+        self.assertIn("**Above the map there are no tiles** [G96]", _section(LEVEL_DESIGN_15, "#### 15.7.3"))
+        route = _read("tools/coop_explore/evidence/w9_l1b_coop.stormwall.expert.glider_over_the_top.txt")
+        self.assertIn("level=w9_l1b_coop gate=stormwall difficulty=1", route)
+        self.assertIn("real=true", route)
+        self.assertIn("checkpoint=99", route)
+        self.assertIn('"checkpoint":', _read("tools/coop_explore/harness.gd"))
+        self.assertIn("func use_checkpoint(", _read("tools/coop_explore/real_harness.gd"))
+        # [G97]: the check list carries the open item.
+        checks = _read("docs/expansion/HUMAN_CHECKS.md")
+        self.assertIn("**V-16** **Echo Hollow favours a place** (OPEN at the release", checks)
 
     def test_the_ward_keys_of_the_main_body_equal_the_files(self):
         d5 = _section(DESIGN, "### D.5")

@@ -613,6 +613,9 @@ msgstr "Humans only: no CPU plays {mode} here."
 msgid "UI_VS_NO_CPU_HERE"
 msgstr "No CPU plays {mode} on {arena}."
 
+msgid "UI_VS_SEATS_CAP"
+msgstr "This device seats {count} players."
+
 msgid "UI_VS_NEXT_ROUND"
 msgstr "Next: {arena}"
 

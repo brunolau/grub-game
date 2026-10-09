@@ -65,6 +65,9 @@ var left_stage: bool = false
 var _level_id: StringName = &""
 var _mode: String = ""
 var _checkpoint_pos: Vector2i = NOWHERE
+## The run's feast kit after every reset (a route file's `kit=<mask>`: pieces carried in from the stages before;
+## 0 = the run's own kit is left as the game has it).
+var kit: int = 0
 
 
 ## Start the co-op run and the level; the active checkpoint is the last one before the gate's tablet (the search's
@@ -134,6 +137,32 @@ func build(host: Node, level_id: StringName, gate_name: String, p_difficulty: in
 	return true
 
 
+## A route file's `checkpoint=<column>`: the run starts at the checkpoint of that tile column (the nearest record)
+## instead of the last one before the tablet - for a route that fetches something a hero finds only on an earlier
+## stretch (9-1b: the gliders lie 90 columns before the storm wall). Call it after [method build]. False when the
+## level has no checkpoint.
+func use_checkpoint(column: int) -> bool:
+	var best: CheckpointBase = null
+	for entity: SimEntity in _level.get_kind(Defs.Kind.CHECKPOINT):
+		var checkpoint: CheckpointBase = entity as CheckpointBase
+		if checkpoint != null and (best == null \
+				or absi((checkpoint.sim_pos.x >> 4) - column) < absi((best.sim_pos.x >> 4) - column)):
+			best = checkpoint
+	if best == null:
+		return false
+	for entity: SimEntity in _level.get_kind(Defs.Kind.CHECKPOINT):
+		(entity as CheckpointBase).active = entity == best
+	Game.set_checkpoint(best.sim_pos)
+	_checkpoint = best
+	_checkpoint_pos = best.sim_pos
+	checkpoint_cell = Vector2i(best.sim_pos.x >> 4, (best.sim_pos.y - 1) >> 4)
+	var tablet_start: Vector2i = starts[1] if starts.size() > 1 else NOWHERE
+	starts = [best.sim_pos]
+	if tablet_start != NOWHERE and tablet_start != best.sim_pos:
+		starts.append(tablet_start)
+	return true
+
+
 func close() -> void:
 	GameInput.clear_scripted()
 
@@ -164,6 +193,8 @@ func begin(_start: Vector2i = NOWHERE, _facing: int = 1, hand: int = -1, _partne
 	else:
 		Game.has_checkpoint = false
 	_level._respawn_now()
+	if kit > 0:
+		Game.feast_kit = kit
 	Sim.rng.reseed(SEED)
 	_p1 = _level.get_hero(0)
 	s.partner = _level.get_hero(1)

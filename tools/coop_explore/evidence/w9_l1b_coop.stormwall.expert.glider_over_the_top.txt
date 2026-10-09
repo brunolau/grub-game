@@ -1,0 +1,3 @@
+level=w9_l1b_coop gate=stormwall difficulty=1 whole=true start=0 tick0=0 real=true tickoff=0 checkpoint=99
+events=[]
+route=34:R,25:RU,9:RD,25:RU,9:RD,25:RU,117:R,6:RD,25:RU,105:R,26:D,14:L

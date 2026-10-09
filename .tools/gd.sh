@@ -96,15 +96,19 @@ release_shared() {
 	rm -f "$MARKER" 2>/dev/null
 }
 
-acquire_exclusive() {
-	gate
-	# Wait only for runs that started in the last IMPORT_WAIT minutes: they may still be loading. An older run has
-	# loaded what it uses and does not hold an import back (a 15-minute route module would otherwise stall every
-	# other run behind the waiting import). Markers older than an hour belong to dead runs.
+# Wait only for runs that started in the last IMPORT_WAIT minutes: they may still be loading. An older run has
+# loaded what it uses and does not hold an import back (a 15-minute route module would otherwise stall every
+# other run behind the waiting import). Markers older than an hour belong to dead runs.
+wait_for_recent_readers() {
 	find "$READERS" -type f -mmin +60 -delete 2>/dev/null
 	while [ -n "$(find "$READERS" -type f -mmin "-$IMPORT_WAIT" 2>/dev/null | head -1)" ]; do
 		sleep 1
 	done
+}
+
+acquire_exclusive() {
+	gate
+	wait_for_recent_readers
 }
 
 run() {
@@ -133,7 +137,8 @@ run() {
 # Import is needed for new or changed assets / import settings and for new scripts that declare a class_name
 # (no .uid yet). A new script without class_name (a test, a tool) loads by path and needs none. Edits of
 # existing scripts and scenes are picked up at run time; after adding or renaming a class_name in an existing
-# script, run "gd.sh import" yourself.
+# script, run "gd.sh import" yourself. Files Godot never imports are listed below (a tool's table belongs in a
+# .txt, not a .tsv; Python's byte code and the .bak save fixtures of tests/data are named so that they ask for none).
 needs_import() {
 	[ -f "$STAMP" ] || return 0
 	[ -d "$ROOT/.godot" ] || return 0
@@ -141,7 +146,7 @@ needs_import() {
 	while IFS= read -r f; do
 		case "$f" in
 			*.gd) [ -f "$ROOT/$f.uid" ] || ! grep -qE '^class_name[[:space:]]' "$ROOT/$f" || return 0 ;;
-			*.tscn | *.tres | *.lvl | *.inputs | *.flow | *.md | *.cfg | *.py | *.json | *.txt | *.uid | *.ps1 | *.sh) ;;
+			*.tscn | *.tres | *.lvl | *.inputs | *.flow | *.md | *.cfg | *.py | *.pyc | *.json | *.txt | *.uid | *.ps1 | *.sh | *.bak) ;;
 			*) return 0 ;;
 		esac
 	done < <(cd "$ROOT" && find assets scenes scripts resources tests tools locale -newer "$STAMP" -type f 2>/dev/null)
@@ -153,10 +158,17 @@ do_import() {
 	run --headless --path "$ROOT" --import | grep -iE "error|warning" | head -60
 }
 
+# The gate first, then the question again, then the wait: of a pool of runs that all started while an import was
+# needed only the first one waits for the recent readers and imports; the others find the stamp fresh when the gate
+# is theirs and go on at once. (Before phase 4 each of them waited its own IMPORT_WAIT minutes with the gate held,
+# one after the other, although nothing was left to import: a pool of 24 runs stood for tens of minutes.)
 import_if_needed() {
 	needs_import || return 0
-	acquire_exclusive
-	needs_import && do_import
+	gate
+	if needs_import; then
+		wait_for_recent_readers
+		needs_import && do_import
+	fi
 	ungate
 }
 

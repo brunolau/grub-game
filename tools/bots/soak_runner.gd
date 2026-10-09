@@ -25,7 +25,8 @@ extends Node
 ##                   longer than its fuses allow;
 ##  - score          what breaks the mode's rules: a negative stack or bank, a bank that shrinks or grows under closed
 ##                   lids, a winner without the best score (Grub Stack: the gong; a tie goes to the Golden Drumstick's
-##                   one side); hearts outside 0..3, an out hero back in, hurts that go down, a winner who was out, a
+##                   one side, or is a draw when nobody took it within the hard cap - DESIGN.md G95, end `golden_cap`);
+##                   hearts outside 0..3, an out hero back in, hurts that go down, a winner who was out, a
 ##                   loser still standing at a last-one-standing gong, a cap winner who has not the fewest hurts (Last
 ##                   Caveman Standing); an ember on a hero who is out, a score other than 1 standing / 0 out (Hot Rock);
 ##                   goals that go down, two goals on one tick, more than CLUBBALL_GOALS, a winner side without the
@@ -48,9 +49,11 @@ extends Node
 ##   detail=1              a ROUND line per round
 ##   cells=1               print the cell table and stop
 ## Output: `CELL` lines (the table), `ANOMALY kind=.. mode=.. arena=.. players=.. seed=.. round=.. tick=.. <what>`,
-## `NET <round> squeezed_out=.. wedged_coconuts=..` for a round in which one of the referee's two nets fired (DESIGN.md
-## G93: a hero knocked out outside the arena's side, a coconut freed from a wall - counted, not anomalies), one
-## `SOAK mode=..` line per mode and `SOAKDONE rounds=.. anomalies=..` last (a shard without it crashed).
+## `NET <round> squeezed_out=.. wedged_coconuts=.. unstruck_coconuts=.. head_clashes=..` for a round in which one of
+## the referee's four nets fired (DESIGN.md G93: a hero knocked out outside the arena's side, a coconut freed from a
+## wall; G95: a coconut nobody struck for 15 s sent back to the middle, a second mutual stomp of one airtime dropped
+## - counted, not anomalies), one `SOAK mode=..` line per mode and `SOAKDONE rounds=.. anomalies=..` last (a shard
+## without it crashed).
 
 const LEVEL_SCENE: String = "res://scenes/world/level.tscn"
 const LEVEL_DIR: String = "res://levels"
@@ -298,7 +301,7 @@ func play_all(specs: Array[Dictionary], mix: bool = false, detail: bool = false)
 		var mode: int = int(spec["mode"])
 		if not per_mode.has(mode):
 			per_mode[mode] = {"rounds": 0, "ticks": 0, "play": 0, "longest": 0, "longest_at": "", "ends": {},
-					"anomalies": 0, "idle": 0, "golden": 0, "squeezed": 0, "wedged": 0}
+					"anomalies": 0, "idle": 0, "golden": 0, "squeezed": 0, "wedged": 0, "unstruck": 0, "clashes": 0}
 		var sum: Dictionary = per_mode[mode]
 		sum["rounds"] = int(sum["rounds"]) + 1
 		sum["ticks"] = int(sum["ticks"]) + int(result["ticks"])
@@ -307,9 +310,12 @@ func play_all(specs: Array[Dictionary], mix: bool = false, detail: bool = false)
 		sum["golden"] = maxi(int(sum["golden"]), int(result["golden_ticks"]))
 		sum["squeezed"] = int(sum["squeezed"]) + int(result["squeezed"])
 		sum["wedged"] = int(sum["wedged"]) + int(result["wedged"])
-		if int(result["squeezed"]) + int(result["wedged"]) > 0:
-			# Not anomalies - the referee's two nets at work (DESIGN.md G93): each firing is named with its round.
-			print("NET %s squeezed_out=%d wedged_coconuts=%d" % [result["tag"], result["squeezed"], result["wedged"]])
+		sum["unstruck"] = int(sum["unstruck"]) + int(result["unstruck"])
+		sum["clashes"] = int(sum["clashes"]) + int(result["clashes"])
+		if int(result["squeezed"]) + int(result["wedged"]) + int(result["unstruck"]) + int(result["clashes"]) > 0:
+			# Not anomalies - the referee's nets at work (DESIGN.md G93, G95): each firing is named with its round.
+			print("NET %s squeezed_out=%d wedged_coconuts=%d unstruck_coconuts=%d head_clashes=%d" % [result["tag"],
+					result["squeezed"], result["wedged"], result["unstruck"], result["clashes"]])
 		if int(result["round_ticks"]) > int(sum["longest"]):
 			sum["longest"] = int(result["round_ticks"])
 			sum["longest_at"] = "%s/%dp/seed%d/r%d" % [spec["arena"], spec["players"], spec["seed"], spec["round"]]
@@ -337,10 +343,10 @@ func play_all(specs: Array[Dictionary], mix: bool = false, detail: bool = false)
 		kinds.sort()
 		for kind: Variant in kinds:
 			ends.append("%s:%d" % [kind, sum["ends"][kind]])
-		lines.append("SOAK mode=%s rounds=%d ticks=%d play=%d longest=%d at=%s ends=%s golden_max=%d idle_max=%d squeezed=%d wedged=%d anomalies=%d" % [
+		lines.append("SOAK mode=%s rounds=%d ticks=%d play=%d longest=%d at=%s ends=%s golden_max=%d idle_max=%d squeezed=%d wedged=%d unstruck=%d clashes=%d anomalies=%d" % [
 			Defs.versus_mode_name(mode), sum["rounds"], sum["ticks"], sum["play"], sum["longest"],
 			sum["longest_at"] if str(sum["longest_at"]) != "" else "-", ",".join(ends), sum["golden"], sum["idle"],
-			sum["squeezed"], sum["wedged"], sum["anomalies"]])
+			sum["squeezed"], sum["wedged"], sum["unstruck"], sum["clashes"], sum["anomalies"]])
 	return {"rounds": total_rounds, "ticks": total_ticks, "anomalies": anomaly_lines.size(),
 			"anomaly_lines": anomaly_lines, "lines": lines, "ms": Time.get_ticks_msec() - started, "longest": longest_all}
 
@@ -386,7 +392,7 @@ func play(spec: Dictionary, mix: bool = false) -> Dictionary:
 	var found: PackedStringArray = PackedStringArray()
 	var result: Dictionary = {"ticks": 0, "round_ticks": 0, "ended": false, "end": "none",
 			"winners": PackedInt32Array(), "scores": PackedInt32Array(), "worst_idle": 0, "golden_ticks": 0,
-			"squeezed": 0, "wedged": 0,
+			"squeezed": 0, "wedged": 0, "unstruck": 0, "clashes": 0,
 			"anomalies": found}
 	var tag: String = "mode=%s arena=%s players=%d seed=%d round=%d" % [Defs.versus_mode_name(mode), id, players,
 			seed_value, round_index]
@@ -484,7 +490,9 @@ func play(spec: Dictionary, mix: bool = false) -> Dictionary:
 	result["scores"] = scores
 	result["golden_ticks"] = referee.round_ticks - watch.golden_at if watch.golden_at >= 0 else 0
 	result["wedged"] = referee.clubball.wedged_resets if referee.mode == Defs.VersusMode.CLUBBALL else 0
+	result["unstruck"] = referee.clubball.unstruck_resets if referee.mode == Defs.VersusMode.CLUBBALL else 0
 	result["squeezed"] = referee.squeezed_out
+	result["clashes"] = referee.clashes_refused
 	if gong_at < 0:
 		found.append("ANOMALY kind=no_end %s tick=%d the round did not end: phase %d after %d ticks of play (limit %d)" % [
 			tag, t, referee.phase, referee.round_ticks, rule_limit + ROUND_LIMIT_TICKS])
@@ -808,7 +816,13 @@ func _check_gong(referee: VersusReferee, players: int, view: Rect2i, watch: Watc
 				elif int(totals[side]) == best:
 					best_sides += 1
 			if winners.is_empty():
-				_say(watch, found, "score", tag, tick, "no winner: a Grub Stack round always has one (totals %s)" % [totals])
+				# The one drawn Grub Stack round (DESIGN.md G95): the Golden Drumstick nobody took within the hard cap
+				# (the stacks may have moved in the tie-break: only the drumstick decides it).
+				if not (watch.went_golden and referee.ended_by_cap()):
+					_say(watch, found, "score", tag, tick, "no winner: a Grub Stack round has one unless its Golden Drumstick ran into the cap (totals %s)" % [totals])
+				elif referee.round_ticks - watch.golden_at != VersusTuning.SUDDEN_DEATH_CAP_TICKS:
+					_say(watch, found, "clock", tag, tick, "the Golden Drumstick's cap fell %d ticks after it, not %d" % [
+							referee.round_ticks - watch.golden_at, VersusTuning.SUDDEN_DEATH_CAP_TICKS])
 			elif not watch.went_golden and not died_now:
 				if best_sides != 1 or int(totals[_side(referee, winners[0])]) != best:
 					_say(watch, found, "score", tag, tick, "winner without the best score: %s with totals %s" % [winners,
@@ -903,6 +917,8 @@ static func _hurts(referee: VersusReferee, players: int) -> PackedInt32Array:
 func _end_kind(referee: VersusReferee, watch: Watch) -> String:
 	match referee.mode:
 		Defs.VersusMode.GRUB_STACK:
+			if watch.went_golden and referee.ended_by_cap():
+				return "golden_cap"
 			return "golden" if watch.went_golden else "clock"
 		Defs.VersusMode.CLUBBALL:
 			if watch.went_golden:

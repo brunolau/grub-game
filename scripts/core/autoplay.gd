@@ -110,7 +110,7 @@ const KEY_LETTERS: Array[Array] = [
 ]
 ## Saves and settings of harness runs (never the player's real ones).
 const DEFAULT_USER_DIR: String = "res://build/autoplay_user"
-const USER_FILES: PackedStringArray = ["save.json", "save.json.bak", "save.json.tmp", "settings.cfg"]
+const USER_FILES: PackedStringArray = ["save.json", "save.json.bak", "save.json.tmp", "save.v1.json", "settings.cfg"]
 
 ## Counts what the engine logs during a smoke run.
 class LogCounter:

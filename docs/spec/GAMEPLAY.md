@@ -1374,7 +1374,8 @@ of the enemy records carry a trait, and every enemy guarding a main-path chokepo
 - **What kills past a trait** [G92]: a `heavy` that no Brace Wall has dazed and the last member of a bond or a split
   refuse every death that is no accepted weapon hit - a feast's touch, a kill-all, a grenade, a mount's bite, a
   glider dive. A `shell` or a `daze` record does not: **as built in 2.0.0 a feasting hero kills it by touch**, a
-  keeper too (measured: with a kit carried in from 7-1, one hero opens the keeper door of 8-1 'hall'). Decided, not
+  keeper too (measured: with a kit carried in from 7-1, one hero opened the keeper door of 8-1 'hall' - closed in
+  its level file in phase 4: the stage's first feast piece lies behind that door). Decided, not
   built: in a co-op party every keeper and every `shell` and `daze` record dies only of a weapon hit its trait
   accepts.
 - Keeper groups: enemies may carry `keeper=<name>` (a group tag; a door `objects/column trigger=keepers:<name>` opens
@@ -1494,8 +1495,9 @@ The Beginner wall is unchanged in both books.
 Existing attacks (forward strike damaging from tick 5, high strike as anti-air, low strike, stomp, the crouch-charged
 strike, thrown specials) with the versus rules of P-C.14: hits knock away (+/-64, -128), a charged hit launches,
 clang, deflect, the stomp ladder 1-2-3-4-6-8 with an 8-tick squash (a stomp is a landing: a hero standing on a tier
-does not stomp a head that rises into his feet [G15]; and it comes from above: the stomper's feet are higher than his
-victim's, so two heroes falling side by side at one height stomp nobody [G93]), the curl stance (and batting a curled rival into a hazard),
+does not stomp a head that rises into his feet [G15]; and two heroes clash heads once: two who fall side by side
+stomp each other on one tick and both bounce, and until a hero's feet have had ground again he is in no second such
+clash - the pair's later mutual stomps are dropped and both fall on [G95]), the curl stance (and batting a curled rival into a hazard),
 12 stunned + 30 immune ticks, hit-stop 2 (4), body bump, 48-tick spawn shield. Thrown specials that hit a wall lie in
 front of its face, never inside it [G17]. Everyone starts every round with the club; specials come from pterodactyl
 crates straight onto the belt and are temporary. Spawns rotate every round (the physics is left-right asymmetric).
@@ -1534,7 +1536,7 @@ the ember); Clubball - none (a hit only knocks back).
   spills everything (all of it bursts out). *Grenade*: every rival spills 5 (or all he has).
 - **Feast Rush**: the last 364 ticks - a bell, every spot refills at once, a second giant bonus drops, the **pot lids
   close** (no banking).
-- **Round**: 2 185 ticks (90 s; 1 457 with 2 players); first to 3 round wins. A tie: the **Golden Drumstick** falls in
+- **Round**: 2 185 ticks (90 s; 1 457 with 2 players); first to 3 round wins. A drumstick nobody takes within 1 457 ticks of its fall ends the round drawn, with "TIME!" [G95]. A tie: the **Golden Drumstick** falls in
   the middle; first to grab it wins.
 - **Teams (2v2)**: shared pot, separate stacks; a teammate's head is a free springboard; friendly hits only bump.
 
@@ -1584,7 +1586,9 @@ picks a new holder among the rest with a new fuse. Last one standing wins; first
 - A coconut faster than 8 px/tick on either axis that touches a hero knocks him down (12 stunned ticks, no
   immunity) and bounces back at half speed; a slower one passes through bodies. A coconut that comes to rest
   inside a wall (a fast shot can end in the block over a goal mouth) for 24 ticks is lost and drops in again at
-  the drop point, as after a goal; nobody scores [G93].
+  the drop point, as after a goal; nobody scores [G93]. So does a coconut in play that nobody has struck for 364
+  ticks (15 s) - a head or a roof it bounces on is no strike: it is the net under every place a ball gets to and no
+  club does (it bounced on the roof of the block over a goal mouth without end); a golden coconut stays golden [G95].
 - **Goals** (`zones/goal team=1|2`): a goal mouth 3 rows high at each end; the coconut's centre inside the other
   team's goal scores; it is reset to the drop point 66 ticks later, heroes back at their spawns. First to 5 goals, or
   the most after 4 370 ticks (3 min); a tie plays on with a "golden coconut" (next goal wins).

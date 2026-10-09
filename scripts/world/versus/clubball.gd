@@ -20,6 +20,12 @@ extends RefCounted
 ## drift into it, where no strike reaches it, and the game (the golden coconut has no clock) never ended - is taken
 ## out of play and drops in again at its drop point after VersusTuning.BALL_RESET_TICKS, as a coconut lost in the
 ## water does; nobody scores, nobody is moved ([method _wedged_step]).
+## A coconut NOBODY STRIKES is lost too (the release round of phase 4, DESIGN.md G95; the same soak): a coconut in
+## play that no club, no strike and no batted teammate has shot for [constant UNSTRUCK_TICKS] in a row (15 s) - it
+## bounced for ever on the roof of the block over a goal mouth and on the heads of heroes who jumped up beside it,
+## out of every club's reach, and the golden coconut, which has no clock, never ended - drops in again at its drop
+## point the same way ([method _unstruck_step]). It is the net under every place a ball can get to and no club can:
+## two sides who brawl away from the ball for 15 s find it in the middle again.
 ## Sides rotate per round (DESIGN.md E.5, phase 3): on an odd round every goal mouth is defended by the other team
 ## than its file names (team 1 defends the right mouth), so the spawns, the goals, the HUD and the bots
 ## (goal_rect / own_goal_x) all swap ends; [member swapped] tells which.
@@ -41,6 +47,14 @@ const WEDGED_TICKS: int = 24
 ## Ticks in a row the coconut has lain so ([method _wedged_step]), and how many wedged coconuts this game has freed.
 var wedged_ticks: int = 0
 var wedged_resets: int = 0
+## A coconut in play that nobody has struck this long is lost (15 s; a rally's window is 44 ticks).
+const UNSTRUCK_TICKS: int = 364
+## Ticks in a row the coconut has been in play since its last shot or its drop-in ([method _unstruck_step]), and how
+## many coconuts nobody struck this game has sent back to the middle.
+var unstruck_ticks: int = 0
+var unstruck_resets: int = 0
+## Coconut.last_shot_tick as the last tick saw it (-1 = no shot since the drop-in).
+var _shot_seen: int = -1
 
 var _referee: VersusReferee = null
 
@@ -72,6 +86,9 @@ func reset() -> void:
 	last_scorer = 0
 	wedged_ticks = 0
 	wedged_resets = 0
+	unstruck_ticks = 0
+	unstruck_resets = 0
+	_shot_seen = -1
 	zones = _round_zones()
 	var coconut: Coconut = ball()
 	if coconut != null:
@@ -160,8 +177,10 @@ func tick() -> int:
 	var defended: int = goal_team_of(coconut)
 	if defended == 0:
 		_wedged_step(coconut)
+		_unstruck_step(coconut)
 		return 0
 	wedged_ticks = 0
+	unstruck_ticks = 0
 	var scorer: int = 3 - defended
 	goals[scorer] += 1
 	last_scorer = scorer
@@ -189,6 +208,27 @@ func _wedged_step(coconut: Coconut) -> void:
 		return
 	wedged_ticks = 0
 	wedged_resets += 1
+	coconut.reset_after(VersusTuning.BALL_RESET_TICKS)
+
+
+## The coconut nobody strikes (see the class description): counts the ticks it is in play since its last shot - a
+## club's, a strike's, a batted teammate's: Coconut.last_shot_tick; a head or a roof it bounces on is no shot - or,
+## without one, since it dropped in, and at [constant UNSTRUCK_TICKS] sends it back to its drop point
+## (Coconut.reset_after). Nobody scores, nobody is moved, a golden coconut stays golden.
+func _unstruck_step(coconut: Coconut) -> void:
+	if coconut == null or not coconut.in_play():
+		unstruck_ticks = 0
+		_shot_seen = -1
+		return
+	if coconut.last_shot_tick != _shot_seen:
+		_shot_seen = coconut.last_shot_tick
+		unstruck_ticks = 0
+		return
+	unstruck_ticks += 1
+	if unstruck_ticks < UNSTRUCK_TICKS:
+		return
+	unstruck_ticks = 0
+	unstruck_resets += 1
 	coconut.reset_after(VersusTuning.BALL_RESET_TICKS)
 
 

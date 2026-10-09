@@ -49,8 +49,9 @@ and the device steps a person runs are in `docs/expansion/HUMAN_CHECKS.md`.
   match there seats `VersusTuning.PLAYERS_MAX_MOBILE` = 2 heroes, humans and CPUs together
   (`VersusMatch.seat_limit()`; a desktop build seats four): four heroes with CPUs are not expected to fit a 60 Hz
   frame on the A53 class (ARCHITECTURE.md 11.5 - an estimate, no device was measured). The cap goes to four when
-  the device measurement of section 2, item 5 passes with four heroes. The lobby does not show the cap yet: its
-  cards 3 and 4 refuse a player without a word (`build/engine_requests/wf12_perf_to_ui.txt`).
+  the device measurement of section 2, item 5 passes with four heroes. The lobby still draws four cards and says why a
+  seat beyond the cap is refused ("This device seats 2 players.", `UI_VS_SEATS_CAP`); drawing only the seats the
+  device has is open (`build/engine_requests/wf12_perf_to_ui.txt`, ways 2 and 3).
 - **Performance**: a party costs more than one hero. Measured on the desktop in phase 4 (ARCHITECTURE.md 11.5,
   `bash tools/perf.sh`): a tick of one hero 180 - 260 us on average, of two heroes 236 - 443 us (about 1.6 times),
   of four heroes in a round with three CPUs 353 - 532 us plus 376 - 517 us of the CPUs' thinking. The budget of

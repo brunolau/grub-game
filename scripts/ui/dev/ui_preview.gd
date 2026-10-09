@@ -352,7 +352,7 @@ func _set_view(text: String) -> void:
 func _redirect_user_data() -> void:
 	var absolute: String = ProjectSettings.globalize_path(USER_DIR)
 	DirAccess.make_dir_recursive_absolute(absolute)
-	for file: String in ["save.json", "save.json.bak", "save.json.tmp", "settings.cfg"]:
+	for file: String in ["save.json", "save.json.bak", "save.json.tmp", "save.v1.json", "settings.cfg"]:
 		if FileAccess.file_exists(absolute + "/" + file):
 			DirAccess.remove_absolute(absolute + "/" + file)
 	Save.set_storage_dir(USER_DIR)

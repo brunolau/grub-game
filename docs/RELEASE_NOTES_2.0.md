@@ -75,6 +75,10 @@ Two options make it kinder or meaner: **Helper mode** (player 2 cannot be hurt -
 
 Arenas: Totem Ring, Echo Hollow, Floe Rink, Cinder Pit, Tar Pulleys, Coconut Cove, Sky Picnic and Colossus Hall.
 
+Every round ends: a Last Caveman Standing round has a hard cap a minute after the arena turns on you, a tied Grub
+Stack round is decided by the Golden Drumstick - grab it within a minute or the round is drawn ("TIME!") - and a
+coconut nobody has struck for 15 seconds drops in at the middle again.
+
 ## Controls for two on one keyboard
 
 The default layout puts one player at each end of the keyboard:
@@ -101,12 +105,10 @@ Playing alone, the controls are those of 1.0, plus **Swap on V or `;`** (pad LB)
   installation and stay where they are (`%APPDATA%\ClubAndGrub`).
 - Everything you reached in 1.0 is under **Solo > Book I**: unlocked stages, best results, the finished game, code
   stones, the high score - for Beginner and Expert separately, as before.
-- Your options and your key bindings are used as they are.
-  <!-- KNOWN ISSUE, open at the time of writing (build/engine_requests/wf12_release_prep_to_core_a.txt): remove the
-  next sentence when tests/test_core_save_1_0.gd test_a_1_0_binding_is_never_shared_with_a_new_2_0_action is green. -->
-  One thing to check if you had bound **V**, **`;`** or **pad LB** to an action in 1.0: 2.0 uses these three for the
-  new Swap button, so that input would also swap weapons in Book II. Give Swap another key or button under
-  *Options > Key bindings*.
+- Your options and your key bindings are used as they are. If you had bound **V**, **`;`** or **pad LB** to an
+  action in 1.0 - the three inputs 2.0 gives to the new Swap button - your binding wins: that input does what you
+  set it to and nothing else, and Swap keeps the others (give it another key or button under *Options > Key
+  bindings* if you like).
 - The level codes of 1.0 open the same stages.
 - Before 2.0 writes its first save, it copies your 1.0 save, untouched, to `save.v1.json` in the same folder, and
   never changes that copy. If you ever want to go back to 1.0.0: close the game, rename `save.v1.json` to
@@ -131,6 +133,10 @@ An OpenGL 3.3 graphics driver is needed. The files are not code-signed, so Smart
 - Co-op is for exactly two players; versus for two to four. Both are played on one computer - there is no online
   play.
 - Android, iOS and macOS builds are prepared in the project but are not part of this release.
+- **Known in 2.0.0**: on the arena Echo Hollow the starting places are not equally good when CPUs play - over many
+  rounds the right floor wins more than its share of Grub Stack and the left shelf of Last Caveman Standing. The
+  starting places rotate every round, so over a match everybody stands on each of them; a rebuild of the arena is
+  planned for the next version.
 - Every co-op gate was proven by machine to need two heroes, and every stage has a recorded play-through that the
   test suite replays. What only people can judge - how the co-op stages feel to a mixed pair, the versus modes with a
   full sofa, key combinations on many keyboards, the music by ear - is listed step by step in

@@ -17,14 +17,25 @@ extends SimEntity
 ##    Stack.
 ##  - CONTACT_ENEMIES: stomps gathered then applied (the stomp ladder 1-2-3-4-6-8 since the stomper's last ground
 ##    tick, an 8-tick squash, 30 immune ticks; an immune, shielded, curled or teammate head is a free springboard),
-##    then the head bounces off the arena's neutral enemies (VersusSignatures.springboard_step). KNOWN, open after
-##    2.0.0 (found by the versus soak, tools/bots/soak.sh): the stomp test is the 1.0 body test - a fall of 8 px a
-##    tick into a body is a stomp whoever is on top - so two heroes falling side by side with their bodies
-##    overlapping stomp EACH OTHER on one tick, each lifted a body's height, both free springboards from then on:
-##    the pair climbs out of the top of the arena until the off-screen rule takes both (4 of 1 008 Grub Stack rounds
-##    of CPUs). The rule that ends it - a stomp comes from above: `stomper.sim_pos.y < victim.sim_pos.y` - was built,
-##    tested and withdrawn before the release, because it re-rolls every bot set of tests/test_versus_bots.gd.
-##  - WORLD: the round: intro countdown, clock, Feast Rush, gong, the Golden Drumstick on a tie.
+##    then the head bounces off the arena's neutral enemies (VersusSignatures.springboard_step). THE HEAD CLASH
+##    (the release round of phase 4, DESIGN.md G95; found by the versus soak, tools/bots/soak.sh): the stomp test is
+##    the 1.0 body test - a fall of 8 px a tick into a body is a stomp whoever is on top - so two heroes falling
+##    side by side with their bodies overlapping stomp EACH OTHER on one tick, each lifted a body's height, both
+##    free springboards from then on; left alone the pair did it again every 12 ticks and climbed out of the top of
+##    the arena until the off-screen rule took both (4 of 1 008 Grub Stack rounds of CPUs). Two heroes clash heads
+##    ONCE: a hero who has been in a mutual stomp since his feet last had ground is in no second one - both stomps
+##    of the pair are dropped, nobody is lifted, nobody bounces, both fall on ([method _without_ladder],
+##    [constant HEAD_CLASHES_MAX]). The first clash and every one-sided stomp are what they were. (The wider rule -
+##    a stomp comes from above: `stomper.sim_pos.y < victim.sim_pos.y` - was built, tested and withdrawn in phase
+##    4: it changes every one-sided stomp too.) A second clash is no rare thing - the soak's CPUs met one in 176 of
+##    1 008 Grub Stack rounds (short ladders of two or three rungs; the four that left the arena were their tail) -
+##    so this rule re-rolled 14 of the 21 bot sets as well; their pins and the 384-round claims were made again
+##    with it (DESIGN.md G95).
+##  - WORLD: the round: intro countdown, clock, Feast Rush, gong, the Golden Drumstick on a tie - and the drumstick's
+##    own hard cap (the release round of phase 4, DESIGN.md G95, ruling R8 "no round lasts for ever"): nobody took
+##    it within VersusTuning.SUDDEN_DEATH_CAP_TICKS of its fall - under Mayhem on Tar Pulleys the CPUs never fetched
+##    it from the top of the pulley block - so the round ends DRAWN, with the "TIME!" banner; the HUD's sundial
+##    counts the cap down ([member cap_at], [method round_ticks_left]).
 ##  - POST: hazards (knock-outs: credit to the last hitter within 73 ticks), respawns after 48 ticks at the free spawn
 ##    farthest from the rivals with a 48-tick spawn shield, the referee's own counters (spawn shield, squash, hit-stop,
 ##    stomp immunity) written to the heroes.
@@ -126,18 +137,25 @@ var gust_wind: int = 0
 var sudden_death_at: int = -1
 ## Round tick of the hard cap (ruling R8, DESIGN.md G78; -1 = none armed): Last Caveman Standing,
 ## VersusTuning.SUDDEN_DEATH_CAP_TICKS after its sudden death started. On that tick the round ends whoever still stands
-## ([method cap_winners]).
+## ([method cap_winners]). Grub Stack arms the same cap when the Golden Drumstick falls (DESIGN.md G95): on that tick
+## the tie-break nobody decided ends the round drawn.
 var cap_at: int = -1
 ## True once the hard cap ended this round ([method ended_by_cap]).
 var _capped: bool = false
 ## Heroes the arena squeezed out of its side this round ([method _squeezed_out]; the soak counts them).
 var squeezed_out: int = 0
+## Mutual stomps a hero may be in between two ground ticks: the head clash ([method _without_ladder]).
+const HEAD_CLASHES_MAX: int = 1
+## Mutual stomps the head-clash rule refused this round (one per pair and tick; the soak counts them).
+var clashes_refused: int = 0
 
 # --- Per slot (index = player slot) -------------------------------------------------------------------------------
 var _stack: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 ## Banked units per pot (the slot, or the team's first slot in 2v2).
 var _pot: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 var _chain: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
+## Mutual stomps the hero has been in since his feet last had ground ([method _without_ladder]).
+var _clashes: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 var _stomp_immune: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 var _shield_left: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 var _squash_left: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
@@ -274,6 +292,7 @@ func begin_round(index: int) -> void:
 		_stack[slot] = 0
 		_pot[slot] = 0
 		_chain[slot] = 0
+		_clashes[slot] = 0
 		_stomp_immune[slot] = 0
 		_shield_left[slot] = 0
 		_squash_left[slot] = 0
@@ -310,6 +329,7 @@ func begin_round(index: int) -> void:
 	cap_at = -1
 	_capped = false
 	squeezed_out = 0
+	clashes_refused = 0
 	level.set_wind(0)
 	level.set_darkness(rules.has(VersusRules.LIGHTS_OUT))
 	var spawns: Array[Vector2i] = VersusArena.spawn_points(level)
@@ -479,6 +499,11 @@ func _start_golden() -> void:
 			_golden.life = 0
 	if _golden == null:
 		_finish(_best_slots())
+		return
+	# The tie-break has the hard cap of ruling R8 (G95): from here the round has at most
+	# VersusTuning.SUDDEN_DEATH_CAP_TICKS left, and the HUD's sundial counts them down.
+	if VersusTuning.SUDDEN_DEATH_CAP_TICKS > 0:
+		cap_at = round_ticks + VersusTuning.SUDDEN_DEATH_CAP_TICKS
 
 
 func _finish(winners: PackedInt32Array) -> void:
@@ -768,8 +793,11 @@ func round_length() -> int:
 
 
 ## Ticks until the gong of the running round; -1 = no clock running (no clock in this mode, the countdown, the
-## Golden Drumstick, after the gong) - the HUD's sundial (ui-B). With the hard cap armed: the ticks until the cap.
+## golden coconut, after the gong) - the HUD's sundial (ui-B). With the hard cap armed: the ticks until the cap - also
+## while the Golden Drumstick lies (G95: its tie-break is capped).
 func round_ticks_left() -> int:
+	if phase == PHASE_GOLDEN and cap_at >= 0:
+		return cap_ticks_left()
 	if phase != PHASE_PLAY:
 		return -1
 	if cap_at >= 0:
@@ -777,8 +805,8 @@ func round_ticks_left() -> int:
 	return time_left_ticks()
 
 
-## Ticks until the hard cap of the round (ruling R8); -1 = no cap armed (not Last Caveman Standing, or its sudden
-## death has not started).
+## Ticks until the hard cap of the round (ruling R8); -1 = no cap armed (Last Caveman Standing before its sudden
+## death, Grub Stack before a Golden Drumstick fell, the other modes).
 func cap_ticks_left() -> int:
 	if cap_at < 0:
 		return -1
@@ -828,8 +856,9 @@ func cap_winners() -> PackedInt32Array:
 
 
 ## True when the hard cap ended this round (ruling R8, DESIGN.md G78) - the gong fell on the cap's tick with more
-## than one side standing - and false for every other gong (the last one standing, also on the cap's own tick; a
-## clock; a goal) and while a round runs. True from the gong on, so a listener of Events.round_ended may ask.
+## than one side standing, or (G95) on the cap of a Golden Drumstick nobody took - and false for every other gong
+## (the last one standing, also on the cap's own tick; a clock; a drumstick taken; a goal) and while a round runs.
+## True from the gong on, so a listener of Events.round_ended may ask.
 func ended_by_cap() -> bool:
 	return phase == PHASE_OVER and _capped
 
@@ -1450,6 +1479,7 @@ func _player_step() -> void:
 				_stomp_immune[slot] = 0
 		if hero.is_grounded():
 			_chain[slot] = 0
+			_clashes[slot] = 0
 			if rules.has(VersusRules.SLIPPERY):
 				hero.ice = maxi(hero.ice, VersusRules.SLIPPERY_ICE)
 		_apply_weight(hero)
@@ -1600,6 +1630,7 @@ func _stomp_step() -> void:
 			if Overlap.body(stomper, victim, stomper) and Overlap.stomp:
 				stomps.append({"stomper": stomper, "victim": victim, "depth": Overlap.depth})
 				break
+	stomps = _without_ladder(stomps)
 	var immune_before: Dictionary = {}
 	for hero: PlayerBase in heroes:
 		immune_before[hero.slot] = _pvp_immune(hero)
@@ -1638,6 +1669,37 @@ func _stomp_step() -> void:
 				_lose_hearts(victim, 1, stomper, &"stomp")
 	# The arena's neutral enemies are springboards (the hero's own contact skips them: they hurt nobody).
 	signatures.springboard_step()
+
+
+## The head clash (see the class description, CONTACT_ENEMIES): of this tick's gathered stomps, a MUTUAL pair - A
+## stomps B and B stomps A - counts as each hero's clash of this airtime, and is dropped, both stomps of it, when
+## either of the two has had his [constant HEAD_CLASHES_MAX] since his feet last had ground ([member _clashes],
+## reset with the stomp chain). Every other stomp is returned as it was gathered, in order.
+func _without_ladder(stomps: Array[Dictionary]) -> Array[Dictionary]:
+	if stomps.size() < 2:
+		return stomps
+	var dropped: Dictionary = {}  # index into stomps -> true
+	for first: int in stomps.size():
+		for second: int in range(first + 1, stomps.size()):
+			if stomps[first]["stomper"] != stomps[second]["victim"] \
+					or stomps[first]["victim"] != stomps[second]["stomper"]:
+				continue
+			var a: int = (stomps[first]["stomper"] as PlayerBase).slot
+			var b: int = (stomps[second]["stomper"] as PlayerBase).slot
+			if _clashes[a] >= HEAD_CLASHES_MAX or _clashes[b] >= HEAD_CLASHES_MAX:
+				dropped[first] = true
+				dropped[second] = true
+				clashes_refused += 1
+			else:
+				_clashes[a] += 1
+				_clashes[b] += 1
+	if dropped.is_empty():
+		return stomps
+	var kept: Array[Dictionary] = []
+	for index: int in stomps.size():
+		if not dropped.has(index):
+			kept.append(stomps[index])
+	return kept
 
 
 # --- WORLD: the round -------------------------------------------------------------------------------------------------
@@ -1683,6 +1745,11 @@ func _round_step() -> void:
 				_world_rules()
 			elif _golden == null or not is_instance_valid(_golden):
 				_finish(_best_slots())
+			elif cap_at >= 0 and round_ticks >= cap_at:
+				# G95: the Golden Drumstick nobody took. The tie stands: the round is drawn, with "TIME!".
+				_capped = true
+				_finish(PackedInt32Array())
+				_call_time.call_deferred()
 
 
 ## The WORLD part of the mode modules and the round's rules: Hot Rock's ember, Clubball's goals, the variants on a
@@ -1935,6 +2002,7 @@ func _respawn(hero: PlayerBase) -> void:
 	_shield_left[slot] = VersusTuning.SPAWN_SHIELD_TICKS
 	hero.shield = VersusTuning.SPAWN_SHIELD_TICKS
 	_chain[slot] = 0
+	_clashes[slot] = 0
 	if phase == PHASE_OVER:
 		hero.set_control_enabled(false)
 

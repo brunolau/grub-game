@@ -104,7 +104,7 @@ Contract files are `scripts/core/**`, `scripts/base/**`, `tests/test_case.gd`, `
 
 | Setting | Value | Why |
 |---|---|---|
-| Name / version / main scene | `Club & Grub`, `1.0.0`, `res://scenes/main.tscn` | boot scene hands over to `scenes/ui/title.tscn` when it exists |
+| Name / version / main scene | `Club & Grub`, `2.0.0` (1.0: `1.0.0`), `res://scenes/main.tscn` | boot scene hands over to `scenes/ui/title.tscn` when it exists |
 | User data dir | `user://` = `%APPDATA%/ClubAndGrub` (custom user dir) | stable across renames; save.json, settings.cfg |
 | Renderer | `gl_compatibility` on desktop and mobile | maximum device coverage |
 | Base viewport | **640 x 360 art px** = 320 x 180 logical px x `Tuning.ART_SCALE` (2) | ASSET_MANIFEST 1 |
@@ -350,8 +350,13 @@ name such as "Z", "Pad A", "Left Stick Up"), `event_device(event)`, `normalize_e
 decode_event`. Keys bind by physical position. Changed actions are saved as text tokens in `[bindings]`
 (`jump=PackedStringArray("key:88", "joy_button:0")`); unchanged actions follow the project defaults; invalid
 entries are ignored. `changed` reports bindings as key `Settings.BINDINGS_KEY` with the action name as value.
+**A default of a later version never doubles an input the player bound in an earlier one** (2.0, phase 4;
+`Settings._drop_shared_defaults`, `tests/test_core_save_1_0.gd`): a file written by 1.0.0 knows nothing of `swap`
+(2.0: V, `;`, pad LB), so on loading every game action the file does not hold gives up each default event that a
+stored action holds - a 1.0 player who had put Jump on V keeps V for Jump alone and Swap keeps `;` - and the
+shortened list is saved like a changed binding (1.0.0 ignores the key).
 
-`Save` (`save.json`, `VERSION = 1`, atomic write with backup, never blocks the game): `load_game()`,
+`Save` (`save.json`, `VERSION = 1` in 1.0 and `VERSION = 2` in 2.0 - the 2.0 format is described further down; before the first write over a file of another version an untouched copy is kept as `save.v1.json` - atomic write with backup, never blocks the game): `load_game()`,
 `save_game()`, `reset()`, `has_progress()`, `is_level_unlocked(id, difficulty)`, `unlock_level`,
 `get_unlocked_levels`, `record_level_result(id, difficulty, score, percent)`, `get_level_result`,
 `get_high_score`, `submit_score`, `is_game_completed`, `set_game_completed`, `add_code_stone`, `has_code_stone`,
@@ -2172,8 +2177,11 @@ ticks of every second. Before the pass Tar Pulleys stood at 60 - 90 ms (p99). So
 CPUs do not**, and the game caps a versus match on a phone or tablet at `VersusTuning.PLAYERS_MAX_MOBILE` = 2
 heroes (`VersusMatch.seat_limit()`: humans and CPUs together; a desktop build seats four;
 `tests/test_core_mobile_cap.gd`). The cap is the estimate's, not a measurement's: it goes to `PLAYERS_MAX` when
-the device check of `docs/expansion/HUMAN_CHECKS.md` (section D) passes with four heroes. Left for whoever ports
-the game: the versus lobby does not show the cap yet (its cards 3 and 4 refuse a player without saying why).
+the device check of `docs/expansion/HUMAN_CHECKS.md` (section D) passes with four heroes. The versus lobby says
+so (the release round, DESIGN.md G94): it still draws its four cards, and a seat beyond the cap refuses a CPU or a
+further player with the status line "This device seats 2 players." (`UI_VS_SEATS_CAP`,
+`VersusLobbyScreen.seats_cap_text`, `tests/test_ui_versus.gd`); drawing only the seats a device has is left for
+whoever ports the game.
 
 ---
 
@@ -2260,3 +2268,13 @@ the game: the versus lobby does not show the cap yet (its cards 3 and 4 refuse a
   round's intro; nothing else of the tick was changed. A versus match on a phone or tablet seats
   `VersusTuning.PLAYERS_MAX_MOBILE` = 2 heroes (an estimate for a Cortex-A53 class device, not a measurement); a
   desktop build seats four.
+- 2.0 phase 4, the release round (the integrator; DESIGN.md G94-G97): `Settings` drops a default event that a
+  stored action of an earlier version holds (above, "Bindings"); the versus lobby names the device's seat cap; three
+  nets of the versus referee - two heroes clash heads once per airtime (`VersusReferee.HEAD_CLASHES_MAX`), a coconut
+  nobody strikes for 15 s drops in again (`VersusClubball.UNSTRUCK_TICKS`), a Golden Drumstick nobody takes within
+  `VersusTuning.SUDDEN_DEATH_CAP_TICKS` ends the round drawn - after which both soak commands
+  (`tools/bots/soak.sh`) pass; a real-game evidence route may name its checkpoint and a carried feast kit
+  (`tools/coop_explore/harness.gd` `read_route`: `checkpoint=`, `kit=`). The shared runner `.tools/gd.sh` no longer
+  queues a pool of runs behind an import that is already done (the gate is taken first, the question asked again,
+  and only the run that really imports waits for the recent readers), and Python byte code and the `.bak` save
+  fixtures ask for no import.

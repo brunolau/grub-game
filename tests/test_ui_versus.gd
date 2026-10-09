@@ -38,6 +38,44 @@ func after_each() -> void:
 	Settings.reset()
 
 
+## G94 (phase 4, docs/ARCHITECTURE.md 11.5): on a phone or tablet a match seats VersusTuning.PLAYERS_MAX_MOBILE
+## heroes. The lobby still draws its four cards; a seat beyond the cap refuses a CPU and a further player and SAYS
+## WHY in the status line (before, card 3 and 4 did nothing at all). A desktop lobby never shows the note.
+func test_lobby_says_why_a_seat_beyond_the_device_cap_is_refused() -> void:
+	var node: VersusLobbyScreen = await _open_lobby()
+	var versus_match: VersusMatch = Game.versus_match
+	var was_mobile: bool = VersusMatch.mobile
+	VersusMatch.mobile = true
+	var cap: int = VersusMatch.seat_limit()
+	assert_eq(cap, VersusTuning.PLAYERS_MAX_MOBILE)
+	var note: String = VersusLobbyScreen.seats_cap_text()
+	assert_eq(note, tr("UI_VS_SEATS_CAP").format({"count": cap}))
+	assert_true(note.contains(str(cap)), "the note names the number of seats (%s)" % note)
+	_key(KEY_SPACE)
+	assert_eq(versus_match.human_count(), 1)
+	if cap < Defs.MAX_PLAYERS:
+		assert_false(node.add_cpu(cap), "no CPU on the first card beyond the cap")
+		assert_false(versus_match.is_seated(cap))
+		assert_eq(node.get_status_text(), note, "the status line says why")
+		assert_true(node.add_cpu(1), "a seat inside the cap takes a CPU")
+		assert_ne(node.get_status_text(), note, "the note goes with the next seat action")
+		assert_eq(versus_match.player_count(), cap)
+		# A further player: the lobby is full by the cap.
+		_pad_button(2, JOY_BUTTON_A)
+		assert_eq(versus_match.human_count(), 1, "a third hero is not seated")
+		assert_eq(node.get_status_text(), note, "and the status line says why")
+		versus_match.ready_all()
+		node.refresh()
+		assert_eq(node.get_status_text(), note, "the note stays until the next seat action")
+		assert_false(node.get_start_button().disabled, "the note does not hold START back: a match of two can start")
+	# On a desktop the same cards take players and CPUs, and nothing is said.
+	VersusMatch.mobile = false
+	assert_true(node.add_cpu(Defs.MAX_PLAYERS - 1), "a desktop seats every card")
+	assert_ne(node.get_status_text(), note)
+	VersusMatch.mobile = was_mobile
+	await _cleanup()
+
+
 ## Press Jump to take a seat (keyboard halves of the classic layout, pads); confirm on a free seat card adds a CPU
 ## (Hunter), confirm on a CPU steps it Hunter -> Chief -> Rookie -> free, "back" on a CPU removes it; every seat gets
 ## a colour nobody else wears and Left / Right skips the others' colours.

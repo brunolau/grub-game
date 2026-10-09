@@ -5,6 +5,8 @@ extends Node
 ## closed only when every route of the evidence set says "not reached").
 ## Usage: bash .tools/gd.sh script res://tools/coop_explore/main.gd -- replay <route file> [trace=<every n ticks>]
 ##        [fine=<from>-<to>] [noevents=1] [cache=1]
+## A real=true route file may say `checkpoint=<column>` (the run's checkpoint, default: the last one before the
+## tablet) and `kit=<mask>` (a feast kit carried into the stage): what a real player brings to a gate.
 ##   trace=   a line every n ticks: the hero, the awake enemies and the movers near him, the partner
 ##   fine=    ... and every tick of this range
 ##   cache=1  keep the result for the gate test (harness.gd replay_key)
@@ -50,6 +52,9 @@ func run(arguments: PackedStringArray) -> int:
 		lib = (load(REAL_HARNESS) as GDScript).new()
 		built = await lib.build(self, level, gate, difficulty)
 		lib.tick_offset = int(route["tickoff"])
+		if built and int(route["checkpoint"]) >= 0:
+			built = lib.use_checkpoint(int(route["checkpoint"]))
+		lib.kit = int(route["kit"])
 	else:
 		lib = harness.new()
 		built = lib.build(level, gate, difficulty, bool(route["whole"]), int(route["tick0"]))

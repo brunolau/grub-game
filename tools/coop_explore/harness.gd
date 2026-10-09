@@ -256,6 +256,12 @@ static func read_route(path: String) -> Dictionary:
 		"difficulty": str(fields.get("difficulty", "0")).to_int(), "whole": str(fields.get("whole", "false")) == "true",
 		"start": str(fields.get("start", "0")).to_int(), "real": str(fields.get("real", "false")) == "true",
 		"tickoff": str(fields.get("tickoff", "0")).to_int(), "events": events if events is Array else [],
+		# What a real player can carry into a gate (phase 4, the levels designer's two finds; real=true routes only):
+		# `checkpoint=<column>` - the run starts with the game's reset at the checkpoint of that column instead of
+		# the last one before the tablet (a route that fetches something from an earlier stretch: the glider of
+		# 9-1b); `kit=<mask>` - the run's feast kit after the reset (pieces carried in from earlier stages).
+		"checkpoint": str(fields["checkpoint"]).to_int() if str(fields.get("checkpoint", "-")).is_valid_int() else -1,
+		"kit": str(fields.get("kit", "0")).to_int(),
 		"flags": flags, "path": path}
 
 

@@ -539,6 +539,7 @@ func load_settings() -> void:
 		if file.has_section(BINDINGS_SECTION):
 			for action: String in file.get_section_keys(BINDINGS_SECTION):
 				_load_binding(action, file.get_value(BINDINGS_SECTION, action))
+			_drop_shared_defaults()
 		for slot: int in Defs.MAX_PLAYERS:
 			var slot_section: String = slot_bindings_section(slot)
 			if file.has_section(slot_section):
@@ -599,6 +600,34 @@ func _load_binding(action: String, stored: Variant) -> void:
 				events.append(event)
 	if not events.is_empty():
 		_apply_binding(StringName(action), events)
+
+
+## A default of a later version never doubles an input the player bound in an earlier one. A file written by 1.0.0
+## holds only the actions its player changed and knows nothing of `swap` (2.0: V, `;`, pad LB): had he put Jump on V,
+## V would jump and swap on one tick. So every game action the file does NOT hold - it follows the project defaults -
+## gives up each default event that a stored action holds: the player's binding wins, the new action keeps what is
+## left of its defaults (Options > Key bindings can give it another), and the shortened list is remembered like a
+## changed binding (1.0.0 ignores the key). [method set_binding]'s promise - no event on two game actions - then
+## holds for every file, whoever wrote it.
+func _drop_shared_defaults() -> void:
+	if _bindings.is_empty():
+		return
+	var stored: Dictionary = {}  # token -> true: every event a stored action holds
+	for action: String in _bindings:
+		for event: InputEvent in _bindings[action]:
+			stored[encode_event(event)] = true
+	for action: StringName in Defs.GAME_ACTIONS:
+		if _bindings.has(String(action)):
+			continue
+		var kept: Array[InputEvent] = []
+		var dropped: bool = false
+		for event: InputEvent in get_bindings(action):
+			if stored.has(encode_event(event)):
+				dropped = true
+			else:
+				kept.append(event)
+		if dropped:
+			_apply_binding(action, kept)
 
 
 ## Make `events` the events of `action` in the InputMap and remember them for save().

@@ -336,7 +336,7 @@ func _parse_args(arguments: PackedStringArray) -> Dictionary:
 func _redirect_user_data(user_dir: String) -> void:
 	var absolute: String = ProjectSettings.globalize_path(user_dir)
 	DirAccess.make_dir_recursive_absolute(absolute)
-	for file: String in ["save.json", "save.json.bak", "save.json.tmp", "settings.cfg"]:
+	for file: String in ["save.json", "save.json.bak", "save.json.tmp", "save.v1.json", "settings.cfg"]:
 		if FileAccess.file_exists(absolute + "/" + file):
 			DirAccess.remove_absolute(absolute + "/" + file)
 	for autoload: String in ["Save", "Settings"]:

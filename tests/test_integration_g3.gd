@@ -290,8 +290,24 @@ func test_the_g3_command_runs_every_slow_module() -> void:
 	var gate_job: String = FileAccess.get_file_as_string("res://tools/world_coop_gates.sh")
 	assert_true(text.contains("COOP_GATES_TOGETHER=1") and text.contains("COOP_GATES_OUT=$RUN/coop_gates"),
 			"the gate job runs the search and the explorer side by side into the run's own folder")
-	for step: String in ["tools/coop_explore/replay_evidence.sh", "tools/coop_explore/explore_gates.sh", "passes=0,1"]:
+	# Since phase 4 the gate job is ONE PLAN AND ONE POOL (world-B, wf12): a process asks every result key, then
+	# every piece that is to do is a job of its own - a search, an explorer pass of 300 s (the plan names one job per
+	# seed of the harness: two passes a row), an evidence replay in a fresh process - and the three tables are
+	# written from what is kept. The pin is that shape, step by step (not the header's by-hand commands).
+	for step: String in ["res://tools/coop_search.gd -- --plan", "PASS_SECONDS=300",
+			"res://tools/coop_explore/main.gd -- explore \"$1\" \"$2\" \"$3\"", "\"pass=$4\"",
+			"res://tools/coop_explore/main.gd -- replay \"res://$1\" cache=1", "grep \"^PLAN explore \" \"$PLAN\"",
+			"grep \"^PLAN replay \" \"$PLAN\"", "\"$OUT/evidence.txt\"", "\"$OUT/explore.txt\"",
+			"\"$OUT/r7_rows.txt\""]:
 		assert_true(gate_job.contains(step), "tools/world_coop_gates.sh runs %s" % step)
+	var plan_tool: String = FileAccess.get_file_as_string("res://tools/coop_search.gd")
+	assert_true(plan_tool.contains("for pass_index: int in (harness.get(&\"PASS_SEEDS\") as Array).size():") \
+			and plan_tool.contains("print(\"PLAN explore %s %s %d %d %s\""),
+			"the plan names one explorer pass per seed of the harness for every gate row")
+	var harness: GDScript = load("res://tools/coop_explore/harness.gd") as GDScript
+	assert_true(harness != null, "tools/coop_explore/harness.gd loads")
+	if harness != null:
+		assert_eq((harness.get(&"PASS_SEEDS") as Array).size(), 2, "two seeded passes a row (R7 c)")
 	for proof: String in ["=> GREEN", "=> RED", "=> OPEN WORK", "coop_gates_r7_rows.txt"]:
 		assert_true(text.contains(proof), "the G3 table reads the three proofs of a row ('%s')" % proof)
 	assert_true(text.contains("--gates-beside") and text.contains("run_job coop_gates"),

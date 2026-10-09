@@ -830,7 +830,14 @@ per row (15.7.2; 10 rows: 11.6 cells). Every standing place a lone hero can reac
 blowhole, a lift - `h` rows over a gate's ledge lies **more than 10 + h / 2 cells** from it (rounded up: 10 rows 15
 cells, 20 rows 20; in a file with a `wind` script 12 + 0.6 h - a tailwind carries 6 px a tick), or the ledge is
 **roofed**: solid cells at most 3 rows over its whole top, closed towards that place. 7-1's warp stack (10 rows over
-the 'stack' shoulder, 11 columns from it) broke it: its owner moves the stack or roofs the shoulder.
+the 'stack' shoulder, 11 columns from it) broke it: its owner moves the stack or roofs the shoulder. **The validator
+warns** (phase 4, `LevelValidator._check_long_drop`; `--strict` makes it an error): it reads LIFTS only - an unrolled
+vine (its top), a geyser that is no deadly vent and a spring (7 rows over the pad), a moving platform (its travel) -
+and asks for more than 10 + h / 2 cells of AIR between the place a lift brings a lone hero to and the gate's ledge
+(12 + 0.6 h with a `wind` script); no warning where the ledge is roofed, rock stands between, the lift is boarded
+above both the tablet's floor and the ledge, the vine is rolled [G81], or the lift lies behind the far cell. It
+counts whole cells of air (the "11 columns" above read 10 there) and has no static reach: a high place a lone hero
+WALKS to is the search's and the explorer's to find (15.7.6).
 
 **Gust gaps** [G79]. In a file with a `wind` script a gap gate is measured against the gust jump (10.1 cells on
 the flat, 15.7.2): **12 cells** of gap towards the side a tailwind blows, or the far lip raised 2 rows over the
@@ -839,6 +846,8 @@ tar) fell to a lone hero's gust jump on both difficulties. Among the co-op files
 `w3_l1b_coop` carry wind. **A slab bridge over a gust gap spans at most 9 cells from the near lip** [G83]: the
 shared view lets a pair stand 290 px apart and a plate stands 8 tiles from its column, so a plate behind a longer
 slab is out of the batted hero's reach (a slab bridge with its plate on the far bank works up to a 10-cell gap).
+The validator makes it an error since phase 4 (`_check_plate_reach`: a plate-driven column over a gap with its plate
+on the other bank than the tablet - the plate at most 17 cells from the gap's first column; 9-2 'drive': 16).
 As rebuilt, 9-2 'drive' is 13 cells of tar (columns 203-215): the slab bridges 9 (203-211), the latch plate
 stands at 219-220, the last 4 cells are hopped in a lull, and the drive is a **charged** one (325 px; an uncharged
 one ends in the tar at 171 px).
@@ -849,8 +858,22 @@ a place below no longer meets it, nor does the special thrown at its top. A see-
 within a jump of its target's level (the recipe above), and so does an x2 secret's ledge beside a gate: they need
 no roof for the coil's sake since G81 (the two roofs of 2-2 and 6-2 'seesaw', 3 rows over the cap ledges, were
 built before the rule and stay). The clean foot of a boost ledge [G67] holds for every ledge within one row of a
-gate's coil, an x2 secret's too (2-2 'lift': the bone ledge's foot was cleared) - the validator's rule still
-reads gate tablets only.
+gate's coil, an x2 secret's too (2-2 'lift': the bone ledge's foot was cleared) - and since phase 4 the validator
+names it there as well (`_check_secret_feet`, an error: a hittable on a floor 1-8 rows under a `secret` tablet's
+ledge that stands within one row and one view of a rolled vine's ledge, within 7 cells of the foot of either open
+end).
+
+**Above the map there are no tiles** [G96]. A hero whose feet are over the map's top meets no floor, no ceiling and
+no wall (the engine probes tiles only inside the map), and a glider pilot gets there by pumping - Up spends lift to
+climb, a dive refills it: about 70 px a cycle, without end. So **a wall that reaches row 0 is no wall for a glider**:
+in a file with a glider everything behind a gate is roofed below the map's top - solid cells from the barrier to
+whatever closes the far side, so that whoever flies over comes down ON the roof - or the gate stands before the
+first glider of the file. 9-1b 'stormwall' fell to it on the real game in phase 4 (one hero, P2's pad untouched: from
+the checkpoint of column 99 with a glider over both keepers and the cloud wall, in the far cell at tick 420) and is
+closed by a cloud roof (rows 3-4, columns 216-241: the way from the door to the exit is a vault); the flight is the
+evidence route `w9_l1b_coop.stormwall.expert.glider_over_the_top` (it starts with `checkpoint=99`: the gliders lie
+90 columns before the wall, where the three proofs never fetched one). The other gliders of 2.0 lie behind their
+file's gates (2-2) or in a boss stage (9-2b). The validator has no rule for it yet.
 
 #### 15.7.4 x2 tablets
 
@@ -870,12 +893,16 @@ still counts against the enemy; a dust puff and a thud tell the player). **The e
 party every enemy whose feet column is in a ward wears the ward mark (chalk-white stripes, drawn only), so a pair
 sees which beasts are no stepping stones before it jumps. Teach it once per book: a sign a few columns inside the
 first ward of 1-1 and of 5-1 co-op, with a marked beast in view ("Marked beasts are no steps - use your partner's
-shoulders!" - 58 characters: the longer "no stepping stones" takes a fourth board line); do not hide a ward's enemies behind front props where a pair decides to bounce. **The pass
+shoulders!" - 58 characters: the longer "no stepping stones" takes a fourth board line; as built the signs stand at
+column 72 of 1-1 and column 71 of 5-1 - on 1-1 Beginner no enemy record lives in that ward before the gate, so the
+first marked beast a Beginner pair sees there is the hopper of column 63 when it follows them: accepted, the Expert
+file has its own at column 77); do not hide a ward's enemies behind front props where a pair decides to bounce. **The pass
 is short** [G87]: the stomped enemy spares the hero during that fall and for 12 ticks after he lands, then its body
 hurts like any other - never build a spot where a hero must stand inside a beast, and keep 4+ cells of floor beside
 a keeper where a hero who dropped onto it can step out. **No sign inside a ward tells a pair to bounce on a
 beast** [G85]: a hint sign copied from the solo file ("Bounce on one to reach the mesa tops!", 5-1's Roller sign at
-column 71) contradicts the marked beast beside it - drop it from the co-op copy or move it out of the ward (a sign
+column 71 - dropped in phase 4: the ward sign stands in its place; 1-1's bounce sign says "- unless it is marked!")
+contradicts the marked beast beside it - drop it from the co-op copy or move it out of the ward (a sign
 about a mount, such as the taming of Chomper, may stay: no ward touches a mount). `ward=<left>,<right>` on the record sets
 the two margins in cells (left = towards column 0; both at least 0). **The margin counts from the gate's high
 ground**: the default presumes that the first standing place leading over the gate is at the tablet; where it
@@ -886,7 +913,8 @@ an enemy's head inside a ward (in a tall file a ward covers its columns on every
 with it. **The validator names it** (`tools/validate_levels.gd -- --gates`, world-B): a warning "high ground at
 the ward's edge" for every top that stands 6+ rows over the floor beside both its ends, at most 5 rows under a
 height gate's ledge, inside the ward within 12 cells of its edge or outside it within 8 - nine gates on the tree
-of the round. Clear it with `ward=` so that the top lies 12+ cells inside (1-1 'hop' `ward=22,12`, 2-2 'lift'
+of the round. The gate's own ledge is no high ground (phase 4): the top the `far` cell stands on, and a top that
+lies wholly behind the `far` cell, are never named. Clear it with `ward=` so that the top lies 12+ cells inside (1-1 'hop' `ward=22,12`, 2-2 'lift'
 `ward=16,12`, 8-1 'stairs' `ward=23,12`, 9-1 'pulley' `ward=12,17`, 4-1 'cliff' `ward=12,14`, 5-2 'sandgate'
 `ward=12,21` - the values first ruled). **As built: `ward=` until no top is named** [G83]. The validator reads no
 comment, and every widened edge may uncover the next top within its 12 cells, so a margin grows until
@@ -924,9 +952,14 @@ of a height gate's foot and a one-way ledge cell fewer than 7 rows over a standi
   (`coop=bond bond=gully keeper=gully`) and stays one.
 - **A feast is no key - keep the pieces away** [G92]: as built a feasting hero kills a `shell` or `daze` keeper by
   touch, and the kit is carried from stage to stage, so one player who arrives with two pieces and finds the third
-  before a keeper hall opens its door alone (8-1 'hall': the piece on the terrace over the hall). Until the engine
-  refuses such a death: **no feast piece between a stage's start and the door of a `shell` or `daze` keeper hall**
-  (a bond of keepers and a `heavy` are safe: they refuse it already). The gate job does not see a carried kit.
+  before a keeper hall opens its door alone. 8-1 'hall' fell to it on the real game in phase 4 (the piece lay on the
+  terrace over the hall, cell 51,38: with a kit of two carried in, one hero stood in the far cell at tick 597) and
+  is closed in its file - the piece lies at 60,40, on the plinth behind the door, where the pair's route still takes
+  it for the feast that kills the Raptor before the exit. The engine's rule is not built in 2.0.0, so the building
+  rule stands: **no feast piece between a stage's start and the door of a `shell` or `daze` keeper hall**
+  (a bond of keepers and a `heavy` are safe: they refuse it already). It holds on every co-op file (pieces lie in
+  5-1, 6-2, 7-1, 8-1 and 9-2). The gate job does not see a carried kit; a real-game route file can carry one in
+  (`kit=<mask>`, 15.7.6).
 - **Bonds are slot-bound** [G72]: a bond, a keeper pair, a drum pair and a split are met only by two different
   heroes who both count; one hero's hit on the last member glances and the dead one regrows. The placing rules
   above that kept ONE hero from both members - out of one hero's reach within the window, never on one throw line
@@ -1029,7 +1062,7 @@ rows that the search had refused, also at three times its bound). Per gate row (
 | Proof | What must hold |
 |---|---|
 | **(a) the search refuses** | the verdict table above - refused (exhaustive), or refused (bounded) with every probe of its kind - on an exact reset (tick base 0 and the total-tick clock put back per run - as built the base is 17 952 in every run and process [G83]; a run that missed replays is bounded and says so), with the lone hero's moves of [G67], the long climb (a hero at rest on a vine is a node [G74]) and, in a file with a `wind` script, the wind's phases [G79] |
-| **(b) the evidence set says "not reached"** | every route by which a gate once fell, replayed in a fresh process; the set is versioned under `tools/` and only grows - the G3b verifier's 21 routes, the two gust routes of [G79] and the 'hop' route under the default ward [G73]: 24 at the lead designer's close, 33 at the round's (nine finds of its explorer, `tools/coop_explore/evidence/`). A route that still reaches `far` is its row's red |
+| **(b) the evidence set says "not reached"** | every route by which a gate once fell, replayed in a fresh process; the set is versioned under `tools/` and only grows - the G3b verifier's 21 routes, the two gust routes of [G79] and the 'hop' route under the default ward [G73]: 24 at the lead designer's close, 33 at the round's (nine finds of its explorer, `tools/coop_explore/evidence/`), **38 at the release** (phase 4: a gust jump at 9-2's new lip, the long drop off 7-1's moved stack on both difficulties, the one route a switched-off ward opens at 6-2 'seesaw', and the glider over 9-1b's storm wall [G96]). A route that still reaches `far` is its row's red. A route of the real game (`real=true`) may say what a real player carries into the gate: `checkpoint=<column>` - the run starts with the game's reset at the checkpoint of that column instead of the last one before the tablet - and `kit=<mask>` - the run's feast kit after the reset |
 | **(c) the explorer stays out** | the continuous-play explorer (versioned under `tools/`: one hero in the search's world, inputs never reset between moves, the lure, ride, strike-on-spring, long-climb and second-throw moves, the exact reset) opens the row in none of **two seeded passes of 300 s** over the whole level |
 
 A replayable route is red whatever (a) says ("a replay wins", above); a find that does not replay from a fresh
@@ -1260,6 +1293,7 @@ New routes describe themselves in a header instead of a `ROUTES` entry. The head
 - [ ] Co-op (phase 4): the ward sign at the first ward of 1-1 and 5-1, a marked beast in view of it, and no sign
       inside a ward that teaches a bounce on a beast [G85]; no spot
       where a hero must stand inside a beast longer than 12 ticks [G87]; where it fits, a checkpoint before a ride of
-      13+ s [G86]; no feast piece before a `shell` or `daze` keeper hall [G92]; the stage's lines of `docs/expansion/HUMAN_CHECKS.md` read once against the file [G90].
+      13+ s [G86]; no feast piece before a `shell` or `daze` keeper hall [G92]; in a file with a glider everything
+      behind a gate roofed below the map's top, or the gate before the first glider [G96]; the stage's lines of `docs/expansion/HUMAN_CHECKS.md` read once against the file [G90].
 - [ ] Signs: every text at most 3 board lines (about 60 characters); the music context of the 15.2 table.
 - [ ] Arena: 20 x 12, row 0 empty, spawns for `players`, cookpots, bot graph baked and its bot test green per mode.

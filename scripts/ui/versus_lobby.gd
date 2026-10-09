@@ -55,6 +55,9 @@ var _key_button: UiButton = null
 var _status: Label = null
 ## G50: why the last "Add CPU" was refused (the chosen arena is for humans only in this mode); "" otherwise.
 var _cpu_note: String = ""
+## The status note of a seat the device does not have (VersusMatch.seat_limit(), DESIGN.md G94): a phone or tablet
+## seats VersusTuning.PLAYERS_MAX_MOBILE heroes. Shown until the next seat action.
+var _seat_note: String = ""
 var _summary: Label = null
 var _picture: JoinScreen.KeyboardPicture = null
 var _key_test_layer: Control = null
@@ -321,8 +324,14 @@ func player_of(event: InputEvent) -> int:
 
 ## A player takes the first free seat with `input`. Returns the seat or -1.
 func join(input: InputSlot) -> int:
+	_seat_note = ""
 	var slot: int = Flow.join_player(input)
 	if slot < 0:
+		if _lobby_full_by_the_cap():
+			# G94: the device seats fewer heroes than the lobby has cards - say so instead of doing nothing.
+			Audio.play_sfx(Sfx.MENU_BACK)
+			_seat_note = seats_cap_text()
+			refresh()
 		return -1
 	_held[slot] = false
 	_hold[slot] = 0.0
@@ -334,6 +343,7 @@ func join(input: InputSlot) -> int:
 
 ## The human of seat `slot` leaves it.
 func leave(slot: int) -> bool:
+	_seat_note = ""
 	if not Flow.leave_player(slot):
 		return false
 	Audio.play_sfx(Sfx.MENU_BACK)
@@ -348,6 +358,13 @@ func leave(slot: int) -> bool:
 ## line says so - Random and Party Mix take CPUs).
 func add_cpu(slot: int, level: int = Defs.BotLevel.HUNTER) -> bool:
 	var versus_match: VersusMatch = Game.versus_match
+	_seat_note = ""
+	if slot >= VersusMatch.seat_limit() or (slot < 0 and _lobby_full_by_the_cap()):
+		# G94: a seat card beyond the device's cap (a phone or tablet seats two heroes) refuses a CPU and says why.
+		Audio.play_sfx(Sfx.MENU_BACK)
+		_seat_note = seats_cap_text()
+		refresh()
+		return false
 	if not VersusArenaScreen.bots_play(versus_match.arena, versus_match.mode):
 		Audio.play_sfx(Sfx.MENU_BACK)
 		_cpu_note = cpu_refused_text(versus_match.arena, versus_match.mode)
@@ -667,7 +684,7 @@ func _refresh_rules() -> void:
 	# G50: a refused "Add CPU" says why (it does not hold START back) until the arena or the mode takes CPUs again.
 	if _cpu_note != "" and VersusArenaScreen.bots_play(versus_match.arena, versus_match.mode):
 		_cpu_note = ""
-	_status.text = _cpu_note if _cpu_note != "" else status
+	_status.text = _seat_note if _seat_note != "" else (_cpu_note if _cpu_note != "" else status)
 	_status.add_theme_color_override(&"font_color", UiKit.COL_BAD if _status.text != "" else UiKit.COL_GOOD)
 	_start.disabled = status != ""
 
@@ -683,6 +700,17 @@ func _refresh_keyboard() -> void:
 					UiPlayers.PALETTE_COLOURS[&"yellow"])[UiPlayers.FILL])
 		data[half] = {"keys": info["keys"], "colour": colour, "taken": slot >= 0}
 	_picture.set_halves(data)
+
+
+## True when the device's seat cap (below the lobby's four cards) is reached: every seat it has is taken.
+func _lobby_full_by_the_cap() -> bool:
+	var limit: int = VersusMatch.seat_limit()
+	return limit < SEATS and Game.versus_match != null and Game.versus_match.player_count() >= limit
+
+
+## G94: "This device seats 2 players." (the lobby's status when a seat beyond the device's cap is asked for).
+static func seats_cap_text() -> String:
+	return TranslationServer.translate("UI_VS_SEATS_CAP").format({"count": VersusMatch.seat_limit()})
 
 
 ## G50: "No CPU plays Grub Stack on Floe Rink." (the lobby's status when "Add CPU" is refused).

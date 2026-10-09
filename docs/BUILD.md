@@ -397,7 +397,14 @@ no file sharing, and `ITSAppUsesNonExemptEncryption = false` (no export-complian
    the version and the release notes exist (`docs/RELEASE_NOTES_2.0.md`).
 2. Import clean, `tests/run_tests.gd` green, level validator green. After any change to a simulation script or a
    co-op level also: `bash tools/sp_identity.sh` (`IDENTICAL`), `bash tools/world_coop_gates.sh`, and before the
-   release the whole table `bash tools/g3.sh --require`.
+   release the whole table `bash tools/g3.sh --require` (it must print `REACHED`; about 70 minutes, alone on the
+   machine). After any change to the versus referee, a mode, an arena file or the bots also the soak, which is no
+   job of that table: `bash tools/bots/soak.sh p4 1000 16` and `bash tools/bots/soak.sh mix 250 16 rules=mix` (each
+   ends `RESULT PASS`; about 6 and 2 minutes) and, for an arena whose file changed, its 384-round fairness claims
+   (`bash tools/bots/fair.sh <tag> <arena> <mode> 0 96`, DESIGN.md G80). `python tools/audit_assets.py` and
+   `python -m unittest discover -s docs/spec -p "test_*.py"` are green. Performance is measured with
+   `bash tools/perf.sh` on a quiet machine when the simulation's cost may have moved (ARCHITECTURE.md 11.5 holds
+   the numbers of 2.0.0; no release gate).
 3. Windows: `tools\build_windows.ps1` ends with `BUILD OK`, then `tools\build_installer.ps1 -SkipBuild -TestInstall`
    ends with `INSTALLER OK` (safe on a machine where the game is installed, 3.4). Publish the setup exe and the zip
    together as GitHub release `v<version>`, with the text at the end of the release notes and the two SHA-256
