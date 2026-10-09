@@ -461,13 +461,6 @@ func play(spec: Dictionary, mix: bool = false) -> Dictionary:
 	while t < limit:
 		Sim.step(1)
 		t += 1
-		# The referee's net at the arena's sides (VersusReferee._squeezed_out): a hero who was in play and is dead now,
-		# with his feet left or right of the view, was knocked out by it on this tick.
-		for slot: int in players:
-			var fallen: PlayerBase = _level.get_hero(slot)
-			if watch.alive[slot] != 0 and fallen.dead and referee.wrap != VersusArena.WRAP_LR \
-					and (fallen.sim_pos.x < view.position.x or fallen.sim_pos.x >= view.end.x):
-				result["squeezed"] = int(result["squeezed"]) + 1
 		_check_tick(referee, players, view, watch, found, tag, t)
 		if t >= trace.x and t <= trace.y:
 			_print_trace(referee, players, t)
@@ -491,6 +484,7 @@ func play(spec: Dictionary, mix: bool = false) -> Dictionary:
 	result["scores"] = scores
 	result["golden_ticks"] = referee.round_ticks - watch.golden_at if watch.golden_at >= 0 else 0
 	result["wedged"] = referee.clubball.wedged_resets if referee.mode == Defs.VersusMode.CLUBBALL else 0
+	result["squeezed"] = referee.squeezed_out
 	if gong_at < 0:
 		found.append("ANOMALY kind=no_end %s tick=%d the round did not end: phase %d after %d ticks of play (limit %d)" % [
 			tag, t, referee.phase, referee.round_ticks, rule_limit + ROUND_LIMIT_TICKS])

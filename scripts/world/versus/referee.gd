@@ -130,6 +130,8 @@ var sudden_death_at: int = -1
 var cap_at: int = -1
 ## True once the hard cap ended this round ([method ended_by_cap]).
 var _capped: bool = false
+## Heroes the arena squeezed out of its side this round ([method _squeezed_out]; the soak counts them).
+var squeezed_out: int = 0
 
 # --- Per slot (index = player slot) -------------------------------------------------------------------------------
 var _stack: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
@@ -307,6 +309,7 @@ func begin_round(index: int) -> void:
 	sudden_death_at = _sudden_death_start()
 	cap_at = -1
 	_capped = false
+	squeezed_out = 0
 	level.set_wind(0)
 	level.set_darkness(rules.has(VersusRules.LIGHTS_OUT))
 	var spawns: Array[Vector2i] = VersusArena.spawn_points(level)
@@ -1432,6 +1435,7 @@ func _player_step() -> void:
 			continue
 		_wrap_hero(hero)
 		if _squeezed_out(hero):
+			squeezed_out += 1
 			knock_out(hero, CAUSE_SQUEEZED)
 			continue
 		var slot: int = hero.slot

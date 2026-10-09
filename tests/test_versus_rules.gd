@@ -445,6 +445,7 @@ func test_a_hero_squeezed_out_of_the_arenas_side_is_knocked_out() -> void:
 	heroes[1].teleport(Vector2i(-10, FLOOR_Y))
 	Sim.step(1)
 	assert_true(heroes[1].dead, "left of the arena: knocked out")
+	assert_eq(referee.squeezed_out, 1, "and counted")
 	assert_eq(kos.size(), 1, "one knock-out")
 	if kos.size() == 1:
 		assert_eq(kos[0][0], heroes[1])

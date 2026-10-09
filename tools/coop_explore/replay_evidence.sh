@@ -16,7 +16,7 @@
 # WHICH RULE HOLDS A ROUTE: `PRE2_GATE_RULES_OFF=<bits> EVIDENCE_OUT=build/coop_explore/evidence_off bash
 # tools/coop_explore/replay_evidence.sh` replays the set with gate rules switched off (PlayerBase.GATE_R1 = 1 the
 # spring launch, R3 = 2 the ward, R5 = 4 the closed door, R6 = 8 the idle hero; 15 = all four). A route that reaches
-# then and not without the switch stands at today's geometry and is held by that rule (11 of the 33 routes of wf11
+# then and not without the switch stands at today's geometry and is held by that rule (10 of the 33 routes of wf11
 # with all four off; the others are held by the level as rebuilt or by a rule without a switch - the slot-bound
 # bonds G72, the coil's own level G81, the shield G82). Results found with a switch are kept under their own keys.
 # Owner: world-B (PLAN.md 4.1). The G3b verifier's verify_evidence.sh, adopted in wf11.
