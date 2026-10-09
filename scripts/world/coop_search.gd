@@ -77,8 +77,29 @@ extends RefCounted
 ##  [method idle_partner_carries] finds the engine still giving a ride on an idle head (since G33 it does not).
 ## The cheap flood of [method flood_reaches] (no chain of feet cells on the grid at rest) is kept as a diagnostic
 ## (result "flood"); it never decides a gate: the search runs on every gate.
+## THE G3b ROUND (wf11; the orchestrator's R7, DESIGN.md G71-G79): the G3b verifier put one hero past 19 gate rows
+## this search had refused, by continuous play it never tried. What changed here:
+##  - THE EXACT RESET ([method Searcher.reset_world]): a run starts from the state a fresh process builds - Sim.tick
+##    at TICK_BASE, the total-tick clock at TOTAL_TICK_BASE, every entity in its level-file state by its DEEP STATE (every script
+##    variable: put back, or the entity spawned again in its place in the tick order), the heroes, the game and the
+##    level likewise. "Replays missed" is 0 and a route does the same in any process (tools/coop_explore/exact.sh).
+##  - THE WARDS (G73): the search world declares the ward of every x2 tablet of the file (the tablets themselves are
+##    not in it), so the engine's "no enemy gives lift in a ward" holds here as in the game.
+##  - THE LONG CLIMB (G74): a hero hanging still on a vine is a resting point ([method Searcher._resting]; a node
+##    that replays the run that hung him there), `climb-long` is 240 ticks of Up, `wait-up` rides a blowhole into a
+##    vine, `long-jump` holds the direction all the way down from a height.
+##  - THE WIND'S PHASES (G79): in a file with a looping wind script every move of an unchanged node is played once
+##    per phase of the script (SearchWind.phases), and `gust-jump` lets the gust carry him before Up.
+##  - NEW PROBES: the RIDE on every enemy of the area (Up held, coming down on its head again and again), the LURE of
+##    every follower of the WHOLE level (the world holds them all: to where it wakes, back to the gate, the ride), a
+##    STRIKE BEGUN ON A SPRING, the SECOND THROW at a bonded pair or a drum pair.
+##  - THE SLOT RULE (G72): [method pair_slot_bound] asks the engine; where a bond or a drum pair is bound to two
+##    slots its solo minimum is PAIR_NEVER and its window record "slot_bound" - from the rule, not from a run.
+## The search is proof (a) of a gate row; (b) the evidence set and (c) the continuous-play explorer are
+## tools/coop_explore (tests/test_coop_gates.gd shows the three per row).
 ## Limits (what "exhaustive" is exhaustive OVER): the search's moves from its resting points - not the full input
-## space. The moving things (walking enemies, platforms, geysers) start every move in their level-file phase, so a
+## space. The moving things (walking enemies, platforms, geysers) start every move in the phase of TICK_BASE
+## (`wait-long` lets a whole geyser cycle pass, the wind is played in each of its phases), so a
 ## timing that needs a walker or a lift somewhere else than its post at the start of a move is only found by a move
 ## that runs through it, by a probe, or through a changed world; moves start from rest (momentum between moves is not
 ## carried - the probes carry it); the hero holds one special per move (each special is tried), not two; nodes outside
@@ -156,6 +177,13 @@ const THROW_REACH_CELLS: Vector2i = Vector2i(18, 9)
 const HIGH_STRIKE_REACH_CELLS: Vector2i = Vector2i(4, 9)
 ## A `climb` move is tried within this many px (x) of a vine's column and from its top to this far under its foot.
 const CLIMB_REACH_PX: Vector2i = Vector2i(12, 96)
+## Rests on a vine closer than this (px of height) are one node ([method Searcher._key_of]), and the moves besides
+## the climbing ones that are played from one ([method Searcher._macro_fits]).
+const CLIMB_KEY_PX: int = 32
+const CLIMB_NODE_MOVES: Array[String] = [
+	"jump R", "jump L", "hop R", "hop L", "run-jump R", "run-jump L", "walk R4", "walk L4", "walk R10", "walk L10",
+	"jump up", "drop",
+]
 ## Archetypes that come to the hero (DESIGN.md G66): the BOUNCE probes wait for one and ride its head with Up held
 ## (DB1's "harrier elevator": 220 px over the floor), whether it has a co-op role or not.
 const FOLLOWER_IDS: Array[String] = [
@@ -187,8 +215,37 @@ const PROBE_IDLE_BAIT: String = "idle-bait"
 const PROBE_THROWN: String = "thrown-special"
 const PROBE_PLATES: String = "plates"
 const PROBE_EGG: String = "egg placement"
+## wf11 (R7, the causes of G3b): the RIDE on every enemy's head (Up held, coming down on it again and again: a
+## leaper over a gap, a lurker at its lip, a perched keeper), the LURE of every follower of the whole level (to where
+## it wakes, back to the gate with it in tow, then the ride), a STRIKE BEGUN ON A SPRING (Up from its hop).
+const PROBE_RIDE: String = "ride"
+const PROBE_LURE: String = "lure"
+const PROBE_SPRING: String = "strike-on-spring"
 const PROBE_FAMILIES: Array[String] = [PROBE_HOP_OVER, PROBE_CHARGE_UNDER, PROBE_IDLE_BAIT, PROBE_THROWN,
-	PROBE_PLATES, PROBE_EGG]
+	PROBE_PLATES, PROBE_EGG, PROBE_RIDE, PROBE_LURE, PROBE_SPRING]
+## The enemies a lone hero can lead (FOLLOWER_IDS and the Roller): the search world holds every one of the WHOLE
+## level, whatever the gate's columns, and the lure probes fetch each that stands within LURE_MAX_COLS of the far
+## cell.
+const LURE_IDS: Array[String] = [
+	"enemies/harrier", "enemies/stinger", "enemies/hopper", "enemies/charger", "enemies/leaper", "enemies/lurker",
+	"enemies/digger", "enemies/roller",
+]
+const LURE_MAX_COLS: int = 140
+## A lure probe's ticks (the way there, the way back at the follower's pace, the ride) and its phases' limits: 140
+## columns are 448 ticks at the hero's 5 px a tick and 747 back at a Harrier's 3 - with the ride, a path of
+## BOUND_TICKS. What stands farther off is beyond a 1457-tick path (a whole level is seldom wider).
+const PROBE_LURE_TICKS: int = 1440
+const LURE_WAKE_TICKS: int = 520
+const LURE_LEAD_TICKS: int = 780
+## Ride probes: ticks the hero stands first, and the ticks of the ride.
+const PROBE_RIDE_WAITS: Array[int] = [0, 48]
+## Strike-on-spring probes: the ticks of the low strike before Up, and where on the pad he stands (px from its centre).
+const PROBE_SPRING_LOWS: Array[int] = [8, 9, 10, 11]
+const PROBE_SPRING_SPOTS: Array[int] = [0, -6, 6]
+## Second-throw probes (a pair of bond members or drums): the ticks between the two throws.
+const PROBE_PAIR_DELAYS: Array[int] = [0, 8, 16]
+## [method pair_solo_min] for a pair the engine binds to two slots (G72): one hero never meets it.
+const PAIR_NEVER: int = 1 << 30
 ## Plate races: ticks on the plate before the run for the door, and the px before the door where he jumps or crawls.
 const PROBE_RACE_WAITS: Array[int] = [0, 40, 120]
 const PROBE_RACE_PX: Array[int] = [16, 48]
@@ -231,7 +288,7 @@ const PROBE_LEAP_PX: Array[int] = [16, 48, 80]
 ## a first pass only once BOUNDED_MIN_NODES resting points were expanded (G59: a bounded refusal counts from there) -
 ## or at TICK_HARD_FACTOR budgets, whatever it expanded (then the gate is UNPROVEN, not refused); a second pass (the
 ## first ran dry: [method Searcher.explore]) it stops at once.
-const MAX_TICKS: int = 1200000
+const MAX_TICKS: int = 1600000
 const TICK_HARD_FACTOR: int = 2
 ## Nodes one gate's search level may spawn (entities respawned at a reset, shots, dropped items) before the search
 ## stops as bounded ([method SearchLevel.spawn]: Godot's message queue holds about 1.4 million deferred calls and a
@@ -373,13 +430,30 @@ class SearchWind:
 		_script = script
 		_loop = loop
 
-	## The level start: no wind, then the entries of tick 0 and 1 (Level._setup_world_state).
-	func restart() -> void:
+	## The level start: no wind, then the entries of tick 0 and 1 (Level._setup_world_state). With `at` > 0 the
+	## script as it stands `at` play ticks into its loop (G79: the search plays every phase of a looping script - a
+	## hero at rest may wait for the gust).
+	func restart(at: int = 0) -> void:
 		_index = 0
 		_base = 0
 		_play = 0
 		_level.set_wind(0)
 		_apply()
+		for i: int in at:
+			_play += 1
+			_apply()
+
+	## The play ticks of one loop at which the wind changes, 0 first (only [0] for a script that does not loop: its
+	## phases pass once, early in a run).
+	func phases() -> PackedInt32Array:
+		var result: PackedInt32Array = PackedInt32Array([0])
+		if _loop <= 0:
+			return result
+		for entry: Vector2i in _script:
+			var at: int = maxi(entry.x - 1, 0)
+			if at > 0 and at < _loop and not result.has(at):
+				result.append(at)
+		return result
 
 	## Phase WORLD (Level._world_step).
 	func step() -> void:
@@ -404,9 +478,13 @@ class ProbePolicy:
 	var label: String = ""
 	## The far cell's centre x (px): where the GO phase heads.
 	var far_x: int = 0
+	## The ticks the policy plays at most ([method Searcher.probe_run]).
+	var ticks: int = PROBE_TICKS
 	var _hops: int = 0
 	var _blocked: int = 0
 	var _go_jump: int = 0
+	var _nav_blocked: int = 0
+	var _nav_jump: int = 0
 
 	func begin(_searcher: Searcher) -> void:
 		pass
@@ -422,6 +500,56 @@ class ProbePolicy:
 	func blocked(hero: PlayerBase, pressing: bool) -> bool:
 		_blocked = _blocked + 1 if pressing and hero.is_grounded() and hero.xvel == 0 else 0
 		return _blocked >= 4
+
+	## The keys of one tick on the way to x `x` (a crude navigator: a jump at a pit's lip or when a step stops him;
+	## the G3b verifier's lure).
+	func navigate(searcher: Searcher, x: int, tolerance: int) -> int:
+		var hero: PlayerBase = searcher.hero
+		var dir: int = signi(x - hero.sim_pos.x)
+		if absi(x - hero.sim_pos.x) <= tolerance:
+			dir = 0
+		var keys: int = dir_flag(dir)
+		if _nav_jump > 0:
+			_nav_jump -= 1
+			return Defs.IN_UP | keys
+		if dir == 0 or not hero.is_grounded():
+			return keys
+		_nav_blocked = _nav_blocked + 1 if hero.xvel == 0 else 0
+		var grid: TileGrid = searcher.level.grid
+		var col: int = Tuning.to_cell(hero.sim_pos.x + dir * 14)
+		var row: int = Tuning.to_cell(hero.sim_pos.y + 2)
+		var pit: bool = grid.in_bounds(col, row) and not TileGrid.is_ground(grid.floor_at(col, row)) \
+				and (not grid.in_bounds(col, row + 1) or not TileGrid.is_ground(grid.floor_at(col, row + 1)))
+		if (pit or _nav_blocked >= 4) and hero.no_jump == 0:
+			_nav_blocked = 0
+			_nav_jump = 8
+			return Defs.IN_UP | keys
+		return keys
+
+	## The keys of one tick of a RIDE (the G3b verifier's move): Up held; over an awake enemy's top, or falling fast
+	## (any contact is a stomp then), steer onto it; beside it keep clear; with nobody near, `bias` (a Defs.IN_* side
+	## or 0). `held` is the policy's own flag (the key is let go for one tick on the ground: the next press is a new
+	## jump).
+	func ride(searcher: Searcher, bias: int) -> int:
+		var hero: PlayerBase = searcher.hero
+		if hero.is_grounded():
+			if _ride_held:
+				_ride_held = false
+				return bias
+			_ride_held = true
+			return Defs.IN_UP | bias
+		_ride_held = true
+		var enemy: EnemyBase = searcher.nearest_awake_enemy(200)
+		if enemy == null:
+			return Defs.IN_UP | bias
+		var dx: int = enemy.sim_pos.x - hero.sim_pos.x
+		if hero.sim_pos.y <= enemy.sim_pos.y - enemy.box_h + 3 or hero.yvel >= 120:
+			return Defs.IN_UP | (dir_flag(signi(dx)) if absi(dx) > 2 else 0)
+		if absi(dx) < 30:
+			return Defs.IN_UP | dir_flag(-signi(dx))
+		return Defs.IN_UP | bias
+
+	var _ride_held: bool = false
 
 	## The GO phase: on toward the far cell, a full jump whenever a step or wall stops him (a crude navigator - its
 	## rest point goes to the BFS, which does the real navigation from there).
@@ -725,29 +853,197 @@ class LeapPolicy:
 		return go(hero)
 
 
-## HOP-OVER, the BOUNCE RIDE (DB1's wf10 #4, the "harrier elevator"): stand `wait` ticks (a follower comes), then jump
-## and keep Up held in the air - a head bounce with Up held is the high one (-224) - again and again, steering toward
-## the far cell (`steer` 1) or straight up (0), until the probe's ticks are over.
-class BouncePolicy:
+## RIDE (wf11, cause A of G3b; DB1's "harrier elevator" of wf10 was its first form): stand `wait` ticks (a follower
+## comes, a leaper leaps), then Up held - a head bounce with Up held is the high one (-224) - coming down on the
+## nearest awake enemy again and again ([method ProbePolicy.ride]), drifting toward the far cell (`steer` 1) or
+## staying over it (0), until the probe's ticks are over.
+class RidePolicy:
 	extends ProbePolicy
 
 	var wait: int = 0
 	var steer: int = 1
-	var _held: bool = false
 
 	func begin(_searcher: Searcher) -> void:
-		_held = false
+		_ride_held = false
 
 	func next(searcher: Searcher, t: int) -> int:
-		var hero: PlayerBase = searcher.hero
 		if t < wait:
 			return 0
-		var dir: int = signi(far_x - hero.sim_pos.x) * steer
-		if hero.is_grounded() and _held:
-			_held = false   # (one tick off the key on the ground: the next press is a new jump)
-			return dir_flag(dir)
-		_held = true
-		return Defs.IN_UP | dir_flag(dir)
+		return ride(searcher, dir_flag(signi(far_x - searcher.hero.sim_pos.x)) if steer == 1 else 0)
+
+
+## LURE (wf11, cause A of G3b: "a woken enemy is never led"): walk to where the follower at entity `target_index`
+## wakes (anywhere in the level), until it comes after him; lead it back to `ride_x` (the probe's site, at the gate) at
+## a pace it keeps up with - he waits when it falls 70 px behind; then the RIDE on it toward the far cell.
+class LurePolicy:
+	extends ProbePolicy
+
+	enum Phase { WAKE, LEAD, RIDE }
+
+	var target_index: int = -1
+	var ride_x: int = 0
+	var steer: int = 1
+	var _target: EnemyBase = null
+	var _phase: int = Phase.WAKE
+	var _since: int = 0
+
+	func begin(searcher: Searcher) -> void:
+		_target = searcher.entity_at(target_index) as EnemyBase
+		_phase = Phase.WAKE
+		_since = 0
+		_nav_blocked = 0
+		_nav_jump = 0
+		_ride_held = false
+
+	func next(searcher: Searcher, _t: int) -> int:
+		var hero: PlayerBase = searcher.hero
+		_since += 1
+		if _target == null or not is_instance_valid(_target) or _target.dead:
+			return -1
+		match _phase:
+			Phase.WAKE:
+				if _target.awake and (_target.sim_pos != _target.spawn_pos or _target.get(&"_circling") == true):
+					_phase = Phase.LEAD
+					_since = 0
+					return 0
+				if _since > LURE_WAKE_TICKS:
+					return -1
+				return navigate(searcher, _target.sim_pos.x, 4)
+			Phase.LEAD:
+				var gap: int = absi(_target.sim_pos.x - hero.sim_pos.x)
+				if absi(hero.sim_pos.x - ride_x) <= 5 and hero.is_grounded() and gap < 90:
+					_phase = Phase.RIDE
+					_since = 0
+					return 0
+				if _since > LURE_LEAD_TICKS or not _target.awake:
+					return -1
+				if gap > 70 and hero.is_grounded() and _nav_jump == 0:
+					return 0
+				return navigate(searcher, ride_x, 5)
+		return ride(searcher, dir_flag(signi(far_x - hero.sim_pos.x)) if steer == 1 else 0)
+
+
+## STRIKE-ON-SPRING (wf11, cause B of G3b): onto the spring pad at `pad_x` (`offset` px from its centre), a low
+## strike begun there (`low` ticks) and Up from its hop - the pad fires at the hop's apex; before R1 the jump table
+## was added to its launch (256 px) - then on toward the far cell in the air (`steer` 1) or straight up (0).
+class SpringPolicy:
+	extends ProbePolicy
+
+	enum Phase { APPROACH, SETTLE, STRIKE, FLY }
+
+	var pad_x: int = 0
+	var offset: int = 0
+	var low: int = 10
+	var steer: int = 1
+	var _phase: int = Phase.APPROACH
+	var _since: int = 0
+
+	func begin(_searcher: Searcher) -> void:
+		_phase = Phase.APPROACH
+		_since = 0
+		_nav_blocked = 0
+		_nav_jump = 0
+		_blocked = 0
+		_go_jump = 0
+
+	func next(searcher: Searcher, _t: int) -> int:
+		var hero: PlayerBase = searcher.hero
+		_since += 1
+		var side: int = dir_flag(signi(far_x - hero.sim_pos.x)) if steer == 1 else 0
+		match _phase:
+			Phase.APPROACH:
+				if (absi(pad_x + offset - hero.sim_pos.x) <= 2 and hero.is_grounded()) or _since > 200:
+					_phase = Phase.SETTLE
+					_since = 0
+					return 0
+				return navigate(searcher, pad_x + offset, 2)
+			Phase.SETTLE:
+				if _since >= 6:
+					_phase = Phase.STRIKE
+					_since = 0
+				return 0
+			Phase.STRIKE:
+				if _since <= low:
+					return Defs.IN_DOWN | Defs.IN_FIRE
+				if _since <= low + 12:
+					return Defs.IN_UP | side
+				_phase = Phase.FLY
+				_since = 0
+				return side
+			Phase.FLY:
+				if _since > 60 or (hero.is_grounded() and _since > 2):
+					return go(hero)
+				return side
+		return go(hero)
+
+
+## THROWN-SPECIAL, the SECOND THROW (wf11, cause C of G3b: a bond or a drum pair broken by two hits in flight): to
+## `spot_x`, the special thrown toward the member at `first_x`, then - `delay` ticks later - a second throw (or the
+## club, `club`) toward the member at `second_x`; with `jump` both from one jump. Then GO: the bond's door, should
+## it open, is on the way.
+class PairPolicy:
+	extends ProbePolicy
+
+	enum Phase { APPROACH, FIRST, WAIT, SECOND, STRIKE, GO }
+
+	var spot_x: int = 0
+	var first_x: int = 0
+	var second_x: int = 0
+	var delay: int = 0
+	var jump: bool = false
+	var club: bool = false
+	var _phase: int = Phase.APPROACH
+	var _since: int = 0
+
+	func begin(_searcher: Searcher) -> void:
+		_phase = Phase.APPROACH
+		_since = 0
+		_nav_blocked = 0
+		_nav_jump = 0
+		_blocked = 0
+		_go_jump = 0
+
+	func next(searcher: Searcher, _t: int) -> int:
+		var hero: PlayerBase = searcher.hero
+		_since += 1
+		var first: int = dir_flag(signi(first_x - hero.sim_pos.x))
+		var second: int = dir_flag(signi(second_x - hero.sim_pos.x))
+		match _phase:
+			Phase.APPROACH:
+				if (absi(spot_x - hero.sim_pos.x) <= 6 and hero.is_grounded()) or _since > 240:
+					_phase = Phase.FIRST
+					_since = 0
+					return first
+				return navigate(searcher, spot_x, 6)
+			Phase.FIRST:
+				if jump:
+					if _since <= 6:
+						return Defs.IN_UP | first
+					if _since <= 12:
+						return first | Defs.IN_FIRE
+				elif _since <= 6:
+					return Defs.IN_FIRE
+				_phase = Phase.WAIT
+				_since = 0
+				return 0
+			Phase.WAIT:
+				if _since > delay:
+					_phase = Phase.SECOND
+					_since = 0
+					return second
+				return 0
+			Phase.SECOND:
+				if club and absi(second_x - hero.sim_pos.x) > 28 and _since < 120:
+					return navigate(searcher, second_x, 20)
+				_phase = Phase.STRIKE
+				_since = 0
+				return second
+			Phase.STRIKE:
+				if _since <= (10 if club else 6):
+					return (second | Defs.IN_FIRE) if jump and not hero.is_grounded() else Defs.IN_FIRE
+				_phase = Phase.GO
+				return 0
+		return go(hero)
 
 
 ## EGG PLACEMENT: walk past a spot so that the drifting egg (PartyTuning.EGG_OFFSET_X / _Y behind and over his feet)
@@ -861,6 +1157,13 @@ class Searcher:
 	## fresh process builds: [method reset_world]. What the search saved of the process's own clocks ([method close]
 	## puts them back, the total moved on by what was played).
 	var _clock_saved: bool = false
+	## Sim.tick at the start of every run of this world (TICK_BASE; set it before [method build_world]: a route file
+	## recorded on another base - the G3b evidence on 0 - is replayed on its own).
+	var tick_base: int = TICK_BASE
+	## What a search world built while another one stands (an engine probe asked for in the middle of a search) hands
+	## back at [method close]: the scripts that drove the two input slots and the other world's deep labels.
+	var _saved_inputs: Array[Callable] = []
+	var _saved_labels: Dictionary = {}
 	var _saved_tick: int = 0
 	var _saved_total: int = 0
 	var _saved_phase_runs: PackedInt32Array = PackedInt32Array()
@@ -893,8 +1196,16 @@ class Searcher:
 	## driver anew; entities still not in their level-file state after RESET_PASSES (a world that is NOT exact:
 	## reported, and such a search is never "exhaustive").
 	var respawns: int = 0
+	## Record entities a reset put back variable by variable (the level's own reset had left them a counter, a tick,
+	## a resolved cache), and their deep snapshots in the level-file world.
+	var restores: int = 0
+	var _deep_snaps: Array = []
 	var party_respawns: int = 0
 	var drift: int = 0
+	## Times a hero's or the driver's variables were put back from [member _party_snaps] (their deep snapshots in the
+	## canonical placement).
+	var party_restores: int = 0
+	var _party_snaps: Array = []
 	## [member CoopSearch.reset_audit]: entities that had not ticked and were changed all the same.
 	var audit_drift: int = 0
 	var _flags: PackedInt32Array = PackedInt32Array()
@@ -929,8 +1240,17 @@ class Searcher:
 	var _probe_drums: Array[int] = []
 	var _probe_doors: Array[int] = []
 	var _probe_mechs: Array[int] = []
-	## ... and of the enemies of a following archetype without a co-op role (FOLLOWER_IDS): the bounce probes' targets.
+	## ... of every enemy without a co-op role (the ride probes' targets; before wf11 only the following archetypes),
+	## of the spring pads, and of the enemies a lone hero can lead (LURE_IDS, no keeper: the lure probes fetch them from
+	## anywhere in the level).
 	var _probe_followers: Array[int] = []
+	var _probe_springs: Array[int] = []
+	var _lure_enemies: Array[int] = []
+	## The wards the search declared to its level (G73: one owner object per x2 tablet of the file).
+	var _ward_owners: Array[RefCounted] = []
+	## The play ticks at which the level's wind script changes within one loop (0 first; [0] without a script): an
+	## unchanged node plays every move once per phase (G79).
+	var _wind_phases: PackedInt32Array = PackedInt32Array([0])
 	## [x of the column, top y, foot y] of every vine of the world (rolled ones as they hang once unrolled): where the
 	## climb moves are tried ([method _macro_fits]).
 	var _vines: Array[Vector3i] = []
@@ -986,8 +1306,10 @@ class Searcher:
 		if not Spawner.exists(PLAYER_ID):
 			return false
 		_saved_level = Game.level
-		# The clocks at zero before anything is spawned: what an entity notes of them while it enters is then the
-		# same in every process (the exact reset).
+		_saved_inputs = [GameInput.get_scripted_slot(0), GameInput.get_scripted_slot(PARTNER_SLOT)]
+		_saved_labels = CoopSearch._deep_labels
+		# The clocks at their start before anything is spawned: what an entity notes of them while it enters is then
+		# the same in every process (the exact reset).
 		_clock_saved = true
 		_saved_tick = Sim.tick
 		_saved_total = Sim.total_ticks
@@ -1017,6 +1339,20 @@ class Searcher:
 			wind_driver.setup(_wind.step, Callable(), Callable())
 			level.add_child(wind_driver)
 			_kept[wind_driver.get_instance_id()] = true
+			_wind_phases = _wind.phases()
+		# The wards of the file's x2 tablets (G73). The tablets themselves are left out of a search world
+		# (WORLD_SKIP_IDS), and in the game each declares its ward to the level when it enters: the search declares
+		# every ward of the file in this difficulty, whatever the gate's columns - with the tablet's OWN function
+		# (X2Tablet.ward_columns: one rule for the game and the search; the level clips it to the map).
+		for record: Dictionary in data.entity_records():
+			if String(record["id"]) != "objects/x2_tablet" or not LevelText.applies_to(record["params"], difficulty):
+				continue
+			var tablet: Dictionary = LevelValidator.parse_tablet(record)
+			var ward: Vector2i = X2Tablet.ward_columns(tablet["cell"].x, tablet["far"].x,
+					(record["params"] as Dictionary).get("ward", ""))
+			var owner: RefCounted = RefCounted.new()
+			_ward_owners.append(owner)
+			level.set_ward(owner, ward.x, ward.y)
 		for record: Dictionary in CoopSearch.world_record_list(data, difficulty, columns):
 			var id: String = String(record["id"])
 			var col: int = int(record["col"])
@@ -1044,8 +1380,12 @@ class Searcher:
 				_bait_spots.append_array(bait_spots(node as EnemyBase))
 				if CoopSearch.has_coop_role(node as EnemyBase):
 					_probe_enemies.append(_entities.size() - 1)
-				elif FOLLOWER_IDS.has(id):
+				elif id != "enemies/decoration":
 					_probe_followers.append(_entities.size() - 1)
+				if LURE_IDS.has(id) and (node as EnemyBase).keeper == &"":
+					_lure_enemies.append(_entities.size() - 1)
+			elif node is SpringPad:
+				_probe_springs.append(_entities.size() - 1)
 			elif node is Plate:
 				_probe_plates.append(_entities.size() - 1)
 			elif id == "objects/drum":
@@ -1078,16 +1418,15 @@ class Searcher:
 		for run_state: PlayerRun in Game.runs:
 			_run_snaps.append(CoopSearch.snapshot(run_state))
 		reset_world()
-		for entity: SimEntity in _entities:
-			_baseline_parts.append(CoopSearch.probe(entity) if entity != null and is_instance_valid(entity) else "gone")
 		_baseline = signature()
 		return true
 
-	## The clocks of a search world at the start of a run: tick 0 of the level, of the process and of every phase,
-	## the dropped-item slots free, the input of the tick before released.
+	## The clocks of a search world at the start of a run: the level's tick at [member tick_base], the phase counters
+	## at zero, the process's total clock at TOTAL_TICK_BASE, the dropped-item slots free, the input of the tick before
+	## released.
 	func _zero_clocks() -> void:
-		Sim.tick = 0
-		Sim.total_ticks = 0
+		Sim.tick = tick_base
+		Sim.total_ticks = TOTAL_TICK_BASE
 		Sim._phase_runs.fill(0)
 		CollectibleBase._drop_slots_used = 0
 		for slot: int in Defs.MAX_PLAYERS:
@@ -1112,6 +1451,11 @@ class Searcher:
 		GameInput.clear_scripted()
 		if world:
 			GameInput.clear_scripted_slot(PARTNER_SLOT)
+		# The world this one was built inside drives its heroes again.
+		for slot: int in _saved_inputs.size():
+			if _saved_inputs[slot].is_valid():
+				GameInput.set_scripted_slot([0, PARTNER_SLOT][slot], _saved_inputs[slot])
+		_saved_inputs = []
 		if level != null and is_instance_valid(level):
 			level.get_parent().remove_child(level)
 			level.free()
@@ -1122,13 +1466,14 @@ class Searcher:
 		_entities.clear()
 		if _clock_saved:
 			# The process's own clocks again; its total moved on by what the search played.
-			_elapsed += Sim.total_ticks
+			_elapsed += maxi(Sim.total_ticks - TOTAL_TICK_BASE, 0)
 			Sim.tick = _saved_tick
 			Sim.total_ticks = _saved_total + _elapsed
 			for phase: int in _saved_phase_runs.size():
 				Sim._phase_runs[phase] = _saved_phase_runs[phase] + _elapsed
 			CollectibleBase._drop_slots_used = _saved_drop_slots
-			CoopSearch._deep_labels = {}
+			CoopSearch._deep_labels = _saved_labels
+			_saved_labels = {}
 			_clock_saved = false
 		if _game_saved:
 			Game.mode = _saved_mode
@@ -1170,7 +1515,8 @@ class Searcher:
 				(node as SimEntity).sim_active = false
 			level.remove_child(node)
 			node.free()
-		_elapsed += Sim.total_ticks
+		_elapsed += maxi(Sim.total_ticks - TOTAL_TICK_BASE, 0)
+		var clock: int = Time.get_ticks_usec()
 		var first: bool = _deep_base.is_empty()
 		if first:
 			for i: int in _entities.size():
@@ -1185,6 +1531,8 @@ class Searcher:
 		# then adds no tick to its counters - it is what the reset before left, as in a fresh process.
 		_zero_clocks()
 		level.woken.clear()
+		CoopSearch.profile_add(&"reset: wake", clock)
+		clock = Time.get_ticks_usec()
 		level.reset_entities()
 		for id: int in level.woken:
 			if _index_of.has(id):
@@ -1192,19 +1540,26 @@ class Searcher:
 		level.woken.clear()
 		level.restore_cells()
 		level._doze_screen_pending.clear()
+		CoopSearch.profile_add(&"reset: level", clock)
+		clock = Time.get_ticks_usec()
 		if first:
 			_capture_base()
 		else:
 			_restore_entities()
 			level.restore_cells()
+		CoopSearch.profile_add(&"reset: entities", clock)
+		clock = Time.get_ticks_usec()
 		CoopSearch.restore(level, _level_snap)
 		CoopSearch.restore(Game, _game_snap)
 		for slot: int in mini(Game.runs.size(), _run_snaps.size()):
 			CoopSearch.restore(Game.runs[slot], _run_snaps[slot])
+		CoopSearch.profile_add(&"reset: game", clock)
+		clock = Time.get_ticks_usec()
 		_reset_party(first)
 		_zero_clocks()
 		_touched.clear()
 		Sim.rng.reseed(SEARCH_SEED)
+		CoopSearch.profile_add(&"reset: party", clock)
 
 	## The record entities that ticked since the last reset: those the run's start left awake ([method _note_awake]),
 	## those the doze manager woke since, and whatever is awake now.
@@ -1225,14 +1580,19 @@ class Searcher:
 	## who names whom in it.
 	func _capture_base() -> void:
 		_deep_base.resize(_entities.size())
+		_deep_snaps.resize(_entities.size())
+		_baseline_parts.resize(_entities.size())
 		for i: int in _entities.size():
 			var entity: SimEntity = entity_at(i)
 			if entity == null:
 				_deep_base[i] = "gone"
+				_baseline_parts[i] = "gone"
 				continue
 			entity.on_screen = false
 			CoopSearch._deep_refs = {}
 			_deep_base[i] = CoopSearch.deep_state(entity)
+			_deep_snaps[i] = CoopSearch.deep_snapshot(entity)
+			_baseline_parts[i] = CoopSearch.probe(entity)
 			for label: String in CoopSearch._deep_refs:
 				var named: int = label.substr(1).to_int() if label.substr(1).is_valid_int() else -1
 				if named >= 0 and named != i:
@@ -1245,6 +1605,7 @@ class Searcher:
 	## that had not ticked but differs is counted ([member audit_drift]) before it is respawned like the others.
 	func _restore_entities() -> void:
 		var check: Dictionary = _touched.duplicate()
+		var slow: bool = CoopSearch.reset_audit or CoopSearch.collect_reset_report
 		if CoopSearch.reset_audit:
 			for i: int in _entities.size():
 				check[i] = true
@@ -1254,16 +1615,36 @@ class Searcher:
 				var entity: SimEntity = entity_at(i)
 				if entity != null:
 					entity.on_screen = false
-				var now: String = CoopSearch.deep_state(entity) if entity != null else "gone"
-				if now == _deep_base[i]:
-					continue
+				# What the level's own reset brought back as far as the game needs it (an enemy at its post, a door
+				# shut) and nothing of the world's signature names: the variables that reset leaves (a wake-up
+				# place, a hit's tick, a counter, a cache resolved on the first tick) are put back one by one from
+				# the entity's deep snapshot. What the level reset does NOT bring back (a sprung pot, a moved
+				# boulder, a collected item, an unrolled vine) is spawned again, as before.
+				var keeps: bool = attempt == 0 and entity != null and not entity.is_queued_for_deletion() \
+						and CoopSearch.reset_keeps(entity) and CoopSearch.probe(entity) == _baseline_parts[i]
+				if slow or not keeps:
+					# (the deep state as text: the audit, the report, a respawned entity against the level file's)
+					if (CoopSearch.deep_state(entity) if entity != null else "gone") == _deep_base[i]:
+						continue
+					if CoopSearch.reset_audit and attempt == 0 and not _touched.has(i):
+						audit_drift += 1
+						CoopSearch.note_reset_diff("AUDIT (never ticked) " + _target_name(i), entity, _deep_base[i])
+					elif CoopSearch.collect_reset_report:
+						CoopSearch.note_reset_diff(("still " if attempt > 0 else "") + String(_records[i]["id"]),
+							entity, _deep_base[i])
+				if keeps:
+					var put_back: int = CoopSearch.deep_restore(entity, _deep_snaps[i])
+					if put_back >= 0:
+						restores += put_back
+						continue
+				if CoopSearch.collect_reset_report:
+					var why: String = "respawned (%s): %s" % ["gone" if entity == null else ("queued for deletion"
+						if entity.is_queued_for_deletion() else ("the level reset does not bring it back"
+						if not CoopSearch.reset_keeps(entity) else ("its signature part differs"
+						if CoopSearch.probe(entity) != _baseline_parts[i] else "its variables cannot be put back"))),
+						_records[i]["id"]]
+					CoopSearch.reset_report[why] = int(CoopSearch.reset_report.get(why, 0)) + 1
 				dirty.append(i)
-				if CoopSearch.reset_audit and attempt == 0 and not _touched.has(i):
-					audit_drift += 1
-					CoopSearch.note_reset_diff("AUDIT (never ticked) " + _target_name(i), entity, _deep_base[i])
-				elif CoopSearch.collect_reset_report:
-					CoopSearch.note_reset_diff(("still " if attempt > 0 else "") + String(_records[i]["id"]), entity,
-						_deep_base[i])
 			if dirty.is_empty():
 				return
 			if attempt == RESET_PASSES:
@@ -1302,6 +1683,8 @@ class Searcher:
 		CoopSearch._deep_labels[node.get_instance_id()] = "#%d" % index
 		_take_place(node, _serials[index])
 		node._on_level_reset()
+		node.on_screen = false
+		_deep_snaps[index] = CoopSearch.deep_snapshot(node)
 
 	## Give `node` (just spawned: last in every order) the registration serial `serial` and the place that goes with
 	## it in Sim's phase lists and in the level's lists of its kind and tags.
@@ -1326,30 +1709,42 @@ class Searcher:
 			list.insert(at, node)
 
 	## The heroes and the driver in the level-file state: placed canonically ([method _canon_party]) and compared
-	## with what the build left; when a hero or the driver differs (a field no respawn clears) all three are built
-	## anew in their places.
+	## with what the build left. A hero's own respawn clears what the game needs cleared; what it leaves (the last
+	## strike's box, the last death's cause, a cache of the map's edges) is put back variable by variable
+	## ([method CoopSearch.deep_restore]: the hero, his components, his run); should one still differ then, all three
+	## are built anew in their places.
 	func _reset_party(first: bool) -> void:
 		_canon_party()
 		if first:
 			_hero_base = CoopSearch.deep_state(hero)
 			_partner_base = CoopSearch.deep_state(partner)
 			_driver_base = CoopSearch.deep_state(driver)
+			_party_snaps = [CoopSearch.deep_snapshot(hero), CoopSearch.deep_snapshot(partner),
+				CoopSearch.deep_snapshot(driver)]
 			return
-		for attempt: int in 2:
-			var same: bool = true
-			for pair: Array in [[hero, _hero_base, "player (the hero)"], [partner, _partner_base, "player (the partner)"],
-					[driver, _driver_base, "party driver"]]:
-				if CoopSearch.deep_state(pair[0]) != str(pair[1]):
-					same = false
-					if CoopSearch.collect_reset_report:
-						CoopSearch.note_reset_diff(("still " if attempt > 0 else "") + str(pair[2]), pair[0], str(pair[1]))
-			if same:
-				return
-			if attempt == 1:
-				drift += 1
-				return
-			_respawn_party()
-			_canon_party()
+		var who: Array = [[hero, _hero_base, "player (the hero)"], [partner, _partner_base, "player (the partner)"],
+			[driver, _driver_base, "party driver"]]
+		var anew: bool = false
+		for k: int in who.size():
+			var pair: Array = who[k]
+			if CoopSearch.collect_reset_report and CoopSearch.deep_state(pair[0]) != str(pair[1]):
+				CoopSearch.note_reset_diff(str(pair[2]), pair[0], str(pair[1]))
+			var put_back: int = CoopSearch.deep_restore(pair[0], _party_snaps[k])
+			party_restores += maxi(put_back, 0)
+			anew = anew or put_back < 0
+		if not anew:
+			return
+		_respawn_party()
+		_canon_party()
+		_party_snaps = [CoopSearch.deep_snapshot(hero), CoopSearch.deep_snapshot(partner),
+			CoopSearch.deep_snapshot(driver)]
+		if CoopSearch.deep_state(hero) != _hero_base or CoopSearch.deep_state(partner) != _partner_base \
+				or CoopSearch.deep_state(driver) != _driver_base:
+			drift += 1
+			if CoopSearch.collect_reset_report:
+				CoopSearch.note_reset_diff("still player (the hero)", hero, _hero_base)
+				CoopSearch.note_reset_diff("still player (the partner)", partner, _partner_base)
+				CoopSearch.note_reset_diff("still party driver", driver, _driver_base)
 
 	## The canonical placement the heroes are compared in: both at the build's spots, full energy, the club in hand,
 	## the hero active and the partner idle.
@@ -1453,7 +1848,7 @@ class Searcher:
 			level.refresh_doze()
 			_note_awake()
 			if _wind != null:
-				_wind.restart()
+				_wind.restart(int(config.get("wind_at", 0)))
 		_first_tick = Sim.tick + 1
 		CoopSearch.profile_add(&"place", clock)
 
@@ -1472,7 +1867,20 @@ class Searcher:
 			# him back there, so the node is a changed one - its replay brings back exactly that platform and him on it.
 			var rest: Vector2i = outcome["pos"]
 			outcome["sig"] = "%s|support@%d,%d" % [str(outcome["sig"]), rest.x, rest.y]
+		elif bool(outcome.get("climb", false)):
+			# He hangs on a vine (wf11, G74 / R7: "a hero at rest on a vine is a node"): the same - a fresh run cannot
+			# hang him there, the node replays the run that did. So a climb of any length is a chain of nodes.
+			var hang: Vector2i = outcome["pos"]
+			outcome["sig"] = "%s|climb@%d,%d" % [str(outcome["sig"]), hang.x, hang.y]
 		return outcome
+
+	## True on a tick the hero is at rest: on the ground and still - or hanging still on a vine (no key held: he
+	## stays where he is; [member CoopSearch.climb_rests]).
+	func _resting() -> bool:
+		if hero.yvel != 0 or hero.xvel != 0:
+			return false
+		return hero.is_grounded() or (CoopSearch.climb_rests and hero.state == Defs.HeroState.CLIMB
+				and hero.sim_pos == hero.sim_prev)
 
 	## The hero's rest at the end of a run (`played`: every flag of the run so far; `skip`: its replayed ticks), with
 	## the WORLD SETTLED: when the world differs from the level file's, he waits on (no input, the ticks count) until
@@ -1508,7 +1916,7 @@ class Searcher:
 				var through: PackedInt32Array = played.duplicate()
 				through.resize(t)
 				return {"goal": true, "ticks": t - skip, "cell": cell, "played": through}
-			still = still + 1 if hero.is_grounded() and hero.yvel == 0 and hero.xvel == 0 else 0
+			still = still + 1 if _resting() else 0
 			var now: String = signature()
 			stable = stable + 1 if now == sig else 0
 			sig = now
@@ -1525,6 +1933,7 @@ class Searcher:
 	func _rest_now(played: PackedInt32Array, skip: int, sig: String) -> Dictionary:
 		return {"pos": hero.sim_pos, "ticks": played.size() - skip, "played": played, "sig": sig,
 			"support": hero.on_platform, "totem": hero.is_riding_totem(),
+			"climb": hero.state == Defs.HeroState.CLIMB and not hero.is_grounded(),
 			"partner_now": partner.sim_pos if partner != null and not partner.is_down() else NOWHERE}
 
 	## The tick loop of [method run].
@@ -1553,7 +1962,7 @@ class Searcher:
 			if goals.has(cell):
 				return {"goal": true, "ticks": t - skip, "cell": cell}
 			if t >= flags.size():
-				if hero.is_grounded() and hero.yvel == 0 and hero.xvel == 0:
+				if _resting():
 					still += 1
 					if still >= 2:
 						var played: PackedInt32Array = flags.duplicate()
@@ -1583,9 +1992,9 @@ class Searcher:
 		var done: bool = false
 		var t: int = 0
 		var outcome: Dictionary = {}
-		while t < PROBE_TICKS + SETTLE_TICKS:
+		while t < policy.ticks + SETTLE_TICKS:
 			var flag: int = 0
-			if not done and t < PROBE_TICKS:
+			if not done and t < policy.ticks:
 				flag = policy.next(self, t)
 				if flag < 0:
 					done = true
@@ -1607,7 +2016,7 @@ class Searcher:
 				outcome = {"goal": true, "ticks": t, "cell": cell, "played": _flags.duplicate()}
 				break
 			if done:
-				if hero.is_grounded() and hero.yvel == 0 and hero.xvel == 0:
+				if _resting():
 					still += 1
 					if still >= 2:
 						outcome = _at_rest(_settled(_flags.duplicate(), goals, 0))
@@ -1910,44 +2319,62 @@ class Searcher:
 					seen[parked_key] = int(node["ticks"])
 					queue.insert(head, parked)
 					placements += 1
+			# G79: in a file with a looping wind script every move of an unchanged node is played once per phase of
+			# the script (the wind as it stands when that phase begins: a hero at rest may wait for the gust); a
+			# changed node replays the run that made it, in the phase that run began in.
+			var phases: PackedInt32Array = PackedInt32Array([0]) if changed or not CoopSearch.wind_phases \
+					else _wind_phases
 			for macro: Dictionary in macros:
 				if not _macro_fits(macro, node):
 					continue
-				var config: Dictionary
-				var events: Array = []
-				var macro_hand: int = int(macro.get("hand", -1))
-				var ride: bool = int(macro.get("partner", PARTNER_EGG)) == PARTNER_IDLE
-				if changed:
-					config = node["config"]
-					events = (node["events"] as Array).duplicate()
-					if macro_hand >= 0 and macro_hand != int(node["hand_now"]):
-						events.append([prefix.size(), "hand", macro_hand])
-					if ride:
-						events.append([prefix.size(), "place", pos])
-				else:
-					config = _config(pos, int(macro["facing"]), macro_hand, PARTNER_IDLE if ride else PARTNER_EGG,
-						NOWHERE if ride else node["partner_at"])
-				var simulated_before: int = simulated
-				var outcome: Dictionary = run(config, prefix + (macro["flags"] as PackedInt32Array), goals, prefix.size(),
-						node.get("expect", pos) if changed else NOWHERE, events)
-				if CoopSearch.collect_stats:
-					CoopSearch.stat_run(macro, simulated - simulated_before, changed, outcome.is_empty())
-				if outcome.is_empty():
-					continue
-				var ticks: int = int(node["ticks"]) + int(outcome["ticks"])
-				if ticks > bound:
-					late += 1
-					continue
-				var path: String = "%s > %s" % [node["path"], macro["name"]]
-				if outcome.has("goal"):
-					return _found(ticks, path, head)
-				# The partner's place for the child: where this node parked him (the next move starts with him there
-				# again, wherever an enemy knocked him meanwhile); a `partner` move's own place; else he stays the egg
-				# (a strike that happens to pop the egg makes no new place: the egg probes hatch him where it matters).
-				if _offer(queue, seen, area, node, outcome, ticks, path, config, events,
-						_partner_spot(config, events) if changed or ride else node["partner_at"],
-						int(node.get("cap", MAX_PREFIX_TICKS)), -1) and CoopSearch.collect_stats:
-					CoopSearch.stat_new(macro)
+				for wind_at: int in phases:
+					var config: Dictionary
+					var events: Array = []
+					var macro_hand: int = int(macro.get("hand", -1))
+					var ride: bool = int(macro.get("partner", PARTNER_EGG)) == PARTNER_IDLE
+					if changed:
+						config = node["config"]
+						events = (node["events"] as Array).duplicate()
+						if macro_hand >= 0 and macro_hand != int(node["hand_now"]):
+							events.append([prefix.size(), "hand", macro_hand])
+						if ride:
+							events.append([prefix.size(), "place", pos])
+					else:
+						config = _config(pos, int(macro["facing"]), macro_hand, PARTNER_IDLE if ride else PARTNER_EGG,
+							NOWHERE if ride else node["partner_at"])
+						if wind_at > 0:
+							config["wind_at"] = wind_at
+					var simulated_before: int = simulated
+					var outcome: Dictionary = run(config, prefix + (macro["flags"] as PackedInt32Array), goals,
+							prefix.size(), node.get("expect", pos) if changed else NOWHERE, events)
+					if CoopSearch.collect_stats:
+						CoopSearch.stat_run(macro, simulated - simulated_before, changed, outcome.is_empty())
+					if CoopSearch.debug_moves:
+						print("    move %s: %s" % [macro["name"], "nothing (died, went down or did not come to rest)"
+							if outcome.is_empty() else ("GOAL" if outcome.has("goal") else "rest %s after %d ticks%s%s" % [
+							str(outcome["pos"]), int(outcome["ticks"]), " on a vine" if bool(outcome.get("climb", false))
+							else "", "" if str(outcome["sig"]) == _baseline else " (a changed world)"])])
+					if outcome.is_empty():
+						continue
+					var ticks: int = int(node["ticks"]) + int(outcome["ticks"])
+					if ticks > bound:
+						late += 1
+						continue
+					var path: String = "%s > %s%s" % [node["path"], macro["name"],
+						"" if wind_at == 0 else " (the wind %d ticks into its loop)" % wind_at]
+					if outcome.has("goal"):
+						return _found(ticks, path, head)
+					# The partner's place for the child: where this node parked him (the next move starts with him
+					# there again, wherever an enemy knocked him meanwhile); a `partner` move's own place; else he
+					# stays the egg (a strike that happens to pop the egg makes no new place: the egg probes hatch him
+					# where it matters). A rest on a vine keeps the long replay cap: a climb is a chain of them.
+					var cap: int = int(node.get("cap", MAX_PREFIX_TICKS))
+					if bool(outcome.get("climb", false)):
+						cap = maxi(cap, PROBE_PREFIX_TICKS)
+					if _offer(queue, seen, area, node, outcome, ticks, path, config, events,
+							_partner_spot(config, events) if changed or ride else node["partner_at"], cap, -1) \
+							and CoopSearch.collect_stats:
+						CoopSearch.stat_new(macro)
 		if probes:
 			var late_hit: Dictionary = _late_probes(plain, sites, goals, area, bound, head)
 			if not late_hit.is_empty():
@@ -1958,7 +2385,9 @@ class Searcher:
 			"exhausted": stopped == "" and waiting == 0, "stopped": stopped, "parked": _count_parked(queue, head),
 			"changed": _count_changed(queue, head), "passes": passes, "cut": cut_total + _cut.size(), "late": late,
 			"worlds": _worlds.size(), "misses": misses, "spawned": level.spawned, "leaks": respawns,
-			"party_respawns": party_respawns, "drift": drift + audit_drift,
+			"party_respawns": party_respawns, "party_restores": party_restores, "restores": restores,
+			"wind_phases": Array(_wind_phases),
+			"drift": drift + audit_drift,
 			"late_sites": late_sites, "shortened": shortened}
 
 	## A child of `node` from a run's `outcome` at rest (`ticks` on the path so far, `path` its text, played with
@@ -2223,12 +2652,13 @@ class Searcher:
 
 	## The probe targets of the world inside `area` (by the cell of their feet point): "e<index>" every role enemy,
 	## "p<index>" every plate, "o<index>" every door column, "d<index>" every drum, "m<index>" every other co-op
-	## mechanism (see-saw, heave boulder, pulley, named platform), "b<index>" every enemy of a following archetype
-	## without a co-op role (the bounce rides), "f" the far cell (leaps).
+	## mechanism (see-saw, heave boulder, pulley, named platform), "b<index>" every enemy without a co-op role (the
+	## rides), "s<index>" every spring pad (the strike begun on it), "f" the far cell (leaps, and the lure of every
+	## follower of the level).
 	func probe_targets(area: Rect2i, far: Vector2i) -> PackedStringArray:
 		var result: PackedStringArray = PackedStringArray()
 		for group: Array in [["e", _probe_enemies], ["p", _probe_plates], ["o", _probe_doors], ["d", _probe_drums],
-				["m", _probe_mechs], ["b", _probe_followers]]:
+				["m", _probe_mechs], ["b", _probe_followers], ["s", _probe_springs]]:
 			for index: int in group[1]:
 				var entity: SimEntity = entity_at(index)
 				if entity != null and area.has_point(Vector2i(Tuning.to_cell(entity.sim_pos.x),
@@ -2270,8 +2700,9 @@ class Searcher:
 		for target: String in targets:
 			if target != "f":
 				names[target] = _target_name(target.substr(1).to_int())
-			# A follower comes to the hero wherever it starts in the area: every gate's own (hop-over, the bounce ride).
-			if not own_target(target) and not target.begins_with("b"):
+			# An enemy comes to the hero - or is met where it stands - wherever it starts in the area, and a spring
+			# launches whoever walks to it: every gate's own (the ride, the strike begun on the pad).
+			if not own_target(target) and not target.begins_with("b") and not target.begins_with("s"):
 				others += 1
 				continue
 			var kind: String = target.substr(0, 1)
@@ -2284,6 +2715,7 @@ class Searcher:
 						kinds.append(name)
 					(required[PROBE_HOP_OVER] as Array).append(target)
 					(required[PROBE_IDLE_BAIT] as Array).append(target)
+					(required[PROBE_RIDE] as Array).append(target)
 					if heavy:
 						(required[PROBE_CHARGE_UNDER] as Array).append(target)
 					else:
@@ -2301,7 +2733,12 @@ class Searcher:
 						kinds.append("twin drums")
 					(required[PROBE_THROWN] as Array).append(target)
 				"b":
-					(required[PROBE_HOP_OVER] as Array).append(target)
+					(required[PROBE_RIDE] as Array).append(target)
+				"s":
+					(required[PROBE_SPRING] as Array).append(target)
+		# The lure of every follower of the level ends at the far cell's sites.
+		if far != NOWHERE and not lure_targets(far).is_empty():
+			(required[PROBE_LURE] as Array).append("f")
 		if mechanism:
 			kinds.append("plate door / pulley / see-saw / boulder")
 		if kinds.is_empty():
@@ -2365,24 +2802,78 @@ class Searcher:
 						var leap: LeapPolicy = _leap(PROBE_IDLE_BAIT, far_x, trigger, hold, 0)
 						leap.label += " partner at %d,%d" % [spot.x, spot.y]
 						items.append([_config(pos, dir, -1, PARTNER_EGG, spot), leap])
+			# The LURE of every follower of the level: fetched from where it sleeps, led to this resting point,
+			# ridden toward the far cell or straight up.
+			for lured: int in lure_targets(far):
+				for steer: int in [1, 0]:
+					var lure: LurePolicy = LurePolicy.new()
+					lure.family = PROBE_LURE
+					lure.far_x = far_x
+					lure.ticks = PROBE_LURE_TICKS
+					lure.target_index = lured
+					lure.ride_x = pos.x
+					lure.steer = steer
+					lure.label = "lure %s to x %d, then the ride %s" % [_target_name(lured), pos.x,
+						"toward the far cell" if steer == 1 else "straight up"]
+					items.append([_config(pos, dir, -1, PARTNER_EGG, NOWHERE), lure])
 			return items
 		var index: int = target.substr(1).to_int()
 		var kind: String = target.substr(0, 1)
 		var enemy: EnemyBase = entity_at(index) as EnemyBase if kind == "e" else null
-		if kind == "b" or (kind == "e" and FOLLOWER_IDS.has(String(_records[index]["id"]))):
-			# The BOUNCE RIDE on a follower's head, from where the hero stands and from right under it.
-			for wait: int in PROBE_BOUNCE_WAITS:
+		if kind == "s":
+			# A STRIKE BEGUN ON THE SPRING, Up from its hop.
+			for low: int in PROBE_SPRING_LOWS:
+				for offset: int in PROBE_SPRING_SPOTS:
+					for steer: int in [1, 0]:
+						var sprung: SpringPolicy = SpringPolicy.new()
+						sprung.family = PROBE_SPRING
+						sprung.far_x = far_x
+						sprung.pad_x = at.x
+						sprung.offset = offset
+						sprung.low = low
+						sprung.steer = steer
+						sprung.label = "low strike of %d ticks begun on %s (%+d px), Up from its hop, %s" % [low,
+							_target_name(index), offset, "toward the far cell" if steer == 1 else "straight up"]
+						items.append([_config(pos, dir, -1, PARTNER_EGG, NOWHERE), sprung])
+			return items
+		if kind == "b" or kind == "e":
+			# The RIDE on its head, from where the hero stands (a follower comes; a leaper leaps; a perched or
+			# standing enemy is walked to by the search's own nodes).
+			for wait: int in (PROBE_BOUNCE_WAITS if FOLLOWER_IDS.has(String(_records[index]["id"]))
+					else PROBE_RIDE_WAITS):
 				for steer: int in [1, 0]:
-					var ride: BouncePolicy = BouncePolicy.new()
-					ride.family = PROBE_HOP_OVER
+					var ride: RidePolicy = RidePolicy.new()
+					ride.family = PROBE_RIDE
 					ride.far_x = far_x
 					ride.wait = wait
 					ride.steer = steer
-					ride.label = "bounce ride on %s: wait %d, Up held, %s" % [_target_name(index), wait,
+					ride.label = "ride on %s: wait %d, Up held, %s" % [_target_name(index), wait,
 						"toward the far cell" if steer == 1 else "straight up"]
 					items.append([_config(pos, dir, -1, PARTNER_EGG, NOWHERE), ride])
 			if kind == "b":
 				return items
+		# THE SECOND THROW at a pair (a bond's two members, two drums of one bond): thrown at the far one, the
+		# near one hit as it lands.
+		var mate_x: int = _pair_mate_x(index)
+		if mate_x >= 0 and (kind == "e" or kind == "d"):
+			for weapon: int in THROW_WEAPONS:
+				for delay: int in PROBE_PAIR_DELAYS:
+					for mode: int in 3:
+						for spot_x: int in [(at.x + mate_x) / 2, at.x - signi(mate_x - at.x) * 28]:
+							var pair: PairPolicy = PairPolicy.new()
+							pair.family = PROBE_THROWN
+							pair.far_x = far_x
+							pair.spot_x = spot_x
+							pair.first_x = mate_x
+							pair.second_x = at.x
+							pair.delay = delay
+							pair.jump = mode == 1
+							pair.club = mode == 2
+							pair.label = "second throw: %s from x %d at the mate (x %d), %d ticks, then %s at %s" % [
+								["club", "hammer", "axe", "swirl", "spear"][weapon], spot_x, mate_x, delay,
+								["a second throw", "a second throw in the same jump", "the club"][mode],
+								_target_name(index)]
+							items.append([_config(pos, dir, weapon, PARTNER_EGG, NOWHERE), pair])
 		# THROWN-SPECIAL at every target (a keeper then dueled, a drum's bond mates then clubbed).
 		for weapon: int in THROW_WEAPONS:
 			for distance: int in PROBE_THROW_PX:
@@ -2481,6 +2972,51 @@ class Searcher:
 			if TileGrid.is_ground(grid.floor_at(col, r + 1)):
 				return Vector2i(spot.x, (r + 1) * Tuning.TILE)
 		return NOWHERE
+
+	## The lure probes' followers ([member _lure_enemies]) within LURE_MAX_COLS of the far cell `far`, as entity indices.
+	func lure_targets(far: Vector2i) -> PackedInt32Array:
+		var result: PackedInt32Array = PackedInt32Array()
+		for index: int in _lure_enemies:
+			var entity: SimEntity = entity_at(index)
+			if entity != null and absi(Tuning.to_cell(entity.sim_pos.x) - far.x) <= LURE_MAX_COLS:
+				result.append(index)
+		return result
+
+	## The nearest living, awake enemy within `reach` px of the hero (x plus half of y), or null: the one a ride
+	## comes down on.
+	func nearest_awake_enemy(reach: int) -> EnemyBase:
+		var best: EnemyBase = null
+		var best_d: int = reach
+		for entity: SimEntity in level.get_kind(Defs.Kind.ENEMY):
+			var enemy: EnemyBase = entity as EnemyBase
+			if enemy == null or enemy.dead or not enemy.awake:
+				continue
+			var d: int = absi(enemy.sim_pos.x - hero.sim_pos.x) + absi(enemy.sim_pos.y - hero.sim_pos.y) / 2
+			if d < best_d:
+				best_d = d
+				best = enemy
+		return best
+
+	## The x of the nearest other member of the pair the record at entity `index` belongs to - a drum of its bond, an
+	## enemy of its bond - or -1 when it has no mate.
+	func _pair_mate_x(index: int) -> int:
+		var params: Dictionary = _records[index]["params"]
+		if not params.has("bond"):
+			return -1
+		var drum: bool = String(_records[index]["id"]) == "objects/drum"
+		var me: SimEntity = entity_at(index)
+		var best: int = -1
+		for other: int in _records.size():
+			var entity: SimEntity = entity_at(other)
+			if other == index or entity == null or me == null:
+				continue
+			var theirs: Dictionary = _records[other]["params"]
+			if str(theirs.get("bond", "")) != str(params["bond"]) \
+					or (String(_records[other]["id"]) == "objects/drum") != drum:
+				continue
+			if best < 0 or absi(entity.sim_pos.x - me.sim_pos.x) < absi(best - me.sim_pos.x):
+				best = entity.sim_pos.x
+		return best
 
 	## The x of the nearest other drum of the drum at entity `index`'s bond (-1 when it has none).
 	func _bond_mate_x(index: int) -> int:
@@ -2598,6 +3134,13 @@ class Searcher:
 
 	func _key_of(node: Dictionary) -> String:
 		var key: String = CoopSearch.state_key(node["pos"], str(node["sig"]))
+		var hang: int = str(node["sig"]).find("|climb@")
+		if hang >= 0:
+			# A rest on a vine: one node per CLIMB_KEY_PX of its height (a hero stops wherever Up is let go - every
+			# 2 px of a vine was a node of its own, each replaying its climb: w7_l2_coop 'dark_gap' spent 1.76 of
+			# 2.41 million ticks on replays and stopped unproven at 319 resting points).
+			var at: Vector2i = node["pos"]
+			key = "%d,%d|climb|%s" % [at.x / KEY_PX, at.y / CLIMB_KEY_PX, str(node["sig"]).left(hang).md5_text()]
 		var at: Vector2i = node["partner_at"]
 		return key if at == NOWHERE else "%s|p%s" % [key, str(CoopSearch.park_key(at))]
 
@@ -2626,10 +3169,32 @@ class Searcher:
 				hand = int(event[2])
 		return hand
 
+	## True when the floor ends ahead of `pos` on the side `facing` and nothing to stand on lies within 4 rows under
+	## his feet over the next columns: a place a long running jump leaves (G74, the long drop).
+	func drop_ahead(pos: Vector2i, facing: int) -> bool:
+		var grid: TileGrid = level.grid
+		var col: int = Tuning.to_cell(pos.x)
+		var row: int = Tuning.to_cell(pos.y - 1)
+		for step: int in range(3, 9):
+			var c: int = col + facing * step
+			if not grid.in_bounds(c, row):
+				return false
+			for down: int in range(1, 6):
+				if grid.in_bounds(c, row + down) and TileGrid.is_ground(grid.floor_at(c, row + down)):
+					return false
+		return true
+
 	## Whether `macro` is worth a run from `node`: strikes where something to hit is near on the side he strikes,
 	## throws where something to throw at is in range on the side he throws, the partner ride moves (a regression check
 	## since G33) only from an unchanged node under a ledge while the engine allows a ride on an idle head.
 	func _macro_fits(macro: Dictionary, node: Dictionary) -> bool:
+		if str(node["sig"]).contains("|climb@"):
+			# From a rest on a vine: on up, the leaps off it, the long jump, a drop - what a hanging hero does (every
+			# one of these moves costs the replay of his climb).
+			var kind: String = str(macro.get("kind", "move"))
+			if kind == "far":
+				return drop_ahead(node["pos"], int(macro["facing"]))
+			return kind == "climb" or CLIMB_NODE_MOVES.has(str(macro["name"]))
 		match str(macro.get("kind", "move")):
 			"strike":
 				return target_near(node["pos"], STRIKE_REACH_CELLS, int(macro["facing"]))
@@ -2643,6 +3208,10 @@ class Searcher:
 				return false
 			"throw":
 				return target_near(node["pos"], THROW_REACH_CELLS, int(macro["facing"]))
+			"far":
+				return drop_ahead(node["pos"], int(macro["facing"]))
+			"gust":
+				return _wind != null
 			"partner":
 				# Only while the engine still lets a hero ride an idle head (CoopSearch.idle_partner_carries; not yet
 				# probed in this process: tried) - since G33 it does not, so they would reach nothing.
@@ -2758,6 +3327,14 @@ static func judge(result: Dictionary) -> Dictionary:
 	var probes_on: bool = bool(result.get("probes_on", true))
 	var probes_text: String = "probes: none run (the search ran without them)" if not probes_on \
 			else ("probes: no target" if counts.is_empty() else "probes %s" % ", ".join(counts))
+	# G79: in a windy file the moves are played in every phase of the looping wind script, the probes in the first.
+	var wind: Array = result.get("wind_phases", [0])
+	if wind.size() > 1:
+		var phase_ticks: PackedStringArray = PackedStringArray()
+		for at: Variant in wind:
+			phase_ticks.append(str(int(at)))
+		probes_text += "; a windy file: every move in each of the %d phases of its wind script (play ticks %s of the loop), the probes in the first phase only" % [
+			wind.size(), ", ".join(phase_ticks)]
 	# A replay that did not bring its world back dropped a move unplayed: a search with one is not exhaustive - nor
 	# is one whose reset left an entity out of its level-file state (the exact reset's drift: 0 since wf11).
 	var misses: int = int(result.get("misses", 0)) + int(result.get("drift", 0))
@@ -2918,7 +3495,7 @@ static func claim_gate(queue_dir: String, level_id: StringName, difficulty: int,
 ## Where [method search_gate] keeps its results (one JSON file per key; build/ is not versioned).
 const FILE_CACHE_DIR: String = "res://build/coop_search_cache"
 ## The search's own version in the cache key (bump it when a result's meaning changes without a code change).
-const FILE_CACHE_VERSION: String = "v4.0"
+const FILE_CACHE_VERSION: String = "v5.0"
 ## The folders whose files make the simulation (their contents are the code fingerprint).
 const FINGERPRINT_DIRS: Array[String] = ["res://scripts", "res://scenes", "res://resources"]
 const FINGERPRINT_EXTENSIONS: Array[String] = ["gd", "tscn", "tres", "json", "cfg"]
@@ -2956,9 +3533,9 @@ static func file_cache_key(path: String, data: LevelData, difficulty: int, gate:
 ## The search's compute bounds and probe switch as text (part of both cache keys: a result found under other bounds is
 ## never read back as this one).
 static func bounds_text() -> String:
-	return "n%d t%d %s%s%s%s%s" % [node_limit, tick_limit, "probes" if probes else "no-probes",
+	return "n%d t%d %s%s%s%s%s%s%s" % [node_limit, tick_limit, "probes" if probes else "no-probes",
 		"" if carry_hits else " no-hits", "" if settle_world else " no-settle", "" if share_worlds else " no-share",
-		" traits" if carry_traits else ""]
+		" traits" if carry_traits else "", "" if climb_rests else " no-climb", "" if wind_phases else " no-wind"]
 
 
 ## True when the search world of `gate` in `difficulty` spawns a boss: a `bosses/` record among
@@ -2973,6 +3550,15 @@ static func world_has_boss(data: LevelData, difficulty: int, gate: String) -> bo
 	var columns: Vector2i = world_columns_of(gate_area(tablet, grid), start_points(data, difficulty, tablet, grid), grid)
 	for record: Dictionary in world_record_list(data, difficulty, columns):
 		if String(record["id"]).begins_with("bosses/"):
+			return true
+	return false
+
+
+## True when the WHOLE level of `data` holds a boss record in `difficulty` (a whole-level world of the continuous-play
+## explorer, tools/coop_explore: its results key on the full fingerprint then, as [method world_has_boss] says).
+static func world_has_boss_anywhere(data: LevelData, difficulty: int) -> bool:
+	for record: Dictionary in data.entity_records():
+		if String(record["id"]).begins_with("bosses/") and LevelText.applies_to(record["params"], difficulty):
 			return true
 	return false
 
@@ -3092,6 +3678,7 @@ static func search_data(data: LevelData, difficulty: int, gate: String) -> Dicti
 	if idle_partner:
 		idle_partner_carries()
 		idle_partner_weighs()
+	probe_bond()
 	profile_add(&"daze", clock)
 	var starts: Array[Vector2i] = start_points(data, difficulty, tablet, grid)
 	for start: Vector2i in starts:
@@ -3114,7 +3701,10 @@ static func search_data(data: LevelData, difficulty: int, gate: String) -> Dicti
 		profile_add(&"build", clock)
 		clock = Time.get_ticks_usec()
 		searcher.set_gate_box(box)
-		found = searcher.explore(starts, {far: true}, area, BOUND_TICKS, node_limit, tick_limit, probes,
+		# (In a file with a looping wind script every move is played once per phase: the tick budget grows with the
+		# phases, so the same resting points are expanded as in calm air.)
+		found = searcher.explore(starts, {far: true}, area, BOUND_TICKS, node_limit,
+				tick_limit * maxi(searcher._wind_phases.size() if wind_phases else 1, 1), probes,
 				mini(BOUNDED_MIN_NODES, node_limit))
 		found["probes"] = searcher.probe_stats.duplicate(true)
 		var needs: Dictionary = searcher.probe_requirements(area, far)
@@ -3153,6 +3743,7 @@ static func search_data(data: LevelData, difficulty: int, gate: String) -> Dicti
 	result["leaks"] = int(found.get("leaks", 0))
 	result["party_respawns"] = int(found.get("party_respawns", 0))
 	result["drift"] = int(found.get("drift", 0))
+	result["wind_phases"] = found.get("wind_phases", [0])
 	result["late_sites"] = int(found.get("late_sites", 0))
 	result["shortened"] = int(found.get("shortened", 0))
 	result["probes_on"] = probes
@@ -3197,7 +3788,8 @@ static func world_records(data: LevelData, difficulty: int, columns: Vector2i) -
 
 
 ## The records of `data` the search world of `difficulty` spawns, in file order: those in `columns` that
-## [method world_keeps], and every record linked by a name to one of them wherever it lies - the plates of a door's
+## [method world_keeps], every enemy of the whole level that follows its target (LURE_IDS, no keeper: the lure), and
+## every record linked by a name to one of the columns' wherever it lies - the plates of a door's
 ## `rise_while` / `sink_while`, the keepers of a `trigger=keepers:<group>` door, the drums of a `trigger=drums:<bond>`
 ## door and the other members of a bond (and the doors of such plates, keepers and drums) - so a mechanism is never
 ## cut in half by the columns.
@@ -3214,6 +3806,10 @@ static func world_record_list(data: LevelData, difficulty: int, columns: Vector2
 			chosen[i] = true
 			for name: String in _link_names(usable[i]):
 				names[name] = true
+		elif LURE_IDS.has(String(usable[i]["id"])) and not (usable[i]["params"] as Dictionary).has("keeper"):
+			# wf11 (cause A of G3b): an enemy that follows its target is the gate's business wherever it stands in
+			# the level - a lone hero wakes it, leads it and rides it (the lure probes).
+			chosen[i] = true
 	for i: int in usable.size():
 		if chosen.has(i):
 			continue
@@ -3391,6 +3987,21 @@ static func reset_keeps(entity: SimEntity) -> bool:
 ## [method Searcher.reset_world]: how often a changed entity and whatever names it are spawned again before what
 ## still differs is counted as drift.
 const RESET_PASSES: int = 3
+## Sim.tick at the start of every run of a search world ([member Searcher.tick_base]): the same in every run and
+## every process - and NOT 0. A level's first ticks are a place no hero at a gate is ever in: objects/geyser is idle
+## before its `delay`, so on base 0 the two deadly vents of 6-2b's 'vent' gate (period 34, delays 0 and 17: never a
+## common gap) left the first 22 ticks of every move free, and a run-jump from a resting point 7 cells before them
+## crossed (the search "opened" the gate that way in wf11's first run). 17 952 is a common multiple of the cycle
+## lengths the levels use (34, 66, 88 and the wind loop 352): every cycle stands where tick 0 would have it, and
+## nothing is "before its delay". (The orchestrator's R7 says "tick base 0 per run"; what it asks - the same clock
+## in every run - holds; the G3b evidence routes, recorded on base 0, are replayed on base 0.)
+const TICK_BASE: int = 17952
+## Sim.total_ticks at the start of every run of a search world. Not zero either: the game's total
+## clock has run for minutes before any level starts, and its code counts on that - the one-hit-per-strike key of
+## G57 (total ticks less the ticks into the swing) is "no key" below zero, so a strike begun in a process's first
+## tick hurt a keeper on every tick of the swing; "never yet" marks are -1 and -1000. The same number in every
+## process: what a route does never depends on it.
+const TOTAL_TICK_BASE: int = 100000
 ## Script variables a deep state leaves out: Sim's and the doze manager's own bookkeeping of an entity (its place in
 ## their lists - the search restores the order itself), the render interpolation, the record's constants, and
 ## `on_screen` (the level writes it at every tick's end; a reset clears it).
@@ -3459,6 +4070,13 @@ static func deep_state(obj: Object, depth: int = 0) -> String:
 	return ("|" if depth == 0 else ";").join(parts)
 
 
+## True for an object many entities share and none owns (the level's grid and file, an enemy's sheet facts): a deep
+## state names it "o" and does not read it (the grid alone is thousands of cells; the search puts its cells back
+## itself).
+static func _deep_shared(held: Object) -> bool:
+	return held is TileGrid or held is LevelData or held is EnemySkin
+
+
 static func _deep_value(value: Variant, depth: int) -> String:
 	match typeof(value):
 		TYPE_NIL:
@@ -3477,7 +4095,7 @@ static func _deep_value(value: Variant, depth: int) -> String:
 				return label
 			if held is Resource:
 				return "r"
-			if depth >= DEEP_DEPTH or held.get_script() == null:
+			if depth >= DEEP_DEPTH or held.get_script() == null or _deep_shared(held):
 				return "o"
 			return "{%s}" % deep_state(held, depth + 1)
 		TYPE_ARRAY:
@@ -3514,6 +4132,73 @@ static func snapshot(obj: Object, only: Array[StringName] = []) -> Dictionary:
 			TYPE_BOOL, TYPE_INT, TYPE_FLOAT, TYPE_STRING, TYPE_STRING_NAME, TYPE_VECTOR2I, TYPE_VECTOR2, TYPE_RECT2I, \
 					TYPE_RECT2, TYPE_VECTOR3I:
 				result[name] = value
+	return result
+
+
+## A DEEP SNAPSHOT of `obj` for [method deep_restore]: every script variable of [method deep_names] - plain values as
+## they are, arrays and dictionaries copied, a node or a resource by reference, any other object it holds (a hero's
+## components, his run) as [the object, its own deep snapshot], DEEP_DEPTH deep.
+static func deep_snapshot(obj: Object, depth: int = 0) -> Dictionary:
+	var result: Dictionary = {}
+	if obj == null:
+		return result
+	for name: StringName in deep_names(obj):
+		var value: Variant = obj.get(name)
+		match typeof(value):
+			TYPE_OBJECT:
+				var held: Object = value
+				if is_instance_valid(held) and not held is Node and not held is Resource and depth < DEEP_DEPTH 						and held.get_script() != null and not _deep_shared(held):
+					result[name] = [held, deep_snapshot(held, depth + 1)]
+				else:
+					result[name] = [held]
+			TYPE_ARRAY, TYPE_DICTIONARY, TYPE_PACKED_BYTE_ARRAY, TYPE_PACKED_INT32_ARRAY, TYPE_PACKED_INT64_ARRAY, 					TYPE_PACKED_FLOAT32_ARRAY, TYPE_PACKED_FLOAT64_ARRAY, TYPE_PACKED_STRING_ARRAY, 					TYPE_PACKED_VECTOR2_ARRAY, TYPE_PACKED_VECTOR3_ARRAY, TYPE_PACKED_COLOR_ARRAY:
+				# (a packed array is shared by reference too: a copy, and a copy of that at every restore)
+				result[name] = [value.duplicate(), 0, 0]
+			TYPE_CALLABLE, TYPE_SIGNAL, TYPE_RID, TYPE_NODE_PATH:
+				pass
+			_:
+				result[name] = value
+	return result
+
+
+## Put a [method deep_snapshot] back into `obj`: only the variables that differ are written (a setter may announce a
+## change), a held object is the snapshot's object again with its own variables put back. Returns 0 when nothing
+## differed, 1 when variables were put back - `obj` is in the snapshot's state either way, every write read back -
+## and -1 when it cannot be (an object the snapshot held is gone, a setter refused the value).
+static func deep_restore(obj: Object, values: Dictionary) -> int:
+	if obj == null or not is_instance_valid(obj):
+		return -1
+	var result: int = 0
+	for name: StringName in values:
+		var kept: Variant = values[name]
+		var now: Variant = obj.get(name)
+		if typeof(kept) == TYPE_ARRAY:
+			var entry: Array = kept
+			if entry.size() == 3:
+				if typeof(now) != typeof(entry[0]) or now != entry[0]:
+					obj.set(name, entry[0].duplicate())
+					result = 1
+				continue
+			var held: Variant = entry[0]
+			if typeof(held) != TYPE_OBJECT or not is_instance_valid(held):
+				return -1   # what it held is gone (a respawned neighbour): no value to put back
+			if not is_same(now, held):
+				obj.set(name, held)
+				if not is_same(obj.get(name), held):
+					return -1
+				result = 1
+			if entry.size() == 2:
+				var inner: int = deep_restore(held, entry[1])
+				if inner < 0:
+					return -1
+				result = maxi(result, inner)
+			continue
+		if typeof(now) != typeof(kept) or now != kept:
+			obj.set(name, kept)
+			var after: Variant = obj.get(name)
+			if typeof(after) != typeof(kept) or after != kept:
+				return -1
+			result = 1
 	return result
 
 
@@ -3574,6 +4259,8 @@ static func _no_input(_tick: int) -> int:
 
 ## Debugging: print every node the search expands (with what its world changed against the baseline).
 static var debug_nodes: bool = false
+## Debugging: print every move of every node and where it ended.
+static var debug_moves: bool = false
 
 
 ## The parts of world signature `b` that differ from `a` (for [member debug_nodes]).
@@ -3677,6 +4364,11 @@ static var carry_hits: bool = true
 ## True: the death (and wounds) of EVERY trait enemy is a changed world, also of one that keeps no door and is in no
 ## bond (the search before wf10); false: only keepers and bond members carry their state ([method probe]).
 static var carry_traits: bool = false
+## False: a hero hanging on a vine is no resting point (the search before wf11: a climb longer than one move was
+## dropped).
+static var climb_rests: bool = true
+## False: every move starts with the wind script at its first tick (the search before wf11; G79).
+static var wind_phases: bool = true
 
 
 ## Rows a feet cell may rise above the cell it last stood in, for [method flood_reaches]: the hero's highest jump
@@ -4021,6 +4713,13 @@ static func make_macros(world: bool = false) -> Array[Dictionary]:
 		# Up a vine (Up held: 2 px a tick; over its top onto the ledge), and a leap off it.
 		result.append(_macro("climb-leap %s" % side, facing, _repeat(up, 40) + _repeat(up | dir, 4)
 				+ _repeat(dir, 20), "climb"))
+		# The leap off a vine from where he hangs, and the LONG JUMP off a height (G74: a running jump from a
+		# standing place `h` rows over a ledge carries 8.4 cells and 0.4 more per row - the direction held all the
+		# way down).
+		result.append(_macro("vine-leap %s" % side, facing, _repeat(up | dir, 4) + _repeat(dir, 24), "climb"))
+		result.append(_macro("long-jump %s" % side, facing, _repeat(dir, 8) + _repeat(up | dir, 9)
+				+ _repeat(dir, 70), "far"))
+
 		# Throws of every special (each held in the hand for the move, the club on the belt).
 		for weapon: int in THROW_WEAPONS:
 			var label: String = ["club", "hammer", "axe", "swirl", "spear"][weapon]
@@ -4040,6 +4739,16 @@ static func make_macros(world: bool = false) -> Array[Dictionary]:
 	result.append(_macro("drop", 1, _repeat(Defs.IN_DOWN, 10)))
 	if world:
 		result.append(_macro("climb", 1, _repeat(up, 96), "climb"))
+		# THE LONG CLIMB (wf11, cause D of G3b): Up for as long as the longest vine (a rest on a vine is a node, so
+		# two of these climb anything), and Up held through a blowhole's or a lift's rise under a vine.
+		result.append(_macro("climb-long", 1, _repeat(up, 240), "climb"))
+		result.append(_macro("wait-up", 1, _repeat(0, 70) + _repeat(up, 60), "climb"))
+		# A whole cycle of what runs on the clock (a geyser's 88 ticks, a lift's beat) at rest.
+		result.append(_macro("wait-long", 1, _repeat(0, 96)))
+		# The GUST JUMP (G79): let the wind carry him - no direction held - then Up alone (only in a file with wind).
+		for slide: int in [12, 30, 50]:
+			result.append(_macro("gust-jump %d" % slide, 1, _repeat(0, slide) + _repeat(up, 9) + _repeat(0, 40),
+					"gust"))
 		result.append(_macro("partner-up", 1, _repeat(up, 9) + _repeat(0, 16) + _repeat(up, 12), "partner", -1,
 				PARTNER_IDLE))
 	return result
@@ -4107,16 +4816,26 @@ static func measure_windows(data: LevelData, difficulty: int, area: Rect2i, sear
 			inside = inside or area.has_point(cell)
 		if not inside or cells.size() < 2:
 			continue
+		# G72 (R2): where the engine binds the pair to two slots, one hero NEVER meets it - from the slot rule
+		# ([method pair_slot_bound]: the engine is asked), not from a run between its members: two hits of one
+		# hero's slot never meet a bond, however they are timed or thrown.
+		var kind: String = "drums" if key.begins_with("drums:") else "bond"
+		var bound: bool = pair_slot_bound(kind)
 		var solo_min: int = 0
 		for i: int in cells.size():
 			for j: int in range(i + 1, cells.size()):
-				solo_min = maxi(solo_min, pair_solo_min(cells[i], cells[j], grid, area, searcher))
+				solo_min = maxi(solo_min, pair_solo_min(cells[i], cells[j], grid, area, searcher, kind))
 		var what: String = key.replace(":", " ")
-		if solo_min == 0:
-			# G36: a bonded pair one thrown special hits together is a build error (the validator names it too).
-			what += " (one thrown special hits two members: a build error, G36)"
-		windows.append({"what": what, "window": int(caps.get(key, PartyTuning.window_ticks(difficulty))),
-			"solo_min": solo_min})
+		if bound:
+			what += " (slot-bound, G72: two different heroes who both count)"
+		elif solo_min == 0:
+			# Not slot-bound (an engine before G72): one hero's two hits in flight meet it whatever its window.
+			what += " (one hero hits both members from one place - a throw through both, or a second throw as the first lands)"
+		var window: Dictionary = {"what": what, "window": int(caps.get(key, PartyTuning.window_ticks(difficulty))),
+			"solo_min": solo_min}
+		if bound:
+			window["slot_bound"] = true
+		windows.append(window)
 	for plate_name: String in plates:
 		var plate: Dictionary = plates[plate_name]
 		var plate_cell: Vector2i = Vector2i(int(plate["col"]), int(plate["row"]))
@@ -4135,12 +4854,20 @@ static func measure_windows(data: LevelData, difficulty: int, area: Rect2i, sear
 	return windows
 
 
-## The least ticks one hero needs between striking the member at `a` and the member at `b` (either order): 0 when a
-## thrown special from a strike spot of one crosses the other; else, for members so far apart that even the fastest
-## hero (HERO_MAX_PX_PER_TICK, nothing in his way) needs more than the largest window plus its margin to go from one
-## strike spot to the other, that lower bound (no search: D5's 731-second bond of members 60-80 columns apart);
-## else the run between their strike spots (BOUND_TICKS when he cannot get there).
-static func pair_solo_min(a: Vector2i, b: Vector2i, grid: TileGrid, area: Rect2i, searcher: Searcher) -> int:
+## The least ticks one hero needs between striking the member at `a` and the member at `b` (either order).
+## `kind` "bond" (enemies) / "drums" names the pair's rule: where the engine binds it to two slots (G72, R2;
+## [method pair_slot_bound]) the answer is PAIR_NEVER - from the slot rule, not from a run: one hero's two hits never
+## meet it, however they are timed or thrown. Else (`kind` "": the geometry alone, and an engine before G72): 0 when
+## one hero hits both from one place - a thrown special from a strike spot of one crosses the other, or a standing
+## spot lets him throw at both ([method two_throws_reach]: the far one first, the near one as it lands; the G3b
+## verifier's cause C) - else, for members so far apart that even the fastest hero (HERO_MAX_PX_PER_TICK, nothing in
+## his way) needs more than the largest window plus its margin to go from one strike spot to the other, that lower
+## bound (no search: D5's 731-second bond of members 60-80 columns apart); else the run between their strike spots
+## (BOUND_TICKS when he cannot get there).
+static func pair_solo_min(a: Vector2i, b: Vector2i, grid: TileGrid, area: Rect2i, searcher: Searcher,
+		kind: String = "") -> int:
+	if kind != "" and pair_slot_bound(kind):
+		return PAIR_NEVER
 	var spots_a: Array[Vector2i] = strike_spots(grid, a)
 	var spots_b: Array[Vector2i] = strike_spots(grid, b)
 	if throw_crosses(spots_a, b) or throw_crosses(spots_b, a):
@@ -4148,10 +4875,29 @@ static func pair_solo_min(a: Vector2i, b: Vector2i, grid: TileGrid, area: Rect2i
 	var bound: int = pair_lower_bound(a, b)
 	if bound > PartyTuning.WINDOW_TICKS_BEGINNER + PartyTuning.WINDOW_SOLO_MARGIN_TICKS:
 		return bound
+	if two_throws_reach(grid, a, b):
+		return 0
 	var goals: Dictionary = {}
 	for spot: Vector2i in spots_b:
 		goals[Vector2i(Tuning.to_cell(spot.x), Tuning.to_cell(spot.y - 1))] = true
 	return travel_ticks(spots_a, goals, area, searcher)
+
+
+## True when some standing spot lets one hero throw a special at the member at `a` AND at the member at `b` (the
+## SECOND THROW: he throws at the far one and hits the near one as that special lands - the gap between the two hits
+## is his to choose): a floor cell within THROW_REACH_CELLS columns of both, on a row within 4 of either, from which
+## [method throw_crosses] finds each.
+static func two_throws_reach(grid: TileGrid, a: Vector2i, b: Vector2i) -> bool:
+	var first: int = maxi(maxi(a.x, b.x) - THROW_REACH_CELLS.x, 0)
+	var last: int = mini(mini(a.x, b.x) + THROW_REACH_CELLS.x, grid.cols - 1)
+	for col: int in range(first, last + 1):
+		for row: int in range(maxi(mini(a.y, b.y) - 4, 0), mini(maxi(a.y, b.y) + 4, grid.rows - 2) + 1):
+			if grid.side_at(col, row) == TileGrid.SIDE_WALL or not TileGrid.is_ground(grid.floor_at(col, row + 1)):
+				continue
+			var spot: Array[Vector2i] = [LevelText.cell_to_feet(float(col), float(row))]
+			if throw_crosses(spot, a) and throw_crosses(spot, b):
+				return true
+	return false
 
 
 ## The fewest ticks any hero needs between strike spots of members at the cells `a` and `b`: their columns less the
@@ -4381,6 +5127,77 @@ static func _probe_idle_weight() -> bool:
 	var weighs: bool = plate.weight > 0 or plate.pressed or plate.presses > 0
 	searcher.close()
 	return weighs
+
+
+## The bond probe ([method probe_bond]); empty before.
+static var _bond_probe: Dictionary = {}
+
+
+## G72 (R2) as built: true when the engine binds a pair of `kind` ("bond": bonded enemies; "drums": a drum pair) to
+## two different slots - one hero's second hit does not meet it, another slot's does ([method probe_bond]). Then
+## one player can never meet that pair, whatever its window and however he times or throws his hits:
+## [method pair_solo_min] says PAIR_NEVER and the search's window records are "slot_bound" (exempt from
+## test_coop_gates' solo_min - 4 cap). Should the rule ever leave the engine, the probe says so at once and the cap
+## holds again.
+static func pair_slot_bound(kind: String) -> bool:
+	return bool(probe_bond().get("drums" if kind == "drums" else "bond", false))
+
+
+## The bond rule of this build, asked of the engine in a co-op search world of two (the striker slot 0, an ACTIVE hero
+## of slot 1 as the control): {"bond": slot-bound for bonded enemies, "drums": for a drum pair, "enemy_own" /
+## "enemy_other": after slot 0 killed one member of a bonded pair, whether the other accepts a hit from slot 0 / from
+## slot 1, "drum_own" / "drum_other": after slot 0 lit one drum of a pair, whether his hit / slot 1's lights the
+## other}.
+static func probe_bond() -> Dictionary:
+	if not _bond_probe.is_empty():
+		return _bond_probe
+	var result: Dictionary = {"bond": false, "drums": false, "enemy_own": true, "enemy_other": false,
+		"drum_own": true, "drum_other": false}
+	var searcher: Searcher = _probe_world("coop_search_bond_probe",
+			"objects/drum 8 13 bond=probe_drums\nobjects/drum 20 13 bond=probe_drums")
+	if searcher == null:
+		_bond_probe = result
+		return result
+	var hero: PlayerBase = searcher.hero
+	var other: PlayerBase = searcher.partner
+	hero.run.reset_energy()
+	hero.respawn_at(Vector2i(160, 224))
+	searcher._mark_active(hero)
+	other.run.reset_energy()
+	other.respawn_at(Vector2i(400, 224))
+	searcher._mark_active(other)
+	searcher.driver.set(&"active_mask", 3)
+	# A bonded pair of enemies: slot 0 kills one; does the other take his hit, and slot 1's?
+	var pair: Array[EnemyBase] = []
+	for x: int in [240, 300]:
+		var member: EnemyBase = EnemyBase.new()
+		member.set_box(Vector3i(32, 32, 16))
+		member.spawn_setup(Vector2i(x, 224), {"coop": "bond", "bond": "probe_bond"})
+		searcher.level.add_child(member)
+		searcher._kept[member.get_instance_id()] = true
+		member.wake()
+		pair.append(member)
+	pair[0].kill(&"probe", hero)
+	if pair[0].dead and not pair[1].dead:
+		result["enemy_own"] = pair[1].accepts_hit_from(hero)
+		result["enemy_other"] = pair[1].accepts_hit_from(other)
+	result["bond"] = not bool(result["enemy_own"]) and bool(result["enemy_other"])
+	# A drum pair: slot 0 lights one; does his hit light the other, and slot 1's?
+	var drums: Array[Drum] = []
+	for entity: SimEntity in searcher._entities:
+		if entity is Drum:
+			drums.append(entity as Drum)
+	if drums.size() == 2:
+		drums[0].take_hit(1, hero)
+		drums[1].take_hit(1, hero)
+		result["drum_own"] = drums[1].lit or drums[1].succeeded
+		drums[1].set(&"cooldown", 0)   # (a drum swallows a second hit for 6 ticks, whoever strikes)
+		drums[1].take_hit(1, other)
+		result["drum_other"] = drums[1].lit or drums[1].succeeded
+		result["drums"] = drums[0].lit and not bool(result["drum_own"]) and bool(result["drum_other"])
+	searcher.close()
+	_bond_probe = result
+	return result
 
 
 ## The daze probe ([method probe_daze]); empty before.

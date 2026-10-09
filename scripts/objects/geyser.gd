@@ -11,7 +11,9 @@ extends SimEntity
 ## (24 x 16 above the anchor floor: x - 12 .. x + 11, feet y - 16 .. y), with yvel >= 0 and not yet launched by this
 ## spout, is launched: heroes `launch(LAUNCH_KEEP, power)`, enemies `yvel = power`, rafts Raft.launch(power) (their
 ## riders go with them), drop platforms DropPlatform.launch(power) (they rise with `power` and their riders with them,
-## then fall back with their dropper fall). -224 rises 105 px.
+## then fall back with their dropper fall). -224 rises 105 px. A hero of a co-op party is launched from the vent's
+## floor (his feet are put on it first) and his flight is held (PlayerBase.launch / hold_launch, wf11 R1): nothing of
+## his own - a hop in the vent box, a strike's hop, a pogo - comes on top of the spout.
 ## Gliding heroes and eggs ignore geysers. `deadly` (a vent of tar or lava): the spout is a deadly box 24 x 64 above the
 ## vent (death, or an egg in co-op) instead of a launch; an `objects/boulder_heavy` resting on any geyser plugs it: no
 ## spout at all [R3].
@@ -239,6 +241,10 @@ func _spout(level: LevelBase) -> void:
 		if hero.dead or hero.is_down() or hero.is_gliding() or hero.is_mounted() or hero.yvel < 0:
 			continue
 		if _inside(vent, hero) and _first_time(hero):
+			if hero.sim_pos.y < sim_pos.y and hero.gate_rule(PlayerBase.GATE_R1):
+				# wf11 R1 (co-op): the launch starts from the vent's floor - a hop inside the vent box (16 px high) no
+				# longer carries its height on top of the spout (120 px from a -224 vent; 105 from the floor).
+				hero.sim_pos.y = sim_pos.y
 			hero.launch(PlayerBase.LAUNCH_KEEP, power)
 			launches += 1
 	var enemies: Array[SimEntity] = level.get_kind(Defs.Kind.ENEMY)

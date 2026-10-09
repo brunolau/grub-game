@@ -684,7 +684,7 @@ enemy, so its 14 / 12 ticks are not capped.
 | `objects/boulder_heavy` | - (2 x 2 cells, anchored at its bottom-left cell) |
 | `objects/pulley` | `a=<platform name>`, `b=<platform name>`, `range` rows [3] |
 | `objects/flower_pot` | - (on a ledge's edge cell) |
-| `objects/x2_tablet` | `gate=<name>`, `far=c,r` (the cell beyond the gate), `secret` (marks an x2 secret) |
+| `objects/x2_tablet` | `gate=<name>`, `far=c,r` (the cell beyond the gate), `secret` (marks an x2 secret), `ward=<left>,<right>` (the two margins of its ward in cells, default 12,12 [G73]; 15.7.4) |
 | `objects/hero_start` | `slot=2` (co-op files) |
 | `objects/gate` | + `needs=<bond>` (locked until a drum bond succeeds) |
 | `objects/spawn_point`, `objects/cookpot`, `objects/coconut`, `objects/crate_lane` | arenas only (15.8) |
@@ -772,7 +772,10 @@ every hero glows warm and every prop whose name holds "glow" (`swamp/props/glowc
 | Grounder | 192 px (12 tiles) along the floor in 32 ticks | rolls under low gaps, breaks `$` in its path |
 | See-saw | launch 153 px (a 4-tile drop onto the high end) to 171 px (5+ tiles) | target ledges up to 9 rows over the low end |
 | Duo reach in general | chained moves (a hop off a jumping partner, see-saw plus hop) reach 12-13 tiles | contain co-op paths with walls and roofs of 13+ rows where skipping would break the stage |
-| **A lone hero** (what every height gate must refuse) [G67] | standing jump 60-64 px; **hop jump** (Up held from the 8th tick of a low strike) 73 px, 77-80 with a high strike on the way, whose box then reaches **123 px**; **pogo jump** (that strike on one hittable at his feet) **114 px** - over the 112 px corner catch of an 8-row ledge; a bounce with Up on any enemy he can lead under the ledge 105 px from its head (a Harrier in the air: 220 px over the floor) | 8 rows hold only over a clean foot: nothing to club and nothing to bounce on within 7 cells of the ledge's foot, no follower within two views (15.7.3) |
+| **A lone hero** (what every height gate must refuse) [G67] | standing jump 60-64 px; **hop jump** (Up held from the 8th tick of a low strike) 73 px, 77-80 with a high strike on the way, whose box then reaches **123 px**; **pogo jump** (that strike on one hittable at his feet) **114 px** - over the 112 px corner catch of an 8-row ledge; a bounce with Up on any enemy he can lead under the ledge 105 px from its head (a Harrier in the air: 220 px over the floor) | 8 rows hold only over a clean foot: nothing to club within 7 cells of the ledge's foot. Enemies are the ward's since [G73]: inside a tablet's ward none gives a hero lift, rest, carry or a pogo, so what is left to keep clear is the high ground at the ward's edge (15.7.3, 15.7.4) |
+| **A spring under a hero of a co-op party** [G71] | a launch: 105 px over the pad's top (115 px over the floor for a pad on the floor) and never a jump on top of it - the 256 px stack of a low strike begun on a pad is gone; a geyser the same: 105 px over its vent from every start, and no strike hop or pogo in the flight after any launch | a spring near a height gate is allowed when the gate's ledge stands 8+ rows over the PAD'S TOP |
+| **The long drop** [G74] | a running jump from a standing place `h` rows above a ledge carries 7.2 cells + about 0.44 per row (the reference hero model): on the flat 115 px, 5 rows down 9.4 cells, 10 rows 11.6, 15 rows 13.4, 20 rows 15.6 | every standing place a lone hero can reach `h` rows over a gate's ledge lies more than 10 + h / 2 cells from it (12 + 0.6 h in a file with wind), or the ledge is roofed (15.7.3) |
+| **The gust jump** [G79] | in a tailwind (`wind` -112) a jump begun from the slide - no direction key, then Up - carries 162 px: 10.1 cells on the flat (the best calm running jump: 115 px, 7.2 cells) | a gap gate of a windy file is 12 cells wide, or its far lip stands 2 rows up (15.7.3) |
 
 #### 15.7.3 Gates
 
@@ -785,11 +788,11 @@ and keepers).
 
 | Kind | Recipe |
 |---|---|
-| **Boost ledge** | a ledge **8 rows over every floor within reach on both difficulties** [G28] - a flat floor at least 3 cells wide under its face, no step, root or rock nearer the top within 10 cells (the corner catch lands feet that enter a ledge's top cell from the side, so a 98-105 px rise climbs a 7-row ledge; G28 measured it with an idle carrier, which no longer carries since G33 - the 8 rows stay [G39]); 11 rows of air over the hop cells; a drop gift on top: a **rolled vine** at the edge, its coil 11+ cells from the gate's `far` cell (the validator counts a coil as a booster; 1-1 and 5-1 co-op). A flower pot reaches 6 rows from the floor it takes root on [G6], so it is no way back from an 8-row ledge (a raised root within reach is a step for a lone hero: a 98-105 px rise plus the corner catch) **The clean foot** [G67]: no hittable (a hidden or inset spot, a breakable block) and no enemy record on the floor within 7 cells of the ledge's foot - ONE is enough for a lone hero's pogo jump (114 px); no Harrier, nor any flyer that follows its target through scenery, within two views (a bounce on it carries a lone hero anywhere). **The coil** [G67]: in a co-op file a rolled vine unrolls only for a hit from its own level (the striker's feet at most one row under its ledge), so put the coil where the upper hero strikes it standing on the ledge (built: `Vine.hit_from_its_level`; a solo file's coil still falls to a hop jump with a high strike, 123 px, from 8 rows below) **One height for every height gate** [G69]: 8 rows (corner catch from 112 px, 30 px over a lone hop jump's 82). A Totem ledge of 5-6 rows is no gate; a 7-row lob ledge (catch from 96 px) holds only over a clean foot and is the search's to prove - prefer 8 rows with a charged lob where the ceiling allows **Measured from every standing place** [G70]: the rows count from every floor a lone hero can stand on under or beside the ledge - a rock's step, a coral shelf, a terrace, a cloud - not from the lowest one (7-1's dune stood 10 rows over the beach and 6 over its own upper shelf; 9-2's raised bridge slab was a step from the slate stack beside it). **A one-way ledge catches like a corner** [G70]: a falling hero whose feet are anywhere inside a `-` / `=` cell is landed on it, so it is climbed from 16 px under its top exactly like a solid ledge (9-1's 6-row cloud ledge fell to the 82 px hop jump; making it as wide as its shaft did not help) |
+| **Boost ledge** | a ledge **8 rows over every floor within reach on both difficulties** [G28] - a flat floor at least 3 cells wide under its face, no step, root or rock nearer the top within 10 cells (the corner catch lands feet that enter a ledge's top cell from the side, so a 98-105 px rise climbs a 7-row ledge; G28 measured it with an idle carrier, which no longer carries since G33 - the 8 rows stay [G39]); 11 rows of air over the hop cells; a drop gift on top: a **rolled vine** at the edge, its coil 11+ cells from the gate's `far` cell (the validator counts a coil as a booster; 1-1 and 5-1 co-op). A flower pot reaches 6 rows from the floor it takes root on [G6], so it is no way back from an 8-row ledge (a raised root within reach is a step for a lone hero: a 98-105 px rise plus the corner catch) **The clean foot** [G67], as the ward left it [G73]: no **hittable** (a hidden or inset spot, a breakable block) on the floor within 7 cells of the ledge's foot - ONE is enough for a lone hero's pogo jump (114 px), and the ward does not touch a hittable's pogo. **Enemies are the ward's**: "no enemy record within 7 cells" and "no Harrier within two views" are replaced by "What may stand near a gate" below this table - inside the tablet's ward an enemy may stand, walk, perch or be led anywhere. **The coil** [G67]: in a co-op file a rolled vine unrolls only for a hit from its own level (the striker's feet at most one row under its ledge), so put the coil where the upper hero strikes it standing on the ledge (built: `Vine.hit_from_its_level`; a solo file's coil still falls to a hop jump with a high strike, 123 px, from 8 rows below) **One height for every height gate** [G69]: 8 rows (corner catch from 112 px, 30 px over a lone hop jump's 82). A Totem ledge of 5-6 rows is no gate; a 7-row lob ledge (catch from 96 px) holds only over a clean foot and is the search's to prove - prefer 8 rows with a charged lob where the ceiling allows **Measured from every standing place** [G70]: the rows count from every floor a lone hero can stand on under or beside the ledge - a rock's step, a coral shelf, a terrace, a cloud - not from the lowest one (7-1's dune stood 10 rows over the beach and 6 over its own upper shelf; 9-2's raised bridge slab was a step from the slate stack beside it). **A one-way ledge catches like a corner** [G70]: a falling hero whose feet are anywhere inside a `-` / `=` cell is landed on it, so it is climbed from 16 px under its top exactly like a solid ledge (9-1's 6-row cloud ledge fell to the 82 px hop jump; making it as wide as its shaft did not help) |
 | **Totem ledge** | a ledge 5 rows up (Totem jump or hop, both difficulties); a gate only because a Totem Ride needs an active carrier [G33]: keep every other booster out of its static reach |
-| **Batter Up gap** | 8 (Beginner) / 9 (Expert) cells of `~` between two floors at the same height; or a 7-row lob ledge (15.7.2) |
+| **Batter Up gap** | 8 (Beginner) / 9 (Expert) cells of `~` between two floors at the same height; or a 7-row lob ledge (15.7.2). In a file with a `wind` script: **12 cells** (the charged drive's 325 px carries it) or a far lip 2 rows up - a lone hero's gust jump crosses 10.1 cells [G79] |
 | **Plate door** | `objects/plate` (`count=1 mode=hold`) at least **8 tiles** from its door (`objects/column rise_while=<plate>`); a plate weighs only active heroes (a parked idle partner or a riderless mount holds nothing [G33]); the holder must reach the far side another way: a second plate beyond the door for him (**leapfrog**: A holds for B, B holds for A - with **two doors in two corridors**, because a column rises only while all its plates are pressed: plate A opens the lower corridor for B, plate B beyond opens the upper corridor for A; 1-1 and 5-1 co-op [G9]), or a `timed:` plate |
-| **Twin drums** | two or more `objects/drum bond=<name>` with a column `trigger=drums:<name>` (or a gate `needs=<name>`); place them so one hero needs at least 28 ticks (Beginner) / 16 (Expert) to strike both - in practice 10+ tiles apart and 4+ rows apart, out of one axe's flight line; the search decides |
+| **Twin drums** | two or more `objects/drum bond=<name>` with a column `trigger=drums:<name>` (or a gate `needs=<name>`); place them so one hero needs at least 28 ticks (Beginner) / 16 (Expert) to strike both - in practice 10+ tiles apart and 4+ rows apart, out of one axe's flight line; the search decides. Since [G72] the drums are slot-bound - two different heroes who both count must light them - so the distance is for the pair's reading and no longer the proof |
 | **See-saw** | `objects/seesaw` with its high end 1 row over the floor, a ledge 4+ rows above the high end within 3 cells to drop from, the target up to 9 rows over the low end; no enemy may fall onto it |
 | **Heave boulder** | `objects/boulder_heavy` with 3+ cells of floor behind the pushed side and 2+ rows of air; it fills a 2-cell gap, plugs a vent (`objects/geyser deadly`) or presses a plate |
 | **Pulley** | `objects/pulley` with two `objects/platform mode=ride` 4+ cells apart; the rider's target `range` rows above his platform's start. Keep rider and counterweight within about 7 rows of each other (`range` 3 at most): while the rider is in the air the view is anchored on the standing counterweight (rows 4-9 of the view), and a lift off the view carries nobody - a range-6 pulley drops its rider through his own lift (D9a, 9-1). Reach a higher target from a co-op ledge over the risen lift - and keep that ledge 7+ rows over the floor the lift rests on (range 3 plus a 4-row jump): 6 rows are a lone hero's hop jump [G70]. The same holds for a vertical co-op climb: give drop clouds a twin beside each step so both climb side by side |
@@ -797,6 +800,43 @@ and keepers).
 | **Brace corridor** | a `heavy` (Bull Rex) in a 4-row-high hall between walls. **The brace is the only way to hurt it** [G57]: every hit glances unless a Brace Wall has it dazed (44 ticks), and a co-op strike hurts it once, so two heroes must land `hp` / 25 + 1 club strikes in braced dazes (a default Bull Rex, hp 25: two, or one crouch-charged; the hp-100 keeper of 3-1: five, which a pair lands inside one daze [G63]); if a daze runs out it wakes, turns and charges again for the next brace. Unbraced it dies of nothing at all - no grenade, kill-all, feast or mount bite [G63]. The 4-row hall does not stop it running under a jumping hero (G3 verifier) - the damage rule is the gate, not the hall. A heavy presses against the wall nearest its target, so the heroes must step into the corridor while it is NOT pressing at their way in (asleep out of view at the far end, or far away): a corridor whose entrance is where the heavy stops makes every entry a trample; a brace across a step is impossible (the body overlap lends the leftmost box half its width) - keep the braced floor flat (DB2, 3-1) [G55] |
 | ~~Chomper two seats~~ | **retired as a gate kind** [G62]: a mount crosses a 6-cell spike bed with one rider in about 24 ticks and the Leeches only drain bones (D6), so whatever the gunner clears, a lone rider outruns. The two seats stay a co-op set piece (6-1); 6-1 and 7-1 built A.6's fallbacks (a boost ledge, leapfrog plate doors) |
 | ~~Lee gap~~ | **retired as a gate kind** [G55]: the lee shelters only the second hero (the croucher already stands past the gap), so whatever carries the first hero over a gust gap carries a lone hero too - it can never be solo-impossible (DB2). The lee stays a co-op comfort taught by a sign; build a Brace corridor, a line drive or a keeper hall where a gate is needed (the search ran the wind - world-B's `SearchWind` - so this is a rule of the move, not of the proof [G41]) |
+
+**What may stand near a gate** [G73] (replaces the enemy half of [G67] (2)). Inside a tablet's ward (15.7.4) no
+enemy gives a hero of a co-op party lift, rest, carry or a pogo, so:
+- **Inside the ward: any enemy record, anywhere** - at a ledge's foot, in a gap, on a keeper's perch, a follower
+  that a hero leads in. "No enemy record on the floor within 7 cells of a height gate's foot" is dropped; do not
+  move enemies out of wards any more.
+- **What remains is the ward's edge.** Outside the ward a head is the 1.0 springboard - a ground enemy lifts feet
+  to 129 px over its floor (105 px over a 24 px head), a Harrier 105 px over wherever it flies (220 px over a
+  floor was measured) - and whoever took that lift comes down inside the ward at 5 px a tick (6 with a gust).
+  So: (a) **the gate's high ground lies 12+ cells inside the ward** - every standing place from which the `far`
+  cell is reached without the duo move: the barrier's own top, a block, shelf, terrace or stack beside it, a roof
+  route over it. Where such a place begins before the tablet, or ends behind the `far` cell, the tablet carries
+  `ward=<left>,<right>` so that the ward begins 12 cells before it (1-1 'hop': the hollow block 10 cells before
+  the tablet, `ward=22,12` - under the default margin the explorer still opened it from the pool's ledge, 5-8
+  cells outside the ward). (b) **"No Harrier within two views" shrinks to this**: where a Harrier or another
+  flyer that follows its target can be brought to a ward's edge - anywhere in the file: it follows for as long as
+  it is allowed to keep up - the gate's barrier is closed above (it reaches the ceiling, or rock roofs it), or
+  its top lies 12+ cells inside the ward AND the long drop below holds for every standing place above it. A
+  keeper Harrier stays perched [G66] and is an enemy like any other.
+- **Hittables: unchanged.** The 7 cells of the clean foot, no column of stacked hittables; coils are the engine's
+  [G67].
+- **Springs** [G71]: allowed near a height gate when its ledge is 8+ rows over the pad's top. **Bonds** [G72]:
+  slot-bound (15.7.5). **One-cell doors** [G75]: allowed again - a hero pushed into a closed door comes back on
+  the side he came from.
+
+**The long drop** [G74]. A running jump from a standing place `h` rows above a ledge carries 7.2 cells plus about 0.44
+per row (15.7.2; 10 rows: 11.6 cells). Every standing place a lone hero can reach - by a vine of any length, a
+blowhole, a lift - `h` rows over a gate's ledge lies **more than 10 + h / 2 cells** from it (rounded up: 10 rows 15
+cells, 20 rows 20; in a file with a `wind` script 12 + 0.6 h - a tailwind carries 6 px a tick), or the ledge is
+**roofed**: solid cells at most 3 rows over its whole top, closed towards that place. 7-1's warp stack (10 rows over
+the 'stack' shoulder, 11 columns from it) broke it: its owner moves the stack or roofs the shoulder.
+
+**Gust gaps** [G79]. In a file with a `wind` script a gap gate is measured against the gust jump (10.1 cells on
+the flat, 15.7.2): **12 cells** of gap towards the side a tailwind blows, or the far lip raised 2 rows over the
+near lip for its first 3 cells, or the near lip roofed for its last 6 cells. 9-2's final gap ('drive', 9 cells of
+tar) fell to a lone hero's gust jump on both difficulties. Among the co-op files only `w9_l2_coop` and
+`w3_l1b_coop` carry wind.
 
 #### 15.7.4 x2 tablets
 
@@ -808,6 +848,26 @@ air cell above a floor. A boss's own objects are no gate mechanism [G49]: the pl
 `bosses/colossus` record that drive no column are the visor Colossus's chains (DESIGN.md B.7) - no tablet, no "drives
 no column" warning, and fewer than two of them in a co-op file is an error; the boss's co-op form is that stage's
 gate (D.8 #1).
+
+**The ward** [G73] (the engine's rule: PHYSICS C.10). Every tablet - `gate=` and `secret` alike - wards the
+columns from its own cell to its `far` cell, widened by 12 cells on both sides (`PartyTuning.WARD_MARGIN_CELLS`),
+over **all rows** of the level: there no enemy gives a hero of a co-op party lift, rest, carry or a pogo (a stomp
+still counts against the enemy; a dust puff and a thud tell the player). `ward=<left>,<right>` on the record sets
+the two margins in cells (left = towards column 0; both at least 0). **The margin counts from the gate's high
+ground**: the default presumes that the first standing place leading over the gate is at the tablet; where it
+begins `n` cells before the tablet (or ends `n` cells behind the `far` cell) that side's margin is 12 + `n`. Put
+the tablet where the pair first meets the gate and the `far` cell behind everything the gate bars. A ward costs
+the pair something too: inside it they cannot bounce on a head either, so no shortcut, bonus or secret may need
+an enemy's head inside a ward (in a tall file a ward covers its columns on every floor), and routes are recorded
+with it. **The validator names it** (`tools/validate_levels.gd -- --gates`, world-B): a warning "high ground at
+the ward's edge" for every top that stands 6+ rows over the floor beside both its ends, at most 5 rows under a
+height gate's ledge, inside the ward within 12 cells of its edge or outside it within 8 - nine gates on the tree
+of the round. Clear it with `ward=` so that the top lies 12+ cells inside (1-1 'hop' `ward=22,12`, 2-2 'lift'
+`ward=16,12`, 8-1 'stairs' `ward=23,12`, 9-1 'pulley' `ward=12,17`, 4-1 'cliff' `ward=12,14`, 5-2 'sandgate'
+`ward=12,21`) or, where the top does not lead past the gate at all, with one comment line above the tablet saying
+why; either way the explorer's two passes are the proof (15.7.6). The same listing prints each gate's ward
+columns, the enemy records inside it and the followers within two views of its edge; a hittable within 7 cells
+of a height gate's foot and a one-way ledge cell fewer than 7 rows over a standing place are errors.
 
 #### 15.7.5 Traits and keeper halls
 
@@ -822,6 +882,16 @@ gate (D.8 #1).
   `grab` needs a `perch=c,r` next to a pit. `lone` is off on Beginner: do not make a gate out of it. Snappers have no
   co-op rule of their own (bait-and-bite was dropped [G10] [G40]): pair them with `bond`. Every trait rule that asks
   for "the nearer hero" (a shield, a keeper's bait, `lone`'s pair) counts only active heroes [G33].
+- **`grab`** in a ward [G73]: a Snatcher does not seize a hero inside a ward (its touch is the plain hurt) and lets
+  go of one it carries at the ward's edge. Never put a `perch=` beyond a gate's barrier from where its Snatcher
+  can seize.
+- **Bonds are slot-bound** [G72]: a bond, a keeper pair, a drum pair and a split are met only by two different
+  heroes who both count; one hero's hit on the last member glances and the dead one regrows. The placing rules
+  above that kept ONE hero from both members - out of one hero's reach within the window, never on one throw line
+  [G36], `window=` capped at `solo_min - 4` [G2] - are therefore no longer proof obligations: place the members
+  where the PAIR reads them (within one view, each with room for its hero), keep the `window=` keys you have, and
+  do not spread a bond to defeat a lone hero. "Keepers must not be led" [G66] stays as a courtesy - the pair
+  should find the keepers at their door.
 - **`hp` counts strikes in co-op files** [G57] [G63]: one strike (a swing, a throw, a ball flight) hurts a given
   enemy once, and an enemy dies when its hp drops below zero, so it takes `hp` / 25 (rounded down) + 1 club strikes:
   `hp=10` (most records) or 20 one, **25 - also every record without `hp=` - two**, 60 three, a keeper with `hp=100`
@@ -905,6 +975,22 @@ one line `GATE <level> <difficulty> <gate>: <verdict> (<evidence>)`, `CoopSearch
 the two, lists unproven gates by name (the row stays open: G3 is not reached) and is red on an open gate. A designer
 whose gate is "unproven" asks world-B for its probes rather than raising the bound again.
 
+**The proof of a gate is three things** [G77] (orchestrator, after the G3b verifier put one hero past 19 of 76
+rows that the search had refused, also at three times its bound). Per gate row (gate x difficulty), and the bar is
+**fixed** - a gate is judged by these three and by nothing wider:
+
+| Proof | What must hold |
+|---|---|
+| **(a) the search refuses** | the verdict table above - refused (exhaustive), or refused (bounded) with every probe of its kind - on an exact reset (tick base 0 and the total-tick clock put back per run; a run that missed replays is bounded and says so), with the lone hero's moves of [G67], the long climb (a hero at rest on a vine is a node [G74]) and, in a file with a `wind` script, the wind's phases [G79] |
+| **(b) the evidence set says "not reached"** | every route by which a gate once fell, replayed in a fresh process; the set is versioned under `tools/` and only grows - the G3b verifier's 21 routes, the two gust routes of [G79] and the 'hop' route under the default ward [G73]: 24 today. A route that still reaches `far` is its row's red |
+| **(c) the explorer stays out** | the continuous-play explorer (versioned under `tools/`: one hero in the search's world, inputs never reset between moves, the lure, ride, strike-on-spring, long-climb and second-throw moves, the exact reset) opens the row in none of **two seeded passes of 300 s** over the whole level |
+
+A replayable route is red whatever (a) says ("a replay wins", above); a find that does not replay from a fresh
+process is no evidence either way and is kept as a seed. The gate table shows the three per row and is green only
+with all three. Nothing else is asked - no wider bound, no further probe, no human attempt: a route found outside
+the bar is a new evidence route for the next round, never a moved bar. The static rules at the top of this section
+are the validator's; where they speak of enemies near a ledge they are superseded inside a ward by 15.7.3.
+
 #### 15.7.7 Two heroes on one camera
 
 - Keep each gate inside one view: both heroes must see each other's role (20 x 11 cells).
@@ -915,6 +1001,9 @@ whose gate is "unproven" asks world-B for its probes rather than raising the bou
   over the partner's floor stay on the view while both stand** (every boost, Totem and lob ledge does). Higher than
   that the upper hero has to come down or the lower one up before the leash runs out; keep drops where one hero may
   stand above the other within 9 rows, or have both drop together.
+- **An idle partner holds no view** [G76]: the camera follows the heroes who count, so a lone climber takes the
+  view with him and the idle one below is leashed. No gate may rest on "his partner keeps the view down": whatever
+  a high place gives a lone hero in the search's world, it gives him in the real game (7-1's warp stack).
 - Checkpoints: keep 2 free cells on each side (P2 respawns 24 px beside P1).
 - Locked rooms (arenas, gates with `lock=`, camera locks) pull the partner in.
 - **Dozing and determinism** (V3.b replays every co-op route with and without dozing): entities out of every view
@@ -992,6 +1081,11 @@ team wipe does not. What it means for a level:
 - **Teach it once**: the egg and tablet signs at the first checkpoint of 1-1 and 5-1 co-op may add "Asleep? Press
   any key!" (one idea per sign [G27]).
 - **The team exit** counts an idle hero on the view as present (an absent partner never blocks the end of a stage).
+- **The leash takes the idle one** [G76]: an idle hero is no camera anchor and no wall for the view - the view
+  goes with whoever plays, the idle hero is left outside it and becomes the egg after 121 / 73 ticks (it drifts
+  after the partner and hatches idle). A two-stream route must not let a stream go idle while the other walks on,
+  nor rely on an idle P2 holding the view. The tribe is wiped when its last counting hero goes down, also beside
+  a hatched idle partner.
 - **No doorstops** [G53]: an idle body blocks no door, slab, column or boulder - they move and push him aside. A
   hold-plate door with floor beside its slab is therefore safe (built by objects-A in phase 3 after world-B's search
   found the doorstop route through w2_l1_coop 'hatches').
@@ -1104,5 +1198,10 @@ New routes describe themselves in a header instead of a `ROUTES` entry. The head
       standing 243+ ticks without input [G33]; a boss arena's weak points 55 px under the view's top (72 px in the boss bar's columns) [G35].
 - [ ] Co-op (G3 follow-up): every heavy on a flat floor a pair can brace on, keeper `hp` set as strikes (`hp` / 25 + 1 [G63]) [G57]; plate
       signs say "crouch" [G58].
+- [ ] Co-op (G3b round): every gate row green on the **three proofs** [G77] - the search, the evidence set, the
+      explorer; the gate's high ground 12+ cells inside its tablet's ward, `ward=` where it begins before the
+      tablet [G73]; no standing place within 10 + h / 2 cells above a gate's ledge [G74]; a gap gate of a windy
+      file 12 cells wide or with a raised far lip [G79]; no route that needs an enemy's head inside a ward, a jump
+      on top of a spring [G71], one hero meeting a bond [G72] or an idle partner's view [G76].
 - [ ] Signs: every text at most 3 board lines (about 60 characters); the music context of the 15.2 table.
 - [ ] Arena: 20 x 12, row 0 empty, spawns for `players`, cookpots, bot graph baked and its bot test green per mode.

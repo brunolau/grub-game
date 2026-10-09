@@ -130,9 +130,11 @@ func test_the_view_edges_are_walls_for_the_leader() -> void:
 	var level: Level = _load(2)
 	var p1: PlayerBase = level.player
 	var p2: PlayerBase = level.get_hero(1)
-	# P2 stays at column 1 of the view: the camera cannot page, so P1 walks into the right edge wall.
+	# P2 stays at column 1 of the view: the camera cannot page, so P1 walks into the right edge wall. (P2 holds a key
+	# on the spot: he COUNTS. An idle P2 holds no view - wf11 R6, the tests further down.)
 	p2.teleport(Vector2i(level.get_party_frame().position.x + 24, FLOOR_Y))
 	_hold(0, Defs.IN_RIGHT)
+	_hold(1, Defs.IN_SWAP)
 	Sim.step(90)
 	var walls: Vector2i = level.get_edge_walls()
 	assert_eq(level.get_party_frame().position.x, 0, "the camera never paged")
@@ -480,6 +482,7 @@ func test_going_down_and_hatching_make_a_hero_idle_again() -> void:
 	var p1: PlayerBase = level.player
 	var p2: PlayerBase = level.get_hero(1)
 	var driver: PartyDriver = _driver(level)
+	_wake(level, p1)  # P1 plays too (wf11 R6: were his pad on the table, the last counting hero going down is a wipe)
 	_wake(level, p2)
 	p2.go_down(&"voluntary")
 	Sim.step(1)
@@ -815,3 +818,216 @@ func test_a_small_locked_view_is_the_party_frame() -> void:
 	level.unlock_camera()
 	level.lock_camera(Rect2i(0, 0, 640, 224))
 	assert_eq(level.get_party_frame().size, Vector2i(320, 176), "a larger lock: the tribe camera's view")
+
+
+# =================================================================================================================
+# wf11 ruling R6: an idle hero is no camera anchor, and he is the one the leash takes
+# =================================================================================================================
+
+func test_an_idle_partner_holds_no_view_and_the_leash_takes_him() -> void:
+	# The pair of test_the_view_edges_are_walls_for_the_leader with the pad of P2 on the table (he never pressed
+	# anything: idle by the rule). The view goes with P1, P2 is left behind and HE becomes the egg; P1 is never leashed.
+	var level: Level = _load(2)
+	var p1: PlayerBase = level.player
+	var p2: PlayerBase = level.get_hero(1)
+	var p2_start: Vector2i = p2.sim_pos
+	_hold(0, Defs.IN_RIGHT)
+	var limit: int = PartyTuning.leash_egg_ticks(Defs.Difficulty.BEGINNER)
+	var p1_leash: int = 0
+	var p2_off_at: int = -1
+	var egg_at: int = -1
+	for t: int in range(1, 181):
+		Sim.step(1)
+		p1_leash = maxi(p1_leash, p1.leash)
+		if p2_off_at < 0 and p2.leash > 0:
+			p2_off_at = t
+		if egg_at < 0 and p2.is_down():
+			egg_at = t
+	assert_true(p2.is_idle(), "P2 never pressed a key")
+	assert_true(level.get_party_frame().position.x > 0, "the view paged with P1 (frame at %d)" % level.get_party_frame().position.x)
+	assert_true(p1.sim_pos.x > 320, "P1 walked on past the first view (x %d): no edge wall held him" % p1.sim_pos.x)
+	assert_true(level.get_party_frame().has_point(p1.sim_pos - Vector2i(0, 1)), "P1 is on the view")
+	assert_eq(p1_leash, 0, "P1 was never off the view for a tick")
+	assert_false(p1.is_down())
+	assert_true(p2_off_at > 0, "P2 stood where he was (x %d) and the view left him" % p2_start.x)
+	assert_eq(egg_at, p2_off_at + limit - 1, "the leash took the idle hero after its %d ticks" % limit)
+	assert_false(p2.dead, "an egg, not a death")
+	assert_eq(Game.lives, Tuning.LIVES_START, "no life lost")
+	assert_true(level.get_party_frame().grow(-PartyTuning.EGG_VIEW_INSET_PX).has_point(p2.sim_pos - Vector2i(0, 1)),
+			"his egg came onto the view, with the hero who plays")
+
+
+func test_a_partner_holds_the_view_until_the_idle_rule_says_he_is_gone() -> void:
+	# P2 pressed a key once, then put the pad down. For 243 ticks he still counts: the view waits for him and P1 stands
+	# at the edge wall, as ever. From the 243rd the view is the view of P1.
+	var level: Level = _load(2)
+	var p1: PlayerBase = level.player
+	var p2: PlayerBase = level.get_hero(1)
+	p2.teleport(Vector2i(level.get_party_frame().position.x + 24, FLOOR_Y))
+	_hold(0, Defs.IN_RIGHT)
+	var first: int = Sim.tick + 1
+	GameInput.set_scripted_slot(1, func(tick: int) -> int: return Defs.IN_LOOK if tick == first else 0)
+	Sim.step(1)
+	assert_false(p2.is_idle(), "one key: he counts")
+	Sim.step(PlayerBase.IDLE_TICKS - 1)
+	assert_false(p2.is_idle(), "242 quiet ticks: still counted")
+	assert_eq(level.get_party_frame().position.x, 0, "the view waited for him the whole time")
+	var walls: Vector2i = level.get_edge_walls()
+	assert_true(p1.sim_pos.x < walls.y and p1.sim_pos.x >= walls.y - 6, "P1 stands at the right wall: %d" % p1.sim_pos.x)
+	assert_eq(p2.leash, 0)
+	Sim.step(1)
+	assert_true(p2.is_idle(), "the 243rd: idle")
+	var limit: int = PartyTuning.leash_egg_ticks(Defs.Difficulty.BEGINNER)
+	var p1_leash: int = 0
+	for t: int in limit + 40:
+		Sim.step(1)
+		p1_leash = maxi(p1_leash, p1.leash)
+	assert_true(level.get_party_frame().position.x > 0, "the view went on with P1")
+	assert_true(p2.is_down(), "and the leash took the sleeper")
+	assert_eq(p1_leash, 0, "never the hero who plays")
+	assert_false(p1.is_down())
+
+
+func test_an_idle_partner_below_never_costs_the_climber_his_body() -> void:
+	# The real-game finding of the G3b verifier (7-1 'stack'): the partner who stood below held the tribe camera and
+	# the leash made the CLIMBER an egg. 40 rows; the floor at row 36, a ledge 16 rows higher (more than a view) on a
+	# pillar at columns 12-15. The pad of P1 is on the table (idle from the start); P2 plays and stands on the ledge.
+	var lines: PackedStringArray = PackedStringArray()
+	for row: int in 40:
+		var line: String = (TileGrid.CH_SOLID_A if row >= 36 else TileGrid.CH_AIR).repeat(COLS)
+		if row >= 20 and row < 36:
+			line = line.substr(0, 12) + TileGrid.CH_SOLID_A.repeat(4) + line.substr(16)
+		if row == 35:
+			line = line.substr(0, 4) + TileGrid.CH_PLAYER_START + line.substr(5)
+		lines.append(line)
+	for idle_low: bool in [true, false]:
+		var level: Level = _load(2, "", "test", "\n".join(lines), Defs.Difficulty.EXPERT)
+		var p1: PlayerBase = level.player
+		var p2: PlayerBase = level.get_hero(1)
+		_hold(1, Defs.IN_SWAP)
+		if not idle_low:
+			_hold(0, Defs.IN_SWAP)
+		Sim.step(5)
+		p2.teleport(Vector2i(13 * 16 + 8, 20 * 16))
+		level.notify_hero_teleported(p2)
+		var limit: int = PartyTuning.leash_egg_ticks(Defs.Difficulty.EXPERT)
+		var p2_leash: int = 0
+		for t: int in limit + 60:
+			Sim.step(1)
+			p2_leash = maxi(p2_leash, p2.leash)
+		if idle_low:
+			assert_true(p1.is_idle() and not p2.is_idle(), "the set-up: P1 idle below, P2 plays above")
+			assert_false(p2.is_down(), "the hero who plays keeps his body")
+			assert_true(level.get_party_frame().has_point(p2.sim_pos - Vector2i(0, 1)),
+					"the view came up to him (frame %s, feet %s)" % [str(level.get_party_frame()), str(p2.sim_pos)])
+			assert_true(p1.is_down(), "the idle hero below was left off the view: the leash took HIM")
+			assert_false(p1.dead)
+		else:
+			# Both play (the rule as it was): P1, the lower slot with ground under his feet, is the anchor; the two stand
+			# farther apart than a view holds, and the leash takes the hero off it - P2 on the ledge.
+			assert_false(p1.is_idle() or p2.is_idle(), "the set-up: both count")
+			assert_true(p2.is_down(), "two heroes who count: the leash is what it was (P2 off the view: an egg)")
+			assert_false(p1.is_down())
+			assert_true(p2_leash >= limit - 1, "his leash ran its %d ticks" % limit)
+		GameInput.clear_scripted()
+		Sim.stop()
+		level.free()
+
+
+func test_the_edge_walls_hold_the_heroes_who_count_only() -> void:
+	# R6 (3): the view is a wall for the heroes it follows. An idle hero is no wall for the view and no view is a wall
+	# for him while his partner plays (a mover may carry him out - then the leash takes him).
+	for p2_counts: bool in [true, false]:
+		var level: Level = _load(2)
+		var p2: PlayerBase = level.get_hero(1)
+		_hold(0, Defs.IN_SWAP)
+		if p2_counts:
+			_hold(1, Defs.IN_SWAP)
+		Sim.step(2)
+		var walls: Vector2i = level.get_edge_walls()
+		p2.teleport(Vector2i(walls.y - 3, FLOOR_Y))
+		p2.xvel = 160  # shoved towards the right edge: 10 px on the next tick
+		Sim.step(1)
+		if p2_counts:
+			assert_true(p2.sim_pos.x < walls.y, "a hero who counts stops at the edge wall (x %d, the wall at %d)" % [p2.sim_pos.x, walls.y])
+		else:
+			assert_true(p2.is_idle(), "the set-up: his pad is on the table")
+			assert_true(p2.sim_pos.x >= walls.y, "an idle hero is not held by the view of his partner (x %d, the wall at %d)"
+					% [p2.sim_pos.x, walls.y])
+		GameInput.clear_scripted()
+		Sim.stop()
+		level.free()
+	# Nobody counts: the walls hold everybody, as they always did.
+	var both: Level = _load(2)
+	var hero: PlayerBase = both.get_hero(1)
+	Sim.step(2)
+	var both_walls: Vector2i = both.get_edge_walls()
+	hero.teleport(Vector2i(both_walls.y - 3, FLOOR_Y))
+	hero.xvel = 160
+	Sim.step(1)
+	assert_true(hero.sim_pos.x < both_walls.y, "two pads on the table: the edge walls are what they were")
+
+
+func test_the_last_counting_hero_going_down_beside_an_idle_partner_wipes_the_team() -> void:
+	# R6 (6). Before: a player who went down beside a hatched partner whose pad lay on the table was an egg nobody
+	# could hatch. Now the toss plays out, a life is paid and both stand at the checkpoint again.
+	var wipes: Array[int] = [0]
+	var on_wipe: Callable = func() -> void: wipes[0] += 1
+	Events.party_wiped.connect(on_wipe)
+	for way: String in ["toss", "voluntary", "partner plays", "an idle hero goes down", "the survivor rests"]:
+		var level: Level = _load(2)
+		var p1: PlayerBase = level.player
+		var p2: PlayerBase = level.get_hero(1)
+		wipes[0] = 0
+		var lives: int = Game.lives
+		match way:
+			"toss":
+				_hold(0, Defs.IN_SWAP)  # P1 plays; P2 never touched his pad
+				Sim.step(3)
+				p1.kill(&"spikes")
+				Sim.step(Tuning.DEATH_ANIM_TICKS - 2)
+				assert_eq(wipes[0], 0, "toss: it plays out first")
+				Sim.step(6)
+				assert_eq(wipes[0], 1, "toss: the last counting hero went down beside an idle partner - a team wipe")
+				assert_eq(Game.lives, lives - 1, "toss: a life is paid")
+				assert_false(p1.is_down() or p1.dead, "toss: P1 stands at the checkpoint again, no egg nobody can hatch")
+				assert_false(p2.is_down() or p2.dead, "toss: and so does P2")
+			"voluntary":
+				_hold(0, Defs.IN_SWAP)
+				Sim.step(3)
+				p1.go_down(&"voluntary")
+				Sim.step(3)
+				assert_eq(wipes[0], 1, "an egg made beside an idle partner: the same wipe, at once")
+				assert_eq(Game.lives, lives - 1)
+				assert_false(p1.is_down())
+			"partner plays":
+				_hold(0, Defs.IN_SWAP)
+				_hold(1, Defs.IN_SWAP)
+				Sim.step(3)
+				p1.kill(&"spikes")
+				Sim.step(Tuning.DEATH_ANIM_TICKS + 4)
+				assert_eq(wipes[0], 0, "a partner who counts: no wipe")
+				assert_true(p1.is_down(), "... an egg, as ever")
+				assert_eq(Game.lives, lives)
+			"an idle hero goes down":
+				Sim.step(3)
+				p2.go_down(&"leash")  # the pad of P2 on the table, and of P1 too: nobody played, nobody is wiped
+				Sim.step(3)
+				assert_eq(wipes[0], 0, "an idle hero turning egg beside an idle partner wipes nothing")
+				assert_true(p2.is_down())
+				assert_eq(Game.lives, lives)
+			"the survivor rests":
+				_hold(0, Defs.IN_SWAP)
+				_hold(1, Defs.IN_SWAP)
+				Sim.step(3)
+				p2.go_down(&"voluntary")
+				Sim.step(3)
+				GameInput.clear_scripted()
+				Sim.step(PlayerBase.IDLE_TICKS + 20)
+				assert_true(p1.is_idle(), "the set-up: P1 put the pad down while P2 is an egg")
+				assert_eq(wipes[0], 0, "going idle wipes nothing - only going down does")
+				assert_eq(Game.lives, lives)
+		GameInput.clear_scripted()
+		Sim.stop()
+		level.free()
+	Events.party_wiped.disconnect(on_wipe)

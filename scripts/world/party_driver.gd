@@ -12,7 +12,9 @@ extends SimEntity
 ## PlayerBase.IDLE_TICKS (10 s), or none since he entered the level, is counted by no co-op rule of this driver and no
 ## duo move uses him: no head contact by him or on his head (no Shoulder Hop, Totem Ride or stomp hatch), a running ride
 ## ends when its rider or carrier becomes idle, no lee behind him, no Relay Bounce by him. The physical steps (edge
-## walls, leash, eggs) treat him as any hatched hero. PlayerBase.counts_for_coop / is_idle are the queries.
+## walls, eggs) treat him as any hatched hero. PlayerBase.counts_for_coop / is_idle are the queries.
+## wf11 ruling R6: an idle hero is no camera anchor (LevelCamera.tick_group follows the heroes who count) and he is
+## the one the leash takes ([method _leash]): a hero who plays is never egged because his partner put the pad down.
 ##
 ## Per tick (each step runs after every hero's own step of the phase):
 ##  - WEAPONS: who is ACTIVE ([method is_active]); who stands in a crouching partner's lee on this tick
@@ -62,6 +64,8 @@ var active_mask: int = 0
 
 ## Sign of the wind the lee mask of the last tick was made for (0: no lee).
 var _lee_sign: int = 0
+## Bit per slot: that hero was an egg at the last wipe check ([method _wipe_check]: a fresh egg is a hero going down).
+var _egg_mask: int = 0
 ## Relay Bounce: enemy instance id -> slot of the hero who bounced on it last.
 var _relay_last: Dictionary = {}
 ## Feast Land check of the running level, decided once (-1 = not yet).
@@ -98,6 +102,14 @@ func _sim_tick(phase: int) -> void:
 func _weapons_step(level: LevelBase) -> void:
 	var walls: Vector2i = Vector2i.ZERO if level.completed else level.get_edge_walls()
 	var fence: bool = walls != Vector2i.ZERO
+	# wf11 R6: the view is the view of the heroes who COUNT - it is a wall for them only. An idle hero (PlayerBase.idle)
+	# is no wall for the view and no view is a wall for him while a partner plays; with nobody counting, everybody is
+	# fenced as before.
+	var somebody_counts: bool = false
+	for hero: PlayerBase in level.contact_order():
+		if not hero.dead and not hero.down and not hero.idle and _r6_on():
+			somebody_counts = true
+			break
 	for hero: PlayerBase in level.contact_order():
 		var bit: int = 1 << hero.slot
 		if hero.dead or hero.down:
@@ -112,7 +124,7 @@ func _weapons_step(level: LevelBase) -> void:
 			hero.end_totem_ride()
 			hero.on_platform = false
 			hero.grounded = false
-		if fence:
+		if fence and not (hero.idle and somebody_counts):
 			# A hero who is outside the walls (a teleport, a snap of the view) may still walk back in, never further out.
 			var x: int = hero.sim_pos.x
 			hero._fenced = true
@@ -130,6 +142,7 @@ func _on_level_reset() -> void:
 	_relay_last.clear()
 	wipe_pending = false
 	active_mask = 0
+	_egg_mask = 0
 	_lee_sign = 0
 	var level: LevelBase = Game.level
 	if level != null:
@@ -427,6 +440,11 @@ func _post(level: LevelBase) -> void:
 
 
 ## C.13 leash: a hero of H whose feet are outside the authentic view for leash_egg_ticks in a row becomes an egg.
+## wf11 ruling R6 "the leash takes the idle one": the tribe camera follows the heroes who COUNT (LevelCamera), so when
+## the pair parts it is the IDLE hero (PlayerBase.is_idle) who is left off the view and becomes the egg. A hero who
+## counts is never leashed while he is the only one who does - nobody is egged because his partner put the pad down
+## (before, an idle partner standing below held the view and the leash took the climber). With two heroes who count,
+## or none, the leash is what it was.
 func _leash(level: LevelBase, order: Array[PlayerBase]) -> void:
 	var frame: Rect2i = level.get_party_frame()
 	var limit: int = PartyTuning.leash_egg_ticks(Game.difficulty)
@@ -435,6 +453,7 @@ func _leash(level: LevelBase, order: Array[PlayerBase]) -> void:
 	var top: int = frame.position.y + 1
 	var right: int = left + frame.size.x
 	var bottom: int = top + frame.size.y
+	var counting: int = -1  # hatched heroes who count; asked once a hero is off the view (-1 = not yet)
 	for hero: PlayerBase in order:
 		if hero.dead or hero.down:
 			hero.leash = 0
@@ -443,6 +462,15 @@ func _leash(level: LevelBase, order: Array[PlayerBase]) -> void:
 		if feet.x >= left and feet.x < right and feet.y >= top and feet.y < bottom:
 			hero.leash = 0
 			continue
+		if not hero.idle and _r6_on():
+			if counting < 0:
+				counting = 0
+				for other: PlayerBase in order:
+					if not other.dead and not other.down and not other.idle:
+						counting += 1
+			if counting == 1:
+				hero.leash = 0  # R6: the view is his alone; an idle partner never costs him his body
+				continue
 		hero.leash += 1
 		if hero.leash >= limit:
 			hero.leash = 0
@@ -508,11 +536,35 @@ static func clamp_egg(feet: Vector2i, frame: Rect2i) -> Vector2i:
 
 ## The team wipe without a death toss (C.12): every hero is an egg (a leash or a voluntary egg while the partner was
 ## already down). A wipe that waits for a toss happens in LevelBase.hero_death_finished.
+## wf11 R6 (6), "the wipe when the last COUNTING hero goes down": on the tick a hero who COUNTED (not idle) becomes an
+## egg, the team is wiped too when nobody is left who counts - every other hero an egg or IDLE (PlayerBase.idle).
+## Before, a player who went down beside a hatched partner whose pad lay on the table was an egg nobody could hatch.
+## It is the going down of a hero who plays that wipes: an idle hero turning egg (the leash's catch) wipes nothing,
+## and neither does a hero who puts the pad down while his partner is an egg.
 func _wipe_check(level: LevelBase, order: Array[PlayerBase]) -> void:
 	if wipe_pending or level.completed or order.is_empty():
 		return
+	var eggs: int = 0
+	var all_eggs: bool = true
 	for hero: PlayerBase in order:
-		if not hero.down or hero.dead:
+		if hero.down and not hero.dead:
+			eggs |= 1 << hero.slot
+		else:
+			all_eggs = false
+	var fresh: int = eggs & ~_egg_mask
+	_egg_mask = eggs
+	if not all_eggs:
+		if fresh == 0 or not _r6_on():
+			return
+		var counted: bool = false
+		for hero: PlayerBase in order:
+			if hero.dead:
+				return  # a toss is running: LevelBase.hero_death_finished decides when it ends
+			if (fresh & (1 << hero.slot)) != 0:
+				counted = counted or not hero.idle
+			elif not hero.down and not hero.idle:
+				return  # somebody still plays
+		if not counted:
 			return
 	wipe_pending = true
 	level.team_wipe()
@@ -537,15 +589,31 @@ func _make_egg(level: LevelBase, hero: PlayerBase, cause: StringName, at: Vector
 
 ## LevelBase.hero_death_finished asks this first (LevelBase.register_party_driver): `hero`'s death toss is over. While
 ## another hero of the party is alive and hatched he becomes an egg where his toss STARTED, clamped into the view
-## (C.12) - true. Otherwise false: the level's default waits for the last toss and wipes the team.
+## (C.12) - true. Otherwise false: the level's default waits for the last toss and wipes the team. wf11 R6 (6): false
+## too when `hero` COUNTED (not idle) and every hatched partner is IDLE - the last counting hero went down.
 func handle_hero_death(hero: PlayerBase) -> bool:
 	var level: LevelBase = Game.level
 	if level == null or hero == null or partner_of(hero) == null:
 		return false
+	if not hero.idle and _r6_on() and not _another_counts(level, hero):
+		return false  # wf11 R6 (6): he played, his partner is hatched but IDLE - nobody could hatch this egg: a wipe
 	var cause: Variant = hero.get(&"death_cause")
 	_make_egg(level, hero, StringName(cause) if cause is StringName or cause is String else &"death",
 			death_origin(hero))
 	return true
+
+
+## False only while R6 is switched off for a measurement (PlayerBase.gate_rules_off).
+static func _r6_on() -> bool:
+	return (PlayerBase.gate_rules_off & PlayerBase.GATE_R6) == 0
+
+
+## True when a hero of the party other than `hero` COUNTS (alive, hatched, not idle - PlayerBase.counts_for_coop).
+func _another_counts(level: LevelBase, hero: PlayerBase) -> bool:
+	for other: PlayerBase in level.contact_order():
+		if other != hero and not other.dead and not other.down and not other.idle:
+			return true
+	return false
 
 
 ## Where `hero`'s death toss started: Player.death_origin when the hero side records it, else the toss walked back

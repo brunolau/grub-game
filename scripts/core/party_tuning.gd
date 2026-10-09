@@ -177,6 +177,13 @@ const IDLE_TICKS: int = 243
 ## The idle warning (DESIGN.md G58): from this many quiet ticks on a "Zzz soon" bubble shows over a co-op hero - 73
 ## ticks (3 s) before he dozes at IDLE_TICKS. Drawing only (HeroParty): no rule reads it.
 const IDLE_WARN_TICKS: int = 170
+## The WARD of a co-op gate (wf11 ruling R3, DESIGN.md G-rulings; LevelBase.set_ward / in_ward, objects/x2_tablet):
+## every x2 tablet wards the columns from its own cell to its `far` cell, widened by this many cells on both sides
+## (a tablet may give its own widths: `ward=<left>,<right>` cells). Inside a ward no enemy gives a hero of a co-op
+## party lift, rest or carry - a head changes neither his velocity nor his position, a club hit on an enemy gives no
+## pogo. 12 cells: an Up bounce taken just outside the ward (-224 v16: 28 ticks back down to the head's height, 140 px
+## at the walk cap of 5 px a tick) comes down inside the margin, before the gate's own columns. (tune)
+const WARD_MARGIN_CELLS: int = 12
 const MAIN_MIN_GATES: int = 2                ## co-op gates on the main path of every co-op `main` file
 const SUB_MIN_GATES: int = 1                 ## every co-op `sub` file: a gate or its boss's co-op form
 ## Boost ledges (Shoulder Hop / Totem Ride), tiles over the floor: 8 on both difficulties (G28 / G39).

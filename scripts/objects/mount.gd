@@ -140,6 +140,9 @@ var _bite_box: Rect2i = Rect2i()
 ## True once the running bite found its target: one target per bite, like a consumed club box.
 var _bite_spent: bool = false
 var _remount_until: PackedInt32Array = PackedInt32Array()
+## wf11 R3 (co-op wards only; empty everywhere else): the enemies whose heads gave the ridden mount nothing - it came
+## down on each inside a ward - until their boxes part ([method _ridden_contacts]).
+var _ward_heads: Array[EnemyBase] = []
 var _anim_age: int = 0
 var _sprite: Sprite2D = null
 var _saddle: Sprite2D = null
@@ -779,13 +782,24 @@ func _tame_now() -> void:
 
 func _ridden_contacts(level: LevelBase) -> void:
 	var enemies: Array[SimEntity] = level.get_kind(Defs.Kind.ENEMY)
+	if not _ward_heads.is_empty():
+		_ward_heads_check()  # wf11 R3 (co-op wards only): a head that gave nothing is forgotten once the boxes part
 	for i: int in enemies.size():
 		var enemy: EnemyBase = enemies[i] as EnemyBase
 		if enemy == null or not enemy.awake or not enemy.contact_hurts or not enemy.is_targetable():
 			continue
 		if not Overlap.body(self, enemy, self):
 			continue
+		if not _ward_heads.is_empty() and _ward_heads.has(enemy):
+			continue  # wf11 R3: still falling through the head that gave nothing - it does not hit the riders either
 		if Overlap.stomp and yvel >= 0:
+			if _in_ward(level):
+				# wf11 R3 (the mount's stomp is its rider's): inside a ward an enemy's head gives a co-op party's mount
+				# no lift - its velocity stays, it falls on through the body - and that enemy is passed until they part.
+				_ward_heads.append(enemy)
+				Audio.play_sfx(Sfx.LAND)
+				level.spawn_fx(&"fx/dust", Vector2i(sim_pos.x, enemy.sim_pos.y - enemy.box_h))
+				continue
 			yvel = STOMP_YVEL
 			grounded = false
 			continue
@@ -797,6 +811,21 @@ func _ridden_contacts(level: LevelBase) -> void:
 			continue
 		rider_hit(enemy)
 		return
+
+
+## wf11 ruling R3, the ward (LevelBase.in_ward; DESIGN.md G-rulings): true when this mount carries a hero of a co-op
+## party and its driver's feet column lies in a ward - an enemy's head then gives it nothing.
+func _in_ward(level: LevelBase) -> bool:
+	return driver != null and driver.gate_rule(PlayerBase.GATE_R3) and level.in_ward(driver.sim_pos.x)
+
+
+## R3: an enemy stays in [member _ward_heads] while it is there to touch and its box still overlaps the mount's.
+func _ward_heads_check() -> void:
+	for i: int in range(_ward_heads.size() - 1, -1, -1):
+		var enemy: EnemyBase = _ward_heads[i]
+		if not is_instance_valid(enemy) or enemy.dead or not enemy.awake or not enemy.contact_hurts \
+				or not enemy.is_targetable() or not Overlap.body(self, enemy, self):
+			_ward_heads.remove_at(i)
 
 
 func _return_home() -> void:
@@ -820,6 +849,7 @@ func _return_home() -> void:
 
 
 func _on_level_reset() -> void:
+	_ward_heads.clear()
 	for hero: PlayerBase in [driver, gunner]:
 		if hero != null:
 			_unseat(hero)

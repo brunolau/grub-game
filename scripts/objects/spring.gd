@@ -1,7 +1,8 @@
 class_name SpringPad
 extends SimEntity
 ## `objects/spring` (`power` v16 [-224]): a springy flower pad (not in the original game, GAMEPLAY.md 7.2). Landing
-## on its top half throws the hero up with `power`, like the big bounce on an enemy head (PHYSICS.md 9).
+## on its top half throws the hero up with `power`, like the big bounce on an enemy head (PHYSICS.md 9). In a co-op
+## party it throws him as a launch (wf11 ruling R1, PlayerBase.spring_bounce): no jump table on top of `power`.
 ##
 ## `skin=flower|cap` [flower] (2.0, 6-2 Spore Hollow: "caps are springs", DESIGN.md A.3; a picture only): a glowing
 ## mushroom cap, CAP_TEXTURE [M 17.3 spring_cap] in the layout of spring.png (5 cells of 64 x 26 art px, pivot
@@ -73,12 +74,14 @@ func _sim_tick(_phase: int) -> void:
 		_launch_test(level, hero)
 
 
-## One hero: landing on it (falling, not gliding) launches him with `power`.
+## One hero: landing on it (falling, not gliding) launches him with `power` - PlayerBase.spring_bounce: the 1.0 bounce
+## in single-player and versus, a LAUNCH for a hero of a co-op party (wf11 ruling R1: the jump table never stacks on a
+## spring, a cap or a pot spring; a low strike begun on the pad rises what a plain jump onto it does).
 func _launch_test(level: LevelBase, hero: PlayerBase) -> void:
 	if hero.dead or hero.down or hero.yvel < 0 or hero.is_gliding():
 		return
 	if Overlap.body(self, hero, hero) and Overlap.stomp:
-		hero.bounce(power, Overlap.depth)
+		hero.spring_bounce(power, Overlap.depth)
 		launches += 1
 		_anim = 0
 		if _sprite != null:

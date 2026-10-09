@@ -222,6 +222,10 @@ const COUNTDOWN_STEPS: int = 3               ## "3, 2, 1, GRUB!"
 const DECIDING_REPLAY_TICKS: int = 73        ## the last 3 s replayed ...
 const DECIDING_REPLAY_SPEED_DIV: int = 2     ## ... at half speed
 const SCOREBOARD_TICKS: int = 121            ## about 5 s
+## This many drawn rounds in a row end the match on its standings (DESIGN.md G78): the side with the most round wins
+## takes it, level sides share a drawn match (VersusMatch.is_over / leaders). 3 (tune); 0 = never. Every mode - a
+## drawn round is rare outside the hard cap, and three in a row are nobody playing.
+const DRAW_ROUNDS_TO_END: int = 3
 const AWARDS_MIN: int = 1                    ## the tally companion hands out 1-3 awards each
 const AWARDS_MAX: int = 3
 

@@ -10,6 +10,7 @@ extends TestCase
 ## TEST_ARENA_SEEDS of them on the others), through world-B's referee and the real heroes, the bots fed through
 ## GameInput's BOT slots exactly as Flow does (HeroBot.new per seat, reset_round with the round seed). Checked:
 ##  - every round ends by the mode's own rule (the gong, the last one standing, five goals), within ROUND_LIMIT_TICKS;
+##    a Last Caveman Standing round at the latest at its hard cap (PLAN.md 8 V4.c: 2 914 ticks of play);
 ##  - no bot stands idle more than VersusTuning.BOT_IDLE_MAX_TICKS (10 s) while it is in play;
 ##  - no hit and no stomp lands on a hero within VersusTuning.SPAWN_SHIELD_TICKS of his spawn (the round start, a
 ##    respawn, a Clubball kick-off);
@@ -17,13 +18,16 @@ extends TestCase
 ##    VersusTuning.BOT_WIN_RATE_SPREAD_PERCENT points of the fair share (the test arenas print theirs);
 ##  - a match log replays identically: the first round of each set is played again from the same start with the
 ##    bots' recorded flags as plain scripted input (no bot) and gives the same digest on every tick.
-## Each set prints one line (rounds, ticks, wins per spawn with the mean score, links played / failed) for the arena
+## Each set prints one line (rounds, ticks, wins per spawn with the mean score, links played / failed, the longest
+## round) for the arena
 ## designers. G50 (PLAN.md cut 4's switch): an (arena, mode) outside the arena's meta `bots` (a mode list or `none`;
 ## default every mode) ships human-only - it prints a skip line "human-only (cut 4)" and is not played. Every round
 ## awaits a frame (the freed levels' queued callbacks are flushed; one frame for all sets overflowed Godot's message
 ## queue, wf9_integration_to_core-B.txt #1). VERSUS_BOTS_SHARD=<i>/<n> plays every n-th (arena, mode) set from the
 ## i-th (tools/g3_versus_bots.sh runs the shards side by side; the mover bake runs in shard 0). Also here (too slow
-## for the quick tests): the rider movers of the arena kit - a see-saw's two ends and a pulley's two lifts - bake as
+## for the quick tests): heroes who never move on every arena that lists Last Caveman Standing - the hard cap ends
+## what no sudden death does, and three drawn rounds end the match (PLAN.md 8 V4.c, DESIGN.md G78; shard 0); the rider movers of the arena kit - a see-saw's two ends
+## and a pulley's two lifts - bake as
 ## mover nodes whose every link verifies, the lifts with links at every still state of their pulley (core-B wf10); a
 ## bot gets off and on lifts that a rival holds between their stops; every committed graph with pulley lifts is
 ## verified in full (the last shard; the quick tests check a sample). Bakes and long verifications run in frames
@@ -377,6 +381,126 @@ func test_committed_graphs_with_pulley_lifts_hold_in_every_state() -> void:
 	assert_true(true, "%d graph(s) with pulley lifts" % checked)
 
 
+func test_heroes_who_never_move_end_every_last_caveman_arena_by_the_cap() -> void:
+	# PLAN.md 8 V4.c (ruling R8, DESIGN.md G78): no Last Caveman Standing round lasts for ever. The default run plays
+	# two idle heroes on spawns 1 + 2 (tests/test_versus_rules.gd); here the other three rotations of two and all four
+	# at once, on every arena file that lists the mode - also where CPUs do not play it (Tar Pulleys) - with the arena's
+	# own sudden death. Whoever no threat reaches is stopped by the hard cap.
+	if _shard().x != 0:
+		assert_true(true, "the idle rounds run in shard 0")
+		return
+	var cap: int = VersusTuning.SUDDEN_DEATH_AT_TICKS + VersusTuning.SUDDEN_DEATH_CAP_TICKS
+	var played: int = 0
+	var capped: int = 0
+	var arenas: int = 0
+	for arena: Dictionary in _arenas():
+		if not (arena["modes"] as Array).has(Defs.VersusMode.LAST_CAVEMAN):
+			continue
+		arenas += 1
+		# (heroes, round): two heroes on spawns 2 + 3, 3 + 4 and 4 + 1 (spawns 1 + 2: the default run), then all four.
+		for case: Vector2i in [Vector2i(2, 1), Vector2i(2, 2), Vector2i(2, 3), Vector2i(mini(int(arena["players"]), 4), 0)]:
+			var players: int = case.x
+			var referee: VersusReferee = _load_round(arena, Defs.VersusMode.LAST_CAVEMAN, players, case.y,
+					VersusTuning.round_seed(7, case.y))
+			assert_not_null(referee, "%s: a referee" % arena["id"])
+			if referee == null:
+				continue
+			for slot: int in players:
+				GameInput.set_scripted_slot(slot, func(_tick: int) -> int: return 0)
+			while referee.phase != VersusReferee.PHASE_OVER and referee.round_ticks < cap + 5:
+				Sim.step(1)
+			var standing: PackedInt32Array = PackedInt32Array()
+			for slot: int in players:
+				if not referee.is_out(slot) and not _level.get_hero(slot).dead:
+					standing.append(slot)
+			var by_cap: bool = referee.cap_at >= 0 and referee.round_ticks >= referee.cap_at
+			var name: String = "%s, %d idle heroes, round %d" % [arena["id"], players, case.y]
+			assert_eq(referee.phase, VersusReferee.PHASE_OVER, "%s: the round ended (%d ticks played)" % [name,
+					referee.round_ticks])
+			assert_true(referee.round_ticks <= cap, "%s: by the hard cap at %d ticks of play (took %d)" % [name, cap,
+					referee.round_ticks])
+			if by_cap:
+				capped += 1
+				assert_eq(referee.winner_slots, PackedInt32Array(), "%s: nobody was hurt - the cap's draw (standing %s)" % [
+					name, standing])
+			print("    %s/last_caveman, %d idle heroes, round %d: %d ticks, ended by %s, standing %s, winners %s" % [
+				arena["id"], players, case.y, referee.round_ticks, "the CAP" if by_cap else "its sudden death", standing,
+				referee.winner_slots])
+			played += 1
+			GameInput.clear_scripted()
+			_free_level()
+			await get_tree().process_frame
+	assert_true(arenas >= 5, "%d arena files list Last Caveman Standing (%d idle rounds)" % [arenas, played])
+	assert_true(capped >= 1, "the cap ended %d of them" % capped)
+
+
+func test_two_who_never_move_draw_a_match_after_three_capped_rounds() -> void:
+	# A 2-player match plays on spawns 1 and 2 (they swap every round): on Colossus Hall both stand under ledges no
+	# stalactite reaches. Before the cap the first round never ended; with it every round is a draw at 2 914 ticks -
+	# and the third drawn round ends the match.
+	var id: StringName = &"arena_colossus_hall"
+	var text: String = FileAccess.get_file_as_string("res://levels/%s.lvl" % id)
+	if _shard().x != 0:
+		assert_true(true, "the drawn match runs in shard 0")
+		return
+	var versus_match: VersusMatch = VersusMatch.new()
+	# Two seats nobody feeds (bot seats without a bot source): their heroes stand idle.
+	versus_match.seat_bot(Defs.BotLevel.HUNTER)
+	versus_match.seat_bot(Defs.BotLevel.HUNTER)
+	versus_match.mode = Defs.VersusMode.LAST_CAVEMAN
+	versus_match.arena = id
+	versus_match.begin_match(5)
+	var cap: int = VersusTuning.SUDDEN_DEATH_AT_TICKS + VersusTuning.SUDDEN_DEATH_CAP_TICKS
+	Sim.manual = true
+	var rounds: int = 0
+	var played: int = 0
+	var first_spawns: Array[Vector2i] = []
+	while not versus_match.is_over() and rounds < 6:
+		assert_eq(versus_match.arena_for_round(versus_match.round_index), id)
+		versus_match.begin_round(id)
+		Game.versus_match = versus_match
+		Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.VERSUS, 2, 1)
+		Game.begin_level(id)
+		_free_level()
+		_level = (load(LEVEL_SCENE) as PackedScene).instantiate() as Level
+		_level.setup_from_text(id, text)
+		add_node(_level)
+		_level.set_view_size(Vector2i(Tuning.VIEW_W, Tuning.VIEW_H) * Tuning.ART_SCALE)
+		Sim.start(versus_match.round_seed())
+		var ref: VersusReferee = VersusReferee.find(_level)
+		# Without Game.versus_match the referee ends the round by Events.round_ended, not through Flow's screens.
+		Game.versus_match = null
+		assert_not_null(ref)
+		if ref == null:
+			break
+		assert_eq(ref.mode, Defs.VersusMode.LAST_CAVEMAN, "the match's mode reached the referee")
+		assert_eq(ref.round_index, rounds)
+		var spawns: Array[Vector2i] = [_level.get_hero(0).sim_pos, _level.get_hero(1).sim_pos]
+		if rounds == 0:
+			first_spawns = spawns
+		elif rounds == 1:
+			assert_eq(spawns, [first_spawns[1], first_spawns[0]] as Array[Vector2i], "two players swap spawns 1 and 2")
+		ref.start_round_now()
+		for slot: int in 2:
+			GameInput.set_scripted_slot(slot, func(_tick: int) -> int: return 0)
+		while ref.phase != VersusReferee.PHASE_OVER and ref.round_ticks < cap + 5:
+			Sim.step(1)
+		assert_eq(ref.phase, VersusReferee.PHASE_OVER, "round %d ended" % rounds)
+		assert_eq(ref.round_ticks, cap, "round %d: at the hard cap" % rounds)
+		assert_eq(ref.winner_slots, PackedInt32Array(), "round %d: nobody was hurt - a draw" % rounds)
+		played += ref.round_ticks
+		assert_true(versus_match.record_round(ref.winner_slots))
+		rounds += 1
+		GameInput.clear_scripted()
+		_free_level()
+		await get_tree().process_frame
+	assert_eq(rounds, VersusTuning.DRAW_ROUNDS_TO_END, "the third drawn round ends the match")
+	assert_true(versus_match.is_over())
+	assert_eq(played, VersusTuning.DRAW_ROUNDS_TO_END * cap, "3 x 2 914 ticks of play")
+	assert_eq(versus_match.leaders(), PackedInt32Array(), "a drawn match: nobody is named")
+	assert_eq(versus_match.round_wins, PackedInt32Array([0, 0, 0, 0]))
+
+
 ## The graph of MOVERS_ROOM, baked once per run (in frames: its pulley sweep is a long bake).
 func _movers_graph() -> NavGraph:
 	if not _baked.has(MOVERS_ID):
@@ -406,6 +530,7 @@ func _play_set(arena: Dictionary, mode: int) -> void:
 	wins.fill(0.0)
 	var rounds: int = 0
 	var ticks: int = 0
+	var longest: int = 0
 	var scores: PackedInt32Array = PackedInt32Array()
 	scores.resize(Defs.MAX_PLAYERS)
 	var worst_idle: int = 0
@@ -429,6 +554,7 @@ func _play_set(arena: Dictionary, mode: int) -> void:
 				return
 			rounds += 1
 			ticks += int(result["ticks"])
+			longest = maxi(longest, int(result["ticks"]))
 			spawn_count = int(result["spawn_count"])
 			worst_idle = maxi(worst_idle, int(result["worst_idle"]))
 			for line: String in result["spawn_hits"]:
@@ -465,11 +591,17 @@ func _play_set(arena: Dictionary, mode: int) -> void:
 			assert_true(absf(share - mean) <= spread + 0.0001,
 					"%s: spawn %d wins %d%% of %d rounds (fair share %d%%, +/-%d)" % [name, spawn + 1,
 					roundi(share * 100.0), rounds, roundi(mean * 100.0), VersusTuning.BOT_WIN_RATE_SPREAD_PERCENT])
-	print("    %s: %d rounds, %d ticks (%d ms), wins per spawn %s, worst idle %d, links %d played / %d failed%s" % [
+	print("    %s: %d rounds, %d ticks (%d ms), wins per spawn %s, worst idle %d, links %d played / %d failed%s; longest round %d" % [
 		name, rounds, ticks, Time.get_ticks_msec() - started_msec, " ".join(shares), worst_idle, played, failed,
-		"" if failures.is_empty() else " (" + "; ".join(failures) + ")",
+		"" if failures.is_empty() else " (" + "; ".join(failures) + ")", longest,
 	])
 	assert_true(unfinished.is_empty(), "%s: every round ended by its rule (not: %s)" % [name, ", ".join(PackedStringArray(unfinished))])
+	if mode == Defs.VersusMode.LAST_CAVEMAN:
+		# PLAN.md 8 V4.c (ruling R8, DESIGN.md G78): no bot round outlasts the hard cap of the mode - the sudden death at
+		# VersusTuning.SUDDEN_DEATH_AT_TICKS, the gong at the latest VersusTuning.SUDDEN_DEATH_CAP_TICKS after it.
+		var cap: int = VersusTuning.SUDDEN_DEATH_AT_TICKS + VersusTuning.SUDDEN_DEATH_CAP_TICKS
+		assert_true(longest <= cap, "%s: no round outlasts the hard cap (the longest ran %d ticks, the cap falls at %d)" % [
+			name, longest, cap])
 	assert_true(worst_idle <= VersusTuning.BOT_IDLE_MAX_TICKS, "%s: a bot stood idle %d ticks (at most %d)" % [
 		name, worst_idle, VersusTuning.BOT_IDLE_MAX_TICKS,
 	])

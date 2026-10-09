@@ -255,7 +255,9 @@ func test_the_zzz_soon_bubble_shows_from_the_170th_quiet_tick_and_the_zzz_from_t
 	var level: Level = _load(2)
 	var p1: PlayerBase = level.player
 	var p2: PlayerBase = level.get_hero(1)
-	_hold(0, Defs.IN_RIGHT)
+	# P1 holds a key on the spot (wf11 R6: were he to walk on, the view would go with him once P2 dozes and the leash
+	# would make the sleeper an egg - tests/test_world_party.gd; an egg shows no bubble).
+	_hold(0, Defs.IN_SWAP)
 	_tap(1)
 	var first_warning: int = -1
 	var first_zzz: int = -1
@@ -280,7 +282,7 @@ func test_the_zzz_soon_bubble_shows_from_the_170th_quiet_tick_and_the_zzz_from_t
 	assert_eq(first_zzz, IDLE, "the Zzz on the 243rd, not before")
 	assert_eq(warning_ticks, IDLE - HeroParty.IDLE_WARN_TICKS, "73 ticks of warning, then the Zzz replaces it")
 	assert_eq(both, 0, "never both at once")
-	assert_false(_party(p1).is_idle_warning_shown(), "P1 walks the whole time: no bubble")
+	assert_false(_party(p1).is_idle_warning_shown(), "P1 holds a key the whole time: no bubble")
 	# His next input clears whichever shows; the warning comes back 170 ticks later.
 	_tap(1)
 	Sim.step(1)
@@ -299,7 +301,7 @@ func test_the_zzz_soon_bubble_shows_from_the_170th_quiet_tick_and_the_zzz_from_t
 func test_an_untouched_partner_shows_the_same_bubble_from_his_170th_tick() -> void:
 	var level: Level = _load(2)
 	var p2: PlayerBase = level.get_hero(1)
-	_hold(0, Defs.IN_RIGHT)
+	_hold(0, Defs.IN_SWAP)  # P1 plays on the spot (R6: a P1 who walks off takes the view, and the leash the sleeper)
 	_hold(1, 0)
 	Sim.step(HeroParty.IDLE_WARN_TICKS - 1)
 	assert_true(p2.is_idle(), "never pressed anything: counted by no rule from the start (G33)")

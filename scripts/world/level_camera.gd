@@ -254,7 +254,11 @@ func snap(hero: PlayerBase) -> void:
 # =================================================================================================================
 
 ## One step of the tribe camera (phase CAMERA, co-op), for `heroes` = the heroes of the party in slot order. It works
-## on H, the heroes that are alive and hatched (not dead, not in a death toss, not an egg):
+## on H, the heroes that are alive and hatched (not dead, not in a death toss, not an egg) AND COUNT (wf11 ruling R6:
+## an IDLE hero - PlayerBase.is_idle, no input of his own for 243 ticks or none since he entered the level - is no
+## camera anchor, holds no paging margin and no footing: while some hatched hero counts, H is the heroes who count and
+## the view goes with them; the idle one left behind is the leash's, PartyDriver._leash. When NO hatched hero counts,
+## H is every hatched hero, as before):
 ##  - |H| = 0: the view holds still; |H| = 1: PHYSICS.md 12.1-12.3 exactly on that hero (always the paging camera);
 ##  - |H| >= 2, horizontally (replaces 12.1): standing still never moves the view; it pages right when a hero moving
 ##    right reaches the start column (16 of 20) while the rear hero is at column 2 or more, left at column 4 while the
@@ -355,14 +359,41 @@ func _collect_tribe(heroes: Array[PlayerBase]) -> void:
 	_tribe.clear()
 	# (PlayerBase.is_down() / is_grounded() read as their fields: the tribe camera runs every co-op tick - the
 	# multi-hero performance pass of phase 3.)
+	var idle_seen: bool = false
 	for hero: PlayerBase in heroes:
 		if hero == null or hero.dead or hero.down:
 			continue
 		_tribe.append(hero)
+		if hero.idle:
+			idle_seen = true
 		if hero.grounded or hero.on_platform:
 			_ground_step[clampi(hero.slot, 0, _ground_step.size() - 1)] = _group_ticks
 		if footing_watch or footing_mode:
 			_note_footing(hero)
+	if idle_seen and _tribe.size() > 1:
+		_drop_idle()
+
+
+## wf11 ruling R6 "an idle hero is no anchor": while some hero of [member _tribe] counts, the IDLE ones
+## (PlayerBase.idle) leave it for this step - the view follows the heroes who play, and a hero is never held back or
+## leashed by a partner who put the pad down. Nothing when every hatched hero is idle (the view stays with them all).
+## Their ground steps and footings are kept above, so a hero who wakes is an anchor again with his history.
+func _drop_idle() -> void:
+	if (PlayerBase.gate_rules_off & PlayerBase.GATE_R6) != 0:
+		return  # the measurement switch: R6 off
+	var counting: int = 0
+	for hero: PlayerBase in _tribe:
+		if not hero.idle:
+			counting += 1
+	if counting == 0 or counting == _tribe.size():
+		return
+	var kept: int = 0
+	for i: int in _tribe.size():
+		var hero: PlayerBase = _tribe[i]
+		if not hero.idle:
+			_tribe[kept] = hero
+			kept += 1
+	_tribe.resize(kept)
 
 
 ## The first hero of H (slot order) standing in the look pose (12.3: on the ground, not on a platform, no motion).

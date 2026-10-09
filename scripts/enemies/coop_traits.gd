@@ -76,7 +76,7 @@ var sealed: bool = false
 ## killer; -1 = nobody, or not dead). Kept while it lies dead, cleared when it regrows, merges or the level resets.
 var kill_slot: int = -1
 ## `bond` / `split` (R2), statistics only (tools and tests; nothing in the simulation reads it): the hits and deaths
-## the slot rule refused on this record since it was spawned.
+## the slot rule refused on this record since the level started (a team wipe clears it with the rest).
 var slot_refusals: int = 0
 ## `grab`: the hero it holds (null = none) and its perch (`perch=c,r`, the feet point of that cell).
 var held: PlayerBase = null
@@ -453,6 +453,7 @@ func on_reset() -> void:
 	regrow = 0
 	died_tick = -1
 	kill_slot = -1
+	slot_refusals = 0
 	sealed = false
 	split = Split.WHOLE
 	mate = null

@@ -15,6 +15,9 @@ extends SceneTree
 ##                          errors; a refused gate prints its verdict - refused (exhaustive) or refused (bounded) -
 ##                          with the evidence. A gate takes up to a few minutes (the result cache of the search is
 ##                          used: build/coop_search_cache); many files: tools/world_coop_gates.sh.
+##   ... -- --gates         one line per co-op gate (of the given files, else of every co-op file): its tablet, its
+##                          far cell and the columns of its WARD on each difficulty (DESIGN.md G73), with the enemy
+##                          records in the ward and the followers within two views of its edge. --coop prints them too.
 ##
 ## Prints `file:line: error: message` / `file:line: warning: message` and a summary. Exit code 0 = no errors,
 ## 1 = errors found (or, with --strict, warnings), 2 = bad arguments.
@@ -34,6 +37,7 @@ func _run() -> void:
 	var strict: bool = false
 	var quiet: bool = false
 	var coop: bool = false
+	var gates: bool = false
 	for argument: String in OS.get_cmdline_user_args():
 		if argument == "--strict":
 			strict = true
@@ -41,6 +45,8 @@ func _run() -> void:
 			quiet = true
 		elif argument == "--coop":
 			coop = true
+		elif argument == "--gates":
+			gates = true
 		elif argument.begins_with("--"):
 			print("validate_levels: unknown option %s" % argument)
 			_finish(2)
@@ -52,21 +58,25 @@ func _run() -> void:
 	for file: String in files:
 		if not file.begins_with(LEVEL_DIR + "/"):
 			validator.add_file(file)
-	if coop and files.is_empty():
+	if (coop or gates) and files.is_empty():
 		files = _coop_files()
 	validator.run()
 	var errors: int = 0
 	var warnings: int = 0
 	for problem: Dictionary in validator.problems:
-		if (not files.is_empty() or coop) and not files.has(str(problem["path"])):
+		if (not files.is_empty() or coop or gates) and not files.has(str(problem["path"])):
 			continue
 		var is_error: bool = int(problem["severity"]) == LevelValidator.ERROR
 		if is_error:
 			errors += 1
-		else:
+		elif int(problem["severity"]) == LevelValidator.WARNING:
 			warnings += 1
 		if is_error or not quiet:
 			print(LevelValidator.format_problem(problem))
+	if coop or gates:
+		for report: Dictionary in validator.gate_reports:
+			if files.has(str(report["path"])):
+				print("%s:%d: note: %s" % [report["path"], int(report["line"]), report["message"]])
 	if coop:
 		errors += await _search_gates(files)
 	var scope: String = "%d level file(s)" % count if files.is_empty() else "%d file(s)" % files.size()

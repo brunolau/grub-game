@@ -2,8 +2,9 @@
 
 They pin the decisions written into the specs after gate G1 and phase 2 (DESIGN.md "Appendix: G1 and phase-2
 resolutions") against the code that implements them, the phase-3 briefs (DESIGN.md A.6) against GAMEPLAY 13.2, the
-music table (LEVEL_DESIGN 15.2) against `Sfx` and the level files, and the request files addressed to the lead
-designer against their replies. Standard library only, read-only. Run from the project root:
+music table (LEVEL_DESIGN 15.2) against `Sfx` and the level files, the rulings of the round after G3b (G71-G79:
+the ward of every x2 tablet against the columns where the evidence routes took their lift), and the request files
+addressed to the lead designer against their replies. Standard library only, read-only. Run from the project root:
 
     python -m unittest discover -s docs/spec -p "test_*.py" -v
 
@@ -1268,6 +1269,191 @@ class DeviationsReviewed(unittest.TestCase):
             self.assertRegex(_read("levels/%s.lvl" % level_id), r"(?m)^objects/x2_tablet .*\bgate=%s\b" % gate)
         self.assertNotRegex(_read("levels/w7_l1_coop.lvl"), r"(?m)^objects/(mount|rex_pen)\b")
         self.assertRegex(_read("levels/w6_l1_coop.lvl"), r"(?m)^objects/mount .*\bwild\b")
+
+
+# =====================================================================================================================
+# The round after G3b (DESIGN.md G71-G79, 2026-10-09, build/engine_requests/wf11_lead_design_to_*.txt): the causes of
+# the verifier's 19 one-hero rows closed by rule, the three proofs of a gate as the fixed bar, the gust jump.
+# =====================================================================================================================
+
+def _tablet(level_id, gate):
+    """(col, far col, ward left, ward right) of the x2 tablet `gate` of a level file; None when it is not there."""
+    m = re.search(r"(?m)^objects/x2_tablet (\d+) \d+ ([^\n]*\bgate=%s\b[^\n]*)$" % gate, _read("levels/%s.lvl" % level_id))
+    if m is None:
+        return None
+    far = re.search(r"\bfar=(\d+),\d+", m.group(2))
+    ward = re.search(r"\bward=(\d+),(\d+)", m.group(2))
+    margin = _gd_consts("scripts/core/party_tuning.gd").get("WARD_MARGIN_CELLS", 12)
+    left, right = (int(ward.group(1)), int(ward.group(2))) if ward else (margin, margin)
+    return int(m.group(1)), int(far.group(1)), left, right
+
+
+class CausesByRule(unittest.TestCase):
+    """[G71]-[G80] the orchestrator's R1-R8 as recorded, the lead designer's ward check, the gust jump, fairness."""
+
+    APPENDIX = DESIGN[DESIGN.index("## Appendix: G1 and phase-2 resolutions"):]
+
+    def _row(self, n):
+        rows = [line for line in self.APPENDIX.splitlines() if line.startswith("| G%d |" % n)]
+        self.assertEqual(len(rows), 1, "one row G%d" % n)
+        return rows[0]
+
+    def test_the_rows(self):
+        for n, texts in (
+                (71, ("fires as a **launch**", "**The measurement is the rule**", "**115 px**", "**142 px**",
+                      "`PlayerBase.launch_hold`")),
+                (72, ("**two different heroes who both count**", "**the ball itself**", "**glances**",
+                      "no longer proof obligations")),
+                (73, ("`PartyTuning.WARD_MARGIN_CELLS`", "**no enemy gives lift, rest or carry**",
+                      "**until their boxes part**", "`ward=22,12`", "**the margin counts from the gate's high ground**",
+                      "the hittable half of [G67] (2) stays whole")),
+                (74, ("**long drop**", "**more than 10 + h / 2 cells**", "**roofed**")),
+                (75, ("put back on the side he came from", "A one-cell keeper door is allowed again")),
+                (76, ("no camera anchor", "**The idle hero's egg**", "**last counting hero**")),
+                (77, ("**fixed**", "**(a) the solo search refuses it**", "**(b) every route of the evidence set says",
+                      "**(c) the continuous-play explorer opens it in none of two seeded passes of 300 s**")),
+                (78, ("**1 457**", "**fewest hurts taken this round**", "**a draw**", "**HUD**")),
+                (79, ("**162 px, 10.1 cells**", "**open on both difficulties**", "**12 cells**",
+                      "the wind's phases")),
+                (80, ("**+17.7**", "at least 384 rounds", "no G3 blocker"))):
+            row = self._row(n)
+            for text in texts:
+                self.assertIn(text, row, "G%d" % n)
+            self.assertEqual(row.count(" | "), 3, "G%d is one table row of four cells" % n)
+
+    def test_the_documents(self):
+        c0 = _section(APPENDIX_C, "### C.0")
+        self.assertIn("**A spring is a launch for a hero of a co-op party** [G71]", c0)
+        self.assertIn("**the launch hold**", c0)
+        self.assertIn("- **The gust jump** [G79]", _section(APPENDIX_C, "### C.6"))
+        c10 = _section(APPENDIX_C, "### C.10")
+        for text in ("- **Slot-bound windows** (co-op only) [G72]", "- **The ward** (co-op only) [G73]",
+                     "- **A closed door passes nobody** (co-op only) [G75]", "`x >> 4` of his feet point",
+                     "boxes no longer overlap"):
+            self.assertIn(text, c10)
+        self.assertIn("dead **or idle**", _section(APPENDIX_C, "### C.12"))
+        self.assertIn("- **An idle hero is no anchor** [G76]", _section(APPENDIX_C, "### C.13"))
+        self.assertIn("| Hard cap (Last Caveman Standing) [G78] |", _section(APPENDIX_C, "### C.14"))
+        c16 = _section(APPENDIX_C, "### C.16")
+        self.assertIn("| Ward | margin 12 cells on each side", c16)
+        self.assertIn("| Sudden-death cap (Last Caveman Standing) | 1 457 (60 s)", c16)
+
+        self.assertIn("**The gust jump** [G79]", _section(GAMEPLAY_13, "### 13.3", r"\n### "))
+        self.assertIn("- **An idle hero is no anchor** [G76]", _section(GAMEPLAY_13, "#### 13.9.2"))
+        self.assertIn("- **Windows are slot-bound** [G72]", _section(GAMEPLAY_13, "#### 13.9.3"))
+        self.assertIn("- **The ward** [G73]", _section(GAMEPLAY_13, "#### 13.9.4"))
+        objects = _section(GAMEPLAY_13, "#### 13.9.7")
+        for text in ("[ward=<left>,<right>]", "**a launch** [G71]", "**a closed door passes nobody** [G75]"):
+            self.assertIn(text, objects)
+        self.assertIn("**The hard cap** [G78]", _section(GAMEPLAY_13, "#### 13.10.4"))
+        self.assertIn("| Ward margin [G73] |", _section(GAMEPLAY_13, "### 13.11"))
+
+        metrics = _section(LEVEL_DESIGN_15, "#### 15.7.2")
+        for text in ("| **A spring under a hero of a co-op party** [G71] |", "| **The long drop** [G74] |",
+                     "| **The gust jump** [G79] |"):
+            self.assertIn(text, metrics)
+        gates = _section(LEVEL_DESIGN_15, "#### 15.7.3")
+        for text in ("**What may stand near a gate** [G73]", "- **Inside the ward: any enemy record, anywhere**",
+                     "- **What remains is the ward's edge.**", "- **Hittables: unchanged.**",
+                     "**The long drop** [G74]", "**Gust gaps** [G79]"):
+            self.assertIn(text, gates)
+        self.assertIn("**The ward** [G73]", _section(LEVEL_DESIGN_15, "#### 15.7.4"))
+        self.assertIn("- **Bonds are slot-bound** [G72]", _section(LEVEL_DESIGN_15, "#### 15.7.5"))
+        proof = _section(LEVEL_DESIGN_15, "#### 15.7.6")
+        for text in ("**The proof of a gate is three things** [G77]", "| **(a) the search refuses** |",
+                     "| **(b) the evidence set says \"not reached\"** |", "| **(c) the explorer stays out** |"):
+            self.assertIn(text, proof)
+        self.assertIn("- **An idle partner holds no view** [G76]", _section(LEVEL_DESIGN_15, "#### 15.7.7"))
+        self.assertIn("- **The leash takes the idle one** [G76]", _section(LEVEL_DESIGN_15, "#### 15.7.9"))
+
+        v3 = PLAN[PLAN.index("**V3 - Co-op proofs.**"):PLAN.index("**V4 - Versus proofs.**")]
+        for text in ("**The fixed bar**", "(1) **the solo search refuses it**",
+                     "(2) **every route of the evidence set says \"not reached\"**",
+                     "(3) **the continuous-play explorer**", "300 s** per gate row"):
+            self.assertIn(text, v3)
+        self.assertIn("c. Rounds end", PLAN[PLAN.index("**V4 - Versus proofs.**"):PLAN.index("**V5 - Performance**")])
+        self.assertIn("**The causes closed by rule**", _section(DESIGN, "### D.8"))
+        self.assertIn("**An idle hero is no anchor** [G76]", _section(DESIGN, "### D.2"))
+        self.assertIn("**A hard cap** [G78]", _section(DESIGN, "### E.4"))
+
+    def test_the_constants_in_code(self):
+        party = _gd_consts("scripts/core/party_tuning.gd")
+        _pending(self, "WARD_MARGIN_CELLS" in party, "party: PartyTuning.WARD_MARGIN_CELLS = 12 (wf11_lead_design_to_party.txt #1)")
+        self.assertEqual(party["WARD_MARGIN_CELLS"], 12)
+        self.assertNotIn("WARD_PASS_TICKS", party, "the pass lasts until the boxes part: no clock [G73]")
+
+    def test_the_cap_in_code(self):
+        versus = _gd_consts("scripts/core/versus_tuning.gd")
+        _pending(self, "SUDDEN_DEATH_CAP_TICKS" in versus, "versus: VersusTuning.SUDDEN_DEATH_CAP_TICKS = 1457 (R8)")
+        self.assertEqual(versus["SUDDEN_DEATH_CAP_TICKS"], 1457)
+
+    def test_the_rules_in_code(self):
+        _pending(self, "func credit_slot" in _read("scripts/enemies/coop_traits.gd"),
+                 "enemies: the slot credit of bonds, splits and drums (R2, wf11_lead_design_to_all.txt)")
+        _pending(self, "func in_ward" in _read("scripts/base/level_base.gd"),
+                 "party: LevelBase.in_ward (R3, wf11_lead_design_to_party.txt #1)")
+        self.assertIn("in_ward(", _read("scripts/player/player.gd"))
+        self.assertIn("spring_bounce", _read("scripts/objects/spring.gd"))
+
+    def test_a_snatcher_does_not_seize_in_a_ward(self):
+        """[G73] the `grab` trait is a carry by an enemy: no seize in a ward, a carried hero let go at its edge."""
+        self.assertIn("a Snatcher does not seize a hero in a ward", _section(APPENDIX_C, "### C.10"))
+        self.assertIn("- **`grab`** in a ward [G73]", _section(LEVEL_DESIGN_15, "#### 15.7.5"))
+        _pending(self, "in_ward" in _read("scripts/enemies/coop_traits.gd"),
+                 "enemies: a Snatcher does not seize a hero whose feet column is in a ward and lets go of one it "
+                 "carries there (R3, wf11_lead_design_to_all.txt #2) - decided in the round, no builder took it")
+
+    # The hero's feet column at each head bounce that LIFTS an evidence route (build/g3bv/evidence, replayed with a
+    # trace on HEAD 082c788: build/lead_design/traces/), with the tablet as it stood then: (level, gate, tablet column,
+    # far column, lift columns). A tablet that was moved since is that gate's rebuild and is not asked.
+    LIFTS = (("w1_l1_coop", "hop", 100, 117, (87, 88)),
+             ("w3_l2_coop", "drive", 93, 106, (88, 90, 94, 97, 99, 101, 102)),
+             ("w3_l2_coop", "floes", 87, 110, (86, 93, 95, 98, 102)),
+             ("w6_l1_coop", "root", 162, 177, (165,)),
+             ("w7_l1_coop", "dune", 179, 197, (185,)),
+             ("w7_l2_coop", "dark_gap", 133, 146, (132, 133, 134, 137)),
+             ("w9_l1b_coop", "stormwall", 196, 222, (197, 212, 213)),
+             ("w9_l2_coop", "brace", 93, 116, tuple(range(107, 114))))
+
+    def test_every_evidence_lift_lies_inside_its_ward(self):
+        hop_outside = []
+        asked = 0
+        for level_id, gate, col, far, lifts in self.LIFTS:
+            tablet = _tablet(level_id, gate)
+            if tablet is None or tablet[:2] != (col, far):
+                continue
+            first = min(col, far) - tablet[2]
+            last = max(col, far) + tablet[3]
+            outside = [c for c in lifts if not first <= c <= last]
+            if (level_id, gate) == ("w1_l1_coop", "hop"):
+                hop_outside = outside  # the one override the trace asked for: pending until the levels owner adds it
+                continue
+            asked += 1
+            self.assertEqual(outside, [], "%s '%s': a lift outside the ward %d..%d" % (level_id, gate, first, last))
+        self.assertGreaterEqual(asked, 1)
+        # (No apostrophe in a pending text: tools/g3.sh counts the lines "skipped 'pending owner change".)
+        _pending(self, not hop_outside, "levels: `ward=22,12` on the hop tablet of w1_l1_coop - its lift is taken at "
+                 "columns 87-88, the default ward begins at 88 (wf11_lead_design_to_levels.txt #1)")
+
+    def test_hop_is_the_one_override_the_trace_asked_for(self):
+        tablet = _tablet("w1_l1_coop", "hop")
+        if tablet is None or tablet[:2] != (100, 117):
+            self.skipTest("the 'hop' tablet of w1_l1_coop was moved: its rebuild is the explorer's to prove")
+        _pending(self, tablet[2:] != (12, 12), "levels: `ward=22,12` (wf11_lead_design_to_levels.txt #1)")
+        self.assertGreaterEqual(tablet[2], 22)
+
+    def test_only_two_coop_files_carry_wind(self):
+        windy = sorted(os.path.basename(p)[:-4] for p in glob.glob(os.path.join(ROOT, "levels", "*_coop.lvl"))
+                       if re.search(r"(?m)^wind(\.\w+)? *=", _read("levels/" + os.path.basename(p))))
+        self.assertEqual(windy, ["w3_l1b_coop", "w9_l2_coop"],
+                         "a co-op file with wind: measure its gap gates against the gust jump (LD 15.7.3 [G79])")
+
+    def test_the_gust_gap_of_9_2_is_rebuilt(self):
+        level = _read("levels/w9_l2_coop.lvl")
+        _pending(self, re.search(r"(?m)^objects/column 207 28 size=9,1\b", level) is None,
+                 "levels: the drive gap of w9_l2_coop still has its 9 cells of tar - the gust jump of one hero crosses "
+                 "them on both difficulties [G79] (wf11_lead_design_to_levels.txt #2, #3)")
+        self.assertRegex(level, r"(?m)^objects/x2_tablet .*\bgate=drive\b")
 
 
 class SuiteBudget(unittest.TestCase):

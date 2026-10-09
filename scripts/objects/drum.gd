@@ -17,6 +17,15 @@ extends HittableBase
 ## apart, then "go" (presentation only; nothing needs two inputs on the same tick). 2.0 IDLE rule: a hit made by an
 ## idle hero (his box, throw or ball; [method _idle_source]) lights nothing.
 ##
+## THE BOND IS SLOT-BOUND in a co-op party (orchestrator ruling R2 of the G3b round; the bond test was edited by
+## enemies-A, who owns the rule: scripts/enemies/coop_traits.gd): it succeeds only through hits credited to TWO
+## DIFFERENT heroes who both count - CoopTraits.credit_slot names a hit's slot (the striker, the thrower of a thrown
+## weapon, the ball itself for a batted hero; nobody for an idle hero, an egg or a downed hero). A hit credited to
+## nobody lights nothing, and the hero who alone struck every other drum of the open window cannot light the last one
+## ([method _light_for]): two axes of one hero thrown in one jump between the drums land inside any window (G3b cause
+## C), so the gap between the hits no longer decides. The drum sounds either way. A party of one, single-player and
+## versus keep the rule before it (any hit lights).
+##
 ## Enemies may share the `bond=` registry (LevelBase.get_tagged): only Drum members count here.
 ##
 ## `skin=drum|cap` [drum] (2.0, 6-2 Spore Hollow co-op: "twin drums made of glowing caps", DESIGN.md D.10; a picture
@@ -48,6 +57,10 @@ var window_left: int = 0
 ## Sim.tick of its last counted hit (-1 = none) and the hits it took (statistics, the solo search, tests).
 var last_hit_tick: int = -1
 var hits: int = 0
+## R2: bit per player slot whose hit struck it since it was lit (read only while [member lit]); the hits the slot
+## rule let light nothing since the level started (statistics, tools, tests).
+var struck_by: int = 0
+var refused: int = 0
 ## The leader only: ticks into the running count-in (-1 = none) and whether the heroes stood ready on the last test.
 var count_in: int = -1
 
@@ -106,8 +119,11 @@ func take_hit(_power: int, source: SimEntity) -> bool:
 	var level: LevelBase = Game.level
 	if level != null:
 		level.spawn_fx(&"fx/star_puff", get_hit_point())
-		if not succeeded and not _idle_source(level, source):
-			_light(level)
+		if not succeeded:
+			if CoopTraits.party_on():
+				_light_for(level, CoopTraits.credit_slot(source))
+			elif not _idle_source(level, source):
+				_light(level)
 	_show()
 	return true
 
@@ -151,6 +167,36 @@ func bond_drums(level: LevelBase) -> Array[Drum]:
 ## The bond's window length (ticks) for the current difficulty.
 func window_ticks() -> int:
 	return window if window >= 0 else PartyTuning.window_ticks(Game.difficulty)
+
+
+## R2 (slot-bound bond, a co-op party): a hit credited to player slot `slot` (CoopTraits.credit_slot; -1 = nobody)
+## lights this drum - unless it counts for nobody, or this is the bond's last dark drum and no hero but this one
+## struck a lit one: then it stays dark ([member refused]). A further hit on a lit drum adds its slot, so the hero who
+## was refused at the last drum lights it once his partner has struck any drum of the window.
+func _light_for(level: LevelBase, slot: int) -> void:
+	if slot < 0:
+		refused += 1
+		return
+	var bit: int = 1 << slot
+	if lit:
+		struck_by |= bit
+		return
+	var drums: Array[Drum] = bond_drums(level)
+	if drums.size() >= 2:
+		var others: int = 0
+		var last_dark: bool = true
+		for drum: Drum in drums:
+			if drum == self:
+				continue
+			if drum.lit:
+				others |= drum.struck_by
+			else:
+				last_dark = false
+		if last_dark and (others & ~bit) == 0:
+			refused += 1
+			return
+	struck_by = bit
+	_light(level)
 
 
 func _light(level: LevelBase) -> void:
@@ -265,6 +311,8 @@ func _is_idle() -> bool:
 func _on_level_reset() -> void:
 	lit = false
 	succeeded = false
+	struck_by = 0
+	refused = 0
 	window_left = 0
 	cooldown = 0
 	count_in = -1

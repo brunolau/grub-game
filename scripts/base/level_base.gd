@@ -25,6 +25,9 @@ extends Node2D
 ## Co-op rules of phase 1 (PLAN.md P1.6, PHYSICS.md C.12 / C.13): [method get_party_frame] (the authentic 20 x 11-cell
 ## view of the tribe camera), [method get_edge_walls], [method pull_party_into] (locked views take the whole party),
 ## [method team_wipe], [method party_spread_point]. Each is neutral for a party of one and outside co-op.
+## Wards (wf11, DESIGN.md G-rulings R3): [method set_ward] / [method clear_ward] (objects/x2_tablet registers its
+## own), [method in_ward], [method get_wards] - the columns around a co-op gate in which no enemy gives a hero of a
+## co-op party lift, rest or carry (the hero's contact and weapon passes ask [method in_ward]).
 
 ## Gameplay is about to start: the grid is built, the hero is spawned, Sim is started.
 signal play_started
@@ -164,6 +167,10 @@ var _tagged: Dictionary = {}
 var _no_entities: Array[SimEntity] = []
 ## True when the registered party driver handles party deaths itself (it has `handle_hero_death(hero) -> bool`).
 var _driver_handles_deaths: bool = false
+## Wards ([method set_ward]): owner instance id -> Vector2i(left px, right px exclusive), and the same spans flattened
+## (left, right, left, right ...) for [method in_ward]. Empty in every level without an x2 tablet (all of Book I solo).
+var _wards: Dictionary = {}
+var _ward_spans: PackedInt32Array = PackedInt32Array()
 
 
 func _init() -> void:
@@ -689,6 +696,59 @@ func tick_shake_timer_by(hero: PlayerBase) -> void:
 	tick_shake_timer()
 
 
+# --- 2.0 wards (wf11 ruling R3: "no enemy gives lift, rest or carry at a co-op gate") ---------------------------------
+
+## Declare the ward of `owner` (an objects/x2_tablet): the tile columns `left_col` .. `right_col` (inclusive, clamped
+## to the map), over all rows. A second call for the same owner replaces its ward. Inside a ward the enemies of the
+## level give a hero of a co-op party nothing to stand on: his contact pass counts the stomp against the enemy and
+## leaves his velocity and position alone, and his club's hit on an enemy gives no pogo (Player, PHYSICS.md C.10
+## "Ward"). The level only keeps the columns; single-player never asks.
+func set_ward(owner: Object, left_col: int, right_col: int) -> void:
+	if owner == null:
+		return
+	var cols: int = grid.cols if grid != null else 0
+	var left: int = maxi(mini(left_col, right_col), 0)
+	var right: int = maxi(left_col, right_col)
+	if cols > 0:
+		right = mini(right, cols - 1)
+	_wards[owner.get_instance_id()] = Vector2i(left * Tuning.TILE, (right + 1) * Tuning.TILE)
+	_rebuild_ward_spans()
+
+
+## Forget the ward of `owner` (it left the level). Safe when it has none.
+func clear_ward(owner: Object) -> void:
+	if owner != null and _wards.erase(owner.get_instance_id()):
+		_rebuild_ward_spans()
+
+
+## True when the logical x `x` (a hero's feet point) lies in the columns of some ward ([method set_ward]). False in
+## every level without wards.
+func in_ward(x: int) -> bool:
+	var spans: PackedInt32Array = _ward_spans
+	var i: int = 0
+	while i < spans.size():
+		if x >= spans[i] and x < spans[i + 1]:
+			return true
+		i += 2
+	return false
+
+
+## Every ward of the level as Vector2i(first column, last column), in the order they were declared (tools, tests, a
+## debug overlay).
+func get_wards() -> Array[Vector2i]:
+	var wards: Array[Vector2i] = []
+	for span: Vector2i in _wards.values():
+		wards.append(Vector2i(span.x / Tuning.TILE, span.y / Tuning.TILE - 1))
+	return wards
+
+
+func _rebuild_ward_spans() -> void:
+	_ward_spans.resize(0)
+	for span: Vector2i in _wards.values():
+		_ward_spans.append(span.x)
+		_ward_spans.append(span.y)
+
+
 ## Switch darkness on or off (fades over Tuning.DARKNESS_FADE_TICKS in the world module).
 func set_darkness(p_dark: bool) -> void:
 	if dark == p_dark:
@@ -871,9 +931,10 @@ func _lose_team_life() -> void:
 ## Death routing of a party (TECH_AUDIT.md 4.7): a hero of a party of two or more calls this when his death toss
 ## has ended (a party of one goes through Events.player_death_finished, which this also falls back to). The
 ## neutral default, until the PartyDriver (PLAN.md P1) turns deaths into eggs and versus respawns: the hero stays
-## dead while any other hero still plays or still has his toss running; once every hero is dead (each toss finished)
-## or down, Events.party_wiped, one life from the pool and [method respawn_player] for the whole party (or game
-## over), exactly the 1.0 rule. Overrides keep that last step. A registered PartyDriver with `handle_hero_death`
+## dead while any other hero still plays or still has his toss running; once every hero is dead (each toss finished),
+## down or - wf11 R6 (6), co-op only, when `hero` himself counted - hatched but IDLE (PlayerBase.idle: his pad lies
+## on the table, he can hatch nobody), Events.party_wiped, one life from the pool and [method respawn_player] for the
+## whole party (or game over), exactly the 1.0 rule. Overrides keep that last step. A registered PartyDriver with `handle_hero_death`
 ## ([method register_party_driver]) is asked first and replaces the default when it returns true.
 func hero_death_finished(hero: PlayerBase) -> void:
 	if hero == null:
@@ -885,9 +946,12 @@ func hero_death_finished(hero: PlayerBase) -> void:
 			and bool(party_driver.call(&"handle_hero_death", hero)):
 		return  # the PartyDriver (register_party_driver) took the death: an egg, a versus respawn
 	_death_done |= 1 << clampi(hero.slot, 0, Defs.MAX_PLAYERS - 1)
+	var counted: bool = not hero.idle and (PlayerBase.gate_rules_off & PlayerBase.GATE_R6) == 0
 	for other: PlayerBase in _orders[0]:
 		if other.is_down():
 			continue
+		if counted and not other.dead and other.idle:
+			continue  # wf11 R6 (6): the last COUNTING hero went down - a hatched hero who is IDLE keeps nobody waiting
 		if not other.dead or (_death_done & (1 << clampi(other.slot, 0, Defs.MAX_PLAYERS - 1))) == 0:
 			return
 	Events.party_wiped.emit()

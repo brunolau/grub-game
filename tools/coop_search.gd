@@ -12,6 +12,11 @@ extends SceneTree
 ##   ... -- --profile           where the time of every search went (reset, place, step, sig, build, windows ...)
 ##   ... -- --sim-profile       the tick time by entity script (Sim's development profiler hook)
 ##   ... -- --nodes             print every resting point the search expands (and what its world changed)
+##   ... -- --moves             ... and every move of every resting point with where it ended
+##   ... -- --reset-report      what the exact reset found changed after the runs (which variables of which entities
+##                              a level reset leaves, which entities it spawned again; CoopSearch.reset_report)
+##   ... -- --audit             every reset compares EVERY entity with the level-file world, not only those that
+##                              ticked (CoopSearch.reset_audit: the check of the rule the exact reset rests on; slow)
 ##   ... -- --egg               the partner stays an egg (no idle hatched partner, CoopSearch.idle_partner = false): tells a
 ##                              gate one player opens through his idle partner from one he opens alone
 ##   ... -- --stats             runs, ticks and new resting points per macro group (what the search spends its time on)
@@ -92,6 +97,9 @@ func _run() -> void:
 	var fresh: bool = false
 	var table_only: bool = false
 	var max_gates: int = -1
+	var search_moves: bool = false
+	var reset_report: bool = false
+	var audit: bool = false
 	for argument: String in OS.get_cmdline_user_args():
 		if argument == "--list":
 			listing = true
@@ -101,6 +109,13 @@ func _run() -> void:
 			sim_profile = SimProfile.new()
 		elif argument == "--nodes":
 			search_debug = true
+		elif argument == "--moves":
+			search_debug = true
+			search_moves = true
+		elif argument == "--reset-report":
+			reset_report = true
+		elif argument == "--audit":
+			audit = true
 		elif argument == "--stats":
 			stats = true
 		elif argument == "--egg":
@@ -163,6 +178,9 @@ func _run() -> void:
 		return
 	search.set(&"use_cache", cache)
 	search.set(&"debug_nodes", search_debug)
+	search.set(&"debug_moves", search_moves)
+	search.set(&"collect_reset_report", reset_report)
+	search.set(&"reset_audit", audit)
 	search.set(&"use_file_cache", cache)
 	search.set(&"collect_stats", stats)
 	if node_limit > 0:
@@ -259,6 +277,10 @@ func _run() -> void:
 		if stats:
 			for line: String in search.call(&"stats_report"):
 				print("    %s" % line)
+		if reset_report:
+			for line: String in search.call(&"reset_report_lines"):
+				print("    reset found: %s" % line)
+			search.set(&"reset_report", {})
 		if sim_profile != null:
 			print("    sim: %s" % sim_profile.report())
 			sim_profile.calls.clear()

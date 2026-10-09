@@ -107,6 +107,25 @@ var wall_bumped: bool = false
 var _x_max_grid: TileGrid = null
 var _x_max: int = 0
 
+## wf11 rulings for a hero of a CO-OP PARTY (hero_party.coop; every member below keeps its default in single-player
+## and versus, whose code paths only compare them):
+## R3, the WARD (LevelBase.in_ward): the enemies whose heads gave him nothing - he came down on each inside a ward,
+## the stomp was counted against it, and until their boxes part nothing more happens between the two (it gives no lift
+## and does not hurt him while he falls through it). Empty = none; more than one when bodies overlap.
+var _ward_heads: Array[EnemyBase] = []
+## R3: true when the club box of this tick's weapon pass was used up on an enemy (not on a hittable): the hit whose
+## pogo a ward takes away - and that enemy (for the measurement trace only).
+var _club_hit_enemy: bool = false
+var _club_enemy: EnemyBase = null
+## R5, "a closed door passes nobody": his feet point at the end of the last tick on which his body cell (feet column,
+## the wall-probe row above the feet row) was no wall - the side he came from ([method _hold_the_side]).
+var _free_x: int = 0
+var _free_y: int = 0
+## R5: farther than this from his last free place (px, either axis) he was not pushed there - he was PUT there (a gate,
+## a travel, a tool that sets his feet point): a new place to come from. No mover carries a hero that far in a tick
+## (PartyTuning.MOVE_MAX_PX_PER_TICK is 18, a knock-back's first tick 20), and a solid of up to three cells lies within it.
+const DOOR_REACH_PX: int = 4 * Tuning.TILE
+
 ## What _refresh_visual() last wrote to the sprites (the performance pass: no engine property is read or written on a
 ## tick on which the picture did not change).
 var _shown_frame: int = -1
@@ -389,6 +408,7 @@ func respawn_at(pos: Vector2i) -> void:
 		_stop_feast_music()
 	_stun_min = Tuning.HIT_STUN_MIN
 	wall_bumped = false
+	_ward_heads.clear()
 	handler = Defs.HeroState.IDLE
 	input_flags = 0
 	club_frame = Tuning.ClubFrame.NONE
@@ -449,16 +469,23 @@ func _weapon_pass() -> void:
 	if club_box_active and not dead and _club_hits(enemies, hittables):
 		# One target per box; a hit in the air is the pogo (PHYSICS.md 9).
 		club_box_active = false
-		notify_weapon_hit()
+		# 2.0 wf11 R3: inside a ward a club hit on an ENEMY gives a co-op hero no pogo (a hittable still does).
+		if not (_club_hit_enemy and hero_party.coop and _in_ward(level)):
+			notify_weapon_hit()
+		elif (gate_rules_off & GATE_TRACE) != 0 and yvel != 0:
+			_ward_trace(level, "no pogo off", _club_enemy)
 
 
 func _club_hits(enemies: Array[SimEntity], hittables: Array[SimEntity]) -> bool:
+	_club_hit_enemy = false
 	for i: int in enemies.size():
 		var enemy: EnemyBase = enemies[i] as EnemyBase
 		if enemy == null or not enemy.awake or not enemy.is_targetable():
 			continue
 		if Overlap.weapon(club_box, club_box_xo, enemy) and enemy.take_hit(club_power, self):
 			_on_weapon_connected(enemy, club_power)
+			_club_hit_enemy = true
+			_club_enemy = enemy
 			return true
 	for i: int in hittables.size():
 		var hittable: HittableBase = hittables[i] as HittableBase
@@ -815,7 +842,8 @@ func _handle_strike(kind: int) -> void:
 	attack_gate = not last
 	if last:
 		swing_lock = Tuning.WEAPON_LOCK[weapon]
-		if not on_platform:
+		# (2.0 wf11 R1: no hop in the flight a spring gave a co-op hero - PlayerBase.launch_hold, false in single-player.)
+		if not on_platform and not launch_hold:
 			yvel += hop
 		if kind == Defs.HeroState.LOW_STRIKE and Sim.tick % Tuning.SKID_DUST_PERIOD == 0:
 			_spawn_fx(FX_DUST, sim_pos)
@@ -909,6 +937,8 @@ func _run_glider(selected: int) -> void:
 				_open_glider()
 				_wind()
 				_wind()
+			elif launch_hold:
+				_idle_body()  # 2.0 wf11 R1 (co-op springs; false in single-player): no jump table in a spring's flight
 			else:
 				_jump_body(true)
 		Defs.HeroState.HURT:
@@ -1263,6 +1293,8 @@ func _update_box() -> void:
 
 func _contact_pass() -> void:
 	var level: LevelBase = Game.level
+	if not _ward_heads.is_empty():
+		_ward_heads_check()  # 2.0 wf11 R3 (co-op only): a head that gave nothing is forgotten once the boxes part
 	# 2.0: an egg touches nothing and the hatch shield skips enemy contact like the hit timer (both never in
 	# single-player).
 	# 2.0: a seated rider's contacts are the mount's (PHYSICS.md C.9, objects/mount tests its ridden box).
@@ -1291,8 +1323,12 @@ func _contact_pass() -> void:
 		if feast > 0:
 			enemy.kill(&"feast", self)
 			continue
+		if not _ward_heads.is_empty() and _ward_heads.has(enemy):
+			continue  # 2.0 wf11 R3 (never in single-player): he is still falling through a head that gave nothing
 		if stomp and yvel >= 0:
-			if is_gliding():
+			if hero_party.coop and _in_ward(level):
+				_ward_stomp(enemy)  # 2.0 wf11 R3: in a ward a head gives no lift, no rest, no carry
+			elif is_gliding():
 				var dive: bool = yvel > Tuning.GLIDER_DIVE_MIN_YVEL_EXCL
 				bounce(Tuning.GLIDER_BUMP_YVEL, depth, enemy)
 				if dive:
@@ -1317,6 +1353,54 @@ func _bounce_on(enemy: EnemyBase, depth: int) -> void:
 	Events.hero_bounced.emit(self, enemy, multiplier)
 	if multiplier > 0:
 		Events.popup_requested.emit(&"multiplier", multiplier, Vector2i(sim_pos.x, sim_pos.y - box_h))
+
+
+## 2.0 wf11 ruling R3, THE WARD (DESIGN.md G-rulings; LevelBase.in_ward, objects/x2_tablet): a hero of a co-op party
+## came down on `enemy`'s head inside a ward - the contact that bounces him everywhere else. Here the head gives
+## NOTHING: his velocity and his position stay as they are (no small bounce, no Up bounce, no glider bump, no standing,
+## no being carried: he falls on through the body). The stomp still counts against the enemy exactly as elsewhere -
+## EnemyBase.on_bounced (the bounce ladder and its number, a `daze` record dazed, the Relay Bounce) or, in a glider
+## dive, on_glider_stomp - once: `enemy` joins [member _ward_heads], and until their boxes part ([method
+## _ward_heads_check]) the two do nothing more to each other, so it does not hurt him during that fall. The cue: a dust
+## puff at the head and the dull thud of a landing. No Events.hero_bounced / player_bounced: he did not bounce.
+func _ward_stomp(enemy: EnemyBase) -> void:
+	_ward_heads.append(enemy)
+	if (gate_rules_off & GATE_TRACE) != 0:
+		_ward_trace(Game.level, "no lift from", enemy)
+	if is_gliding():
+		if yvel > Tuning.GLIDER_DIVE_MIN_YVEL_EXCL:
+			enemy.on_glider_stomp(self)
+	else:
+		var multiplier: int = enemy.on_bounced(self)
+		if multiplier > 0:
+			Events.popup_requested.emit(&"multiplier", multiplier, Vector2i(sim_pos.x, sim_pos.y - box_h))
+	Audio.play_sfx(Sfx.LAND)
+	_spawn_fx(FX_DUST, Vector2i(sim_pos.x, enemy.sim_pos.y - enemy.box_h))
+
+
+## The measurement trace of PlayerBase.GATE_TRACE: one line per contact a ward changed.
+func _ward_trace(level: LevelBase, what: String, enemy: EnemyBase) -> void:
+	print("WARD %s t%d P%d at cell %d,%d (yvel %d, Up %s): %s %s at cell %d,%d" % [level.level_id, Sim.tick, slot + 1,
+		sim_pos.x >> 4, (sim_pos.y - 1) >> 4, yvel, str((_raw_flags & Defs.IN_UP) != 0), what,
+		String((enemy.get_script() as Script).resource_path).get_file().get_basename() if is_instance_valid(enemy) else "?",
+		(enemy.sim_pos.x >> 4) if is_instance_valid(enemy) else -1,
+		((enemy.sim_pos.y - 1) >> 4) if is_instance_valid(enemy) else -1])
+
+
+## R3: true when his feet column lies in a ward of `level` (LevelBase.in_ward; asked for a hero of a co-op party only,
+## and never while the rule is switched off for a measurement, PlayerBase.gate_rules_off).
+func _in_ward(level: LevelBase) -> bool:
+	return (gate_rules_off & GATE_R3) == 0 and level.in_ward(sim_pos.x)
+
+
+## R3: an enemy stays in [member _ward_heads] only while it is there to touch and its box still overlaps his - the
+## fall through it. Parted, dead, asleep, gone, or he himself out of play: forgotten, and the next contact is a new one.
+func _ward_heads_check() -> void:
+	for i: int in range(_ward_heads.size() - 1, -1, -1):
+		var enemy: EnemyBase = _ward_heads[i]
+		if dead or down or not is_instance_valid(enemy) or enemy.dead or not enemy.awake or not enemy.contact_hurts \
+				or not enemy.is_targetable() or not Overlap.body(self, enemy, self):
+			_ward_heads.remove_at(i)
 
 
 ## 2.0 Brace Wall (PHYSICS.md C.10), before an enemy's contact would hurt this crouching hero: when he braces with a
@@ -1345,6 +1429,11 @@ func _post_step() -> void:
 	if hero_party.active:
 		# 2.0 (off in single-player): the shield, the egg, the leash count (PHYSICS.md C.0 table, POST).
 		hero_party.post_step(Game.level)
+		if hero_party.coop:
+			_hold_the_side(Game.level)  # wf11 R5: a closed door passes nobody
+			if launch_hold and (grounded or on_platform or down or dead or mount != null or totem_carrier != null
+					or state == Defs.HeroState.CLIMB):
+				launch_hold = false  # wf11 R1: ground, a platform, a carrier, a vine or a saddle ends a spring's flight
 	if dead and death_ticks < Tuning.DEATH_ANIM_TICKS:
 		_death_step()
 	if (dead and death_ticks >= Tuning.DEATH_ANIM_TICKS) or down:
@@ -1354,6 +1443,61 @@ func _post_step() -> void:
 	if _animator.footstep:
 		Audio.play_sfx(Sfx.FOOTSTEP)
 	_refresh_visual()
+
+
+## 2.0 wf11 ruling R5, "A CLOSED DOOR PASSES NOBODY" (co-op only; POST, after every mover of the tick - his own step,
+## platforms and rafts, a Totem carry, a head's slide, a grab, a knock-back). The hero's BODY CELL is his feet column in
+## the wall-probe row (the row above his feet row, PHYSICS.md 11.2 #7). The 1.0 collision keeps a walker 10 px from a
+## wall, but it can be talked into letting the feet point into a wall's column - a wind that pushes while he steers
+## away creeps 1 px a tick past the probe (it takes back the speed AFTER the air step), a floor edge under a door lands
+## him in the door's column - and then the corner slip (11.2 #5) carries him across a one-cell door to its far side
+## (the w9_l2_coop 'brace' route of build/g3bv/evidence: through the keeper door, the Bull Rex alive). For a hero of a
+## co-op party:
+##  - a tick that ends with his body cell in a WALL which he entered SIDEWAYS - from another column than the one he
+##    last stood free in ([member _free_x]) - puts him back at that x, the side he came from, and stops the speed that
+##    carried him in;
+##  - so does a tick that took him ACROSS a wall cell (two columns or more in one go with a wall between: a knock-back,
+##    a launch, a carry).
+## A wall cell entered from above or below, or one that came to him (a rising block), is left to the 1.0 corner slip.
+## An egg and a hero in his death toss pass through everything; a seated rider is placed by his mount (his free x is
+## only kept). Every discontinuous move starts afresh ([method teleport]; and any place farther than DOOR_REACH_PX
+## from his last free one: he was put there, not pushed).
+func _hold_the_side(level: LevelBase) -> void:
+	if level == null or down or dead or (gate_rules_off & GATE_R5) != 0 \
+			or absi(sim_pos.x - _free_x) > DOOR_REACH_PX or absi(sim_pos.y - _free_y) > DOOR_REACH_PX:
+		_free_x = sim_pos.x
+		_free_y = sim_pos.y
+		return
+	var grid: TileGrid = level.grid
+	var col: int = sim_pos.x >> 4
+	var row: int = sim_pos.y >> 4
+	var from_col: int = _free_x >> 4
+	var blocked: bool = row >= 1 and sim_pos.y > 0 and grid.side_at(col, row - 1) == TileGrid.SIDE_WALL
+	if not blocked and row >= 1 and sim_pos.y > 0 and absi(col - from_col) >= 2:
+		var step: int = 1 if col > from_col else -1
+		var between: int = from_col + step
+		while between != col:
+			if grid.side_at(between, row - 1) == TileGrid.SIDE_WALL:
+				blocked = true
+				break
+			between += step
+	if not blocked:
+		_free_x = sim_pos.x
+		_free_y = sim_pos.y
+		return
+	if col == from_col or mount != null:
+		return
+	if signi(xvel) == signi(col - from_col):
+		xvel = 0
+	sim_pos.x = _free_x
+
+
+## Every discontinuous move (a spawn, a respawn, a gate, the party's travel, a pull into a locked view) is a new
+## place to come from for R5 ([method _hold_the_side]).
+func teleport(pos: Vector2i) -> void:
+	super.teleport(pos)
+	_free_x = pos.x
+	_free_y = pos.y
 
 
 ## One tick of the death toss: no input, no tiles. After Tuning.DEATH_ANIM_TICKS the level takes over: through

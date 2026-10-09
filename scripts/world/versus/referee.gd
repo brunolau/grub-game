@@ -25,9 +25,10 @@ extends SimEntity
 ## Caveman Standing (hearts, bones, Stock, Grudge Pterodactyls [VersusGrudge]); Hot Rock ([VersusHotRock]: the ember)
 ## and Clubball ([VersusClubball]: shots, goals) - their hits only knock back.
 ## PLAN.md P2.4 (phase 2): the themed sudden deaths ([VersusSuddenDeath], at 1 457 ticks in Last Caveman Standing,
-## an event toggle elsewhere; ruling R8: a Last Caveman Standing round has a HARD CAP VersusTuning.SUDDEN_DEATH_CAP_TICKS
-## after its sudden death started - [member cap_at], [method cap_winners]: no round lasts forever between players
-## who hide from the arena's threats), pterodactyl crates ([VersusCrates]), temporary specials (throws counted, lost on a
+## an event toggle elsewhere; ruling R8, DESIGN.md G78: a Last Caveman Standing round has a HARD CAP,
+## VersusTuning.SUDDEN_DEATH_CAP_TICKS after its sudden death started - [member cap_at], [method cap_winners]: no
+## round lasts for ever between players who hide from the arena's threats), pterodactyl crates ([VersusCrates]),
+## temporary specials (throws counted, lost on a
 ## knock-out or at the round end), the versus feast (per hero cutlery; a feaster's touch costs a rival), presets,
 ## variants and the Auto handicap ([VersusRules]), dazes (a Grudge rock, a giant bonus bonk, a Clubball knock-down:
 ## 12 stunned ticks and no immunity after).
@@ -113,8 +114,9 @@ var signatures: VersusSignatures = null
 var gust_wind: int = 0
 ## Round tick at which the themed sudden death starts (-1 = never this round).
 var sudden_death_at: int = -1
-## Round tick of the hard cap (ruling R8; -1 = none armed): Last Caveman Standing, VersusTuning.SUDDEN_DEATH_CAP_TICKS
-## after its sudden death started. On that tick the round ends whoever still stands ([method cap_winners]).
+## Round tick of the hard cap (ruling R8, DESIGN.md G78; -1 = none armed): Last Caveman Standing,
+## VersusTuning.SUDDEN_DEATH_CAP_TICKS after its sudden death started. On that tick the round ends whoever still stands
+## ([method cap_winners]).
 var cap_at: int = -1
 
 # --- Per slot (index = player slot) -------------------------------------------------------------------------------

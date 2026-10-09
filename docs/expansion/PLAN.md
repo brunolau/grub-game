@@ -399,6 +399,29 @@ and 'caps', `w2_l2_coop` 'lift', 'drums'); the other 53 rows did not fall to 600
 verifier's edits: nothing but `tools/g3.sh` was changed (a run that leaves proofs out no longer prints "REACHED").
 The next G3 needs every route of `build/g3bv/evidence` to fail and the explorer beside the search in the gate test.
 
+**The causes by rule (2026-10-09, the round after G3b; the lead designer's record)**. Rebuilding gates one by one had
+failed twice, so the orchestrator closed the causes by rule (R1-R8, recorded as DESIGN.md G71-G78 with the as-decided
+details): (B) a spring is a launch for a hero of a co-op party (G71); (C) bonds, keeper pairs, drum pairs and splits
+are slot-bound (G72); (A, E) the ward - around every x2 tablet no enemy gives lift, rest, carry or a pogo (G73); (D)
+the long drop as a building rule and 7-1's warp stack out of reach of the 'stack' shoulder (G74); (E) a closed door
+passes nobody (G75); an idle hero is no camera anchor and is the one the leash takes (G76); a Last Caveman Standing
+round ends at a hard cap (G78); and the proof of a gate is three things, a fixed bar (G77, V3.c below). The lead
+designer traced all 21 evidence routes on the tree before the rules (`build/lead_design/traces/`): every head bounce
+of the cause-A and cause-E routes lies inside its tablet's ward by the default margin of 12 cells but one -
+`w1_l1_coop` 'hop' takes its lift at columns 87-88 and its ward began at 88, so that tablet carries `ward=22,12` (the
+margin counts from the gate's high ground); with the ward built, the verifier's explorer opened 'hop' under the
+default margin from the pool's ledge at columns 80-83 (seed 2, 164 s;
+`build/lead_design/evidence/w1_l1_coop.hop.expert.pool_ledge_default_ward.txt`) - the override is needed. And one row
+was no head bounce at all: **a sixth cause (F), the gust jump** (G79) - `w9_l2_coop` 'drive' falls on BOTH
+difficulties to a lone hero who waits for the level's tailwind and jumps its 9 cells of tar from the slide (10.1
+cells), touching no enemy's head (`build/lead_design/evidence/w9_l2_coop.drive.{expert,beginner}.gust_no_lift.txt`,
+each replayed in a fresh process: far cell at tick 326 / 324). No rule of the round closes it: the gap is rebuilt (12
+cells or a raised far lip), the search plays the wind's phases, and the evidence set is 24 routes (with that 'hop'
+route). With it one hero passed **20 of the 76 rows** on the G3b tree. At the lead designer's close, on the tree with
+the engine rules built, 20 of the 24 routes say "not reached" or "DIED" in fresh processes
+(`build/lead_design/after3/`); the four that still reach are the level-file work of the Levels phase: 7-1 'stack'
+(Expert), 1-1 'hop' until its `ward=22,12`, and 9-2 'drive' on both difficulties.
+
 ---
 
 ## 7. Phase 4 - QA and release 2.0
@@ -454,6 +477,24 @@ c. Requiredness: `tests/test_coop_gates.gd` runs the solo-impossibility search o
    row counts the gates once by name: "n/N gates refused: e exhaustive, b bounded + probes", green only when e + b =
    N; unproven gates leave the row **open** (named; neither green nor red, but G3 is not reached), an open gate, a
    crashed shard or a shifted gate table is red; every verdict is kept in `<run dir>/coop_gates_verdicts.txt`.
+   **The fixed bar** (the orchestrator's R7 after G3b; DESIGN.md G77): a gate row is proven by **three things** and
+   judged by nothing wider -
+   (1) **the solo search refuses it**, as above: exhaustive, or bounded with every probe - on an exact reset (tick
+       base 0, the total-tick clock put back per run; a run that missed replays is bounded and says so), with the
+       long climb (a hero at rest on a vine is a node) and, in a file with a `wind` script, the wind's phases (G79);
+   (2) **every route of the evidence set says "not reached"** - the replayable routes by which a gate once fell
+       (the G3b verifier's 21, the two gust routes of G79 and the 'hop' route of G73: 24), versioned under `tools/`, each replayed in a fresh
+       process; the set only grows;
+   (3) **the continuous-play explorer** - versioned under `tools/`, with the lure, ride, strike-on-spring,
+       long-climb and second-throw moves and an exact world reset - **opens it in none of two seeded passes of
+       300 s** per gate row over the whole level.
+   A replayable route is red whatever the search prints; a find that does not replay from a fresh process is a
+   seed, not a verdict. The coop_gates row of the gate table shows the three per row, is green only when all three
+   hold for all 76 rows, and names the open rows otherwise. No wider bound, further probe or human attempt is part
+   of the bar: a route found outside it joins the evidence set for the next round. The causes the G3b routes used
+   are closed by rule (G71-G76) or by a building rule (G74, G79), and the window checks named above ("below the
+   measured solo minimum minus 4 ticks", the one-throw build error of G36) are no longer proof obligations: a bond
+   is slot-bound (G72).
 d. Bosses: each `test_enemies_<boss>.gd` asserts the co-op form is not beatable by the single-hero search - one hero
    plus an idle hatched partner placed anywhere he could be hatched (G33) - runs the fairness checks per hero, and pins
    every weak point at least 72 px under the locked view's top (DESIGN.md B.0 [G35]).
@@ -466,7 +507,14 @@ a. `tests/test_versus_rules.gd`: scripted multi-stream matches for every rule (c
    every sudden death telegraphed >= 10 ticks, respawn shield).
 b. `tests/test_versus_bots.gd` (slow module): four Hunter bots finish a round on every (arena, supported mode) with no
    bot idle more than 10 s; no hit lands within 48 ticks of a spawn; win rates per spawn point within +/-15 % over
-   the seeded set; a match log replays to identical digests.
+   the seeded set; a match log replays to identical digests. The module's 48-round sets (12 seeds x 4 rounds) are
+   the deterministic regression pin; a fairness claim for an (arena, mode) - after an arena or a bot change, and
+   for the release - is made on at least 384 rounds (DESIGN.md G80: at 48 rounds a fair spawn's share has a
+   standard deviation of 6 points; Sky Picnic's Grub Stack measured +17.7 there and is P4's to bring inside).
+c. Rounds end (the orchestrator's R8; DESIGN.md G78): `tests/test_versus_rules.gd` proves that a Last Caveman
+   Standing round between heroes who never meet ends at the hard cap - `VersusTuning.SUDDEN_DEATH_CAP_TICKS`, 1 457
+   ticks after its sudden death starts - with the side that took the fewest hurts as the winner, else a draw; no
+   bot round of (b) outlasts it.
 
 **V5 - Performance**: two-hero `--perf` runs per world and four-hero arena runs stay inside the budgets agreed at
 G1 (ARCHITECTURE 11); the A53 device check gates 4-player versus on mobile.

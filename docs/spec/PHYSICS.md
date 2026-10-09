@@ -1280,6 +1280,21 @@ resolutions" (marked **[Gn]**).
    `grounded = false`, `glide` unchanged. Unlike the enemy bounce (section 9), which relies on `no_jump` already being
    armed by the fall, a launch arms it itself: a launched hero can never add the jump table to the launch, even
    when he stood still with UP held (the idle handler runs until he lands, as after a bounce).
+   **A spring is a launch for a hero of a co-op party** [G71] (#2; `PlayerBase.spring_bounce`, `launch_hold`): an
+   `objects/spring` - pad, cap, flower pot - throws him with the bounce of section 9 (`yvel = power`, `fall_ticks
+   = 0`, `y -= depth`: his feet on the pad's top line) and arms **the launch hold**: from that tick until he next
+   has ground, a platform, a carrier, a vine or a saddle under him (cleared in his `POST`) **no jump starts and
+   none goes on, no strike hops and no hit gives a pogo** - `no_jump` is held (the glider carrier's jump
+   included), the strike handlers skip their hop, `notify_weapon_hit` gives no impulse; only gravity acts. Before,
+   a pad that fired at the apex of a low strike's hop (`yvel` 0: no fall had armed `no_jump`, and the hop runs the
+   1.0 jump handler in the air - the hop jump of C.4 [G67]) was topped by the whole jump table: feet **256 px**
+   up; with `no_jump = 6` alone a second low strike's hop (-48, seven ticks into the rise) still made it 142 px.
+   **Every `launch()` holds the flight the same way in a co-op party** (geyser, see-saw, vine leap, bat, dismount,
+   hatch pop), and a geyser puts a co-op hero's feet on the vent's floor before it launches him (C.6). The measure
+   that binds: a -224 pad or vent lifts his feet 105 px over its top - for a pad at most **115 px** over the floor
+   it stands on - from every start (walking, falling or jumping on, any strike begun on it or beside it with UP
+   held, the hop jump, the pogo jump). In single-player, a party of one and versus a spring is the 1.0 bounce and
+   a launch is as written above.
 5. **Order of operations** (section 3 / ARCHITECTURE 4.2). Party work runs in a `PartyDriver` registered after the
    heroes (multiplayer only); `Defs.Phase` is unchanged:
 
@@ -1433,12 +1448,21 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
   of a tar pit, with full air control [G8].
 - `deadly` (a vent of tar or lava): the spout is a deadly box 24 x 64 above the vent *(tune)* (death, or an egg in
   co-op) instead of a launch. An `objects/boulder_heavy` resting on any geyser plugs it: no spout at all [R3].
+- **A geyser under a hero of a co-op party** [G71]: his feet are put on the vent's floor and the launch holds the
+  flight (C.0 #4) - 105 px from every start. A solo hero keeps the vent's 16 px box: a hop inside it at the spout
+  tick rises 120 px, strikes begun on the vent with UP around the spout tick 180 px (party's measurement).
 - **Alternating gusts** reuse the wind of 13.1 with negative values for a rightward wind: `WIND` stays
   `xvel -= shr(wind, 3)` (so `wind = -24` adds 3 v16 per call) with the 1.0 leftward floor; no other change is needed
   because every handler that runs `WIND` is followed by an `ACCEL` clamp or `FRICTION`. Crouch and crawl stay immune.
   The `wind` script may now hold negative values and repeat: meta `wind_loop = <ticks>` restarts it every that many
   ticks [R4] (entry ticks count from the start of each round). Bosses (the Storm Roc) set `level.wind` themselves.
   Outside the ice biome the wind shows as gust streaks instead of snow.
+- **The gust jump** [G79] (measured on `w9_l2_coop`; no rule change): a hero running with a tailwind of -112 moves
+  6 px/tick; when he lets go of the direction key he slides on at that speed for some ticks, and a jump begun in
+  that slide with UP alone keeps the speed for the whole flight: 27 ticks at 6 px/tick = **162 px, 10.1 cells** on
+  the flat (the search's world, `build/lead_design/wind/`), against 115 px (7.2 cells) for the best running jump
+  in calm air (section 5 on the reference hero model: RIGHT held, UP for 5 ticks, landing on tick 24). It is how a
+  gust gap is crossed, by one hero as by two; a gap gate of a windy file is sized for it (LEVEL_DESIGN 15.7.3).
 - **Lee** (co-op only) [G23]: in `WEAPONS`, before any hero moves, a hero of `H` (C.13) is **sheltered** on this tick
   when his feet are 0..64 px downwind of the feet of an active partner of `H` (C.10; a crouch is input, so a croucher
   is never idle [G41]) who is in the crouch state (5, not crawl) with
@@ -1692,6 +1716,59 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
   splits a whole `split` record counts as that swing's hit on the record. The death test is 8.3's (`hp < 0` after the
   subtraction): with power 25 an enemy takes `hp / 25 + 1` strikes (integer division; hp 100: five), a charged strike
   subtracts 100. In single-player, in a party of one and in versus the 1.0 per-tick test is unchanged.
+- **Slot-bound windows** (co-op only) [G72]: every "two within a window" rule - a named `bond`, the halves of a
+  `split`, a drum pair - is met only by hits credited to two different heroes who both count. **Credit** of a hit
+  (`CoopTraits.credit_slot`): the slot of the hero whose strike it is - his club box, his mount's bite, the thrower
+  of a thrown weapon for its whole flight, and for a batted hero the ball's own slot, not his batter's - while that
+  hero counts on the tick the hit lands (`counts_for_coop()`); otherwise nobody (-1). On a windowed record a weapon
+  hit credited to nobody glances (clank, spark, no damage), and the death that would leave its whole group dead
+  without two different counting slots among the deaths of the open window is refused: a weapon hit on the last
+  living member glances, and no other cause (a kill-all, a grenade, a feast's or a mount's bite, a glider dive)
+  kills it. A member whose mate lives dies as before and opens the window; the group seals only with two slots among
+  its deaths, else the dead regrow (the halves merge) when the window closes, as after any missed window. Drums: a
+  strike lights a drum for its credited slot, a strike credited to nobody lights nothing, and the bond succeeds
+  only when the drums lit in the window carry two slots. Window lengths, the `window=` cap, the count-in and the
+  regrow are unchanged; the daze is slot-bound by [G47].
+- **The ward** (co-op only) [G73] (`X2Tablet.ward_columns`, `LevelBase.in_ward`): every `objects/x2_tablet` wards
+  the cell columns
+  `[min(tc, fc) - left, max(tc, fc) + right]` over all rows (`tc` the tablet's column, `fc` its `far` column;
+  `left` = `right` = `PartyTuning.WARD_MARGIN_CELLS` = 12 unless the record carries `ward=<left>,<right>`; clipped
+  to the level; fixed at load). A hero is **in a ward** on a tick when `x >> 4` of his feet point lies in one. For
+  such a hero:
+  - **Stomp** (`CONTACT_ENEMIES`: `Overlap.body`, the stomp flag, `yvel >= 0`; on foot, gliding or seated - a
+    mount's stomp is its rider's): nothing of the hero is written - not `xvel`, `yvel`, x, y, `fall_ticks`,
+    `no_jump`, the grounded flags or his jump or strike state; no depth correction, no bounce of section 9
+    (-224 / -64), no glider bump, no cut bounce [G54]. The enemy takes the stomp as anywhere, once:
+    `on_bounced(hero)` (a `daze` record is dazed, the multiplier chain counts), `on_glider_stomp` for a dive, and
+    the multiplier pop-up; `Events.hero_bounced` / `player_bounced` are not sent (he did not bounce).
+  - **The pass** (`Player._ward_heads`): that enemy joins his list of heads that gave nothing, and
+    the contact test of this hero and that enemy is skipped - no hurt from its body, no second stomp - until their
+    boxes no longer overlap (or it dies, sleeps or stops being targetable). Its projectiles and every other enemy
+    are tested as always.
+  - **No rest, no carry**: no enemy is ground, a platform or a carrier for him. The one enemy rule that carries a
+    hero is the `grab` trait: a Snatcher does not seize a hero in a ward - its touch there is the plain hurt of
+    10.1 - and lets go of one it carries on the tick his feet column enters a ward (decided; the trait's owner
+    builds it). A ridden mount is its driver's: its stomp gives it no lift there, the ward tested at his feet.
+  - **No pogo off an enemy**: a club box of his that hits an enemy does not write his velocity (the pogo of 8.3 is
+    skipped); damage, knock-back, the clank and "one target per box" are unchanged. A hittable still gives its
+    pogo.
+  - **Cue** (drawing and sound only): `fx/dust` at the enemy's head and `Sfx.LAND` on the stomp tick, in place of
+    the bounce ring and `Sfx.BOUNCE`.
+  Not warded: boss bodies (their stomp rules are their fight's, GAMEPLAY 13.6), a partner's head (above), mounts as
+  mounts, platforms, rafts, lifts, see-saws, geysers, springs, vines. In single-player, a party of one and versus
+  no ward exists.
+- **A closed door passes nobody** (co-op only) [G75] (`Player._hold_the_side`, in the hero's `POST`, after every
+  mover of the tick): his **body cell** is his feet column in the wall-probe row (the row above his feet row,
+  11.2 #7); `_free_x` is his x at the end of the last tick on which the body cell was no SIDE-1 wall. A tick that
+  ends with the body cell in a wall which he entered **from another column**, or that took him **across** a wall
+  cell (two columns or more in one go: a knock-back, a launch, a carry), puts him back at `_free_x` - the side he
+  came from - with y kept, and stops the speed that carried him in. It holds whatever moved him: an enemy's shove
+  or carry, a head he stood on or slid off [G54], a carrier or a bat, a mover's push [G53], a knock-back, a gust,
+  and his own walk where the 1.0 probe lets his feet point into a wall's column (a gust that creeps him 1 px a
+  tick past the probe, a floor edge under a door). A wall cell entered in his own column - from above or below,
+  or a block that came to him - is left to the 1.0 corner slip; eggs and death tosses pass; a seated rider is
+  placed by his mount; every teleport starts afresh. Horizontal only. Single-player keeps the 1.0 corner slip,
+  which carried a hero across a one-cell door column.
 
 ### C.11 Curl and Batter Up
 
@@ -1757,7 +1834,9 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
   this includes hazards that hurt as enemies, such as a lightning bolt); grabs, squeezes and drains skip him; his
   stomps still bounce. The skull trap, deadly tiles, pits, liquids, crushes, the band, the auto-scroll edge and the
   leash still act on him (an egg).
-- **Team wipe**: on the tick a hero goes down while every other hero is down, an egg or dead (or both in one tick):
+- **Team wipe**: on the tick a hero goes down while every other hero is down, an egg, dead **or idle** - a hero
+  who counted went down and no other hero counts [G76] (an egg beside a hatched idle partner had nobody to hatch
+  it; an idle hero's own down, and a hero who goes idle beside an egg, wipe nothing) - (or both in one tick):
   the last toss plays out (60 ticks), then exactly 10.4 #3 - the curtain, one life from the tribe pool (game over when
   none is left), the level state reset (enemies, platforms, columns, plates, drums, mounts, bosses), every hero
   respawned hatched at the active checkpoint: slot `s` at the checkpoint x + `24 * s` px towards the side where the
@@ -1795,6 +1874,13 @@ hero; with `|H| = 0` it holds still. With two heroes:
 - **Leash**: a hero of `H` whose feet point is outside the authentic view rectangle (20 x 11 cells at the camera
   cell) for **121** (Beginner) / **73** (Expert) consecutive ticks becomes an egg (no toss, no life); the count
   restarts when he is back inside. The HUD shows an edge arrow with a stone countdown.
+- **An idle hero is no anchor** [G76] (`LevelCamera._drop_idle`, `PartyDriver._leash`): the horizontal rule, the edge walls, the anchor,
+  the standing window and the look-around refusal above read `Hc` - the heroes of `H` who count (C.10: hatched and
+  not idle) - wherever they say `H`. With `|Hc| = 1` the camera is 12.1-12.5 exactly on that hero; with `|Hc| = 0`
+  (every hatched hero idle) they read `H` as before. The leash still counts every hero of `H`: the view follows who counts, so the hero left outside
+  it is the idle one, and he becomes the egg (an egg like any other, C.12; he hatches idle). A hero who wakes is in
+  `Hc` from that tick, and a leash count that is running on him runs on. A counting hero whose partners are all
+  idle is never leashed: his own camera holds him.
 - **Locked views** (`zones/arena`, `zones/camera_lock`, a gate with `lock=`): when the first hero triggers a lock,
   every other hero of `H` whose feet are outside the locked view is moved to the trigger hero's feet point
   `- 24 * facing` px (same y; `notify_hero_teleported`); eggs are clamped in. Auto-scroll (4-1) and the rising scroll
@@ -1823,6 +1909,7 @@ hero; with `|H| = 0` it holds still. With two heroes:
 | Hot Rock holder | `ACCEL` limit 96 in the walk handler and the airborne step (6 px/tick: the holder is the faster one) [R7] |
 | King of the Feast carrier | `ACCEL` limit 64; no strikes |
 | Respawn | after a hazard (Grub Stack, Stock option): 48 ticks, at the free spawn point farthest from the rivals |
+| Hard cap (Last Caveman Standing) [G78] | armed once, on the tick the round's sudden death starts: `cap_at = round_ticks + VersusTuning.SUDDEN_DEATH_CAP_TICKS` (1 457 = 60 s *(tune)*; 0 = no cap). On the tick `round_ticks >= cap_at` the round ends whoever stands. Winner: among the sides still standing (a team in 2v2, else one hero) the side with more heroes standing, then with more lives left (Stock), then with the fewest hurts taken this round (one per heart lost - a charged hit is two; a healed heart takes none back; a handicap's extra hearts do not count; no hurt for a hit the leaf shield took, a Grudge rock's daze or a hazard's knock-out); sides still level: a draw (nobody scores the round). On the cap's own tick the last-one-standing rule is asked first. The HUD's sundial, absent in this mode until then, runs the cap's length (its number red from 10 s). **Drawn rounds** (`VersusMatch.ended_by_draws`): `VersusTuning.DRAW_ROUNDS_TO_END` = 3 *(tune; 0 = never)* drawn rounds in a row end the match on its standings, in every mode - the side with the most round wins, and nobody when no single side leads (a drawn match); a round with a winner resets the count |
 
 ### C.15 Doze with the new moves
 
@@ -1867,6 +1954,7 @@ Owner of each table: `Tuning` (core: hero and world rules), `PartyTuning` (core,
 | Respawn spread | 24 per slot | px | C.12 | PartyTuning |
 | Tribe camera | start col 16 / 4 with the rear at col >= 2 / <= 17; stop col 5 / 15 or rear at 1 / 18; edge walls 8 px; standing window: feet at most 9 rows apart, view top in [lowest - 176, highest - 32] | | C.13 | PartyTuning |
 | Leash | 121 B / 73 E | ticks | C.13 | PartyTuning |
+| Ward | margin 12 cells on each side *(tune)* (`ward=<left>,<right>` per tablet); the pass lasts until the boxes part [G73] | cells | C.10 | PartyTuning (`WARD_MARGIN_CELLS`) |
 | Pull into a locked view | 24 px behind the trigger hero | px | C.13 | PartyTuning |
 | Versus knocks | 64, -128; hammer x3/2; charged 128, -160, ice 3; swirl pop -160 | v16 | C.14 | VersusTuning |
 | Versus hurt | `hit_timer` 43, stun while >= 31 (12 + 30) | ticks | C.14 | VersusTuning |
@@ -1876,6 +1964,7 @@ Owner of each table: `Tuning` (core: hero and world rules), `PartyTuning` (core,
 | Squash / stomp immunity | 8 / 30; ladder 1, 2, 3, 4, 6, 8 | ticks | C.14 | VersusTuning |
 | Body bump | 1 px/tick; knock at 64: +/-64, -64 *(tune)* | | C.14 | VersusTuning |
 | Spawn shield / respawn | 48 / 48 | ticks | C.14 | VersusTuning |
+| Sudden-death cap (Last Caveman Standing) | 1 457 (60 s) *(tune)* [G78] | ticks | C.14 | VersusTuning (`SUDDEN_DEATH_CAP_TICKS`) |
 | Temporary specials | axe 3, swirling axe 2, spear 3 throws; wrap life 40 ticks | | C.14 | VersusTuning |
 | Weight | 10 -> cap 64; 20 -> cap 48, impulses x3/4 *(tune)* | units, v16 | C.14 | VersusTuning |
 | Hot Rock holder / King carrier caps | 96 / 64 | v16 | C.14 | VersusTuning |

@@ -1088,6 +1088,138 @@ func _idle_round(id: StringName, text: String, players: int, round_index: int) -
 	return result
 
 
+# --- Drawn rounds end the match (DESIGN.md G78, the last clause) --------------------------------------------------------
+
+## A match of `count` seats nobody feeds (bot seats without a bot source stand idle), first to `to_win` round wins.
+func _idle_match(count: int, mode: int, to_win: int = 0) -> VersusMatch:
+	var versus_match: VersusMatch = VersusMatch.new()
+	for i: int in count:
+		versus_match.seat_bot(Defs.BotLevel.HUNTER)
+	versus_match.mode = mode
+	versus_match.rounds_to_win = to_win
+	versus_match.begin_match(5)
+	return versus_match
+
+
+func _record(versus_match: VersusMatch, winners: Array) -> void:
+	versus_match.begin_round(&"test_world_arena_flat")
+	versus_match.record_round(PackedInt32Array(winners))
+
+
+func test_three_drawn_rounds_in_a_row_end_the_match_on_its_standings() -> void:
+	assert_eq(VersusTuning.DRAW_ROUNDS_TO_END, 3)
+	# Nobody ever won a round: a drawn match, nobody named.
+	var versus_match: VersusMatch = _idle_match(2, Defs.VersusMode.LAST_CAVEMAN)
+	for i: int in 2:
+		_record(versus_match, [])
+		assert_false(versus_match.is_over(), "%d drawn round(s): the match goes on" % (i + 1))
+	_record(versus_match, [])
+	assert_true(versus_match.ended_by_draws(), "three in a row")
+	assert_true(versus_match.is_over(), "the match is over")
+	assert_eq(versus_match.leaders(), PackedInt32Array(), "nobody won a round: a drawn match")
+	assert_eq(versus_match.round_index, 3)
+	# A round with a winner breaks the row; the leader takes a match that draws end.
+	versus_match = _idle_match(3, Defs.VersusMode.LAST_CAVEMAN)
+	_record(versus_match, [])
+	_record(versus_match, [])
+	_record(versus_match, [1])
+	assert_eq(versus_match.draws_in_a_row, 0, "a won round starts the count again")
+	_record(versus_match, [])
+	_record(versus_match, [])
+	assert_false(versus_match.is_over(), "two drawn rounds after P2's win")
+	_record(versus_match, [])
+	assert_true(versus_match.is_over())
+	assert_eq(versus_match.leaders(), PackedInt32Array([1]), "the one side that leads takes the match")
+	var runs: Array[PlayerRun] = []
+	for slot: int in 3:
+		var run: PlayerRun = PlayerRun.new()
+		run.slot = slot
+		runs.append(run)
+	versus_match.finish(runs)
+	assert_eq(runs[0].comeback, 0, "no Comeback Caveman for a match nobody came back in")
+	# Level sides share a drawn match: nobody is named, however many rounds each won.
+	versus_match = _idle_match(2, Defs.VersusMode.LAST_CAVEMAN)
+	_record(versus_match, [0])
+	_record(versus_match, [1])
+	for i: int in 3:
+		_record(versus_match, [])
+	assert_true(versus_match.is_over())
+	assert_eq(versus_match.leaders(), PackedInt32Array(), "1 : 1 and three draws: a drawn match")
+	# 2v2: a team is one side - both of the leading team win.
+	versus_match = _idle_match(4, Defs.VersusMode.LAST_CAVEMAN)
+	for slot: int in 4:
+		versus_match.get_seat(slot).team = 1 if slot % 2 == 0 else 2
+	_record(versus_match, [0, 2])
+	for i: int in 3:
+		_record(versus_match, [])
+	assert_eq(versus_match.leaders(), PackedInt32Array([0, 2]), "the leading team, both members")
+	# A match that wins end is what it was; a rematch starts the count again; every mode has the rule.
+	versus_match = _idle_match(2, Defs.VersusMode.GRUB_STACK, 1)
+	_record(versus_match, [])
+	_record(versus_match, [])
+	_record(versus_match, [0])
+	assert_true(versus_match.is_over(), "first to 1")
+	assert_false(versus_match.ended_by_draws())
+	assert_eq(versus_match.leaders(), PackedInt32Array([0]))
+	for i: int in 3:
+		versus_match.rematch()
+		assert_eq(versus_match.draws_in_a_row, 0)
+		assert_false(versus_match.is_over())
+		_record(versus_match, [])
+	assert_false(versus_match.is_over(), "one drawn round in each of three matches is no row")
+	_record(versus_match, [])
+	_record(versus_match, [])
+	assert_true(versus_match.is_over(), "Grub Stack too: three drawn rounds in one match")
+
+
+func test_the_stampede_runs_along_the_floor_of_every_stampede_arena() -> void:
+	# Totem Ring's middle column is its totem: the chargers ran along the totem's top (y 64), over every head on the
+	# floor, until the idle rounds of ruling R8 showed that its stampede never ended a round (wf11).
+	var checked: int = 0
+	for file: String in DirAccess.get_files_at("res://levels"):
+		if file.get_extension() != "lvl" or not (file.begins_with("arena_") or file.begins_with("test_world_arena")):
+			continue
+		var id: StringName = StringName(file.get_basename())
+		var text: String = FileAccess.get_file_as_string("res://levels/%s" % file)
+		var meta: Dictionary = LevelData.parse(id, text).resolved_meta(Defs.Difficulty.BEGINNER)
+		if VersusSuddenDeath.theme_of(meta) != VersusSuddenDeath.STAMPEDE:
+			continue
+		var was_manual: bool = Sim.manual
+		Sim.manual = true
+		Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.VERSUS, 2, 1)
+		Game.begin_level(id)
+		var real: Level = (load("res://scenes/world/level.tscn") as PackedScene).instantiate() as Level
+		real.setup_from_text(id, text)
+		add_child(real)
+		real.set_view_size(Vector2i(Tuning.VIEW_W, Tuning.VIEW_H) * Tuning.ART_SCALE)
+		Sim.start(3)
+		var ref: VersusReferee = VersusReferee.find(real)
+		assert_not_null(ref, "%s: a referee" % id)
+		if ref != null:
+			ref.mode = Defs.VersusMode.LAST_CAVEMAN
+			ref.begin_round(0)
+			ref.start_round_now()
+			for slot: int in 2:
+				GameInput.set_scripted_slot(slot, func(_tick: int) -> int: return 0)
+			ref.start_sudden_death()
+			Sim.step(2)
+			var chargers: int = 0
+			for node: Node in get_tree().get_nodes_in_group(VersusReferee.ROUND_GROUP):
+				var hazard: VersusHazard = node as VersusHazard
+				if hazard != null and hazard.kind == VersusHazard.CHARGER:
+					chargers += 1
+					assert_eq(hazard.sim_pos.y, VersusTuning.ARENA_FLOOR_ROW * Tuning.TILE,
+							"%s: the charger's feet are on the arena floor (row %d)" % [id, VersusTuning.ARENA_FLOOR_ROW])
+			assert_eq(chargers, 1, "%s: the first charger of the stampede" % id)
+			checked += 1
+		GameInput.clear_scripted()
+		Sim.stop()
+		Sim.manual = was_manual
+		remove_child(real)
+		real.free()
+	assert_true(checked >= 2, "%d stampede arenas (Totem Ring and the developer arenas)" % checked)
+
+
 func test_two_heroes_who_never_move_end_every_last_caveman_arena_by_the_cap() -> void:
 	var files: PackedStringArray = PackedStringArray()
 	for file: String in DirAccess.get_files_at("res://levels"):
@@ -1103,10 +1235,10 @@ func test_two_heroes_who_never_move_end_every_last_caveman_arena_by_the_cap() ->
 		if not VersusArena.modes_of(meta).has(Defs.VersusMode.LAST_CAVEMAN):
 			continue
 		arenas += 1
-		# (heroes, round): two heroes on spawns 1 + 2, two on spawns 3 + 4 (a match's rotation), then all four at once -
-		# every spawn point holds an idle hero twice. (All four rotations of two were measured with and without the cap
-		# in build/versus/idle_nocap.gd; three cases keep this test at about 4 s.)
-		var cases: Array[Vector2i] = [Vector2i(2, 0), Vector2i(2, 2), Vector2i(4, 0)]
+		# (heroes, round): two heroes on spawns 1 + 2 - the spawns of every round of a 2-player match. The other
+		# rotations of two and all four at once: the slow module (tests/test_versus_bots.gd); the same table with and
+		# without the cap: build/versus/idle_nocap.gd (wf11). One round per arena keeps this test at about 2 s.
+		var cases: Array[Vector2i] = [Vector2i(2, 0)]
 		var lines: PackedStringArray = PackedStringArray()
 		for case: Vector2i in cases:
 			var result: Dictionary = _idle_round(id, text, case.x, case.y)

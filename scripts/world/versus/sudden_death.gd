@@ -281,9 +281,21 @@ func _rumble() -> void:
 		Audio.play_sfx(Sfx.QUAKE)
 
 
-## The floor's top under the arena's middle (logical px): the first ground under row 1 at the view's centre column.
+## The arena floor's top (logical px): the LOWEST surface of the view - per column the lowest ground cell with open
+## air over it, the lowest of all columns (the view's bottom when no column has one). Not the first ground under the
+## view's middle: Totem Ring's middle column is its totem, so its stampede ran along the totem's top (y 64), over
+## the head of everybody on the floor - found by the idle rounds of ruling R8 (wf11; the chargers never ended one).
 func _floor_y() -> int:
-	return _first_ground_y(VersusArena.view_rect().get_center().x >> 4, 1)
+	var view: Rect2i = VersusArena.view_rect()
+	var bottom_row: int = mini((view.end.y >> 4) - 1, _level.grid.rows - 1)
+	var best: int = -1
+	for col: int in range(view.position.x >> 4, view.end.x >> 4):
+		for row: int in range(bottom_row, 0, -1):
+			if TileGrid.is_ground(_level.grid.floor_at(col, row)) \
+					and not TileGrid.is_ground(_level.grid.floor_at(col, row - 1)):
+				best = maxi(best, row * Tuning.TILE)
+				break
+	return best if best >= 0 else view.end.y
 
 
 ## Feet y of the first ground cell in `col` at or below `from_row` (the view bottom when there is none).

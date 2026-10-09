@@ -588,11 +588,101 @@ func test_static_reach_around_a_ledge_gate() -> void:
 		"reach_coop": _coop_text("reach_coop", entities, rows, "solo_bonus")})
 	assert_true(validator.has_problem("'objects/spring' at 12,13 is within reach of the ledge of gate 'hop'"),
 			_messages(validator))
-	assert_true(validator.has_problem("'enemies/walker' at 3,13 is within reach of the ledge of gate 'hop'"))
+	# G73: inside the tablet's ward (columns 0..20 here) no enemy gives lift, rest, carry or a pogo - any enemy
+	# record may stand there. Outside the ward a head is the 1.0 springboard: with ward=0,0 (columns 5..8) the same
+	# walker is within reach of the ledge again.
+	assert_false(validator.has_problem("'enemies/walker' at 3,13 is within reach of the ledge of gate 'hop'"),
+			"an enemy inside the ward is harmless (G73)")
+	var narrow: LevelValidator = _validator({"solo_bonus": _solo("solo_bonus", "bonus"),
+		"narrow_coop": _coop_text("narrow_coop", entities.replace("far=8,5", "far=8,5 ward=0,0"), rows, "solo_bonus")})
+	assert_true(narrow.has_problem("'enemies/walker' at 3,13 is within reach of the ledge of gate 'hop'"),
+			_messages(narrow))
+	assert_false(narrow.has_problem("unknown parameter 'ward'", LevelValidator.WARNING), _messages(narrow))
 	assert_false(validator.has_problem("'objects/geyser' at 14,13"), "a deadly vent lifts nobody")
 	assert_false(validator.has_problem("'objects/spring' at 35,13"), "out of reach")
 	assert_true(validator.has_problem("bark board at 17,10 is within 12 cells of gate 'hop'"))
 	assert_true(validator.has_problem("hittables at 15,12 and 15,13 stack up near gate 'hop': a club pogo ladder"))
+
+
+func test_gate_rules_of_the_g3b_round() -> void:
+	# THE WARD (G73): `ward=<left>,<right>` is parsed, a malformed one is an error; the columns are the tablet's
+	# cell to its far cell and the margins, clipped to the map.
+	var tablet: Dictionary = LevelValidator.parse_tablet({"col": 20, "row": 13, "line": 3,
+		"params": {"gate": "g", "far": "28,5", "ward": "22,12"}})
+	assert_eq(tablet["ward"], Vector2i(22, 12))
+	assert_eq(LevelValidator.ward_columns(tablet, 100), Vector2i(0, 40), "20 - 22 clipped to 0; 28 + 12")
+	var plain: Dictionary = LevelValidator.parse_tablet({"col": 30, "row": 13, "line": 3,
+		"params": {"gate": "g", "far": "20,5"}})
+	assert_eq(plain["ward"], Vector2i(-1, -1), "none given: the default")
+	assert_eq(LevelValidator.ward_columns(plain, 100), Vector2i(20 - PartyTuning.WARD_MARGIN_CELLS,
+			30 + PartyTuning.WARD_MARGIN_CELLS), "the far cell left of the tablet: from it to the tablet")
+	var rows: PackedStringArray = _coop_rows()
+	_paint(rows, 6, 16, 24)        # a boost ledge 8 rows over the floor: its near end at column 16, far cell 20,5
+	var gate: String = "objects/x2_tablet 12 13 gate=hop far=20,5"
+	var bad_ward: LevelValidator = _validator({"solo_bonus": _solo("solo_bonus", "bonus"),
+		"badward_coop": _coop_text("badward_coop", gate + " ward=12", rows, "solo_bonus")})
+	assert_true(bad_ward.has_problem("ward=12 must be ward=<left>,<right>"), _messages(bad_ward))
+	# THE CLEAN FOOT (G67 (2), G73): one hittable on the floor within 7 cells of the ledge's foot is a pogo jump.
+	var foot: LevelValidator = _validator({"solo_bonus": _solo("solo_bonus", "bonus"),
+		"foot_coop": _coop_text("foot_coop", gate + "\nobjects/hidden_spot 10 13\nobjects/breakable_block 7 13"
+		+ "\nobjects/hidden_spot 23 13", rows, "solo_bonus")})
+	assert_true(foot.has_problem("'objects/hidden_spot' at 10,13 lies on a floor 8 rows under the ledge of gate 'hop'"),
+			_messages(foot))
+	assert_false(foot.has_problem("'objects/breakable_block' at 7,13"), "8 cells from the foot (column 15): out of the rule")
+	assert_false(foot.has_problem("'objects/hidden_spot' at 23,13"), "beyond the far cell: reached through the gate")
+	var tall: PackedStringArray = _coop_rows()
+	_paint(tall, 4, 16, 24)        # 10 rows up: out of the pogo's reach
+	var high: LevelValidator = _validator({"solo_bonus": _solo("solo_bonus", "bonus"),
+		"tall_coop": _coop_text("tall_coop", "objects/x2_tablet 12 13 gate=hop far=20,3\nobjects/hidden_spot 10 13",
+		tall, "solo_bonus")})
+	assert_false(high.has_problem("the clean foot"), _messages(high))
+	# THE ONE-WAY CATCH (G70): a one-way ledge cell fewer than 7 rows over a standing place on the tablet's side.
+	var cloud: PackedStringArray = _coop_rows()
+	_paint(cloud, 6, 16, 24, TileGrid.CH_ONEWAY_A)   # the far cell stands on a one-way ledge ...
+	_paint(cloud, 11, 12, 15)                        # ... 5 rows over a shelf beside its end
+	var catch: LevelValidator = _validator({"solo_bonus": _solo("solo_bonus", "bonus"),
+		"cloud_coop": _coop_text("cloud_coop", gate, cloud, "solo_bonus")})
+	assert_true(catch.has_problem("the one-way ledge cell 16,6 of gate 'hop' (beginner) is 5 rows over the standing place at 13,11"),
+			_messages(catch))
+	var solid: PackedStringArray = _coop_rows()
+	_paint(solid, 6, 16, 24)
+	_paint(solid, 11, 12, 14)
+	var corner: LevelValidator = _validator({"solo_bonus": _solo("solo_bonus", "bonus"),
+		"corner_coop": _coop_text("corner_coop", gate, solid, "solo_bonus")})
+	assert_false(corner.has_problem("one-way ledge cell"), "a solid ledge is the search's business, not this rule's")
+	# HIGH GROUND AT THE WARD'S EDGE (G73, a warning): a top 6+ rows over the floor beside it, inside the ward but
+	# within 12 cells of its edge (1-1 'hop': the hollow block, ruled ward=22,12).
+	var block: PackedStringArray = _coop_rows()
+	_paint(block, 6, 26, 34)       # the ledge: far cell 30,5; tablet at 20 -> the ward begins at column 8
+	for row: int in range(6, 14):
+		_paint(block, row, 14, 17) # a block 8 rows high, 6 cells inside the ward's edge
+	var edge_text: String = _coop_text("edge_coop", "objects/x2_tablet 20 13 gate=hop far=30,5", block, "solo_bonus")
+	var edge: LevelValidator = _validator({"solo_bonus": _solo("solo_bonus", "bonus"), "edge_coop": edge_text})
+	assert_true(edge.has_problem("high ground at the ward's edge of gate 'hop' (beginner): the top at columns 14-17, row 6",
+			LevelValidator.WARNING), _messages(edge))
+	var widened: LevelValidator = _validator({"solo_bonus": _solo("solo_bonus", "bonus"),
+		"wide_coop": edge_text.replace("id = edge_coop", "id = wide_coop").replace("far=30,5", "far=30,5 ward=20,12")})
+	assert_false(widened.has_problem("high ground at the ward's edge", LevelValidator.WARNING),
+			"ward=20,12 puts the block 14 cells inside: %s" % _messages(widened))
+	# A REPORT LINE PER GATE with its ward columns.
+	var reported: bool = false
+	for report: Dictionary in edge.gate_reports:
+		if str(report["gate"]) == "hop":
+			reported = true
+			assert_true(str(report["message"]).contains("tablet 20,13 far 30,5 ward columns 8..39"), str(report))
+	assert_true(reported, "a gate report for 'hop' (%s)" % str(edge.gate_reports))
+	# A keeper must not be one-shot; a bond on a zone-spawner record can be met by nobody (enemies-A, wf11).
+	var cast: LevelValidator = _validator({"solo_bonus": _solo("solo_bonus", "bonus"),
+		"cast_coop": _coop_text("cast_coop", "\n".join(PackedStringArray([
+			"objects/x2_tablet 4 13 gate=g far=30,13",
+			"enemies/charger 12 13 keeper=k",
+			"objects/column 20 13 size=1,4 rise=4 trigger=keepers:k",
+			"enemies/leaper 24 13 coop=bond bond=pits",
+			"enemies/leaper 28 13 coop=bond bond=pits",
+		])), PackedStringArray(), "solo_bonus")})
+	assert_true(cast.has_problem("'enemies/charger' is a keeper ('k') but a one-shot enemy"), _messages(cast))
+	assert_true(cast.has_problem("'enemies/leaper' carries bond 'pits' but is a zone-spawner record",
+			LevelValidator.WARNING), _messages(cast))
 
 
 func test_mechanisms_belong_to_a_gate() -> void:
@@ -750,7 +840,14 @@ func test_search_measures_the_windows_near_the_gate() -> void:
 	assert_true(bool(result["reached"]), "a level gate on open floor (the windows are measured anyway)")
 	assert_false(drums.is_empty(), "%s %s" % [str(result["windows"]), result["detail"]])
 	assert_eq(int(drums["window"]), PartyTuning.WINDOW_TICKS_EXPERT)
-	assert_eq(int(drums["solo_min"]), 0, "three cells apart: an axe from beside one crosses the other")
+	# G72: where the engine binds the drums to two slots one hero never meets them - the solo minimum is "never",
+	# from the slot rule; an engine before G72 gives the geometry's answer (three cells apart: an axe from beside
+	# one crosses the other - 0).
+	if CoopSearch.pair_slot_bound("drums"):
+		assert_eq(int(drums["solo_min"]), CoopSearch.PAIR_NEVER, "slot-bound: one hero never lights both")
+		assert_true(bool(drums.get("slot_bound", false)), "... and the window is exempt from the solo_min - 4 cap")
+	else:
+		assert_eq(int(drums["solo_min"]), 0, "three cells apart: an axe from beside one crosses the other")
 	assert_false(daze.is_empty(), str(result["windows"]))
 	assert_eq(int(daze["window"]), PartyTuning.DAZE_TICKS_EXPERT)
 	var measured: int = int(daze["solo_min"])
@@ -815,6 +912,7 @@ func test_search_windows_report_the_records_caps() -> void:
 	var data: LevelData = _search_level("caps_coop", 6, entities)
 	CoopSearch.measure_daze_solo_min("enemies/raptor")
 	CoopSearch.daze_slot_bound()   # the engine probe builds a world of its own: before the bare searcher (no nesting)
+	CoopSearch.probe_bond()        # (the same for the slot rule of bonds and drums, G72)
 	var bare: CoopSearch.Searcher = CoopSearch.Searcher.new()
 	assert_true(bare.build(data.id, data.resolved_meta(Defs.Difficulty.BEGINNER), CoopSearch.grid_at_rest(data,
 			Defs.Difficulty.BEGINNER)))
@@ -827,9 +925,11 @@ func test_search_windows_report_the_records_caps() -> void:
 	assert_eq(by_what.get("bond wide", -1), PartyTuning.window_ticks(Defs.Difficulty.BEGINNER), "no cap: the difficulty's")
 	assert_eq(by_what.get("daze enemies/raptor", -1), 5, "a daze record: its own window=")
 	for window: Dictionary in windows:
-		# G47: the daze record is slot-bound exactly when the engine binds the daze to the other slot; bonds never are.
+		# G47: the daze record is slot-bound exactly when the engine binds the daze to the other slot; G72: a bond
+		# exactly when the engine binds bonds to two slots.
 		var daze: bool = str(window["what"]).begins_with("daze ")
-		assert_eq(bool(window.get("slot_bound", false)), daze and CoopSearch.daze_slot_bound(), str(window))
+		assert_eq(bool(window.get("slot_bound", false)), CoopSearch.daze_slot_bound() if daze
+				else CoopSearch.pair_slot_bound("bond"), str(window))
 	var validator: LevelValidator = _validator({"solo_bonus": _solo("solo_bonus", "bonus"), "capped_coop":
 			_coop_text("capped_coop", "enemies/walker 3 13 coop=bond bond=b window=x
 enemies/walker 9 13 coop=bond bond=b window=12",
@@ -1002,7 +1102,7 @@ func test_search_gate_table_and_shards_partition_it() -> void:
 		assert_ne(entry["far"], Vector2i(-1, -1), "%s names its far cell" % str(entry))
 
 
-func test_bonded_pairs_one_throw_hits_are_errors() -> void:
+func test_bonded_pairs_on_one_throw_line_are_notes_since_the_slot_rule() -> void:
 	var entities: String = "\n".join(PackedStringArray([
 		"objects/x2_tablet 4 13 gate=drums far=36,13",
 		"objects/drum 8 12 bond=near",
@@ -1015,9 +1115,20 @@ func test_bonded_pairs_one_throw_hits_are_errors() -> void:
 	]))
 	var validator: LevelValidator = _validator({"solo_main": _solo("solo_main"),
 		"bonded_coop": _coop_text("bonded_coop", entities)})
-	assert_true(validator.has_problem("drum bond 'near' (beginner): one thrown special"), _messages(validator))
-	assert_true(validator.has_problem("bond 'row' (expert): one thrown special"), "a spear flies far along one row")
-	assert_false(validator.has_problem("bond 'apart'"), "no throw line from the floor reaches 11 rows up")
+	# G72: the bonds are slot-bound, so a pair on one throw line is no build error any more (G36 was) - a NOTE: a
+	# designer may want to know, the proof does not rest on it.
+	assert_true(validator.has_problem("drum bond 'near' (beginner): one thrown special", LevelValidator.NOTE),
+			_messages(validator))
+	assert_true(validator.has_problem("bond 'row' (expert): one thrown special", LevelValidator.NOTE),
+			"a spear flies far along one row")
+	assert_false(validator.has_problem("one thrown special"), "no error")
+	assert_false(validator.has_problem("one thrown special", LevelValidator.WARNING), "no warning either")
+	assert_false(validator.has_problem("bond 'apart'", LevelValidator.NOTE), "no throw line from the floor reaches 11 rows up")
+	var noted: Dictionary = {}
+	for problem: Dictionary in validator.problems:
+		if int(problem["severity"]) == LevelValidator.NOTE:
+			noted = problem
+	assert_true(LevelValidator.format_problem(noted).contains(": note: "), LevelValidator.format_problem(noted))
 
 
 func test_lee_gap_without_a_crouching_spot_warns() -> void:
@@ -1095,8 +1206,8 @@ func test_search_engine_probes_daze_and_ride() -> void:
 	for macro: Dictionary in direct.macros:
 		if str(macro["kind"]) == "partner":
 			ride_macro = macro
-	var fits: bool = direct._macro_fits(ride_macro, {"pos": Vector2i(10 * Tuning.TILE + 8, 224),
-		"prefix": PackedInt32Array()})
+	var fits: bool = direct._macro_fits(ride_macro, direct._node(Vector2i(10 * Tuning.TILE + 8, 224), 0, "start",
+			direct._baseline, CoopSearch.NOWHERE))
 	direct.close()
 	assert_eq(carries, rides, "the probe = the engine (a ride on an idle head: %s)" % rides)
 	assert_false(ride_macro.is_empty(), "the ride macros are still made (the regression check)")
@@ -1476,8 +1587,14 @@ func test_search_verdicts_name_their_evidence() -> void:
 	var missed: Dictionary = _raw_result(40, true, "", keeper, all_run)
 	missed["misses"] = 3
 	assert_eq(CoopSearch.judge(missed)["verdict"], CoopSearch.VERDICT_BOUNDED)
-	assert_true(str(CoopSearch.judge(missed)["evidence"]).contains("3 move(s) from changed worlds were not played"),
+	assert_true(str(CoopSearch.judge(missed)["evidence"]).contains("3 replay(s) or reset(s) did not bring the world back exactly (3 replays missed, 0 entities left changed)"),
 			str(CoopSearch.judge(missed)["evidence"]))
+	# ... and so is a search whose reset left an entity out of its level-file state (the exact reset's drift, wf11).
+	var drifted: Dictionary = _raw_result(40, true, "", keeper, all_run)
+	drifted["drift"] = 2
+	assert_eq(CoopSearch.judge(drifted)["verdict"], CoopSearch.VERDICT_BOUNDED)
+	assert_true(str(CoopSearch.judge(drifted)["evidence"]).contains("0 replays missed, 2 entities left changed"),
+			str(CoopSearch.judge(drifted)["evidence"]))
 	# The first pass ran dry and the budget ended in the second (only longer replays left): bounded with its probes.
 	var second: Dictionary = _raw_result(200, false, "ticks", keeper, all_run)
 	second["passes"] = 2
@@ -1578,7 +1695,11 @@ func test_search_probes_and_carried_wounds_kill_what_one_move_cannot() -> void:
 			unhurt = "lost" if plain.is_empty() else ("same" if str(plain["sig"]) == searcher._baseline else "changed")
 			break
 	searcher.close()
-	assert_true(wounded.contains("walker 16,13: e0:75"), "one strike: the keeper at 75 is a changed world (%s)" % wounded)
+	# (12 ticks of FIRE are one swing and the start of a second - a held FIRE re-swings: one hit per swing [G57], so
+	# the keeper stands at 75, or at 50 where the second swing still reaches him. Which one depends on where his sway
+	# has him on that tick; since wf11 every run starts on tick 0, so it is the same in every process.)
+	assert_true(wounded.contains("walker 16,13: e0:75") or wounded.contains("walker 16,13: e0:50"),
+			"one strike move: the wounded keeper is a changed world (%s)" % wounded)
 	assert_eq(unhurt, "same", "without carry_hits the same strike left the level-file world")
 
 

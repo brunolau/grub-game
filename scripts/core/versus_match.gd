@@ -148,6 +148,9 @@ var bots: Array = [null, null, null, null]
 ## The recording of the current (or last) round: its input log and start snapshot, for the deciding-moment replay
 ## (VersusReplay; Flow.start_round makes it, Flow.end_round finishes it, Flow.play_deciding_moment plays it).
 var replay: VersusReplay = null
+## Drawn rounds in a row so far (a round nobody won; a round with a winner sets it back to 0). At
+## VersusTuning.DRAW_ROUNDS_TO_END the match is over on its standings (DESIGN.md G78; [method ended_by_draws]).
+var draws_in_a_row: int = 0
 ## Per slot: the most round wins it trailed the leader by so far (for Comeback Caveman).
 var _deficits: PackedInt32Array = _zeros()
 
@@ -542,6 +545,7 @@ func begin_match(seed_value: int = -1) -> void:
 	round_mode = mode
 	round_wins = _zeros()
 	_deficits = _zeros()
+	draws_in_a_row = 0
 	history.clear()
 	bots = [null, null, null, null]
 	replay = null
@@ -585,6 +589,7 @@ func record_round(winners: PackedInt32Array) -> bool:
 			clean.append(slot)
 			round_wins[slot] += 1
 	history.append({"arena": round_arena, "mode": round_mode, "winners": clean})
+	draws_in_a_row = draws_in_a_row + 1 if clean.is_empty() else 0
 	round_index += 1
 	var lead: int = 0
 	for slot: int in seated_slots():
@@ -594,16 +599,25 @@ func record_round(winners: PackedInt32Array) -> bool:
 	return true
 
 
-## True when somebody reached round_wins_needed().
+## True when somebody reached round_wins_needed() - or when VersusTuning.DRAW_ROUNDS_TO_END rounds in a row were drawn
+## ([method ended_by_draws]: nobody is playing; the match ends on its standings).
 func is_over() -> bool:
 	var needed: int = round_wins_needed()
 	for slot: int in seated_slots():
 		if round_wins[slot] >= needed:
 			return true
-	return false
+	return ended_by_draws()
 
 
-## The slots with the most round wins (the match winners once is_over(); both of a team).
+## True when the last VersusTuning.DRAW_ROUNDS_TO_END rounds (3; 0 = the rule is off) were all drawn (DESIGN.md G78:
+## two players whom no sudden death reaches draw every round at the hard cap - the rounds end, and so does the match).
+func ended_by_draws() -> bool:
+	return VersusTuning.DRAW_ROUNDS_TO_END > 0 and draws_in_a_row >= VersusTuning.DRAW_ROUNDS_TO_END
+
+
+## The slots with the most round wins (the match winners once is_over(); both of a team). A match that drawn rounds
+## ended ([method ended_by_draws]) has winners only when ONE side leads: level sides share a drawn match - nobody is
+## named (an empty list: the results' "Draw!", no Comeback Caveman).
 func leaders() -> PackedInt32Array:
 	var best: int = 0
 	for slot: int in seated_slots():
@@ -614,6 +628,8 @@ func leaders() -> PackedInt32Array:
 	for slot: int in seated_slots():
 		if round_wins[slot] == best:
 			result.append(slot)
+	if ended_by_draws() and _sides_of(result) > 1:
+		return PackedInt32Array()
 	return result
 
 
@@ -681,6 +697,16 @@ static func _closeness(runs: Array[PlayerRun], run: PlayerRun, award: Dictionary
 		return 0.0
 	var value: float = float(run.award_value(award) - low) / float(high - low)
 	return 1.0 - value if fewest else value
+
+
+## How many sides `slots` belong to: the teams of a 2v2 match, else every slot its own.
+func _sides_of(slots: PackedInt32Array) -> int:
+	if not is_team_match():
+		return slots.size()
+	var teams: Dictionary = {}
+	for slot: int in slots:
+		teams[seats[slot].team] = true
+	return teams.size()
 
 
 func _free_seat(slot: int) -> int:

@@ -621,3 +621,108 @@ func test_outside_a_rising_climb_the_follow_is_the_1_0_rule() -> void:
 	for i: int in 20:
 		tribe.tick_group(_party)
 	assert_eq(tribe.pos.y, FLOOR_Y - 88, "nor does the tribe camera")
+
+
+# =================================================================================================================
+# wf11 ruling R6: an idle hero is no anchor (LevelCamera._drop_idle)
+# =================================================================================================================
+
+func test_an_idle_hero_holds_no_paging_margin() -> void:
+	# The rear hero at the margin column stops the page (test_paging_right_waits_for_the_rear_hero) - while he counts.
+	# Idle (PlayerBase.idle: his pad lies on the table), he holds nothing: the view pages with the hero who plays, by
+	# the 1.0 rule on that hero alone.
+	var camera: LevelCamera = _camera()
+	var solo: LevelCamera = _camera()
+	var col: int = camera.get_cell().x
+	_at(camera, _a, 16)
+	_at(camera, _b, 1)
+	_a.xvel = Tuning.WALK_CAP
+	camera.tick_group(_party)
+	camera.tick_group(_party)
+	assert_eq(camera.get_cell().x, col, "the rear hero counts and stands at the margin: no page")
+	_b.idle = true
+	var lone: Array[PlayerBase] = [_a]
+	solo.pos = camera.pos
+	solo.h_dir = camera.h_dir
+	for i: int in 12:
+		camera.tick_group(_party)
+		solo.tick_group(lone)
+		assert_eq(camera.pos, solo.pos, "step %d: the view moves as for the playing hero alone" % i)
+	assert_true(camera.get_cell().x > col, "it paged although the idle hero is left behind (column %d)" % _sc(camera, _b))
+	assert_true(_sc(camera, _b) < 0, "the idle hero is off the view now: the case of the leash")
+	assert_eq(camera.anchor_slot, 0)
+	# He wakes: he counts again and holds his margin (off the view, the page stops at once).
+	_b.idle = false
+	camera.tick_group(_party)
+	var woke_at: int = camera.get_cell().x
+	camera.tick_group(_party)
+	camera.tick_group(_party)
+	assert_eq(camera.get_cell().x, woke_at, "awake again, the rear hero stops the page")
+
+
+func test_an_idle_hero_is_no_vertical_anchor() -> void:
+	# The case of the G3b verifier (wf10, 7-1 'stack' in the real game): a partner who stands below has ground on every
+	# tick and was the anchor - the climber left the view and the leash took HIM. An idle hero anchors nothing.
+	var camera: LevelCamera = _camera()
+	_at(camera, _a, 8)
+	_at(camera, _b, 10)
+	camera.tick_group(_party)
+	var y: int = camera.pos.y
+	# A climbs (no ground under his feet) far above the view; B stands on the floor and counts: the view stays with B.
+	_a.grounded = false
+	_a.sim_pos.y = camera.pos.y - 6 * Tuning.TILE
+	for i: int in 20:
+		camera.tick_group(_party)
+	assert_eq(camera.anchor_slot, 1, "the standing hero who counts is the anchor")
+	assert_eq(camera.pos.y, y, "the view stays with him")
+	# B puts the pad down: the view goes up to the hero who plays.
+	_b.idle = true
+	for i: int in 60:
+		camera.tick_group(_party)
+	assert_eq(camera.anchor_slot, 0, "the playing hero is the anchor, grounded or not")
+	assert_true(camera.pos.y < y, "the view went up to him (top %d, was %d)" % [camera.pos.y, y])
+	assert_true(_a.sim_pos.y > camera.pos.y and _a.sim_pos.y <= camera.pos.y + camera.rows * Tuning.TILE,
+			"his feet are on the view (feet %d, view top %d)" % [_a.sim_pos.y, camera.pos.y])
+
+
+func test_when_nobody_counts_the_view_stays_with_every_hatched_hero() -> void:
+	# Two pads on the table (a level start before the first key, both players away): H is every hatched hero, as before.
+	var camera: LevelCamera = _camera()
+	var col: int = camera.get_cell().x
+	_a.idle = true
+	_b.idle = true
+	_at(camera, _a, 16)
+	_at(camera, _b, 1)
+	_a.xvel = Tuning.WALK_CAP  # carried along by something: the group rules still hold the rear margin
+	for i: int in 6:
+		camera.tick_group(_party)
+	assert_eq(camera.get_cell().x, col, "both idle: the margin of the rear hero holds, as it always did")
+	# And an egg, a dead hero or a single hero change nothing: |H| = 1 is the 1.0 camera whether he is idle or not.
+	_b.down = true
+	camera.tick_group(_party)
+	camera.tick_group(_party)
+	assert_true(camera.get_cell().x > col, "the idle hero alone in H is followed (the 1.0 camera)")
+
+
+func test_a_rising_climb_follows_the_footing_of_the_heroes_who_count() -> void:
+	var camera: LevelCamera = _camera()
+	camera.footing_mode = true
+	camera.footing_watch = true
+	_at(camera, _a, 8)
+	_at(camera, _b, 10)
+	camera.pos.y = FLOOR_Y - 9 * Tuning.TILE
+	camera.tick_group(_party)
+	# A stands eight rows up (more than the six rows a shared view holds); B stays on the floor.
+	_a.sim_pos.y = FLOOR_Y - 8 * Tuning.TILE
+	for i: int in 40:
+		camera.tick_group(_party)
+	assert_eq(camera.pos.y, _a.sim_pos.y - LevelCamera.FOOTING_ROOM_PX, "farther apart than a view: it goes with the leader")
+	# The roles turned - the high hero idle, the low one plays: the view does NOT rise for the footing of a sleeper.
+	var low: LevelCamera = _camera()
+	low.footing_mode = true
+	low.footing_watch = true
+	low.pos.y = FLOOR_Y - 9 * Tuning.TILE
+	_a.idle = true
+	for i: int in 40:
+		low.tick_group(_party)
+	assert_eq(low.pos.y, FLOOR_Y - 9 * Tuning.TILE, "the footing of an idle hero raises no view while his partner plays")

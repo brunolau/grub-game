@@ -25,6 +25,9 @@ extends RefCounted
 
 const ERROR: int = 0
 const WARNING: int = 1
+## A NOTE (wf11): a fact a designer may want that is neither wrong nor doubtful - a number the proof no longer rests
+## on (a bonded pair on one throw line since the bonds are slot-bound, G72). Printed as `note:`, never counted.
+const NOTE: int = 2
 
 ## Size limits of a level in tiles (section 7.1).
 const MIN_COLS: int = 20
@@ -133,7 +136,7 @@ const CATALOGUE: Dictionary = {
 	"objects/boulder_heavy": [],
 	"objects/pulley": ["a", "b", "range"],
 	"objects/flower_pot": [],
-	"objects/x2_tablet": ["gate", "far", "secret"],
+	"objects/x2_tablet": ["gate", "far", "secret", "ward"],
 	"objects/spawn_point": ["index"],
 	"objects/cookpot": ["team"],
 	"objects/coconut": [],
@@ -290,6 +293,19 @@ const GUARD_IDS: Array[String] = ["enemies/guard", "enemies/shellback"]
 const LED_KEEPER_IDS: Array[String] = [
 	"enemies/stinger", "enemies/hopper", "enemies/charger", "enemies/leaper", "enemies/lurker", "enemies/digger",
 ]
+## Enemy archetypes whose record is ONE-SHOT (it despawns for good, "dead without a kill": the Charger; every copy of
+## a zone-spawner) and the zone-spawner archetypes themselves (the record makes copies and never dies).
+const ONE_SHOT_IDS: Array[String] = ["enemies/charger", "enemies/leaper", "enemies/dropper", "enemies/digger"]
+const SPAWNER_IDS: Array[String] = ["enemies/leaper", "enemies/dropper", "enemies/digger"]
+## HIGH GROUND AT THE WARD'S EDGE (DESIGN.md G73, LEVEL_DESIGN.md 15.7.3; the lead designer's wf11 request): a
+## standing place this many rows or more over every floor beside it is out of a lone hero's own reach (the hop jump:
+## 82 px and the corner catch) - he gets there only by a lift, and outside a ward an enemy's head is one. Such a place
+## inside a ward within HIGH_GROUND_INSIDE_CELLS of its edge, or outside it within HIGH_GROUND_OUTSIDE_CELLS, at
+## most HIGH_GROUND_UNDER_ROWS rows under the gate's ledge, is a warning (the explorer is the proof).
+const HIGH_GROUND_ROWS: int = 6
+const HIGH_GROUND_INSIDE_CELLS: int = 12
+const HIGH_GROUND_OUTSIDE_CELLS: int = 8
+const HIGH_GROUND_UNDER_ROWS: int = 5
 ## Co-op objects (DESIGN.md D.5) other than columns: never in a solo campaign file.
 const COOP_OBJECTS: Array[String] = [
 	"objects/plate", "objects/drum", "objects/boulder_heavy", "objects/pulley", "objects/flower_pot",
@@ -337,6 +353,21 @@ const BOOSTERS: Array[String] = [
 ]
 ## Hittables (a column of two or more is a club pogo ladder).
 const HITTABLE_IDS: Array[String] = ["objects/hidden_spot", "objects/breakable_block", "objects/container"]
+## THE CLEAN FOOT (DESIGN.md G67 (2) as the ward left it, G73; LEVEL_DESIGN.md 15.7.3): no hittable on a floor
+## within this many cells of a height gate's foot - ONE is enough for a lone hero's pogo jump (114 px and the corner
+## catch: an 8-row ledge). Enemies are the ward's business, not this rule's.
+const CLEAN_FOOT_CELLS: int = 7
+## ... and at most this many rows under the ledge's top (114 px and the 16 px of the corner catch: 8 rows; a floor 9
+## rows down is out of the pogo's reach).
+const CLEAN_FOOT_ROWS: int = 8
+## A ONE-WAY CELL CATCHES LIKE A CORNER (DESIGN.md G70 (2)): a falling hero whose feet are anywhere inside it is
+## landed on it, so a one-way ledge is climbed from 16 px under its top by the 82 px hop jump of G67 - from a standing
+## place fewer than this many rows under it. (A solid ledge catches only feet that enter its top cell from the side.)
+const ONE_WAY_CATCH_ROWS: int = 7
+## The columns either side of a one-way cell from which a jump brings the feet into it.
+const ONE_WAY_REACH_COLS: int = 3
+## The default margin of a tablet's ward, in cells on both sides (DESIGN.md G73; PartyTuning.WARD_MARGIN_CELLS).
+const WARD_MARGIN_CELLS: int = PartyTuning.WARD_MARGIN_CELLS
 ## Ids an arena never holds (LEVEL_DESIGN.md 15.8: no exit, no checkpoint, no co-op objects but see-saws and pulleys).
 const ARENA_FORBIDDEN: Array[String] = [
 	"objects/exit", "objects/checkpoint", "objects/gate", "items/warp", "objects/plate", "objects/drum",
@@ -351,6 +382,11 @@ const PLATE_TIMED: String = "timed:"
 var problems: Array[Dictionary] = []
 ## Level ids that count as existing for `next` / `bonus` besides the levels added (tests).
 var known_ids: PackedStringArray = PackedStringArray()
+
+## One line per co-op gate found by [method run] (`tools/validate_levels.gd -- --coop` prints them): the tablet, its
+## far cell and the columns of its WARD (DESIGN.md G73) on each difficulty, with what stands in it:
+## { "path": String, "line": int, "gate": String, "message": String }, in file order.
+var gate_reports: Array[Dictionary] = []
 
 var _levels: Array[LevelData] = []
 var _all_ids: Dictionary = {}
@@ -439,7 +475,7 @@ func has_problem(fragment: String, severity: int = ERROR) -> bool:
 ## `file:line: error: message` (the format editors and CI understand).
 static func format_problem(problem: Dictionary) -> String:
 	return "%s:%d: %s: %s" % [
-		problem["path"], problem["line"], "error" if int(problem["severity"]) == ERROR else "warning",
+		problem["path"], problem["line"], ["error", "warning", "note"][clampi(int(problem["severity"]), 0, 2)],
 		problem["message"],
 	]
 
@@ -1104,6 +1140,7 @@ func _check_content(data: LevelData, grid: TileGrid) -> void:
 				_check_trait_share(data, records, difficulty)
 			_check_ledge_reach(data, records, tablets, difficulty)
 			_check_bonded_pairs(data, records, difficulty)
+		_report_gates(data, records)
 		_check_halls(data, grid, records)
 		_check_led_keepers(data, records)
 		_check_lee_gaps(data, grid)
@@ -1374,8 +1411,8 @@ func _check_bonded_pairs(data: LevelData, records: Array[Dictionary], difficulty
 				var a: Vector2i = Vector2i(int(members[i]["col"]), int(members[i]["row"]))
 				var b: Vector2i = Vector2i(int(members[j]["col"]), int(members[j]["row"]))
 				if throw_crosses(strike_spots(grid, a), b) or throw_crosses(strike_spots(grid, b), a):
-					_add(data.path, int(members[j]["line"]), ERROR,
-							"%s (%s): one thrown special from beside the member at %d,%d also hits the member at %d,%d - one hero strikes both at once (G36: put them on rows no single throw line crosses, or use another trait)" % [
+					_add(data.path, int(members[j]["line"]), NOTE,
+							"%s (%s): one thrown special from beside the member at %d,%d also hits the member at %d,%d - one hero strikes both at once; no build error since the bonds are slot-bound (G72: only two different heroes who both count meet a bond; G36 was the rule before)" % [
 							group, Defs.difficulty_name(difficulty), a.x, a.y, b.x, b.y])
 
 
@@ -1542,6 +1579,10 @@ func _check_tablets(data: LevelData, grid: TileGrid, records: Array[Dictionary],
 		if not grid.in_bounds(far.x, far.y):
 			_add(data.path, line, ERROR, "%s far=%d,%d is outside the map" % [label, far.x, far.y])
 			continue
+		if record["params"].has("ward") and tablet["ward"] == Vector2i(-1, -1):
+			_add(data.path, line, ERROR,
+					"%s ward=%s must be ward=<left>,<right>: the two margins of its ward in cells, whole numbers of 0 or more (G73; without it both are %d)" % [
+					label, str(record["params"]["ward"]), WARD_MARGIN_CELLS])
 		if grid.side_at(far.x, far.y) == TileGrid.SIDE_WALL or not TileGrid.is_ground(grid.floor_at(far.x, far.y + 1)):
 			_add(data.path, line, ERROR, "%s far=%d,%d must be an air cell above a floor" % [label, far.x, far.y])
 		var gate: String = tablet["gate"]
@@ -1556,20 +1597,43 @@ func _check_tablets(data: LevelData, grid: TileGrid, records: Array[Dictionary],
 
 
 ## An x2 tablet record as {"gate": String ("" = none), "secret": bool, "cell": Vector2i, "far": Vector2i
-## ((-1, -1) = missing or malformed), "line": int}. Shared with the solo search (CoopSearch).
+## ((-1, -1) = missing or malformed), "ward": Vector2i (its `ward=<left>,<right>` margins in cells; (-1, -1) = none
+## given or malformed: the default), "line": int}. Shared with the solo search (CoopSearch).
 static func parse_tablet(record: Dictionary) -> Dictionary:
 	var params: Dictionary = record["params"]
 	var far: Vector2i = Vector2i(-1, -1)
 	var parts: PackedStringArray = str(params.get("far", "")).replace(" ", "").split(",")
 	if parts.size() == 2 and parts[0].is_valid_int() and parts[1].is_valid_int():
 		far = Vector2i(parts[0].to_int(), parts[1].to_int())
+	var ward: Vector2i = Vector2i(-1, -1)
+	var widths: PackedStringArray = str(params.get("ward", "")).replace(" ", "").split(",")
+	if widths.size() == 2 and widths[0].is_valid_int() and widths[1].is_valid_int() and widths[0].to_int() >= 0 \
+			and widths[1].to_int() >= 0:
+		ward = Vector2i(widths[0].to_int(), widths[1].to_int())
 	return {
 		"gate": str(params.get("gate", "")) if params.has("gate") and not params["gate"] is bool else "",
 		"secret": params.has("secret") and bool(params["secret"]),
 		"cell": Vector2i(int(record["col"]), int(record["row"])),
 		"far": far,
+		"ward": ward,
 		"line": int(record["line"]),
 	}
+
+
+## THE WARD of a tablet ([method parse_tablet]) in a map `cols` columns wide, as Vector2i(first column, last column):
+## the columns from its own cell to its `far` cell (its own column alone without one), widened by its `ward=` margins
+## (left = towards column 0) or by WARD_MARGIN_CELLS on both sides, clipped to the map - over all rows (DESIGN.md G73,
+## PHYSICS.md C.10). The engine's own rule is objects/x2_tablet's (X2Tablet.ward_columns; the validator cannot name
+## that class: it is loaded by tools before the autoloads exist) - tests/test_world_search.gd holds the two equal.
+static func ward_columns(tablet: Dictionary, cols: int) -> Vector2i:
+	var widths: Vector2i = tablet.get("ward", Vector2i(-1, -1))
+	if widths.x < 0 or widths.y < 0:
+		widths = Vector2i(WARD_MARGIN_CELLS, WARD_MARGIN_CELLS)
+	var cell: Vector2i = tablet["cell"]
+	var far: Vector2i = tablet.get("far", Vector2i(-1, -1))
+	var low: int = cell.x if far.x < 0 else mini(cell.x, far.x)
+	var high: int = cell.x if far.x < 0 else maxi(cell.x, far.x)
+	return Vector2i(clampi(low - widths.x, 0, maxi(cols - 1, 0)), clampi(high + widths.y, 0, maxi(cols - 1, 0)))
 
 
 ## Every co-op mechanism lies inside the area of some x2 tablet's gate (its tablet and far cell grown by one view);
@@ -1645,11 +1709,14 @@ func _check_trait_share(data: LevelData, records: Array[Dictionary], difficulty:
 
 
 ## Static solo-impossibility rules (LEVEL_DESIGN.md 15.7.6): within REACH_COLS across and REACH_ROWS below the far
-## cell of a height gate nothing a single hero could climb on (an enemy to bounce on, a spring, a geyser that is not a
-## deadly vent, a vine, a bark board, a glider, a moving or dropping platform, a mount, a pogo ladder of hittables);
-## no bark board within BARK_GATE_CELLS of any gate.
+## cell of a height gate nothing a single hero could climb on (a spring, a geyser that is not a deadly vent, a vine, a
+## bark board, a glider, a moving or dropping platform, a mount, a pogo ladder of hittables; an enemy to bounce on only
+## OUTSIDE the tablet's ward - inside it no enemy gives lift, rest, carry or a pogo [G73], so any enemy record may
+## stand there); no bark board within BARK_GATE_CELLS of any gate; THE CLEAN FOOT [G67 (2)] and THE ONE-WAY CATCH
+## [G70 (2)] ([method _check_clean_foot], [method _check_one_way_ledge]).
 func _check_ledge_reach(data: LevelData, records: Array[Dictionary], tablets: Array[Dictionary],
 		difficulty: int) -> void:
+	var grid: TileGrid = data.build_grid(difficulty)
 	for tablet: Dictionary in tablets:
 		if tablet["gate"] == "":
 			continue
@@ -1657,6 +1724,7 @@ func _check_ledge_reach(data: LevelData, records: Array[Dictionary], tablets: Ar
 		var cell: Vector2i = tablet["cell"]
 		var height_gate: bool = cell.y - far.y >= HEIGHT_GATE_ROWS
 		var reach: Rect2i = Rect2i(far.x - REACH_COLS, far.y, REACH_COLS * 2 + 1, REACH_ROWS + 1)
+		var ward: Vector2i = ward_columns(tablet, grid.cols)
 		var hittable_cells: Dictionary = {}
 		for record: Dictionary in records:
 			if not LevelText.applies_to(record["params"], difficulty):
@@ -1674,8 +1742,9 @@ func _check_ledge_reach(data: LevelData, records: Array[Dictionary], tablets: Ar
 			var booster: bool = BOOSTERS.has(id)
 			if id == "objects/geyser" and record["params"].has("deadly") and bool(record["params"]["deadly"]):
 				booster = false
-			if Spawner.category(StringName(id)) == "enemies" and id != "enemies/decoration":
-				booster = true
+			if Spawner.category(StringName(id)) == "enemies" and id != "enemies/decoration" \
+					and (at.x < ward.x or at.x > ward.y):
+				booster = true   # (an enemy outside the ward is the 1.0 springboard; inside it gives nothing, G73)
 			if booster:
 				_add(data.path, int(record["line"]), ERROR,
 						"'%s' at %d,%d is within reach of the ledge of gate '%s' (%d cells across, %d rows below its top): a single hero could climb on it" % [
@@ -1687,6 +1756,218 @@ func _check_ledge_reach(data: LevelData, records: Array[Dictionary], tablets: Ar
 				_add(data.path, int(tablet["line"]), ERROR,
 						"hittables at %d,%d and %d,%d stack up near gate '%s': a club pogo ladder" % [
 						at.x, at.y, at.x, at.y + 1, tablet["gate"]])
+		if height_gate:
+			_check_clean_foot(data, grid, records, tablet, difficulty)
+			_check_one_way_ledge(data, grid, tablet, difficulty)
+			_check_ward_edge(data, grid, tablet, difficulty)
+
+
+## The ledge of a height gate: the run of floor cells the `far` cell stands on (the cells of row far.y + 1 that carry
+## a hero, joined side by side, at most REACH_COLS either way), as Vector2i(first column, last column); (-1, -1) when
+## the far cell has no floor.
+static func ledge_run(grid: TileGrid, far: Vector2i) -> Vector2i:
+	if not grid.in_bounds(far.x, far.y + 1) or not TileGrid.is_ground(grid.floor_at(far.x, far.y + 1)):
+		return Vector2i(-1, -1)
+	var first: int = far.x
+	var last: int = far.x
+	while first - 1 >= maxi(far.x - REACH_COLS, 0) and TileGrid.is_ground(grid.floor_at(first - 1, far.y + 1)) \
+			and grid.side_at(first - 1, far.y) != TileGrid.SIDE_WALL:
+		first -= 1
+	while last + 1 <= mini(far.x + REACH_COLS, grid.cols - 1) and TileGrid.is_ground(grid.floor_at(last + 1, far.y + 1)) \
+			and grid.side_at(last + 1, far.y) != TileGrid.SIDE_WALL:
+		last += 1
+	return Vector2i(first, last)
+
+
+## THE CLEAN FOOT (DESIGN.md G67 (2) as the ward left it, G73; G70 (1); LEVEL_DESIGN.md 15.7.3): no hittable - a
+## hidden or inset spot, a breakable block, a container - on a floor within CLEAN_FOOT_CELLS cells of a height gate's
+## foot (the column beside the end of its ledge that faces the tablet, [method ledge_run]) and at most
+## CLEAN_FOOT_ROWS rows under the ledge's top: a low strike on ONE hittable at his feet is a lone hero's pogo jump
+## (114 px; with the corner catch an 8-row ledge), from every standing place under or beside the ledge - a step, a
+## shelf, the floor - and the ward does not touch a hittable's pogo. What lies beyond the far cell is reached
+## through the gate and does not count; a floor 9 or more rows under the ledge is out of the pogo's reach.
+func _check_clean_foot(data: LevelData, grid: TileGrid, records: Array[Dictionary], tablet: Dictionary,
+		difficulty: int) -> void:
+	var far: Vector2i = tablet["far"]
+	var cell: Vector2i = tablet["cell"]
+	var run: Vector2i = ledge_run(grid, far)
+	if run.x < 0:
+		return
+	var top: int = far.y + 1
+	var foot_col: int = run.x - 1 if cell.x <= far.x else run.y + 1
+	for record: Dictionary in records:
+		var id: String = String(record["id"])
+		if not HITTABLE_IDS.has(id) or not LevelText.applies_to(record["params"], difficulty):
+			continue
+		var at: Vector2i = Vector2i(int(record["col"]), int(record["row"]))
+		if absi(at.x - foot_col) > CLEAN_FOOT_CELLS or (cell.x <= far.x and at.x > far.x) 				or (cell.x > far.x and at.x < far.x):
+			continue
+		# The floor it lies on: its own cell (inset) or the first floor within two rows under it.
+		var floor_row: int = -1
+		for row: int in range(at.y, mini(at.y + 3, grid.rows)):
+			if grid.in_bounds(at.x, row) and TileGrid.is_ground(grid.floor_at(at.x, row)):
+				floor_row = row
+				break
+		if floor_row < 0 or floor_row - top < 1 or floor_row - top > CLEAN_FOOT_ROWS:
+			continue
+		_add(data.path, int(record["line"]), ERROR,
+				"'%s' at %d,%d lies on a floor %d rows under the ledge of gate '%s' (%s), within %d cells of its foot (column %d): one hittable at a lone hero's feet is a pogo jump of 114 px - with the corner catch an 8-row ledge (G67: the clean foot)" % [
+				id, at.x, at.y, floor_row - top, tablet["gate"], Defs.difficulty_name(difficulty), CLEAN_FOOT_CELLS,
+				foot_col])
+
+
+## THE ONE-WAY CATCH (DESIGN.md G70 (2); LEVEL_DESIGN.md 15.7.3): a one-way cell of a height gate's ledge
+## ([method ledge_run]) with a standing place fewer than ONE_WAY_CATCH_ROWS rows under it, straight below or within
+## ONE_WAY_REACH_COLS columns, through open air: a falling hero whose feet are anywhere inside a one-way cell is
+## landed on it, so the 82 px hop jump climbs it from 6 rows down ('pulley' of 9-1 fell that way; widening the ledge
+## did not help, the seventh row did).
+func _check_one_way_ledge(data: LevelData, grid: TileGrid, tablet: Dictionary, difficulty: int) -> void:
+	var far: Vector2i = tablet["far"]
+	var cell: Vector2i = tablet["cell"]
+	var run: Vector2i = ledge_run(grid, far)
+	if run.x < 0:
+		return
+	var top: int = far.y + 1
+	# The near side only: the ledge's cells from its end towards the tablet up to the far cell, and the standing
+	# places on that side of the far cell (what lies beyond the far cell is reached through the gate).
+	var first: int = run.x if cell.x <= far.x else far.x
+	var last: int = far.x if cell.x <= far.x else run.y
+	for col: int in range(first, last + 1):
+		var ch: String = grid.get_char(col, top)
+		if ch != TileGrid.CH_ONEWAY_A and ch != TileGrid.CH_ONEWAY_B:
+			continue
+		for under: int in range(maxi(col - ONE_WAY_REACH_COLS, 0), mini(col + ONE_WAY_REACH_COLS, grid.cols - 1) + 1):
+			if (cell.x <= far.x and under > far.x) or (cell.x > far.x and under < far.x):
+				continue
+			for row: int in range(top + 1, mini(top + ONE_WAY_CATCH_ROWS, grid.rows)):
+				if not TileGrid.is_ground(grid.floor_at(under, row)):
+					continue
+				# The first floor under that column: a standing place when it has air over it (rock over it: none).
+				if grid.side_at(under, row - 1) != TileGrid.SIDE_WALL:
+					_add(data.path, int(tablet["line"]), ERROR,
+							"the one-way ledge cell %d,%d of gate '%s' (%s) is %d rows over the standing place at %d,%d: a one-way cell catches like a corner - the hop jump (82 px) lands on it from fewer than %d rows down (G70)" % [
+							col, top, tablet["gate"], Defs.difficulty_name(difficulty), row - top, under, row,
+							ONE_WAY_CATCH_ROWS])
+					return
+				break
+
+
+## HIGH GROUND AT THE WARD'S EDGE (a warning; LEVEL_DESIGN.md 15.7.3 "the gate's high ground lies 12+ cells inside the
+## ward"): a top - a run of standing cells on one row - that stands HIGH_GROUND_ROWS rows or more over the floor
+## beside each of its ends (or ends at a wall), so a lone hero reaches it only by a lift, lies no more than
+## HIGH_GROUND_UNDER_ROWS rows under the ledge of this height gate (from it a jump reaches the ledge), on the
+## tablet's side of the far cell - and inside the ward within HIGH_GROUND_INSIDE_CELLS of its edge, or outside it
+## within HIGH_GROUND_OUTSIDE_CELLS: outside a ward an enemy's head is the 1.0 springboard, and whoever took that
+## lift comes down 12 cells further. 1-1 'hop' is the case (the hollow block of columns 90-97: `ward=22,12`). It is
+## cleared by a `ward=` that puts the top 12+ cells inside - or, where the top does not lead past the gate, by a
+## comment above the tablet saying why, with the explorer's two passes as the proof (LEVEL_DESIGN.md 15.7.4). No
+## warning where the ward's edge on that side is the map's edge.
+func _check_ward_edge(data: LevelData, grid: TileGrid, tablet: Dictionary, difficulty: int) -> void:
+	var far: Vector2i = tablet["far"]
+	var cell: Vector2i = tablet["cell"]
+	var ward: Vector2i = ward_columns(tablet, grid.cols)
+	var top: int = far.y + 1
+	var left_side: bool = cell.x <= far.x
+	# The edge towards the tablet (the side a lone hero comes from) and the band of columns beside it. Where that
+	# edge is the map's own nothing stands outside it: no warning (the lead designer's ruling, wf11).
+	if (left_side and ward.x <= 0) or (not left_side and ward.y >= grid.cols - 1):
+		return
+	var edge: int = ward.x if left_side else ward.y
+	var first: int = edge - HIGH_GROUND_OUTSIDE_CELLS if left_side else edge - HIGH_GROUND_INSIDE_CELLS + 1
+	var last: int = edge + HIGH_GROUND_INSIDE_CELLS - 1 if left_side else edge + HIGH_GROUND_OUTSIDE_CELLS
+	first = maxi(first, 1)
+	last = mini(last, grid.cols - 2)
+	for row: int in range(maxi(top - REACH_ROWS, 1), mini(top + HIGH_GROUND_UNDER_ROWS, grid.rows - 1) + 1):
+		var col: int = first
+		while col <= last:
+			if not _stands(grid, col, row):
+				col += 1
+				continue
+			# The whole top this cell belongs to.
+			var from: int = col
+			while from - 1 >= 0 and _stands(grid, from - 1, row):
+				from -= 1
+			var to: int = col
+			while to + 1 < grid.cols and _stands(grid, to + 1, row):
+				to += 1
+			if to - from < 40 and _drop_beside(grid, from - 1, row) >= HIGH_GROUND_ROWS \
+					and _drop_beside(grid, to + 1, row) >= HIGH_GROUND_ROWS:
+				var inside: bool = col >= ward.x and col <= ward.y
+				_add(data.path, int(tablet["line"]), WARNING,
+						"high ground at the ward's edge of gate '%s' (%s): the top at columns %d-%d, row %d stands %d+ rows over every floor beside it and lies %s the ward (columns %d..%d) %d cell(s) from its edge - a lone hero is lifted onto it by a head outside the ward; the gate's high ground lies 12+ cells inside (widen it with ward=<left>,<right>) [G73]" % [
+						tablet["gate"], Defs.difficulty_name(difficulty), from, to, row, HIGH_GROUND_ROWS,
+						"inside" if inside else "outside", ward.x, ward.y, absi(col - edge)])
+				return
+			col = to + 1
+
+
+## True when a hero stands in the cell over (col, row): that cell carries him and the cell above it is no wall.
+static func _stands(grid: TileGrid, col: int, row: int) -> bool:
+	return grid.in_bounds(col, row) and row >= 1 and TileGrid.is_ground(grid.floor_at(col, row)) \
+			and grid.side_at(col, row - 1) != TileGrid.SIDE_WALL
+
+
+## The rows from the top row `row` down to the first floor in column `col` (the floor beside a top's end); a large
+## number when that column is a wall at the top's level (the top ends at rock) or has no floor at all.
+static func _drop_beside(grid: TileGrid, col: int, row: int) -> int:
+	if col < 0 or col >= grid.cols or grid.side_at(col, row - 1) == TileGrid.SIDE_WALL:
+		return 1 << 20
+	for down: int in range(row, grid.rows):
+		if TileGrid.is_ground(grid.floor_at(col, down)):
+			return down - row
+	return 1 << 20
+
+
+## The report line of every gate of a co-op file ([member gate_reports]): its tablet, its far cell and its WARD
+## columns per difficulty (DESIGN.md G73), with the enemy records that stand in the ward (the ward makes them
+## harmless as springboards) and those of a following archetype outside it within two views (the ward's edge rule
+## of LEVEL_DESIGN.md 15.7.3: a flyer or a walker a lone hero can bring to the edge).
+func _report_gates(data: LevelData, records: Array[Dictionary]) -> void:
+	var lines: Dictionary = {}   # gate -> [line, PackedStringArray]
+	for difficulty: int in [Defs.Difficulty.BEGINNER, Defs.Difficulty.EXPERT]:
+		if difficulty == Defs.Difficulty.BEGINNER and str(data.value("min_difficulty")) == "expert":
+			continue
+		var grid: TileGrid = data.build_grid(difficulty)
+		for record: Dictionary in records:
+			if String(record["id"]) != "objects/x2_tablet" or not LevelText.applies_to(record["params"], difficulty):
+				continue
+			var tablet: Dictionary = parse_tablet(record)
+			if tablet["far"] == Vector2i(-1, -1):
+				continue
+			var ward: Vector2i = ward_columns(tablet, grid.cols)
+			var inside: int = 0
+			var keepers: int = 0
+			var edge: PackedStringArray = PackedStringArray()
+			for other: Dictionary in records:
+				var id: String = String(other["id"])
+				if Spawner.category(StringName(id)) != "enemies" or id == "enemies/decoration" \
+						or not LevelText.applies_to(other["params"], difficulty):
+					continue
+				var col: int = int(other["col"])
+				if col >= ward.x and col <= ward.y:
+					inside += 1
+					keepers += 1 if (other["params"] as Dictionary).has("keeper") else 0
+				elif (LED_KEEPER_IDS.has(id) or id == "enemies/harrier") and not (other["params"] as Dictionary).has("keeper") \
+						and (col >= ward.x - 2 * GATE_AREA_COLS and col <= ward.y + 2 * GATE_AREA_COLS):
+					edge.append("%s %d,%d" % [id.get_file(), col, int(other["row"])])
+			var name: String = str(tablet["gate"]) if tablet["gate"] != "" else "(secret at %d,%d)" % [
+				tablet["cell"].x, tablet["cell"].y]
+			var text: String = "%s: tablet %d,%d far %d,%d ward columns %d..%d (%s); %d enemy record(s) in the ward (%d keeper(s)): no lift, rest, carry or pogo from them [G73]%s" % [
+				Defs.difficulty_name(difficulty), tablet["cell"].x, tablet["cell"].y, tablet["far"].x, tablet["far"].y,
+				ward.x, ward.y, "ward=%d,%d" % [tablet["ward"].x, tablet["ward"].y] if tablet["ward"].x >= 0
+				else "the default %d cells either side" % WARD_MARGIN_CELLS, inside, keepers,
+				"" if edge.is_empty() else "; followers within two views of its edge: %s" % ", ".join(edge)]
+			if not lines.has(name):
+				lines[name] = [int(tablet["line"]), []]
+			(lines[name][1] as Array).append(text)
+	for name: String in lines:
+		var parts: Array = lines[name][1]
+		# Both difficulties alike: one line for the two.
+		if parts.size() == 2 and str(parts[0]).substr(str(parts[0]).find(": ")) \
+				== str(parts[1]).substr(str(parts[1]).find(": ")):
+			parts = ["Beginner and Expert" + str(parts[0]).substr(str(parts[0]).find(": "))]
+		gate_reports.append({"path": data.path, "line": int(lines[name][0]), "gate": name,
+			"message": "gate '%s' - %s" % [name, " | ".join(PackedStringArray(parts))]})
 
 
 ## Keeper and Guard halls are exactly HALL_ROWS rows of air under a ceiling over the whole patrol, so nobody jumps or
@@ -1730,6 +2011,17 @@ func _check_led_keepers(data: LevelData, records: Array[Dictionary]) -> void:
 			_add(data.path, int(record["line"]), WARNING,
 					"'%s' is a keeper ('%s') that can be led: it follows its target, so one hero takes it to its bond mate or off its door - a keeper stands still or is pinned [G66]" % [
 					id, str(params["keeper"])])
+		# wf11 (enemies-A, with the slot rule of G72): a one-shot record despawns "dead without a kill", and a
+		# keeper door counts it as dead - it opens for nobody's deed. A record of a zone-spawner archetype never
+		# dies at all (its copies do): a bond on it can be met by nobody.
+		if params.has("keeper") and ONE_SHOT_IDS.has(id):
+			_add(data.path, int(record["line"]), ERROR,
+					"'%s' is a keeper ('%s') but a one-shot enemy: it despawns without a kill and its door counts it as dead - a keeper must not be one_shot" % [
+					id, str(params["keeper"])])
+		if params.has("bond") and SPAWNER_IDS.has(id):
+			_add(data.path, int(record["line"]), WARNING,
+					"'%s' carries bond '%s' but is a zone-spawner record: the record never dies (its copies do), so nobody can ever meet the bond [G68, G72] - drop the bond or use an enemy that stands" % [
+					id, str(params["bond"])])
 
 
 ## Rows of air from the cell (col, row) up to the first wall cell (grid.rows + 1 when there is none: open sky).

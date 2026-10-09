@@ -93,8 +93,20 @@ func _asleep_tick() -> void:
 	copy.wake()
 
 
+## 2.0 co-op (R2, the `split` trait on a zone spawner's copies: `enemies/dropper coop=split`): a dead HALF whose split
+## window is still open stays in the level until the window is decided - CoopTraits revives it for the merge, or
+## [method _on_coop_sealed] lets it go. (Freed at once - its corpse leaves a view's edge within 5 ticks - it could not
+## merge back, and its living half was left a plain half that one hero finished alone.) A bonded copy leaves as
+## before: its bond holds the spawner records, which never die, so nothing waits for it.
 func _on_gone() -> void:
 	if _is_copy:
+		if _traits != null and _traits.kind == Defs.CoopTrait.SPLIT and _traits.window_open():
+			return
+		_detach()
+
+
+func _on_coop_sealed() -> void:
+	if _is_copy and dead and not _corpse:
 		_detach()
 
 

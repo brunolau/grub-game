@@ -215,6 +215,36 @@ var gave_input: bool = false
 ## versus. Read it through [method is_idle] / [method counts_for_coop].
 var idle: bool = false
 
+# --- 2.0 wf11 gate rules: the measurement switch --------------------------------------------------------------------
+## The rules that close a co-op gate to one hero, one bit each: R1 a spring / a launch is held, R3 the ward, R5 a
+## closed door passes nobody, R6 the idle hero (camera, leash, edge walls, the wipe).
+const GATE_R1: int = 1
+const GATE_R3: int = 2
+const GATE_R5: int = 4
+const GATE_R6: int = 8
+## Not a rule: with this bit of [member gate_rules_off] set, every contact a ward changed is printed - a `WARD` line
+## per stomp that gave no lift and per pogo it took (level, stage tick, slot, feet cell, the enemy) - so a route that
+## the ward moved shows where (`PRE2_GATE_RULES_OFF=16 bash .tools/gd.sh test coop_routes --only=test_coop_routes`).
+const GATE_TRACE: int = 16
+## Measurement switch (development only, as LevelBase.doze_enabled; the game never sets it): the rules whose bit is
+## set here are NOT applied, so a co-op route replayed once with each bit set tells which rule moved it. A debug build
+## reads the environment variable PRE2_GATE_RULES_OFF once (e.g. `PRE2_GATE_RULES_OFF=2 bash .tools/gd.sh test
+## coop_routes --only=test_coop_routes`); an exported release build always has 0.
+static var gate_rules_off: int = _gate_rules_off_from_env()
+
+
+static func _gate_rules_off_from_env() -> int:
+	return OS.get_environment("PRE2_GATE_RULES_OFF").to_int() if OS.is_debug_build() else 0
+
+
+# --- 2.0 wf11 ruling R1: a spring is a launch (co-op only; [method spring_bounce], [method hold_launch]) --------------
+## True from the tick a spring (a pad, a cap, a pot spring) or any [method launch] (a geyser, a see-saw, a vine leap,
+## a bat, a dismount, a hatch) threw this hero of a co-op party until he next has ground, a platform, a carrier, a
+## vine or a saddle under him (the hero clears it in POST): in that flight NO lift of his own comes on top of the
+## launch - no jump-table impulse (no_jump is armed; a glider carrier's jump too), no strike-hop impulse, no pogo
+## ([method notify_weapon_hit]) - only gravity. Always false in single-player and versus.
+var launch_hold: bool = false
+
 
 func get_kind() -> int:
 	return Defs.Kind.PLAYER
@@ -474,6 +504,46 @@ func bounce(yvel_v16: int, depth: int = 0, head: SimEntity = null) -> void:
 	sim_pos.y -= depth
 
 
+## True for a hero of a CO-OP PARTY: a co-op run (Game.mode COOP) of two or more players (Game.party; the partners are
+## spawned after P1, so the run's party size decides, as for the party component). The wf11 rules that close a co-op
+## gate to one hero are tied to it - a spring is a launch ([method spring_bounce]), the ward (LevelBase.in_ward), a
+## closed door passes nobody - so single-player and versus never meet them.
+func in_coop_party() -> bool:
+	return Game.party > 1 and Game.mode == Defs.GameMode.COOP
+
+
+## True when the gate rule `bit` (GATE_R1 ..) applies to this hero: a hero of a co-op party, and the rule is not
+## switched off for a measurement ([member gate_rules_off]).
+func gate_rule(bit: int) -> bool:
+	return (gate_rules_off & bit) == 0 and in_coop_party()
+
+
+## A spring pad, a cap or a flower-pot spring throws this hero (objects/spring, GAMEPLAY.md 7.2). Single-player and
+## versus: exactly [method bounce] - the 1.0 pad (yvel set, fall_ticks cleared, lifted by `depth`; the jump lock-out is
+## left as it was). A hero of a co-op party ([method in_coop_party]; wf11 ruling R1 "a spring is a launch"): the same
+## bounce (which puts his feet on the pad's top line: the launch always starts there) and then the rule of
+## [method launch] - no_jump = Tuning.NO_JUMP_TICKS and no platform under him - with [method hold_launch]: until he
+## next has ground under him nothing of his own adds to the pad's speed. (Before, a low strike begun on a pad with Up
+## held from its hop met the pad at the hop's apex - no fall had armed no_jump yet - and the whole jump table was added
+## to the pad's -224: 256 px and more, sixteen rows, from every spring, cap and pot of every co-op file; with Fire held
+## a moment longer a second strike's hop came on top of a plain launch: 142 px.) Now whatever he does on the pad or in
+## the flight rises what a plain jump onto it rises: 105 px above the pad's top. The G54 guard of [method bounce] holds
+## for both.
+func spring_bounce(yvel_v16: int, depth: int = 0) -> void:
+	bounce(yvel_v16, depth)
+	if gate_rule(GATE_R1):
+		no_jump = Tuning.NO_JUMP_TICKS
+		on_platform = false
+		hold_launch()
+
+
+## wf11 R1: from now until this hero of a co-op party next has ground under him his flight is gravity's alone
+## ([member launch_hold]). Nothing in single-player and versus.
+func hold_launch() -> void:
+	if gate_rule(GATE_R1):
+		launch_hold = true
+
+
 ## Called by a platform that passed its ride test this tick (PHYSICS.md 11.4): carries the hero by `dx`, sets
 ## on_platform and the grounded bookkeeping, and puts his feet on the platform top.
 func ride_platform(platform: SimEntity, dx: int, dy: int) -> void:
@@ -547,6 +617,7 @@ func respawn_at(pos: Vector2i) -> void:
 	squash = 0
 	curl = CURL_NONE
 	ball_batter = null
+	launch_hold = false
 	leave_mount()
 	_fenced = false
 	end_totem_ride()
@@ -570,9 +641,10 @@ func set_control_enabled(enabled: bool) -> void:
 
 
 ## A weapon box of this hero hit something while he was airborne: pogo (PHYSICS.md 9). Called by whoever
-## resolves a hit outside the hero's own weapon pass (bosses).
+## resolves a hit outside the hero's own weapon pass (bosses). 2.0 wf11 R1: no pogo in the flight a spring gave a hero
+## of a co-op party ([member launch_hold], always false in single-player).
 func notify_weapon_hit() -> void:
-	if yvel != 0:
+	if yvel != 0 and not launch_hold:
 		yvel = Tuning.POGO_YVEL
 
 
@@ -582,6 +654,10 @@ func notify_weapon_hit() -> void:
 ## given component is clamped to +/- PartyTuning.LAUNCH_AXIS_CAP v16 (pass LAUNCH_KEEP to keep one, e.g. a geyser
 ## keeps xvel); then fall_ticks = 0, no_jump = Tuning.NO_JUMP_TICKS (a launched hero never adds the jump table),
 ## on_platform and grounded cleared; glide unchanged.
+## 2.0 wf11 R1 (the lead designer's ruling on the measurement: a strike begun on a vent stacked its hops on the launch
+## - 180 px from a -224 geyser, for one hero): in a CO-OP party the flight is held ([method hold_launch]) - until he
+## next has ground under him no strike hop and no pogo comes on top of the launch, as after a spring. Single-player
+## and versus: exactly the launch as it was.
 func launch(p_xvel: int, p_yvel: int) -> void:
 	if p_xvel != LAUNCH_KEEP:
 		xvel = clampi(p_xvel, -PartyTuning.LAUNCH_AXIS_CAP, PartyTuning.LAUNCH_AXIS_CAP)
@@ -591,6 +667,7 @@ func launch(p_xvel: int, p_yvel: int) -> void:
 	no_jump = Tuning.NO_JUMP_TICKS
 	on_platform = false
 	grounded = false
+	hold_launch()
 
 
 ## Make this hero an egg where he is (PHYSICS.md C.12: after his death toss, or at once for the leash and the

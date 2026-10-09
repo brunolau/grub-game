@@ -11,6 +11,9 @@ const COOP_LEVEL: String = "res://levels/test_enemies_coop.lvl"
 const PLAYER_SCENE: String = "res://scenes/player/player.tscn"
 
 var _p2: PlayerBase = null
+## The real level of the last _real_level() (null otherwise) and Sim.manual before it.
+var _real: Level = null
+var _was_manual: bool = false
 
 
 func before_each() -> void:
@@ -23,6 +26,11 @@ func before_each() -> void:
 
 func after_each() -> void:
 	GameInput.clear_scripted()
+	if _real != null:
+		Sim.manual = _was_manual
+		Flow.pending_level_id = &""
+		Audio.stop_music(0.0)
+		_real = null
 	Game.new_game(Defs.Difficulty.BEGINNER)
 	Game.begin_level(&"")
 
@@ -202,7 +210,7 @@ func test_a_bond_needs_the_party_and_a_team_wipe_clears_it() -> void:
 	var b: EnemyBase = _bonded(Vector2i(280, 160))
 	Sim.step(2)
 	a.kill(&"weapon", _hero)
-	b.kill(&"weapon", _hero)
+	b.kill(&"weapon", _p2)
 	assert_true(a.coop_traits().sealed)
 	_level.reset_entities()
 	assert_false(a.dead or b.dead, "a team wipe brings every record back")
@@ -1520,3 +1528,577 @@ func _trace_egg(egg_partner: bool, pos: Vector2i) -> PlayerBase:
 	_p2.teleport(pos)
 	_p2.down = true
 	return _p2
+
+
+# =================================================================================================================
+# R2: the windows are slot-bound (bond, split, the twin drums)
+# =================================================================================================================
+
+## R2: a bond is met only by deaths credited to two DIFFERENT heroes. One hero kills one member; while it lies dead
+## his hits on the other glance - whatever their gap - and nothing else of his kills it; his partner's hit does, and
+## the bond seals.
+func test_a_bond_is_met_only_by_two_different_heroes() -> void:
+	var a: EnemyBase = _bonded(Vector2i(60, 160))
+	var b: EnemyBase = _bonded(Vector2i(280, 160))
+	Sim.step(2)
+	assert_true(b.take_hit(10, _hero))
+	assert_eq(b.hp, 15, "no window open: any hero who counts hurts a member")
+	assert_true(a.take_hit(100, _hero))
+	assert_true(a.dead, "P1 kills the first")
+	assert_eq(a.coop_traits().kill_slot, 0, "credited to his slot")
+	var sparks: int = _count_fx(&"fx/hit_stars")
+	for gap: int in [0, 1, CoopTraits.window_ticks() - 2]:
+		Sim.step(gap)
+		assert_true(b.take_hit(100, _hero), "his hit on the other is used up ...")
+		assert_eq(b.hp, 15, "... and glances")
+		assert_false(b.dead)
+	assert_eq(b.coop_traits().slot_refusals, 3)
+	assert_true(_count_fx(&"fx/hit_stars") > sparks, "with the glance's spark")
+	b.kill(&"weapon", _hero)
+	assert_false(b.dead, "nor does a kill of his own slot go through")
+	assert_true(b.take_hit(100, _p2), "his partner's hit, still inside the window")
+	assert_true(b.dead)
+	assert_eq(b.coop_traits().kill_slot, 1)
+	assert_true(a.coop_traits().sealed and b.coop_traits().sealed, "two different slots: the bond is met")
+	assert_true(CoopTraits.bond_done(_level, &"twins"))
+	# One hero alone, striking at both on every tick: the dead member regrows when its window closes and he may
+	# then kill the other - never both.
+	_level.reset_entities()
+	Sim.step(2)
+	var kills: Array[int] = [0, 0]
+	var both_dead: int = 0
+	for tick: int in 200:
+		for n: int in 2:
+			var member: EnemyBase = [a, b][n]
+			var was_dead: bool = member.dead
+			member.take_hit(100, _hero)
+			if member.dead and not was_dead:
+				kills[n] += 1
+		if (a.dead and b.dead) or CoopTraits.bond_done(_level, &"twins"):
+			both_dead += 1
+		Sim.step(1)
+	assert_true(kills[0] >= 2 and kills[1] >= 2, "he killed each several times (%s)" % str(kills))
+	assert_eq(both_dead, 0, "and never had both members dead")
+	assert_false(a.coop_traits().sealed or b.coop_traits().sealed)
+
+
+## R2: a hit credited to a hero who does not COUNT - idle, an egg, down - counts for nobody: it glances off a bond
+## member, his thrown weapon and his ball too. A batted ball is credited to the BALL, not to his batter: a lone hero
+## who bats his idle partner into a member has not found a second slot, and a pair's Batter Up has.
+func test_a_hit_of_an_idle_hero_an_egg_or_a_downed_hero_counts_for_nobody() -> void:
+	var a: EnemyBase = _bonded(Vector2i(60, 160))
+	var b: EnemyBase = _bonded(Vector2i(280, 160))
+	Sim.step(2)
+	assert_eq(CoopTraits.credit_slot(_hero), 0)
+	assert_eq(CoopTraits.credit_slot(_p2), 1)
+	assert_eq(CoopTraits.credit_slot(null), -1, "no hero's hit")
+	assert_eq(CoopTraits.credit_slot(a), -1)
+	var throw: ProjectileBase = _shot(Vector2i(200, 150), 208, 1)
+	assert_eq(CoopTraits.credit_slot(throw), 1, "a thrown weapon: its thrower")
+	for state: String in ["idle", "egg", "dead"]:
+		_p2.idle = state == "idle"
+		_p2.down = state == "egg"
+		_p2.dead = state == "dead"
+		assert_false(_p2.counts_for_coop())
+		assert_eq(CoopTraits.credit_slot(_p2), -1, "%s: his own box counts for nobody" % state)
+		assert_eq(CoopTraits.credit_slot(throw), -1, "%s: the weapon he threw before, too" % state)
+		assert_true(a.take_hit(100, _p2))
+		assert_true(a.take_hit(100, throw))
+		assert_false(a.dead, "%s: his hits glance, also with no window open" % state)
+		assert_eq(a.hp, a.max_hp)
+	assert_eq(a.coop_traits().slot_refusals, 6)
+	_p2.idle = false
+	_p2.down = false
+	_p2.dead = false
+	# The ball: credited to the batted hero himself.
+	_p2.curl = PlayerBase.CURL_BALL
+	_p2.ball_batter = _hero
+	assert_eq(Defs.hitter_slot(_p2), 0, "the statistics credit a ball's hit to its batter")
+	assert_eq(CoopTraits.credit_slot(_p2), 1, "the windows credit it to the ball")
+	assert_true(a.take_hit(100, _hero))
+	assert_true(a.dead, "P1 clubs one member ...")
+	_p2.idle = true
+	assert_true(b.take_hit(100, _p2))
+	assert_false(b.dead, "... and bats his IDLE partner into the other: nobody's hit, it glances")
+	_p2.idle = false
+	assert_true(b.take_hit(100, _p2))
+	assert_true(b.dead, "a partner who plays, batted into it, is the second slot")
+	assert_eq([a.coop_traits().kill_slot, b.coop_traits().kill_slot], [0, 1])
+	assert_true(a.coop_traits().sealed and b.coop_traits().sealed, "a pair's Batter Up meets the bond")
+	_p2.curl = PlayerBase.CURL_NONE
+	_p2.ball_batter = null
+
+
+## R2: nothing else of one hero's ends the bond either - with one member dead by his hand the other stays alive
+## through his kill-all, a grenade (nobody's), his feast and his glider dives; the same deaths by his partner count.
+func test_no_other_death_by_the_same_hero_ends_a_bond() -> void:
+	var a: EnemyBase = _bonded(Vector2i(60, 160))
+	var b: EnemyBase = _bonded(Vector2i(280, 160))
+	Sim.step(2)
+	assert_eq(ItemEffects.kill_all(_hero), 2, "a kill-all reaches both")
+	assert_eq([a.dead, b.dead].count(true), 1, "and kills ONE: the second death would be the same hero's")
+	var dead: EnemyBase = a if a.dead else b
+	var alive: EnemyBase = b if a.dead else a
+	assert_eq(alive.coop_traits().slot_refusals, 1)
+	ItemEffects.grenade()
+	assert_false(alive.dead, "a grenade is nobody's")
+	alive.kill(&"feast", _hero)
+	assert_false(alive.dead, "his feast does not eat it")
+	for dive: int in Tuning.GLIDER_DIVE_KILLS_ON:
+		alive.on_glider_stomp(_hero)
+	assert_false(alive.dead, "nor do his glider dives kill it")
+	assert_eq(alive.coop_traits().slot_refusals, 4)
+	assert_false(CoopTraits.bond_done(_level, &"twins"))
+	alive.kill(&"feast", _p2)
+	assert_true(alive.dead, "his partner's feast does")
+	assert_true(dead.coop_traits().sealed and alive.coop_traits().sealed)
+	# A grenade first: the death is nobody's, so the window it opens cannot be met by one more hero.
+	_level.reset_entities()
+	Sim.step(2)
+	a.burst_into_items(0)
+	assert_true(a.dead, "the first death is free (it only opens the window)")
+	assert_eq(a.coop_traits().kill_slot, -1)
+	assert_true(b.take_hit(100, _hero))
+	assert_true(b.take_hit(100, _p2))
+	assert_false(b.dead, "one slot more would be one slot in all: both heroes' hits glance until it regrows")
+	Sim.step(CoopTraits.window_ticks())
+	assert_false(a.dead, "the window closed: it regrew")
+
+
+## R2 for a bond of three: two different slots among the three deaths meet it; the hero who killed two cannot kill
+## the last, his partner can.
+func test_a_bond_of_three_needs_two_slots_among_its_deaths() -> void:
+	var members: Array[EnemyBase] = []
+	for x: int in [60, 160, 280]:
+		members.append(_enemy(&"enemies/walker", Vector2i(x, 160), {"coop": "bond", "bond": "trio", "speed": 0}))
+	Sim.step(2)
+	assert_true(members[0].take_hit(100, _hero))
+	assert_true(members[1].take_hit(100, _hero))
+	assert_true(members[0].dead and members[1].dead, "P1 may kill two of three")
+	assert_true(members[2].take_hit(100, _hero))
+	assert_false(members[2].dead, "but not the last: every death would be his")
+	assert_true(members[2].take_hit(100, _p2))
+	assert_true(members[2].dead)
+	for member: EnemyBase in members:
+		assert_true(member.coop_traits().sealed, "P1, P1, P2: met")
+
+
+## R2 leaves a record whose mates LEFT without a window as it was: a one-shot member that despawned is gone, and
+## the one that remains dies as a plain enemy.
+func test_a_member_whose_mate_despawned_dies_as_before() -> void:
+	var a: EnemyBase = _bonded(Vector2i(60, 160))
+	var b: EnemyBase = _bonded(Vector2i(280, 160))
+	Sim.step(2)
+	a.one_shot = true
+	a.sleep()
+	assert_true(a.dead, "a one-shot member that left the view is gone for good")
+	assert_eq(a.coop_traits().died_tick, -1, "without a window")
+	assert_true(b.take_hit(100, _hero))
+	assert_true(b.dead, "nothing waits for a second slot: the rest of the bond dies to any hero")
+	assert_true(b.coop_traits().sealed)
+
+
+## R2 for the split: its halves fall to two different heroes. The hero who killed one half cannot kill the other
+## while it lies dead - they merge back when the window closes - and his partner can.
+func test_split_halves_fall_to_two_different_heroes() -> void:
+	var blob: EnemyBase = _splitter(Vector2i(200, 160))
+	_hero.teleport(Vector2i(150, 160))
+	_p2.teleport(Vector2i(250, 160))
+	Sim.step(2)
+	_p2.idle = true
+	assert_true(blob.take_hit(25, _p2), "an idle hero's hit on the whole record")
+	assert_eq(blob.hp, 0, "a whole record has no window: an idle hero's hit splits it as any hit does")
+	var copy: EnemyBase = blob.coop_traits().mate
+	Sim.step(EnemyTuning.SPLIT_RUN_TICKS)
+	assert_true(copy.take_hit(25, _p2), "his hit on a half is used up")
+	assert_false(copy.dead, "a half is a windowed record: nobody's hit glances")
+	assert_true(copy.take_hit(25, _hero), "P1's hit on a half")
+	assert_true(copy.dead, "P1 kills one half")
+	for tick: int in CoopTraits.window_ticks() - 1:
+		assert_true(blob.take_hit(25, _hero), "tick %d: his hit on the other half is used up" % tick)
+		assert_false(blob.dead, "tick %d: it glances" % tick)
+		Sim.step(1)
+	Sim.step(1)
+	assert_eq(blob.coop_traits().split, CoopTraits.Split.WHOLE, "the window closed: merged back into the whole")
+	assert_eq(blob.hp, blob.max_hp)
+	# The pair.
+	_p2.idle = false
+	assert_true(blob.take_hit(25, _hero), "split again")
+	copy = blob.coop_traits().mate
+	Sim.step(EnemyTuning.SPLIT_RUN_TICKS)
+	assert_true(copy.take_hit(25, _hero), "P1 kills the spawned half")
+	Sim.step(3)
+	assert_true(blob.take_hit(25, _p2), "P2 hits the other inside the window")
+	assert_true(blob.dead and copy.dead, "both halves dead")
+	assert_true(blob.coop_traits().sealed and copy.coop_traits().sealed, "one half each: the split is met")
+
+
+## R2, a tar blob from the sky (`enemies/dropper coop=split`: its halves are a zone spawner's copy and the half that
+## copy spawned). The copy's half, killed at the view's edge, is thrown out of the view and used to be freed 5 ticks
+## later - no merge, and its mate was left a plain half that the same hero finished alone. Now it waits for its
+## window: its mate turns his hits away, they merge back, and with one half each the blob is gone for good and the
+## record may drop the next one.
+func test_a_dead_half_of_a_sky_blob_waits_for_its_window() -> void:
+	var record: Dropper = _enemy(&"enemies/dropper", Vector2i(200, 160), {"coop": "split", "max": 1, "hp": 10,
+			"pause": 0}) as Dropper
+	var blob: Dropper = null
+	for tick: int in 120:
+		Sim.step(1)
+		for entity: SimEntity in _level.get_kind(Defs.Kind.ENEMY):
+			var dropper: Dropper = entity as Dropper
+			if dropper != null and dropper.is_copy() and dropper.xvel != 0 and dropper._grounded:
+				blob = dropper
+		if blob != null:
+			break
+	assert_not_null(blob, "a blob dropped and walks")
+	if blob == null:
+		return
+	assert_true(blob.take_hit(25, _hero))
+	var half: EnemyBase = blob.coop_traits().mate
+	assert_not_null(half, "the first hit split it")
+	assert_eq(blob.coop_traits().split, CoopTraits.Split.HALF)
+	# The spawner's copy stands at the view's right edge when P1 (left of it) kills it: its corpse flies out.
+	blob.teleport(Vector2i(_level.view.end.x - 4, 160))
+	half.teleport(Vector2i(120, 160))
+	_hero.teleport(Vector2i(100, 160))
+	Sim.step(1)
+	assert_true(blob.take_hit(25, _hero))
+	assert_true(blob.dead)
+	Sim.step(EnemyTuning.DEATH_ARC_MIN_TICKS + 3)
+	assert_false(blob._corpse, "its corpse left the view and is over")
+	assert_false(blob.is_queued_for_deletion(), "but the dead half stays for its window")
+	assert_eq(record.alive_copies(), 1)
+	assert_true(half.take_hit(25, _hero))
+	assert_false(half.dead, "so its mate still turns the same hero's hit away")
+	Sim.step(CoopTraits.window_ticks())
+	assert_false(blob.dead, "the window closed: it merged back")
+	assert_eq(blob.coop_traits().split, CoopTraits.Split.WHOLE)
+	assert_true(half.dead and not half.sim_active, "the spawned half is gone")
+	# One half each.
+	assert_true(blob.take_hit(25, _hero))
+	half = blob.coop_traits().mate
+	blob.teleport(Vector2i(_level.view.end.x - 4, 160))
+	Sim.step(1)
+	assert_true(blob.take_hit(25, _hero))
+	Sim.step(EnemyTuning.DEATH_ARC_MIN_TICKS + 3)
+	assert_false(blob.is_queued_for_deletion())
+	assert_true(half.take_hit(25, _p2))
+	assert_true(half.dead and half.coop_traits().sealed, "P2's hit ends it")
+	assert_true(blob.is_queued_for_deletion(), "the sealed copy leaves at once")
+	assert_eq(record.alive_copies(), 0, "and the record may drop the next blob")
+
+
+## R2 for the twin drums (objects/drum.gd; the bond test there is this rule's): the bond succeeds only through hits
+## of two different heroes who count. The hero who lit one drum cannot light the last - his second hit sounds and
+## stays dark - until his partner has struck a drum of the window; an idle hero's, an egg's and a downed hero's hits
+## light nothing; a ball is its own slot. A party of one keeps the rule before R2.
+func test_twin_drums_are_lit_only_by_two_different_heroes() -> void:
+	var d1: Drum = _spawn(&"objects/drum", Vector2i(100, 160), {"bond": "twin"}) as Drum
+	var d2: Drum = _spawn(&"objects/drum", Vector2i(400, 160), {"bond": "twin"}) as Drum
+	var window: int = PartyTuning.window_ticks(Game.difficulty)
+	Sim.step(1)
+	d1.take_hit(25, _hero)
+	assert_true(d1.lit, "P1 lights the first drum")
+	assert_eq(d1.struck_by, 1)
+	d2.take_hit(25, _shot(Vector2i(380, 150), 208, 0))
+	assert_eq(d2.hits, 1, "his throw strikes the second inside the window ...")
+	assert_false(d2.lit, "... and it stays dark: every drum would be his")
+	assert_eq(d2.refused, 1)
+	assert_false(Drum.bond_succeeded(_level, &"twin"))
+	Sim.step(window)
+	assert_false(d1.lit, "the window closed")
+	# His partner struck a drum of the window: now the hero who was refused lights the last one.
+	d1.take_hit(25, _hero)
+	Sim.step(Tuning.HIDDEN_SPOT_HIT_COOLDOWN)
+	d2.take_hit(25, _hero)
+	assert_false(d2.lit)
+	d1.take_hit(25, _p2)
+	assert_eq(d1.struck_by, 3, "P2 strikes the lit drum too")
+	Sim.step(Tuning.HIDDEN_SPOT_HIT_COOLDOWN)
+	d2.take_hit(25, _hero)
+	assert_true(Drum.bond_succeeded(_level, &"twin"), "both heroes drummed inside the window")
+	# Nobody's hits.
+	_level.reset_entities()
+	Sim.step(1)
+	assert_eq([d1.struck_by, d2.refused], [0, 0], "a team wipe clears the drums' slot state")
+	d1.take_hit(25, _hero)
+	var refused: int = d2.refused
+	var throw: ProjectileBase = _shot(Vector2i(380, 150), 208, 1)
+	for state: String in ["idle", "egg", "dead"]:
+		_p2.idle = state == "idle"
+		_p2.down = state == "egg"
+		_p2.dead = state == "dead"
+		d2.take_hit(25, throw if state != "idle" else _p2)
+		assert_false(d2.lit, "%s: his hit lights nothing" % state)
+		Sim.step(Tuning.HIDDEN_SPOT_HIT_COOLDOWN)
+	assert_eq(d2.refused, refused + 3)
+	_p2.idle = false
+	_p2.down = false
+	_p2.dead = false
+	# The ball is its own slot.
+	_level.reset_entities()
+	Sim.step(1)
+	d1.take_hit(25, _hero)
+	_p2.curl = PlayerBase.CURL_BALL
+	_p2.ball_batter = _hero
+	_p2.idle = true
+	d2.take_hit(25, _p2)
+	assert_false(d2.lit, "his idle partner batted into the second drum lights nothing")
+	_p2.idle = false
+	Sim.step(Tuning.HIDDEN_SPOT_HIT_COOLDOWN)
+	d2.take_hit(25, _p2)
+	assert_true(Drum.bond_succeeded(_level, &"twin"), "a partner who plays, batted into it, is the second hero")
+	_p2.curl = PlayerBase.CURL_NONE
+	_p2.ball_batter = null
+	# A party of one: the rule before R2 (any hit lights).
+	_level.reset_entities()
+	_p2.free()
+	Sim.step(1)
+	assert_false(CoopTraits.party_on())
+	d1.take_hit(25, _hero)
+	d2.take_hit(25, _hero)
+	assert_true(Drum.bond_succeeded(_level, &"twin"), "alone in the level one hero drums both")
+
+
+# =================================================================================================================
+# R2 with the real entities: one hero's two throws in flight open no door, the pair's do
+# =================================================================================================================
+
+## G3b cause C on w5_l2_coop 'rattlers' (Expert, window 12; the verifier's route w5_l2_coop.rattlers.expert): the lone
+## real hero stands between the bonded keeper Snappers of the real file with spears, his partner parked idle beside
+## him. He throws high at the far one and forward at the near one as that spear lands: both hits arrive 6 ticks
+## apart, inside the window - the far one dies and the near one's hit GLANCES (the slot rule; before R2 it died and
+## the keeper door opened). The dead one regrows, the door never opens. The pair - the same two throws, one by each
+## hero - kills both, seals the bond and the door rises.
+func test_one_heros_two_spears_in_flight_never_open_the_rattlers_door_and_the_pairs_do() -> void:
+	var lv: Level = _real_level(&"w5_l2_coop", Defs.Difficulty.EXPERT)
+	var keepers: Array[EnemyBase] = _keepers(lv, &"rattlers")
+	var door: RisingColumn = _door(lv, RisingColumn.Drive.KEEPERS, &"rattlers")
+	assert_eq([keepers[0].spawn_pos, keepers[1].spawn_pos], [Vector2i(344, 480), Vector2i(632, 480)],
+			"the keeper Snappers of the file (cells 21,29 and 39,29)")
+	assert_eq(door.block, Rect2i(19, 26, 1, 4), "their door")
+	var spot: Vector2i = Vector2i(455, 480)
+	var opened: Array[int] = [0]
+	var watch: Callable = func() -> void:
+		if door.triggered or CoopTraits.keepers_done(lv, &"rattlers"):
+			opened[0] += 1
+	# One hero, both throws.
+	_stand(lv, 0, spot, 1, Defs.Weapon.SPEAR)
+	var parked: PlayerBase = _stand(lv, 1, spot - Vector2i(25, 0), 1, Defs.Weapon.CLUB, false)
+	lv.snap_camera()
+	Sim.step(3)
+	assert_true(parked.is_idle() and not lv.get_hero(0).is_idle(), "the lone player and his parked partner")
+	assert_true(keepers[0].is_targetable() and keepers[1].is_targetable(), "both keepers on the view")
+	_play_party("10:UF|,2:|,1:L|,8:F|,12:|", watch, func() -> bool: return keepers[0].last_hit_tick >= 0)
+	_assert_second_hit_refused(keepers[1], keepers[0], "the far Snapper", "the near Snapper")
+	assert_eq(opened[0], 0, "the keepers were never both dead")
+	_play_party("30:|", watch)
+	assert_eq(opened[0], 0, "the door stays shut for one hero")
+	assert_false(keepers[0].dead or keepers[1].dead, "the dead keeper regrew when its window closed")
+	assert_eq(door.risen, 0)
+	# The pair: the same two throws, one each.
+	_clear_throws(lv)
+	lv.reset_entities()
+	_stand(lv, 0, spot, 1, Defs.Weapon.SPEAR)
+	_stand(lv, 1, spot, 1, Defs.Weapon.SPEAR)
+	lv.snap_camera()
+	Sim.step(3)
+	_play_party("10:UF|,2:|,1:|L,8:|F,12:|", watch)
+	assert_true(keepers[0].dead and keepers[1].dead, "one spear each: both keepers fall inside the window")
+	assert_eq([keepers[1].coop_traits().kill_slot, keepers[0].coop_traits().kill_slot], [0, 1],
+			"the far one to P1, the near one to P2")
+	assert_true(keepers[0].coop_traits().sealed and keepers[1].coop_traits().sealed, "the bond is met")
+	assert_eq(keepers[0].coop_traits().slot_refusals + keepers[1].coop_traits().slot_refusals, 0,
+			"nothing glanced this time")
+	assert_true(door.triggered, "the keeper door starts")
+	Sim.step(Tuning.COLUMN_RISE_PERIOD * 4 + 1)
+	assert_eq(door.risen, 4, "and rises")
+	assert_eq(lv.get_cell(19, 29), TileGrid.CH_AIR, "the doorway is open")
+
+
+## The same on w9_l1b_coop 'stormwall' (Expert; the verifier's route w9_l1b_coop.stormwall.expert): the two perched
+## keeper Harriers of the real file, 14 columns apart over the cloud. The lone real hero throws an axe high at the
+## far one and, turned round, one at the near one: 7 ticks apart - the second glances, the door stays shut; with one
+## axe each the pair opens it.
+func test_one_heros_two_axes_in_flight_never_open_the_stormwall_and_the_pairs_do() -> void:
+	var lv: Level = _real_level(&"w9_l1b_coop", Defs.Difficulty.EXPERT)
+	var keepers: Array[EnemyBase] = _keepers(lv, &"storm")
+	var door: RisingColumn = _door(lv, RisingColumn.Drive.KEEPERS, &"storm")
+	assert_eq([keepers[0].spawn_pos, keepers[1].spawn_pos], [Vector2i(3176, 160), Vector2i(3400, 160)],
+			"the perched keepers of the file (cells 198,9 and 212,9)")
+	var spot: Vector2i = Vector2i(3246, 192)
+	var opened: Array[int] = [0]
+	var watch: Callable = func() -> void:
+		if door.triggered or CoopTraits.keepers_done(lv, &"storm"):
+			opened[0] += 1
+	_stand(lv, 0, spot, 1, Defs.Weapon.AXE)
+	_stand(lv, 1, spot - Vector2i(25, 0), 1, Defs.Weapon.CLUB, false)
+	lv.snap_camera()
+	Sim.step(3)
+	assert_true(keepers[0].is_targetable() and keepers[1].is_targetable(), "both keepers on the view")
+	_play_party("10:UF|,2:|,1:L|,10:UF|,10:|", watch, func() -> bool: return keepers[0].last_hit_tick >= 0)
+	_assert_second_hit_refused(keepers[1], keepers[0], "the far keeper", "the near keeper")
+	assert_eq(keepers[0].sim_pos, Vector2i(3176, 160), "the near one sits on its perch untouched")
+	_play_party("30:|", watch)
+	assert_eq(opened[0], 0, "the stormwall's door stays shut for one hero")
+	assert_false(keepers[0].dead or keepers[1].dead, "the dead keeper is back on its perch")
+	_clear_throws(lv)
+	lv.reset_entities()
+	_stand(lv, 0, spot, 1, Defs.Weapon.AXE)
+	_stand(lv, 1, spot, 1, Defs.Weapon.AXE)
+	lv.snap_camera()
+	Sim.step(3)
+	_play_party("10:UF|,2:|,1:|L,10:|UF,10:|", watch)
+	assert_true(keepers[0].dead and keepers[1].dead, "one axe each: both keepers fall inside the window")
+	assert_true(keepers[0].coop_traits().sealed and keepers[1].coop_traits().sealed, "the bond is met")
+	assert_true(door.triggered, "the stormwall's door starts")
+	Sim.step(Tuning.COLUMN_RISE_PERIOD * 4 + 1)
+	assert_eq(door.risen, 4, "and rises")
+
+
+## The twin drums of w4_l2_coop 'drums' (Expert; the verifier's route found_w4_l2_coop__drums__1: "two axes thrown in
+## one jump between the drums land inside the window, the bond succeeds"): the lone real hero throws a spear at drum B
+## by the keep tower and, turned round, one from a jump at drum A on its ledge - they strike 8 ticks apart, inside the
+## window: B is lit and A stays DARK (the hero who lit every other drum cannot light the last). The portcullis stays
+## down. With one spear each the pair's bond succeeds and the door rises.
+func test_one_heros_two_spears_in_flight_never_light_both_drums_and_the_pairs_do() -> void:
+	var lv: Level = _real_level(&"w4_l2_coop", Defs.Difficulty.EXPERT)
+	var door: RisingColumn = _door(lv, RisingColumn.Drive.DRUMS, &"spikes")
+	var drum_a: Drum = null
+	var drum_b: Drum = null
+	for entity: SimEntity in lv.get_tagged(&"bond", &"spikes"):
+		var drum: Drum = entity as Drum
+		if drum != null and drum.cell == Vector2i(155, 22):
+			drum_a = drum
+		elif drum != null and drum.cell == Vector2i(141, 26):
+			drum_b = drum
+	assert_true(drum_a != null and drum_b != null, "the twin drums of the file (cells 155,22 and 141,26)")
+	var window: int = drum_a.bond_drums(lv)[0].window_ticks()
+	assert_eq(window, PartyTuning.WINDOW_TICKS_EXPERT)
+	var spot: Vector2i = Vector2i(2440, 432)
+	_stand(lv, 0, spot, -1, Defs.Weapon.SPEAR)
+	_stand(lv, 1, spot - Vector2i(25, 0), 1, Defs.Weapon.CLUB, false)
+	lv.snap_camera()
+	Sim.step(3)
+	var lit_both: Array[int] = [0]
+	_play_party("8:F|,6:|,1:R|,4:U|,8:F|,6:|", func() -> void:
+		if drum_a.lit and drum_b.lit:
+			lit_both[0] += 1, func() -> bool: return drum_a.hits > 0)
+	assert_eq([drum_b.hits, drum_a.hits], [1, 1], "both spears struck their drums")
+	var gap: int = drum_a.last_hit_tick - drum_b.last_hit_tick
+	assert_true(gap > 0 and gap < window, "%d ticks apart: inside the %d-tick window" % [gap, window])
+	assert_true(drum_b.lit, "drum B is lit: his first hit opened the window")
+	assert_false(drum_a.lit, "drum A stays dark: the same hero lit the other one")
+	assert_eq([drum_a.refused, drum_b.refused], [1, 0], "refused by the slot rule")
+	assert_eq(lit_both[0], 0)
+	assert_false(Drum.bond_succeeded(lv, &"spikes"))
+	Sim.step(window + 4)
+	assert_false(drum_a.lit or drum_b.lit, "the window closed: both dark again")
+	assert_false(door.triggered, "the portcullis stays down for one hero")
+	# The pair: P1's spear at drum B, P2's from his jump at drum A.
+	_clear_throws(lv)
+	lv.reset_entities()
+	_stand(lv, 0, spot, -1, Defs.Weapon.SPEAR)
+	_stand(lv, 1, spot, -1, Defs.Weapon.SPEAR)
+	lv.snap_camera()
+	Sim.step(3)
+	_play_party("8:F|,6:|,1:|R,4:|U,8:|F,6:|", Callable(), func() -> bool: return drum_a.hits > 1)
+	assert_eq([drum_b.struck_by, drum_a.struck_by], [1, 2], "B by P1, A by P2")
+	assert_true(Drum.bond_succeeded(lv, &"spikes"), "one spear each: the bond succeeds")
+	Sim.step(2)
+	assert_true(door.triggered, "and the portcullis rises")
+	Sim.step(Tuning.COLUMN_RISE_PERIOD * 4 + 1)
+	assert_eq(door.risen, 4)
+
+
+## `first` died to the lone hero's first throw; his second hit `second` inside the window and glanced.
+func _assert_second_hit_refused(first: EnemyBase, second: EnemyBase, first_name: String, second_name: String) -> void:
+	var window: int = first.coop_traits().group_window()
+	assert_true(first.dead, "%s fell to his first throw" % first_name)
+	assert_eq(first.coop_traits().kill_slot, 0, "credited to P1")
+	var gap: int = second.last_hit_tick - first.last_hit_tick
+	assert_true(first.last_hit_tick >= 0 and gap > 0 and gap < window,
+			"his second throw hit %s %d ticks later, inside the %d-tick window" % [second_name, gap, window])
+	assert_eq(second.last_hit_slot, 0)
+	assert_false(second.dead, "%s lives: the hit glanced" % second_name)
+	assert_eq(second.hp, second.max_hp, "without damage")
+	assert_eq(second.coop_traits().slot_refusals, 1, "turned away by the slot rule")
+	assert_false(first.coop_traits().sealed or second.coop_traits().sealed)
+
+
+## The enemies of keeper group `group` of a real level, left to right.
+func _keepers(lv: LevelBase, group: StringName) -> Array[EnemyBase]:
+	var keepers: Array[EnemyBase] = []
+	for entity: SimEntity in lv.get_tagged(&"keeper", group):
+		keepers.append(entity as EnemyBase)
+	keepers.sort_custom(func(a: EnemyBase, b: EnemyBase) -> bool: return a.spawn_pos.x < b.spawn_pos.x)
+	return keepers
+
+
+## The door (objects/column) of drive `drive` whose trigger names `group`.
+func _door(lv: LevelBase, drive: int, group: StringName) -> RisingColumn:
+	for entity: SimEntity in lv.get_kind(Defs.Kind.OTHER):
+		var column: RisingColumn = entity as RisingColumn
+		if column != null and column.drive == drive and column.group == group:
+			return column
+	return null
+
+
+## The real hero of `slot` at `pos` (feet) facing `face` with `weapon` in hand; `plays` false: his player never
+## pressed anything (PlayerBase.is_idle from his first tick on).
+func _stand(lv: LevelBase, slot: int, pos: Vector2i, face: int, weapon: int, plays: bool = true) -> PlayerBase:
+	var hero: PlayerBase = lv.get_hero(slot)
+	hero.respawn_at(pos)
+	hero.facing = face
+	hero.run.set_weapon(weapon)
+	hero.gave_input = plays
+	hero.input_idle_ticks = 0
+	hero.idle = not plays
+	return hero
+
+
+## Play the party script `text` ("ticks:P1 keys|P2 keys,...") tick by tick; `each` is called after every tick, and the
+## script ends early on the tick after which `stop` holds.
+func _play_party(text: String, each: Callable = Callable(), stop: Callable = Callable()) -> void:
+	var streams: Array[PackedInt32Array] = Autoplay.parse_inputs_multi(text)
+	var first: int = Sim.tick + 1
+	for slot: int in streams.size():
+		var flags: PackedInt32Array = streams[slot]
+		GameInput.set_scripted_slot(slot, func(tick: int) -> int:
+			var index: int = tick - first
+			return flags[index] if index >= 0 and index < flags.size() else 0)
+	for i: int in streams[0].size():
+		Sim.step(1)
+		if each.is_valid():
+			each.call()
+		if stop.is_valid() and stop.call():
+			break
+	GameInput.clear_scripted()
+
+
+## Every thrown weapon still in the level is used up (before a reset: a stuck spear is no part of the next try).
+func _clear_throws(lv: LevelBase) -> void:
+	for entity: SimEntity in lv.get_kind(Defs.Kind.HERO_PROJECTILE).duplicate():
+		var shot: ProjectileBase = entity as ProjectileBase
+		if shot != null:
+			shot.consume()
+
+
+## The real level `level_id` (its scene, its records) with a co-op party of two real heroes whose players are at
+## their pads (PlayerBase.gave_input); the flat fixture level is dropped.
+func _real_level(level_id: StringName, difficulty: int) -> Level:
+	if _level != null and is_instance_valid(_level):
+		_level.free()
+	_level = null
+	_was_manual = Sim.manual
+	Sim.manual = true
+	Game.start_run(difficulty, Defs.GameMode.COOP, 2)
+	Game.begin_level(level_id)
+	var made: Level = (load(Flow.LEVEL_SCENE) as PackedScene).instantiate() as Level
+	made.setup_from_text(level_id, FileAccess.get_file_as_string(Levels.get_level_path(level_id)))
+	add_node(made)
+	made.set_view_size(Vector2i(Tuning.VIEW_W, Tuning.VIEW_H) * Tuning.ART_SCALE)
+	for who: PlayerBase in made.contact_order():
+		who.gave_input = true
+	_real = made
+	return made
