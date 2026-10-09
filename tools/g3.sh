@@ -394,6 +394,19 @@ for flow in "${FLOWS[@]}"; do
 	fi
 done
 
+# The gate is the WHOLE list: a run that left a proof out (--only / --skip, a job that wrote no log) never says
+# "reached" - the proofs that did not run are open work, named here (the G3b verifier: `--require --skip=coop_gates`
+# printed "G3: REACHED" with no gate searched).
+NOT_RUN=()
+for job in inventory default slow_tests campaign_routes book2_routes coop_routes "${MORE_SLOW[@]}" versus_bots 		sp_identity spec_docs; do
+	[ -f "$RUN/$job.log" ] || NOT_RUN+=("$job")
+done
+[ -f "$RUN/coop_gates_0.log" ] || NOT_RUN+=("coop_gates")
+for flow in "${FLOWS[@]}"; do
+	[ -f "$RUN/flow_$flow.log" ] || NOT_RUN+=("flow_$flow")
+done
+[ ${#NOT_RUN[@]} -gt 0 ] && OPEN+=("not run: ${NOT_RUN[*]}")
+
 if [ ${#RED[@]} -eq 0 ] && [ ${#OPEN[@]} -eq 0 ]; then
 	VERDICT="G3: REACHED - every proof green, the content complete"
 	CODE=0

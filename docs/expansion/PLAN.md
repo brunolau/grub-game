@@ -376,6 +376,29 @@ route of 6-2b in co-op still loses P2 to the leash three times in the climb (its
 validator rule for G67's clean foot or G70's one-way ledges (the search is their proof); the human pair playtests
 of P4.5.
 
+**The G3b verification (2026-10-09, the adversarial verifier's record; `build/engine_requests/wf10_g3b_verify_to_*.txt`)**.
+**Gate G3 is NOT passed.** Everything the table of `run_g3b_final1` ran was re-run and is green (run dir
+`build/g3/run_g3bv_a` beside an uncached search of all 76 gate rows at 3x the bounds, one gate per process: 59
+exhaustive, 17 bounded with every probe, none open - `build/g3bv/deep_verdicts_3x.txt`), and none of 60 one-player
+replays of the eight co-op bosses beats one. But the search's refusals are refusals of its own moves: a
+continuous-play explorer in the same search world (`build/g3bv/explore.gd`: nothing reset between moves, the whole
+level, 300 s per gate row) brings **one hero to the far cell of 12 of the 45 gates - 19 of the 76 rows, in 9 of the
+23 gated files** - each a route that replays in a fresh process (`build/g3bv/evidence/`,
+`bash build/g3bv/verify_evidence.sh`), 'dune' of 7-1 also in the real game with P2's slot quiet. By cause:
+(A) an Up bounce on an enemy he wakes, leads or meets at the gate - `w7_l1_coop` 'dune' (the lone gull 22 columns
+back; the rebuilt dune holds against the hop jump only), `w1_l1_coop` 'hop' (Expert), `w3_l2_coop` 'drive' and
+'floes', `w6_l1_coop` 'root', `w7_l2_coop` 'dark_gap' (Expert), `w9_l2_coop` 'drive', `w9_l1b_coop` 'stormwall';
+(B) the hop jump begun on a spring: 256 px, 16 rows, off every pad and cap - `w2_l2_coop` 'seesaw';
+(C) a bond broken by two hits in flight (a special thrown at the far member, the near one hit as it lands) -
+`w5_l2_coop` 'rattlers', 'stormwall', and the drum bond of `w4_l2_coop` 'drums';
+(D) a climb the search cannot play (a vine longer than its 96-tick move) - `w7_l1_coop` 'stack' from the warp stack;
+(E) through a closed one-cell keeper door from the keeper's head - `w9_l2_coop` 'brace'.
+Four more rows were reached once and do not replay (the search world's reset is not exact: `w6_l2_coop` 'seesaw'
+and 'caps', `w2_l2_coop` 'lift', 'drums'); the other 53 rows did not fall to 600 explorer-seconds on two seeds. The remedies are rulings
+(the big bounce of a lone hero, a spring as a launch, slot-bound bonds, one-cell doors) and designers' files, not a
+verifier's edits: nothing but `tools/g3.sh` was changed (a run that leaves proofs out no longer prints "REACHED").
+The next G3 needs every route of `build/g3bv/evidence` to fail and the explorer beside the search in the gate test.
+
 ---
 
 ## 7. Phase 4 - QA and release 2.0
