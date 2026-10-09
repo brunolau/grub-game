@@ -305,6 +305,9 @@ func test_the_g3_command_runs_every_slow_module() -> void:
 	# G50: human-only (arena, mode) cells are neither green nor red.
 	assert_true(text.contains("human-only (cut 4)"), "the G3 table lists human-only cells")
 	assert_true(text.contains("tools/sp_identity.sh"), "the single-player identity check (V1)")
+	# Every level file through the validator, strict, and the headless boot check have rows of their own (G3c).
+	assert_true(text.contains("res://tools/validate_levels.gd -- --strict"), "the validator, strict")
+	assert_true(text.contains("bash $GD smoke"), "the boot check")
 	assert_true(text.contains("test integration_g3"), "the content inventory")
 	for flow: String in ["campaign", "campaign_beginner", "campaign_b2", "campaign_coop", "g3_versus", "harness_exit"]:
 		assert_true(FileAccess.file_exists("res://tools/autoplay/%s.flow" % flow), "%s.flow exists" % flow)

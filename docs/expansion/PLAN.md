@@ -422,6 +422,39 @@ the engine rules built, 20 of the 24 routes say "not reached" or "DIED" in fresh
 (`build/lead_design/after3/`); the four that still reach are the level-file work of the Levels phase: 7-1 'stack'
 (Expert), 1-1 'hop' until its `ward=22,12`, and 9-2 'drive' on both difficulties.
 
+**The G3c integration (2026-10-09, after every other agent of the round had closed)**. At world-B's close the three
+proofs stood at 64 of 76 rows green and 12 red, each red row with a route that replays; nine of the twelve were
+finds of the round's own explorer, and two causes among them had no rule: a coil's "own level" was met in
+mid-air (a special thrown at the top of a jump from a ledge below unrolled it - 2-2 and 6-2 'seesaw'), and one
+hero killed both keeper Shellbacks of 5-1 'gully' with a special thrown from on top of them or from inside them.
+The Levels phase closed all twelve in the level files (13 files: the wards of nine tablets widened until the
+validator named no top, a stalactite and a rock roof over the two see-saw cap ledges, the foot of 2-2's x2 bone
+ledge cleared, the gully's keepers a slot-bound bond of two tortoises, 7-1's warp stack six columns left, 9-2's
+drive gap 13 cells with a slab of 9) and re-recorded 21 co-op routes. Built by the integrator, for the owners who
+did not run, and recorded as DESIGN.md **G81-G83**:
+- **the coil is opened by a hero who stands on its level** (G81; `scripts/objects/vine.gd`): the hitter's feet and
+  the ground he last stood on are at most one row under the coil's ledge; a batted ball is its own delivery and
+  must count. `test_objects_book2` +2 (the real hero's jump from a shelf 3 rows under the ledge is never a hit
+  from its level in a co-op file, always in a solo file);
+- **over a shield there is no behind** (G82; `scripts/enemies/coop_traits.gd`): a `shell` is hurt only by a hero
+  who stands clear of its body on the side its shield does not face - the thrower's place decides for a thrown
+  weapon. `test_enemies_coop` +1, red without the rule; both explorer routes of the gully, replayed on the level
+  file of before the rebuild, reach the far cell without the rule and end dead with it;
+- **the `grab` trait in a ward** (G73, decided by the lead designer, built now): a Snatcher does not seize a hero
+  whose feet column is in a ward and lets go of one it carries at the ward's edge. `test_enemies_coop` +1, red
+  with the ward switched off;
+- `bond=` on a zone-spawner record is a validator error (3-2 'pits' is clean); the slow list holds 17 tests (V7);
+- **`tools/g3.sh` runs the gate job as the three proofs** (V3.c "As wired"), has a row for the co-op bosses
+  (V3.d), plays `g3_versus.flow` headless and the five play flows windowed; the versus builder's fairness tool
+  and the flow's generator are versioned (`tools/bots/fair.sh`, `tools/autoplay/gen_versus_flow.py`);
+- every wf11 request file has its reply (`build/engine_requests/wf11_*`); the lead designer's open questions of the
+  Levels phase are ruled in G83 (the wards as built, the partial bridge of 9-2, the gully as a bond, the Roller
+  left out, the tick base 17 952, the 33-route evidence set).
+The 57 co-op route runs replay unchanged with the three rules (`test_coop_routes` 10 / 10), and
+`tools/sp_identity.sh` is IDENTICAL.
+
+G3C_RUN_RECORD
+
 ---
 
 ## 7. Phase 4 - QA and release 2.0
@@ -482,9 +515,12 @@ c. Requiredness: `tests/test_coop_gates.gd` runs the solo-impossibility search o
    (1) **the solo search refuses it**, as above: exhaustive, or bounded with every probe - on an exact reset (tick
        base 0, the total-tick clock put back per run; a run that missed replays is bounded and says so), with the
        long climb (a hero at rest on a vine is a node) and, in a file with a `wind` script, the wind's phases (G79);
+       as built the base is the same in every run and process but not 0: 17 952, a common multiple of the levels'
+       cycle lengths, so that no geyser is "before its delay" at a move's start (DESIGN.md G77 "As built at G3c");
    (2) **every route of the evidence set says "not reached"** - the replayable routes by which a gate once fell
        (the G3b verifier's 21, the two gust routes of G79 and the 'hop' route of G73: 24), versioned under `tools/`, each replayed in a fresh
-       process; the set only grows;
+       process; the set only grows (33 at the close of the round: nine finds of its own explorer joined,
+       `tools/coop_explore/evidence/`);
    (3) **the continuous-play explorer** - versioned under `tools/`, with the lure, ride, strike-on-spring,
        long-climb and second-throw moves and an exact world reset - **opens it in none of two seeded passes of
        300 s** per gate row over the whole level.
@@ -494,10 +530,24 @@ c. Requiredness: `tests/test_coop_gates.gd` runs the solo-impossibility search o
    of the bar: a route found outside it joins the evidence set for the next round. The causes the G3b routes used
    are closed by rule (G71-G76) or by a building rule (G74, G79), and the window checks named above ("below the
    measured solo minimum minus 4 ticks", the one-throw build error of G36) are no longer proof obligations: a bond
-   is slot-bound (G72).
+   is slot-bound (G72). Two causes the round's own explorer found inside the bar are closed by rule as well: a
+   coil is opened only by a hero who stands on its level (G81), and a `shell` is hurt only by a hero behind it
+   (G82).
+   **As wired** (the G3c integration): the `coop_gates` job of `tools/g3.sh` is `tools/world_coop_gates.sh` - the
+   search workers and the explorer's two passes of every row side by side, then the evidence set, then the test,
+   which reads all three back - and it runs **first and alone**: a pass is 300 s of wall time, so every process
+   that shares the cores takes ticks from it (each row prints the ticks its passes played). The row of the table
+   reads "n / 76 gate rows GREEN by the three proofs (R7): (a) e exhaustive, b bounded + probes; (b) the evidence
+   step's line; (c) the explorer step's line"; a RED row is printed with its three proofs and its route file, an
+   unproven row (a proof that did not run) is open work. Kept results are keyed by the level file and the
+   simulation's code: any change of a script, scene or resource of the simulation makes every row stale (51
+   minutes for the whole job on this 12-core desktop; a rerun on an unchanged tree reads everything back in a few
+   minutes).
 d. Bosses: each `test_enemies_<boss>.gd` asserts the co-op form is not beatable by the single-hero search - one hero
    plus an idle hatched partner placed anywhere he could be hatched (G33) - runs the fairness checks per hero, and pins
-   every weak point at least 72 px under the locked view's top (DESIGN.md B.0 [G35]).
+   every weak point at least 72 px under the locked view's top (DESIGN.md B.0 [G35]). The gate table has a row for
+   it since G3c ("co-op bosses (V3.d)": the eight forms by test name - Brute, Tusker, Inkjaw and Mangrove in the
+   default suite, the Rival Chieftains, the Colossus, the Twin Idols and the Storm Roc among the slow tests).
 e. `test_core_doze.gd` extended: a two-hero route with and without dozing; no dozing entity within reach of any hero
    or inside any view.
 
@@ -510,7 +560,8 @@ b. `tests/test_versus_bots.gd` (slow module): four Hunter bots finish a round on
    the seeded set; a match log replays to identical digests. The module's 48-round sets (12 seeds x 4 rounds) are
    the deterministic regression pin; a fairness claim for an (arena, mode) - after an arena or a bot change, and
    for the release - is made on at least 384 rounds (DESIGN.md G80: at 48 rounds a fair spawn's share has a
-   standard deviation of 6 points; Sky Picnic's Grub Stack measured +17.7 there and is P4's to bring inside).
+   standard deviation of 6 points; Sky Picnic's Grub Stack measured +17.7 there and is P4's to bring inside) with
+   `bash tools/bots/fair.sh <tag> <arena> <mode> 0 96` (the versus builder's tool, versioned at G3c).
 c. Rounds end (the orchestrator's R8; DESIGN.md G78): `tests/test_versus_rules.gd` proves that a Last Caveman
    Standing round between heroes who never meet ends at the hard cap - `VersusTuning.SUDDEN_DEATH_CAP_TICKS`, 1 457
    ticks after its sudden death starts - with the side that took the fewest hurts as the winner, else a draw; no
@@ -542,7 +593,11 @@ no longer has fails the run. A test goes on that list only if it shares no costl
 file - otherwise the whole file is a slow module. `tools/g3.sh` also runs the lead designer's
 `docs/spec/test_spec_docs.py` (job `spec_docs`: a failure is red; every test skipped as "pending owner change: ..."
 is listed as "not built: ..." - open work, so those texts stay one line) and `tools/autoplay/harness_exit.flow` (a
-harness run must leave the engine without leak reports).
+harness run must leave the engine without leak reports). Since the G3c integration `SLOW_TESTS` also holds
+`test_hero_bot_bodies_move_on_hero_physics` (16.5 s alone, versus' measurement) and
+`test_search_hop_jump_reaches_six_rows_not_seven` (12-15 s, two real searches): 17 slow tests; and `tools/g3.sh`
+plays `tools/autoplay/g3_versus.flow` beside the campaign flows, and the five play flows a second time
+**windowed** (`gd.sh play`: a real window, off-screen and muted - jobs `wflow_<flow>`).
 
 ---
 

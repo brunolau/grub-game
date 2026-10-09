@@ -1456,6 +1456,81 @@ class CausesByRule(unittest.TestCase):
         self.assertRegex(level, r"(?m)^objects/x2_tablet .*\bgate=drive\b")
 
 
+class G3cIntegration(unittest.TestCase):
+    """[G81]-[G83] the G3c integrator's records: the coil asks where the hitter stands, over a shield there is no
+    behind, the Levels phase and the gate job as built."""
+
+    APPENDIX = DESIGN[DESIGN.index("## Appendix: G1 and phase-2 resolutions"):]
+
+    def _row(self, n):
+        rows = [line for line in self.APPENDIX.splitlines() if line.startswith("| G%d |" % n)]
+        self.assertEqual(len(rows), 1, "one row G%d" % n)
+        self.assertEqual(rows[0].count(" | "), 3, "G%d is one table row of four cells" % n)
+        return rows[0]
+
+    def test_the_rows(self):
+        for n, texts in (
+                (81, ("**standing there**", "`last_ground_y <= top + 16`", "**A batted ball is its own delivery**",
+                      "2-2 'seesaw'", "6-2 'seesaw'")),
+                (82, ("hurt only by a hero who is **behind** it", "**on** it or **in** it", "`w5_l1_coop` 'gully'",
+                      "`_shell_faces_hitter`")),
+                (83, ("**`ward=` until no top is named**", "1-1 'hop' 34,12", "at most 9 cells from the near lip**",
+                      "**error**", "**Left for phase 4**"))):
+            row = self._row(n)
+            for text in texts:
+                self.assertIn(text, row, "G%d" % n)
+        self.assertIn("**As built at G3c**", [l for l in self.APPENDIX.splitlines() if l.startswith("| G77 |")][0])
+        self.assertIn("**17 952**", [l for l in self.APPENDIX.splitlines() if l.startswith("| G77 |")][0])
+        self.assertIn("**33 routes**", [l for l in self.APPENDIX.splitlines() if l.startswith("| G77 |")][0])
+
+    def test_the_documents(self):
+        self.assertIn("**By a hero who stands there** [G81]", _section(APPENDIX_C, "### C.4"))
+        self.assertIn("- **Over a shield there is no behind** (co-op only) [G82]", _section(APPENDIX_C, "### C.10"))
+        gates = _section(LEVEL_DESIGN_15, "#### 15.7.3")
+        self.assertIn("**A coil is opened by a hero who stands on its level** [G81]", gates)
+        self.assertIn("**A slab bridge over a gust gap spans at most 9 cells from the near lip** [G83]", gates)
+        self.assertIn("**As built: `ward=` until no top is named** [G83]", _section(LEVEL_DESIGN_15, "#### 15.7.4"))
+        self.assertIn("- **`shell`: over a shield there is no behind** [G82]", _section(LEVEL_DESIGN_15, "#### 15.7.5"))
+        self.assertIn("**The G3c integration", PLAN)
+
+    def test_the_rules_in_code(self):
+        vine = _read("scripts/objects/vine.gd")
+        self.assertIn("hero.last_ground_y <= level_y", vine)
+        self.assertIn("hero.counts_for_coop()", vine)
+        traits = _read("scripts/enemies/coop_traits.gd")
+        self.assertIn("func _shell_faces_hitter", traits)
+        self.assertIn("func _warded", traits)
+        self.assertRegex(_read("scripts/world/level_validator.gd"),
+                         r'SPAWNER_IDS\.has\(id\):\s+_add\(data\.path, int\(record\["line"\]\), ERROR')
+
+    def test_the_wards_in_the_files(self):
+        for level_id, gate, left, right in (("w1_l1_coop", "hop", 34, 12), ("w1_l2_coop", "treehouse", 12, 62),
+                                            ("w2_l2_coop", "lift", 26, 12), ("w2_l2_coop", "seesaw", 45, 12),
+                                            ("w4_l1_coop", "cliff", 12, 29), ("w5_l2_coop", "sandgate", 12, 21),
+                                            ("w7_l1_coop", "stack", 38, 12), ("w8_l1_coop", "stairs", 23, 12),
+                                            ("w9_l1_coop", "pulley", 12, 17)):
+            tablet = _tablet(level_id, gate)
+            self.assertIsNotNone(tablet, "%s '%s'" % (level_id, gate))
+            self.assertEqual(tablet[2:], (left, right), "%s '%s': ward= as recorded in [G83]" % (level_id, gate))
+
+    def test_the_gully_is_a_bond_and_no_zone_spawner_carries_one(self):
+        gully = _read("levels/w5_l1_coop.lvl")
+        self.assertEqual(len(re.findall(r"(?m)^enemies/walker .*\bbond=gully\b.*\bkeeper=gully\b", gully)), 2)
+        for path in sorted(glob.glob(os.path.join(ROOT, "levels", "*_coop.lvl"))):
+            text = _read("levels/" + os.path.basename(path))
+            self.assertIsNone(re.search(r"(?m)^enemies/(leaper|dropper|digger) .*\bbond=", text),
+                              os.path.basename(path))
+
+    def test_the_gate_command_runs_the_three_proofs(self):
+        g3 = _read("tools/g3.sh")
+        for text in ("bash tools/world_coop_gates.sh", "COOP_GATES_TOGETHER=1", "gate rows GREEN by the three proofs",
+                     "co-op bosses (V3.d)", "wflow_", "validate_levels --strict", "smoke (boot)"):
+            self.assertIn(text, g3)
+        for tool in ("tools/bots/fair.sh", "tools/bots/fair.gd", "tools/bots/fair_runner.gd",
+                     "tools/autoplay/gen_versus_flow.py"):
+            self.assertTrue(os.path.isfile(os.path.join(ROOT, tool)), tool)
+
+
 class SuiteBudget(unittest.TestCase):
     """PLAN 8 V7 names every slow module of tests/run_tests.gd and the rule of the single slow tests."""
 

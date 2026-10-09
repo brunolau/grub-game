@@ -1115,7 +1115,12 @@ keepers carry a keeper hall.
    ward** [G73] (around every x2 tablet no enemy gives lift, rest, carry or a pogo); **a closed door passes nobody**
    [G75]; **an idle hero is no anchor** [G76]. Two causes stay building rules: **the long drop** [G74] (a standing
    place h rows over a gate's ledge lies more than 10 + h / 2 cells from it, or the ledge is roofed) and **the gust
-   jump** [G79] (in a windy file a gap gate is 12 cells, or its far lip is raised).
+   jump** [G79] (in a windy file a gap gate is 12 cells, or its far lip is raised). Two more causes, found by the
+   round's own explorer inside the bar, are closed by rule since the G3c integration: **a coil is opened by a hero
+   who stands on its level** [G81] (the top of a jump from a place below is not the coil's level) and **over a
+   shield there is no behind** [G82] (a `shell` is hurt only by a hero who stands clear of it on its far side; a
+   special thrown from on top of it or from inside it glances). How the Levels phase built the wards and the gust
+   gap is [G83].
    **The proof of a gate is three things** [G77], and the bar is fixed: (a) the solo search refuses it - exhaustive,
    or bounded with every probe (#3); (b) every route of the evidence set - the replayable routes by which a gate
    once fell, versioned under `tools/` - says "not reached"; (c) the continuous-play explorer, versioned under

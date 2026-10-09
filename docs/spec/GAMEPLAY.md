@@ -901,7 +901,9 @@ ever needed** on a main path; specials open shortcuts, secrets and paintings (13
   off. A climber is held by his vine, so vines are climbed from rafts, spear steps and lifts [G8]. **Rolled vines** lie
   coiled on a ledge until one strike unrolls them (they stay unrolled); in a co-op file only a strike from the
   coil's own level counts - a hero whose feet are at most one row under its ledge - so the drop gift of a boost
-  ledge cannot be struck down from the floor below [G67].
+  ledge cannot be struck down from the floor below [G67] - nor from the top of a jump or a bounce: the coil is
+  opened by a hero who **stands** on its level (the ground he last stood on counts, not where a jump took his
+  feet) [G81].
 - **Tar** `:` (P-C.5): the hero sinks 6 px, wades at 2 px/tick and only hops (33 px; on the tar itself the hop lands
   on tick 16, 32 px out); ground enemies are slowed the same way; dropped items stop dead. The tar rules end at his next
   landing or when anything but his own hop throws him up (a geyser, a bounce, a launch, a hurt) [G8]. `~` of
@@ -1345,7 +1347,7 @@ of the enemy records carry a trait, and every enemy guarding a main-path chokepo
 
 | Trait | Rule | Why one hero cannot do it |
 |---|---|---|
-| `shell` | the shield faces the nearer active hero **every tick** (no active hero near: the nearest hatched one); a hit from that side (striker's x, or a projectile flying into the shield; `abs(dx) < 4` counts as front) glances with a clank and a spark; back hits count | one hero is always in front |
+| `shell` | the shield faces the nearer active hero **every tick** (no active hero near: the nearest hatched one); a hit from that side (striker's x, or a projectile flying into the shield; `abs(dx) < 4` counts as front) glances with a clank and a spark; back hits count - **from a hero who is behind it** [G82]: the striker's place, or the thrower's for a thrown weapon, clear of its body on the side its shield does not face; a hero on its head or inside its body (in a ward he falls through it) is in front whatever he throws | one hero is always in front |
 | `bond` | records with the same `bond=<name>`: when one dies a window opens; every other record of the bond must die before it closes, or the dead ones **regrow** at their anchors with full hp (a 22-tick regrow, harmless) | its deaths must be credited to **two different heroes who both count**: one hero's hits never meet it, however timed or thrown, and his hit on the last member glances [G72] (before that rule: targets out of one hero's reach within the window [G36]) |
 | `daze` | when any active hero within 48 px (and 32 px vertically) starts a strike, it hops away from him (`xvel` +/-64, `yvel` -96 *(tune)*); it hops over a thrown weapon coming at it within 48 px (`yvel` -128); a head bounce **dazes** it 14 ticks (Beginner) / 12 (Expert); only a dazed one can be hurt, and only by a hero of another slot than the one whose bounce dazed it (his hits glance; slot-bound, so not capped by the solo minimum [G47]); other hits glance | the bouncer cannot hurt his own daze |
 | `heavy` | it is stopped only by a **Brace Wall** (P-C.10), which dazes it 44 ticks with its head open; it is **damaged only while so dazed** (then hits from any side count) - every other hit glances: front, back, from above, thrown, a ball, a bounce [G57]; while it is not so dazed it dies of nothing else either - no kill-all, grenade, feast or mount bite, glider dive [G63] | needs two braced bodies (it runs under a jumping hero, so a lone hero who lands behind it gains nothing) |

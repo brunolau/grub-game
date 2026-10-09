@@ -28,8 +28,12 @@
 # campaign_routes, book2_routes, coop_routes, core_bots, integration_totem_ring, levels_w4, coop_gates,
 # versus_bots, sp_identity, spec_docs (docs/spec/test_spec_docs.py, needs python), flow_campaign,
 # flow_campaign_beginner, flow_campaign_b2, flow_campaign_coop, flow_g3_versus, flow_harness_exit (a clean engine exit
-# after a harness run), and the windowed runs of the five play flows: wflow_campaign, wflow_campaign_beginner,
-# wflow_campaign_b2, wflow_campaign_coop, wflow_g3_versus (one name for all ten: --skip=wflows / --only=wflows).
+# after a harness run), the windowed runs of the five play flows: wflow_campaign, wflow_campaign_beginner,
+# wflow_campaign_b2, wflow_campaign_coop, wflow_g3_versus (one name for all five: --skip=wflows / --only=wflows),
+# validate (tools/validate_levels.gd -- --strict: every level file, errors and warnings both red) and smoke (the
+# headless boot check of gd.sh: the game starts, lists its levels and logs no error or warning).
+# A second call with the same $G3_TAG and --only=<jobs> adds those jobs' logs to the run dir and prints the whole
+# table again from every log in it (how a row that was red for a reason outside the tree is run again).
 #   --jobs=J       jobs at once in stage 2 (default $G3_JOBS, else 12)
 #   --gates-beside the gate job beside the others, not before them
 #   --require      G3 itself (G3_REQUIRE=1 for every job): the inventory rows, every Expert route cell, the campaign
@@ -154,6 +158,9 @@ COOP_GATES_TIMEOUT=7200 bash tools/world_coop_gates.sh $GATE_SEARCHERS"
 	# The lead designer's consistency tests of the specs against the code (docs/spec/test_spec_docs.py): a ruling whose
 	# owner has not built it yet is skipped there with its request named - the table lists each as open work.
 	add spec_docs "$PYTHON -m unittest discover -s docs/spec -p 'test_*.py' -v"
+	# Every level file through the validator, strict (a warning fails it too), and the headless boot check.
+	add validate "GD_TIMEOUT=1200 bash $GD script res://tools/validate_levels.gd -- --strict"
+	add smoke "GD_TIMEOUT=300 bash $GD smoke"
 	add inventory "G3_REQUIRE=$REQUIRE GD_TIMEOUT=600 bash $GD test integration_g3"
 	# --require: every job demands the finished content (inventory rows, Expert route cells, whole campaign runs, every
 	# `need` of the campaign flows).
@@ -295,7 +302,7 @@ if [ -f "$RUN/coop_gates.log" ]; then
 	open_work="$(grep -c '=> OPEN WORK' "$R7ROWS" 2>/dev/null)"; open_work="${open_work:-0}"
 	# (b) and (c) as the worker steps printed them: the routes that still reach, the passes played and their finds.
 	evidence="$(tail -1 "$GATES_DIR/evidence.txt" 2>/dev/null | cut -c1-110)"
-	explore="$(tail -1 "$GATES_DIR/explore.txt" 2>/dev/null | cut -c1-150)"
+	explore="$(tail -1 "$GATES_DIR/explore.txt" 2>/dev/null | sed 's/ ([^()]*passes)$//' | cut -c1-170)"
 	fresh="$(grep -h -E '^== round [0-9]+: ' "$RUN/coop_gates.log" | sed -E 's/^== round [0-9]+: ([0-9]+) gate search.*/\1/' | awk '{s += $1} END {print s + 0}')"
 	text="$green/${gates:-?} gate rows GREEN by the three proofs (R7): (a) $exhaustive exhaustive, $bounded bounded + probes"
 	text="$text ($fresh searched in this run); (b) ${evidence:-evidence step not run}; (c) ${explore:-explorer step not run}"
@@ -423,6 +430,36 @@ elif wanted spec_docs; then
 	row "spec docs (rulings)" "" "not run"
 fi
 
+# The level validator, strict: its last line counts the files, the errors and the warnings; exit 0 only when clean.
+if [ -f "$RUN/validate.log" ]; then
+	last="$(grep "^validate_levels: " "$RUN/validate.log" | tail -1 | sed 's/^validate_levels: //')"
+	if [ -z "$last" ]; then
+		note "validate_levels --strict" "NO RESULT (see $RUN/validate.log)" 1
+	elif [ "$(cat "$RUN/validate.rc" 2>/dev/null)" = "0" ] && [[ "$last" == *" 0 error(s), 0 warning(s)"* ]]; then
+		note "validate_levels --strict" "PASS $last ($(secs validate))" 0
+	else
+		first="$(grep -m1 -E ": (error|warning): " "$RUN/validate.log" | cut -c1-150)"
+		note "validate_levels --strict" "FAIL $last; $first" 1
+	fi
+elif wanted validate; then
+	row "validate_levels --strict" "" "not run"
+fi
+
+# The headless boot check: `Smoke: ran <s> s, <e> error(s), <w> warning(s) logged`.
+if [ -f "$RUN/smoke.log" ]; then
+	last="$(grep "^Smoke: ran " "$RUN/smoke.log" | tail -1 | sed 's/^Smoke: //')"
+	levels="$(sed -n 's/^Smoke: .*, \([0-9]*\) level(s),.*/\1/p' "$RUN/smoke.log" | tail -1)"
+	if [ -z "$last" ]; then
+		note "smoke (boot)" "NO RESULT (see $RUN/smoke.log)" 1
+	elif [ "$(cat "$RUN/smoke.rc" 2>/dev/null)" = "0" ] && [[ "$last" == *" 0 error(s), 0 warning(s) logged"* ]]; then
+		note "smoke (boot)" "PASS $last; ${levels:-?} level(s) listed ($(secs smoke))" 0
+	else
+		note "smoke (boot)" "FAIL $last (see $RUN/smoke.log)" 1
+	fi
+elif wanted smoke; then
+	row "smoke (boot)" "" "not run"
+fi
+
 FLOW_ROWS=()
 for flow in "${FLOWS[@]}"; do FLOW_ROWS+=("flow_$flow"); done
 for flow in "${WFLOWS[@]}"; do FLOW_ROWS+=("wflow_$flow"); done
@@ -460,7 +497,8 @@ done
 # "reached" - the proofs that did not run are open work, named here (the G3b verifier: `--require --skip=coop_gates`
 # printed "G3: REACHED" with no gate searched).
 NOT_RUN=()
-for job in inventory default slow_tests campaign_routes book2_routes coop_routes "${MORE_SLOW[@]}" versus_bots 		sp_identity spec_docs; do
+for job in inventory default slow_tests campaign_routes book2_routes coop_routes "${MORE_SLOW[@]}" versus_bots \
+		sp_identity spec_docs validate smoke; do
 	[ -f "$RUN/$job.log" ] || NOT_RUN+=("$job")
 done
 [ -f "$RUN/coop_gates.log" ] || NOT_RUN+=("coop_gates")

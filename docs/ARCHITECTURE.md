@@ -1820,9 +1820,17 @@ GD_TIMEOUT=5400 bash .tools/gd.sh play --flow=tools/autoplay/campaign_coop.flow 
 ```
 
 Their headless twins: `test_book2_routes` / `test_coop_routes` `test_the_*_campaign_in_one_run`
-(RouteTestCase.play_campaign). Gate G3 in one command: `bash tools/g3.sh` (every slow module - coop_gates sharded,
-versus_bots sharded by `tools/g3_versus_bots.sh` - the default suite, sp_identity, the campaign flows headless and the
-content inventory `tests/test_integration_g3.gd` -> the G3 table; header in the file).
+(RouteTestCase.play_campaign). Gate G3 in one command: `bash tools/g3.sh` (header in the file) -> the G3 table. Since
+the G3c integration it has two stages. Stage 1, alone: the `coop_gates` job, the three proofs of every x2 gate row
+(PLAN.md 8 V3.c "The fixed bar") through `tools/world_coop_gates.sh` - search workers and the continuous-play
+explorer's two passes of 300 s per row side by side (`tools/coop_explore/`), the evidence set, then
+`tests/test_coop_gates.gd`, which reads all three back; about 51 minutes on 12 cores, a few minutes when nothing of
+the simulation or the levels changed since the kept results. Stage 2: every other slow module (versus_bots sharded
+by `tools/g3_versus_bots.sh`), the slow tests, the default suite, sp_identity, the spec tests, the content inventory
+`tests/test_integration_g3.gd`, the campaign flows and `g3_versus.flow` headless, and the five play flows again
+windowed (`gd.sh play`, off-screen and muted). Development tools versioned beside it: `tools/bots/fair.sh` (a
+fairness claim over 384 bot rounds, PLAN.md 8 V4.b) and `tools/autoplay/gen_versus_flow.py` (writes
+`g3_versus.flow` from the arena files).
 
 **Headless flows and the view** (P2.6 investigation, core-A): a flow run headless (`scripts/core/dev/
 headless_flow.gd`) must give every level the view of a window. The headless display server keeps a window of its own
