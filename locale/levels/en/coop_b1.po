@@ -12,6 +12,10 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 
 # --- w1_l1_coop Vine Bridges (co-op) ---
+# The solo SIGN_W1_BOUNCE with the ward's exception (wf12, DESIGN G85): in co-op a marked beast gives no bounce.
+msgid "SIGN_COOP_W1_BOUNCE"
+msgstr "Hold Jump as you land on a head to bounce high - unless it is marked!"
+
 msgid "SIGN_COOP_W1_EGG"
 msgstr "Fall or get hit and you float in an egg. Whack it to hatch!"
 

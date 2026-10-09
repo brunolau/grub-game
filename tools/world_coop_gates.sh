@@ -29,15 +29,15 @@
 #  4. THE TEST - `bash .tools/gd.sh test coop_gates` asserts every row from the kept results and prints its `R7` and
 #     `GATE` line. The test is the verdict; the pool only does the work early.
 #
-# TIME on this 12-core / 24-thread desktop. The bar fixes the work: 152 passes of 300 s of wall time (306 s a
-# process: 12.9 process-hours) and 4.9 hours of search under that load (76 searches, the dearest 26 minutes; G3c's
-# durations) - 64 300 process-seconds, so 24 processes cannot end before 44.9 minutes (this pool's schedule on those
-# durations: 2 696 s; with the two plans and the test about 46). The two fixed groups of wf11 took 51 (3 050 s: the
-# 6 search workers 2 990 s beside 18 explorers, then a round of 76 processes that only read the cache back, the
-# evidence, the test). "ABOUT 40 MINUTES" IS NOT REACHED WITHOUT WEAKENING PROOF (c): 28 processes on the 24 threads
-# would end in 39 minutes (COOP_GATES_SLOTS=28), and every pass would play about a seventh fewer ticks (a pass is
-# wall time). The default stays one process per thread; every run prints the ticks its passes played (G3c: 0.88 to
-# 1.93 million a pass, median 1.30), so a run on a loaded machine shows what it is worth.
+# TIME on this 12-core / 24-thread desktop: 46 MINUTES 37 SECONDS, measured alone (2026-10-09 18:21, --fresh:
+# 2 796 s - the plans and the pool 2 781 s, the test and the tables 15 s); 51 minutes before wf12. The bar fixes the
+# work: 152 passes of 300 s of wall time (306 s a process: 12.9 process-hours) and 5 hours of search beside them (76
+# searches, the dearest 26 minutes) - 65 500 process-seconds, so 24 processes cannot end before 45 minutes.
+# "ABOUT 40 MINUTES" IS NOT REACHED WITHOUT WEAKENING PROOF (c): a pass is wall time, so the only way under 45 is
+# more processes than threads (COOP_GATES_SLOTS=28 would end in about 40), and then every pass plays about a
+# seventh fewer ticks. The default stays one process per thread, and every run prints the ticks its passes played
+# - 197.9 million in that run, 0.86 to 1.92 million a pass, median 1.28 (the G3c table: 201.3 million, 0.88 to
+# 1.93, median 1.30) - so a run on a loaded machine shows what it is worth.
 #
 #   bash tools/world_coop_gates.sh                the whole job on S = `nproc` processes
 #   bash tools/world_coop_gates.sh 16             ... on 16 processes
@@ -86,12 +86,17 @@
 #   2026-10-09 15:32  wf12, this pool on 24 slots - party's proof run of Q3 / Q4, NOT alone (16 processes of versus's
 #                     fairness sweeps, recorder trials and a runner convoy beside it): pool 4 898 s, the searches
 #                     36 148 s (twice G3c's), the passes a median of 0.66 million ticks (half G3c's) - what a loaded
-#                     machine does to the job, and why the pass line prints its ticks. No clean run of the round.
+#                     machine does to the job, and why the pass line prints its ticks.
 #   2026-10-09 17:17  wf12, this pool with the longest job first and no mix, --fresh: 50 minutes (3 015 s: the pool
 #                     2 993 s with 99.7 % of its 24 slots busy, the plans 12 s, the test 5 s); 76 rows green, 37
 #                     routes, 184.2 million explorer ticks (0.58 to 1.70 million a pass, median 1.20). Other agents'
 #                     runs beside it until 17:36 (up to 16 processes) - and the searches took 24 341 s for G3c's
 #                     17 588 s: 24 of them at once at the start and again at the end. Hence the mix (run_pool).
+#   2026-10-09 18:21  wf12, this pool with the mix (8 slots of 24 to the searches by the costs of the run before; 7
+#                     by today's), --fresh, nothing else running: 46 min 37 s (2 796 s); the searches 18 361 s (G3c
+#                     17 588 s), 197.9 million explorer ticks (median 1.28 million a pass); 76 rows green - 53
+#                     exhaustive, 23 bounded with every probe - 0 of 37 routes reach, 152 passes silent.
+#   The same tree again with nothing changed: 25 s (the plan 8 s: 0 searches, 0 passes, 0 replays to do; the test).
 # RUN IT ALONE: every other Godot run takes ticks from the passes (their wall time is fixed), and an exclusive
 # runner call of another terminal (`gd.sh raw`, an import) holds every start of the pool back for minutes.
 # (The body is one function, parsed whole before it runs: saving this file under a running job does not disturb it.)

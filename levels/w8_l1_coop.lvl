@@ -114,7 +114,13 @@ objects/hidden_spot 3 39 kind=small count=3 contents=food:5,food:6,treasure:0 pr
 # (B) terrace T1: checkpoint 1, the keeper hall under the old arch, the low arch, a real chest, the plinth of plate 2
 objects/sign 34 44 text=SIGN_W8_GUARD
 objects/container 33 44 skin=chest contents=food:9,food:10,treasure:1
-items/feast_piece 51 38 index=0
+# The first feast piece lies BEHIND the keeper door of 'hall' (wf12, DESIGN G92; it lay at 51,38 on the lintel
+# over the hall): a feast's touch kills a shell keeper, and a hero who came in with two pieces of the kit took
+# it, dropped through the lintel's hole and opened the door alone (replayed on the real game with his partner
+# idle: the far cell at tick 597). Now it lies on the plinth of plate 2 beside the two fruits, on the pair's
+# way: no feast can burn in the hall, and the kit still fills at the summit (the route's Raptor dies of it).
+# No feast piece between a stage's start and a shell or daze keeper door (LEVEL_DESIGN 15.7.5).
+items/feast_piece 60 40 index=0
 items/food 36 41 index=7
 items/food 37 40 index=8
 items/food 41 42 index=11

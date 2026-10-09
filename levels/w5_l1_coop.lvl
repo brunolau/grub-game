@@ -154,7 +154,6 @@ items/treasure 175 21 index=3
 props/canyon/jar_a 157 15 layer=back
 props/canyon/cave_mouth 175 21 layer=back
 objects/checkpoint 180 21
-objects/sign 71 18 text=SIGN_W5_ROLLER
 enemies/roller 203 11 left=-1 right=1 range=10 coop=shell
 enemies/roller 207 11 left=-1 right=1 range=7 coop=shell
 enemies/roller 195 14 left=-1 right=1 expert coop=shell
@@ -242,6 +241,10 @@ objects/sign 52 18 text=SIGN_W5_COOP_EGG
 objects/sign 60 18 text=SIGN_W5_COOP_TABLET
 items/weapon 62 15 kind=spear
 enemies/walker 75 18 skin=turtle left=-2 right=2 hp=10
+# The ward sign (wf12, DESIGN G85) stands where the solo file's Roller sign stood (column 71; that sign told the
+# pair to bounce on a beast that wears the mark here, and its first Roller is left out): 3 columns inside the
+# ward of 'hop' (68..108), the tortoise of columns 73-77 marked beside it.
+objects/sign 71 18 text=SIGN_W5_COOP_WARD
 # --- gate 1 'hop': the boost ledge (8 rows over the floor) and its rolled vine (the way back)
 objects/x2_tablet 80 18 gate=hop far=96,10
 objects/sign 78 18 text=SIGN_W5_COOP_HOP

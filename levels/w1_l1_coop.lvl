@@ -121,7 +121,7 @@ Q = objects/hidden_spot kind=small count=3 contents=food:29,treasure:10,food:40 
 
 [entities]
 objects/sign 13 38 text=SIGN_W1_CLUB
-objects/sign 34 38 text=SIGN_W1_BOUNCE
+objects/sign 34 38 text=SIGN_COOP_W1_BOUNCE
 zones/secret 2 29 name=cliff_top rect=0,26,7,4
 zones/secret 130 24 name=high_road rect=113,18,34,9
 zones/secret 187 37 name=hollow_hill rect=183,35,9,4
@@ -245,6 +245,14 @@ objects/sign 172 18 text=SIGN_W1_HOME
 objects/checkpoint 231.5 17
 # ---- co-op (DB1) ------------------------------------------------------------------------------------------------
 objects/hero_start 4 38 slot=2
+# The ward sign (wf12, DESIGN G85): the book's first ward - gate 'hop' below, columns 66..129 - is taught where it
+# begins. The board stands 6 columns inside it, at the far end of the first vine bridge: on Expert the hopper of
+# column 77 wears the mark 5 columns ahead and comes hopping (the view is 20 cells wide and trails the pair); on
+# both difficulties the hopper of column 63 puts the mark on as it follows the pair over the bridge - a Beginner
+# pair that clubbed it before the bridge sees no marked beast here (none lives in the ward before the gate).
+# The solo bounce sign of column 34 has its co-op text (SIGN_COOP_W1_BOUNCE, "... unless it is marked!"): it must
+# not promise what a ward takes away.
+objects/sign 72 38 text=SIGN_COOP_W1_WARD
 objects/sign 88 38 text=SIGN_COOP_W1_EGG
 # Gate 1 "hop": the springy flower became a ledge 8 rows over the flat floor on both difficulties, its face where the
 # old step stood (G2 integration: a Totem Ride on an idle partner plus the corner catch climbs 7 rows, and the old

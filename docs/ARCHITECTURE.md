@@ -1822,10 +1822,13 @@ GD_TIMEOUT=5400 bash .tools/gd.sh play --flow=tools/autoplay/campaign_coop.flow 
 Their headless twins: `test_book2_routes` / `test_coop_routes` `test_the_*_campaign_in_one_run`
 (RouteTestCase.play_campaign). Gate G3 in one command: `bash tools/g3.sh` (header in the file) -> the G3 table. Since
 the G3c integration it has two stages. Stage 1, alone: the `coop_gates` job, the three proofs of every x2 gate row
-(PLAN.md 8 V3.c "The fixed bar") through `tools/world_coop_gates.sh` - search workers and the continuous-play
-explorer's two passes of 300 s per row side by side (`tools/coop_explore/`), the evidence set, then
-`tests/test_coop_gates.gd`, which reads all three back; about 51 minutes on 12 cores, a few minutes when nothing of
-the simulation or the levels changed since the kept results. Stage 2: every other slow module (versus_bots sharded
+(PLAN.md 8 V3.c "The fixed bar") through `tools/world_coop_gates.sh` - since phase 4 one plan and one pool: a
+process asks every kept result first, then the solo searches, the continuous-play explorer's two passes of 300 s
+per row (`tools/coop_explore/`) and the evidence replays that are to do run side by side as jobs of one pool, then
+`tests/test_coop_gates.gd`, which reads all three back; 47 minutes on 12 cores (51 before the pool; 45 is the
+floor of the bar: its passes are wall time), half a minute when nothing of the simulation or the levels changed
+since the kept results. The designers' recorders of the 52 co-op routes are versioned beside the routes
+(`tools/autoplay/recorders/record.sh <route file>`). Stage 2: every other slow module (versus_bots sharded
 by `tools/g3_versus_bots.sh`), the slow tests, the default suite, sp_identity, the spec tests, the content inventory
 `tests/test_integration_g3.gd`, the campaign flows and `g3_versus.flow` headless, and the five play flows again
 windowed (`gd.sh play`, off-screen and muted). Development tools versioned beside it: `tools/bots/fair.sh` (a
