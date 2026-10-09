@@ -1721,15 +1721,23 @@ ints_eq`, `fail`, `expect_errors(n)`, `load_reference()` (PHYSICS_REFERENCE.json
 `tests/test_core_level_base.gd` shows how to test entities in a bare `LevelBase` without the world module. Tests
 never write real user data (redirected to `build/test_user`). The runner prints the seconds of every file. **Slow
 modules** (PLAN.md 8 V7; `SLOW_FILES` in `tests/run_tests.gd`: `test_coop_gates.gd` since G1, core-B's
-`test_versus_bots.gd` since phase 2, and since the G2 integration the route replays `test_campaign_routes.gd`,
-`test_book2_routes.gd` and `test_coop_routes.gd`) are skipped, each with a
+`test_versus_bots.gd` since phase 2, since the G2 integration the route replays `test_campaign_routes.gd`,
+`test_book2_routes.gd` and `test_coop_routes.gd`, and since the G3 follow-up round core-B's nav-graph tests
+`test_core_bots.gd`, the whole match of `test_integration_totem_ring.gd` and the fairness sweeps of
+`test_levels_w4.gd`) are skipped, each with a
 `skip` line and a closing `SKIPPED:` line, unless the run has `-- --slow` (`GD_TIMEOUT=4000 bash .tools/gd.sh test
 --slow`; or each by name in parallel - `COOP_GATES_SHARD=<i>/<n>` splits `test_coop_gates`) or a filter that names the
 module - its whole name after `test_` (`bash .tools/gd.sh test coop_gates`); a
 filter that only touches it (`coop`, `gates`) runs the other matching files and skips the slow one, so a module's quick
 check never pays for the slow search (P2.6 sign-off; `run_tests.discover_files` is the rule, `tests/
 test_core_runner.gd` keeps it). They run at every gate and before every merge that touches co-op files or the solo
-search. The default run took about 4 minutes at G1 (1 135 tests) and 7.5 minutes before the G2 integration moved the
+search. **Slow tests** (the same budget, since the G3 follow-up round; `SLOW_TESTS` in `tests/run_tests.gd`): single
+test methods of files that stay in the default run - real solo searches, the single-hero boss searches, whole-table
+loops - are skipped by the same rule (a `skip` line each; run by `-- --slow` or by a filter that names their file's
+module) and run alone with `bash .tools/gd.sh test --slow-tests`; a listed name its file no longer has fails that
+file. A test on no list that takes more than 10 s gets a `note:` line and a NOTE line in the summary. `tools/g3.sh`
+(the gate's one command) runs every slow module and the slow tests beside the default suite, so nothing the default
+run skips is skipped by a gate. The default run took about 4 minutes at G1 (1 135 tests) and 7.5 minutes before the G2 integration moved the
 route replays out (about 4.5 minutes after it); gd.sh's default `GD_TIMEOUT` of 300 s is close: a full run passes
 `GD_TIMEOUT=600`. **Isolation between files** (P2.6): the runner puts back the global clock state a
 file left behind - `Sim.frozen` (a Flow transition that a failing test never awaited), a `Sim.time_scale` other than

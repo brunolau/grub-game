@@ -1529,9 +1529,10 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
   still lands in view (8 px over its bottom edge; a bigger room would put the ledge under 6-2b's painting nook, six
   rows down, out of the view that never sinks - the off-screen rule of 10.3 kills there) and a partner up to 6 rows
   lower is on the view too (farther behind he is the leash's and the band's case: an egg, C.13).
-- **Footing room for two** [G65] (**decided, not built** when the G3 follow-up round closed: as built the view
-  follows the highest footing alone, and 6-2b's Beginner pair - P2 one ledge behind P1 - loses P2 to the leash
-  three times in the climb): in a party the view's top does not rise above `lowest footing - 160` px (10 rows; the
+- **Footing room for two** [G65] (built by party at the end of the G3 follow-up round:
+  `LevelCamera.FOOTING_KEEP_LOW_PX` = 160, `FOOTING_LEAD_MIN_PX` = 64; the Beginner reference route of 6-2b still
+  loses P2 to the leash three times in the climb, because its pilot keeps him nine to ten rows behind P1 on the
+  vines - farther than any view holds, so the clause never acts there: a pilot matter, DESIGN G65): in a party the view's top does not rise above `lowest footing - 160` px (10 rows; the
   trailing hatched hero stays in view), the leader's room shrinking from 72 px down to 64 px (4 rows) and no
   further - `want = min(max(high - 72, low - 160), high - 64)` while `low - high <= view height - 64`, else
   `high - 72` (the footings do not fit one view: the view goes with the leader, the partner is the leash's and the
@@ -1854,7 +1855,7 @@ Owner of each table: `Tuning` (core: hero and world rules), `PartyTuning` (core,
 | Mount | C.9 table | | C.9 | MountTuning |
 | Totem | head 35 / rest 34 px; foot reach 16 px; jump-off 16 over the carry; impulses `>> 1`; drop lock 12 *(tune)* | | C.10 | PartyTuning |
 | Shoulder Hop | -224 (= `Tuning.BOUNCE_YVEL_UP`), active partner only | v16 | C.10 | PartyTuning |
-| Idle | 243 ticks without input of his own (or none since entering the level; a held flag is input every tick); "Zzz soon" bubble from 170, Zzz from 243 [G58] | ticks | C.10 | PartyTuning (`IDLE_TICKS`; `IDLE_WARN_TICKS` asked of core-A - a private constant of `hero_party.gd` until then) |
+| Idle | 243 ticks without input of his own (or none since entering the level; a held flag is input every tick); "Zzz soon" bubble from 170, Zzz from 243 [G58] | ticks | C.10 | PartyTuning (`IDLE_TICKS`, `IDLE_WARN_TICKS`; `HeroParty.IDLE_WARN_TICKS` draws by the same value) |
 | Lee | 64 px downwind, 16 px vertical *(tune)* | px | C.6 | PartyDriver (PartyTuning asked) |
 | Brace | 16 px apart, heavy dazed 44 (hurt only then [G57]) | | C.10 | PartyTuning |
 | One hit per strike | co-op files: one hit per enemy per strike instance [G57] | | C.10 | enemies (`EnemyBase`) |

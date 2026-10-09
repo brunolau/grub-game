@@ -2,13 +2,16 @@
 # (DESIGN.md A.6 / D.10, LEVEL_DESIGN.md 15.7): the same coast with P2's start, a pair of axes on bar 1, log rafts
 # for two (4 cells) and two co-op gates on the main path, each with its tablet and a checkpoint behind:
 #  - 'dune' (DESIGN A.6's named fallback of the "urchins" Chomper gate): leapfrog plate doors - the urchin beds
-#    and Chomper's pen give way to a dune ten rows high with two corridors; plate A before it holds the lower
+#    and Chomper's pen give way to a dune twelve rows high with two corridors; plate A before it holds the lower
 #    corridor's door for the partner, plate B beyond it holds the upper corridor's door (reached by two coral
-#    shelves) for the holder; each plate 8+ tiles from its door;
-#  - 'stack': a Batter Up lob - the sea-stack shoulder stands 7 rows over the 3-row rock (10 over the beach) and
-#    the rock's blowhole is gone: one hero curls on the rock, the other lobs him up with a high strike; up there
-#    he clubs the rolled vine at the edge, which unrolls down to the rock - the way up for the batter (its coil and
-#    the warp stack's blowhole 11+ cells from the far cell).
+#    shelves) for the holder; each plate 8+ tiles from its door. The dune's top is 8 rows over the upper shelf
+#    (DESIGN G69: at 6 rows a lone hero's hop jump climbed it from the shelf and walked down the far side);
+#  - 'stack': a Batter Up lob - the sea-stack shoulder stands 7 rows over the rock's step (the rock is 2 rows, its
+#    step 3 over the beach; the shoulder 10) and the rock's blowhole is gone: one hero curls on the step, the other
+#    lobs him up with a high strike from the rock; up there he clubs the rolled vine at the edge, which unrolls down
+#    to the step - the way up for the batter (its coil and the warp stack's blowhole 11+ cells from the far cell).
+#    A 7-row lob ledge over a clean foot (LEVEL_DESIGN 15.7.2, DESIGN G67 / G69): the solo file's rock (3 rows, its
+#    step 4) left the shoulder 6 rows over the step - a lone hero's hop jump caught its corner.
 # Traits: the tortoises are Shellbacks (shell), the gulls `lone`; no bonded pairs (G36: one thrown special crosses
 # the fish pools in one line). Left out of the solo file: the leaping fish and the gulls over the raft reaches
 # (they knock a paddler off his raft), the gull and

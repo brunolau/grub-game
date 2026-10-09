@@ -328,6 +328,54 @@ cut arenas as rewards); `w3_l2_coop.inputs` (Beginner), which [G54]'s guard move
 party; `PartyTuning.IDLE_WARN_TICKS` waits for a core-A owner (a private constant of `hero_party.gd` meanwhile). Gate G3 is therefore **not reached** by the lead designer's record; the verdict is the
 G3b integrator's and verifier's.
 
+**The G3b integration (2026-10-09, after every other agent of the round had closed)**. world-B's final table had
+reached the lead designer after he closed: 40 gates refused (exhaustive), 27 refused (bounded), **9 rows open** - six
+gates of five co-op files, all through the lone hero's moves of G67 (the hop jump, the pogo jump), none through a
+coil. Built by the integrator, for the owners who did not run:
+- **the coil rule of G67** (`scripts/objects/vine.gd`; a ball's touch in `hero_party.gd`): in a co-op file a rolled
+  vine unrolls only for a hit from its own level; `test_objects_book2` +2 rows (the real hero's hop jump with a high
+  strike from the floor 8 rows under the ledge opens a solo coil and never a co-op one), DB1's regression probe of
+  1-2 'treehouse' "refused (21 trials)", the routes of the eleven rolled-vine files replay;
+- **the six open gates, rebuilt in their level files** by the building rules of G67 / G69 (DESIGN.md **G70**; no
+  engine rule): `ending_coop` 'lookout', `w3_l1_coop` 'cliff', `w7_l1_coop` 'dune' and 'stack', `w9_l1_coop` 'pulley',
+  `w9_l2_coop` 'drive'; the two 7-1 co-op routes and the 9-1 co-op route re-recorded with their designers' bots, the
+  others replay unchanged;
+- **the painting ladder of G60** (core-A's `unlock_table.gd`, `tuning.gd`, `save.gd`, `versus_match.gd`; art-A's
+  pattern tags, `ui/unlock_icons.png` and the slab's carved marks; ui's `en.po` and `unlocks.gd`; their tests);
+- `PartyTuning.IDLE_WARN_TICKS` (G58); `Spawner` keeps the scripts of every scene its cache drops until the engine
+  shuts down (integration's finding of the round: Godot 4.7.2 leaks a script that dies while the script language
+  runs - the shipped game printed leak errors at exit after co-op 4-2 into 4-2b; `test_core_level_base`);
+- `tests/test_world_validator.gd`'s search-reset row moved its test coil one row down (the coil rule);
+  `tools/autoplay/g3_versus.flow` walks a human into the open at the start of Last Caveman Standing on Colossus
+  Hall (both humans spawn under a ledge that no stalactite of the sudden death passes: two heroes who never move
+  there never end the round - a question for the pair playtests of P4.5, not changed in the game);
+  `docs/ARCHITECTURE.md` 9.1 names the slow modules and slow tests of the round.
+
+**Gate G3: REACHED** on the tree of 2026-10-09 (`G3_TAG=g3b_final1 bash tools/g3.sh --require --shards=12
+--jobs=16`, table `build/g3/run_g3b_final1/g3_table.txt`): content complete (20 Book II files, 35 co-op files, 31 / 31
+solo and 57 / 57 co-op route cells, 6 featured routes, 20 paintings, 76 x2 gates, 8 arenas, 21 of 22 versus cells
+with CPUs - Tar Pulleys' Last Caveman Standing human-only); the default suite 1 675 / 1 675 in 176 s on its own
+clock, the slow tests 15 / 15; `test_campaign_routes` 18 / 18, `test_book2_routes` 8 / 8, `test_coop_routes` 10 / 10;
+**76 / 76 gates refused, uncached: 51 exhaustive, 25 bounded with every probe of their kind**, none open, none
+unproven (`coop_gates_verdicts.txt`); the bot sets 32 / 32 over 21 cells; `tools/sp_identity.sh` IDENTICAL;
+`docs/spec/test_spec_docs.py` 85 / 85 with no ruling pending its owner; the five flows pass headless with a clean
+exit (Book I both difficulties, Book II both difficulties with both Feast Lands, the co-op campaigns of both books,
+the harness exit). Beside the table: the four campaign flows and `g3_versus.flow` (the 17 cells CPUs play) also pass
+**windowed** (off-screen, muted; 14 / 116 / 157 / 367 / 108 checks, 849 screenshots under `build/screenshots/g3b_*`,
+no leak report at exit) and `g3_versus.flow` headless (108 checks); `tools/validate_levels.gd` - 120 files, 0
+errors, and `--coop` over the 36 co-op files 0 errors with all 76 gates refused (the two warnings of both runs are
+3-1b's lee comfort; `--coop` now asks only for the difficulties a file is played in, as the gate test does - it had
+searched Expert-only files on Beginner); `tools/build_windows.ps1` - a clean import, the suite 1 675 / 1 675 in
+161 s on the then idle machine (V7's 5 minutes), the release exe exported and booted (smoke: 0 errors, 78 levels,
+no developer level, development switches ignored).
+**Still open after G3** (none of them a row of the gate; each for phase 4): G65's proof - the Beginner reference
+route of 6-2b in co-op still loses P2 to the leash three times in the climb (its pilot, DESIGN G65);
+`w7_l2b_coop.expert.inputs` sits exactly on its `max_hurts:6`; two bot sets sit on the edge of the fairness band
+(Sky Picnic and Totem Ring, Grub Stack); the Colossus Hall stalemate above; a freed entity can stay filed in
+`LevelBase`'s doze index (seen only in the search world, worked around there, not reproduced in the game); no static
+validator rule for G67's clean foot or G70's one-way ledges (the search is their proof); the human pair playtests
+of P4.5.
+
 ---
 
 ## 7. Phase 4 - QA and release 2.0

@@ -5,7 +5,10 @@
 #    hp 100) and an ice door at its far end that opens when the rex is dead. Its front glances: two heroes crouching
 #    side by side on the slippery ice (a Brace Wall) stop it dead and daze it with its head open.
 #  - 'cliff': the cliff climb ends at a rock step 8 rows under the clifftop: a Shoulder Hop gets one hero up, and
-#    he clubs the coiled vine at the edge down for his partner (the gift).
+#    he clubs the coiled vine at the edge down for his partner (the gift). The step is a clean foot (DESIGN.md
+#    G67): the cliff room under the clifftop (in the solo file a secret behind two cracked blocks at the cliff's
+#    foot) has an open doorway here and its roast spot lies at the room's far end - a lone hero's low strike on a
+#    block at his feet was a pogo jump of 128 px, onto the clifftop.
 # x2 secret: the ice cave under the lake (a hatch on the near shore; the far-shore lid is frozen shut): a
 # plate holds an ice door open while the partner fetches the cave painting (24) and the U. Shellback turtles on
 # the hill, in the valley and on the ridge; two ridge chargers are a bonded pair (one rushes down from the rock
@@ -238,7 +241,8 @@ props/ice/icicle 86 47
 props/ice/icicle 89 47
 props/ice/rocks_small 77 49
 # Gate 'cliff': the rock step 8 rows under the clifftop; the coiled vine at the clifftop's edge (its coil 12 cells
-# from the far cell) hangs down to the step.
+# from the far cell) hangs down to the step. Nothing to club within 7 cells of the cliff's foot (G67): the cliff
+# room's doorway (col 123, rows 34-35) is open, its roast spot `w` at col 131.
 objects/sign 118 35 text=SIGN_COOP_W3_HOP
 objects/x2_tablet 120 35 gate=cliff far=134,27
 objects/vine 122 28 length=8 rolled=true

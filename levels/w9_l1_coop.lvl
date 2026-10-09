@@ -8,9 +8,12 @@
 #  - 'pulley': the vine in the shaft beside the slate block lies rolled. Two cloud lifts flush with the cloud
 #    shelf hang on a pulley: lift A over a slot in the shelf, lift B at the shaft. Both step on together; the one
 #    on B hops (it rises while he is in the air and A is loaded) three rows up, on to a cloud ledge in the shaft
-#    6 rows over the shelf and the slate block, 9 rows over it; there he strikes the coil and his partner climbs
+#    7 rows over the shelf and the slate block, 9 rows over it; there he strikes the coil and his partner climbs
 #    out of the slot to the vine. The block's roof keeps a lone hero off a raised lift. (Range 3, not 6: the
 #    tribe camera keeps the standing counterweight on its 9th row, so a rider 12 rows over him leaves the view.)
+#    The ledge is 7 rows up, 4 over the raised lift (DESIGN G67 / G69): at 6 rows a lone hero's hop jump (82 px)
+#    from the shelf fell into the cloud's cell and was landed on it - a one-way ledge catches from 16 px under
+#    its top.
 # Traits: lone eagles. No bounceable enemy near either gate (darts and storm pterodactyls of S and of the shaft are
 # left out).
 

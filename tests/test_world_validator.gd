@@ -1631,7 +1631,9 @@ func test_search_hop_jump_reaches_six_rows_not_seven() -> void:
 func test_search_reset_respawns_what_a_level_reset_leaves_changed() -> void:
 	# An unrolled vine stays unrolled "through deaths and team wipes" - but not from one move of the search to the
 	# next: the search world spawns it again (before wf10 every later move played with the vine down).
-	var searcher: CoopSearch.Searcher = _search_world(_search_level("leak_coop", 6, "objects/vine 12 12 length=1 rolled"))
+	# The coil lies one row over the floor: in a co-op file it unrolls only for a hit from its own level - the
+	# striker's feet at most one row under its ledge (DESIGN.md G67; two rows over the floor it passes his strike).
+	var searcher: CoopSearch.Searcher = _search_world(_search_level("leak_coop", 6, "objects/vine 12 13 length=1 rolled"))
 	var strike: PackedInt32Array = CoopSearch._repeat(Defs.IN_RIGHT, 1) + CoopSearch._repeat(Defs.IN_FIRE, 12) 			+ CoopSearch._repeat(0, 12)
 	var unrolled: String = ""
 	for gap: int in [10, 16, 22, 28, 4]:
@@ -1644,7 +1646,7 @@ func test_search_reset_respawns_what_a_level_reset_leaves_changed() -> void:
 	var back: bool = not after.is_empty() and str(after["sig"]) == searcher._baseline
 	var leaks_after: int = searcher.leaks
 	searcher.close()
-	assert_true(unrolled.contains("vine 12,12") and unrolled.contains("opened=true"),
+	assert_true(unrolled.contains("vine 12,13") and unrolled.contains("opened=true"),
 			"a strike unrolls the vine: a changed world (%s)" % unrolled)
 	assert_true(back, "the next move starts in the level-file world again: the vine is rolled")
 	assert_eq(leaks_after - leaks_before, 1, "the search spawned the vine again (a level reset leaves it unrolled)")

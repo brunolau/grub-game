@@ -113,6 +113,9 @@ objects/hero_start 2 18 slot=2
 # Gate "lookout": the barred village gate (DESIGN.md D.9). The door block (cols 56-57, rows 15-18) rises 4 rows into
 # the wall while the latch plate on the gallery is pressed - and a latch stays pressed. The tablet stands at
 # the hop spot under the gallery's end; the far cell lies beyond the gate.
+# The clean foot (DESIGN.md G67, LEVEL_DESIGN.md 15.7.3): the road's two hidden spots (`QQ`, cols 42-43 in the solo
+# file) lie at cols 33-34 here, 12 cells from the gallery's end - under the tablet a lone hero's low strike found
+# them, and that club pogo with a jump on top (130 px) put him on the gallery (the G3 follow-up's search).
 objects/sign 39 18 text=SIGN_COOP_END_GATE
 objects/x2_tablet 43 18 gate=lookout far=59,18
 objects/plate 46 10 name=lookout mode=latch

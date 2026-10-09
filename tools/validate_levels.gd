@@ -91,7 +91,8 @@ func _coop_files() -> PackedStringArray:
 	return result
 
 
-## The solo-impossibility search on every x2 gate of the co-op `files`, both difficulties. Returns the errors printed.
+## The solo-impossibility search on every x2 gate of the co-op `files`, on every difficulty the file is played in.
+## Returns the errors printed.
 ## A coroutine: a frame passes after every gate (a search plays tens of thousands of moves without one, and the nodes
 ## it freed leave their deferred calls in the engine's message queue until then - content's wf10 #1: six gates in a
 ## row filled it and Godot crashed).
@@ -106,6 +107,11 @@ func _search_gates(files: PackedStringArray) -> int:
 		if data == null or str(data.value("kind")) != LevelText.KIND_COOP:
 			continue
 		for difficulty: int in [Defs.Difficulty.BEGINNER, Defs.Difficulty.EXPERT]:
+			# Only the difficulties the file is played in (LevelRegistry.is_available, the rule of
+			# tests/test_coop_gates.gd): an Expert-only file has no Beginner gate - its windows are the Expert ones
+			# (G3b: `w4_l2_coop` 'drums' was reported OPEN on Beginner, a difficulty nobody can start it in).
+			if difficulty == Defs.Difficulty.BEGINNER and str(data.value("min_difficulty")) == "expert":
+				continue
 			var gates: Dictionary = {}
 			for record: Dictionary in data.entity_records():
 				if String(record["id"]) == "objects/x2_tablet" and LevelText.applies_to(record["params"], difficulty):

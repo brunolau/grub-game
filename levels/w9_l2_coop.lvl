@@ -6,6 +6,9 @@
 #    and only a Brace Wall of two crouching heroes stops it (dazed 44 ticks, head open); it keeps the hall's door;
 #  - 'drive': the final gap is 9 cells of tar without its drop clouds: a charged Batter Up line drive puts one hero
 #    across; he steps on the latch plate there and the cloud slab over the gap sinks into a bridge for his partner.
+#    The slate stack over the cloud hall is 14 rows high here (5 more than in the solo file; DESIGN G67): from its
+#    top a lone hero stepped onto the raised slab, and he reached that top from the painting's cloud - 6 rows under
+#    it - by a hop jump, or by a pogo jump on the painting's spot (130 px). Now it stands 11 rows over that cloud.
 # The Guards of the solo file are left out (a Guard in co-op needs a 4-row hall, LEVEL_DESIGN 15.7.5): tribesmen
 # keep their places. Traits: the heavy Bull Rex, lone tribesmen and storm pterodactyls (over a third of the
 # records); the valley Rollers stay plain - a bond on the two slopes would lie on one throw line (G36).
@@ -164,7 +167,8 @@ props/sky/feather_d 188 34
 objects/checkpoint 190 34
 props/sky/icicle 196 31
 props/sky/icicle 201 31
-# co-op gate 'drive': 9 cells of tar; the latch plate on the far bank sinks the slab into a bridge
+# co-op gate 'drive': 9 cells of tar; the latch plate on the far bank sinks the slab into a bridge (the slab rests 7
+# rows over the floor: nothing a lone hero can stand on may come within a jump of its top - the slate stack, G67)
 objects/checkpoint 204 34
 objects/x2_tablet 202 34 gate=drive far=219,34
 objects/plate 223 34 name=bridge mode=latch
