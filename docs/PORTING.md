@@ -45,12 +45,20 @@ and the device steps a person runs are in `docs/expansion/HUMAN_CHECKS.md`.
 - **Co-op on a phone or tablet**: one touch player plus one gamepad player (the touch overlay serves one slot). The
   two-player "table mode" (mirrored touch clusters at both ends of a tablet) is a hidden prototype in 2.0 and is not
   reachable from the release menus (DESIGN.md D.11 [G37]).
-- **Versus on a phone or tablet**: one touch player against bots, or with up to three pads.
-- **Performance**: a party costs more than one hero - each extra hero adds about 100 us per tick on the desktop
-  (docs/expansion/TECH_AUDIT.md 1). The budget of ARCHITECTURE.md 11 (one tick
-  <= 2 ms on 4 x Cortex-A53) was not met by the desktop proxy numbers of 1.0 already and was **never measured on a
-  device**; PLAN.md P4.2 asks for two-hero co-op inside the 1.0 budget class on that phone and four heroes on
-  mobile only where the check passes (else a cap of two there). That measurement is open (section 2, item 5).
+- **Versus on a phone or tablet**: two heroes - one touch player against one CPU or one pad player, or two pads. A
+  match there seats `VersusTuning.PLAYERS_MAX_MOBILE` = 2 heroes, humans and CPUs together
+  (`VersusMatch.seat_limit()`; a desktop build seats four): four heroes with CPUs are not expected to fit a 60 Hz
+  frame on the A53 class (ARCHITECTURE.md 11.5 - an estimate, no device was measured). The cap goes to four when
+  the device measurement of section 2, item 5 passes with four heroes. The lobby does not show the cap yet: its
+  cards 3 and 4 refuse a player without a word (`build/engine_requests/wf12_perf_to_ui.txt`).
+- **Performance**: a party costs more than one hero. Measured on the desktop in phase 4 (ARCHITECTURE.md 11.5,
+  `bash tools/perf.sh`): a tick of one hero 180 - 260 us on average, of two heroes 236 - 443 us (about 1.6 times),
+  of four heroes in a round with three CPUs 353 - 532 us plus 376 - 517 us of the CPUs' thinking. The budget of
+  ARCHITECTURE.md 11 (one tick <= 2 ms on 4 x Cortex-A53) was not met by the desktop proxy numbers of 1.0 already
+  and was **never measured on a device**; PLAN.md P4.2 asks for two-hero co-op inside the 1.0 budget class on that
+  phone and four heroes on mobile only where the check passes (else a cap of two there). The estimate says two
+  heroes fit and four with CPUs do not, so the cap of two is in the game (above); the device measurement itself is
+  open (section 2, item 5).
 - **Screen**: the shared tribe camera frames two heroes inside the same 640 x 360 base picture; wider screens show
   more, as before. Versus arenas are one screen (20 x 12 cells) with a decorated frame on other shapes.
 - **Store text and ratings**: local multiplayer only - still no network, no accounts, no data collected. "Number of
@@ -84,7 +92,11 @@ and the device steps a person runs are in `docs/expansion/HUMAN_CHECKS.md`.
    (ARCHITECTURE.md 11), and only desktop numbers exist so far (ARCHITECTURE.md 11.4: 132-272 us average per tick
    windowed on a Ryzen 9 7900X for 1.0 solo; a Cortex-A53 runs GDScript roughly 10-15x slower). If it is over, the
    remaining cost is the hero's tick and the item bursts of the boss defeats (ARCHITECTURE.md 11.4). For 2.0 measure
-   a two-hero co-op stage of every world and a four-player arena as well (section 1a). **How**: the perf probe
+   a two-hero co-op stage of every world and a four-player arena as well (section 1a; `bash tools/perf.sh` writes
+   those flows on the desktop - `build/perf_sh/<tag>/coop.flow`, `versus.flow` - and ARCHITECTURE.md 11.5 holds
+   the desktop numbers to compare with; for four heroes on a device the measuring export sets
+   `VersusTuning.PLAYERS_MAX_MOBILE` to 4).
+   **How**: the perf probe
    (`--perf`) is a development tool - a release build ignores it and no export carries it (`*/dev/*`, `tools/*`
    are excluded), so the measurement needs a private measuring export: a debug export from a copy of the Android preset whose
    exclude filter keeps `scripts/core/dev/*` and whose include filter adds the flow and route files it plays,
@@ -181,6 +193,7 @@ iPhone (iOS 15), a current iPhone with Dynamic Island, an iPad; for macOS one Ap
     Co-op, each book and difficulty has its own slot); a device that held a 1.0 build shows its progress under
     Solo > Book I after the update, and `save.v1.json` lies beside `save.json`.
 15a. Two players (2.0): co-op with the touch player and one pad through one whole stage (the shared camera, the Egg
-    Hatch, a gate that needs both); versus with the touch player and bots, and with two or more pads; touch buttons
+    Hatch, a gate that needs both); versus with the touch player and one CPU, and with the touch player and a pad
+    (two heroes: the mobile cap, section 1a); touch buttons
     of the touch player stay inside the safe area and never cover the second hero's HUD panel (top right).
 15. Store builds: install the exact signed AAB / IPA (internal testing track, TestFlight) and repeat 1, 6 and 8.

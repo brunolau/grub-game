@@ -88,6 +88,15 @@ var _installed: bool = false
 var _installed_slot: int = 0
 # Levels already reported as having no graph.
 static var _warned: Dictionary = {}
+# Phase-4 performance pass: what the first versus bot of a tick recorded ([method _record]) - every other versus bot
+# of that tick sees the same heroes (GameInput.sample() asks them one after another before the first phase, and a
+# bot only reads), so it copies the entry instead of asking every hero and the referee again. Told apart by
+# Sim.total_ticks and the level; -1 = nothing recorded.
+static var _shared: PackedInt32Array = PackedInt32Array()
+## Tests and measurements only: false = every bot looks at the heroes itself again.
+static var share_seen: bool = true
+static var _shared_tick: int = -1
+static var _shared_level: int = 0
 var _last_pos: Vector2i = Vector2i(-(1 << 20), -(1 << 20))
 
 
@@ -254,6 +263,13 @@ func bind(p_level: LevelBase) -> void:
 				% level.level_id)
 	movers.bind(level, nav.graph)
 	nav.reset()
+	# Phase-4 performance pass: what the bots keep of a level is made now, on the first tick of the round's intro, not
+	# on the first tick of play - the searches' tables (BotNavigator.warm_up) and, for a versus bot, where to stand
+	# to strike each spot (BotBrain.spot_stands: found once per graph and cell, kept from then on).
+	nav.warm_up(movers)
+	if body == null and nav.graph != null:
+		for spot: HittableBase in BotSenses.spots(level):
+			BotBrain.spot_stands(nav.graph, spot.cell)
 	_seen_count = 0
 	brain.reset()
 
@@ -296,6 +312,18 @@ func _record(tick: int) -> void:
 	var size: int = _seen.size()
 	var index: int = _seen_count % size
 	var entry: PackedInt32Array = _seen[index]
+	# The bots of GameInput.sample() (a tick has begun, no phase has run): one look at the heroes for all of them. A
+	# boss body's bot is asked inside a phase, a test asks between ticks or through its own referee: they look themselves.
+	var sharing: bool = share_seen and body == null and Sim.is_in_tick() and Sim._phase < 0 \
+			and BotSenses.test_referee == null
+	if sharing and _shared_tick == Sim.total_ticks and _shared_level == level.get_instance_id() \
+			and _shared.size() == entry.size():
+		for i: int in entry.size():
+			entry[i] = _shared[i]
+		_seen[index] = entry
+		_seen_ticks[index] = tick
+		_seen_count += 1
+		return
 	entry.fill(0)
 	var holder: int = BotSenses.ember_holder(level)
 	for p_slot: int in Defs.MAX_PLAYERS:
@@ -334,3 +362,10 @@ func _record(tick: int) -> void:
 	_seen[index] = entry
 	_seen_ticks[index] = tick
 	_seen_count += 1
+	if sharing:
+		if _shared.size() != entry.size():
+			_shared.resize(entry.size())
+		for i: int in entry.size():
+			_shared[i] = entry[i]
+		_shared_tick = Sim.total_ticks
+		_shared_level = level.get_instance_id()

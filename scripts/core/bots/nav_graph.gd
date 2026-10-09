@@ -81,6 +81,10 @@ const UNREACHABLE: int = 1 << 30
 # Heap keys: cost << ID_BITS | link id (ties go to the lower link id, as a linear scan would).
 const ID_BITS: int = 20
 const ID_MASK: int = (1 << ID_BITS) - 1
+## A search tells landings apart by node and x: node * LANDING_SPAN + x (x in level px, far inside the span).
+const LANDING_SPAN: int = 1 << 22
+## ... and only on a graph with at least this many links (a small graph has hardly any landing twice).
+const LANDING_MIN_LINKS: int = 512
 
 
 ## A standable span.
@@ -195,8 +199,25 @@ var _out: Array = []
 # Live offsets and last motions of the movers (Vector2i per mover; ZERO = at the level-start place / still).
 var _mover_offsets: Array[Vector2i] = []
 var _mover_motions: Array[Vector2i] = []
+# True for a graph [method load_for_level] read from its file: nobody edits its nodes and links again, so what is
+# derived from them may be kept. Adding a node or a link, or [method rebuild], ends it.
+var _settled: bool = false
+# Per weight class and node: the outgoing links without those that repeat an earlier link of the list - the same
+# take-off window, cost, target node and landing ([method _distinct_links]). Made on first use.
+var _distinct: Array = []
+# Per link id of a settled graph, for the searches (made on first use, [method _link_tables]): the take-off window,
+# the cost of the step without the walk to it ([method link_cost_from] at its own x0), the target node, the landing.
+var _tab_x0: PackedInt32Array = PackedInt32Array()
+var _tab_x1: PackedInt32Array = PackedInt32Array()
+var _tab_cost: PackedInt32Array = PackedInt32Array()
+var _tab_to: PackedInt32Array = PackedInt32Array()
+var _tab_land: PackedInt32Array = PackedInt32Array()
 
 static var _cache: Dictionary = {}
+## Tests and measurements only: false = every search looks at every link of every landing, as before the phase-4
+## performance pass (no landing is skipped, no repeat of a step is left out). The results are the same either way
+## (tests/test_core_bots_fast.gd).
+static var fast: bool = true
 
 
 # =================================================================================================================
@@ -214,6 +235,7 @@ static func load_for_level(p_level_id: StringName) -> NavGraph:
 		return _cache[p_level_id]
 	var graph: NavGraph = load_file(path_for(p_level_id))
 	if graph != null:
+		graph._settled = true
 		_cache[p_level_id] = graph
 	return graph
 
@@ -432,6 +454,9 @@ func usable_class(weight_class: int) -> int:
 func add_node(node: NavNode) -> NavNode:
 	node.id = nodes.size()
 	nodes.append(node)
+	_settled = false
+	_distinct.clear()
+	_tab_x0 = PackedInt32Array()
 	for list: Variant in _out:
 		(list as Array).append(PackedInt32Array())
 	if _out.is_empty():
@@ -444,6 +469,9 @@ func add_link(link: NavLink) -> NavLink:
 	link.id = links.size()
 	link.flags = expand_keys(link.keys)
 	links.append(link)
+	_settled = false
+	_distinct.clear()
+	_tab_x0 = PackedInt32Array()
 	if _out.size() != WEIGHT_CLASSES:
 		rebuild()
 	elif link.from >= 0 and link.from < nodes.size():
@@ -456,6 +484,9 @@ func add_link(link: NavLink) -> NavLink:
 
 ## Recompute the outgoing link lists and the link ids (after loading or editing).
 func rebuild() -> void:
+	_settled = false
+	_distinct.clear()
+	_tab_x0 = PackedInt32Array()
 	_out.clear()
 	for c: int in WEIGHT_CLASSES:
 		var per_node: Array = []
@@ -670,21 +701,93 @@ func link_cost_from(link: NavLink, x: int) -> int:
 ## The cheapest route from (from_node, from_x) to (to_node, to_x): the link ids in order (empty when already on
 ## to_node, or when no route exists - see [method path_cost]). Deterministic: ties go to the lower link id.
 ## `blocked` = link ids not to use (links a bot saw fail); `weight_class` = whose links (WEIGHT_*).
+## `mask` and `open` (both or none): the same set as `blocked`, prepared by the caller for many searches - `mask` one
+## byte per link (1 = not to use), `open` one entry per node (null at first; the search keeps the usable outgoing
+## links of a node there, [method open_links]). With them `blocked` is not read: a search then looks at the usable
+## links of a node only, in the same order (BotNavigator on a graph with pulley lifts, where all but a few of a
+## node's links are left out at any time). The caller empties `open` whenever `mask` or the class changes.
 func find_path(from_node: int, from_x: int, to_node: int, to_x: int, blocked: Dictionary = {},
-		weight_class: int = WEIGHT_LIGHT) -> PackedInt32Array:
-	return _search(from_node, from_x, to_node, to_x, blocked, weight_class)["path"]
+		weight_class: int = WEIGHT_LIGHT, mask: PackedByteArray = PackedByteArray(), open: Array = []) -> PackedInt32Array:
+	return _search(from_node, from_x, to_node, to_x, blocked, weight_class, mask, open)["path"]
 
 
 ## Estimated ticks from (from_node, from_x) to (to_node, to_x); UNREACHABLE when there is no route.
 func path_cost(from_node: int, from_x: int, to_node: int, to_x: int, blocked: Dictionary = {},
-		weight_class: int = WEIGHT_LIGHT) -> int:
-	return int(_search(from_node, from_x, to_node, to_x, blocked, weight_class)["cost"])
+		weight_class: int = WEIGHT_LIGHT, mask: PackedByteArray = PackedByteArray(), open: Array = []) -> int:
+	return int(_search(from_node, from_x, to_node, to_x, blocked, weight_class, mask, open)["cost"])
+
+
+## The outgoing links of a node of a settled graph without the repeats, for a search that leaves no link out: a link
+## whose take-off window, cost ([method link_cost_from] without the walk), target node and landing equal those of an
+## earlier link of [method links_from] is the same step to such a search - it reaches the same landing at the same
+## cost from any x and, with the higher id, never before the earlier one. Tar Pulleys holds every move once per
+## pulley state: 2 668 links, a few dozen distinct ones per node.
+func _distinct_links(node_id: int, weight_class: int) -> PackedInt32Array:
+	if _distinct.size() != WEIGHT_CLASSES:
+		_distinct.clear()
+		for c: int in WEIGHT_CLASSES:
+			var per_node: Array = []
+			for n: int in nodes.size():
+				var seen: Dictionary = {}
+				var kept: PackedInt32Array = PackedInt32Array()
+				for id: int in (_out[c] as Array)[n]:
+					var link: NavLink = links[id]
+					var step: Array = [link.x0, link.x1, link_cost_from(link, link.x0), link.to, link.land_center()]
+					if not seen.has(step):
+						seen[step] = true
+						kept.append(id)
+				per_node.append(kept)
+			_distinct.append(per_node)
+	return (_distinct[usable_class(clampi(weight_class, 0, WEIGHT_CLASSES - 1))] as Array)[node_id]
+
+
+## Make what the searches keep of a settled graph (the link tables, the distinct steps) now instead of in the first
+## search: a bot calls it when it binds to a level, so the first tick of play pays nothing for it. No result depends
+## on when they are made.
+func warm_up() -> void:
+	if not fast or not _settled or links.is_empty() or nodes.is_empty() or _out.size() != WEIGHT_CLASSES:
+		return
+	if _tab_x0.size() != links.size():
+		_link_tables()
+	_distinct_links(0, WEIGHT_LIGHT)
+
+
+# The link tables of a settled graph (see `_tab_x0`): what a search reads of a link, without asking the link.
+func _link_tables() -> void:
+	var count: int = links.size()
+	_tab_x0.resize(count)
+	_tab_x1.resize(count)
+	_tab_cost.resize(count)
+	_tab_to.resize(count)
+	_tab_land.resize(count)
+	for id: int in count:
+		var link: NavLink = links[id]
+		_tab_x0[id] = link.x0
+		_tab_x1[id] = link.x1
+		_tab_cost[id] = link_cost_from(link, link.x0)
+		_tab_to[id] = link.to
+		_tab_land[id] = link.land_center()
+
+
+## The usable outgoing links of `node_id` for a class under `mask` (1 = not to use), in the order of [method
+## links_from]; kept in `open[node_id]` for the next search (see [method find_path]).
+func open_links(node_id: int, weight_class: int, mask: PackedByteArray, open: Array) -> PackedInt32Array:
+	var kept: Variant = open[node_id]
+	if kept != null:
+		return kept
+	var usable: PackedInt32Array = PackedInt32Array()
+	for id: int in links_from(node_id, weight_class):
+		if mask[id] == 0:
+			usable.append(id)
+	open[node_id] = usable
+	return usable
 
 
 ## One search from (from_node, from_x) to every node: {"cost": PackedInt32Array, "x": PackedInt32Array} per node id -
 ## the cheapest ticks to stand on it and the x he arrives at (UNREACHABLE / 0 when it cannot be reached). For
-## comparing many goals at once ([method reach_cost]).
-func reach_from(from_node: int, from_x: int, blocked: Dictionary = {}, weight_class: int = WEIGHT_LIGHT) -> Dictionary:
+## comparing many goals at once ([method reach_cost]). `mask` / `open`: see [method find_path].
+func reach_from(from_node: int, from_x: int, blocked: Dictionary = {}, weight_class: int = WEIGHT_LIGHT,
+		mask: PackedByteArray = PackedByteArray(), open: Array = []) -> Dictionary:
 	var cost: PackedInt32Array = PackedInt32Array()
 	cost.resize(nodes.size())
 	cost.fill(UNREACHABLE)
@@ -697,6 +800,17 @@ func reach_from(from_node: int, from_x: int, blocked: Dictionary = {}, weight_cl
 	cost[from_node] = 0
 	at[from_node] = from_x
 	var count: int = links.size()
+	var masked: bool = count > 0 and mask.size() == count and open.size() == nodes.size()
+	var shared: bool = fast and count >= LANDING_MIN_LINKS
+	# Nothing left out on a settled graph: the repeats of a step are left out (same costs and landings without them).
+	var plain: bool = fast and _settled and not masked and blocked.is_empty() and _out.size() == WEIGHT_CLASSES
+	# A settled graph: what the loop needs of a link is read from the tables (the same numbers).
+	var tabled: bool = fast and _settled and count > 0
+	if tabled and _tab_x0.size() != count:
+		_link_tables()
+	var x0s: PackedInt32Array = _tab_x0
+	var x1s: PackedInt32Array = _tab_x1
+	var costs: PackedInt32Array = _tab_cost
 	var dist: PackedInt32Array = PackedInt32Array()
 	dist.resize(count)
 	dist.fill(UNREACHABLE)
@@ -704,8 +818,11 @@ func reach_from(from_node: int, from_x: int, blocked: Dictionary = {}, weight_cl
 	done.resize(count)
 	done.fill(0)
 	var heap: PackedInt64Array = PackedInt64Array()
-	for id: int in links_from(from_node, weight_class):
-		if not blocked.has(id):
+	# Landings already expanded, by node and x ([method _search]).
+	var landed: Dictionary = {}
+	for id: int in (open_links(from_node, weight_class, mask, open) if masked else (
+			_distinct_links(from_node, weight_class) if plain else links_from(from_node, weight_class))):
+		if masked or not blocked.has(id):
 			dist[id] = link_cost_from(links[id], from_x)
 			heap_push(heap, dist[id], id)
 	while not heap.is_empty():
@@ -715,15 +832,34 @@ func reach_from(from_node: int, from_x: int, blocked: Dictionary = {}, weight_cl
 		if done[current] == 1 or current_cost != dist[current]:
 			continue
 		done[current] = 1
-		var link: NavLink = links[current]
-		var land_x: int = link.land_center()
-		if current_cost < cost[link.to]:
-			cost[link.to] = current_cost
-			at[link.to] = land_x
-		for next: int in links_from(link.to, weight_class):
-			if done[next] == 1 or blocked.has(next):
+		var landed_on: int = _tab_to[current] if tabled else links[current].to
+		var land_x: int = _tab_land[current] if tabled else links[current].land_center()
+		if current_cost < cost[landed_on]:
+			cost[landed_on] = current_cost
+			at[landed_on] = land_x
+		if shared:
+			var landing: int = landed_on * LANDING_SPAN + land_x
+			if landed.has(landing):
 				continue
-			var next_cost: int = current_cost + link_cost_from(links[next], land_x)
+			landed[landing] = true
+		for next: int in (open_links(landed_on, weight_class, mask, open) if masked else (
+				_distinct_links(landed_on, weight_class) if plain else links_from(landed_on, weight_class))):
+			if done[next] == 1 or (not masked and blocked.has(next)):
+				continue
+			# link_cost_from(links[next], land_x), written out: this line runs once per usable link of every landing.
+			var next_cost: int = current_cost
+			if tabled:
+				next_cost += (absi(clampi(land_x, x0s[next], x1s[next]) - land_x) + WALK_PX_PER_TICK - 1) \
+						/ WALK_PX_PER_TICK + costs[next]
+			else:
+				var step: NavLink = links[next]
+				var wait: int = 0
+				if step.cycle.size() >= 3:
+					wait = step.cycle[0] / 2
+				elif not step.cond.is_empty():
+					wait = MOVER_WAIT_TICKS
+				next_cost += (absi(clampi(land_x, step.x0, step.x1) - land_x) + WALK_PX_PER_TICK - 1) \
+						/ WALK_PX_PER_TICK + SETTLE_TICKS + wait + step.ticks
 			if next_cost < dist[next]:
 				dist[next] = next_cost
 				heap_push(heap, next_cost, next)
@@ -745,7 +881,12 @@ func reach_cost(reach: Dictionary, pos: Vector2i) -> int:
 
 
 # Edge-based Dijkstra on a binary heap: dist[link] = cheapest ticks until that link has landed (at its land centre).
-func _search(from_node: int, from_x: int, to_node: int, to_x: int, blocked: Dictionary, weight_class: int) -> Dictionary:
+# A landing (node, x) is expanded once, by the first link popped with it: a later link with the same landing costs at
+# least as much (the heap pops in cost order), and what the next links cost from there depends on the landing alone -
+# so its relaxations could lower nothing and would write nothing. Skipping them changes no result (on a graph that
+# holds every move once per pulley state most links share their landing with others).
+func _search(from_node: int, from_x: int, to_node: int, to_x: int, blocked: Dictionary, weight_class: int,
+		mask: PackedByteArray = PackedByteArray(), open: Array = []) -> Dictionary:
 	var none: Dictionary = {"path": PackedInt32Array(), "cost": UNREACHABLE}
 	if from_node < 0 or from_node >= nodes.size() or to_node < 0 or to_node >= nodes.size():
 		return none
@@ -754,6 +895,14 @@ func _search(from_node: int, from_x: int, to_node: int, to_x: int, blocked: Dict
 	if from_node == to_node:
 		best_cost = walk_ticks(to_x - from_x)
 	var count: int = links.size()
+	var masked: bool = count > 0 and mask.size() == count and open.size() == nodes.size()
+	var shared: bool = fast and count >= LANDING_MIN_LINKS
+	var tabled: bool = fast and _settled and count > 0
+	if tabled and _tab_x0.size() != count:
+		_link_tables()
+	var x0s: PackedInt32Array = _tab_x0
+	var x1s: PackedInt32Array = _tab_x1
+	var costs: PackedInt32Array = _tab_cost
 	var dist: PackedInt32Array = PackedInt32Array()
 	dist.resize(count)
 	dist.fill(UNREACHABLE)
@@ -764,8 +913,9 @@ func _search(from_node: int, from_x: int, to_node: int, to_x: int, blocked: Dict
 	done.resize(count)
 	done.fill(0)
 	var heap: PackedInt64Array = PackedInt64Array()
-	for id: int in links_from(from_node, weight_class):
-		if blocked.has(id):
+	var landed: Dictionary = {}
+	for id: int in (open_links(from_node, weight_class, mask, open) if masked else links_from(from_node, weight_class)):
+		if not masked and blocked.has(id):
 			continue
 		dist[id] = link_cost_from(links[id], from_x)
 		heap_push(heap, dist[id], id)
@@ -778,17 +928,35 @@ func _search(from_node: int, from_x: int, to_node: int, to_x: int, blocked: Dict
 		if current_cost >= best_cost:
 			break
 		done[current] = 1
-		var link: NavLink = links[current]
-		var land_x: int = link.land_center()
-		if link.to == to_node:
+		var landed_on: int = _tab_to[current] if tabled else links[current].to
+		var land_x: int = _tab_land[current] if tabled else links[current].land_center()
+		if landed_on == to_node:
 			var total: int = current_cost + walk_ticks(to_x - land_x)
 			if total < best_cost:
 				best_cost = total
 				best_last = current
-		for next: int in links_from(link.to, weight_class):
-			if done[next] == 1 or blocked.has(next):
+		if shared:
+			var landing: int = landed_on * LANDING_SPAN + land_x
+			if landed.has(landing):
 				continue
-			var cost: int = current_cost + link_cost_from(links[next], land_x)
+			landed[landing] = true
+		for next: int in (open_links(landed_on, weight_class, mask, open) if masked else links_from(landed_on, weight_class)):
+			if done[next] == 1 or (not masked and blocked.has(next)):
+				continue
+			# link_cost_from(links[next], land_x), written out (as in [method reach_from]).
+			var cost: int = current_cost
+			if tabled:
+				cost += (absi(clampi(land_x, x0s[next], x1s[next]) - land_x) + WALK_PX_PER_TICK - 1) \
+						/ WALK_PX_PER_TICK + costs[next]
+			else:
+				var onward: NavLink = links[next]
+				var wait: int = 0
+				if onward.cycle.size() >= 3:
+					wait = onward.cycle[0] / 2
+				elif not onward.cond.is_empty():
+					wait = MOVER_WAIT_TICKS
+				cost += (absi(clampi(land_x, onward.x0, onward.x1) - land_x) + WALK_PX_PER_TICK - 1) \
+						/ WALK_PX_PER_TICK + SETTLE_TICKS + wait + onward.ticks
 			if cost < dist[next]:
 				dist[next] = cost
 				prev[next] = current

@@ -100,6 +100,10 @@ class Seat:
 
 
 # --- Seats -------------------------------------------------------------------------------------------------------
+## True on a phone or tablet: a match there seats VersusTuning.PLAYERS_MAX_MOBILE heroes at most ([method
+## seat_limit]; phase 4, docs/ARCHITECTURE.md 11.5). Tests set it to play the mobile rule on a desktop.
+static var mobile: bool = OS.has_feature("mobile")
+
 ## Defs.MAX_PLAYERS seats, index = player slot.
 var seats: Array[Seat] = _empty_seats()
 
@@ -709,10 +713,17 @@ func _sides_of(slots: PackedInt32Array) -> int:
 	return teams.size()
 
 
+## The seats a match may fill on this device: the first VersusTuning.players_max(mobile) of them. A human or a CPU
+## asking for a seat beyond it gets none (the lobby is full).
+static func seat_limit() -> int:
+	return VersusTuning.players_max(mobile)
+
+
 func _free_seat(slot: int) -> int:
+	var limit: int = mini(seats.size(), seat_limit())
 	if slot >= 0:
-		return slot if slot < seats.size() and not seats[slot].is_taken() else -1
-	for index: int in seats.size():
+		return slot if slot < limit and not seats[slot].is_taken() else -1
+	for index: int in limit:
 		if not seats[index].is_taken():
 			return index
 	return -1

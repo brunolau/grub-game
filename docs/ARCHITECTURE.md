@@ -1808,6 +1808,9 @@ Phase-3 commands: `wait_ms <ms>` (real time), `section <name>` (an independent p
 Flow.goto_title when the game is elsewhere - a part that stops is cut short and the run goes on at the next
 `section`, still failing with exit 4) and `need <level id | route path> ...` (a skeleton flow - a `# skeleton:` line -
 skips to the next section when the content has not landed and reports the part PENDING; any other flow fails).
+Phase-4 commands, for measuring (`tools/perf.sh`): `versus_seed <n>` (every versus match started through the menus
+plays with this match seed instead of the clock's: the same flow plays the same rounds; `Flow.versus_seed`) and
+`frame_sleep <usec>` (vsync off and an idle sleep between two frames, so a run's pace does not depend on the display).
 The campaign flows:
 
 ```
@@ -1931,7 +1934,7 @@ screenshot their work from day one. It is a development tool, not the loader; it
 | Textures | nearest, lossless, no mipmaps; every texture <= 2048 px per side (the Brute sheets were re-packed to 2016 px, ASSET_MANIFEST); <= 96 MB of textures loaded per level; the terrain atlases and the liquid strip of a level share one texture built at load (`WorldTileSet.shared_atlas`), so the tile layers stay one batch per quadrant |
 | Audio | <= 10 SFX voices + 2 music streams; OGG music streamed; no decoding in `_sim_tick` |
 | Loading | a level loads in <= 2 s on the target device; entity scenes are cached by `Spawner`; the level loader calls `Spawner.retain_only(ids)` (scenes of the previous level are released with their textures), `Spawner.preload_ids(ids)` and `Spawner.preload_runtime()` (every fx / items / projectiles scene: nothing is loaded inside a tick). Menus and the world map load ahead what the next level start needs (`Flow.warm_up`, 11.2), so the first level of a session starts as fast as any other |
-| Measuring | `--perf` (debug builds, with `--autoplay` or `--flow`, `scripts/core/dev/perf_probe.gd`): frame CPU / GPU time, draw calls, tick cost, entity counts (registered and ticking), memory and load times per level against this table, slow ticks with what they loaded, a leak snapshot at every title / map arrival; `--perf=layers` also attributes the draw calls to the layers of each level. Headless: `scripts/core/dev/sim_bench.gd` (11.3) |
+| Measuring | `--perf` (debug builds, with `--autoplay` or `--flow`, `scripts/core/dev/perf_probe.gd`): frame CPU / GPU time, draw calls, tick cost, entity counts (registered and ticking), memory and load times per level against this table, slow ticks with what they loaded, a leak snapshot at every title / map arrival; `--perf=layers` also attributes the draw calls to the layers of each level. Headless: `scripts/core/dev/sim_bench.gd` (11.3). 2.0: `bash tools/perf.sh` plays one, two and four heroes with the probe and prints a row per level - tick average / p95 / p99 / worst, the CPU heroes' thinking (`input`), frame CPU time - and `--perf=profile` the cost per phase and class of each level (11.5) |
 | Memory | <= 300 MB resident on Android |
 | Resolution independence | no assumption about the view size; UI anchored; touch targets >= 56 art px |
 | Battery | no busy loops; `Engine.max_fps` stays 0 (vsync); the simulation stops when the app is paused |
@@ -2051,6 +2054,127 @@ about 50 us) and the 10-45 entities that tick near the action. The single spikes
 at once (w2_l2b during the Brute's item burst; 44 in bonus_b); dropped items peak at 36 (w4_l2b: 32 bonus items
 and 4 key items).
 
+### 11.5 2.0: two and four heroes (phase 4, PLAN.md 7 P4.2)
+
+One command measures it: `bash tools/perf.sh` (header in the file; `--profile` for the cost per phase and class,
+`--fast` for a quick comparison of two trees, `--table` to print a kept run again). It writes flow scripts from the
+versioned route files - a solo route and the two-hero route of the first stage of each of the nine worlds, four
+heroes who press nothing on every arena, and one seeded round per arena through the versus menus with P1 idle and
+three Hunter CPUs (`tools/autoplay/gen_versus_flow.py --perf`; the flow command `versus_seed` fixes the match seed,
+so the same rounds are played every time) - and plays them in the windowed game (off-screen, muted, debug binary)
+with the probe of section 11: real time, vsync off with 6.9 ms of idle sleep per frame (about 140 frames per
+second, so that the pace does not depend on the display and the four parts run side by side: off-screen windows
+share one slow vsync on Windows and throttle each other). The probe's "tick" is every phase and every end-of-tick
+handler; the start of a tick - input sampling, where the CPU heroes think, and the `sim_prev` snapshot - is its
+"input", timed with `--perf=profile`.
+
+**Measured** (Ryzen 9 7900X, the tree of 2026-10-09, microseconds per tick; two runs of the same simulation code,
+of each the average, and the higher p95 / p99 / worst of the two. An average moves by 10 - 15 % from run to run
+on this machine - `w9_l1_coop` 329 and 236 - so a difference inside that is no finding):
+
+| Case | tick average | p95 | p99 | worst | against the proxy of section 11 (150 / 500) |
+|---|---|---|---|---|---|
+| one hero, a route per world (Book I is the 1.0 baseline) | 180 - 260 | 294 - 523 | 526 - 782 | 1 569 | x1.2 - 1.7 / x1.1 - 1.6 |
+| two heroes, the co-op route of the same stage | 236 - 443 | 418 - 610 | 602 - 954 | 2 386 | x1.6 - 3.0 / x1.2 - 1.9 |
+| four heroes on an arena, nobody presses anything | 325 - 401 | 413 - 523 | 463 - 590 | 778 | x2.2 - 2.7 / x0.9 - 1.2 |
+| four heroes, a round of one idle human and three Hunters: the tick | 353 - 532 | 504 - 866 | 609 - 1 113 | 2 539 | x2.4 - 3.5 / x1.2 - 2.2 |
+| ... and the three Hunters' thinking before it (input, after the pass below) | 376 - 517 | 652 - 918 | 802 - 1 107 | | |
+
+| Stage | one hero: average (two runs) / p95 / p99 | two heroes: average (two runs) / p95 / p99 |
+|---|---|---|
+| 1-1 | 222, 247 / 399 / 782 | 384, 397 / 553 / 849 |
+| 2-1 | 243, 246 / 439 / 782 | 393, 404 / 607 / 842 |
+| 3-1 | 213, 215 / 376 / 711 | 366, 390 / 585 / 822 |
+| 4-1 | 235, 252 / 480 / 773 | 380, 354 / 595 / 852 |
+| 5-1 | 243, 260 / 523 / 759 | 352, 386 / 610 / 919 |
+| 6-1 | 240, 235 / 349 / 773 | 443, 380 / 599 / 705 |
+| 7-1 | 245, 220 / 348 / 640 | 407, 321 / 588 / 869 |
+| 8-1 | 252, 243 / 406 / 782 | 351, 297 / 548 / 954 |
+| 9-1 | 206, 180 / 315 / 546 | 329, 236 / 510 / 777 |
+
+| Arena (4 heroes, 3 Hunters) | tick: average (two runs) / p95 / p99 | input before the pass: average / p95 / p99 / worst | input after it |
+|---|---|---|---|
+| Cinder Pit | 497, 532 / 866 / 1 113 | 598 / 942 / 1 211 / 15 428 | 456 / 746 / 961 |
+| Colossus Hall | 430, 426 / 674 / 865 | 530 / 847 / 1 034 / 9 651 | 472 / 757 / 904 |
+| Echo Hollow | 397, 425 / 668 / 888 | 630 / 1 119 / 1 301 / 17 140 | 481 / 918 / 1 107 |
+| Floe Rink | 377, 383 / 620 / 895 | 446 / 760 / 932 / 12 447 | 376 / 652 / 802 |
+| Sky Picnic | 436, 436 / 682 / 931 | 524 / 890 / 1 093 / 13 700 | 453 / 765 / 940 |
+| Tar Pulleys | 410, 390 / 652 / 985 | 1 314 / 8 147 / 11 647 / 20 708 | 517 / 891 / 1 076 |
+| Totem Ring | 445, 400 / 702 / 912 | 631 / 1 156 / 1 433 / 12 709 | 474 / 861 / 1 036 |
+| Coconut Cove (Clubball) | 449, 353 / 614 / 730 | 650 / 1 166 / 1 310 / 1 420 | 495 / 879 / 1 070 |
+
+A frame that holds a tick costs 0.44 - 0.59 ms of CPU at p95 and 0.56 - 0.79 ms at p99 with one hero,
+0.51 - 0.83 and 0.73 - 1.04 ms with two, 1.15 - 1.58 and 1.47 - 1.95 ms in a round with three Hunters (process
+step and render CPU time together; Tar Pulleys' p99 was 5.99 ms before the pass). Two, three and four heroes who
+press nothing on an arena cost 184 - 230, 216 - 297 and 265 - 330 us a tick: about 100 us for the level and the
+referee and 50 us a hero. A frame draws 45 calls at most on an arena and 41 in a measured stage (limit 60; the
+versus lobby, a menu, 109); at most 49 entities tick in a co-op stage and 60 on Cinder Pit in a round (limit 48:
+its crates and their food).
+
+**Where the time goes** (`--perf=profile`, usec per tick, the timing included):
+- *Tar Pulleys with CPUs, the worst case by far.* The arena's graph holds every move once per pulley state: 2 668
+  links, 2 581 of them pulley links. A bot planned around the states the lifts are not in with a Dictionary of the
+  links to leave out, made again by a pass over every pulley link (2.6 ms) whenever the lifts' state changed - on
+  11 - 14 % of its ticks, each followed by a new route search over a node's 330 outgoing links, nearly all of
+  them left out. Three Hunters: 8 ms at p95, 12 ms at p99. A Hot Rock runner also searched all 2 668 links for the
+  chaser's reach (23 ms a search): a seeded Hot Rock round of four CPUs took 9.1 ms per tick headless.
+- *Every arena with CPUs.* Each bot asked every hero and the referee for the same state every tick (33 us a bot),
+  searched its graph once per decision (48 - 185 us a reach, a decision every 6 ticks), and on the first tick of
+  play of a round the bots filled their caches (a frame of 9 - 19 ms as the round begins).
+- *Two heroes.* No single part: the two heroes' own four phases (about 115 us of a 440 us profiled tick), the
+  party driver's three steps (45), the end of the tick with the doze decision and the `on_screen` pass (40 - 50
+  with the harness), the start (27 - 30), the tribe camera (25; one hero's camera 10), the start handlers (20),
+  and enemies that cost two to three times a solo enemy per call (a target among two heroes, traits, bonds). The
+  multi-hero pass of phase 3 had taken what repeats per hero there (`LevelBase`'s full pass and column index, the
+  party driver's one pass, the hero's written-out primitives); phase 4 found nothing more to remove without
+  touching a rule, and changed none of it. The same holds for the versus referee (about 100 us with four idle
+  heroes, as much as the heroes themselves).
+
+**What the phase-4 pass removed** - all of it in `scripts/core/bots/`, none of it a decision:
+1. `NavGraph._search` / `reach_from` expand a landing (node and x) once: a later link with the same landing costs
+   at least as much, and what follows depends on the landing alone (graphs of 512 links or more). Tar Pulleys: a
+   reach 23.3 -> 5.7 ms, a route with its cost 7.0 -> 2.4 ms.
+2. `BotNavigator.update_movers` keeps the links to leave out as a mask made from the pulley links indexed by
+   state (one copy and a few dozen writes), and the searches read the open links of a node, kept until the mask
+   changes; the Dictionary is made only when `search_blocked()` is asked for it. A seeded Grub Stack round of four
+   CPUs on Tar Pulleys: 2.70 -> 1.10 ms per tick headless.
+3. On a graph read from its file (`load_for_level`: nobody edits it) a reach that leaves nothing out skips the
+   repeats of a step (same window, cost, target and landing), and both searches read what they need of a link
+   from packed tables instead of the link objects. A reach on the small graphs 48 - 185 -> 35 - 111 us, the
+   chaser's reach on Tar Pulleys 5.7 -> 1.3 ms; the Hot Rock round above: 9.13 -> 1.51 ms per tick.
+4. The versus bots of a tick share one look at the heroes (`HeroBot._record`: the first asks, the others copy).
+5. What the bots keep of a level - the searches' tables, the pulley index, where to stand to strike each spot -
+   is made when a bot binds to it, on the first tick of the round's intro, not on the first tick of play: the
+   frames of a round's play are all under 2.5 ms now (one tick per frame).
+Together: the table above (input -11 to -25 % on seven arenas, -61 % on Tar Pulleys with its p95 from 8.1 to
+0.9 ms); 348 seeded soak rounds in about 60 s instead of 143. The switches `NavGraph.fast`,
+`BotNavigator.use_mask` and `HeroBot.share_seen` (tests and measurements only) give the code of before.
+
+**Proof that no result moved.** The 161 per-tick digests of the route folder (371 125 ticks; the Rival Chieftains
+are driven by the same bots) are identical with and without the pass, dozing on and off; `tools/sp_identity.sh`
+says IDENTICAL; 348 seeded soak rounds (`tools/bots/soak.sh <tag> 84 8 detail=1`: every mode and arena with two
+to four CPUs, 480 552 ticks, 48 rounds on Tar Pulleys) end on the same tick with the same winners, scores and
+idle count; the eight rounds of `tools/perf.sh` have the same lengths; `tests/test_versus_bots.gd` keeps its
+48-round pins; and `tests/test_core_bots_fast.gd` compares the searches with the plain search kept in the test
+(90 trials on the settled graph and on a copy: routes, costs, landings), the mask with the Dictionary link by
+link in 40 pulley states, and two rounds played with the pass off and on.
+
+**What a Cortex-A53 class device can be expected to run - an estimate, no device was measured.** With the factor
+of 11.4 (10 - 15 times this desktop) a frame that holds a tick is expected at 4 - 9 ms (p95) and 6 - 12 ms (p99)
+with one hero - 1.0's class, the tick alone 1.8 - 3.9 ms on average: over the 2 ms of section 11 as 1.0 is -, at
+5 - 12 ms and 7 - 16 ms with two heroes (the tick 2.4 - 6.6 ms on average, about 1.6 times one hero): inside the
+16.7 ms of a 60 Hz frame on all but the worst ticks. A second hero on an arena costs what a co-op partner costs
+and one CPU adds 1 - 2.5 ms, so two-player co-op and a versus match of two are expected to run at 60 frames
+with a late frame now and then. Four heroes without CPUs are at the edge (the tick 3.5 - 8 ms on average, 6 - 17
+at p99, before the frame's own work). Four heroes with three CPUs are expected at 12 - 24 ms (p95) and 15 - 29
+ms (p99) per frame with a tick, 7.6 - 15 ms of tick and thinking on average: a late frame on many of the 24
+ticks of every second. Before the pass Tar Pulleys stood at 60 - 90 ms (p99). So **two heroes fit, four with
+CPUs do not**, and the game caps a versus match on a phone or tablet at `VersusTuning.PLAYERS_MAX_MOBILE` = 2
+heroes (`VersusMatch.seat_limit()`: humans and CPUs together; a desktop build seats four;
+`tests/test_core_mobile_cap.gd`). The cap is the estimate's, not a measurement's: it goes to `PLAYERS_MAX` when
+the device check of `docs/expansion/HUMAN_CHECKS.md` (section D) passes with four heroes. Left for whoever ports
+the game: the versus lobby does not show the cap yet (its cards 3 and 4 refuse a player without saying why).
+
 ---
 
 ## 12. Decisions and deviations recorded here
@@ -2128,3 +2252,11 @@ and 4 key items).
   (world-B's referee sets them, player-A's party component runs them), `leash` (player-A counts, ui-B's HUD shows),
   and a player's look `PlayerRun.palette` / `pattern` (ui-A picks, player-A and ui-B draw). The numbers of the
   PHYSICS.md C.16 rows that name `Tuning`, `PartyTuning` or `VersusTuning` live there (a module never keeps a copy).
+- 2.0 phase 4 (performance, 11.5): the measurement is one command (`tools/perf.sh`) and its numbers of record are
+  taken in real time with vsync off and a fixed sleep per frame; the probe times the CPU heroes' thinking apart
+  from the tick (`input`). The bots' route search was made faster without a decision changing - a landing expanded
+  once, a mask and the open links of a node on graphs with pulley lifts, the distinct steps and packed link tables
+  of a graph read from its file, one look at the heroes per tick for all versus bots, the caches filled in a
+  round's intro; nothing else of the tick was changed. A versus match on a phone or tablet seats
+  `VersusTuning.PLAYERS_MAX_MOBILE` = 2 heroes (an estimate for a Cortex-A53 class device, not a measurement); a
+  desktop build seats four.

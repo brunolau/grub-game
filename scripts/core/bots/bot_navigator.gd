@@ -42,6 +42,10 @@ const WALL_REACH_PX: int = 48
 ## [member safe_falls]: ticks without a route after which the blocked links of the node he stands on get one more try.
 const RETRY_BLOCKED_TICKS: int = 72
 
+## Tests and measurements only: false = on a graph with pulley lifts the searches read the Dictionary of
+## [method search_blocked] again instead of the mask (the phase-4 performance pass; the same routes either way).
+static var use_mask: bool = true
+
 var graph: NavGraph = null
 ## Link ids not to use (id -> true), of the current weight class.
 var blocked: Dictionary = {}
@@ -87,11 +91,30 @@ var _failures: Dictionary = {}
 # Links not to plan with on a level with pulley lifts (core-B wf10): [member blocked] plus the pulley links of every
 # pulley state but the one the pulley will rest in for this hero ([method update_movers]); "" = none (plan with
 # `blocked` alone).
+# Phase-4 performance pass: the set is kept as `_mask` (one byte per link, 1 = left out; made from the per-state
+# groups of the graph's pulley links in a few hundred writes instead of a pass over every pulley link) and the
+# searches read it with `_open` (NavGraph.find_path). The Dictionary `_avoid` - the same set - is only made when
+# somebody asks for it ([method search_blocked]), from what the set was made of: `_avoid_base` (the blocked links
+# then), `_avoid_plan`, `_avoid_states`.
 var _avoid: Dictionary = {}
 var _avoid_key: String = ""
+var _avoid_made: bool = true
+var _avoid_base: Dictionary = {}
+var _avoid_plan: Dictionary = {}
+var _avoid_states: Dictionary = {}
+var _mask: PackedByteArray = PackedByteArray()
+var _mask_on: bool = false
+var _open: Array = []
+var _open_class: int = -1
 var _pulley_links: PackedInt32Array = PackedInt32Array()
 var _clear_links: PackedInt32Array = PackedInt32Array()
 var _pulley_graph: NavGraph = null
+# The pulley links of `_pulley_graph`: one byte per link (1 = a pulley link); the movers they belong to; and the ids
+# of the links verified at rest per (mover, taken from the lift or not, pulley offset) - [method _state_key].
+var _pulley_mask: PackedByteArray = PackedByteArray()
+var _pulley_movers: PackedInt32Array = PackedInt32Array()
+var _state_links: Dictionary = {}
+var _no_links: PackedInt32Array = PackedInt32Array()
 var _last_x: int = -(1 << 30)
 var _still: int = 0
 var _hop: int = 0
@@ -122,6 +145,8 @@ func reset() -> void:
 	_last_x = -(1 << 30)
 	_avoid = {}
 	_avoid_key = ""
+	_avoid_made = true
+	_mask_on = false
 	_stranded = 0
 
 
@@ -134,45 +159,158 @@ func reset() -> void:
 func update_movers(hero: PlayerBase, live: NavMoversLive) -> void:
 	if graph == null or live == null or not live.has_pulleys():
 		_avoid_key = ""
+		_mask_on = false
 		return
 	if _pulley_graph != graph:
 		_pulley_graph = graph
-		_pulley_links = PackedInt32Array()
-		_clear_links = PackedInt32Array()
-		for candidate: NavGraph.NavLink in graph.links:
-			if candidate.cond.size() >= 5 and graph.is_pulley_lift(candidate.cond[0]):
-				_pulley_links.append(candidate.id)
-			elif candidate.clear_at.size() >= 3:
-				_clear_links.append(candidate.id)
+		_index_pulley_links()
 	var plan: Dictionary = live.pulley_plan(hero)
 	var states: Dictionary = live.pulley_states() if not _clear_links.is_empty() else {}
 	var key: String = "%s|%s|%d|%d" % [plan, states, weight_class, blocked.size()]
 	if key == _avoid_key:
 		return
 	_avoid_key = key
-	_avoid = blocked.duplicate()
-	for id: int in _pulley_links:
-		var candidate: NavGraph.NavLink = graph.links[id]
-		var mover: int = candidate.cond[0]
-		if not plan.has(mover):
-			continue
-		var want: Vector2i = plan[mover]
-		var p: int = want.y if graph.nodes[candidate.from].mover == mover else want.x
-		if graph.link_pulley_offset(candidate) != p or candidate.cond[3] != 0 or candidate.cond[4] != 0:
-			_avoid[id] = true
-	for id: int in _clear_links:
-		var candidate: NavGraph.NavLink = graph.links[id]
-		if states.has(candidate.clear_at[0]):
-			var state: Vector2i = states[candidate.clear_at[0]]
-			if not NavGraph.link_clear(candidate, state.x, state.y):
-				_avoid[id] = true
+	_avoid_base = blocked.duplicate()
+	_avoid_plan = plan.duplicate()
+	_avoid_states = states.duplicate()
+	_avoid_made = false
+	_mask_on = _make_mask()
+	if not _mask_on:
+		_avoid = _make_avoid()
+		_avoid_made = true
 	# The planned path may use a pulley link of the old state: plan again.
 	_path = PackedInt32Array()
 
 
+## Make what this navigator keeps of its graph now (HeroBot.bind: a level start) instead of on the first tick it
+## plans: the graph's own tables (NavGraph.warm_up) and, on a level with pulley lifts, the index of its pulley links.
+func warm_up(live: NavMoversLive) -> void:
+	if graph == null:
+		return
+	graph.warm_up()
+	if live != null and live.has_pulleys() and _pulley_graph != graph:
+		_pulley_graph = graph
+		_index_pulley_links()
+
+
+# The pulley links and the links past a lift's column of `graph` (once per graph), and the pulley links by state.
+func _index_pulley_links() -> void:
+	_pulley_links = PackedInt32Array()
+	_clear_links = PackedInt32Array()
+	_pulley_mask = PackedByteArray()
+	_pulley_mask.resize(graph.links.size())
+	_pulley_mask.fill(0)
+	_pulley_movers = PackedInt32Array()
+	_state_links = {}
+	for candidate: NavGraph.NavLink in graph.links:
+		if candidate.cond.size() >= 5 and graph.is_pulley_lift(candidate.cond[0]):
+			_pulley_links.append(candidate.id)
+			_pulley_mask[candidate.id] = 1
+			var mover: int = candidate.cond[0]
+			if not _pulley_movers.has(mover):
+				_pulley_movers.append(mover)
+			if candidate.cond[3] == 0 and candidate.cond[4] == 0:
+				var state: int = _state_key(mover, graph.nodes[candidate.from].mover == mover,
+						graph.link_pulley_offset(candidate))
+				var ids: PackedInt32Array = _state_links.get(state, PackedInt32Array())
+				ids.append(candidate.id)
+				_state_links[state] = ids
+		elif candidate.clear_at.size() >= 3:
+			_clear_links.append(candidate.id)
+
+
+# The key of `_state_links`: the links of `mover` taken from the lift (`from_lift`) or onto it that were verified at
+# pulley offset `offset` (px, far inside +/- 2^20).
+static func _state_key(mover: int, from_lift: bool, offset: int) -> int:
+	return ((mover * 2 + (1 if from_lift else 0)) << 22) + offset + (1 << 21)
+
+
+# `_mask` for `_avoid_base`, `_avoid_plan` and `_avoid_states`: exactly the links [method _make_avoid] names. A pulley
+# link is left out unless it was verified at rest at the offset the plan wants for its side of its lift: every pulley
+# link is marked (one copy), then the wanted states are opened again - a few dozen links each. False (no mask; the
+# Dictionary is used) for a blocked key that is no link id.
+func _make_mask() -> bool:
+	var size: int = graph.links.size()
+	var covered: bool = true
+	for mover: int in _pulley_movers:
+		if not _avoid_plan.has(mover):
+			covered = false
+			break
+	if covered:
+		_mask = _pulley_mask.duplicate()
+	else:
+		# A plan that does not know every pulley lift (no game makes one): its lifts' links only.
+		_mask = PackedByteArray()
+		_mask.resize(size)
+		_mask.fill(0)
+		for id: int in _pulley_links:
+			if _avoid_plan.has(graph.links[id].cond[0]):
+				_mask[id] = 1
+	for mover: Variant in _avoid_plan:
+		if not mover is int:
+			return false
+		var want: Vector2i = _avoid_plan[mover]
+		for id: int in _state_links.get(_state_key(mover, true, want.y), _no_links):
+			_mask[id] = 0
+		for id: int in _state_links.get(_state_key(mover, false, want.x), _no_links):
+			_mask[id] = 0
+	for id: Variant in _avoid_base:
+		if not id is int or int(id) < 0 or int(id) >= size:
+			return false
+		_mask[id] = 1
+	for id: int in _clear_links:
+		var candidate: NavGraph.NavLink = graph.links[id]
+		if _avoid_states.has(candidate.clear_at[0]):
+			var state: Vector2i = _avoid_states[candidate.clear_at[0]]
+			if not NavGraph.link_clear(candidate, state.x, state.y):
+				_mask[id] = 1
+	_open_class = -1
+	return true
+
+
+# The links left out as a Dictionary (id -> true), link by link: the blocked ones, the pulley links of every state but
+# the planned one, the links past a lift's column while it is in their way.
+func _make_avoid() -> Dictionary:
+	var avoid: Dictionary = _avoid_base.duplicate()
+	for id: int in _pulley_links:
+		var candidate: NavGraph.NavLink = graph.links[id]
+		var mover: int = candidate.cond[0]
+		if not _avoid_plan.has(mover):
+			continue
+		var want: Vector2i = _avoid_plan[mover]
+		var p: int = want.y if graph.nodes[candidate.from].mover == mover else want.x
+		if graph.link_pulley_offset(candidate) != p or candidate.cond[3] != 0 or candidate.cond[4] != 0:
+			avoid[id] = true
+	for id: int in _clear_links:
+		var candidate: NavGraph.NavLink = graph.links[id]
+		if _avoid_states.has(candidate.clear_at[0]):
+			var state: Vector2i = _avoid_states[candidate.clear_at[0]]
+			if not NavGraph.link_clear(candidate, state.x, state.y):
+				avoid[id] = true
+	return avoid
+
+
 ## The links the searches leave out: [member blocked], plus the pulley links of other states ([method update_movers]).
 func search_blocked() -> Dictionary:
-	return _avoid if _avoid_key != "" else blocked
+	if _avoid_key == "":
+		return blocked
+	if not _avoid_made:
+		# (A graph put in place since the set was made has other link ids: only the blocked links are known then.)
+		_avoid = _make_avoid() if _pulley_graph == graph else _avoid_base.duplicate()
+		_avoid_made = true
+	return _avoid
+
+
+# True when the searches read `_mask` (it stands for the links of this graph), with `_open` ready for the class in use.
+func _masked() -> bool:
+	if not use_mask or not _mask_on or _avoid_key == "" or _mask.is_empty() or _mask.size() != graph.links.size():
+		return false
+	var search: int = search_class()
+	if search != _open_class or _open.size() != graph.nodes.size():
+		_open_class = search
+		_open = []
+		_open.resize(graph.nodes.size())
+	return true
 
 
 ## Switch to the links known to work for weight class `p_class` (NavGraph.WEIGHT_*).
@@ -238,6 +376,8 @@ func cost_to(hero: PlayerBase, pos: Vector2i) -> int:
 		to = graph.node_below(pos)
 	if to < 0:
 		return NavGraph.UNREACHABLE
+	if _masked():
+		return graph.path_cost(from, hero.sim_pos.x, to, pos.x, blocked, search_class(), _mask, _open)
 	return graph.path_cost(from, hero.sim_pos.x, to, pos.x, search_blocked(), search_class())
 
 
@@ -248,6 +388,8 @@ func reach(hero: PlayerBase) -> Dictionary:
 	var from: int = node_of(hero)
 	if from < 0:
 		from = graph.node_for(hero.sim_pos)
+	if _masked():
+		return graph.reach_from(from, hero.sim_pos.x, blocked, search_class(), _mask, _open)
 	return graph.reach_from(from, hero.sim_pos.x, search_blocked(), search_class())
 
 
@@ -276,7 +418,10 @@ func step(hero: PlayerBase, tick: int) -> int:
 		return _walk_on(hero, clampi(target.x, graph.node_x0(node), graph.node_x1(node)), tolerance, node)
 	_path_age += 1
 	if _path.is_empty() or _path_from != here or _path_age >= REPLAN_TICKS:
-		_path = graph.find_path(here, hero.sim_pos.x, target_node, target.x, search_blocked(), search_class())
+		if _masked():
+			_path = graph.find_path(here, hero.sim_pos.x, target_node, target.x, blocked, search_class(), _mask, _open)
+		else:
+			_path = graph.find_path(here, hero.sim_pos.x, target_node, target.x, search_blocked(), search_class())
 		_path_from = here
 		_path_age = 0
 	if _path.is_empty():
@@ -567,7 +712,13 @@ func _fail(failed: NavGraph.NavLink, _hero: PlayerBase, what: String) -> void:
 	if count >= LINK_FAILURES_TO_BLOCK:
 		blocked[failed.id] = true
 		if _avoid_key != "":
-			_avoid[failed.id] = true
+			# The set in use takes it at once (the next [method update_movers] makes the set again).
+			_avoid_base[failed.id] = true
+			if _avoid_made:
+				_avoid[failed.id] = true
+			if _mask_on and failed.id >= 0 and failed.id < _mask.size():
+				_mask[failed.id] = 1
+				_open_class = -1
 
 
 ## True when another living hero's body overlaps this one's (a body bump or a head to stand on changes the move: the

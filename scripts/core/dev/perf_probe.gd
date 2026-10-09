@@ -11,14 +11,21 @@ extends Node
 ##   gpu        GPU time of the root viewport in ms (when the driver reports it)
 ##   wall       time between two frames in ms (vsync included: a hitch shows up here)
 ##   draws      canvas draw calls of the frame; objects / primitives drawn
-##   tick       cost of one simulation tick in microseconds (Sim.tick_started .. Sim.tick_finished)
+##   tick       cost of one simulation tick in microseconds (Sim.tick_started .. Sim.tick_finished): every phase and
+##              every end-of-tick handler, NOT the input sampling before it (GameInput.sample: the CPU heroes think
+##              there, scripts/core/bots) - that part is `input`, timed with `--perf=profile` only
+##   input      `--perf=profile`: cost of the start of a tick in microseconds (input sampling with the CPU heroes'
+##              thinking, the sim_prev snapshot)
 ##   entities   registered SimEntity and how many of them tick (the rest doze); awake enemies; dropped (moving)
 ##              items; items in view; thrown hero weapons; platforms in view; enemy projectiles; fx nodes
 ##   memory     texture memory, video memory, static memory (MB); objects, nodes, resources, orphan nodes
 ## Level loads: from the covered screen (Flow.transition_covered) to Events.level_started, and from the moment the
 ## level node enters the tree to Events.level_started (the level's own build).
 ## `--perf=profile` also times every _sim_tick call of the windowed game (Sim._profiler) and prints the cost per phase
-## and class at the end ("Perf profile: ...") - the windowed share of each part, which a headless run cannot show.
+## and class at the end, per level ("Perf profile <level>: ...") - the windowed share of each part, which a headless
+## run cannot show. The timing itself costs: read the tick columns from a run without it.
+## One line per level in a fixed shape for tools ("Perf row: ...", tools/perf.sh): heroes, ticks, tick cost average /
+## p95 / p99 / max, input, frame CPU, process, render, GPU, draw calls, ticking entities.
 ## Leak check: SNAPSHOT_FRAMES frames after each arrival on the title or the world map the object, node, resource and
 ## orphan counts and static memory are recorded; compare the first and the last.
 ## Frames of the first WARMUP_FRAMES after a scene change are filed under "<segment>#warmup" (loading hitches).
@@ -73,6 +80,9 @@ class Segment:
 	var max_video_mb: float = 0.0
 	var max_static_mb: float = 0.0
 	var grid: String = ""
+	## Most heroes the level held, and (--perf=profile) the cost of every tick's start in microseconds.
+	var heroes: int = 0
+	var input: PackedInt32Array = PackedInt32Array()
 	var process: PackedFloat32Array = PackedFloat32Array()
 	var render: PackedFloat32Array = PackedFloat32Array()
 	## Where the most draw calls happened: [draws, tick, hero x, hero y].
@@ -94,6 +104,11 @@ class FrameStart:
 
 
 const TOP_COUNT: int = 12
+## Rows of the profile printed per level (--perf=profile).
+const PROFILE_ROWS: int = 32
+## Desktop proxy of the tick budget (docs/ARCHITECTURE.md 11): average and p99 per tick in microseconds.
+const PROXY_TICK_AVG_US: float = 150.0
+const PROXY_TICK_P99_US: float = 500.0
 
 var _frame_start: FrameStart = null
 var _tick_scenes: int = 0
@@ -125,9 +140,15 @@ var _layers_mode: bool = false
 var _layers_done: Dictionary = {}
 var _layers_busy: bool = false
 var _last_draws: int = 0
-## --perf=profile: "phase|script" -> PackedInt64Array [calls, usec], and the ticks profiled.
+## --perf=profile, per segment (level): row key -> PackedInt64Array [calls, usec]; the ticks profiled per segment; the
+## rows of the segment whose tick runs now; the name of every row key (an int: a part, or script and phase).
 var _profile_calls: Dictionary = {}
-var _profile_ticks: int = 0
+var _profile_ticks: Dictionary = {}
+var _profile_now: Dictionary = {}
+var _profile_names: Dictionary = {}
+var _profile_parts: Dictionary = {}
+## The starts of the ticks since the last frame (--perf=profile), in microseconds.
+var _pending_inputs: PackedInt32Array = PackedInt32Array()
 
 
 func _init() -> void:
@@ -200,6 +221,9 @@ func _process(_delta: float) -> void:
 	for t: int in _pending_ticks:
 		seg.ticks.append(t)
 	_pending_ticks.clear()
+	for t: int in _pending_inputs:
+		seg.input.append(t)
+	_pending_inputs.clear()
 	seg.max_texture_mb = maxf(seg.max_texture_mb, Performance.get_monitor(Performance.RENDER_TEXTURE_MEM_USED) / MB)
 	seg.max_video_mb = maxf(seg.max_video_mb, Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / MB)
 	seg.max_static_mb = maxf(seg.max_static_mb, Performance.get_monitor(Performance.MEMORY_STATIC) / MB)
@@ -217,6 +241,7 @@ func _sample_level(seg: Segment) -> void:
 		return
 	if seg.grid.is_empty() and level.grid != null:
 		seg.grid = "%dx%d" % [level.grid.cols, level.grid.rows]
+	seg.heroes = maxi(seg.heroes, level.hero_count())
 	seg.max_entities = maxi(seg.max_entities, Sim.get_entity_count())
 	seg.max_ticking = maxi(seg.max_ticking, _pending_ticking)
 	_pending_ticking = 0
@@ -354,35 +379,57 @@ func _on_tick_finished(tick: int) -> void:
 		_first_loads.append([cost, _segment_key(), tick, ", ".join(loaded)])
 
 
-## Sim._profiler callbacks (--perf=profile).
+## Sim._profiler callbacks (--perf=profile). Rows are keyed by an int (no text is built per call): a script's
+## instance id and the phase, or a part's number.
 func add_call(phase: int, script: Script, usec: int) -> void:
-	_profile_add("%s|%s" % [Defs.Phase.keys()[phase], script.resource_path.get_file() if script != null else "?"], usec)
+	var key: int = (script.get_instance_id() if script != null else 0) * Defs.PHASE_COUNT + phase
+	var entry: PackedInt64Array = _profile_now.get(key, PackedInt64Array())
+	if entry.is_empty():
+		entry = PackedInt64Array([0, 0])
+		if not _profile_names.has(key):
+			_profile_names[key] = "%s|%s" % [Defs.Phase.keys()[phase],
+					script.resource_path.get_file() if script != null else "?"]
+	entry[0] += 1
+	entry[1] += usec
+	_profile_now[key] = entry
 
 
 func add_part(part: StringName, usec: int) -> void:
 	if part == &"begin: input, snapshot":
-		_profile_ticks += 1
-	_profile_add("TICK|" + String(part), usec)
-
-
-func _profile_add(key: String, usec: int) -> void:
-	var entry: PackedInt64Array = _profile_calls.get(key, PackedInt64Array([0, 0]))
+		# The first part of a tick: the rows of the level it runs in.
+		var segment: String = _segment_key()
+		if not _profile_calls.has(segment):
+			_profile_calls[segment] = {}
+			_profile_ticks[segment] = 0
+		_profile_now = _profile_calls[segment]
+		_profile_ticks[segment] = int(_profile_ticks[segment]) + 1
+		_pending_inputs.append(usec)
+	if not _profile_parts.has(part):
+		_profile_parts[part] = -1 - _profile_parts.size()
+		_profile_names[_profile_parts[part]] = "TICK|" + String(part)
+	var key: int = _profile_parts[part]
+	var entry: PackedInt64Array = _profile_now.get(key, PackedInt64Array([0, 0]))
 	entry[0] += 1
 	entry[1] += usec
-	_profile_calls[key] = entry
+	_profile_now[key] = entry
 
 
 func _print_profile() -> void:
-	var rows: Array[Array] = []
-	for key: String in _profile_calls:
-		var entry: PackedInt64Array = _profile_calls[key]
-		rows.append([key, entry[0], entry[1]])
-	rows.sort_custom(func(a: Array, b: Array) -> bool: return int(a[2]) > int(b[2]))
-	var ticks: float = maxf(float(_profile_ticks), 1.0)
-	print("Perf profile: %d ticks, usec per tick by phase|script (calls per tick, usec per call)" % _profile_ticks)
-	for row: Array in rows.slice(0, 40):
-		print("Perf profile: %-44s %7.2f us/tick  %6.2f calls/tick  %6.2f us/call" % [row[0], float(row[2]) / ticks,
-				float(row[1]) / ticks, float(row[2]) / maxf(float(row[1]), 1.0)])
+	for segment: String in _profile_calls:
+		var calls: Dictionary = _profile_calls[segment]
+		var rows: Array[Array] = []
+		var total: int = 0
+		for key: int in calls:
+			var entry: PackedInt64Array = calls[key]
+			rows.append([_profile_names.get(key, "?"), entry[0], entry[1]])
+			total += entry[1]
+		rows.sort_custom(func(a: Array, b: Array) -> bool: return int(a[2]) > int(b[2]))
+		var ticks: float = maxf(float(_profile_ticks[segment]), 1.0)
+		print("Perf profile %s: %d ticks, %.1f us per tick in all parts; usec per tick by phase|script (calls per tick, usec per call)" % [
+				segment, _profile_ticks[segment], float(total) / ticks])
+		for row: Array in rows.slice(0, PROFILE_ROWS):
+			print("Perf profile %s: %-44s %7.2f us/tick  %6.2f calls/tick  %6.2f us/call" % [segment, row[0],
+					float(row[2]) / ticks, float(row[1]) / ticks, float(row[2]) / maxf(float(row[1]), 1.0)])
 
 
 func _on_covered() -> void:
@@ -471,6 +518,15 @@ func _on_finished(_exit_code: int) -> void:
 			seg.max_video_mb, seg.max_static_mb, seg.grid])
 		if key.ends_with("#warmup"):
 			continue
+		if key.begins_with("level:") and int(row["ticks"]) > 0:
+			# One line per level in a fixed shape (tools/perf.sh reads it); input is 0 without --perf=profile.
+			print("Perf row: %s | heroes %d | ticks %d | tick us avg %d p95 %d p99 %d max %d | input us avg %d p95 %d p99 %d max %d | cpu ms avg %.2f p95 %.2f p99 %.2f max %.2f | process ms avg %.2f p99 %.2f | render ms avg %.2f p99 %.2f | gpu ms avg %.2f max %.2f | draws avg %.0f max %d | ticking %d of %d | proxy avg x%.2f p99 x%.2f" % [
+				key.trim_prefix("level:"), seg.heroes, row["ticks"], row["tick_avg_us"], row["tick_p95_us"],
+				row["tick_p99_us"], row["tick_max_us"], row["input_avg_us"], row["input_p95_us"], row["input_p99_us"],
+				row["input_max_us"], row["cpu_avg"], row["cpu_p95"], row["cpu_p99"], row["cpu_max"], row["process_avg"],
+				row["process_p99"], row["render_avg"], row["render_p99"], row["gpu_avg"], row["gpu_max"],
+				row["draws_avg"], row["draws_max"], seg.max_ticking, seg.max_entities,
+				float(row["tick_avg_us"]) / PROXY_TICK_AVG_US, float(row["tick_p99_us"]) / PROXY_TICK_P99_US])
 		_worst(worst, "cpu_p99_ms", row["cpu_p99"], key)
 		_worst(worst, "cpu_max_ms", row["cpu_max"], key)
 		_worst(worst, "gpu_max_ms", row["gpu_max"], key)
@@ -574,6 +630,8 @@ func _summarise(seg: Segment) -> Dictionary:
 	cpu.sort()
 	var ticks: PackedInt32Array = seg.ticks.duplicate()
 	ticks.sort()
+	var inputs: PackedInt32Array = seg.input.duplicate()
+	inputs.sort()
 	var draws_sum: int = 0
 	var draws_max: int = 0
 	for d: int in seg.draws:
@@ -585,14 +643,18 @@ func _summarise(seg: Segment) -> Dictionary:
 	render.sort()
 	return {
 		"frames": seg.frames,
-		"cpu_avg": _avg(seg.cpu), "cpu_p99": _pct(cpu, 0.99), "cpu_max": _pct(cpu, 1.0),
+		"cpu_avg": _avg(seg.cpu), "cpu_p95": _pct(cpu, 0.95), "cpu_p99": _pct(cpu, 0.99), "cpu_max": _pct(cpu, 1.0),
+		"heroes": seg.heroes,
+		"input_avg_us": int(_avg_i(inputs)), "input_p95_us": _pct_i(inputs, 0.95), "input_p99_us": _pct_i(inputs, 0.99),
+		"input_max_us": _pct_i(inputs, 1.0),
 		"process_avg": _avg(seg.process), "process_p99": _pct(process, 0.99),
 		"render_avg": _avg(seg.render), "render_p99": _pct(render, 0.99),
 		"gpu_avg": _avg(seg.gpu), "gpu_max": _max_f(seg.gpu), "wall_avg": _avg(seg.wall), "wall_max": _max_f(seg.wall),
 		"draws_at": seg.draws_at,
 		"draws_avg": float(draws_sum) / maxf(float(seg.draws.size()), 1.0), "draws_max": draws_max,
 		"ticks": ticks.size(),
-		"tick_avg_us": int(_avg_i(ticks)), "tick_p99_us": _pct_i(ticks, 0.99), "tick_max_us": _pct_i(ticks, 1.0),
+		"tick_avg_us": int(_avg_i(ticks)), "tick_p95_us": _pct_i(ticks, 0.95), "tick_p99_us": _pct_i(ticks, 0.99),
+		"tick_max_us": _pct_i(ticks, 1.0),
 		"entities_max": seg.max_entities, "ticking_max": seg.max_ticking, "awake_max": seg.max_awake, "level_awake_max": seg.max_level_awake,
 		"dropped_max": seg.max_dropped, "items_in_view_max": seg.max_items_in_view,
 		"items_registered_max": seg.max_items_total, "thrown_max": seg.max_thrown,

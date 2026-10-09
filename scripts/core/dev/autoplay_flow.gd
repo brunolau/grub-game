@@ -47,6 +47,12 @@ extends Node
 ##   reset_events                     set the `events.*` counters back to zero
 ##   start_level <id> [expert] [players=<n>]   shortcut for segment work: a new run straight into a level (no
 ##                                    menus); with players=2..4 a co-op run of that party (a versus run in an arena)
+##   versus_seed <n>                  every versus match the flow starts through the menus from here on plays with
+##                                    this match seed instead of the clock's (Flow.versus_seed; -1 = the clock again):
+##                                    the same flow then plays the same rounds (tools/perf.sh)
+##   frame_sleep <usec>               measurement runs: vsync off and the engine's idle sleep of <usec> between two
+##                                    frames (OS.low_processor_usage_mode), so a run renders about 1 000 000 / usec
+##                                    frames per second instead of the display's rate; 0 = as the settings say again
 ##   window <width> <height>          resize the game window (os px) and wait until the view follows: 1600 720 gives
 ##                                    the 800 x 360 view of a wide phone, 1364 1024 the 682 x 512 view of a tablet
 ##   focus out|in                     the application loses / regains the focus, as when the player switches to
@@ -236,6 +242,7 @@ const COMMAND_ARGS: Dictionary = {
 	"play_file": [1, 1], "input": [1, 2], "weapon": [1, 2], "shot": [1, -1], "every": [1, 2], "expect": [1, -1],
 	"log": [1, -1], "reset_events": [0, 0], "start_level": [1, 3], "window": [2, 2], "focus": [1, 1],
 	"wait_ms": [1, 1], "expect_errors": [1, 1], "section": [1, -1], "need": [1, -1], "quit": [0, 0],
+	"versus_seed": [1, 1], "frame_sleep": [1, 1],
 }
 ## Pad control names of `pad` (besides button numbers).
 const PAD_NAMES: PackedStringArray = [
@@ -270,7 +277,7 @@ static func lint(script_text: String) -> Dictionary:
 					"any" if int(bounds[1]) < 0 else str(bounds[1]), count])
 			continue
 		match op:
-			"wait", "every", "window", "wait_ms", "expect_errors":
+			"wait", "every", "window", "wait_ms", "expect_errors", "versus_seed", "frame_sleep":
 				for argument: String in command.slice(1, 3 if op == "window" else 2):
 					if not argument.is_valid_int():
 						errors.append(at + "'%s' needs a number, not '%s'" % [op, argument])
@@ -646,6 +653,15 @@ func _execute(command: PackedStringArray) -> bool:
 				await get_tree().process_frame
 		"expect_errors":
 			_expected_errors += maxi(_int_arg(command, 1, 0), 0)
+		"versus_seed":
+			Flow.versus_seed = _int_arg(command, 1, -1)
+		"frame_sleep":
+			var usec: int = maxi(_int_arg(command, 1, 0), 0)
+			var vsync: bool = usec == 0 and Settings.get_bool("video/vsync")
+			DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED if vsync else DisplayServer.VSYNC_DISABLED)
+			OS.low_processor_usage_mode = usec > 0
+			if usec > 0:
+				OS.low_processor_usage_mode_sleep_usec = usec
 		"section":
 			print("Autoplay flow: section %s" % rest)
 			return await _start_section()
@@ -937,8 +953,16 @@ func _on_tick_finished(tick: int) -> void:
 		for slot: int in range(1, level.hero_count()):
 			var other: PlayerBase = level.get_hero(slot)
 			if other != null:
-				_party_trace.append_array([_frame, tick, slot + 1, other.sim_pos.x, other.sim_pos.y, other.xvel,
-						other.yvel, other.state, 1 if other.dead else 0])
+				# Entry by entry: the tick the probe measures allocates nothing for the trace.
+				_party_trace.append(_frame)
+				_party_trace.append(tick)
+				_party_trace.append(slot + 1)
+				_party_trace.append(other.sim_pos.x)
+				_party_trace.append(other.sim_pos.y)
+				_party_trace.append(other.xvel)
+				_party_trace.append(other.yvel)
+				_party_trace.append(other.state)
+				_party_trace.append(1 if other.dead else 0)
 				_party_levels.append(level.level_id)
 	if _every > 0 and _ticks % _every == 0:
 		_capture("t%06d_%s" % [_ticks, _every_name])

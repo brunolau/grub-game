@@ -15,6 +15,13 @@ extends RefCounted
 # =================================================================================================================
 const PLAYERS_MIN: int = 2
 const PLAYERS_MAX: int = Defs.MAX_PLAYERS
+## Phase 4 (PLAN.md 7 P4.2, docs/ARCHITECTURE.md 11.5): the most heroes of a versus match on a phone or tablet
+## (OS.has_feature("mobile"), [method players_max]). An ESTIMATE, no device was measured: on a Cortex-A53 class device
+## a tick of four heroes with CPU seats is expected at about a 60 Hz frame on average and two to three at its worst,
+## a tick of two heroes at a third of a frame - the class of 1.0 and of two-player co-op, which is the mobile target
+## (PLAN.md 9). Raise it to PLAYERS_MAX when the device check of docs/expansion/HUMAN_CHECKS.md (section D) passes
+## with four heroes; desktop builds always seat PLAYERS_MAX.
+const PLAYERS_MAX_MOBILE: int = 2
 ## A round's Sim.rng seed is match_seed * ROUND_SEED_FACTOR + round index, so a round is a pure function of the
 ## inputs (see round_seed()). Bots never draw from Sim.rng. [TA 4.9]
 const ROUND_SEED_FACTOR: int = 31
@@ -237,6 +244,12 @@ const AWARDS_MAX: int = 3
 ## The Sim.rng seed of round `round_index` of a match. [TA 4.9]
 static func round_seed(match_seed: int, round_index: int) -> int:
 	return match_seed * ROUND_SEED_FACTOR + round_index
+
+
+## The most heroes of a versus match on this kind of device: PLAYERS_MAX_MOBILE on a phone or tablet (`mobile`),
+## else PLAYERS_MAX. VersusMatch seats no more ([method VersusMatch.seat_limit]).
+static func players_max(mobile: bool) -> int:
+	return clampi(PLAYERS_MAX_MOBILE, PLAYERS_MIN, PLAYERS_MAX) if mobile else PLAYERS_MAX
 
 
 ## Round length of Grub Stack for `players` heroes.

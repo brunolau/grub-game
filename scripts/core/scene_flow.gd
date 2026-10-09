@@ -131,6 +131,9 @@ var play_book: int = 1
 ## 2.0: show the deciding moment of every versus round between the gong and the scoreboard (DESIGN.md E.8 step 5).
 ## Off in headless runs (tests and flow scripts drive rounds tick by tick; a test that wants it switches it on).
 var deciding_moment: bool = true
+## Development (the flow command `versus_seed`, tools/perf.sh): the seed of every match [method start_versus] starts
+## without one, instead of the clock's - the same flow then plays the same rounds. -1 (the game): the clock.
+var versus_seed: int = -1
 var _layer: CanvasLayer = null
 var _cover: TransitionCover = null
 var _cover_tween: Tween = null
@@ -811,7 +814,8 @@ func party_size() -> int:
 
 ## A player joins with `input` (GameInput.join_input_for_event: "press Jump on any device") at slot `slot` (-1 = the
 ## first free one). Returns the slot, or -1 when that input already plays or no seat is free (co-op takes
-## PartyTuning.COOP_PLAYERS, the versus lobby Defs.MAX_PLAYERS). The single player of a running game keeps his
+## PartyTuning.COOP_PLAYERS, the versus lobby VersusMatch.seat_limit(): Defs.MAX_PLAYERS, fewer on a phone or tablet -
+## VersusTuning.PLAYERS_MAX_MOBILE). The single player of a running game keeps his
 ## device as P1 (GameInput.current_device_input). In the versus lobby the player is also seated in Game.versus_match.
 ## During a campaign stage the stage restarts at its checkpoint in the co-op file, score kept (on the world map the
 ## next start plays it).
@@ -819,7 +823,7 @@ func join_player(input: InputSlot, slot: int = -1) -> int:
 	if input == null or input.kind == Defs.InputSlotKind.NONE or GameInput.find_input(input) >= 0:
 		return -1
 	var lobby: bool = _in_versus_lobby()
-	var limit: int = Defs.MAX_PLAYERS if lobby else PartyTuning.COOP_PLAYERS
+	var limit: int = VersusMatch.seat_limit() if lobby else PartyTuning.COOP_PLAYERS
 	if lobby and Game.versus_match != null and Game.versus_match.player_count() >= limit:
 		return -1
 	if GameInput.get_slot(0).kind == Defs.InputSlotKind.ALL_DEVICES:
@@ -974,7 +978,8 @@ func start_versus(p_match: VersusMatch = null, seed_value: int = -1) -> bool:
 	Game.versus_match = versus_match
 	versus_match.compact_seats()
 	versus_match.remember_rules()
-	versus_match.begin_match(seed_value if seed_value >= 0 else int(Time.get_ticks_usec() & 0x7FFFFFFF))
+	var fresh_seed: int = versus_seed if versus_seed >= 0 else int(Time.get_ticks_usec() & 0x7FFFFFFF)
+	versus_match.begin_match(seed_value if seed_value >= 0 else fresh_seed)
 	_begin_versus_run(versus_match)
 	start_round()
 	return true
