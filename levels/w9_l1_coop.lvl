@@ -360,7 +360,9 @@ objects/sign 47 92 text=SIGN_W9_COOP_SEESAW
 objects/seesaw 42 92 len=5 facing=r
 objects/checkpoint 28 83
 # --- co-op gate 2 'pulley' (S7): lift A in the shelf's slot, lift B at the shaft, the rolled vine
-objects/x2_tablet 36 71 gate=pulley far=26,53
+# ward=12,17 (columns 14..53; wf11, DESIGN G73): the top at columns 38-41, row 57 stands on the tablet's side
+# within 10 cells of the default ward's edge; the margin counts from the gate's high ground.
+objects/x2_tablet 36 71 gate=pulley far=26,53 ward=12,17
 objects/sign 38 71 text=SIGN_W9_COOP_PULLEY
 objects/platform 30 72 name=lift_a mode=ride skin=cloud
 objects/platform 49 72 name=lift_b mode=ride skin=cloud

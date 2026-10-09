@@ -7,20 +7,28 @@
 # search refuses the gate, (b) every route of the evidence set says "not reached" in a fresh process, (c) the
 # continuous-play explorer opens it in none of two seeded passes of 300 s over the whole level. This script runs all
 # three on worker processes and then the test, which reads their kept results:
-#   step 1  the search workers (below)                        76 rows: about 10-15 minutes on 12 workers
-#   step 1b tools/coop_explore/replay_evidence.sh             23 routes, a fresh process each: about a minute
+#   step 1  the search workers (below)                        76 rows, 4.3 hours of search (wf11: the new probes,
+#                                                             the wind's phases): 31 minutes on 12 workers
+#   step 1b tools/coop_explore/replay_evidence.sh             24 routes, a fresh process each: under a minute
 #   step 1c tools/coop_explore/explore_gates.sh               76 rows x 2 passes x 300 s = 12.7 hours of play:
 #                                                             38 minutes on 20 processes, 63 on 12 (COOP_GATES_EXPLORERS,
 #                                                             default N); rows the search or a route already opened
 #                                                             are not explored (they are red)
 #   step 2  the test (reads everything back)                  seconds
-# THE WHOLE GATE JOB IN ABOUT 40 MINUTES: `COOP_GATES_EXPLORERS=20 bash tools/world_coop_gates.sh 12` on this 12-core /
-# 24-thread desktop with nothing else running - the search on 12 workers WHILE the explorers start on the rows the
-# evidence set leaves closed is not attempted: the three steps run one after another (about 12 + 1 + 38 minutes; with
-# the results kept, a rerun on an unchanged tree is a minute). A pass is 300 s of WALL time, so more explorer
-# processes than cores play fewer ticks per pass: each pass prints the ticks it played and the row shows them.
+# One after another that is about 31 + 1 + 38 = 70 minutes on this 12-core / 24-thread desktop (`COOP_GATES_EXPLORERS=20
+# bash tools/world_coop_gates.sh 12`; the search step measured alone, 2026-10-09). THE WHOLE GATE JOB IN 51 MINUTES,
+# MEASURED (2026-10-09 07:16-08:07, nothing else running): the two long steps side by side -
+# `COOP_GATES_TOGETHER=1 COOP_GATES_EXPLORERS=18 bash tools/world_coop_gates.sh 6`: 18 explorer processes play every
+# row's two passes (152 passes in 2 540 s) WHILE 6 workers search (76 searches, 4.9 hours of search under that load,
+# done after 2 995 s), then the evidence (33 routes, 23 s) and the test (28 s). Every row is explored then, also one
+# that turns out red. "About 40 minutes" is not reached on 12 cores: the explorer's bar alone is 12.7 process-hours
+# of wall time and the search grew to 4.3 (the probes of wf11, the wind's phases); more cores bring it down - the
+# job is processes x wall time, nothing shared. With the results kept, a rerun on an unchanged tree is a few minutes.
+# A pass is 300 s of WALL time, so more processes than cores play fewer ticks per pass: each pass prints the ticks
+# it played and the row shows them (the silent passes of that run: 0.87 to 1.86 million ticks, median 1.27).
 #   --no-explore      skip step 1c (the rows then read "unproven: (c) ... NOT RUN" unless their passes are kept)
-#   COOP_GATES_EXPLORERS=20 bash tools/world_coop_gates.sh 12     12 search workers, 20 explorer processes
+#   COOP_GATES_EXPLORERS=20 bash tools/world_coop_gates.sh 12     12 search workers, then 20 explorer processes
+#   COOP_GATES_TOGETHER=1 COOP_GATES_EXPLORERS=18 bash tools/world_coop_gates.sh 6     both at once (about 45 minutes)
 #
 #   bash tools/world_coop_gates.sh                N workers = the CPU cores (Godot's thread count / 2, at most 16)
 #   bash tools/world_coop_gates.sh 8              8 workers
@@ -151,6 +159,19 @@ fi
 QUEUE="$OUT/queue"
 rm -f "$OUT"/worker_*.log "$OUT"/worker_*.part "$OUT/test.log" "$OUT/verdicts.txt"
 ROUNDS_MAX="${COOP_GATES_ROUNDS:-3}"
+# R7 (c) side by side with the search (COOP_GATES_TOGETHER=1): the explorer's two passes on EVERY gate row start now,
+# on their own processes, and are waited for after the evidence step.
+REL_OUT="build/coop_gates"
+case "$OUT" in "$ROOT"/*) REL_OUT="${OUT#"$ROOT"/}" ;; esac
+EXPLORERS="${COOP_GATES_EXPLORERS:-$N}"
+TOGETHER="${COOP_GATES_TOGETHER:-0}"
+explore_pid=""
+if [ "$EXPLORE" -eq 1 ] && [ "$TOGETHER" = "1" ]; then
+	XSTART=$(date +%s)
+	( cd "$ROOT" && EXPLORE_OUT="$REL_OUT/passes" bash tools/coop_explore/explore_gates.sh all "$EXPLORERS" passes=0,1 \
+		> "$OUT/explore.txt" 2>&1 ) &
+	explore_pid=$!
+fi
 
 # One worker of one round: ONE GATE PER GODOT PROCESS (tools/coop_search.gd --max-gates=1), again and again until a
 # process finds nothing left to claim. A process per gate costs a few seconds of start-up each, and buys two things:
@@ -220,14 +241,15 @@ for ((i = 0; i < N; i++)); do
 	echo "worker $i (round 1): $(grep -cE ' gate .*: (refused|REACHED|UNPROVEN) in ' "$log") gate(s), $(grep -E ' gate .*: (refused|REACHED|UNPROVEN) in ' "$log" | sed -E 's/.* in ([0-9.]+) s.*/\1/' | awk '{s += $1} END {printf "%.0f", s}') s searching ($(grep -E '^exit=' "$log" | tail -1))"
 done
 # R7 (b): the evidence set, a fresh process per route (kept for the test).
-REL_OUT="build/coop_gates"
-case "$OUT" in "$ROOT"/*) REL_OUT="${OUT#"$ROOT"/}" ;; esac
 ( cd "$ROOT" && EVIDENCE_OUT="$REL_OUT/evidence" bash tools/coop_explore/replay_evidence.sh "$N" > "$OUT/evidence.txt" 2>&1 )
 echo "== evidence (R7 b; $(( $(date +%s) - MID )) s): $(tail -1 "$OUT/evidence.txt")"
 grep "REACHED the far cell" "$OUT/evidence.txt" | sed 's/^/   /' | cut -c1-200
 # R7 (c): the explorer's two seeded passes of 300 s on every gate row that (a) and (b) leave closed.
-EXPLORERS="${COOP_GATES_EXPLORERS:-$N}"
-if [ "$EXPLORE" -eq 1 ]; then
+if [ -n "$explore_pid" ]; then
+	wait "$explore_pid"
+	echo "== explorer (R7 c; $(( $(date +%s) - XSTART )) s on $EXPLORERS process(es), side by side with the search; every row): $(tail -1 "$OUT/explore.txt")"
+	grep "REACHED the far cell" "$OUT/explore.txt" | sed 's/^/   /' | cut -c1-260
+elif [ "$EXPLORE" -eq 1 ]; then
 	XSTART=$(date +%s)
 	( cd "$ROOT" && GD_TIMEOUT=300 bash .tools/gd.sh script res://tools/coop_search.gd -- --list 2>/dev/null ) \
 		| awk '$1 ~ /^[0-9]+$/ { print $2, $4, ($3 == "Expert" ? 1 : 0) }' > "$OUT/rows_all.txt"
@@ -254,10 +276,11 @@ if [ "$EXPLORE" -eq 1 ]; then
 else
 	echo "== explorer (R7 c): skipped (--no-explore) - a row without kept passes reads unproven"
 fi
+TSTART=$(date +%s)
 ( cd "$ROOT" && GD_TIMEOUT="$TMO" bash .tools/gd.sh test coop_gates > "$OUT/test.log" 2>&1 )
 code=$?
 END=$(date +%s)
-echo "== gates (the test, $((END - MID)) s)"
+echo "== gates (the test, $((END - TSTART)) s)"
 grep -E "^\s+.* gate .*: (refused|REACHED) in |slot-bound" "$OUT/test.log" | sed 's/^ *//'
 # The G59 verdict of every gate (DESIGN.md G59, LEVEL_DESIGN.md 15.7.6): the test's own lines when it prints them
 # (CoopSearch.verdict_line), else the search tool's table from the cache the workers filled.
@@ -267,8 +290,8 @@ if [ ! -s "$OUT/verdicts.txt" ]; then
 		| grep -E "^GATE " > "$OUT/verdicts.txt"
 fi
 grep -E "^\s*R7 " "$OUT/test.log" | sed 's/^ *//' > "$OUT/r7_rows.txt"
-echo "== the three proofs per row (R7; $OUT/r7_rows.txt): $(grep -c '=> GREEN' "$OUT/r7_rows.txt") green, $(grep -c '=> RED' "$OUT/r7_rows.txt") red, $(grep -c '=> OPEN WORK' "$OUT/r7_rows.txt") open work of $(grep -c '^R7 ' "$OUT/r7_rows.txt") row(s)"
-grep -E "=> (RED|OPEN WORK)" "$OUT/r7_rows.txt" | cut -c1-420
+echo "== the three proofs per row (R7; $OUT/r7_rows.txt): $(grep -c '=> GREEN' "$OUT/r7_rows.txt") green, $(grep -c '=> RED' "$OUT/r7_rows.txt") red, $(grep -c '=> OPEN WORK' "$OUT/r7_rows.txt") open work of $(grep -c ' => ' "$OUT/r7_rows.txt") row(s)"
+grep -E "=> (RED|OPEN WORK)|^R7 note" "$OUT/r7_rows.txt" | cut -c1-420
 echo "== verdicts (G59 + R7; $OUT/verdicts.txt)"
 cat "$OUT/verdicts.txt"
 count() { grep -cE "^GATE [^:]*: $1" "$OUT/verdicts.txt"; }

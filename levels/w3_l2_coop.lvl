@@ -10,7 +10,8 @@
 #    The drums stand 19 columns apart, so one hero alone needs far longer than the window (and no throw from one
 #    bank reaches the other drum).
 # Traits: the walking turtles are Shellbacks (shell), the hoppers Raptors (daze), and the lower gallery's two ice
-# pits hold twin leapers (bond, 17 columns apart). The warp to Feast Land C moved up into the crystal cache, a
+# pits hold plain leapers (no bond on a zone spawner, G68; the bat over the lower gallery is `lone` instead - the
+# file's third of trait records). The warp to Feast Land C moved up into the crystal cache, a
 # boost ledge 8 rows over the skylight cave's floor: one hero Shoulder-Hops there off his partner's head - the x2
 # secret, with Cave Painting 26. Checkpoint behind the gates on the far bank.
 
@@ -47,6 +48,7 @@ C = objects/checkpoint
 E = objects/exit
 O = objects/drop_platform skin=ice delay=8
 D = enemies/dart skin=bat_b range=6 speed=3 hp=10
+L = enemies/dart skin=bat_b range=6 speed=3 hp=10 coop=lone
 d = enemies/dart skin=pterodactyl_b range=7 speed=4 hp=10 expert
 X = enemies/leaper skin=dragon_b pause=110 hp=10
 A = enemies/dangler skin=bat_b depth=56 hp=10
@@ -105,7 +107,7 @@ t = items/treasure index=6
 ################################################################################################################............########################...........#################
 ################################################################################################################........t...########################...f.......#################
 ################################################################################################################........---.#########..#############.----......#################
-################################################################################################################............d########D.#############...........#################
+################################################################################################################............d########L.#############...........#################
 ################################################################################################################............................................f..#################
 ################################################################################################################.........--...............................-----#################
 ################################################################################################################...............................................#################
@@ -271,12 +273,12 @@ objects/column 96 37 size=9,1 rise=1 trigger=drums:floes
 objects/column 96 35 size=1,2 rise=0 beginner
 objects/checkpoint 106 35
 # The lower gallery: on Expert a Raptor waits on the rock before the first ice pit (5 columns from the
-# checkpoint, range 3), fought on solid ground; on the ice between the pits a Shellback and the twin leapers of
-# the two pits (17 columns apart: no single hero clubs both inside the window).
+# checkpoint, range 3), fought on solid ground; on the ice between the pits a Shellback and the leapers of the
+# two pits (plain since wf11: a leaper record is a zone spawner that never dies, so its bond was never met - G68).
 enemies/raptor 122 53 skin=mini_rex_b range=3 hp=10 expert
 enemies/walker 132 53 skin=turtle_b left=-3 right=3 hp=10 coop=shell
-enemies/leaper 125 53 skin=dragon_b pause=110 hp=10 coop=bond bond=pits
-enemies/leaper 142 53 skin=dragon_b pause=110 hp=10 coop=bond bond=pits
+enemies/leaper 125 53 skin=dragon_b pause=110 hp=10
+enemies/leaper 142 53 skin=dragon_b pause=110 hp=10
 # The hopper by the exit became a Raptor and moved down to the lower gallery (no bouncing near the cache ledge):
 # on the ice between the pits on Beginner, on the rock after the second pit on Expert (the Expert ice strip keeps
 # only the Shellback and the leapers: both Expert Raptors are fought on solid ground).

@@ -48,7 +48,7 @@ msgid "SIGN_W5_COOP_PLATES"
 msgstr "Crouch on a plate to hold a door open for your partner."
 
 msgid "SIGN_W5_COOP_GULLY"
-msgstr "Shellbacks face the nearer caveman - one baits, one clubs!"
+msgstr "Twin tortoises: club one each at once, or one grows back!"
 
 # --- w5_l2 Rattlesnake Gulch ---
 msgid "SIGN_W5_VINE"

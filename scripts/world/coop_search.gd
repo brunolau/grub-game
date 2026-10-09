@@ -1182,6 +1182,9 @@ class Searcher:
 	## index -> indices of the record entities whose baseline state names it (a door its plate, a pulley its lifts):
 	## looked at again when it is respawned.
 	var _holders: Dictionary = {}
+	## Indices of the record entities whose level-file state names a hero or the driver (spawned again when those are
+	## built anew: [method _reset_party]).
+	var _party_holders: Dictionary = {}
 	## The heroes' and the driver's deep states after the canonical placement of [method _canon_party], and their
 	## serials.
 	var _hero_base: String = ""
@@ -1594,6 +1597,8 @@ class Searcher:
 			_deep_snaps[i] = CoopSearch.deep_snapshot(entity)
 			_baseline_parts[i] = CoopSearch.probe(entity)
 			for label: String in CoopSearch._deep_refs:
+				if label == "#h" or label == "#p" or label == "#d":
+					_party_holders[i] = true
 				var named: int = label.substr(1).to_int() if label.substr(1).is_valid_int() else -1
 				if named >= 0 and named != i:
 					if not _holders.has(named):
@@ -1711,8 +1716,9 @@ class Searcher:
 	## The heroes and the driver in the level-file state: placed canonically ([method _canon_party]) and compared
 	## with what the build left. A hero's own respawn clears what the game needs cleared; what it leaves (the last
 	## strike's box, the last death's cause, a cache of the map's edges) is put back variable by variable
-	## ([method CoopSearch.deep_restore]: the hero, his components, his run); should one still differ then, all three
-	## are built anew in their places.
+	## ([method CoopSearch.deep_restore]: the hero, his components, his run); when one cannot be put back (a list of
+	## his that names other entities than the level file's) all three are built anew in their places, and with them
+	## the entities whose own state names a hero.
 	func _reset_party(first: bool) -> void:
 		_canon_party()
 		if first:
@@ -1735,6 +1741,8 @@ class Searcher:
 		if not anew:
 			return
 		_respawn_party()
+		for holder: int in _party_holders:
+			_respawn_in_place(holder)
 		_canon_party()
 		_party_snaps = [CoopSearch.deep_snapshot(hero), CoopSearch.deep_snapshot(partner),
 			CoopSearch.deep_snapshot(driver)]
@@ -4136,8 +4144,9 @@ static func snapshot(obj: Object, only: Array[StringName] = []) -> Dictionary:
 
 
 ## A DEEP SNAPSHOT of `obj` for [method deep_restore]: every script variable of [method deep_names] - plain values as
-## they are, arrays and dictionaries copied, a node or a resource by reference, any other object it holds (a hero's
-## components, his run) as [the object, its own deep snapshot], DEEP_DEPTH deep.
+## they are, arrays and dictionaries copied (one that holds objects: its deep value), a node or a resource by
+## reference, any other object it holds (a hero's components, his run) as [the object, its own deep snapshot],
+## DEEP_DEPTH deep.
 static func deep_snapshot(obj: Object, depth: int = 0) -> Dictionary:
 	var result: Dictionary = {}
 	if obj == null:
@@ -4153,7 +4162,15 @@ static func deep_snapshot(obj: Object, depth: int = 0) -> Dictionary:
 					result[name] = [held]
 			TYPE_ARRAY, TYPE_DICTIONARY, TYPE_PACKED_BYTE_ARRAY, TYPE_PACKED_INT32_ARRAY, TYPE_PACKED_INT64_ARRAY, 					TYPE_PACKED_FLOAT32_ARRAY, TYPE_PACKED_FLOAT64_ARRAY, TYPE_PACKED_STRING_ARRAY, 					TYPE_PACKED_VECTOR2_ARRAY, TYPE_PACKED_VECTOR3_ARRAY, TYPE_PACKED_COLOR_ARRAY:
 				# (a packed array is shared by reference too: a copy, and a copy of that at every restore)
-				result[name] = [value.duplicate(), 0, 0]
+				if _holds_objects(value):
+					# A container that names objects (a hero's list of the level's vines): what it names may be
+					# spawned again by a reset, so its copy would hand back the freed ones - in wf11's first explorer
+					# runs a hero could never climb a rolled vine again once a reset had respawned it (4 replays of
+					# 100 000 off their state, all at one node). It is held to its DEEP VALUE - the names of what it
+					# holds - and whoever differs from that is built anew.
+					result[name] = [_deep_value(value, depth), 0, 0, 0]
+				else:
+					result[name] = [value.duplicate(), 0, 0]
 			TYPE_CALLABLE, TYPE_SIGNAL, TYPE_RID, TYPE_NODE_PATH:
 				pass
 			_:
@@ -4161,11 +4178,29 @@ static func deep_snapshot(obj: Object, depth: int = 0) -> Dictionary:
 	return result
 
 
+## True when `value` is an object or a container that holds one (at any depth).
+static func _holds_objects(value: Variant) -> bool:
+	match typeof(value):
+		TYPE_OBJECT:
+			return true
+		TYPE_ARRAY:
+			for item: Variant in value:
+				if _holds_objects(item):
+					return true
+		TYPE_DICTIONARY:
+			var table: Dictionary = value
+			for key: Variant in table:
+				if _holds_objects(key) or _holds_objects(table[key]):
+					return true
+	return false
+
+
 ## Put a [method deep_snapshot] back into `obj`: only the variables that differ are written (a setter may announce a
-## change), a held object is the snapshot's object again with its own variables put back. Returns 0 when nothing
-## differed, 1 when variables were put back - `obj` is in the snapshot's state either way, every write read back -
-## and -1 when it cannot be (an object the snapshot held is gone, a setter refused the value).
-static func deep_restore(obj: Object, values: Dictionary) -> int:
+## change), a held object is the snapshot's object again with its own variables put back; a container of objects is
+## compared by its deep value and never written. Returns 0 when nothing differed, 1 when variables were put back -
+## `obj` is in the snapshot's state either way, every write read back - and -1 when it cannot be (an object the
+## snapshot held is gone, a container names other objects than it did, a setter refused the value).
+static func deep_restore(obj: Object, values: Dictionary, depth: int = 0) -> int:
 	if obj == null or not is_instance_valid(obj):
 		return -1
 	var result: int = 0
@@ -4174,6 +4209,10 @@ static func deep_restore(obj: Object, values: Dictionary) -> int:
 		var now: Variant = obj.get(name)
 		if typeof(kept) == TYPE_ARRAY:
 			var entry: Array = kept
+			if entry.size() == 4:
+				if _deep_value(now, depth) != str(entry[0]):
+					return -1   # a container of objects that no longer names what it named: nothing to put back
+				continue
 			if entry.size() == 3:
 				if typeof(now) != typeof(entry[0]) or now != entry[0]:
 					obj.set(name, entry[0].duplicate())
@@ -4188,7 +4227,7 @@ static func deep_restore(obj: Object, values: Dictionary) -> int:
 					return -1
 				result = 1
 			if entry.size() == 2:
-				var inner: int = deep_restore(held, entry[1])
+				var inner: int = deep_restore(held, entry[1], depth + 1)
 				if inner < 0:
 					return -1
 				result = maxi(result, inner)

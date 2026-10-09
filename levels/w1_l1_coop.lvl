@@ -253,7 +253,12 @@ objects/sign 88 38 text=SIGN_COOP_W1_EGG
 # partner climbs it (the gift). The far cell is 16 columns from the coil (a rolled vine counts as a booster within
 # reach of the far cell).
 objects/sign 97 38 text=SIGN_COOP_W1_HOP
-objects/x2_tablet 100 38 gate=hop far=117,31
+# ward=34,12 (columns 66..129; wf11, DESIGN G73): the gate's high ground begins before the tablet - the hollow
+# block of columns 90-97, from whose top a jump reaches the boost ledge, and the pool's one-way ledge (80-85)
+# before it: under the default margin a lone hero took three Up bounces on the led Expert hopper at columns
+# 80-88 and stood on the block. The lead designer ruled 22 (78..129); 34 puts the pool's ledge 12+ cells inside
+# as well, which is what the validator's high-ground rule asks.
+objects/x2_tablet 100 38 gate=hop far=117,31 ward=34,12
 objects/vine 101 31 length=8 rolled
 objects/sign 104 30 text=SIGN_COOP_W1_VINE
 objects/checkpoint 135.5 33

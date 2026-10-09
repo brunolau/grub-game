@@ -153,6 +153,28 @@ func test_every_coop_gate_is_refused_by_the_solo_search() -> void:
 			assert_true(int(window["window"]) <= int(window["solo_min"]) - WINDOW_MARGIN,
 					"%s: %s window %d below the solo minimum %d - %d" % [label, window.get("what", "?"),
 					window["window"], window["solo_min"], WINDOW_MARGIN])
+	if shard.x == 0:
+		_note_orphan_routes(gates)
+
+
+## The evidence routes that belong to NO row of the gate table - a difficulty the file is not played in, a gate that
+## is gone - are named (once, by the first shard), never silently dropped: `R7 note: ...` with what the route does. Not
+## a row, so not a failure: nobody can start that file on that difficulty.
+func _note_orphan_routes(gates: Array[Array]) -> void:
+	var harness: GDScript = load(HARNESS) as GDScript if ResourceLoader.exists(HARNESS) else null
+	if harness == null:
+		return
+	var rows: Dictionary = {}
+	for gate: Array in gates:
+		rows["%s|%s|%d" % [gate[0], gate[2], int(gate[1])]] = true
+	for path: String in harness.call(&"evidence_files"):
+		var route: Dictionary = harness.call(&"read_route", path)
+		if route.is_empty() or rows.has("%s|%s|%d" % [route["level"], route["gate"], int(route["difficulty"])]):
+			continue
+		var kept: Dictionary = harness.call(&"cache_read", harness.call(&"replay_key", path))
+		print("    R7 note: evidence route %s is for %s (%s) gate %s - no row of the gate table (the file is not played on that difficulty, or the gate is gone): %s" % [
+				path.get_file(), route["level"], Defs.difficulty_name(int(route["difficulty"])), route["gate"],
+				str(kept.get("outcome", "not replayed")) if not kept.is_empty() else "not replayed"])
 
 
 ## The G59 verdict of a search result: {"verdict", "evidence"} - the search's own (CoopSearch.gate_verdict) when it has

@@ -379,7 +379,10 @@ objects/hero_start 2 105 slot=2
 # checkpoint on the forest floor.
 objects/checkpoint 31 105
 objects/sign 29 105 text=SIGN_COOP_W1_TOTEM
-objects/x2_tablet 33 105 gate=treehouse far=27,93
+# ward=12,62 (to the map's right edge; wf11, DESIGN G73; the lead designer's 61 and a column): the validator names
+# the branches beyond the trunk (columns 52-82, row 84; 68-95, row 96) as high ground at this ward's edge. It
+# costs the pair nothing: the wards of 'shaft' (36..76), 'nest' (32..61) and the x2 secret (75..95) cover them.
+objects/x2_tablet 33 105 gate=treehouse far=27,93 ward=12,62
 objects/vine 40 94 length=8 rolled
 # Specials in pairs: a second axe floats over the tree house deck (a jump takes it).
 items/weapon 31 90 kind=axe

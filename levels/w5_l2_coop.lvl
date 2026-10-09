@@ -223,7 +223,9 @@ props/canyon/cactus_tall 55 17 layer=back
 # --- co-op (w5_l2_coop): P2's start
 objects/hero_start 2 79 slot=2
 # --- gate 1 'sandgate' (bands B / C)
-objects/x2_tablet 42 67 gate=sandgate far=2,55
+# ward=12,21 (to the map's right edge; wf11, DESIGN G73): the band's top at columns 28-62, row 56 runs out of
+# the default ward (0..54) on the tablet's side.
+objects/x2_tablet 42 67 gate=sandgate far=2,55 ward=12,21
 objects/sign 37 67 text=SIGN_W5_COOP_SANDGATE
 objects/plate 30 67 name=pa
 objects/column 22 67 size=1,2 rise=2 rise_while=pa

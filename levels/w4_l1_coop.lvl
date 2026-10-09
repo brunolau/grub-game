@@ -406,7 +406,10 @@ objects/geyser 7 47 deadly period=66 delay=20
 # (col 13) down for him. The far cell is the cliff top by the exit; the coil is 12 cells from it and 8 rows over
 # the floor (out of a jumping strike reach).
 objects/sign 17 171 text=SIGN_COOP_W4_CLIFF
-objects/x2_tablet 16 171 gate=cliff far=1,163
+# ward=12,29 (to the map's right edge; wf11, DESIGN G73): the tops of row 153 (columns 17-18 and 27-44) stand
+# within 12 cells of the default ward's edge. It costs the pair nothing: the wards of 'boulder' (2..29) and of
+# the x2 secret (25..45) cover the file's whole width already.
+objects/x2_tablet 16 171 gate=cliff far=1,163 ward=12,29
 objects/vine 13 164 length=8 rolled
 objects/exit 3 163
 # The letter S of the solo pillar (the chamber was rebuilt) lies on the cliff top, on the way to the exit.

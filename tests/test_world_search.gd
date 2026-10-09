@@ -72,6 +72,11 @@ class Owned:
 	var names: PackedStringArray = PackedStringArray()
 
 
+class Lister:
+	extends RefCounted
+	var listed: Array = []
+
+
 class Holder:
 	extends RefCounted
 	var number: int = 3
@@ -133,6 +138,24 @@ func test_deep_snapshot_puts_every_variable_back_and_says_when_it_cannot() -> vo
 	node.free()
 	assert_eq(CoopSearch.deep_restore(a, holder_snap), -1, "a freed object cannot be put back: the caller respawns")
 	assert_eq(CoopSearch.snapshot(a, [&"number", &"text"]), {&"number": 3, &"text": "a"}, "the plain snapshot")
+	# A container that names objects is never put back blindly (its copy would hand back objects a reset has freed):
+	# it is held to the names of what it holds, and whoever names something else cannot be put back.
+	var lister: Lister = Lister.new()
+	var first: Node = Node.new()
+	var second: Node = Node.new()
+	lister.listed = [first]
+	var list_snap: Dictionary = CoopSearch.deep_snapshot(lister)
+	assert_eq(CoopSearch.deep_restore(lister, list_snap), 0, "the same list: nothing to do")
+	lister.listed = [second]
+	assert_eq(CoopSearch.deep_restore(lister, list_snap), 0,
+			"another node of the same name in the search world (a respawned neighbour): the list stands as it is")
+	assert_true(is_same(lister.listed[0], second), "... and is NOT written back to the old object")
+	lister.listed = [first, second]
+	assert_eq(CoopSearch.deep_restore(lister, list_snap), -1, "it names more than it did: built anew by the caller")
+	lister.listed = []
+	assert_eq(CoopSearch.deep_restore(lister, list_snap), -1)
+	first.free()
+	second.free()
 
 
 # =================================================================================================================
@@ -201,6 +224,17 @@ func test_a_respawned_entity_keeps_its_place_in_the_tick_order() -> void:
 	searcher._respawn_in_place(walker)
 	assert_eq(int(searcher._index_of[searcher.level.get_tagged(&"bond", &"pair")[0].get_instance_id()]), walker,
 			"the first member of the bond is still the first")
+	# A hero keeps a list of the level's vines: after a vine was spawned again the next run's hero names the NEW one
+	# (wf11: the old list came back from his snapshot with the freed vine in it - he never climbed that vine again).
+	var vine: int = -1
+	for i: int in searcher._records.size():
+		if String(searcher._records[i]["id"]) == "objects/vine":
+			vine = i
+	searcher._respawn_in_place(vine)
+	searcher._begin(searcher._config(Vector2i(5 * 16, 14 * 16), 1, -1, CoopSearch.PARTNER_EGG, CoopSearch.NOWHERE))
+	assert_false(CoopSearch.deep_state(searcher.hero).contains("freed"), "the hero names no freed entity")
+	assert_true(CoopSearch.deep_state(searcher.hero).contains("#%d" % vine), "... but the vine that stands there now")
+	assert_eq(searcher.drift, 0)
 	searcher.close()
 
 

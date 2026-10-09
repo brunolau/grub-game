@@ -7,8 +7,8 @@
 #    unrolls down to the floor, the way up for the partner (the coil is out of every throw from the floor);
 #  - 'plates': a leapfrog plate door - the mesa's lower tunnel opens while plate A is held, its upper tunnel while
 #    plate B beyond the mesa is held (each plate 8+ tiles from its door);
-#  - 'gully': two Shellbacks keep the gully under the plain (a hall exactly 4 rows high); one hero baits the shield
-#    while the other, dropped in through a hole behind it, clubs its back; the keeper door opens when both are dead.
+#  - 'gully': two bonded tortoises keep the gully under the plain (a hall 4 rows high, entered through the holes
+#    in its crust); each hero clubs one of them inside the bond's window; the keeper door opens when both are dead.
 # The Rollers of the long climb carry `shell` (G36: as one bond 'climb' a single thrown special could hit two
 # members; the lead designer's ruling, applied by integration in phase 3 - the routes jump them unchanged); the first
 # Roller, the plateau Roller and tortoise, the Expert Roller of the plain and the Expert eagle are left out (a bounce
@@ -145,8 +145,8 @@ props/canyon/dry_bush 140 15 layer=back
 props/canyon/boulders 147 15 layer=back
 items/food 141 13 index=39
 items/food 142 13 index=40
-enemies/shellback 155 21 keeper=gully left=-1 right=1 speed=0 hp=10
-enemies/shellback 164 21 keeper=gully left=-1 right=1 speed=0 hp=10
+enemies/walker 155 21 skin=turtle left=0 right=0 speed=0 hp=10 coop=bond bond=gully keeper=gully
+enemies/walker 164 21 skin=turtle left=0 right=0 speed=0 hp=10 coop=bond bond=gully keeper=gully
 items/food 153 20 index=42
 items/food 162 20 index=43
 items/food 172 20 index=44
@@ -253,7 +253,9 @@ objects/plate 106 11 name=plate_a
 objects/column 115 11 size=1,2 rise=2 rise_while=plate_a
 objects/plate 117 11 name=plate_b
 objects/column 108 7 size=1,2 rise=2 rise_while=plate_b
-# --- gate 3 'gully': the keeper gully of two Shellbacks and its door
+# --- gate 3 'gully': the keeper gully of two bonded tortoises and its door (wf11: a lone hero dropped through a
+# hole onto each Shellback and clubbed its back from on top of it or - in the ward, where he falls through a body -
+# from inside it: a shell is no gate where a hero gets above it. A bond is met only by two heroes, DESIGN G72)
 objects/x2_tablet 170 21 gate=gully far=174,21
 objects/sign 145 15 text=SIGN_W5_COOP_GULLY
 objects/column 171 21 size=1,4 rise=4 trigger=keepers:gully

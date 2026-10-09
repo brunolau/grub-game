@@ -228,7 +228,9 @@ objects/checkpoint 59 44
 objects/checkpoint 164 26
 # co-op gate 'stairs': the boulder and plate A, plate B, the stair columns; plate C on the summit and the
 # door of the vine shaft in the cliff it holds open for the holder
-objects/x2_tablet 117 38 gate=stairs far=161,26
+# ward=23,12 (columns 94..173; wf11, DESIGN G73): the ruin's roof (columns 106-140, 14 rows over the road) begins
+# 11 cells before the tablet; the margin counts from the gate's high ground.
+objects/x2_tablet 117 38 gate=stairs far=161,26 ward=23,12
 objects/sign 112 38 text=SIGN_W8_COOP_STAIRS
 objects/boulder_heavy 123 35
 objects/plate 127 35 name=pa
