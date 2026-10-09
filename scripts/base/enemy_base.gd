@@ -264,6 +264,8 @@ func is_targetable() -> bool:
 ## whole `split` record splits it without damage (CoopTraits.absorbs_hit).
 ## G57 one hit per strike (a co-op party, every enemy): the later ticks of a swing that already hurt it are used up
 ## without anything happening ([method _repeats_strike]); single-player and versus keep the 1.0 hit on every tick.
+## R2 (slot-bound windows, a co-op party): a member of a bond or a split half turns away the hit of a hero who does not
+## count and the hit that could not meet its group - it glances (CoopTraits.accepts_hit).
 func take_hit(power: int, source: SimEntity) -> bool:
 	if not is_targetable():
 		return false
@@ -274,6 +276,8 @@ func take_hit(power: int, source: SimEntity) -> bool:
 		last_hit_slot = slot
 		last_hit_tick = Sim.total_ticks
 	if not accepts_hit_from(source):
+		if _traits != null:
+			_traits.on_hit_refused(source)
 		_on_hit_refused(source)
 		return true
 	if slot >= 0 and _repeats_strike(slot, source):
@@ -395,10 +399,13 @@ func _bounce_multiplier(count: int) -> int:
 ## enemy is thrown away from the killer in an arc and falls off the screen.
 ## 2.0 (G57): a `heavy` record of a co-op party that no Brace Wall has dazed dies of no cause but a weapon hit it
 ## accepted (CoopTraits.refuses_death: a kill-all, a feast's bite, a mount's bite leave it alive).
+## R2 (slot-bound windows): the last living member of a bond or split of a co-op party dies of nothing its `killer`'s
+## slot could not meet the group with - not by the hero who killed its mates, not by nobody (CoopTraits.refuses_kill;
+## its weapon hits have glanced in [method take_hit] already).
 func kill(cause: StringName, killer: SimEntity = null) -> void:
 	if dead:
 		return
-	if cause != &"weapon" and _traits != null and _traits.refuses_death():
+	if _traits != null and ((cause != &"weapon" and _traits.refuses_death()) or _traits.refuses_kill(killer)):
 		return
 	var was_awake: bool = awake
 	dead = true
@@ -420,8 +427,9 @@ func kill(cause: StringName, killer: SimEntity = null) -> void:
 		visible = false
 	Audio.play_sfx(Sfx.FEAST_CHOMP if cause == &"feast" else Sfx.ENEMY_DEATH)
 	if _traits != null:
-		# 2.0: a bond / split death opens or completes its window; a held hero or a host is let go.
-		_traits.on_killed()
+		# 2.0: a bond / split death opens or completes its window (R2: credited to the killer's slot); a held hero or
+		# a host is let go.
+		_traits.on_killed(killer)
 	Events.enemy_killed.emit(self, points, cause)
 	died.emit(self, cause)
 	if not thrown:
@@ -430,11 +438,12 @@ func kill(cause: StringName, killer: SimEntity = null) -> void:
 
 
 ## Grenade: vanish into `count` random bonus items, no score. 2.0 (G57): not a `heavy` record of a co-op party that
-## no Brace Wall has dazed (CoopTraits.refuses_death).
+## no Brace Wall has dazed (CoopTraits.refuses_death). R2: nor the last living member of a bond or split whose mates
+## lie dead in the open window - a grenade's death is credited to nobody (CoopTraits.refuses_kill).
 func burst_into_items(count: int = Tuning.GRENADE_ITEMS_PER_ENEMY) -> void:
 	if dead:
 		return
-	if _traits != null and _traits.refuses_death():
+	if _traits != null and (_traits.refuses_death() or _traits.refuses_kill(null)):
 		return
 	dead = true
 	for i: int in count:
@@ -769,6 +778,13 @@ func _coop_spawn_copy(extra: Dictionary) -> EnemyBase:
 ## that keep a state of their own (a sky dropper falling or walking) take the source's here. Override; nothing by
 ## default.
 func _on_coop_copy(_source: EnemyBase) -> void:
+	pass
+
+
+## 2.0 co-op (CoopTraits): this record's bond or split group was met while it lay dead (or the party fell apart with
+## its window open) - it will not regrow or merge. Archetypes that keep a dead record back for its window let it go
+## here (SpawnerEnemy). Override; nothing by default.
+func _on_coop_sealed() -> void:
 	pass
 
 

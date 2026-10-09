@@ -1,0 +1,3 @@
+level=w7_l1_coop gate=dune difficulty=1 whole=true start=1 tick0=-
+events=[[134, "hand", 3]]
+route=1:L,9:DF,4:LU,10:UF,5:L,4:R,1:U,1:,1:U,1:,1:U,1:,22:U,1:,1:U,1:,1:U,1:,12:U,6:R,25:U,9:RU,16:RDF,1:R,6:F,20:,6:D,2:UD,26:R,17:LU,1:U,4:RU,1:,1:LU,4:RU,35:R,16:LD,2:RU,9:LU,1:,8:LU,1:,8:LU,1:,5:RU,9:LU,1:U,1:RU,1:LU,1:RU,1:,1:RU,1:,1:RU,1:,28:U,4:RU,10:R,4:RU,24:R,33:U,26:RD,6:RU,12:R,26:RU,1:L,10:DF,2:,32:U,1:L,25:D,8:F,2:,7:D,2:UD,8:R,26:LU,6:R,12:L

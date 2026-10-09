@@ -114,6 +114,9 @@ const LCS_HEART_BONES: int = Tuning.BONES_PER_HEART  ## a lost heart bursts into
 const LCS_ROUND_WINS: int = 5
 const LCS_STOCKS: int = 3                    ## option Stock: 3 lives with respawn
 const SUDDEN_DEATH_AT_TICKS: int = 1457      ## the arena's themed sudden death starts at 60 s
+## The hard cap (ruling R8): a Last Caveman Standing round ends this long after its sudden death started, whoever
+## still stands - fewest hurts taken in the round wins, else a draw (VersusReferee.cap_winners). 60 s (tune); 0 = no cap.
+const SUDDEN_DEATH_CAP_TICKS: int = 1457
 const GRUDGE_ROCK_PERIOD_TICKS: int = 73     ## Grudge Pterodactyls: one rock per 3 s ...
 const GRUDGE_SQUAWK_TICKS: int = 10          ## ... after a 10-tick squawk ...
 const GRUDGE_ROCK_DAZE_TICKS: int = 12       ## ... a rock dazes, costs no heart

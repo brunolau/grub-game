@@ -30,7 +30,7 @@ func _check_index(level: LevelBase, stage_tick: int) -> void:
 		var first: int = level._dz_ins[slot * 2]
 		var last: int = level._dz_ins[slot * 2 + 1]
 		if not entity._sim_suspended:
-			if first != -1:
+			if first != LevelBase.DZ_NOT_FILED:
 				problems.append("%s is awake but filed (%d..%d)" % [entity.name, first, last])
 			continue
 		_dozing_seen += 1
@@ -43,11 +43,11 @@ func _check_index(level: LevelBase, stage_tick: int) -> void:
 		var top: int = level._doze_rects[k + 1]
 		var right: int = level._doze_rects[k + 2]
 		var bottom: int = level._doze_rects[k + 3]
-		if first == -1:
+		if first == LevelBase.DZ_NOT_FILED:
 			if not level._dz_scan:
 				problems.append("%s dozes but is not filed" % entity.name)
 			continue
-		if first == -2:
+		if first == LevelBase.DZ_FILED_WIDE:
 			if not level._dz_wide.has(entity):
 				problems.append("%s is marked wide but not in _dz_wide" % entity.name)
 		else:
@@ -79,7 +79,7 @@ func _check_index(level: LevelBase, stage_tick: int) -> void:
 				problems.append("column %s holds a stale entry" % str(col))
 				break
 	for entity: SimEntity in level._dz_wide:
-		if not is_instance_valid(entity) or entity._doze_slot < 0 or level._dz_ins[entity._doze_slot * 2] != -2:
+		if not is_instance_valid(entity) or entity._doze_slot < 0 or level._dz_ins[entity._doze_slot * 2] != LevelBase.DZ_FILED_WIDE:
 			problems.append("a stale wide entry")
 			break
 	_index_ticks += 1
@@ -119,3 +119,140 @@ func test_the_doze_index_holds_on_every_tick_of_coop_routes() -> void:
 		assert_true(_dozing_seen > 1000, "%s: entities dozed (%d)" % [entry[0], _dozing_seen])
 		assert_eq(_index_problems, 0, "%s: the index held on every tick (first problem: %s)" % [entry[0], _index_first])
 		print("    %s (%s): %d ticks checked, %d dozing entity-ticks" % [entry[0], entry[1], _index_ticks, _dozing_seen])
+
+
+# --- A freed entity must never stay filed (wf11: the stale bucket entry seen in the search world) ----------------------
+
+## An idle entity with a doze area of its own (the test moves it); it may always doze.
+class Sleeper:
+	extends SimEntity
+
+	var area: Rect2i = Rect2i()
+
+	func _doze_area() -> Rect2i:
+		return area
+
+	func _can_doze() -> bool:
+		return true
+
+
+## A bare level whose view the test moves.
+class ViewLevel:
+	extends LevelBase
+
+	var view: Rect2i = Rect2i(0, 0, Tuning.VIEW_W, Tuning.VIEW_H)
+
+	func get_view_rect() -> Rect2i:
+		return view
+
+
+func _view_level() -> ViewLevel:
+	var level: ViewLevel = ViewLevel.new()
+	level.level_id = &"test"
+	var rows: PackedStringArray = PackedStringArray()
+	for row: int in 24:
+		rows.append((TileGrid.CH_SOLID_A if row >= 20 else TileGrid.CH_AIR).repeat(256))
+	level.grid = TileGrid.from_rows(rows)
+	add_node(level)
+	return level
+
+
+func _sleeper(level: LevelBase, area: Rect2i) -> Sleeper:
+	var entity: Sleeper = Sleeper.new()
+	entity.area = area
+	place(level, entity, Vector2i(area.position.x + area.size.x / 2, area.end.y))
+	return entity
+
+
+## Every entry of the column index is a live, dozing entity of `level` that the index knows it filed there.
+func _stale_entries(level: LevelBase) -> PackedStringArray:
+	var stale: PackedStringArray = PackedStringArray()
+	for col: Variant in level._dz_buckets:
+		for entry: Variant in level._dz_buckets[col]:
+			if not is_instance_valid(entry):
+				stale.append("column %s: a freed entity" % str(col))
+				continue
+			var entity: SimEntity = entry
+			var slot: int = entity._doze_slot
+			if slot < 0 or slot >= level._doze.size() or level._doze[slot] != entity:
+				stale.append("column %s: %s is not in the doze list" % [str(col), entity.name])
+			elif not level.dz_is_filed(slot) or level._dz_ins[slot * 2] > int(col) or level._dz_ins[slot * 2 + 1] < int(col):
+				stale.append("column %s: %s is not filed there by the index" % [str(col), entity.name])
+	for entry: Variant in level._dz_wide:
+		if not is_instance_valid(entry):
+			stale.append("wide: a freed entity")
+	return stale
+
+
+func test_an_entity_dozing_left_of_the_map_is_unfiled_when_it_is_freed() -> void:
+	# The stale entry of wf10 (the search world of w4_l1_coop 'boulder': a Digger's copy that died with its box over the
+	# map's left edge): an area whose first grid column is -1 or -2 was filed under the very numbers the index used for
+	# "not filed" and "wide", so unregister_entity left it in its buckets - and every later pass over those columns met a
+	# freed instance.
+	Sim.manual = true
+	Sim.start(1)
+	var level: ViewLevel = _view_level()
+	level.view = Rect2i(2400, 0, Tuning.VIEW_W, Tuning.VIEW_H)  # far from the left edge
+	var areas: Array[Rect2i] = [
+		Rect2i(-40, 300, 30, 16),    # grid columns -1 .. -1  (the old "not filed" mark)
+		Rect2i(-100, 300, 30, 16),   # grid columns -2 .. -2  (the old "wide" mark)
+		Rect2i(-20, 300, 40, 16),    # grid columns -1 .. 0
+		Rect2i(20, 300, 30, 16),     # grid column 0 (a plain one, for comparison)
+	]
+	var sleepers: Array[Sleeper] = []
+	for area: Rect2i in areas:
+		sleepers.append(_sleeper(level, area))
+	Sim.step(2)
+	for entity: Sleeper in sleepers:
+		assert_true(entity.is_dozing(), "the entity at %s dozes far from the view" % str(entity.area))
+		assert_true(level.dz_is_filed(entity._doze_slot), "... and the index has it filed")
+	assert_eq(_stale_entries(level), PackedStringArray(), "the index is sound while they doze")
+	# A second decision over the same entities files nothing twice.
+	level.respawn_player()
+	var filed: int = 0
+	for col: Variant in level._dz_buckets:
+		filed += (level._dz_buckets[col] as Array).size()
+	assert_eq(filed, 5, "each entity is filed once per column of its area (1 + 1 + 2 + 1)")
+	# Freed while dozing (a search reset, a split copy leaving, a spawner's corpse): nothing of them stays filed.
+	for entity: Sleeper in sleepers:
+		level.remove_child(entity)
+		entity.free()
+	assert_eq(_stale_entries(level), PackedStringArray(), "no freed entity stays in the column index")
+	var left_over: int = 0
+	for col: Variant in level._dz_buckets:
+		left_over += (level._dz_buckets[col] as Array).size()
+	assert_eq(left_over, 0, "the buckets are empty again")
+	# The view comes to the left edge: the passes over those columns meet no freed instance (the runner counts engine
+	# errors: "Trying to assign invalid previously freed instance" was thrown on every tick).
+	level.view = Rect2i(0, 200, Tuning.VIEW_W, Tuning.VIEW_H)
+	var late: Sleeper = _sleeper(level, Rect2i(3000, 300, 30, 16))
+	Sim.step(3)
+	assert_true(late.is_dozing(), "the doze manager still decides (a far entity dozes)")
+	level.view = Rect2i(2800, 200, Tuning.VIEW_W, Tuning.VIEW_H)
+	Sim.step(2)
+	assert_false(late.is_dozing(), "... and wakes it when the view comes")
+	Sim.manual = false
+	Sim.stop()
+
+
+func test_a_dozing_entity_left_of_the_map_wakes_when_the_view_comes() -> void:
+	# The other half of the same defect: marked "not filed" although it was, such an entity was filed again at every
+	# scan and - worse - unfiled never, so a wake left its old entries behind.
+	Sim.manual = true
+	Sim.start(1)
+	var level: ViewLevel = _view_level()
+	level.view = Rect2i(2400, 0, Tuning.VIEW_W, Tuning.VIEW_H)
+	var entity: Sleeper = _sleeper(level, Rect2i(-40, 300, 30, 16))
+	Sim.step(2)
+	assert_true(entity.is_dozing(), "it dozes far from the view")
+	level.view = Rect2i(0, 200, Tuning.VIEW_W, Tuning.VIEW_H)
+	Sim.step(2)
+	assert_false(entity.is_dozing(), "the view at the left edge wakes it")
+	assert_false(level.dz_is_filed(entity._doze_slot), "an awake entity is not filed")
+	assert_eq(_stale_entries(level), PackedStringArray(), "... and left nothing behind in the buckets")
+	level.view = Rect2i(2400, 0, Tuning.VIEW_W, Tuning.VIEW_H)
+	Sim.step(2)
+	assert_true(entity.is_dozing(), "it dozes again when the view leaves")
+	assert_eq(_stale_entries(level), PackedStringArray(), "the index is sound")
+	Sim.manual = false
+	Sim.stop()

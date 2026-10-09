@@ -121,7 +121,10 @@ var _doze_views: Array[Rect2i] = []
 ## The column index of the DOZING entities (phase-3 performance pass, [method _doze_index_pass]): bucket c holds every
 ## dozing entity whose stored doze area touches the grid column c (x >> 6, Tuning.DOZE_GRID_PX); an area wider than
 ## DZ_WIDE_COLS columns sits in `_dz_wide` instead. `_dz_ins` keeps per doze slot the columns it is filed under (first,
-## last; -1 = not filed, -2 = in `_dz_wide`). Only dozing entities are filed: a dozing entity's area does not move, and
+## last; DZ_NOT_FILED = not filed, DZ_FILED_WIDE = in `_dz_wide`: two numbers no grid column can be - until wf11 they
+## were -1 and -2, the very columns of an area that begins left of the map (a corpse with its box over x = 0): such an
+## entity read as "not filed", was filed again at every scan and never unfiled, and once it was freed every pass over
+## its columns met a freed instance; [method dz_is_filed]). Only dozing entities are filed: a dozing entity's area does not move, and
 ## after every decision it lies off every doze rectangle, so a full pass need only look at the awake entities, the
 ## noted ones and the dozing ones under a doze rectangle - exactly the slots on which the full scan can act.
 var _dz_buckets: Dictionary = {}
@@ -133,6 +136,9 @@ var _dz_scan: bool = false
 var _dz_cands: PackedInt32Array = PackedInt32Array()
 var _dz_mark: PackedByteArray = PackedByteArray()
 const DZ_WIDE_COLS: int = 24
+## `_dz_ins` marks (see above): far outside every grid column a 32-bit pixel can have (x >> 6).
+const DZ_NOT_FILED: int = -(1 << 30)
+const DZ_FILED_WIDE: int = DZ_NOT_FILED + 1
 
 ## PlayerSet bookkeeping: the number of registered heroes (non-null entries of `heroes`), the contact orders of a
 ## party (index r = the heroes in slot order rotated by r; rebuilt when the party changes, so contact_order() never
@@ -227,8 +233,8 @@ func register_entity(entity: SimEntity) -> void:
 		_doze.append(entity)
 		_doze_rects.append_array([0, 0, 0, 0])
 		_doze_known.append(0)
-		_dz_ins.append(-1)
-		_dz_ins.append(-1)
+		_dz_ins.append(DZ_NOT_FILED)
+		_dz_ins.append(DZ_NOT_FILED)
 		_dz_mark.append(0)
 		if entity._sim_suspended:
 			_dz_scan = true  # suspended without the manager: only a scan finds it
@@ -1167,7 +1173,7 @@ func _doze_full_pass() -> void:
 		if entity._sim_suspended:
 			if not far:
 				_doze_wake_entity(entity)
-			elif _dz_ins[slot * 2] == -1:
+			elif _dz_ins[slot * 2] == DZ_NOT_FILED:
 				_dz_file(slot)
 		elif far:
 			_doze_check(slot)
@@ -1246,6 +1252,11 @@ func _doze_index_pass() -> void:
 			_doze_check(slot)
 
 
+## True when the entity in doze slot `slot` is filed in the column index (under its columns or among the wide ones).
+func dz_is_filed(slot: int) -> bool:
+	return _dz_ins[slot * 2] != DZ_NOT_FILED
+
+
 ## Adds to `_dz_cands` (marked in `_dz_mark`) every filed dozing entity of the grid columns of [left, right) (px).
 func _dz_collect(left: int, right: int) -> void:
 	for col: int in range(left >> 6, ((right - 1) >> 6) + 1):
@@ -1261,7 +1272,7 @@ func _dz_collect(left: int, right: int) -> void:
 
 ## Files the (dozing) entity of `slot` under the grid columns of its stored area.
 func _dz_file(slot: int) -> void:
-	if _dz_ins[slot * 2] != -1:
+	if _dz_ins[slot * 2] != DZ_NOT_FILED:
 		_dz_unfile(slot)
 	var entity: SimEntity = _doze[slot]
 	var k: int = slot * 4
@@ -1269,8 +1280,8 @@ func _dz_file(slot: int) -> void:
 	var last: int = (_doze_rects[k + 2] - 1) >> 6
 	if _doze_rects[k + 2] <= _doze_rects[k] or last - first + 1 > DZ_WIDE_COLS:
 		_dz_wide.append(entity)
-		_dz_ins[slot * 2] = -2
-		_dz_ins[slot * 2 + 1] = -2
+		_dz_ins[slot * 2] = DZ_FILED_WIDE
+		_dz_ins[slot * 2 + 1] = DZ_FILED_WIDE
 		return
 	for col: int in range(first, last + 1):
 		var bucket: Variant = _dz_buckets.get(col)
@@ -1285,18 +1296,18 @@ func _dz_file(slot: int) -> void:
 ## Takes the entity of `slot` out of the column index (nothing when it is not filed).
 func _dz_unfile(slot: int) -> void:
 	var first: int = _dz_ins[slot * 2]
-	if first == -1:
+	if first == DZ_NOT_FILED:
 		return
 	var entity: SimEntity = _doze[slot]
-	if first == -2:
+	if first == DZ_FILED_WIDE:
 		_dz_wide.erase(entity)
 	else:
 		for col: int in range(first, _dz_ins[slot * 2 + 1] + 1):
 			var bucket: Variant = _dz_buckets.get(col)
 			if bucket != null:
 				(bucket as Array).erase(entity)
-	_dz_ins[slot * 2] = -1
-	_dz_ins[slot * 2 + 1] = -1
+	_dz_ins[slot * 2] = DZ_NOT_FILED
+	_dz_ins[slot * 2 + 1] = DZ_NOT_FILED
 
 
 ## The rectangles of the further views (1..) and heroes (all but `first`) into `_dz_more`, the feet points of every
@@ -1387,7 +1398,7 @@ func _doze_check(slot: int) -> void:
 	if entity._sim_suspended:
 		if not _doze_far(slot):
 			_doze_wake_entity(entity)
-		elif _dz_ins[slot * 2] == -1:
+		elif _dz_ins[slot * 2] == DZ_NOT_FILED:
 			_dz_file(slot)
 		return
 	if not _doze_far(slot) or not entity._can_doze():
@@ -1414,7 +1425,7 @@ func _doze_store_area(slot: int, area: Rect2i) -> void:
 	_doze_known[slot] = 1
 	# A dozing entity's area changes only here: it is filed again under the new one (the check that follows wakes it
 	# when the new area is near).
-	var filed: bool = _dz_ins[slot * 2] != -1
+	var filed: bool = _dz_ins[slot * 2] != DZ_NOT_FILED
 	if filed:
 		_dz_unfile(slot)
 	if area.size.x <= 0 or area.size.y <= 0:

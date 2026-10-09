@@ -1,0 +1,3 @@
+level=w3_l2_coop gate=drive difficulty=0 whole=true start=0 tick0=-
+events=[[28, "hand", 4], [174, "hand", -1]]
+route=22:U,1:,1:U,1:,1:U,1:,1:U,1:R,8:UF,7:,1:L,15:LU,29:U,5:RU,1:,1:RU,1:,1:RU,1:,12:RU,10:LU,1:,1:RU,1:L,6:DF,9:LU,9:L,26:RD,1:,1:U,3:LU,23:RU,9:U,2:,2:R,6:RU,9:R

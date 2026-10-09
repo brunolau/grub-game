@@ -38,6 +38,23 @@ extends RefCounted
 ## Count-in (GAMEPLAY.md 13.9.3): while every member of a bond (or both halves of a split) is alive and each has a
 ## hatched hero within EnemyTuning.COUNT_IN_REACH_PX - not one hero for all - the group plays three blips
 ## PartyTuning.COUNT_IN_SPACING_TICKS apart, then "go" (presentation only, like the twin drums' count-in).
+##
+## THE WINDOWS ARE SLOT-BOUND (orchestrator ruling R2 of the G3b round; G3b cause C: one hero threw at the far member
+## and hit the near one as that special landed - the gap between two hits in flight is his to choose). A bond or a
+## split is met only by deaths credited to TWO DIFFERENT heroes who both COUNT (PlayerBase.counts_for_coop: alive,
+## hatched, not idle), however the hits are timed or thrown:
+##  - [method credit_slot] names the slot of a hit: the striker (his club box, his mount's bite), the thrower of a
+##    thrown weapon, the BALL itself for a batted hero (not his batter: a lone hero who bats his idle partner into a
+##    member has not found a second slot) - and nobody (-1) for a hero who does not count when it lands;
+##  - a weapon hit credited to nobody glances off a windowed record ([method accepts_hit]);
+##  - a death that would leave the whole group dead without two different counting slots among its deaths is refused:
+##    a weapon hit on the last living member glances (the clank and the spark of every glance), and any other death
+##    of it - a kill-all, a grenade, a feast's or a mount's bite, a glider dive - leaves it alive
+##    ([method refuses_kill]). So one hero kills one member and never the last: the dead one regrows (or merges) when
+##    its window closes, and "every member dead" still means "the bond was met" for the keeper doors;
+##  - the group seals ([method on_killed]) only with two different slots among its deaths in the window.
+## The twin drums use the same credit (objects/drum.gd); the daze is slot-bound by G47. A party of one, single-player
+## and versus never come here ([method party_on]).
 
 enum Split { WHOLE, HALF }
 
@@ -55,6 +72,12 @@ var regrow: int = 0
 var died_tick: int = -1
 ## `bond` / `split`: the group died within its window: it stays dead until the level resets.
 var sealed: bool = false
+## `bond` / `split` (R2): the player slot its death in the open window is credited to ([method credit_slot] of its
+## killer; -1 = nobody, or not dead). Kept while it lies dead, cleared when it regrows, merges or the level resets.
+var kill_slot: int = -1
+## `bond` / `split` (R2), statistics only (tools and tests; nothing in the simulation reads it): the hits and deaths
+## the slot rule refused on this record since it was spawned.
+var slot_refusals: int = 0
 ## `grab`: the hero it holds (null = none) and its perch (`perch=c,r`, the feet point of that cell).
 var held: PlayerBase = null
 var perch: Vector2i = Vector2i.ZERO
@@ -130,6 +153,30 @@ static func party_on() -> bool:
 ## The window of the bond and split traits for the current difficulty (PartyTuning.window_ticks).
 static func window_ticks() -> int:
 	return PartyTuning.window_ticks(Game.difficulty)
+
+
+## R2 (slot-bound windows): the hero a hit by `source` is credited to in a bond, split or drum window - `source`
+## itself when it is a hero (his club box, his mount's bite; a batted BALL is credited to the ball, not to his batter
+## as Defs.hitter_slot does for the statistics), the thrower of a thrown weapon (the hero of its `owner_slot`); null
+## for anything else. Whether he COUNTS is [method credit_slot]'s question.
+static func credit_hero(source: SimEntity) -> PlayerBase:
+	if source == null or not is_instance_valid(source):
+		return null
+	var hero: PlayerBase = source as PlayerBase
+	if hero != null:
+		return hero
+	if source.get_kind() != Defs.Kind.HERO_PROJECTILE or Game.level == null:
+		return null
+	var owner: Variant = source.get(&"owner_slot")
+	return Game.level.get_hero(int(owner)) if owner is int else null
+
+
+## R2: the player slot a hit by `source` counts for in a bond, split or drum window: [method credit_hero]'s slot while
+## that hero COUNTS on this tick (PlayerBase.counts_for_coop: alive, hatched, not idle); -1 = it counts for nobody (no
+## hero's hit, or the hit of an idle hero, an egg or a downed hero - his own box, his ball, a weapon he threw before).
+static func credit_slot(source: SimEntity) -> int:
+	var hero: PlayerBase = credit_hero(source)
+	return hero.slot if hero != null and hero.counts_for_coop() else -1
 
 
 ## A record's window or daze time from the difficulty's value `base` and its level parameters `params` (the
@@ -208,6 +255,13 @@ func keeps_awake() -> bool:
 	return (died_tick >= 0 and not sealed) or held != null or host != null or regrow > 0 or _returning
 
 
+## True while this record lies dead in its group's open window: it regrows or merges when the window closes, or
+## stays dead when the group seals. A dead record must stay in the level meanwhile (SpawnerEnemy keeps a dead copy
+## until then: a half that was freed could neither merge nor hold its mate to the slot rule).
+func window_open() -> bool:
+	return died_tick >= 0 and not sealed
+
+
 # =================================================================================================================
 # Hits and bounces (EnemyBase.take_hit, accepts_hit_from, on_bounced)
 # =================================================================================================================
@@ -232,7 +286,63 @@ func accepts_hit(source: SimEntity) -> bool:
 		Defs.CoopTrait.DAZE:
 			# G47: the daze is slot-bound - only a hero of another slot than the bouncer's hurts it.
 			return dazed > 0 and Defs.hitter_slot(source) != _dazer_slot
+		Defs.CoopTrait.BOND, Defs.CoopTrait.SPLIT:
+			# R2: the windows are slot-bound - nobody's hit and the hit that could not meet the group glance.
+			return not _slot_glances(source)
 	return true
+
+
+## R2: true when the slot rule turns a weapon hit by `source` away from this record: it is a windowed record (a named
+## bond's member, a split half) and the hit is credited to nobody, or its death by that slot would leave the whole
+## group dead without two different counting slots ([method _wasted_kill]).
+func _slot_glances(source: SimEntity) -> bool:
+	if not _windowed() or sealed:
+		return false
+	var slot: int = credit_slot(source)
+	return slot < 0 or _wasted_kill(slot)
+
+
+## R2: true when this record's death, credited to player slot `slot` (-1: nobody), would end its group without
+## meeting it: every other member that still belongs to the group lies dead in the open window and no two different
+## counting slots would stand among the deaths - for a pair: the mate fell to the same hero, or to nobody. False
+## while a mate lives (this death only opens the window or leaves it open) and for a record whose mates all left
+## without a window (a one-shot that despawned: it dies as a plain enemy, as it did before R2).
+func _wasted_kill(slot: int) -> bool:
+	var slots: int = (1 << slot) if slot >= 0 else 0
+	var open: bool = false
+	for member: EnemyBase in _group():
+		if member == enemy:
+			continue
+		if not member.dead:
+			return false
+		var traits: CoopTraits = member.coop_traits()
+		if traits == null or traits.died_tick < 0 or traits.sealed:
+			continue
+		open = true
+		if traits.kill_slot >= 0:
+			slots |= 1 << traits.kill_slot
+	return open and (slots & (slots - 1)) == 0
+
+
+## R2 (EnemyBase.kill of every cause, burst_into_items): true when this death must not happen - `killer`'s slot
+## ([method credit_slot]; null: nobody's, a grenade) could not meet the group ([method _wasted_kill]): the last
+## living member of a bond or split whose mates fell to the same hero or to nobody stays alive through a kill-all, a
+## grenade, a feast's or a mount's bite and a glider dive, as its weapon hits glance. Counted in
+## [member slot_refusals].
+func refuses_kill(killer: SimEntity) -> bool:
+	if not _windowed() or sealed or not party_on():
+		return false
+	if not _wasted_kill(credit_slot(killer)):
+		return false
+	slot_refusals += 1
+	return true
+
+
+## EnemyBase.take_hit: a hit by `source` has just glanced ([method accepts_hit] or the record's own rule refused it).
+## Statistics only: counts the glances the slot rule asks for.
+func on_hit_refused(source: SimEntity) -> void:
+	if party_on() and _slot_glances(source):
+		slot_refusals += 1
 
 
 ## G57 one hit per strike (EnemyBase._repeats_strike, every enemy of a co-op party): the strike instance a weapon hit
@@ -291,9 +401,12 @@ func on_bounced(hero: PlayerBase) -> void:
 	_sfx(Sfx.DAZE)
 
 
-## The record died (EnemyBase.kill, burst_into_items): let go of what it holds; a `bond` / `split` record opens or
-## completes its group's window.
-func on_killed() -> void:
+## The record died (EnemyBase.kill, burst_into_items; `killer` as EnemyBase.kill got it, null: nobody): let go of what
+## it holds; a `bond` / `split` record opens or completes its group's window. R2: the death is credited to
+## [method credit_slot] of `killer`, and the group seals only when its deaths in the window carry two different
+## counting slots ([method refuses_kill] has kept every other last death from happening; a record whose mates all left
+## without a window - nothing but its own death is open - dies as a plain enemy, as before).
+func on_killed(killer: SimEntity = null) -> void:
 	_let_go()
 	dazed = 0
 	_dazer_slot = -1
@@ -303,14 +416,22 @@ func on_killed() -> void:
 	if sealed or not party_on() or not _windowed():
 		return
 	died_tick = Sim.total_ticks
+	kill_slot = credit_slot(killer)
 	_death_pos = enemy.sim_pos
 	var first: int = died_tick
+	var open: int = 0
+	var slots: int = 0
 	for member: EnemyBase in _group():
 		if not member.dead:
 			return
 		var traits: CoopTraits = member.coop_traits()
 		if traits != null and traits.died_tick >= 0:
 			first = mini(first, traits.died_tick)
+			open += 1
+			if traits.kill_slot >= 0:
+				slots |= 1 << traits.kill_slot
+	if open >= 2 and (slots & (slots - 1)) == 0:
+		return  # R2: one slot (or nobody) for every death - not met; the dead regrow when the window closes
 	if died_tick - first < group_window():
 		for member: EnemyBase in _group():
 			var traits: CoopTraits = member.coop_traits()
@@ -318,6 +439,7 @@ func on_killed() -> void:
 				traits.sealed = true
 				traits.died_tick = -1
 				member._doze_note()
+				member._on_coop_sealed()
 
 
 ## The level was reset (team wipe, EnemyBase._on_level_reset): everything back to the level-file state.
@@ -330,6 +452,7 @@ func on_reset() -> void:
 	_dazer_slot = -1
 	regrow = 0
 	died_tick = -1
+	kill_slot = -1
 	sealed = false
 	split = Split.WHOLE
 	mate = null
@@ -434,6 +557,7 @@ func dead_tick() -> void:
 		sealed = true
 		died_tick = -1
 		enemy._doze_note()
+		enemy._on_coop_sealed()
 		return
 	if Sim.total_ticks - _group_first() < group_window():
 		return
@@ -793,6 +917,7 @@ func _group_first() -> int:
 ## Bond: back alive at `pos` (its anchor) with full hit points, harmless for EnemyTuning.REGROW_TICKS.
 func _regrow_at(pos: Vector2i) -> void:
 	died_tick = -1
+	kill_slot = -1
 	enemy._coop_revive(pos)
 	if enemy.awake:
 		regrow = EnemyTuning.REGROW_TICKS
@@ -878,6 +1003,7 @@ func _become_whole() -> void:
 	split = Split.WHOLE
 	mate = null
 	died_tick = -1
+	kill_slot = -1
 	_run = 0
 	enemy.hp = enemy.max_hp
 	enemy.flash = EnemyTuning.FLASH_TICKS

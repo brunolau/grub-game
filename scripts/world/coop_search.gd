@@ -326,6 +326,14 @@ class SearchLevel:
 	## Freed entities found filed in the doze index and dropped ([method _dz_collect]).
 	var stale_doze: int = 0
 
+	## Instance ids of the entities the doze manager woke since the search last cleared this (the exact reset: an
+	## entity that never ticked in a run is still what the reset before it left, [method Searcher.reset_world]).
+	var woken: Dictionary = {}
+
+	func _doze_wake_entity(entity: SimEntity) -> void:
+		woken[entity.get_instance_id()] = true
+		super._doze_wake_entity(entity)
+
 	func set_cell(col: int, row: int, ch: String) -> void:
 		var cell: Vector2i = Vector2i(col, row)
 		if not changed.has(cell) and grid.in_bounds(col, row):
@@ -821,10 +829,12 @@ class Searcher:
 	var runs: int = 0
 	## Ticks replayed to bring a changed node back (part of [member simulated]).
 	var replayed: int = 0
-	## The signature part of every record entity in the level-file world ([method reset_world] checks each against it).
+	## The signature part of every record entity in the level-file world.
 	var _baseline_parts: PackedStringArray = PackedStringArray()
-	## Entities a level reset left changed and the search spawned again (an unrolled vine, a tamed rex).
-	var leaks: int = 0
+	## Record entities a reset spawned again ([member respawns]; the name of the result's count since wf10).
+	var leaks: int:
+		get:
+			return respawns
 	## Probe-made worlds whose replay was cut down to the inputs up to the kill ([method _shorten]).
 	var shortened: int = 0
 	## Probe targets of the gate that no resting point came in reach of, probed from the nearest one at the end
@@ -846,11 +856,47 @@ class Searcher:
 	var _saved_party: int = 1
 	var _saved_difficulty: int = 0
 	var _game_saved: bool = false
-	## A search world starts every run on the same Sim.tick (the one it was built on), so whatever counts on the clock
-	## (a geyser's period, a lift's phase) is in the same phase in a run and in its replay; [method close] puts the
-	## clock at the latest tick reached.
-	var _tick_base: int = -1
-	var _tick_max: int = 0
+	## THE EXACT RESET (wf11, R7: "a found route always replays in a fresh process"). A search world is built with the
+	## clocks at zero (Sim.tick, Sim.total_ticks, the phase counters) and every run starts there again, in the state a
+	## fresh process builds: [method reset_world]. What the search saved of the process's own clocks ([method close]
+	## puts them back, the total moved on by what was played).
+	var _clock_saved: bool = false
+	var _saved_tick: int = 0
+	var _saved_total: int = 0
+	var _saved_phase_runs: PackedInt32Array = PackedInt32Array()
+	var _saved_drop_slots: int = 0
+	## Ticks played by the runs that ended (the process's total clock moves on by them at [method close]).
+	var _elapsed: int = 0
+	## The deep state ([method CoopSearch.deep_state]) of every record entity right after the build's reset: awake,
+	## never ticked - what a fresh process starts every route from.
+	var _deep_base: PackedStringArray = PackedStringArray()
+	## The registration serial of every record entity (Sim calls a phase in this order, the level lists a kind in it).
+	var _serials: PackedInt32Array = PackedInt32Array()
+	## Instance id -> index of a record entity.
+	var _index_of: Dictionary = {}
+	## Indices of the record entities that ticked since the last reset (awake at the run's start, or woken in it).
+	var _touched: Dictionary = {}
+	## index -> indices of the record entities whose baseline state names it (a door its plate, a pulley its lifts):
+	## looked at again when it is respawned.
+	var _holders: Dictionary = {}
+	## The heroes' and the driver's deep states after the canonical placement of [method _canon_party], and their
+	## serials.
+	var _hero_base: String = ""
+	var _partner_base: String = ""
+	var _driver_base: String = ""
+	var _party_serials: PackedInt32Array = PackedInt32Array()
+	## The level's, the game's and each run's plain variables in the level-file world ([method CoopSearch.snapshot]).
+	var _level_snap: Dictionary = {}
+	var _game_snap: Dictionary = {}
+	var _run_snaps: Array[Dictionary] = []
+	## Record entities a reset found changed and spawned again in their place; resets that built the heroes or the
+	## driver anew; entities still not in their level-file state after RESET_PASSES (a world that is NOT exact:
+	## reported, and such a search is never "exhaustive").
+	var respawns: int = 0
+	var party_respawns: int = 0
+	var drift: int = 0
+	## [member CoopSearch.reset_audit]: entities that had not ticked and were changed all the same.
+	var audit_drift: int = 0
 	var _flags: PackedInt32Array = PackedInt32Array()
 	var _first_tick: int = 0
 	## The records spawned into the world and their entities (same index).
@@ -940,8 +986,14 @@ class Searcher:
 		if not Spawner.exists(PLAYER_ID):
 			return false
 		_saved_level = Game.level
-		_tick_base = Sim.tick
-		_tick_max = Sim.tick
+		# The clocks at zero before anything is spawned: what an entity notes of them while it enters is then the
+		# same in every process (the exact reset).
+		_clock_saved = true
+		_saved_tick = Sim.tick
+		_saved_total = Sim.total_ticks
+		_saved_phase_runs = Sim._phase_runs.duplicate()
+		_saved_drop_slots = CollectibleBase._drop_slots_used
+		_zero_clocks()
 		_saved_mode = Game.mode
 		_saved_party = Game.party
 		_saved_difficulty = Game.difficulty
@@ -976,6 +1028,8 @@ class Searcher:
 			_records.append(record)
 			_entities.append(node)
 			_kept[node.get_instance_id()] = true
+			_index_of[node.get_instance_id()] = _entities.size() - 1
+			_serials.append(node._sim_serial)
 			if CoopSearch.is_target(id):
 				_targets.append(node.sim_pos)
 			if CoopSearch.is_mechanism_target(record):
@@ -1012,16 +1066,47 @@ class Searcher:
 		driver = PartyDriver.new()
 		level.register_party_driver(driver)
 		_kept[driver.get_instance_id()] = true
+		_party_serials = PackedInt32Array([hero._sim_serial, partner._sim_serial, driver._sim_serial])
+		_label_world()
 		# The cells the entities wrote while entering (boulders, static columns) are the world's own.
 		level.changed.clear()
 		GameInput.set_scripted(_flag_at)
 		GameInput.set_scripted_slot(PARTNER_SLOT, CoopSearch._no_input)
 		macros = CoopSearch.make_macros(true)
+		_level_snap = CoopSearch.snapshot(level, LEVEL_SNAP)
+		_game_snap = CoopSearch.snapshot(Game)
+		for run_state: PlayerRun in Game.runs:
+			_run_snaps.append(CoopSearch.snapshot(run_state))
 		reset_world()
 		for entity: SimEntity in _entities:
 			_baseline_parts.append(CoopSearch.probe(entity) if entity != null and is_instance_valid(entity) else "gone")
 		_baseline = signature()
 		return true
+
+	## The clocks of a search world at the start of a run: tick 0 of the level, of the process and of every phase,
+	## the dropped-item slots free, the input of the tick before released.
+	func _zero_clocks() -> void:
+		Sim.tick = 0
+		Sim.total_ticks = 0
+		Sim._phase_runs.fill(0)
+		CollectibleBase._drop_slots_used = 0
+		for slot: int in Defs.MAX_PLAYERS:
+			GameInput.slot_flags[slot] = 0
+			GameInput.prev_slot_flags[slot] = 0
+			GameInput._slot_latched[slot] = 0
+
+	## The names a deep state gives the nodes of this world ([member CoopSearch._deep_labels]): "#<index>" a record
+	## entity, "#h" / "#p" / "#d" the heroes and the driver, "#L" the level.
+	func _label_world() -> void:
+		var labels: Dictionary = {}
+		for i: int in _entities.size():
+			if _entities[i] != null and is_instance_valid(_entities[i]):
+				labels[_entities[i].get_instance_id()] = "#%d" % i
+		labels[hero.get_instance_id()] = "#h"
+		labels[partner.get_instance_id()] = "#p"
+		labels[driver.get_instance_id()] = "#d"
+		labels[level.get_instance_id()] = "#L"
+		CoopSearch._deep_labels = labels
 
 	func close() -> void:
 		GameInput.clear_scripted()
@@ -1035,9 +1120,16 @@ class Searcher:
 		partner = null
 		driver = null
 		_entities.clear()
-		if _tick_base >= 0:
-			Sim.tick = maxi(Sim.tick, _tick_max)
-			_tick_base = -1
+		if _clock_saved:
+			# The process's own clocks again; its total moved on by what the search played.
+			_elapsed += Sim.total_ticks
+			Sim.tick = _saved_tick
+			Sim.total_ticks = _saved_total + _elapsed
+			for phase: int in _saved_phase_runs.size():
+				Sim._phase_runs[phase] = _saved_phase_runs[phase] + _elapsed
+			CollectibleBase._drop_slots_used = _saved_drop_slots
+			CoopSearch._deep_labels = {}
+			_clock_saved = false
 		if _game_saved:
 			Game.mode = _saved_mode
 			Game.party = _saved_party
@@ -1049,10 +1141,25 @@ class Searcher:
 		var index: int = tick - _first_tick
 		return _flags[index] if index >= 0 and index < _flags.size() else 0
 
-	## Back to the level-file state: runtime entities (shots, effects, dropped items, spear steps, springs) freed,
-	## every entity reset (LevelBase.reset_entities), the cells changed since put back; an entity a reset does not
-	## bring back (a sprung pot, a collected item, an opened spot, a moved boulder) is spawned again from its record,
-	## and then the heroes and the driver are registered again after it (the level's order: entities, P1, P2, driver).
+	## Back to the level-file state, EXACTLY (wf11, R7): the state a fresh process builds, whatever was played before.
+	## Before wf11 a reset was the game's own (LevelBase.reset_entities) plus a respawn of what that leaves changed by
+	## design (a sprung pot, a moved boulder, a collected item) - and six gates counted replays that missed their
+	## world, five routes of the G3b verifier's explorer did not replay in a fresh process: the clock ran on
+	## (Sim.total_ticks is in every "until" an enemy keeps, in the bond window, in a platform's carry), a respawned
+	## entity went to the END of the tick order, an entity that dozed through the reset woke with the ticks of the
+	## run before added to its counters, a hero kept what respawn_at does not clear, the game its score and food.
+	## Now:
+	##  1. the runtime entities (shots, dropped items, spear steps, springs) are freed;
+	##  2. every record entity that ticked since the last reset ([member _touched]) is woken, then
+	##     LevelBase.reset_entities runs and the changed cells are put back;
+	##  3. each of those whose DEEP STATE ([method CoopSearch.deep_state]: every script variable, also of the objects
+	##     it owns) is not the level-file world's is spawned again from its record IN ITS PLACE - the same registration
+	##     serial (Sim's order inside a phase), the same place in the level's kind and tag lists - and so is whatever
+	##     named it (a door its plate), up to RESET_PASSES times; what still differs then is counted ([member drift]);
+	##  4. the level's, the game's and the runs' plain variables are put back, the heroes placed canonically and
+	##     compared like the entities (built anew with the driver when they differ: [method _reset_party]);
+	##  5. the clocks are zero again, the RNG reseeded.
+	## The run's own placement and the doze decision follow in [method _begin].
 	func reset_world() -> void:
 		var stale: Array[Node] = []
 		for child: Node in level.get_children():
@@ -1063,38 +1170,227 @@ class Searcher:
 				(node as SimEntity).sim_active = false
 			level.remove_child(node)
 			node.free()
+		_elapsed += Sim.total_ticks
+		var first: bool = _deep_base.is_empty()
+		if first:
+			for i: int in _entities.size():
+				_touched[i] = true
+		else:
+			_note_touched()
+		for i: int in _touched:
+			var dozer: SimEntity = entity_at(i)
+			if dozer != null and dozer._sim_suspended:
+				level.doze_wake(dozer)
+		# The clocks are zero from here on: an entity that dozed through the whole run and is woken by its own reset
+		# then adds no tick to its counters - it is what the reset before left, as in a fresh process.
+		_zero_clocks()
+		level.woken.clear()
 		level.reset_entities()
+		for id: int in level.woken:
+			if _index_of.has(id):
+				_touched[int(_index_of[id])] = true
+		level.woken.clear()
 		level.restore_cells()
-		var respawned: bool = false
-		for i: int in _entities.size():
-			# Kept when a level reset brings it back by itself - and it IS back: an entity whose signature part differs
-			# from the level-file world after the reset (an unrolled vine and a tamed rex stay so "through deaths and
-			# team wipes"; whatever else an owner makes lasting tomorrow) is spawned again from its record. Before wf10
-			# an unrolled vine stayed unrolled for every later move of the search: a leak that made paths that do not
-			# exist (w7_l1_coop 'stack') and changed worlds that were none (w5_l1_coop 'plates': 77 of 78).
-			if CoopSearch.reset_keeps(_entities[i]) and (i >= _baseline_parts.size()
-					or CoopSearch.probe(_entities[i]) == _baseline_parts[i]):
-				continue
-			leaks += 1 if CoopSearch.reset_keeps(_entities[i]) else 0
-			var record: Dictionary = _records[i]
-			var old: SimEntity = _entities[i]
-			if old != null and is_instance_valid(old):
-				_kept.erase(old.get_instance_id())
-				level.remove_child(old)
-				old.free()
-			var params: Dictionary = (record["params"] as Dictionary).duplicate()
-			var node: SimEntity = level.spawn(StringName(String(record["id"])), LevelText.cell_to_feet(
-					float(int(record["col"])), float(int(record["row"])), params), params) as SimEntity
-			_entities[i] = node
-			if node != null:
-				_kept[node.get_instance_id()] = true
-			respawned = true
-		level.restore_cells()
-		if respawned:
-			for node: SimEntity in [hero, partner, driver]:
-				level.remove_child(node)
-				level.add_child(node)
+		level._doze_screen_pending.clear()
+		if first:
+			_capture_base()
+		else:
+			_restore_entities()
+			level.restore_cells()
+		CoopSearch.restore(level, _level_snap)
+		CoopSearch.restore(Game, _game_snap)
+		for slot: int in mini(Game.runs.size(), _run_snaps.size()):
+			CoopSearch.restore(Game.runs[slot], _run_snaps[slot])
+		_reset_party(first)
+		_zero_clocks()
+		_touched.clear()
 		Sim.rng.reseed(SEARCH_SEED)
+
+	## The record entities that ticked since the last reset: those the run's start left awake ([method _note_awake]),
+	## those the doze manager woke since, and whatever is awake now.
+	func _note_touched() -> void:
+		for id: int in level.woken:
+			if _index_of.has(id):
+				_touched[int(_index_of[id])] = true
+		_note_awake()
+
+	## Every record entity that is awake now is one that ticks (called once the run's start decided who dozes).
+	func _note_awake() -> void:
+		for i: int in _entities.size():
+			var entity: SimEntity = _entities[i]
+			if entity == null or not is_instance_valid(entity) or not entity._sim_suspended:
+				_touched[i] = true
+
+	## The level-file world's deep state of every record entity (the build's first reset: all awake, none ticked), and
+	## who names whom in it.
+	func _capture_base() -> void:
+		_deep_base.resize(_entities.size())
+		for i: int in _entities.size():
+			var entity: SimEntity = entity_at(i)
+			if entity == null:
+				_deep_base[i] = "gone"
+				continue
+			entity.on_screen = false
+			CoopSearch._deep_refs = {}
+			_deep_base[i] = CoopSearch.deep_state(entity)
+			for label: String in CoopSearch._deep_refs:
+				var named: int = label.substr(1).to_int() if label.substr(1).is_valid_int() else -1
+				if named >= 0 and named != i:
+					if not _holders.has(named):
+						_holders[named] = []
+					(_holders[named] as Array).append(i)
+		CoopSearch._deep_refs = {}
+
+	## Step 3 of [method reset_world]. With [member CoopSearch.reset_audit] every record entity is compared, and one
+	## that had not ticked but differs is counted ([member audit_drift]) before it is respawned like the others.
+	func _restore_entities() -> void:
+		var check: Dictionary = _touched.duplicate()
+		if CoopSearch.reset_audit:
+			for i: int in _entities.size():
+				check[i] = true
+		for attempt: int in RESET_PASSES + 1:
+			var dirty: PackedInt32Array = PackedInt32Array()
+			for i: int in check:
+				var entity: SimEntity = entity_at(i)
+				if entity != null:
+					entity.on_screen = false
+				var now: String = CoopSearch.deep_state(entity) if entity != null else "gone"
+				if now == _deep_base[i]:
+					continue
+				dirty.append(i)
+				if CoopSearch.reset_audit and attempt == 0 and not _touched.has(i):
+					audit_drift += 1
+					CoopSearch.note_reset_diff("AUDIT (never ticked) " + _target_name(i), entity, _deep_base[i])
+				elif CoopSearch.collect_reset_report:
+					CoopSearch.note_reset_diff(("still " if attempt > 0 else "") + String(_records[i]["id"]), entity,
+						_deep_base[i])
+			if dirty.is_empty():
+				return
+			if attempt == RESET_PASSES:
+				drift += dirty.size()
+				return
+			dirty.sort()
+			check = {}
+			for i: int in dirty:
+				_respawn_in_place(i)
+				check[i] = true
+				for holder: Variant in _holders.get(i, []):
+					check[int(holder)] = true
+
+	## Record entity `index` spawned again from its record in the place of the old one: Sim calls it where the old
+	## one was called (its registration serial), the level lists it where the old one stood (its kind, its bond and
+	## keeper groups); then the level reset it gets in a fresh world too.
+	func _respawn_in_place(index: int) -> void:
+		respawns += 1
+		var record: Dictionary = _records[index]
+		var old: SimEntity = _entities[index]
+		if old != null and is_instance_valid(old):
+			_kept.erase(old.get_instance_id())
+			_index_of.erase(old.get_instance_id())
+			CoopSearch._deep_labels.erase(old.get_instance_id())
+			old.sim_active = false
+			old.get_parent().remove_child(old)
+			old.free()
+		var params: Dictionary = (record["params"] as Dictionary).duplicate()
+		var node: SimEntity = level.spawn(StringName(String(record["id"])), LevelText.cell_to_feet(
+				float(int(record["col"])), float(int(record["row"])), params), params) as SimEntity
+		_entities[index] = node
+		if node == null:
+			return
+		_kept[node.get_instance_id()] = true
+		_index_of[node.get_instance_id()] = index
+		CoopSearch._deep_labels[node.get_instance_id()] = "#%d" % index
+		_take_place(node, _serials[index])
+		node._on_level_reset()
+
+	## Give `node` (just spawned: last in every order) the registration serial `serial` and the place that goes with
+	## it in Sim's phase lists and in the level's lists of its kind and tags.
+	func _take_place(node: SimEntity, serial: int) -> void:
+		Sim.suspend(node)
+		node._sim_serial = serial
+		Sim.resume(node)
+		var lists: Array = [level._by_kind[node.get_kind()]]
+		for tag: String in LevelBase.TAG_PARAMS:
+			if node.spawn_params.has(tag):
+				lists.append(level.get_tagged(StringName(tag), StringName(str(node.spawn_params[tag]))))
+		for list: Array in lists:
+			var from: int = list.find(node)
+			if from < 0:
+				continue
+			list.remove_at(from)
+			var at: int = list.size()
+			for k: int in list.size():
+				if (list[k] as SimEntity)._sim_serial > serial:
+					at = k
+					break
+			list.insert(at, node)
+
+	## The heroes and the driver in the level-file state: placed canonically ([method _canon_party]) and compared
+	## with what the build left; when a hero or the driver differs (a field no respawn clears) all three are built
+	## anew in their places.
+	func _reset_party(first: bool) -> void:
+		_canon_party()
+		if first:
+			_hero_base = CoopSearch.deep_state(hero)
+			_partner_base = CoopSearch.deep_state(partner)
+			_driver_base = CoopSearch.deep_state(driver)
+			return
+		for attempt: int in 2:
+			var same: bool = true
+			for pair: Array in [[hero, _hero_base, "player (the hero)"], [partner, _partner_base, "player (the partner)"],
+					[driver, _driver_base, "party driver"]]:
+				if CoopSearch.deep_state(pair[0]) != str(pair[1]):
+					same = false
+					if CoopSearch.collect_reset_report:
+						CoopSearch.note_reset_diff(("still " if attempt > 0 else "") + str(pair[2]), pair[0], str(pair[1]))
+			if same:
+				return
+			if attempt == 1:
+				drift += 1
+				return
+			_respawn_party()
+			_canon_party()
+
+	## The canonical placement the heroes are compared in: both at the build's spots, full energy, the club in hand,
+	## the hero active and the partner idle.
+	func _canon_party() -> void:
+		hero.run.reset_energy()
+		_set_hand(-1)
+		hero.respawn_at(Vector2i(Tuning.TILE * 2, Tuning.TILE * 2))
+		hero.facing = 1
+		_mark_active(hero)
+		partner.run.reset_energy()
+		partner.run.set_weapon(Defs.Weapon.CLUB)
+		partner.run.set_belt(PlayerRun.BELT_EMPTY)
+		partner.respawn_at(Vector2i(Tuning.TILE * 3, Tuning.TILE * 2))
+		partner.facing = 1
+		_mark_idle(partner)
+		for who: PlayerBase in [hero, partner]:
+			who.on_screen = false
+
+	## The heroes and the driver built anew, each in the place of the old one (the order: entities, P1, P2, driver).
+	func _respawn_party() -> void:
+		party_respawns += 1
+		for node: SimEntity in [driver, partner, hero]:
+			_kept.erase(node.get_instance_id())
+			CoopSearch._deep_labels.erase(node.get_instance_id())
+			node.sim_active = false
+			node.get_parent().remove_child(node)
+			node.free()
+		hero = level.spawn(PLAYER_ID, Vector2i(Tuning.TILE * 2, Tuning.TILE * 2), {}) as PlayerBase
+		partner = level.spawn(PLAYER_ID, Vector2i(Tuning.TILE * 3, Tuning.TILE * 2), {"slot": PARTNER_SLOT}) \
+				as PlayerBase
+		driver = PartyDriver.new()
+		level.register_party_driver(driver)
+		var nodes: Array[SimEntity] = [hero, partner, driver]
+		for k: int in nodes.size():
+			_kept[nodes[k].get_instance_id()] = true
+			_take_place(nodes[k], _party_serials[k])
+		CoopSearch._deep_labels[hero.get_instance_id()] = "#h"
+		CoopSearch._deep_labels[partner.get_instance_id()] = "#p"
+		CoopSearch._deep_labels[driver.get_instance_id()] = "#d"
+		for node: SimEntity in nodes:
+			node._on_level_reset()
 
 	## What a reset would undo that a player could use (see the class header): "" parts for an untouched world.
 	func signature() -> String:
@@ -1137,8 +1433,6 @@ class Searcher:
 		runs += 1
 		var clock: int = Time.get_ticks_usec()
 		if world:
-			_tick_max = maxi(_tick_max, Sim.tick)
-			Sim.tick = _tick_base
 			reset_world()
 		CoopSearch.profile_add(&"reset", clock)
 		clock = Time.get_ticks_usec()
@@ -1155,7 +1449,9 @@ class Searcher:
 				_place_idle(at, facing)
 			else:
 				_place_partner(int(config["partner"]), start, facing)
+			level.woken.clear()
 			level.refresh_doze()
+			_note_awake()
 			if _wind != null:
 				_wind.restart()
 		_first_tick = Sim.tick + 1
@@ -1661,7 +1957,8 @@ class Searcher:
 			"replayed": replayed, "placements": placements, "queued": waiting,
 			"exhausted": stopped == "" and waiting == 0, "stopped": stopped, "parked": _count_parked(queue, head),
 			"changed": _count_changed(queue, head), "passes": passes, "cut": cut_total + _cut.size(), "late": late,
-			"worlds": _worlds.size(), "misses": misses, "spawned": level.spawned, "leaks": leaks,
+			"worlds": _worlds.size(), "misses": misses, "spawned": level.spawned, "leaks": respawns,
+			"party_respawns": party_respawns, "drift": drift + audit_drift,
 			"late_sites": late_sites, "shortened": shortened}
 
 	## A child of `node` from a run's `outcome` at rest (`ticks` on the path so far, `path` its text, played with
@@ -2461,8 +2758,9 @@ static func judge(result: Dictionary) -> Dictionary:
 	var probes_on: bool = bool(result.get("probes_on", true))
 	var probes_text: String = "probes: none run (the search ran without them)" if not probes_on \
 			else ("probes: no target" if counts.is_empty() else "probes %s" % ", ".join(counts))
-	# A replay that did not bring its world back dropped a move unplayed: a search with one is not exhaustive.
-	var misses: int = int(result.get("misses", 0))
+	# A replay that did not bring its world back dropped a move unplayed: a search with one is not exhaustive - nor
+	# is one whose reset left an entity out of its level-file state (the exact reset's drift: 0 since wf11).
+	var misses: int = int(result.get("misses", 0)) + int(result.get("drift", 0))
 	var dry: bool = bool(result.get("exhausted", false))
 	if dry and misses == 0:
 		var evidence: String = "exhaustive, %d resting points%s; %s" % [explored,
@@ -2479,8 +2777,8 @@ static func judge(result: Dictionary) -> Dictionary:
 		"" if not first_dry else " - the first pass (every world within a %d-tick replay) ran dry, these are the longer replays of the second"
 		% MAX_PREFIX_TICKS]
 	if dry:
-		bound = "the queue ran dry after %d resting points, but %d move(s) from changed worlds were not played (the replay did not bring their world back): not exhaustive" % [
-			explored, misses]
+		bound = "the queue ran dry after %d resting points, but %d replay(s) or reset(s) did not bring the world back exactly (%d replays missed, %d entities left changed): not exhaustive" % [
+			explored, misses, int(result.get("misses", 0)), int(result.get("drift", 0))]
 	if explored < BOUNDED_MIN_NODES and not first_dry:
 		return {"verdict": VERDICT_UNPROVEN, "evidence": "%s - below the %d resting points a bounded refusal needs; %s"
 			% [bound, BOUNDED_MIN_NODES, probes_text], "missing": missing}
@@ -2509,11 +2807,12 @@ static func report_lines(result: Dictionary) -> PackedStringArray:
 	if detail.begins_with("static rule") or not result.has("probes"):
 		lines.append("search: not run (%s)" % detail)
 		return lines
-	var counts: String = "%d runs, %d ticks (%d replayed); %d parked-partner, %d changed-world nodes in %d worlds; %d paths past the %d-tick bound; %d replays missed; %d nodes spawned, %d respawned after a reset left them changed" % [
+	var counts: String = "%d runs, %d ticks (%d replayed); %d parked-partner, %d changed-world nodes in %d worlds; %d paths past the %d-tick bound; %d replays missed; %d nodes spawned; the exact reset: %d entities respawned in place, the heroes %d times, %d left not in the level-file state" % [
 		int(result.get("runs", 0)), int(result.get("simulated", 0)), int(result.get("replayed", 0)),
 		int(result.get("parked", 0)), int(result.get("changed", 0)), int(result.get("worlds", 0)),
 		int(result.get("late", 0)), int(result.get("bound", BOUND_TICKS)), int(result.get("misses", 0)),
-		int(result.get("spawned", 0)), int(result.get("leaks", 0))]
+		int(result.get("spawned", 0)), int(result.get("leaks", 0)), int(result.get("party_respawns", 0)),
+		int(result.get("drift", 0))]
 	var passes: String = "one pass, no replay cut" if int(result.get("passes", 1)) < 2 and int(result.get("cut", 0)) == 0 \
 			else ("two passes, %d states past the first pass's %d-tick replay cap taken up" % [int(result.get("cut", 0)),
 			MAX_PREFIX_TICKS] if int(result.get("passes", 1)) >= 2 else "first pass, %d states past its %d-tick replay cap waiting"
@@ -2852,6 +3151,8 @@ static func search_data(data: LevelData, difficulty: int, gate: String) -> Dicti
 	result["misses"] = int(found.get("misses", 0))
 	result["spawned"] = int(found.get("spawned", 0))
 	result["leaks"] = int(found.get("leaks", 0))
+	result["party_respawns"] = int(found.get("party_respawns", 0))
+	result["drift"] = int(found.get("drift", 0))
 	result["late_sites"] = int(found.get("late_sites", 0))
 	result["shortened"] = int(found.get("shortened", 0))
 	result["probes_on"] = probes
@@ -3081,6 +3382,183 @@ static func reset_keeps(entity: SimEntity) -> bool:
 		var spot: SceneryHittable = entity
 		return not spot.opened and spot.hits_left == spot.hits_total
 	return true
+
+
+# =================================================================================================================
+# The exact reset's tools (wf11, R7): the deep state of an object, plain snapshots, the report of what a reset found
+# =================================================================================================================
+
+## [method Searcher.reset_world]: how often a changed entity and whatever names it are spawned again before what
+## still differs is counted as drift.
+const RESET_PASSES: int = 3
+## Script variables a deep state leaves out: Sim's and the doze manager's own bookkeeping of an entity (its place in
+## their lists - the search restores the order itself), the render interpolation, the record's constants, and
+## `on_screen` (the level writes it at every tick's end; a reset clears it).
+const DEEP_SKIP: Array[StringName] = [
+	&"sim_prev", &"on_screen", &"spawn_params", &"spawn_pos", &"_sim_registered", &"_sim_serial", &"_sim_phase_list",
+	&"_sim_suspended", &"_sim_awake_slot", &"_doze_slot", &"_level_awake_slot",
+]
+## Objects owned by an object are read this deep (a hero's components, an enemy's traits, their own helpers).
+const DEEP_DEPTH: int = 3
+## The level's plain variables a run can change and a reset puts back ([method snapshot]; its registries and the doze
+## manager's caches are rebuilt by the level itself).
+const LEVEL_SNAP: Array[StringName] = [
+	&"shake", &"shake_offset", &"wind", &"lee_mask", &"scroll_flags", &"dark", &"completed", &"active_enemies",
+	&"time_left", &"_camera_locked", &"_camera_lock_rect", &"_respawn_dark", &"_shake_tick", &"_shake_hero",
+	&"_death_done",
+]
+
+## Script -> the names of its script variables without DEEP_SKIP ([method deep_names]).
+static var _deep_names: Dictionary = {}
+## Instance id -> the name a deep state gives that node ([method Searcher._label_world]).
+static var _deep_labels: Dictionary = {}
+## The labels a [method deep_state] met (filled while it is a Dictionary someone reads; [method Searcher._capture_base]).
+static var _deep_refs: Dictionary = {}
+## True: every reset compares EVERY record entity with the level-file world, not only those that ticked, and counts
+## one that had not ticked but differs ([member Searcher.audit_drift]) - the check of the rule the exact reset rests
+## on (tests, tools/coop_explore: audit=1).
+static var reset_audit: bool = false
+## True: [member reset_report] is filled.
+static var collect_reset_report: bool = false
+## What the resets found changed: "<what>.<variable>" -> times (tools/coop_search.gd --reset-report).
+static var reset_report: Dictionary = {}
+
+
+## The names of the script variables of `obj` that make its deep state (every level of its scripts, without
+## DEEP_SKIP), read once per script.
+static func deep_names(obj: Object) -> Array:
+	var script: Variant = obj.get_script()
+	if script == null:
+		return []
+	if _deep_names.has(script):
+		return _deep_names[script]
+	var names: Array = []
+	for property: Dictionary in obj.get_property_list():
+		if int(property["usage"]) & PROPERTY_USAGE_SCRIPT_VARIABLE == 0:
+			continue
+		var name: StringName = StringName(str(property["name"]))
+		if not DEEP_SKIP.has(name):
+			names.append(name)
+	_deep_names[script] = names
+	return names
+
+
+## The DEEP STATE of `obj`: the value of every script variable ([method deep_names]) as text - plain values as they
+## print; a node by its name in the search world ("#<index>" a record entity, "#h" / "#p" / "#d", "rt" a runtime
+## entity, "n" any other node, "freed" one that is gone); a resource "r"; any other object it holds read the same way,
+## DEEP_DEPTH deep; arrays and dictionaries element by element. Two entities of one record with the same deep state
+## go on identically from identical surroundings: what the exact reset compares with the level-file world.
+static func deep_state(obj: Object, depth: int = 0) -> String:
+	if obj == null:
+		return "~"
+	var names: Array = deep_names(obj)
+	var parts: PackedStringArray = PackedStringArray()
+	parts.resize(names.size())
+	for k: int in names.size():
+		parts[k] = _deep_value(obj.get(names[k]), depth)
+	return ("|" if depth == 0 else ";").join(parts)
+
+
+static func _deep_value(value: Variant, depth: int) -> String:
+	match typeof(value):
+		TYPE_NIL:
+			return "~"
+		TYPE_BOOL, TYPE_INT, TYPE_FLOAT, TYPE_STRING, TYPE_STRING_NAME, TYPE_VECTOR2I, TYPE_VECTOR2, TYPE_RECT2I, \
+				TYPE_VECTOR3I:
+			return str(value)
+		TYPE_OBJECT:
+			if not is_instance_valid(value):
+				return "freed"
+			var held: Object = value
+			if held is Node:
+				var label: String = str(_deep_labels.get(held.get_instance_id(), "rt" if held is SimEntity else "n"))
+				if label.begins_with("#"):
+					_deep_refs[label] = true
+				return label
+			if held is Resource:
+				return "r"
+			if depth >= DEEP_DEPTH or held.get_script() == null:
+				return "o"
+			return "{%s}" % deep_state(held, depth + 1)
+		TYPE_ARRAY:
+			var items: PackedStringArray = PackedStringArray()
+			for item: Variant in value:
+				items.append(_deep_value(item, depth))
+			return "[%s]" % ",".join(items)
+		TYPE_DICTIONARY:
+			var pairs: PackedStringArray = PackedStringArray()
+			var held_dict: Dictionary = value
+			for key: Variant in held_dict:
+				pairs.append("%s:%s" % [_deep_value(key, depth), _deep_value(held_dict[key], depth)])
+			pairs.sort()
+			return "{%s}" % ",".join(pairs)
+		TYPE_CALLABLE, TYPE_SIGNAL, TYPE_RID, TYPE_NODE_PATH:
+			return "-"
+	return str(value)
+
+
+## The plain script variables of `obj` (numbers, booleans, texts, vectors and rectangles; of `only` when it is given)
+## as {name: value}: what [method restore] puts back.
+static func snapshot(obj: Object, only: Array[StringName] = []) -> Dictionary:
+	var result: Dictionary = {}
+	if obj == null:
+		return result
+	for property: Dictionary in obj.get_property_list():
+		if int(property["usage"]) & PROPERTY_USAGE_SCRIPT_VARIABLE == 0:
+			continue
+		var name: StringName = StringName(str(property["name"]))
+		if not only.is_empty() and not only.has(name):
+			continue
+		var value: Variant = obj.get(name)
+		match typeof(value):
+			TYPE_BOOL, TYPE_INT, TYPE_FLOAT, TYPE_STRING, TYPE_STRING_NAME, TYPE_VECTOR2I, TYPE_VECTOR2, TYPE_RECT2I, \
+					TYPE_RECT2, TYPE_VECTOR3I:
+				result[name] = value
+	return result
+
+
+## Put the values of a [method snapshot] back (only those that changed: a setter may announce a change).
+static func restore(obj: Object, values: Dictionary) -> void:
+	if obj == null:
+		return
+	for name: StringName in values:
+		if obj.get(name) != values[name]:
+			obj.set(name, values[name])
+
+
+## Note for [member reset_report] which variables of `obj` differ from the deep state `base` ("<what>.<variable>").
+static func note_reset_diff(what: String, obj: Object, base: String) -> void:
+	if obj == null or not is_instance_valid(obj):
+		reset_report["%s: gone" % what] = int(reset_report.get("%s: gone" % what, 0)) + 1
+		return
+	var names: Array = deep_names(obj)
+	var was: PackedStringArray = base.split("|")
+	var now: PackedStringArray = deep_state(obj).split("|")
+	if was.size() != names.size() or now.size() != names.size():
+		# (a value with a "|" in it: an owned object's own state - named as a whole)
+		var whole: String = "%s: (an owned object's state)" % what
+		reset_report[whole] = int(reset_report.get(whole, 0)) + 1
+		return
+	for k: int in names.size():
+		if was[k] != now[k]:
+			var key: String = "%s.%s" % [what, names[k]]
+			reset_report[key] = int(reset_report.get(key, 0)) + 1
+			if not reset_report.has(key + " e.g."):
+				reset_report[key + " e.g."] = "%s -> %s" % [was[k].left(40), now[k].left(40)]
+
+
+## [member reset_report] as lines, the most frequent first.
+static func reset_report_lines() -> PackedStringArray:
+	var rows: Array = []
+	for key: String in reset_report:
+		if not key.ends_with(" e.g."):
+			rows.append([int(reset_report[key]), key])
+	rows.sort_custom(func(a: Array, b: Array) -> bool: return a[0] > b[0] or (a[0] == b[0] and str(a[1]) < str(b[1])))
+	var lines: PackedStringArray = PackedStringArray()
+	for row: Array in rows:
+		lines.append("%6d  %s%s" % [row[0], row[1], "  (%s)" % str(reset_report[str(row[1]) + " e.g."])
+			if reset_report.has(str(row[1]) + " e.g.") else ""])
+	return lines
 
 
 ## The key of a node: the resting point (KEY_PX wide) and the world signature.

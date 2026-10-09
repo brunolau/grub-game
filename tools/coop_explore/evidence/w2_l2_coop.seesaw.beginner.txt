@@ -1,0 +1,3 @@
+level=w2_l2_coop gate=seesaw difficulty=0 whole=true start=1 tick0=-
+events=[[138, "hand", 2], [159, "hand", 4], [754, "hand", -1]]
+route=29:U,4:LU,12:L,80:R,1:,13:R,8:UF,12:,5:RU,6:RF,13:R,3:U,19:LU,1:U,29:RU,6:U,11:RD,3:R,14:RU,11:R,7:D,2:UD,12:R,1:RU,1:,1:RU,1:,12:RU,1:,1:RU,1:,18:RU,14:R,9:RU,18:R,9:RU,20:R,9:RU,20:R,9:RU,20:R,9:RU,20:R,9:RU,14:R,16:L,22:U,1:,1:U,1:,31:U,4:LU,13:L,1:R,9:DF,7:RU,15:R,9:RU,13:R,30:,9:RU,16:RDF,1:L,7:DF,4:LU,10:UF,11:L,5:LD,1:,13:L,9:LU,21:L,9:LU,20:L,9:LU,17:L,8:R

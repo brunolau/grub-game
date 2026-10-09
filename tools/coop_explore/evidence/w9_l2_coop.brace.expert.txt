@@ -1,0 +1,3 @@
+level=w9_l2_coop gate=brace difficulty=1 whole=true start=1 tick0=-
+events=[[28, "hand", 3], [377, "hand", 2]]
+route=28:RU,8:LU,6:LF,10:L,2:R,9:RU,27:R,9:RU,115:R,9:RU,12:R,9:RU,11:R,21:D,1:R,19:D,8:F,2:,14:U,4:RU,14:R,9:RU,16:RDF,7:LU,7:L,1:R,8:UF,19:,6:R,23:RU,18:RD,1:R,9:DF,6:RU,14:R,24:U,8:RU,6:RF,10:R,3:LU,2:RU,1:LU,3:RU,3:LU,1:RU,3:LU,1:RU,2:LU,23:U,8:D,2:UD,9:L,9:RU,7:R,7:D,2:UD,10:R,34:U,1:R,9:RU,13:R,27:LU,3:D,2:UD,4:R,1:L,1:DF

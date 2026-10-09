@@ -25,7 +25,9 @@ extends SimEntity
 ## Caveman Standing (hearts, bones, Stock, Grudge Pterodactyls [VersusGrudge]); Hot Rock ([VersusHotRock]: the ember)
 ## and Clubball ([VersusClubball]: shots, goals) - their hits only knock back.
 ## PLAN.md P2.4 (phase 2): the themed sudden deaths ([VersusSuddenDeath], at 1 457 ticks in Last Caveman Standing,
-## an event toggle elsewhere), pterodactyl crates ([VersusCrates]), temporary specials (throws counted, lost on a
+## an event toggle elsewhere; ruling R8: a Last Caveman Standing round has a HARD CAP VersusTuning.SUDDEN_DEATH_CAP_TICKS
+## after its sudden death started - [member cap_at], [method cap_winners]: no round lasts forever between players
+## who hide from the arena's threats), pterodactyl crates ([VersusCrates]), temporary specials (throws counted, lost on a
 ## knock-out or at the round end), the versus feast (per hero cutlery; a feaster's touch costs a rival), presets,
 ## variants and the Auto handicap ([VersusRules]), dazes (a Grudge rock, a giant bonus bonk, a Clubball knock-down:
 ## 12 stunned ticks and no immunity after).
@@ -38,7 +40,7 @@ extends SimEntity
 ## [method stack_of], [method banked_of], [method score_of], [method leader_slot], [method time_left_ticks],
 ## [method in_feast_rush], [method lids_closed], [method bank_from] / [method bank_from_stack], [method is_banking],
 ## [method walk_cap_of], [method round_length], [method round_ticks_left], [method round_wins_of], [method team_of],
-## [method food_value], [method weight_class],
+## [method food_value], [method weight_class], [method hurts_of], [method cap_ticks_left], [method cap_winners],
 ## signal [signal stack_changed]; round control: [method begin_round], [method start_round_now], [method end_round].
 
 ## A hero's stack, bank or both changed (HUD, stack display).
@@ -111,6 +113,9 @@ var signatures: VersusSignatures = null
 var gust_wind: int = 0
 ## Round tick at which the themed sudden death starts (-1 = never this round).
 var sudden_death_at: int = -1
+## Round tick of the hard cap (ruling R8; -1 = none armed): Last Caveman Standing, VersusTuning.SUDDEN_DEATH_CAP_TICKS
+## after its sudden death started. On that tick the round ends whoever still stands ([method cap_winners]).
+var cap_at: int = -1
 
 # --- Per slot (index = player slot) -------------------------------------------------------------------------------
 var _stack: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
@@ -140,6 +145,9 @@ var _airborne: PackedByteArray = PackedByteArray([0, 0, 0, 0])
 var _daze_left: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 ## Last Caveman Standing, option Stock: lives left.
 var _stocks: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
+## Last Caveman Standing: hurts taken this round - one per heart lost (a charged hit is two), whoever or whatever
+## took it; bones that heal a heart do not take a hurt back. The hard cap's measure ([method cap_winners]).
+var _hurts_taken: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 ## The Auto handicap's leaf shield (absorbs one hit).
 var _leaf: PackedByteArray = PackedByteArray([0, 0, 0, 0])
 ## The versus feast: cutlery pieces each hero holds (bit mask) and the referee's feast clock.
@@ -265,6 +273,7 @@ func begin_round(index: int) -> void:
 		_walk_cap[slot] = Tuning.WALK_CAP
 		_daze_left[slot] = 0
 		_stocks[slot] = VersusTuning.LCS_STOCKS if mode == Defs.VersusMode.LAST_CAVEMAN and rules.stock else 0
+		_hurts_taken[slot] = 0
 		_leaf[slot] = rules.leaf_shield[slot] if slot < rules.leaf_shield.size() else 0
 		_cutlery[slot] = 0
 		_feast_left[slot] = 0
@@ -282,6 +291,7 @@ func begin_round(index: int) -> void:
 		sudden_death.stop()
 	sudden_death = VersusSuddenDeath.new(self, level)
 	sudden_death_at = _sudden_death_start()
+	cap_at = -1
 	level.set_wind(0)
 	level.set_darkness(rules.has(VersusRules.LIGHTS_OUT))
 	var spawns: Array[Vector2i] = VersusArena.spawn_points(level)
@@ -432,6 +442,10 @@ func start_sudden_death(theme: StringName = &"") -> void:
 		sudden_death = VersusSuddenDeath.new(self, level)
 	var chosen: StringName = theme if theme != &"" else VersusSuddenDeath.theme_of(level.meta)
 	sudden_death.start(chosen)
+	# Ruling R8: from here a Last Caveman Standing round has at most VersusTuning.SUDDEN_DEATH_CAP_TICKS left (armed
+	# once per round: a second start does not move it).
+	if mode == Defs.VersusMode.LAST_CAVEMAN and cap_at < 0 and VersusTuning.SUDDEN_DEATH_CAP_TICKS > 0:
+		cap_at = round_ticks + VersusTuning.SUDDEN_DEATH_CAP_TICKS
 	_sfx(Sfx.SUDDEN_DEATH)
 	Events.round_sudden_death_started.emit(round_index, chosen)
 
@@ -726,17 +740,73 @@ func time_left_ticks() -> int:
 	return maxi(round_total - round_ticks, 0)
 
 
-## The round's whole length in ticks (0 = no clock) - the HUD's sundial (ui-B).
+## The round's whole length in ticks (0 = no clock) - the HUD's sundial (ui-B). Last Caveman Standing has no clock
+## until its hard cap is armed (ruling R8): from then on the sundial is the cap's, VersusTuning.SUDDEN_DEATH_CAP_TICKS
+## long, so the HUD counts the round's last seconds down with the timer it has.
 func round_length() -> int:
+	if cap_at >= 0:
+		return VersusTuning.SUDDEN_DEATH_CAP_TICKS
 	return round_total
 
 
 ## Ticks until the gong of the running round; -1 = no clock running (no clock in this mode, the countdown, the
-## Golden Drumstick, after the gong) - the HUD's sundial (ui-B).
+## Golden Drumstick, after the gong) - the HUD's sundial (ui-B). With the hard cap armed: the ticks until the cap.
 func round_ticks_left() -> int:
 	if phase != PHASE_PLAY:
 		return -1
+	if cap_at >= 0:
+		return cap_ticks_left()
 	return time_left_ticks()
+
+
+## Ticks until the hard cap of the round (ruling R8); -1 = no cap armed (not Last Caveman Standing, or its sudden
+## death has not started).
+func cap_ticks_left() -> int:
+	if cap_at < 0:
+		return -1
+	return maxi(cap_at - round_ticks, 0)
+
+
+## Last Caveman Standing: the hurts `slot` took this round - one per heart lost (a charged hit is two). Bones that
+## heal a heart take none back, and a handicap's extra hearts do not count: it is what he TOOK, not what he has left.
+func hurts_of(slot: int) -> int:
+	return _hurts_taken[slot] if slot >= 0 and slot < Defs.MAX_PLAYERS else 0
+
+
+## Who wins when the hard cap ends the round (ruling R8: "the hero with fewer hurts taken wins, then a draw"): among
+## the sides that still stand, the one with the fewest hurts taken this round; several with the same: nobody (a draw,
+## an empty list). Before the hurts, where the rules give a side more than one body or life: the side with more
+## heroes standing (2v2), then with more lives left (option Stock) - a hazard takes a life without a hurt. A side is
+## a team in 2v2 (its hurts, heroes and lives are summed), else one hero.
+func cap_winners() -> PackedInt32Array:
+	var standing: PackedInt32Array = _standing_slots()
+	var bodies: Dictionary = {}   # side key -> heroes standing
+	var lives: Dictionary = {}    # side key -> lives left (Stock)
+	var hurts: Dictionary = {}    # side key -> hurts taken by the whole side
+	for hero: PlayerBase in _heroes():
+		var key: int = _side_key(hero.slot)
+		hurts[key] = int(hurts.get(key, 0)) + _hurts_taken[hero.slot]
+		if standing.has(hero.slot):
+			bodies[key] = int(bodies.get(key, 0)) + 1
+			lives[key] = int(lives.get(key, 0)) + _stocks[hero.slot]
+	var best_key: int = -1
+	var best: Array[int] = []
+	var tie: bool = false
+	for key: int in bodies:
+		var value: Array[int] = [int(bodies[key]), int(lives[key]), -int(hurts[key])]
+		if best_key < 0 or value > best:
+			best_key = key
+			best = value
+			tie = false
+		elif value == best:
+			tie = true
+	var winners: PackedInt32Array = PackedInt32Array()
+	if best_key < 0 or tie:
+		return winners
+	for slot: int in standing:
+		if _side_key(slot) == best_key:
+			winners.append(slot)
+	return winners
 
 
 ## [method time_left_ticks] by the bots' name (core-B).
@@ -1538,6 +1608,9 @@ func _round_step() -> void:
 				var standing: PackedInt32Array = _standing_slots()
 				if _team_count(standing) <= 1 and level.hero_count() > 1:
 					_finish(standing)
+				elif cap_at >= 0 and round_ticks >= cap_at:
+					# Ruling R8: the hard cap. Nobody outlasts the sudden death by hiding from it.
+					_finish(cap_winners())
 		PHASE_GOLDEN:
 			round_ticks += 1
 			signatures.wind_step()
@@ -1943,6 +2016,7 @@ func _lose_hearts(victim: PlayerBase, count: int, attacker: PlayerBase, cause: S
 	var run: PlayerRun = victim.run
 	var lost: int = mini(count, run.hearts)
 	run.hearts -= lost
+	_hurts_taken[victim.slot] += lost
 	run.emit_energy()
 	if lost > 0 and Spawner.exists(&"items/bone"):
 		for n: int in lost * VersusTuning.LCS_HEART_BONES:
@@ -2100,8 +2174,13 @@ func _best_slots() -> PackedInt32Array:
 func _team_count(slots: PackedInt32Array) -> int:
 	var seen: Dictionary = {}
 	for slot: int in slots:
-		seen[teams[slot] + 100 if teams[slot] >= 0 else slot] = true
+		seen[_side_key(slot)] = true
 	return seen.size()
+
+
+## The side `slot` plays on, as a key: his team in 2v2 (100 + team), else the slot itself.
+func _side_key(slot: int) -> int:
+	return teams[slot] + 100 if teams[slot] >= 0 else slot
 
 
 func _with_teammates(slots: PackedInt32Array) -> PackedInt32Array:

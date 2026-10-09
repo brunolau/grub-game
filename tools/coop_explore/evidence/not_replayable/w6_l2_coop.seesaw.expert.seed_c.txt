@@ -1,0 +1,3 @@
+level=w6_l2_coop gate=seesaw difficulty=1 whole=true start=0 tick0=-
+events=[]
+route=8:R,33:U,3:R,29:RU,49:U,4:RU,10:R,10:UF,2:,1:L,10:DF,2:,17:D,16:,1:R,8:DF,9:RU,19:R,1:L,6:DF,9:LU,9:L,16:,14:U,1:L,21:D,8:F,6:,1:R,29:D,8:F,4:,8:L,2:LU,13:L,24:U,8:LU,3:U,23:LU,1:U,1:RU,1:LU,1:U,4:RU,4:LU,1:U,7:RU,3:LU,1:U,6:RU,1:U,5:RU,55:R,16:U,6:R,6:DF,5:RU,13:R,1:U,1:,1:U,1:,1:U,13:RU,2:,1:R,6:DF,5:RU,7:R,5:

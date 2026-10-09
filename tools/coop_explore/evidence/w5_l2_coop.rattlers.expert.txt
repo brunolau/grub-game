@@ -1,0 +1,3 @@
+level=w5_l2_coop gate=rattlers difficulty=1 whole=true start=1 tick0=-
+events=[[34, "hand", 3], [274, "hand", -1], [448, "hand", 4]]
+route=1:R,10:D,8:F,2:,13:L,5:LU,6:LF,11:L,22:LD,1:L,10:DF,6:LU,13:L,12:LU,34:L,9:LU,12:L,6:RU,15:R,1:L,8:DF,6:LU,14:L,22:,27:LU,1:,10:U,4:RU,35:R,42:U,4:LU,7:L,9:LU,6:L,9:LU,16:LDF,4:R,25:LD,2:,1:L,6:F,3:,1:L,8:DF,6:,6:RU,23:R,10:UF,2:,1:L,8:F,2:,1:L,10:UF,2:,27:L,24:D,13:LU

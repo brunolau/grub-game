@@ -1,0 +1,3 @@
+level=w7_l1_coop gate=stack difficulty=0 whole=true start=1 tick0=-
+events=[[283, "hand", 3], [378, "hand", 2], [397, "hand", 3], [530, "place", 0], [610, "hand", 4], [764, "hand", -1], [914, "hand", 4], [993, "hand", 3]]
+route=7:RD,1:R,10:UF,2:,1:L,8:F,2:,14:LU,15:L,35:,6:RD,5:R,4:RU,14:R,34:U,4:RU,20:R,28:U,8:R,9:DF,11:RU,15:R,31:L,8:DF,16:,17:U,1:,1:U,1:,1:U,10:D,2:UD,12:R,9:RU,16:RDF,5:RU,6:RF,8:R,1:L,6:F,19:,42:U,2:,1:R,8:UF,16:,3:D,2:UD,5:R,24:D,2:UD,2:R,2:,54:U,12:R,12:RD,1:R,6:F,9:,69:L,33:,6:RU,19:R,11:RD,1:,42:U,4:L,12:U,7:,1:R,8:F,2:,28:R,34:RU,11:R,3:RU,6:RF,14:R,3:L,40:RU,1:R,8:DF,4:,1:R,6:F,20:,99:U,8:R,16:RU,63:R

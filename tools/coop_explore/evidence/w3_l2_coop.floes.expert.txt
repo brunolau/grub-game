@@ -1,0 +1,3 @@
+level=w3_l2_coop gate=floes difficulty=1 whole=true start=0 tick0=-
+events=[[205, "place", 0], [207, "hand", 4], [299, "hand", -1]]
+route=22:U,1:,1:U,1:,1:U,1:,10:U,1:R,13:U,1:R,10:RU,19:R,9:LU,16:LDF,28:L,18:RD,34:U,4:RU,15:R,2:,1:L,8:UF,10:,7:L,53:U,9:RU,4:R,1:,7:LU,2:R,37:RU,18:R,10:RD

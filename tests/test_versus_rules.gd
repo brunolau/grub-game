@@ -904,6 +904,245 @@ func test_lcs_sudden_death_starts_at_sixty_seconds() -> void:
 	assert_eq(started, [VersusSuddenDeath.STAMPEDE] as Array[StringName], "the jungle's Stampede")
 
 
+# --- The hard cap of a Last Caveman Standing round (ruling R8) ---------------------------------------------------------
+
+## Round `mode` on the flat arena with a sudden death that never kills (the syrup flood only slows), so that heroes
+## who stand still outlast it - the round only the hard cap ends.
+func _lcs_no_kill(count: int, xs: Array, rules: VersusRules = null) -> void:
+	_arena(count, xs)
+	level.meta["sudden"] = String(VersusSuddenDeath.SYRUP_FLOOD)
+	if rules != null:
+		referee.rules = rules
+	_mode(Defs.VersusMode.LAST_CAVEMAN)
+
+
+## Jump the running round to its sudden death (the cap is armed on that tick).
+func _to_sudden_death() -> void:
+	referee.round_ticks = VersusTuning.SUDDEN_DEATH_AT_TICKS - 1
+	Sim.step(1)
+	_unshield()
+
+
+func test_lcs_hard_cap_ends_the_round_sixty_seconds_into_the_sudden_death() -> void:
+	_lcs_no_kill(2, [100, 250])
+	assert_eq(VersusTuning.SUDDEN_DEATH_CAP_TICKS, Tuning.seconds_to_ticks(60.0), "60 s by default")
+	assert_eq(referee.cap_at, -1, "no cap before the sudden death")
+	assert_eq(referee.cap_ticks_left(), -1)
+	assert_eq(referee.round_length(), 0, "and no clock on the HUD")
+	assert_eq(referee.round_ticks_left(), -1)
+	_to_sudden_death()
+	assert_true(referee.sudden_death.is_running(), "the sudden death started")
+	assert_eq(referee.cap_at, VersusTuning.SUDDEN_DEATH_AT_TICKS + VersusTuning.SUDDEN_DEATH_CAP_TICKS,
+			"the cap is armed with it")
+	assert_eq(referee.round_length(), VersusTuning.SUDDEN_DEATH_CAP_TICKS, "the HUD's sundial is the cap's from here")
+	assert_eq(referee.round_ticks_left(), VersusTuning.SUDDEN_DEATH_CAP_TICKS, "counting the last 60 s down")
+	assert_eq(referee.time_left_ticks(), -1, "the round clock the bots read is not it")
+	referee.start_sudden_death()
+	assert_eq(referee.cap_at, VersusTuning.SUDDEN_DEATH_AT_TICKS + VersusTuning.SUDDEN_DEATH_CAP_TICKS,
+			"a second start does not move the cap")
+	Sim.step(VersusTuning.SUDDEN_DEATH_CAP_TICKS - 1)
+	assert_eq(ended.size(), 0, "one tick before the cap both still stand")
+	assert_eq(referee.round_ticks_left(), 1)
+	Sim.step(1)
+	assert_eq(referee.phase, VersusReferee.PHASE_OVER, "the cap ends the round")
+	assert_eq(referee.round_ticks, VersusTuning.SUDDEN_DEATH_AT_TICKS + VersusTuning.SUDDEN_DEATH_CAP_TICKS)
+	assert_eq(ended.size(), 1)
+	assert_eq(ended[0], PackedInt32Array(), "nobody was hurt: a draw")
+	assert_eq(referee.round_ticks_left(), -1, "no clock after the gong")
+	assert_false(referee.sudden_death.is_running(), "the sudden death stops with the round")
+	# The next round starts without a cap.
+	referee.begin_round(1)
+	assert_eq(referee.cap_at, -1)
+	assert_eq(referee.round_length(), 0)
+
+
+func test_lcs_at_the_cap_the_hero_with_fewer_hurts_wins() -> void:
+	_lcs_no_kill(2, [100, 125])
+	# P2 has a handicap card of 5 hearts: he may take a hurt and still show more hearts than P1 - the cap counts what
+	# a hero TOOK this round, not what he has left.
+	referee.start_hearts = PackedInt32Array([3, 5, 3, 3])
+	_mode(Defs.VersusMode.LAST_CAVEMAN)
+	_to_sudden_death()
+	_box(heroes[0], 1)
+	Sim.step(1)
+	assert_eq(referee.hurts_of(1), 1, "P1's hit: one hurt for P2")
+	assert_eq(referee.hurts_of(0), 0)
+	assert_eq(Game.runs[1].hearts, 4, "P2 still has more hearts than P1")
+	assert_eq(referee.cap_winners(), PackedInt32Array([0]), "fewer hurts taken")
+	referee.round_ticks = referee.cap_at - 1
+	Sim.step(1)
+	assert_eq(ended.size(), 1, "the cap")
+	assert_eq(ended[0], PackedInt32Array([0]), "P1 took fewer hurts: his round")
+
+
+func test_lcs_cap_counts_a_charged_hit_twice_and_healing_takes_no_hurt_back() -> void:
+	_lcs_no_kill(3, [100, 125, 250])
+	_to_sudden_death()
+	_box(heroes[0], 1, 100)
+	Sim.step(1)
+	assert_eq(referee.hurts_of(1), VersusTuning.LCS_CHARGED_HEARTS, "a charged hit is two hurts")
+	heroes[1].run.hearts = VersusTuning.LCS_HEARTS
+	assert_eq(referee.hurts_of(1), 2, "six bones heal the heart, not the hurt")
+	referee._lose_hearts(heroes[0], 1, null, &"hit")
+	referee._lose_hearts(heroes[2], 1, null, &"hit")
+	assert_eq(referee.cap_winners(), PackedInt32Array(), "P1 and P3 took one hurt each, P2 two: the best two tie - a draw")
+	referee._lose_hearts(heroes[2], 1, null, &"hit")
+	assert_eq(referee.cap_winners(), PackedInt32Array([0]), "P1 alone took the fewest")
+	referee.round_ticks = referee.cap_at - 1
+	Sim.step(1)
+	assert_eq(ended.size(), 1)
+	assert_eq(ended[0], PackedInt32Array([0]))
+
+
+func test_lcs_cap_in_teams_and_with_stock() -> void:
+	# 2v2: the side with more heroes standing, then the side that took fewer hurts (summed), both members winning.
+	_lcs_no_kill(4, [60, 120, 200, 260])
+	referee.teams = PackedInt32Array([1, 1, 2, 2])
+	_to_sudden_death()
+	referee._lose_hearts(heroes[0], 2, null, &"hit")
+	referee._lose_hearts(heroes[2], 1, null, &"hit")
+	assert_eq(referee.cap_winners(), PackedInt32Array([2, 3]), "team 2 took one hurt, team 1 two")
+	heroes[3].kill(&"liquid")
+	Sim.step(2)
+	assert_true(referee.is_out(3), "a hazard took P4 out")
+	assert_eq(ended.size(), 0, "one of team 2 still stands")
+	assert_eq(referee.cap_winners(), PackedInt32Array([0, 1]), "two standing beat one, whatever the hurts")
+	referee.round_ticks = referee.cap_at - 1
+	Sim.step(1)
+	assert_eq(ended.size(), 1)
+	assert_eq(ended[0], PackedInt32Array([0, 1]), "the whole team wins the round")
+
+
+func test_lcs_cap_with_stock_counts_lives_before_hurts() -> void:
+	var rules: VersusRules = VersusRules.new()
+	rules.stock = true
+	_lcs_no_kill(2, [60, 260], rules)
+	_to_sudden_death()
+	referee._lose_hearts(heroes[0], 2, null, &"hit")
+	assert_eq(referee.cap_winners(), PackedInt32Array([1]), "the same lives: fewer hurts")
+	heroes[1].kill(&"liquid")
+	Sim.step(VersusTuning.RESPAWN_TICKS + 1)
+	assert_false(heroes[1].dead, "Stock: P2 is back")
+	assert_eq(referee.stocks_of(1), VersusTuning.LCS_STOCKS - 1)
+	assert_eq(referee.cap_winners(), PackedInt32Array([0]), "a hazard took a life without a hurt: more lives win")
+
+
+func test_no_hard_cap_outside_last_caveman_standing() -> void:
+	_arena(3, [60, 160, 260])
+	_mode(Defs.VersusMode.HOT_ROCK)
+	referee.start_sudden_death()
+	assert_eq(referee.cap_at, -1, "Hot Rock ends by its fuse")
+	assert_eq(referee.round_length(), 0)
+	var rules: VersusRules = VersusRules.new()
+	rules.sudden_death_event = true
+	referee.rules = rules
+	_mode(Defs.VersusMode.GRUB_STACK)
+	referee.start_sudden_death()
+	assert_eq(referee.cap_at, -1, "Grub Stack ends by its clock")
+	assert_eq(referee.round_length(), VersusTuning.stack_round_ticks(3), "whose sundial stays its own")
+
+
+## Every arena file that lists Last Caveman Standing (the shipped ones and the developer arena), real heroes, the
+## real referee, the arena's own sudden death: `players` heroes who never press a key. The round must end by the cap.
+func _idle_round(id: StringName, text: String, players: int, round_index: int) -> Dictionary:
+	var was_manual: bool = Sim.manual
+	Sim.manual = true
+	Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.VERSUS, players, 1)
+	Game.begin_level(id)
+	var real: Level = (load("res://scenes/world/level.tscn") as PackedScene).instantiate() as Level
+	real.setup_from_text(id, text)
+	add_child(real)
+	real.set_view_size(Vector2i(Tuning.VIEW_W, Tuning.VIEW_H) * Tuning.ART_SCALE)
+	Sim.start(VersusTuning.round_seed(7, round_index))
+	var result: Dictionary = {}
+	var ref: VersusReferee = VersusReferee.find(real)
+	if ref != null:
+		ref.mode = Defs.VersusMode.LAST_CAVEMAN
+		ref.begin_round(round_index)
+		ref.start_round_now()
+		for slot: int in players:
+			GameInput.set_scripted_slot(slot, func(_tick: int) -> int: return 0)
+		var limit: int = VersusTuning.SUDDEN_DEATH_AT_TICKS + VersusTuning.SUDDEN_DEATH_CAP_TICKS
+		var moved: bool = false
+		var spawns: Array[Vector2i] = []
+		for slot: int in players:
+			spawns.append(real.get_hero(slot).sim_pos)
+		while ref.phase != VersusReferee.PHASE_OVER and ref.round_ticks < limit + 5:
+			Sim.step(1)
+		var hurts: PackedInt32Array = PackedInt32Array()
+		var standing: PackedInt32Array = PackedInt32Array()
+		for slot: int in players:
+			hurts.append(ref.hurts_of(slot))
+			if not ref.is_out(slot) and not real.get_hero(slot).dead:
+				standing.append(slot)
+			moved = moved or absi(real.get_hero(slot).sim_pos.x - spawns[slot].x) > Tuning.TILE * 3
+		result = {"over": ref.phase == VersusReferee.PHASE_OVER, "ticks": ref.round_ticks, "limit": limit,
+				"winners": ref.winner_slots.duplicate(), "hurts": hurts, "standing": standing,
+				"capped": ref.cap_at >= 0 and ref.round_ticks >= ref.cap_at, "moved": moved,
+				"theme": VersusSuddenDeath.theme_of(real.meta)}
+	GameInput.clear_scripted()
+	Sim.stop()
+	Sim.manual = was_manual
+	remove_child(real)
+	real.free()
+	return result
+
+
+func test_two_heroes_who_never_move_end_every_last_caveman_arena_by_the_cap() -> void:
+	var files: PackedStringArray = PackedStringArray()
+	for file: String in DirAccess.get_files_at("res://levels"):
+		if file.get_extension() == "lvl" and (file.begins_with("arena_") or file == "test_world_arena_flat.lvl"):
+			files.append(file)
+	files.sort()
+	var arenas: int = 0
+	var capped: int = 0
+	for file: String in files:
+		var id: StringName = StringName(file.get_basename())
+		var text: String = FileAccess.get_file_as_string("res://levels/%s" % file)
+		var meta: Dictionary = LevelData.parse(id, text).resolved_meta(Defs.Difficulty.BEGINNER)
+		if not VersusArena.modes_of(meta).has(Defs.VersusMode.LAST_CAVEMAN):
+			continue
+		arenas += 1
+		# (heroes, round): two heroes on spawns 1 + 2, two on spawns 3 + 4 (a match's rotation), then all four at once -
+		# every spawn point holds an idle hero twice. (All four rotations of two were measured with and without the cap
+		# in build/versus/idle_nocap.gd; three cases keep this test at about 4 s.)
+		var cases: Array[Vector2i] = [Vector2i(2, 0), Vector2i(2, 2), Vector2i(4, 0)]
+		var lines: PackedStringArray = PackedStringArray()
+		for case: Vector2i in cases:
+			var result: Dictionary = _idle_round(id, text, case.x, case.y)
+			var name: String = "%s, %d idle heroes, round %d" % [id, case.x, case.y]
+			assert_false(result.is_empty(), "%s: the arena has a referee" % name)
+			if result.is_empty():
+				continue
+			assert_true(bool(result["over"]), "%s: the round ended (%d ticks played)" % [name, result["ticks"]])
+			assert_true(int(result["ticks"]) <= int(result["limit"]),
+					"%s: within %d ticks of play - sudden death at %d, the cap %d later (took %d)" % [name, result["limit"],
+					VersusTuning.SUDDEN_DEATH_AT_TICKS, VersusTuning.SUDDEN_DEATH_CAP_TICKS, result["ticks"]])
+			var winners: PackedInt32Array = result["winners"]
+			var standing: PackedInt32Array = result["standing"]
+			var hurts: PackedInt32Array = result["hurts"]
+			if bool(result["capped"]):
+				capped += 1
+				# The cap's rule on what the round left: the fewest hurts among the standing, alone, or nobody.
+				var fewest: int = 1 << 30
+				for slot: int in standing:
+					fewest = mini(fewest, hurts[slot])
+				var best: PackedInt32Array = PackedInt32Array()
+				for slot: int in standing:
+					if hurts[slot] == fewest:
+						best.append(slot)
+				assert_eq(winners, best if best.size() == 1 else PackedInt32Array(),
+						"%s: at the cap the fewest hurts win, else a draw (standing %s, hurts %s)" % [name, standing, hurts])
+			else:
+				assert_true(standing.size() <= 1, "%s: before the cap only the last one standing ends it (%s)" % [name,
+						standing])
+			lines.append("%dp r%d: %d ticks %s winners %s" % [case.x, case.y, result["ticks"],
+					"CAP" if bool(result["capped"]) else str(result["theme"]), winners])
+		print("    %s: %s" % [id, "; ".join(lines)])
+	assert_true(arenas >= 5, "%d arena files list Last Caveman Standing" % arenas)
+	assert_true(capped >= 1, "the cap ended %d of the rounds (Colossus Hall's ledges hide two campers for good)" % capped)
+
+
 func test_one_bonk_and_big_bounce() -> void:
 	var rules: VersusRules = VersusRules.new()
 	rules.set_variant(VersusRules.ONE_BONK)
