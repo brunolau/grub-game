@@ -1025,9 +1025,180 @@ func test_the_last_counting_hero_going_down_beside_an_idle_partner_wipes_the_tea
 				GameInput.clear_scripted()
 				Sim.step(PlayerBase.IDLE_TICKS + 20)
 				assert_true(p1.is_idle(), "the set-up: P1 put the pad down while P2 is an egg")
-				assert_eq(wipes[0], 0, "going idle wipes nothing - only going down does")
+				# Both pads went down on the same tick, so the egg's own player is away too: nobody is stuck and nothing
+				# is wiped (phase 4 Q3 / G86 wipes only beside the egg of a player who is at his pad - the tests below).
+				assert_true(p2.is_idle(), "the set-up: ... and P2's player left with him")
+				assert_eq(wipes[0], 0, "two pads on the table wipe nothing")
 				assert_eq(Game.lives, lives)
 		GameInput.clear_scripted()
 		Sim.stop()
 		level.free()
+	Events.party_wiped.disconnect(on_wipe)
+
+
+# =================================================================================================================
+# Phase 4 ruling Q3 (DESIGN.md G86): no dead end beside an idle partner
+# =================================================================================================================
+
+## A pair on `difficulty`: both players pressed a key, then P2 went down - an egg beside a partner who plays. Returns
+## the level; both slots hold Swap from here on (the callers let go of what they need).
+func _egg_beside_a_player(difficulty: int) -> Level:
+	var level: Level = _load(2, "", "test", "", difficulty)
+	_hold(0, Defs.IN_SWAP)
+	_hold(1, Defs.IN_SWAP)
+	Sim.step(3)
+	level.get_hero(1).go_down(&"voluntary")
+	Sim.step(1)
+	return level
+
+
+func test_an_egg_beside_an_idle_partner_is_wiped_after_the_idle_wipe_ticks() -> void:
+	# Before: P2's egg beside a hatched P1 whose pad lay on the table waited for ever (the pause menu was the way out).
+	assert_eq(PartyTuning.IDLE_WIPE_TICKS, 73, "3 s (tune through DESIGN)")
+	var idle: int = PlayerBase.IDLE_TICKS
+	var limit: int = PartyTuning.IDLE_WIPE_TICKS
+	var wipes: Array[int] = [0]
+	var on_wipe: Callable = func() -> void: wipes[0] += 1
+	Events.party_wiped.connect(on_wipe)
+	for difficulty: int in [Defs.Difficulty.BEGINNER, Defs.Difficulty.EXPERT]:
+		var what: String = "Expert" if difficulty == Defs.Difficulty.EXPERT else "Beginner"
+		var level: Level = _egg_beside_a_player(difficulty)
+		var p1: PlayerBase = level.player
+		var p2: PlayerBase = level.get_hero(1)
+		var driver: PartyDriver = _driver(level)
+		var lives: int = Game.lives
+		wipes[0] = 0
+		assert_true(p2.is_down() and not p1.is_idle(), what + ": the set-up - an egg beside a partner who plays")
+		# P1 puts the pad down; P2's player stays at his (a held key is input on every tick, for an egg too).
+		_hold(0, 0)
+		Sim.step(idle - 1)
+		assert_false(p1.is_idle(), what + ": 242 quiet ticks - P1 still counts")
+		assert_eq(driver.idle_wipe_ticks, 0, what + ": no clock while a hatched hero counts")
+		Sim.step(1)
+		assert_true(p1.is_idle() and not p2.is_idle(), what + ": the 243rd - the only hatched hero is idle, the egg's player is not")
+		assert_eq(driver.idle_wipe_ticks, 1, what + ": the clock starts on that tick")
+		Sim.step(limit - 2)
+		assert_eq(driver.idle_wipe_ticks, limit - 1, what + ": %d ticks of it" % (limit - 1))
+		assert_eq(wipes[0], 0, what + ": ... and nothing yet")
+		assert_eq(Game.lives, lives, what)
+		assert_true(p2.is_down(), what + ": still an egg")
+		Sim.step(1)
+		assert_eq(wipes[0], 1, what + ": the %drd tick - the team is wiped, as when both are down" % limit)
+		assert_eq(Game.lives, lives - 1, what + ": one life from the tribe pool")
+		Sim.step(2)
+		assert_false(p1.is_down() or p1.dead or p2.is_down() or p2.dead, what + ": both stand hatched at the checkpoint")
+		assert_eq(driver.idle_wipe_ticks, 0, what + ": the clock is back at 0")
+		assert_true(p1.is_idle() and not p2.is_idle(), what + ": the wipe woke nobody - P2 plays on, P1 dozes")
+		Sim.step(idle + limit + 20)
+		assert_eq(wipes[0], 1, what + ": no egg, no dead end - nothing more happens however long P1 rests")
+		assert_eq(Game.lives, lives - 1, what)
+		GameInput.clear_scripted()
+		Sim.stop()
+		level.free()
+	Events.party_wiped.disconnect(on_wipe)
+
+
+func test_the_idle_wipe_clock_is_cleared_by_a_key_a_hatch_and_a_toss() -> void:
+	var idle: int = PlayerBase.IDLE_TICKS
+	var limit: int = PartyTuning.IDLE_WIPE_TICKS
+	var wipes: Array[int] = [0]
+	var on_wipe: Callable = func() -> void: wipes[0] += 1
+	Events.party_wiped.connect(on_wipe)
+	for way: String in ["a key on tick 72", "a hatch", "a toss"]:
+		var level: Level = _egg_beside_a_player(Defs.Difficulty.BEGINNER)
+		var p1: PlayerBase = level.player
+		var p2: PlayerBase = level.get_hero(1)
+		var driver: PartyDriver = _driver(level)
+		var lives: int = Game.lives
+		wipes[0] = 0
+		_hold(0, 0)
+		Sim.step(idle + limit - 2)
+		assert_eq(driver.idle_wipe_ticks, limit - 1, way + ": the set-up - one tick before the wipe")
+		assert_eq(wipes[0], 0, way)
+		match way:
+			"a key on tick 72":
+				# P1's player comes back: one key, on the tick that would have been the 73rd.
+				var tap: int = Sim.tick + 1
+				GameInput.set_scripted_slot(0, func(tick: int) -> int: return Defs.IN_LOOK if tick == tap else 0)
+				Sim.step(1)
+				assert_false(p1.is_idle(), way + ": he counts again")
+				assert_eq(driver.idle_wipe_ticks, 0, way + ": the clock is cleared")
+				Sim.step(idle - 1)
+				assert_eq(wipes[0], 0, way + ": and stays cleared while he counts (242 quiet ticks)")
+				assert_eq(driver.idle_wipe_ticks, 0, way)
+				Sim.step(limit - 1)
+				assert_eq(wipes[0], 0, way + ": idle again - a new clock, from its first tick")
+				Sim.step(1)
+				assert_eq(wipes[0], 1, way + ": ... and its own %d ticks later the wipe" % limit)
+				assert_eq(Game.lives, lives - 1, way)
+			"a hatch":
+				# Something hatches the egg (a checkpoint's hatch_all here): no egg, no dead end.
+				driver.hatch_all(p1)
+				Sim.step(1)
+				assert_false(p2.is_down(), way + ": the set-up - hatched")
+				assert_eq(driver.idle_wipe_ticks, 0, way + ": the clock is cleared")
+				Sim.step(limit + 20)
+				assert_eq(wipes[0], 0, way + ": no wipe")
+				assert_eq(Game.lives, lives, way)
+			"a toss":
+				# The dozing hero is killed where he stands: his toss decides first (C.12), the clock does not run in it.
+				p1.kill(&"spikes")
+				Sim.step(1)
+				assert_eq(driver.idle_wipe_ticks, 0, way + ": a hero in his death toss - the clock waits")
+				Sim.step(Tuning.DEATH_ANIM_TICKS - 3)
+				assert_eq(wipes[0], 0, way + ": the toss plays out")
+				Sim.step(6)
+				assert_eq(wipes[0], 1, way + ": then the wipe of a party with nobody left - once")
+				assert_eq(Game.lives, lives - 1, way + ": one life, not two")
+		GameInput.clear_scripted()
+		Sim.stop()
+		level.free()
+	Events.party_wiped.disconnect(on_wipe)
+
+
+func test_two_pads_on_the_table_never_cost_a_life() -> void:
+	# G86 #3: the clock runs only while the EGG's own player is at his pad - the wipe is the stuck player's way out.
+	var idle: int = PlayerBase.IDLE_TICKS
+	var limit: int = PartyTuning.IDLE_WIPE_TICKS
+	var wipes: Array[int] = [0]
+	var on_wipe: Callable = func() -> void: wipes[0] += 1
+	Events.party_wiped.connect(on_wipe)
+	for way: String in ["both players leave", "the egg of a partner who never played"]:
+		for difficulty: int in [Defs.Difficulty.BEGINNER, Defs.Difficulty.EXPERT]:
+			var what: String = "%s (%s)" % [way, "Expert" if difficulty == Defs.Difficulty.EXPERT else "Beginner"]
+			var level: Level = null
+			if way == "both players leave":
+				level = _egg_beside_a_player(difficulty)
+			else:
+				# P2's pad was never touched: the leash made him an egg while P1 played on (R6); then P1 takes a rest.
+				level = _load(2, "", "test", "", difficulty)
+				_hold(0, Defs.IN_SWAP)
+				Sim.step(3)
+				level.get_hero(1).go_down(&"leash")
+				Sim.step(1)
+			var p1: PlayerBase = level.player
+			var p2: PlayerBase = level.get_hero(1)
+			var driver: PartyDriver = _driver(level)
+			var lives: int = Game.lives
+			wipes[0] = 0
+			GameInput.clear_scripted()
+			var clock: int = 0
+			for t: int in idle + 4 * limit:
+				Sim.step(1)
+				clock = maxi(clock, driver.idle_wipe_ticks)
+			assert_true(p1.is_idle() and p2.is_idle() and p2.is_down(), what + ": the set-up - nobody at a pad, one egg")
+			assert_eq(clock, 0, what + ": the clock never ran")
+			assert_eq(wipes[0], 0, what + ": no wipe")
+			assert_eq(Game.lives, lives, what + ": no life lost")
+			# The egg's player comes back and finds his partner dozing: any key of his own starts the clock.
+			_hold(1, Defs.IN_LEFT)
+			Sim.step(limit - 1)
+			assert_eq(wipes[0], 0, what + ": his key starts the clock - %d ticks: nothing yet" % (limit - 1))
+			assert_eq(driver.idle_wipe_ticks, limit - 1, what)
+			Sim.step(1)
+			assert_eq(wipes[0], 1, what + ": the %drd: the wipe, his way out" % limit)
+			assert_eq(Game.lives, lives - 1, what)
+			GameInput.clear_scripted()
+			Sim.stop()
+			level.free()
 	Events.party_wiped.disconnect(on_wipe)

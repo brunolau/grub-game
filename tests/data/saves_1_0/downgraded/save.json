@@ -1,0 +1,136 @@
+{
+  "code_stones": [
+    "w1_l1:3",
+    "w1_l2:0",
+    "w1_l2:1",
+    "w2_l1:3",
+    "w2_l1:0",
+    "w2_l1:1",
+    "w2_l1:2",
+    "w1_l1:1"
+  ],
+  "completed": {
+    "beginner": false,
+    "expert": false
+  },
+  "high_score": 0.0,
+  "paintings": [
+    3.0
+  ],
+  "results": {
+    "beginner": {},
+    "expert": {
+      "w1_l1": {
+        "clears": 1,
+        "percent": 54,
+        "score": 124400
+      }
+    }
+  },
+  "spaces": {
+    "coop/book1/beginner": {
+      "belt": [],
+      "completed": false,
+      "high_score": 0.0,
+      "results": {},
+      "unlocked": []
+    },
+    "coop/book1/expert": {
+      "belt": [],
+      "completed": false,
+      "high_score": 0.0,
+      "results": {},
+      "unlocked": []
+    },
+    "coop/book2/beginner": {
+      "belt": [],
+      "completed": false,
+      "high_score": 0.0,
+      "results": {},
+      "unlocked": []
+    },
+    "coop/book2/expert": {
+      "belt": [],
+      "completed": false,
+      "high_score": 0.0,
+      "results": {},
+      "unlocked": [
+        "w5_l2"
+      ]
+    },
+    "single/book1/beginner": {
+      "belt": [],
+      "completed": false,
+      "high_score": 0.0,
+      "results": {
+        "w1_l1": {
+          "clears": 1.0,
+          "percent": 57.0,
+          "score": 126300.0
+        }
+      },
+      "unlocked": [
+        "w1_l2"
+      ]
+    },
+    "single/book1/expert": {
+      "belt": [],
+      "completed": false,
+      "high_score": 0.0,
+      "results": {
+        "w1_l1": {
+          "clears": 1.0,
+          "percent": 54.0,
+          "score": 124400.0
+        },
+        "w1_l2": {
+          "clears": 1.0,
+          "percent": 51.0,
+          "score": 563100.0
+        },
+        "w2_l1": {
+          "clears": 1.0,
+          "percent": 92.0,
+          "score": 1018800.0
+        }
+      },
+      "unlocked": [
+        "w1_l2",
+        "w2_l1",
+        "w2_l2"
+      ]
+    },
+    "single/book2/beginner": {
+      "belt": [],
+      "completed": false,
+      "high_score": 0.0,
+      "results": {
+        "w5_l1": {
+          "clears": 1.0,
+          "percent": 66.0,
+          "score": 77000.0
+        }
+      },
+      "unlocked": []
+    },
+    "single/book2/expert": {
+      "belt": [],
+      "completed": false,
+      "high_score": 0.0,
+      "results": {},
+      "unlocked": []
+    }
+  },
+  "stats": {},
+  "unlocked": {
+    "beginner": [],
+    "expert": [
+      "w1_l2"
+    ]
+  },
+  "unlocks": {
+    "all": false,
+    "rewards": []
+  },
+  "version": 1
+}

@@ -143,6 +143,9 @@ var _remount_until: PackedInt32Array = PackedInt32Array()
 ## wf11 R3 (co-op wards only; empty everywhere else): the enemies whose heads gave the ridden mount nothing - it came
 ## down on each inside a ward - until their boxes part ([method _ridden_contacts]).
 var _ward_heads: Array[EnemyBase] = []
+## Phase 4 ruling Q4 (DESIGN.md G87): the clock of each head of [member _ward_heads] (same index;
+## PlayerBase.ward_grace_step) - the pass ends PartyTuning.WARD_GRACE_TICKS ticks after the mount has ground again.
+var _ward_since: PackedInt32Array = PackedInt32Array()
 var _anim_age: int = 0
 var _sprite: Sprite2D = null
 var _saddle: Sprite2D = null
@@ -797,6 +800,7 @@ func _ridden_contacts(level: LevelBase) -> void:
 				# wf11 R3 (the mount's stomp is its rider's): inside a ward an enemy's head gives a co-op party's mount
 				# no lift - its velocity stays, it falls on through the body - and that enemy is passed until they part.
 				_ward_heads.append(enemy)
+				_ward_since.append(PlayerBase.WARD_FALLING)
 				Audio.play_sfx(Sfx.LAND)
 				level.spawn_fx(&"fx/dust", Vector2i(sim_pos.x, enemy.sim_pos.y - enemy.box_h))
 				continue
@@ -820,12 +824,21 @@ func _in_ward(level: LevelBase) -> bool:
 
 
 ## R3: an enemy stays in [member _ward_heads] while it is there to touch and its box still overlaps the mount's.
+## Phase 4 ruling Q4 (DESIGN.md G87; the mount's stomp is its rider's, so is its grace): the pass holds while the mount
+## is in the air and for PartyTuning.WARD_GRACE_TICKS ticks after the first tick it has ground again - then that
+## enemy's body meets the riders as any body does ([method rider_hit]). A mount standing in a keeper is no shelter.
 func _ward_heads_check() -> void:
 	for i: int in range(_ward_heads.size() - 1, -1, -1):
 		var enemy: EnemyBase = _ward_heads[i]
-		if not is_instance_valid(enemy) or enemy.dead or not enemy.awake or not enemy.contact_hurts \
-				or not enemy.is_targetable() or not Overlap.body(self, enemy, self):
+		var forget: bool = not is_instance_valid(enemy) or enemy.dead or not enemy.awake or not enemy.contact_hurts \
+				or not enemy.is_targetable() or not Overlap.body(self, enemy, self)
+		if not forget:
+			var since: int = PlayerBase.ward_grace_step(_ward_since[i], grounded)
+			_ward_since[i] = since
+			forget = PlayerBase.ward_grace_over(since)
+		if forget:
 			_ward_heads.remove_at(i)
+			_ward_since.remove_at(i)
 
 
 func _return_home() -> void:
@@ -850,6 +863,7 @@ func _return_home() -> void:
 
 func _on_level_reset() -> void:
 	_ward_heads.clear()
+	_ward_since.clear()
 	for hero: PlayerBase in [driver, gunner]:
 		if hero != null:
 			_unseat(hero)

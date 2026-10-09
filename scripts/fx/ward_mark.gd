@@ -12,14 +12,15 @@ extends RefCounted
 ## (HeroPalette), so marked enemies of one sheet still batch together - the cost is at most one more draw state per
 ## sheet that is on the view both marked and unmarked.
 ##
-## What is drawn: chevron bands of chalk across the body - a zigzag every BAND_PERIOD art px, CHALK_PX of chalk white
-## between two EDGE_PX lines of dark ink (the ink keeps the bands readable on pale sheets: gulls, ghosts, snow
-## turtles, the light half of a slime; the chalk on dark ones). The bands are cut in the sprite's own space (art px
-## from the enemy's feet point), whole pixels, only where the sheet's texel is opaque - so they lie on the body like
-## paint and never on the air around it. The hit flash still shows through (the bands take the sprite's modulate).
-## Not a HUD element, no text, no motion of its own.
+## What is drawn: slanted bands of chalk across the body, the same slant on every beast - one band every BAND_PERIOD
+## art px, CHALK_PX of chalk white between two EDGE_PX lines of dark ink (the ink keeps the bands readable on pale
+## sheets: gulls, ghosts, snow turtles, the light half of a slime; the chalk on dark ones). The bands are cut in the
+## sprite's own space (art px from the enemy's feet point), whole pixels, only where the sheet's texel is opaque and
+## RIM_PX inside the silhouette - so they lie on the body like paint, the sheet's own outline stays whole, and nothing
+## is drawn on the air around it. The hit flash still shows through (the bands take the sprite's modulate), the feast
+## food and the Shaman's bone are other nodes and stay plain. Not a HUD element, no text, no motion of its own.
 
-## The bands: slanted one art px down per art px to the right; BAND_PERIOD art px from one band to the next (measured
+## The bands: they rise one art px per art px to the right; BAND_PERIOD art px from one band to the next (measured
 ## along a row), CHALK_PX of chalk between two EDGE_PX lines of ink, the first band BAND_SHIFT px from the feet point.
 const BAND_PERIOD: int = 26
 const CHALK_PX: int = 5

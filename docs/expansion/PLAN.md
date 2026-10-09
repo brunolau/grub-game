@@ -509,6 +509,75 @@ pair playtests of P4.5 (9-2's charged drive across the partial bridge among them
 | P4.5 | lead designer | mixed-skill pair playtests of every co-op stage, including the gate types G1 could not playtest (window and daze values, Batter Up, the lee); an expert told to cheat; final *(tune)* values written into DESIGN.md and the specs |
 | P4.6 | core-A | version 2.0.0, Save v2 migration test on real 1.0 saves, exports (Windows, Android, macOS, iOS presets), `test_core_release` filters, smoke run of the exported build, README / BUILD notes |
 
+**The phase-4 record of the lead designer (2026-10-09; P4.5, the rulings and the specs)**. The orchestrator's
+phase-4 rulings Q1-Q7 are DESIGN.md **G84-G90**, sent to every owner with the as-decided details as
+`build/engine_requests/wf12_lead_design_to_all.txt`: the coil rule and the shield rule of the G3c integrator are
+confirmed (G84); the ward stays and **the enemy shows it** - a ward mark on every enemy whose feet column is in a
+ward, for a co-op party only, drawing only, and a teaching sign at the first ward of co-op 1-1 and 5-1 (G85); **no
+dead end beside an idle partner** - `PartyTuning.IDLE_WIPE_TICKS` 73 (G86); **the ward's grace is short** -
+`PartyTuning.WARD_GRACE_TICKS` 12 (G87); version 2.0.0 with Windows as the release target (G88); nothing public
+from an agent (G89); what only people can check is not faked (G90). The lead designer's own: **G91**, DESIGN.md
+D.12 - the register of every *(tune)* value as 2.0.0 ships it, each constant pinned against the tree by
+`docs/spec/test_spec_docs.py` - **G92**, below, and **G93**: the three rules the versus builder's soak of P4.1
+(4 020 seeded rounds, 5 562 673 ticks, no engine error) asked of the referee - a stomp comes from above, nobody
+stays outside the arena's sides, a wedged coconut is lost - accepted as built, with Sky Picnic's Grub Stack inside
+the fairness band since its big spot moved into the two lips of the hole (best spawn 31.0 % of 384 rounds, G80)
+and a "TIME!" banner on a round the hard cap ends (G78).
+- **The main body says what the game does.** DESIGN.md D.2-D.11 carried the first design where the appendix had
+  long ruled otherwise; D.4, D.5, D.6, D.7, D.8, D.9, D.10 and D.11 now state the ward (with the nine `ward=` keys
+  as built), the slot-bound windows, the launch hold, the closed door, the coil and the shield, the stages as built
+  (5-1's gully a bond, 9-2's charged drive over 13 cells, 8-1 and 8-2 as their files are), and F.5 the release.
+  GAMEPLAY.md 13.9 / 13.11 and PHYSICS.md C.0 / C.10 / C.12 / C.16 lost "starting value", "phase-3 content" and the
+  `solo_min - 4` cap as a proof; LEVEL_DESIGN.md 15.7.4-15.7.9 and 15.10 carry the building rules of G85-G87 and G92.
+- **P4.5 is not done, and nothing pretends it is.** No pair of people played. The step is
+  `docs/expansion/HUMAN_CHECKS.md`: 262 checks, one line each, unticked, each with what to look for and the file and
+  value to change if it fails - the tribe's rules (17), the 35 co-op stages with a play-through line each and a line
+  for each of the 45 gates (122), the expert told to cheat (13), versus (14), keyboards with the key sets of the WASD
+  + numpad layout (11), pads and the reconnect dialog (7), the music with all 51 tracks (58), the look-over (6),
+  devices - an Android phone with the release owner's `--perf` steps, printed as untested - (10), the Windows build
+  with a real 1.0 save (4). The spec test fails when a
+  gate, an arena cell or a music file of the tree has no line, when a quoted constant is not the tree's, when a
+  named file is missing or when a box is ticked.
+- **What a tool could measure was measured** (the tools are scratch files of the phase under
+  `build/lead_design/wf12/`, named in the check list so that the numbers can be made again): **the wards** cover
+  1 786 of the 3 977 columns of the 23 co-op files with tablets, 44.9 % - 4-1 and 5-2 from end to end - and 186 of
+  the 396 enemy records of the co-op files stand in one (`wards.py`; it reproduces the G3c verifier's 44 %); the
+  Snatcher bat of 1-2 hangs inside a ward and therefore never seizes. **The recorded pair** (`pair_probe.gd`, all 57
+  two-stream route runs replayed on the release tree): 22 Beginner stages in 38:15 and 35 Expert stages in 57:55
+  of playing time, 26 and 62 hurts, no hero down, no wipe; per gate 1 to 34 s from the tablet to the far cell - five gates over the
+  30 s target even for the rehearsed pair (1-2 'shaft' 34 s on Beginner, 8-1 'stairs' 34 s, 7-1 'stack' 33 s, 6-2
+  'seesaw' 32 s on Expert, 3-1b 'hut' 30 s on Beginner); the eight co-op boss fights 47-83 s with 0-4 hurts in the
+  fight (DESIGN.md B.0). **The music**: 51 tracks, 44.7 minutes for one pass (`music.py`), with the audit owner's
+  loudness and loop-seam numbers (`tools/audit_assets.py --audio`: all 51 at -18.0 LUFS as played, no seam harder
+  than the music's own waveform). A debug `start_level ... players=2` flow gives only P1 a device (measured), so
+  the check list sends a pair through the campaigns in order. **The two rules of the phase move no recorded
+  route**: the same probe on the tree with the ward's grace built gives the same stage ticks, hurts and gate times
+  in all 57 runs, and party's per-tick digests of the 57 runs are the same before and after both rules (140 060
+  ticks); of the 33 evidence routes two end earlier and dead, none reaches. Of the 59 signs that stand inside a
+  ward one teaches a bounce on a beast that is now marked (`signs.py`: 5-1's Roller sign) - ruled out of the co-op
+  copy (G85).
+- **G92 - one hero opens 8-1 'hall' with a carried feast kit** (the cheat "the 8-1 feast piece", taken as far as a
+  tool reaches). A feast's touch kills before any trait is asked and only a `heavy` and a bond's last member refuse
+  such a death; the kit is carried from stage to stage. On the real level with P2 idle, the run's kit preset to two
+  pieces and P1 placed by teleport (`feast_probe.gd`: the rule, not a route) the piece on the terrace over the
+  hall starts the feast, both keeper Shellbacks die of his touch and the keeper door rises; without the feast
+  nothing dies. The three proofs start a gate without a carried kit and stay green: the bar of V3.c is not moved
+  and gate G3 stands. Decided: in a co-op party a keeper and every `shell` and `daze` record dies only of a weapon
+  hit its trait accepts. **Not built** (no owner of the traits in the phase;
+  `build/engine_requests/wf12_lead_design_to_orchestrator.txt`); the remedy without the engine is to move 8-1's
+  first feast piece behind the hall's door. Until one of the two is in the tree the spec test lists it as "not
+  built".
+- **Open at the lead designer's close**: G92 above; the human checks themselves; three "not built" lines of the
+  spec test, each waiting for a file that is not the lead designer's - G92, the two ward signs in `w1_l1_coop` and
+  `w5_l1_coop`, and the Roller sign still in `w5_l1_coop` (`build/engine_requests/wf12_lead_design_to_levels.txt`);
+  the desktop `--perf` runs with two and four heroes were not made in the phase (ten Godot processes side by
+  side: the numbers would be noise), and the device steps of section D are the release owner's, untested (no
+  Android toolchain in the project, G88); a 1.0 profile that had rebound V, `;` or pad LB shares that input with
+  the new Swap until core fixes `Settings.load_settings` (the release owner's red test); the mark is by the enemy's column and the rule by the hero's, so within a body's width of a
+  ward's edge the two can differ (accepted, G85); a pair with one hero in an egg whose partner rests 13 s loses a
+  life (the cost of G86, a line of the check list); a weighted second pad makes one person a pair (G58 says a held
+  key is input: a question for the owner, line X-05).
+
 ---
 
 ## 8. Verification rules

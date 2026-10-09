@@ -19,6 +19,9 @@ var _coop: bool = false
 func after_each() -> void:
 	if Events.hero_bounced.is_connected(_on_bounced):
 		Events.hero_bounced.disconnect(_on_bounced)
+	if Events.hero_hurt.is_connected(_on_hurt):
+		Events.hero_hurt.disconnect(_on_hurt)
+	PlayerBase.ward_grace_ticks = PartyTuning.WARD_GRACE_TICKS
 	GameInput.clear_scripted()
 	super.after_each()
 
@@ -645,12 +648,20 @@ func test_falling_through_two_bodies_counts_each_once() -> void:
 	_falling(hero, Vector2i(x, FLOOR_Y - 90), 32)
 	var hearts: int = hero.run.hearts
 	var both: Array[int] = [0]
-	_play(hold("", 40), func(_t: int) -> void:
+	var landed: Array[int] = [0]
+	var at_grace_end: Array[int] = [hearts]
+	_play(hold("", 40), func(t: int) -> void:
 		if hero._ward_heads.size() == 2:
-			both[0] += 1)
+			both[0] += 1
+		if landed[0] == 0 and hero.grounded and hero.sim_pos.y == FLOOR_Y:
+			landed[0] = t
+		if landed[0] != 0 and t == landed[0] + PartyTuning.WARD_GRACE_TICKS:
+			at_grace_end[0] = hero.run.hearts)
 	assert_true(both[0] >= 4, "he fell through both at once (%d ticks in both boxes)" % both[0])
 	assert_eq([first.bounce_count, second.bounce_count], [1, 1], "each stomp counted once - no chain climbing a tick at a time")
-	assert_eq(hero.run.hearts, hearts, "neither hurt him during the fall")
+	assert_true(landed[0] > 0 and landed[0] + PartyTuning.WARD_GRACE_TICKS < 40, "the set-up: he landed between the two and stayed")
+	assert_eq(at_grace_end[0], hearts, "neither hurt him during the fall nor in the grace after the landing")
+	assert_eq(hero.run.hearts, hearts - 1, "... and staying inside the two bodies costs a heart then (phase 4 Q4: no shelter)")
 
 
 func test_a_ridden_mount_gets_no_lift_from_a_head_in_a_ward() -> void:
@@ -669,16 +680,22 @@ func test_a_ridden_mount_gets_no_lift_from_a_head_in_a_ward() -> void:
 		var hearts: int = hero.run.hearts
 		var rose: Array[int] = [0]
 		var landed: Array[bool] = [false]
-		_play(hold("", 40), func(_t: int) -> void:
-			if mount.grounded:
+		var landed_at: Array[int] = [0]
+		var sat_through_grace: Array[bool] = [false]
+		_play(hold("", 40), func(t: int) -> void:
+			if mount.grounded and not landed[0]:
 				landed[0] = true
+				landed_at[0] = t
+			if landed[0] and t == landed_at[0] + PartyTuning.WARD_GRACE_TICKS:
+				sat_through_grace[0] = hero.is_mounted()
 			if mount.yvel < 0 and not landed[0]:
 				rose[0] += 1)
 		var what: String = "in the ward" if inside else "outside the ward"
 		if inside:
 			assert_eq(rose[0], 0, what + ": the head gave the mount nothing - it fell through")
 			assert_eq(hero.run.hearts, hearts, what + ": and the body did not hit its rider during the fall")
-			assert_true(hero.is_mounted(), what + ": he still sits")
+			assert_true(sat_through_grace[0], what + ": he still sits when the grace after the landing ends (phase 4 Q4: "
+					+ "the mount that stays in the body is hit after it - test_a_mount_standing_in_a_keeper_is_no_shelter_either)")
 		else:
 			assert_true(rose[0] > 0, what + ": the mount's stomp bounce (MountTuning.STOMP_YVEL)")
 		if hero.is_mounted():
@@ -687,6 +704,176 @@ func test_a_ridden_mount_gets_no_lift_from_a_head_in_a_ward() -> void:
 		enemy.free()
 		Game.level.remove_child(mount)
 		mount.free()
+
+
+# =================================================================================================================
+# Phase 4, Q4 (DESIGN.md G87) - the ward's grace is short: standing inside a keeper is no shelter
+# =================================================================================================================
+
+var _hurts: int = 0
+
+
+func _on_hurt(_hero: PlayerBase, _kind: int, _source: SimEntity) -> void:
+	_hurts += 1
+
+
+## The hero comes down on the head of a keeper (40 px wide, `height` px tall) inside the ward and then does nothing: he
+## lands inside its body and stays. With `fall_px` > 0 he is held at that many px a tick while he is in the air (a
+## slow fall: many ticks inside the body before the floor). Returns "landed" (the tick he first had the floor under
+## him; 0 = never), "air" (ticks in the air with the two boxes overlapping), "air_hurts" (hurts during the fall),
+## "hurt_after" (for the tick of the landing and every tick after it: how often that keeper had hurt him by its end),
+## "overlap" (the same ticks: whether the boxes overlapped at its end), "count" (the keeper's bounce count at the end).
+func _stand_inside(height: int, ticks: int, fall_px: int = 0) -> Dictionary:
+	var x: int = 50 * 16 + 8
+	var keeper: EnemyBase = _body_at(Vector2i(x, FLOOR_Y), {"hp": 25, "keeper": "door"})
+	keeper.set_box(Vector3i(40, height, 20))
+	hero.respawn_at(Vector2i(x, FLOOR_Y - height - 24))
+	_falling(hero, Vector2i(x, FLOOR_Y - height - 24), 32)
+	_hurts = 0
+	Events.hero_hurt.connect(_on_hurt)
+	var state: Dictionary = {"landed": 0, "air": 0, "air_hurts": 0, "hurt_after": [], "overlap": [], "count": 0}
+	_play(hold("", ticks), func(t: int) -> void:
+		var touching: bool = Overlap.body(hero, keeper, hero)
+		if int(state["landed"]) == 0:
+			if hero.grounded and hero.sim_pos.y == FLOOR_Y:
+				state["landed"] = t
+			else:
+				if touching:
+					state["air"] = int(state["air"]) + 1
+				state["air_hurts"] = _hurts
+				if fall_px > 0:
+					hero.yvel = fall_px * 16
+		if int(state["landed"]) != 0:
+			(state["hurt_after"] as Array).append(_hurts)
+			(state["overlap"] as Array).append(touching))
+	Events.hero_hurt.disconnect(_on_hurt)
+	state["count"] = keeper.bounce_count
+	Game.level.remove_child(keeper)
+	keeper.free()
+	return state
+
+
+func test_the_wards_grace_ends_twelve_ticks_after_the_landing() -> void:
+	assert_eq(PartyTuning.WARD_GRACE_TICKS, 12, "the grace (tune through DESIGN)")
+	assert_eq(PlayerBase.ward_grace_ticks, PartyTuning.WARD_GRACE_TICKS, "the hero reads the table's value")
+	_world(true, _flat_rows())
+	_tablet(40, 52)
+	var grace: int = PartyTuning.WARD_GRACE_TICKS
+	for height: int in [35, 60]:
+		var what: String = "a keeper %d px tall" % height
+		var run: Dictionary = _stand_inside(height, 90)
+		var after: Array = run["hurt_after"]
+		assert_true(int(run["landed"]) > 0 and after.size() > grace + 50, what + ": the set-up - he landed inside it and stayed")
+		assert_true(int(run["air"]) >= 3, what + ": he fell through its body (%d ticks in its box in the air)" % int(run["air"]))
+		assert_eq(run["air_hurts"], 0, what + ": not hurt during the fall")
+		assert_eq(after.slice(0, grace + 1), _zeros(grace + 1),
+				what + ": no hurt on the tick of the landing and the %d ticks after it" % grace)
+		assert_true(bool((run["overlap"] as Array)[grace]), what + ": the set-up - still inside its box on tick %d" % grace)
+		assert_eq(after[grace + 1], 1, what + ": tick %d after the landing - the body hurts him as anywhere" % (grace + 1))
+		assert_eq(run["count"], 1, what + ": one stomp counted for the fall; standing in it stomps nothing")
+		assert_true(int(after[after.size() - 1]) >= 2,
+				what + ": and again once his hurt's immunity is over - standing inside a keeper is no shelter (%d hurts in %d ticks)"
+				% [int(after[after.size() - 1]), after.size()])
+	# The fall itself is covered however long it lasts: 1 px a tick through a 60 px body.
+	var slow: Dictionary = _stand_inside(60, 110, 1)
+	var slow_after: Array = slow["hurt_after"]
+	assert_true(int(slow["air"]) > 3 * grace, "a slow fall: %d ticks in its box before the floor" % int(slow["air"]))
+	assert_eq(slow["air_hurts"], 0, "a slow fall: not hurt in the air, whatever the body's height")
+	assert_true(int(slow["landed"]) > 0 and slow_after.size() > grace + 1, "a slow fall: the set-up - he landed and stayed")
+	if slow_after.size() > grace + 1:
+		assert_eq(slow_after.slice(0, grace + 1), _zeros(grace + 1), "a slow fall: the %d ticks count from the landing" % grace)
+		assert_eq(slow_after[grace + 1], 1, "a slow fall: and end as after any landing")
+	# The rule before G87 ("until the boxes part"): the same stand costs nothing, for as long as he likes - the shelter.
+	PlayerBase.ward_grace_ticks = -1
+	var before: Dictionary = _stand_inside(35, 90)
+	PlayerBase.ward_grace_ticks = PartyTuning.WARD_GRACE_TICKS
+	var before_after: Array = before["hurt_after"]
+	assert_true(before_after.size() > grace + 50 and bool((before["overlap"] as Array)[before_after.size() - 1]),
+			"the old rule: the set-up - he stood inside it to the end")
+	assert_eq(before_after[before_after.size() - 1], 0,
+			"the old rule sheltered him for ever (this test is red without G87: 0 hurts in %d ticks)" % before_after.size())
+
+
+func _zeros(count: int) -> Array:
+	var zeros: Array = []
+	zeros.resize(count)
+	zeros.fill(0)
+	return zeros
+
+
+func test_a_hero_who_lands_in_a_keeper_and_walks_on_never_pays() -> void:
+	# G87 #3: 12 ticks at the walk cap are 60 px - out of the widest keeper's body (54 px art, 27 px of box here: 54).
+	_world(true, _flat_rows())
+	_tablet(40, 52)
+	var x: int = 50 * 16 + 8
+	for keys: String in ["R", "L"]:
+		var keeper: EnemyBase = _body_at(Vector2i(x, FLOOR_Y), {"hp": 25, "keeper": "door"})
+		keeper.set_box(Vector3i(54, 40, 27))
+		hero.respawn_at(Vector2i(x, FLOOR_Y - 70))
+		_falling(hero, Vector2i(x, FLOOR_Y - 70), 32)
+		_hurts = 0
+		Events.hero_hurt.connect(_on_hurt)
+		var landed: Array[int] = [0]
+		var out: Array[int] = [0]
+		_play(hold(keys, 60), func(t: int) -> void:
+			if landed[0] == 0 and hero.grounded and hero.sim_pos.y == FLOOR_Y:
+				landed[0] = t
+			if landed[0] != 0 and out[0] == 0 and not Overlap.body(hero, keeper, hero):
+				out[0] = t)
+		Events.hero_hurt.disconnect(_on_hurt)
+		assert_true(landed[0] > 0 and out[0] > 0, "%s: the set-up - he landed in the middle of it and walked out" % keys)
+		assert_true(out[0] - landed[0] <= PartyTuning.WARD_GRACE_TICKS,
+				"%s: clear of a 54 px body %d ticks after the landing (the grace is %d)" % [keys, out[0] - landed[0],
+				PartyTuning.WARD_GRACE_TICKS])
+		assert_eq(_hurts, 0, "%s: a stomp in good faith costs no heart" % keys)
+		assert_true(hero._ward_heads.is_empty(), "%s: and the two are strangers again" % keys)
+		Game.level.remove_child(keeper)
+		keeper.free()
+
+
+func test_a_mount_standing_in_a_keeper_is_no_shelter_either() -> void:
+	_world(true, _flat_rows())
+	_tablet(40, 52)
+	var x: int = 50 * 16 + 8
+	for old_rule: bool in [false, true]:
+		PlayerBase.ward_grace_ticks = -1 if old_rule else PartyTuning.WARD_GRACE_TICKS
+		_look_at(x)
+		var mount: Mount = Game.level.spawn(&"objects/mount", Vector2i(x - 4, FLOOR_Y - 70)) as Mount
+		hero.respawn_at(Vector2i(x - 4, FLOOR_Y - 70))
+		assert_true(mount != null and mount.seat(hero), "the set-up: the hero sits on a mount")
+		var enemy: EnemyBase = _body_at(Vector2i(x, FLOOR_Y), {"hp": 200, "keeper": "door"})
+		mount.yvel = 48
+		mount.grounded = false
+		_hurts = 0
+		var hits: Array[int] = [0]
+		var landed: Array[int] = [0]
+		var first_hit: Array[int] = [0]
+		var seated: Array[bool] = [true]
+		_play(hold("", 70), func(t: int) -> void:
+			if landed[0] == 0 and mount.grounded:
+				landed[0] = t
+			if seated[0] and not hero.is_mounted():
+				seated[0] = false
+				hits[0] += 1
+				if first_hit[0] == 0:
+					first_hit[0] = t)
+		var what: String = "the rule before G87" if old_rule else "G87"
+		assert_true(landed[0] > 0, what + ": the set-up - the mount came down through the keeper and stands in it")
+		if old_rule:
+			assert_eq(hits[0], 0, what + ": a rider was sheltered inside the keeper for as long as the mount stood there")
+		else:
+			assert_true(first_hit[0] > landed[0] + PartyTuning.WARD_GRACE_TICKS,
+					what + ": not hit during the fall nor in the %d ticks after the landing (landed %d, hit %d)"
+					% [PartyTuning.WARD_GRACE_TICKS, landed[0], first_hit[0]])
+			assert_eq(first_hit[0], landed[0] + PartyTuning.WARD_GRACE_TICKS + 1,
+					what + ": the keeper's body knocks the rider off on tick %d after the landing" % (PartyTuning.WARD_GRACE_TICKS + 1))
+		if hero.is_mounted():
+			mount.dismount(hero)
+		Game.level.remove_child(enemy)
+		enemy.free()
+		Game.level.remove_child(mount)
+		mount.free()
+	PlayerBase.ward_grace_ticks = PartyTuning.WARD_GRACE_TICKS
 
 
 # =================================================================================================================

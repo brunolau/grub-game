@@ -869,11 +869,14 @@ over **all rows** of the level: there no enemy gives a hero of a co-op party lif
 still counts against the enemy; a dust puff and a thud tell the player). **The enemy shows it** [G85]: in a co-op
 party every enemy whose feet column is in a ward wears the ward mark (chalk-white stripes, drawn only), so a pair
 sees which beasts are no stepping stones before it jumps. Teach it once per book: a sign a few columns inside the
-first ward of 1-1 and of 5-1 co-op, with a marked beast in view ("Marked beasts are no stepping stones - use your
-partner's shoulders!"); do not hide a ward's enemies behind front props where a pair decides to bounce. **The pass
+first ward of 1-1 and of 5-1 co-op, with a marked beast in view ("Marked beasts are no steps - use your partner's
+shoulders!" - 58 characters: the longer "no stepping stones" takes a fourth board line); do not hide a ward's enemies behind front props where a pair decides to bounce. **The pass
 is short** [G87]: the stomped enemy spares the hero during that fall and for 12 ticks after he lands, then its body
 hurts like any other - never build a spot where a hero must stand inside a beast, and keep 4+ cells of floor beside
-a keeper where a hero who dropped onto it can step out. `ward=<left>,<right>` on the record sets
+a keeper where a hero who dropped onto it can step out. **No sign inside a ward tells a pair to bounce on a
+beast** [G85]: a hint sign copied from the solo file ("Bounce on one to reach the mesa tops!", 5-1's Roller sign at
+column 71) contradicts the marked beast beside it - drop it from the co-op copy or move it out of the ward (a sign
+about a mount, such as the taming of Chomper, may stay: no ward touches a mount). `ward=<left>,<right>` on the record sets
 the two margins in cells (left = towards column 0; both at least 0). **The margin counts from the gate's high
 ground**: the default presumes that the first standing place leading over the gate is at the tablet; where it
 begins `n` cells before the tablet (or ends `n` cells behind the `far` cell) that side's margin is 12 + `n`. Put
@@ -919,6 +922,11 @@ of a height gate's foot and a one-way ledge cell fewer than 7 rows over a standi
   crust with holes over it (5-1, 3-1b) is no way in for one hero; it still needs both ends closed to a single hero
   walking round (the hall rule above). 5-1 'gully' was rebuilt as a bond of two tortoises before the rule
   (`coop=bond bond=gully keeper=gully`) and stays one.
+- **A feast is no key - keep the pieces away** [G92]: as built a feasting hero kills a `shell` or `daze` keeper by
+  touch, and the kit is carried from stage to stage, so one player who arrives with two pieces and finds the third
+  before a keeper hall opens its door alone (8-1 'hall': the piece on the terrace over the hall). Until the engine
+  refuses such a death: **no feast piece between a stage's start and the door of a `shell` or `daze` keeper hall**
+  (a bond of keepers and a `heavy` are safe: they refuse it already). The gate job does not see a carried kit.
 - **Bonds are slot-bound** [G72]: a bond, a keeper pair, a drum pair and a split are met only by two different
   heroes who both count; one hero's hit on the last member glances and the dead one regrows. The placing rules
   above that kept ONE hero from both members - out of one hero's reach within the window, never on one throw line
@@ -1249,8 +1257,9 @@ New routes describe themselves in a header instead of a `ROUTES` entry. The head
       tablet [G73]; no standing place within 10 + h / 2 cells above a gate's ledge [G74]; a gap gate of a windy
       file 12 cells wide or with a raised far lip [G79]; no route that needs an enemy's head inside a ward, a jump
       on top of a spring [G71], one hero meeting a bond [G72] or an idle partner's view [G76].
-- [ ] Co-op (phase 4): the ward sign at the first ward of 1-1 and 5-1, a marked beast in view of it [G85]; no spot
+- [ ] Co-op (phase 4): the ward sign at the first ward of 1-1 and 5-1, a marked beast in view of it, and no sign
+      inside a ward that teaches a bounce on a beast [G85]; no spot
       where a hero must stand inside a beast longer than 12 ticks [G87]; where it fits, a checkpoint before a ride of
-      13+ s [G86]; the stage's lines of `docs/expansion/HUMAN_CHECKS.md` read once against the file [G90].
+      13+ s [G86]; no feast piece before a `shell` or `daze` keeper hall [G92]; the stage's lines of `docs/expansion/HUMAN_CHECKS.md` read once against the file [G90].
 - [ ] Signs: every text at most 3 board lines (about 60 characters); the music context of the 15.2 table.
 - [ ] Arena: 20 x 12, row 0 empty, spawns for `players`, cookpots, bot graph baked and its bot test green per mode.

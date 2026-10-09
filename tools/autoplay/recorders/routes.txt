@@ -1,0 +1,53 @@
+# route file	kind	probe	bot or macro script	difficulty	the bot's own arguments   (read by tools/autoplay/recorders/record.sh; paths under tools/autoplay/recorders/)
+bonus_a_coop.inputs	bot	db1/p4/probe.gd	db1/p4/bot_bonus_a.gd	beginner	--mirror=7,9
+bonus_b_coop.inputs	bot	db1/p5/probe.gd	db1/p5/bot_bonus_b.gd	beginner	
+bonus_c_coop.inputs	bot	db3/probe.gd	db3/bot_bonus_c_coop.gd	beginner	
+bonus_d_coop.inputs	rec	d5/probe.gd	d5/rec/bonus_d_coop.txt	beginner	
+bonus_e_coop.inputs	bot	d7/probe.gd	d7/bot_bonus_e_coop.gd	beginner	
+ending_b_coop.inputs	bot	content/d9b/probe.gd	content/d9b/bot_ending_b.gd	expert	--limit=5000
+ending_coop.inputs	bot	db3/probe.gd	levels/bot_ending_coop.gd	expert	
+w1_l1_coop.expert.inputs	rec	levels/recprobe/probe.gd	levels/rec_w11/w1_l1_coop_e.txt	expert	
+w1_l1_coop.inputs	rec	levels/recprobe/probe.gd	levels/rec_w11/w1_l1_coop_b.txt	beginner	
+w1_l2_coop.expert.inputs	bot	db1/p5/probe.gd	db1/p6/bot_w1_l2.gd	expert	--dlift2_bottom=1104
+w1_l2_coop.inputs	bot	db1/p5/probe.gd	db1/p6/bot_w1_l2.gd	beginner	--dlift2_bottom=1096
+w2_l1_coop.expert.inputs	bot	db1/p5/probe.gd	db1/p5/bot_w2_l1.gd	expert	--rex34_charge --rex_crawl=3100 --rex_stand=3140
+w2_l1_coop.inputs	bot	db1/p5/probe.gd	db1/p5/bot_w2_l1.gd	beginner	--rex_crawl=3100 --rex_stand=3140
+w2_l2_coop.expert.inputs	bot	db2/probe.gd	levels/bot_w2_l2_coop.gd	expert	
+w2_l2_coop.inputs	bot	db2/probe.gd	levels/bot_w2_l2_coop.gd	beginner	
+w2_l2b_coop.expert.inputs	bot	db2/probe.gd	bosses10/bot_w2_l2b_coop.gd	expert	
+w2_l2b_coop.inputs	bot	db2/probe.gd	bosses10/bot_w2_l2b_coop.gd	beginner	
+w3_l1_coop.expert.inputs	bot	db2/probe.gd	db2/bot_w3_l1_coop.gd	expert	
+w3_l1_coop.inputs	bot	db2/probe.gd	db2/bot_w3_l1_coop.gd	beginner	--cave=1
+w3_l1b_coop.expert.inputs	bot	db2/probe.gd	levels/bot_w3_l1b_coop.gd	expert	--ledge=1
+w3_l1b_coop.inputs	bot	db2/probe.gd	db2/bot_w3_l1b_coop.gd	beginner	--ledge=1
+w3_l2_coop.expert.inputs	bot	db3/probe.gd	db3/bot_w3_l2_coop.gd	expert	--fixes_in=res://tools/autoplay/recorders/levels/w3e_fixes.json
+w3_l2_coop.inputs	bot	db3/probe.gd	db3/bot_w3_l2_coop.gd	beginner	--learn --attempts=400 --downs_only --fixes_in=res://tools/autoplay/recorders/db3/w3b_fixes.json
+w4_l1_coop.inputs	bot	db3/probe.gd	db3/bot_w4_l1_coop.gd	expert	
+w4_l2_coop.inputs	bot	db3/probe.gd	db3/bot_w4_l2_coop.gd	expert	
+w4_l2b_coop.inputs	bot	db3/probe.gd	db3/bot_w4_l2b_coop.gd	expert	--learn --attempts=400 --fixes_in=res://tools/autoplay/recorders/db3/w4_l2b_fixes2.json
+w5_l1_coop.expert.inputs	rec	levels/recprobe/probe.gd	levels/rec_d5/w5_l1_coop_e.txt	expert	
+w5_l1_coop.inputs	rec	levels/recprobe/probe.gd	levels/rec_d5/w5_l1_coop_b.txt	beginner	
+w5_l2_coop.expert.inputs	rec	levels/recprobe/probe.gd	levels/rec_d5/w5_l2_coop_e.txt	expert	
+w5_l2_coop.inputs	rec	d5/probe.gd	d5/rec/w5_l2_coop_b.txt	beginner	
+w5_l2b_coop.expert.inputs	rec	d5/probe.gd	d5/rec/w5_l2b_coop_e.txt	expert	
+w5_l2b_coop.inputs	rec	d5/probe.gd	d5/rec/w5_l2b_coop_b.txt	beginner	
+w6_l1_coop.expert.inputs	bot	d6/probe.gd	enemies_a11/bot_w6_l1_coop_g57.gd	expert	
+w6_l1_coop.inputs	bot	d6/probe.gd	enemies_a11/bot_w6_l1_coop_g57.gd	beginner	
+w6_l2_coop.expert.inputs	bot	d6/probe.gd	d6/bot_w6_l2_coop.gd	expert	
+w6_l2_coop.inputs	bot	d6/probe.gd	d6/bot_w6_l2_coop.gd	beginner	
+w6_l2b_coop.expert.inputs	bot	d6/probe.gd	levels/bot_w6_l2b_coop.gd	expert	
+w6_l2b_coop.inputs	bot	d6/probe.gd	levels/bot_w6_l2b_coop.gd	beginner	
+w7_l1_coop.expert.inputs	bot	d7/probe.gd	g3b/bot_w7_l1_coop.gd	expert	
+w7_l1_coop.inputs	bot	d7/probe.gd	g3b/bot_w7_l1_coop.gd	beginner	
+w7_l2_coop.expert.inputs	bot	d7/probe.gd	d7/bot_w7_l2_coop.gd	expert	
+w7_l2_coop.inputs	bot	d7/probe.gd	d7/bot_w7_l2_coop.gd	beginner	
+w7_l2b_coop.expert.inputs	bot	d7/probe.gd	levels/bot_w7_l2b_coop.gd	expert	
+w7_l2b_coop.inputs	bot	d7/probe.gd	bosses10/d7/bot_w7_l2b_coop.gd	beginner	
+w8_l1_coop.inputs	bot	d8/probe.gd	d8/bot_w8_l1_coop.gd	expert	
+w8_l2_coop.inputs	bot	d8/probe.gd	d8/bot_w8_l2_coop.gd	expert	
+w8_l2b_coop.inputs	bot	d8/probe.gd	bosses10/d8/bot_w8_l2b_coop.gd	expert	
+w9_l1_coop.inputs	bot	d9a/probe.gd	g3b/bot_w9_l1_coop.gd	expert	
+w9_l1b_coop.inputs	bot	d9a/probe.gd	d9a/bot_w9_l1b_coop.gd	expert	
+w9_l2_coop.inputs	bot	d9a/probe.gd	levels/bot_w9_l2_coop.gd	expert	
+w9_l2b_coop.inputs	bot	d9a/probe.gd	d9a/bot_w9_l2b_coop.gd	expert	
+w9_l3_coop.inputs	bot	d9b/probe.gd	d9b/bot_w9_l3_coop.gd	expert	

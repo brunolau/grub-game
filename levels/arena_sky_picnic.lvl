@@ -1,9 +1,9 @@
 # Club & Grub level file - format 2 (docs/ARCHITECTURE.md 7.11). Versus arena #7 of docs/expansion/DESIGN.md E.5:
 # Sky Picnic - Feast Land, a cake island in the sky that wraps top-bottom; KID-SAFE: no cell can kill (no liquid, no
 # spikes, no pit - the floor's hole drops you onto the cake island from the top); sudden death: the Syrup flood, which
-# only slows. Owner: DA (arenas, docs/expansion/PLAN.md 6.1). Rules: docs/LEVEL_DESIGN.md 15.8. Dressing: art-B's
-# hand-over (.tools/asset_candidates/expansion/_handover/ARENA_DRESSING.md, "Sky Picnic"; E.5 has no sketch, the
-# geometry is DA's).
+# only slows. Owner: DA (arenas, docs/expansion/PLAN.md 6.1); the spots and spawn numbers as they stand since phase 4:
+# versus (DESIGN.md G80). Rules: docs/LEVEL_DESIGN.md 15.8. Dressing: art-B's hand-over
+# (.tools/asset_candidates/expansion/_handover/ARENA_DRESSING.md, "Sky Picnic"); the geometry is DA's.
 #
 # Layout notes:
 # - The sky: the floor (row 10) has a 4-cell hole (cols 8-11) over nothing - the bottom row is the seam (wrap = tb), so
@@ -12,17 +12,34 @@
 # - Tiers 3 rows apart: the floor (row 10), the cake island (row 7), the icing clouds (row 4, cols 3-7 / 12-16, one-way
 #   `=` of feast/terrain_icing). Springs (cols 2 / 17, -224 = 105 px) lift a hero from the floor to the clouds' outer
 #   ends. Nothing stands higher than row 4, so a plain jump never reaches the top seam.
-# - Spots (visible, refill 15 s after they are emptied): one in the floor beside each spring's far side (cols 5 / 14),
-#   one flush in each cloud's outer end (cols 3 / 16), and the big spot: two big-spot cells side by side in the cake
-#   island's top (cols 9 / 10, the E.5 sketches' `**`) - each counts its own 3 hits, the first one used up drops the
-#   giant over itself and opens its twin (the flood fill: one giant per refill). Symmetric: either half of the island
-#   strikes its own cell. The giant falls 7 rows onto the island over the hole.
+# - Spots (visible, refill 15 s after they are emptied) - six, as they stand since phase 4 (DESIGN.md G80: "the big
+#   cells struck and paid on the floor halves themselves"):
+#     the BIG spots: one cell in each lip of the hole (cols 7 / 12 of the floor), each a spot of its own with its own 3
+#       hits and its own giant, which falls onto the lip it was struck in - a floor half digs and is paid at home, and
+#       nobody races a rival for one giant in the middle;
+#     small spots flush in the cake island's top corners (cols 8 / 11; 3 pieces) - the island is what the hole's fall,
+#       the Feast Rush giant and the Golden Drumstick (x 160, row 2) lead to;
+#     small spots flush in each cloud's outer end (cols 3 / 16; 3 pieces).
+#   Until phase 4 the big spot was two touching cells in the island's top (cols 9 / 10) and the small floor spots sat
+#   at cols 5 / 14: both floor Hunters dug their own cell from the floor, the giant fell onto the island, and the right
+#   floor climbs the island with a standing jump where the left needs a run-up (1.0 physics, the same for players) -
+#   spawn 1 took the round's first giant and 42.7 % of 384 Grub Stack rounds (+17.7; DESIGN.md G80).
 # - Cookpots: two (4-player arena), on the clouds' inner halves (cols 6 / 13).
 # - Spawns (rotate every round; 2 players use 1 and 2): 1 and 2 on the floor between the springs and the hole (cols
-#   13 / 6), 3 and 4 on the clouds (cols 4 / 15).
+#   6 / 13), 3 and 4 on the clouds (cols 15 / 4) - since phase 4 the MIRROR IMAGE of the numbers before (1 was the
+#   right floor, 3 the left cloud). The places are the same; who stands where is not a matter of taste: a round's slot
+#   order runs with the spawn numbers (slot = spawn - round: spawn n acts before spawn n + 1 in three rounds of four),
+#   and 1.0's left-right asymmetries favour the right half here, the right cloud above all. Measured on these spots
+#   over 768 Grub Stack rounds each (by place: left floor / right floor / left cloud / right cloud): the old numbers
+#   23.0 / 30.5 / 17.3 / 29.2 %, these 22.7 / 25.4 / 21.4 / 30.6 %, only the floor pair swapped 24.5 / 17.8 / 20.1 /
+#   37.6 %. Whoever moves a spawn here - or changes a rule of the heroes' contacts - measures again.
 # - Modes: Hot Rock (default), Grub Stack (E.5: "Hot Rock / Grub Stack"; no Last Caveman Standing on the kid-safe
-#   arena); each has a green bot set in core-B's tests/test_versus_bots.gd (12 seeds x 4 rounds, four Hunters; DA's
-#   phase-3 runs: Hot Rock 4 points worst, Grub Stack 12).
+#   arena); each has a green bot set in tests/test_versus_bots.gd (12 seeds x 4 rounds, four Hunters).
+# - Spawn fairness as measured in phase 4 (four Hunters; `bash tools/bots/fair.sh <tag> arena_sky_picnic <mode> 0 96 5`
+#   = 384 rounds, and `... 96 96 5` = a second, independent 384), wins by spawn 1 / 2 / 3 / 4:
+#     Grub Stack  22.1 / 24.5 / 31.0 / 22.4 % (worst +6.0)   and   23.2 / 26.3 / 30.2 / 20.3 % (worst +5.2)
+#     Hot Rock    26.3 / 26.0 / 22.1 / 25.5 % (worst -2.9)   and   25.0 / 26.0 / 26.8 / 22.1 % (worst -2.9)
+#   (G80's target: 10 points for the worst spawn of Grub Stack; one spawn's standard error at 384 rounds is 2.2.)
 # - Bot graph: resources/bots/arena_sky_picnic.json, baked with core-B's tool after every edit of this file:
 #   bash .tools/gd.sh script res://tools/bots/bake_nav.gd -- arena_sky_picnic
 
@@ -43,7 +60,7 @@ round_time = 90
 wrap = tb
 sudden = syrup_flood
 author = DA
-notes = "Versus arena 7 (DESIGN.md E.5): Feast Land, wrap top-bottom, kid-safe (no deadly cell); the floor's hole drops onto the cake island with the big spot, springs to the icing clouds; the syrup flood only slows."
+notes = "Versus arena 7 (DESIGN.md E.5): Feast Land, wrap top-bottom, kid-safe (no deadly cell); the floor's hole drops onto the cake island, a big spot in each lip of the hole, springs to the icing clouds; the syrup flood only slows."
 
 [legend]
 ? = objects/hidden_spot kind=small count=3 look=block tile=#
@@ -60,14 +77,14 @@ D = objects/spawn_point index=4
 ....................
 ....................
 ....................
-....C.P......Q.D....
+....D.P......Q.C....
 ...s====....====s...
 ....................
 ....................
-........#**#........
+........?##?........
 ........####........
-..J...B......@...J..
-#####?##....##?#####
+..J...@......B...J..
+#######*....*#######
 ########....########
 
 [entities]

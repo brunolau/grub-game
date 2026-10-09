@@ -3538,6 +3538,17 @@ static func file_cache_key(path: String, data: LevelData, difficulty: int, gate:
 	return "|".join(parts).md5_text()
 
 
+## True when [method search_gate] would read this gate's result back from FILE_CACHE_DIR instead of searching (the
+## level file, its base file, the simulation's code, the bounds and the rule switches are what they were when it was
+## kept): what the gate job's plan asks before it starts a process for the gate (tools/coop_search.gd --plan).
+static func has_kept_result(level_id: StringName, difficulty: int, gate: String) -> bool:
+	var path: String = level_path(level_id)
+	var data: LevelData = LevelData.load_file(path)
+	if data == null:
+		return false
+	return not _file_cache_read(file_cache_key(path, data, difficulty, gate)).is_empty()
+
+
 ## The search's compute bounds and probe switch as text (part of both cache keys: a result found under other bounds is
 ## never read back as this one).
 static func bounds_text() -> String:

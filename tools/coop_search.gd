@@ -28,6 +28,14 @@ extends SceneTree
 ##   ... -- --nodes=<n>         the resting-point bound (CoopSearch.node_limit; default MAX_NODES)
 ##   ... -- --ticks=<n>         the tick budget (CoopSearch.tick_limit; default MAX_TICKS)
 ##   ... -- --no-probes         no continuous-play probes (every bounded result is then UNPROVEN)
+##   ... -- --plan              THE GATE JOB'S PLAN (tools/world_coop_gates.sh): no search - one line per piece of the
+##                              three proofs of every chosen gate row, saying whether its kept result is still valid
+##                              for today's level file and simulation code or has to be made:
+##                                `PLAN search <level> <gate> <0|1> <cost s> todo|kept`
+##                                `PLAN explore <level> <gate> <0|1> <pass> todo|kept [| its kept line]`
+##                                `PLAN replay <route file> todo|kept [| its kept line]`
+##                              and a summary; with --fresh everything is `todo`, with --no-explore no explorer lines
+##   ... -- --no-explore        (with --plan) leave the explorer's passes out of the plan
 ##   ... -- --max-gates=<n>     stop after n searches (a queue worker that makes room for an import between gates)
 ##   ... -- --queue=<dir>       a WORKER of a shared queue: take the gates dearest first (CoopSearch.order_by_cost) and
 ##                              search only those this process claims in <dir> (CoopSearch.claim_gate) - N workers
@@ -45,6 +53,8 @@ extends SceneTree
 ## Autoloads are reached through the tree and the search is loaded by path: this script is compiled before they exist.
 
 const SEARCH_PATH: String = "res://scripts/world/coop_search.gd"
+## The continuous-play harness (the explorer's passes and the evidence replays keep their results by its keys).
+const HARNESS_PATH: String = "res://tools/coop_explore/harness.gd"
 
 
 ## --sim-profile: Sim's development profiler hook (Sim._profiler): the time of every entity call by script and of
@@ -100,6 +110,8 @@ func _run() -> void:
 	var search_moves: bool = false
 	var reset_report: bool = false
 	var audit: bool = false
+	var planning: bool = false
+	var plan_explore: bool = true
 	for argument: String in OS.get_cmdline_user_args():
 		if argument == "--list":
 			listing = true
@@ -131,6 +143,10 @@ func _run() -> void:
 			repeat = count.to_int()
 		elif argument == "--no-cache":
 			cache = false
+		elif argument == "--plan":
+			planning = true
+		elif argument == "--no-explore":
+			plan_explore = false
 		elif argument == "--no-probes":
 			no_probes = true
 		elif argument == "--fresh":
@@ -204,6 +220,10 @@ func _run() -> void:
 			print("%3d  %s  %s  %s  tablet %s  far %s" % [i, entry["level"], _difficulty_name(int(entry["difficulty"])),
 				entry["gate"], str(entry["cell"]), str(entry["far"])])
 		print("coop_search: %d gate(s)" % chosen.size())
+		_finish(0)
+		return
+	if planning:
+		_plan(search, chosen, fresh, plan_explore, selectors.is_empty() and shard.y <= 1)
 		_finish(0)
 		return
 	if sim_profile != null:
@@ -293,6 +313,50 @@ func _run() -> void:
 	print("coop_search: %d gate(s) in %.1f s (%.1f s searching), %d failing; verdicts: %s" % [searched,
 		(Time.get_ticks_msec() - started) / 1000.0, gate_seconds, failures, ", ".join(counts)])
 	_finish(1 if failures > 0 else 0)
+
+
+## --plan: what the three proofs of the chosen gate rows still need (see the header). `fresh`: everything is to do;
+## `explore`: the explorer's passes are part of the plan; `evidence`: the evidence set too (the whole table is chosen).
+func _plan(search: GDScript, chosen: Array, fresh: bool, explore: bool, evidence: bool) -> void:
+	var harness: GDScript = load(HARNESS_PATH) as GDScript if ResourceLoader.exists(HARNESS_PATH) else null
+	var todo: Vector3i = Vector3i.ZERO
+	var total: Vector3i = Vector3i.ZERO
+	for entry: Dictionary in chosen:
+		var level: StringName = entry["level"]
+		var difficulty: int = int(entry["difficulty"])
+		var gate: String = str(entry["gate"])
+		var kept: bool = not fresh and bool(search.call(&"has_kept_result", level, difficulty, gate))
+		var cost: float = float(search.call(&"gate_cost", level, difficulty, gate))
+		total.x += 1
+		todo.x += 0 if kept else 1
+		print("PLAN search %s %s %d %.0f %s" % [level, gate, difficulty,
+			cost if cost >= 0.0 else float(search.get(&"UNKNOWN_COST_SECONDS")), "kept" if kept else "todo"])
+		if not explore or harness == null:
+			continue
+		var seconds: int = int(harness.get(&"PASS_SECONDS"))
+		for pass_index: int in (harness.get(&"PASS_SEEDS") as Array).size():
+			var seed_value: int = harness.call(&"row_seed", level, difficulty, gate, pass_index)
+			var result: Dictionary = {} if fresh else harness.call(&"cache_read",
+					harness.call(&"explore_key", level, difficulty, gate, seed_value, seconds))
+			total.y += 1
+			todo.y += 1 if result.is_empty() else 0
+			print("PLAN explore %s %s %d %d %s" % [level, gate, difficulty, pass_index, "todo" if result.is_empty()
+				else "kept | %s; %d rounds, %d ticks played (%d replays, %d of them off their state); %d s, seed %d [kept]" % [
+				"REACHED the far cell in %d ticks" % int(result.get("ticks", -1)) if bool(result.get("reached", false))
+				else "NOT reached", int(result.get("rounds", 0)), int(result.get("played", 0)),
+				int(result.get("replays", 0)), int(result.get("misses", 0)) + int(result.get("drift", 0)),
+				int(result.get("seconds", seconds)), seed_value]])
+	if evidence and harness != null:
+		for path: String in harness.call(&"evidence_files"):
+			var result: Dictionary = {} if fresh else harness.call(&"cache_read", harness.call(&"replay_key", path))
+			total.z += 1
+			todo.z += 1 if result.is_empty() else 0
+			print("PLAN replay %s %s" % [path.trim_prefix("res://"), "todo" if result.is_empty()
+				else "kept | REPLAY %s d%d %s: %s at tick %d [kept]" % [str(result.get("level", "?")),
+				int(result.get("difficulty", 0)), str(result.get("gate", "?")), str(result.get("outcome", "?")),
+				int(result.get("ticks", -1))]])
+	print("coop_search: plan - %d of %d search(es), %d of %d explorer pass(es), %d of %d evidence replay(s) to do" % [
+		todo.x, total.x, todo.y, total.y, todo.z, total.z])
 
 
 ## True when `entry` matches one of `selectors` (`<level>`, `<level>:<gate>`, `<level>:<gate>:<difficulty>`).

@@ -6,6 +6,9 @@
     python tools/audit_assets.py --audio          measure every track, loop and effect; exit 1 when a gate fails
                                                   (needs numpy, soundfile, pyloudnorm, scipy: the project venv)
     python tools/audit_assets.py --sheets DIR     contact sheets and style numbers of the 2.0 art (needs Pillow)
+    python tools/audit_assets.py --shipped PATH   a built licence folder (build/windows/licenses) or a release zip:
+                                                  exit 1 unless it holds CREDITS.md and every file of
+                                                  assets/licenses/, byte for byte, and nothing else
 
     --root DIR    audit another project root (the tests build small ones)
     --no-git      do not compare the "Since" column with the tag v1.0.0
@@ -51,6 +54,10 @@ import re
 import struct
 import subprocess
 import sys
+
+# No __pycache__ file under tools/: .tools/gd.sh takes any new file there that is not a known text type as a reason to
+# re-import the project, and an import holds every Godot run of every terminal back.
+sys.dont_write_bytecode = True
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -440,6 +447,18 @@ def check_licence_folder(files: list[str], rows: list[dict]) -> list[Finding]:
     return findings
 
 
+def check_licence_index(root: str, files: list[str]) -> list[Finding]:
+    """Every file the tables of assets/licenses/README.md list exists (the other direction is check_credits)."""
+    findings = []
+    present = set(files)
+    for line in read_text(root, LICENCE_INDEX).split("\n"):
+        match = re.match(r"^\| *`([^`/]+\.(?:txt|md))` *\|", line)
+        if match and "licenses/" + match.group(1) not in present:
+            findings.append(Finding("licence-index", LICENCE_INDEX, "lists `%s`, which is not in assets/licenses/"
+                                    % match.group(1)))
+    return findings
+
+
 ROLE_OF_KIND = {"art": "Art", "data": "Art", "music": "Music", "sound": "Sound"}
 
 
@@ -684,6 +703,7 @@ def audit(root: str, use_git: bool = True) -> tuple[list[Finding], list[str]]:
     findings += check_files(files, rows)
     findings += check_rows(root, rows, packs)
     findings += check_licence_folder(files, rows)
+    findings += check_licence_index(root, files)
     findings += check_credits(root, rows, packs)
     note = "not compared with %s (--no-git)" % RELEASE_TAG
     if use_git:
@@ -705,6 +725,44 @@ def audit(root: str, use_git: bool = True) -> tuple[list[Finding], list[str]]:
         note,
     ]
     return findings, summary
+
+
+def check_shipped(root: str, target: str) -> tuple[list[Finding], int]:
+    """The licence texts beside a built game: `target` is the licenses folder next to the exe or the release zip
+    (its entries under licenses/). It must hold CREDITS.md and every file of assets/licenses/, byte for byte, and
+    nothing else. Returns (findings, number of files that must ship)."""
+    import zipfile
+
+    def read(path: str) -> bytes:
+        with open(path, "rb") as handle:
+            return handle.read()
+
+    wanted = {"CREDITS.md": read(os.path.join(root, CREDITS))}
+    folder = os.path.join(root, "assets", "licenses")
+    for name in sorted(os.listdir(folder)):
+        if os.path.isfile(os.path.join(folder, name)):
+            wanted[name] = read(os.path.join(folder, name))
+    have = {}
+    if os.path.isdir(target):
+        for name in os.listdir(target):
+            if os.path.isfile(os.path.join(target, name)):
+                have[name] = read(os.path.join(target, name))
+    elif os.path.isfile(target) and zipfile.is_zipfile(target):
+        with zipfile.ZipFile(target) as archive:
+            for entry in archive.namelist():
+                if entry.startswith("licenses/") and not entry.endswith("/"):
+                    have[entry[len("licenses/"):]] = archive.read(entry)
+    else:
+        return [Finding("shipped", target, "neither a folder nor a zip file")], len(wanted)
+    findings = []
+    for name in sorted(wanted):
+        if name not in have:
+            findings.append(Finding("shipped", target, "%s is missing" % name))
+        elif have[name] != wanted[name]:
+            findings.append(Finding("shipped", target, "%s differs from the project's file" % name))
+    for name in sorted(set(have) - set(wanted)):
+        findings.append(Finding("shipped", target, "%s is not a licence text of the project" % name))
+    return findings, len(wanted)
 
 
 # ---------------------------------------------------------------------------------------- writing the file ledger
@@ -827,7 +885,9 @@ def build_ledger(root: str) -> tuple[str, list[tuple[str, str]]]:
                % (len(rows), ", ".join("%s %d" % (k, v) for k, v in sorted(counts.items()))))
     out.append("")
     out.append("*Since* = the release that first shipped the file. *Pack*, *Author* and *Licence* are the header "
-               "of the licence text named beside them (several packs: joined with `;`). *Source* is the file "
+               "of the licence text named beside them (several packs: joined with `;`); one licence text can cover "
+               "several pages of one author under the title of the first (its `Page:` lines name them all, and "
+               "`CREDITS.md` names each page). *Source* is the file "
                "inside the pack, in the pipeline's words (pack keys are the staging folder names). \"%s\" rows are "
                "Club & Grub's own drawings or data, made by the script the row names; \"%s\" rows are the legal "
                "texts themselves. Sizes, grids and animations: sections 3-13 and 17." % (OWN_WORK, LICENCE_TEXT))
@@ -1327,6 +1387,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--audio", action="store_true")
     parser.add_argument("--markdown", action="store_true")
     parser.add_argument("--sheets", metavar="DIR")
+    parser.add_argument("--shipped", metavar="PATH")
     args = parser.parse_args(argv)
     root = os.path.abspath(args.root)
     for stream in (sys.stdout, sys.stderr):
@@ -1338,6 +1399,13 @@ def main(argv: list[str] | None = None) -> int:
         return run_audio(root, args.markdown)
     if args.sheets:
         return run_sheets(root, args.sheets)
+    if args.shipped:
+        findings, count = check_shipped(root, args.shipped)
+        for finding in findings:
+            print("GAP " + str(finding))
+        print("LICENCE TEXTS SHIPPED: %s (%d files expected in %s, %d gap(s))" % (
+            "FAIL" if findings else "PASS", count, args.shipped, len(findings)))
+        return 1 if findings else 0
     findings, summary = audit(root, use_git=not args.no_git)
     for finding in findings:
         print("GAP " + str(finding))

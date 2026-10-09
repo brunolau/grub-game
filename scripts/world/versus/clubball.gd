@@ -15,6 +15,11 @@ extends RefCounted
 ## of play for VersusTuning.BALL_RESET_TICKS (Coconut.reset_after), then it drops in at its drop point and every hero
 ## is back at his side's spawn with the spawn shield. First to VersusTuning.CLUBBALL_GOALS, or the most after
 ## VersusTuning.CLUBBALL_MATCH_TICKS; a tie plays on with the golden coconut (the next goal wins, the clock stops).
+## A WEDGED coconut is lost (phase 4, found by the versus soak): a coconut that lies still with its centre inside a
+## wall cell for [constant WEDGED_TICKS] in a row - a lob that comes down beside the block over a goal mouth can
+## drift into it, where no strike reaches it, and the game (the golden coconut has no clock) never ended - is taken
+## out of play and drops in again at its drop point after VersusTuning.BALL_RESET_TICKS, as a coconut lost in the
+## water does; nobody scores, nobody is moved ([method _wedged_step]).
 ## Sides rotate per round (DESIGN.md E.5, phase 3): on an odd round every goal mouth is defended by the other team
 ## than its file names (team 1 defends the right mouth), so the spawns, the goals, the HUD and the bots
 ## (goal_rect / own_goal_x) all swap ends; [member swapped] tells which.
@@ -31,6 +36,11 @@ var golden: bool = false
 var last_scorer: int = 0
 ## True on an odd round: the sides changed ends ([method set_round]).
 var swapped: bool = false
+## A coconut that lies still with its centre inside a wall cell this long is lost (1 s: no bounce or roll rests there).
+const WEDGED_TICKS: int = 24
+## Ticks in a row the coconut has lain so ([method _wedged_step]), and how many wedged coconuts this game has freed.
+var wedged_ticks: int = 0
+var wedged_resets: int = 0
 
 var _referee: VersusReferee = null
 
@@ -60,6 +70,8 @@ func reset() -> void:
 	pause_left = 0
 	golden = false
 	last_scorer = 0
+	wedged_ticks = 0
+	wedged_resets = 0
 	zones = _round_zones()
 	var coconut: Coconut = ball()
 	if coconut != null:
@@ -147,7 +159,9 @@ func tick() -> int:
 	var coconut: Coconut = ball()
 	var defended: int = goal_team_of(coconut)
 	if defended == 0:
+		_wedged_step(coconut)
 		return 0
+	wedged_ticks = 0
 	var scorer: int = 3 - defended
 	goals[scorer] += 1
 	last_scorer = scorer
@@ -157,6 +171,25 @@ func tick() -> int:
 		Audio.play_sfx(Sfx.COUNTDOWN_GO)
 	_referee.goal_scored.emit(scorer, goals[1], goals[2])
 	return scorer
+
+
+## The wedged coconut (see the class description): counts the ticks it lies still with its centre in a wall cell and,
+## at [constant WEDGED_TICKS], sends it back to its drop point (Coconut.reset_after). A golden coconut stays golden.
+func _wedged_step(coconut: Coconut) -> void:
+	var level: LevelBase = _referee.level
+	if coconut == null or level == null or not coconut.in_play() or coconut.xvel != 0 or coconut.yvel != 0:
+		wedged_ticks = 0
+		return
+	var centre: Vector2i = coconut.center()
+	if level.grid.side_at(centre.x >> 4, centre.y >> 4) != TileGrid.SIDE_WALL:
+		wedged_ticks = 0
+		return
+	wedged_ticks += 1
+	if wedged_ticks < WEDGED_TICKS:
+		return
+	wedged_ticks = 0
+	wedged_resets += 1
+	coconut.reset_after(VersusTuning.BALL_RESET_TICKS)
 
 
 ## The clock ran out on a tie: the golden coconut (the next goal wins).

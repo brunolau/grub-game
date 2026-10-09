@@ -38,20 +38,55 @@ project; `gd.sh` says how to install the engine when it cannot find it.
 | `iOS` | `build/ios/ClubAndGrub.ipa` (on a Mac; elsewhere an Xcode project) | arm64 | team id **placeholder**, automatic signing |
 
 Every preset exports all resources plus `levels/*.lvl`, `CREDITS.md` and `assets/licenses/*`, and excludes
-`tests/*`, `tools/*`, `docs/*`, `build/*`, `levels/test_*.lvl`, the debug level (`scenes/core/debug_level.tscn`,
-`scripts/core/debug_level.gd`) and every folder named `dev` (`*/dev/*`). `tests/test_core_release.gd` keeps the
-four presets in line. To see exactly what a preset ships, export only the data and list the zip:
+`tests/*`, `tools/*`, `docs/*`, `build/*`, the developer levels `levels/test_*.lvl` and their baked bot graphs
+`resources/bots/test_*.json`, the debug level (`scenes/core/debug_level.tscn`, `scripts/core/debug_level.gd`),
+every folder named `dev` (`*/dev/*`: the flow runner, the input recorder, the perf probe, the benches, the UI
+previews), the font tool `resources/ui/*.py`, and two development tools that live beside game code and that no
+shipped script names: the level validator and the co-op gate search (`scripts/world/level_validator.gd`,
+`scripts/world/coop_search.gd`). The four presets carry the same three filter lines.
+
+Two test files keep this true:
+
+- `tests/test_core_release.gd` - the filters are present and equal on all four presets, the version, the icons,
+  the installer's test mode;
+- `tests/test_core_release_pack.gd` - works out, from the project folder, the file list each preset ships (the way
+  the exporter does: all resources plus the include filter minus the exclude filter) and judges every file: no
+  developer level (by name `test_*` or by `kind = test`), no test, tool or recorder, nothing outside `assets/`,
+  `scripts/`, `scenes/`, `levels/`, `locale/`, `resources/` and the two root files, every asset named in
+  `docs/ASSET_MANIFEST.md`, no shipped script naming a tool that is left out. When the environment variable
+  `CLUBANDGRUB_RELEASE_EXE` names an exported exe (the Windows build script sets it), the same test reads the file
+  table of the pack embedded in that exe and compares it with the list: nothing more, nothing less.
+
+To see exactly what a preset ships, export only the data and list the zip:
 
 ```
 godot --headless --path . --export-pack "Android" build/export_check/Android.zip
 ```
 
 Shared identity: application id `com.clubandgrub.game` (macOS, iOS, Android), name "Club & Grub", version from
-`application/config/version` in `project.godot` (1.0.0; the Windows exe reports 1.0.0.0 - the presets leave their
-own version fields empty so that this one value is the version everywhere). The icon is
+`application/config/version` in `project.godot` (2.0.0; the Windows exe reports 2.0.0.0 - the presets leave their
+own version fields empty so that this one value is the version everywhere: the title screen, the exe, the zip and
+the installer take it from there, and `tests/test_core_release.gd` pins it). The Android `version/code` is 2. The icon is
 `res://assets/icon.png` (256 x 256); Godot derives the `.ico`, `.icns` and the legacy Android launcher icon from it.
 The iOS store icon (`assets/icon_1024.png`) and the Android adaptive layers (`assets/icon_android_*.png`) are
 built from the hero sheet by `tools/make_app_icons.py` (run it again after the hero art changes).
+
+### 2.1 The headless preset check (Android, macOS, iOS)
+
+2.0.0 ships for Windows; the other three presets must stay loadable (docs/PORTING.md). The check needs no SDK, no
+Mac and no signing - a data-only export loads the preset, applies its filters and writes the pack:
+
+```
+godot --headless --path . --export-pack "Android" build/export_check/android.zip
+godot --headless --path . --export-pack "macOS"   build/export_check/macos.zip
+godot --headless --path . --export-pack "iOS"     build/export_check/ios.zip
+```
+
+Each must exit with code 0, print no `ERROR:` line about the preset, and leave `export_presets.cfg` unchanged
+(`git diff --stat export_presets.cfg` is empty). The three zips must list the same project files as the Windows
+build (compare the names; converted files carry platform-independent names). The results for 2.0.0 are in
+docs/PORTING.md ("State of 2.0.0"). A full export of these platforms was not made for
+2.0.0: their toolchains are not part of the project (sections 4 to 6 say what each needs).
 
 ### Placeholders to replace before a store release
 
@@ -83,24 +118,41 @@ The script
 
 1. checks the Godot version and the template `windows_release_x86_64.exe`;
 2. imports the project and stops on any import error or warning;
+2b. runs the asset and licence audit `tools\audit_assets.py` (Python 3, standard library only: the project's
+   `.tools\venv` or `python` on the PATH; it installs nothing) and stops on any asset without a row in
+   `docs/ASSET_MANIFEST.md`, any licence that is not CC0 / OFL, any pack missing from the credits or the licence
+   texts;
 3. runs the whole test suite and stops unless it reports `RESULT: PASS`;
 4. exports the `Windows Desktop` preset in release mode to `build\windows\ClubAndGrub.exe`, stops on any `ERROR:` /
-   `WARNING:` in the export log and checks that the exe is the only file written (no `.pck`, no DLL). One pair of
-   lines is let through: the first export of a fresh checkout converts every scene to binary (`.godot/exported/`)
-   and the editor then reports `WARNING: <n> ObjectDB instances were leaked at exit` and
-   `ERROR: <n> resources still in use at exit` while it shuts down, after the pack is written; later exports reuse the
-   converted scenes and print neither. The script lists them as "ignored editor shutdown report";
-5. starts the exe for a smoke check (below) and stops unless it exits with code 0 and its log is clean;
-6. copies the licence texts next to the exe (`build\windows\licenses\`: `CREDITS.md` and every file of
+   `WARNING:` in the export log and checks that the exe is the only file written (no `.pck`, no DLL), that it
+   reports the version of `project.godot`, and that the export left `export_presets.cfg` as it was (if the editor
+   rewrote it, the file is put back and the build stops). One pair of lines is let through: the first export of a
+   fresh checkout converts every scene to binary (`.godot/exported/`) and the editor then reports
+   `WARNING: <n> ObjectDB instances were leaked at exit` and `ERROR: <n> resources still in use at exit` while it
+   shuts down, after the pack is written; later exports reuse the converted scenes and print neither. The script
+   lists them as "ignored editor shutdown report";
+5. starts the exe for a smoke check (below) and stops unless it exits with code 0, its log is clean and it reports
+   the version of `project.godot`;
+6. reads the file table of the pack inside the exe and lets `tests/test_core_release_pack.gd` judge it (section 2):
+   no developer level, test, tool or recorder, every asset in the manifest, exactly the files the filters ship.
+   The script prints the test's `pack:` line, for example
+   `pack: 2591 file(s) inside ClubAndGrub.exe (engine 4.7.2): 1368 project files, 78 levels, ...`;
+7. copies the licence texts next to the exe (`build\windows\licenses\`: `CREDITS.md` and every file of
    `assets\licenses\` - the Godot MIT notice and third-party notices, both OFL font licences with the FONTLOG, the
-   CC0 legal code and the per-pack evidence; the game shows the same texts under Credits > Licences) and packs the
-   release zip `build\ClubAndGrub-<version>-windows.zip` (the exe plus that folder);
-7. prints the SHA-256 of the exe and of the zip and exits with 0. Any failure prints `BUILD FAILED: ...` and exits
+   CC0 legal code and the per-pack evidence; the game shows the same texts under Credits > Licences), packs the
+   release zip `build\ClubAndGrub-<version>-windows.zip` (the exe plus that folder) and lets
+   `tools\audit_assets.py --shipped` compare the folder and the zip with the project's licence texts, byte for byte;
+8. prints the SHA-256 of the exe and of the zip and exits with 0. Any failure prints `BUILD FAILED: ...` and exits
    with 1.
 
 Options: `-Godot <path>` (else `$env:GODOT`, else `.tools\godot\...`, else `godot` on the PATH), `-SmokeSeconds <n>`
 (default 4), `-HeadlessSmoke` (build machines without a GPU), `-SkipTests` (packaging experiments only - never
-ship such a build). Logs: `build\windows\logs\` (import, tests, export) and `build\windows\smoke\smoke.log`.
+ship such a build), `-OutputRoot <folder>` (default `build`: the exe goes to `<folder>\windows`, the zip to
+`<folder>`; use another folder, for example `build\trial`, to try the script without replacing the release files).
+Logs: `build\windows\logs\` (import, audit, tests, export, pack check) and `build\windows\smoke\smoke.log`.
+
+The script shares the project with other Godot runs through `build\.godot_lock`, as `.tools/gd.sh` does: the
+import and the export run alone, the tests run beside other test runs.
 
 ### 3.2 The smoke check of a release build
 
@@ -116,8 +168,8 @@ nothing logged an error or a warning. In an exported build it also logs an error
 finds inside the package. The log ends with lines such as
 
 ```
-Smoke: Club & Grub 1.0.0 (release build), 15 level(s), screen 'title'
-Smoke: levels bonus_a,bonus_b,bonus_c,ending,w1_l1,w1_l2,w2_l1,w2_l2,w2_l2b,w3_l1,w3_l1b,w3_l2,w4_l1,w4_l2,w4_l2b
+Smoke: Club & Grub 2.0.0 (release build), 78 level(s), screen 'title'
+Smoke: levels arena_cinder_pit,arena_coconut_cove,...,bonus_a,bonus_a_coop,...,w9_l3,w9_l3_coop
 Smoke: campaign beginner w1_l1,w1_l2,w2_l1,w2_l2,w3_l1,w3_l2; expert w1_l1,w1_l2,w2_l1,w2_l2,w3_l1,w3_l2,w4_l1,w4_l2
 Smoke: ran 3.0 s, 0 error(s), 0 warning(s) logged
 ```
@@ -125,7 +177,8 @@ Smoke: ran 3.0 s, 0 error(s), 0 warning(s) logged
 The script runs the exe with `APPDATA` pointed at `build\windows\smoke\appdata`, so the check never reads or writes
 the settings and saves of a real installation, and it adds `--autoplay=w1_l1`, which the log must report as
 ignored. It also compares the `Smoke: levels` line with the folder: the build must hold every `levels\*.lvl` except
-the developer levels `test_*.lvl`, and none of those. The exe is a GUI program: it opens no console, so read the log
+the developer levels `test_*.lvl`, and none of those (78 files in 2.0.0: 35 solo stages, 35 co-op versions, 8 arenas;
+the `Smoke: campaign` line names the map stops of Book I), and the first line must carry the project's version. The exe is a GUI program: it opens no console, so read the log
 file, not the terminal.
 
 ### 3.3 Manual export and optional code signing
@@ -163,10 +216,35 @@ powershell -ExecutionPolicy Bypass -File tools\build_installer.ps1 -TestInstall
 ```
 
 The script runs `tools\build_windows.ps1` first (`-SkipBuild` packs the existing export), takes the version from
-`project.godot`, compiles the installer and, with `-TestInstall`, installs it silently for the current user into
-`build\installer_test`, checks the files, the uninstall entry and the Start menu shortcut, smoke-checks the installed
-game with its own `APPDATA`, uninstalls it silently and checks that nothing is left. It stops with exit code 1 at
-the first problem. Close a running copy of the game first.
+`project.godot`, checks that the exe carries that version and compiles the installer. It stops with exit code 1 at
+the first problem. `-OutputRoot <folder>` works as for the Windows script (the export is read from
+`<folder>\windows`, the installer is written to `<folder>`).
+
+The compiler writes the setup file into a folder of its own under `%TEMP%` and the script moves the finished file
+to the output folder. Inno Setup's first step writes the icon and version resources into the new file, and that
+fails with `Resource update error: EndUpdateResource failed, try excluding the Output folder from your antivirus
+software (110)` when another program opens the file at that moment; on the development machine it failed for every
+output folder inside the project and never under `%TEMP%`. The script also compiles again (up to three times) when
+it sees that one error.
+
+**`-TestInstall` is safe on a machine where the game is installed.** It never runs the release installer. It
+compiles the same script a second time in its test mode (`/DTestAppId=<a new GUID>`): a throwaway twin that is
+another application for Windows - its own AppId, the name "Club & Grub installer test xxxxxxxx", its own Start menu
+group and uninstall entry, no desktop shortcut, no "close the running game", and none of the code that offers to
+delete saved games. The twin is installed silently for the current user into `<folder>\installer_test\app`, its
+files, uninstall entry and Start menu shortcut are checked, the installed game runs its smoke check with its own
+`APPDATA` and must report the version, then the twin is uninstalled through its own uninstaller and the script
+checks that no file, no uninstall entry and no Start menu folder of it is left. A failed check still uninstalls
+the twin; a run that was killed leaves a record (`installer_test\test_install.json`) and the next run removes that
+twin first. The file `...-setup-TEST-ONLY.exe` is deleted after a good run; never publish one.
+
+The script proves on every run that the real game was not touched: before the test it records the uninstall
+entries of the real AppId (this user and all users), every installed file, the Start menu folders, the desktop
+shortcuts and the save and settings files in `%APPDATA%\ClubAndGrub` with their hashes, and compares after it.
+Any difference fails the run and is listed. (Playing the game during the test changes the save files and is
+reported as such a difference - run the test again without playing.) The script itself never writes to the
+registry and uninstalls only the copy whose uninstall entry carries its own throwaway AppId and points into its
+own test folder.
 
 What the installer does: per-user install into `%LOCALAPPDATA%\Programs\Club & Grub` by default (no administrator
 rights; the first page offers an all-users install into Program Files), Start menu entries for the game, the licence
@@ -174,6 +252,39 @@ folder and the uninstaller, an optional desktop shortcut, an entry under *Settin
 `AppId` - never change it) and closes a running game before replacing it. Uninstalling keeps `%APPDATA%\ClubAndGrub`
 (saves and settings) unless the player answers yes to the question at the end. Silent installs:
 `ClubAndGrub-<version>-setup.exe /VERYSILENT /CURRENTUSER` (add `/MERGETASKS=desktopicon` for the desktop shortcut).
+
+**Upgrading 1.0.0 to 2.0.0**: the 2.0.0 installer has the AppId of 1.0.0, so it replaces the installed game in its
+folder and keeps one entry under *Settings > Apps*. It does not touch `%APPDATA%\ClubAndGrub`. The game itself
+reads the 1.0 save (section 3.5).
+
+### 3.5 Saves and settings of 1.0.0 in 2.0.0
+
+- `save.json` is version 2 in 2.0 (progress per mode, book and difficulty; ARCHITECTURE.md 3.6). A version 1 file
+  is migrated when it is read: its progress becomes Solo > Book I. Reading writes nothing. The first save after it
+  first copies the 1.0 file, byte for byte, to `save.v1.json` beside it and reads the copy back; only then is
+  `save.json` replaced, and if the copy cannot be made nothing is written. The game never changes `save.v1.json`
+  (a second, different 1.0 file would become `save.v1.2.json`).
+- `settings.cfg` keeps its version (1) and format: options and key bindings of 1.0.0 are read as they are, and the
+  file 2.0 writes still reads in 1.0.0. New keys: `controls/party_keyboard`, `coop/rival_score`,
+  `coop/helper_mode`, `versus/last_rules`, and the per-player binding sections `[bindings_p1]`..`[bindings_p4]`.
+- Going back: 1.0.0 does not read a version 2 save (it warns and shows no progress). If it is played anyway it
+  writes a version 1 file that still carries the 2.0 data; 2.0 merges both when it reads that file. To restore the
+  old state exactly, put `save.v1.json` back as `save.json`.
+- Proof: `bash .tools/gd.sh test core_save` - `tests/test_core_save_1_0.gd` loads real profiles written by the
+  1.0.0 release (`tests/data/saves_1_0/`: a fresh one, mid Book I on both difficulties with a level code, changed
+  options and rebound keys, a finished game, and a 2.0 profile that 1.0.0 then played) and checks every unlocked
+  stage, result, completion flag, code stone, high score, option and binding, the 20 level codes, and that no 2.0
+  save is written before the copy exists.
+
+### 3.6 Two players on one PC (what a tester needs to know)
+
+Co-op (two players) and versus (two to four) share one computer. Default keys: P1 W A S D, Space jump, Left Ctrl
+strike, E swap, Q look; P2 numpad 8 4 5 6, Num 0 jump, Num Enter strike, Num + swap, Num . look - bound by physical
+key (any keyboard layout, Num Lock on or off). Two more layouts exist for keyboards without a numpad; every key
+can be rebound per player. A keyboard seats two players; further players use gamepads, one per player (A jump, X /
+B strike, Y / RB look, LB swap, Start pause). Many keyboards cannot report every combination of six or more keys:
+the join screen's key test shows it, and a gamepad or another layout is the cure. What a person must check on real
+keyboards and pads is listed in `docs/expansion/HUMAN_CHECKS.md`.
 
 The installer art (`installer/*.png`, `installer/club_and_grub.ico`) is generated from the game's sprites by
 `tools/make_installer_art.py`. To sign the installer as well, add a `SignTool` entry to the `[Setup]` section (see
@@ -281,10 +392,16 @@ no file sharing, and `ITSAppUsesNonExemptEncryption = false` (no export-complian
 
 ## 7. Release checklist
 
-1. `application/config/version` raised in `project.godot`; Android `version/code` raised.
-2. Import clean, `tests/run_tests.gd` green, level validator green.
+1. `application/config/version` raised in `project.godot` (2.0.0); Android `version/code` raised (2); the fallback
+   version in `installer/club_and_grub.iss` and `VERSION` in `tests/test_core_release.gd` follow; `CHANGELOG.md` has
+   the version and the release notes exist (`docs/RELEASE_NOTES_2.0.md`).
+2. Import clean, `tests/run_tests.gd` green, level validator green. After any change to a simulation script or a
+   co-op level also: `bash tools/sp_identity.sh` (`IDENTICAL`), `bash tools/world_coop_gates.sh`, and before the
+   release the whole table `bash tools/g3.sh --require`.
 3. Windows: `tools\build_windows.ps1` ends with `BUILD OK`, then `tools\build_installer.ps1 -SkipBuild -TestInstall`
-   ends with `INSTALLER OK`. Publish the setup exe and the zip together as GitHub release `v<version>`.
+   ends with `INSTALLER OK` (safe on a machine where the game is installed, 3.4). Publish the setup exe and the zip
+   together as GitHub release `v<version>`, with the text at the end of the release notes and the two SHA-256
+   values of the build log. Publishing is the owner's decision; no build script commits, tags or uploads.
 4. Other platforms: export, install on the devices of `docs/PORTING.md` section 5, run the device checklist.
 5. `CREDITS.md` and `assets/licenses/` are inside the package (they are, through the include filter) and readable
    in the game (Credits > Licences); the Windows release zip also carries them as files in `licenses/` next to the

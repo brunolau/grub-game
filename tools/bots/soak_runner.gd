@@ -43,10 +43,14 @@ extends Node
 ##   rules=default|mix     see above
 ##   first=<k>             start the cells' seeds at SEED_BASE + k (a second, different thousand)
 ##   arena=<id> players=<n> seed=<s> round=<r>   ONE round (with mode=): the replay of an anomaly; detail=1 prints it
+##   trace=<from>:<to>     with one round: a TRACE line per tick of that span (every hero's feet, speed, state, ground,
+##                         platform, dead / out and the keys his CPU pressed) - what led to the anomaly's tick
 ##   detail=1              a ROUND line per round
 ##   cells=1               print the cell table and stop
 ## Output: `CELL` lines (the table), `ANOMALY kind=.. mode=.. arena=.. players=.. seed=.. round=.. tick=.. <what>`,
-## one `SOAK mode=..` line per mode and `SOAKDONE rounds=.. anomalies=..` last (a shard without it crashed).
+## `NET <round> squeezed_out=.. wedged_coconuts=..` for a round in which one of the referee's two nets fired (DESIGN.md
+## G93: a hero knocked out outside the arena's side, a coconut freed from a wall - counted, not anomalies), one
+## `SOAK mode=..` line per mode and `SOAKDONE rounds=.. anomalies=..` last (a shard without it crashed).
 
 const LEVEL_SCENE: String = "res://scenes/world/level.tscn"
 const LEVEL_DIR: String = "res://levels"
@@ -62,8 +66,8 @@ const ROUND_LIMIT_TICKS: int = 5200
 ## A hero in play may be outside the view this many ticks in a row (a fall into a pit kills him sooner; a spring's arc
 ## over the top is shorter).
 const OUTSIDE_TICKS_MAX: int = 48
-## Feet this far over the top of the view are still inside (a jump from the top tier), and this far under its bottom
-## (the fill row of the file).
+## Feet this far over the top of the view are still inside for the span check (a bounce off a head on the top tier
+## arcs higher, but for less than OUTSIDE_TICKS_MAX ticks), and this far under its bottom (the fill row of the file).
 const TOP_MARGIN_PX: int = 80
 const BOTTOM_MARGIN_PX: int = 16
 ## Slack on the respawn clock (the death animation ends, then VersusTuning.RESPAWN_TICKS run).
@@ -108,7 +112,10 @@ class Watch:
 	var banked: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 	var hurts: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 	var out: PackedByteArray = PackedByteArray([0, 0, 0, 0])
+	## In play (alive and not out) and standing (not out; dead only counts where a knock-out is final) as the tick before
+	## ended: on the gong's tick they still say who was there when the tick began.
 	var alive: PackedByteArray = PackedByteArray([1, 1, 1, 1])
+	var standing: PackedByteArray = PackedByteArray([1, 1, 1, 1])
 	var outside: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 	var dead_for: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 	var holder_gone: int = 0
@@ -235,6 +242,10 @@ func run(args: PackedStringArray) -> int:
 			one["seed"] = int(arg.trim_prefix("seed="))
 		elif arg.begins_with("round="):
 			one["round"] = int(arg.trim_prefix("round="))
+		elif arg.begins_with("trace="):
+			var span: PackedStringArray = arg.trim_prefix("trace=").split(":")
+			if span.size() == 2:
+				one["trace"] = Vector2i(int(span[0]), int(span[1]))
 	if modes.is_empty():
 		print("SOAK: no such mode")
 		return 1
@@ -287,13 +298,18 @@ func play_all(specs: Array[Dictionary], mix: bool = false, detail: bool = false)
 		var mode: int = int(spec["mode"])
 		if not per_mode.has(mode):
 			per_mode[mode] = {"rounds": 0, "ticks": 0, "play": 0, "longest": 0, "longest_at": "", "ends": {},
-					"anomalies": 0, "idle": 0, "golden": 0}
+					"anomalies": 0, "idle": 0, "golden": 0, "squeezed": 0, "wedged": 0}
 		var sum: Dictionary = per_mode[mode]
 		sum["rounds"] = int(sum["rounds"]) + 1
 		sum["ticks"] = int(sum["ticks"]) + int(result["ticks"])
 		sum["play"] = int(sum["play"]) + int(result["round_ticks"])
 		sum["idle"] = maxi(int(sum["idle"]), int(result["worst_idle"]))
 		sum["golden"] = maxi(int(sum["golden"]), int(result["golden_ticks"]))
+		sum["squeezed"] = int(sum["squeezed"]) + int(result["squeezed"])
+		sum["wedged"] = int(sum["wedged"]) + int(result["wedged"])
+		if int(result["squeezed"]) + int(result["wedged"]) > 0:
+			# Not anomalies - the referee's two nets at work (DESIGN.md G93): each firing is named with its round.
+			print("NET %s squeezed_out=%d wedged_coconuts=%d" % [result["tag"], result["squeezed"], result["wedged"]])
 		if int(result["round_ticks"]) > int(sum["longest"]):
 			sum["longest"] = int(result["round_ticks"])
 			sum["longest_at"] = "%s/%dp/seed%d/r%d" % [spec["arena"], spec["players"], spec["seed"], spec["round"]]
@@ -307,9 +323,8 @@ func play_all(specs: Array[Dictionary], mix: bool = false, detail: bool = false)
 			anomaly_lines.append(line)
 			print(line)
 		if detail:
-			print("ROUND mode=%s arena=%s players=%d seed=%d round=%d ticks=%d play=%d end=%s winners=%s scores=%s idle=%d" % [
-				Defs.versus_mode_name(mode), spec["arena"], spec["players"], spec["seed"], spec["round"], result["ticks"],
-				result["round_ticks"], result["end"], result["winners"], result["scores"], result["worst_idle"]])
+			print("ROUND %s ticks=%d play=%d end=%s winners=%s scores=%s idle=%d" % [result["tag"], result["ticks"],
+					result["round_ticks"], result["end"], result["winners"], result["scores"], result["worst_idle"]])
 		await get_tree().process_frame
 	_end()
 	var lines: PackedStringArray = PackedStringArray()
@@ -322,10 +337,10 @@ func play_all(specs: Array[Dictionary], mix: bool = false, detail: bool = false)
 		kinds.sort()
 		for kind: Variant in kinds:
 			ends.append("%s:%d" % [kind, sum["ends"][kind]])
-		lines.append("SOAK mode=%s rounds=%d ticks=%d play=%d longest=%d at=%s ends=%s golden_max=%d idle_max=%d anomalies=%d" % [
+		lines.append("SOAK mode=%s rounds=%d ticks=%d play=%d longest=%d at=%s ends=%s golden_max=%d idle_max=%d squeezed=%d wedged=%d anomalies=%d" % [
 			Defs.versus_mode_name(mode), sum["rounds"], sum["ticks"], sum["play"], sum["longest"],
 			sum["longest_at"] if str(sum["longest_at"]) != "" else "-", ",".join(ends), sum["golden"], sum["idle"],
-			sum["anomalies"]])
+			sum["squeezed"], sum["wedged"], sum["anomalies"]])
 	return {"rounds": total_rounds, "ticks": total_ticks, "anomalies": anomaly_lines.size(),
 			"anomaly_lines": anomaly_lines, "lines": lines, "ms": Time.get_ticks_msec() - started, "longest": longest_all}
 
@@ -371,9 +386,11 @@ func play(spec: Dictionary, mix: bool = false) -> Dictionary:
 	var found: PackedStringArray = PackedStringArray()
 	var result: Dictionary = {"ticks": 0, "round_ticks": 0, "ended": false, "end": "none",
 			"winners": PackedInt32Array(), "scores": PackedInt32Array(), "worst_idle": 0, "golden_ticks": 0,
+			"squeezed": 0, "wedged": 0,
 			"anomalies": found}
 	var tag: String = "mode=%s arena=%s players=%d seed=%d round=%d" % [Defs.versus_mode_name(mode), id, players,
 			seed_value, round_index]
+	result["tag"] = tag
 	_errors.reset()
 	_free_level()
 	var text: String = _text_of(id)
@@ -395,6 +412,13 @@ func play(spec: Dictionary, mix: bool = false) -> Dictionary:
 	versus_match.begin_match(seed_value)
 	if mix:
 		_mix_rules(versus_match, mode, players, seed_value)
+		var sides: PackedStringArray = PackedStringArray()
+		for slot: int in players:
+			sides.append(str(versus_match.get_seat(slot).team))
+		# An anomaly under mixed rules names them (replay it with rules=mix).
+		tag += " rules=mix(preset=%s,variants=%s,stock=%s,sudden=%s,weapons=%s,teams=%s)" % [
+			VersusMatch.PRESET_NAMES[versus_match.preset], "+".join(versus_match.variants) if not versus_match.variants.is_empty() else "-",
+			versus_match.stock, versus_match.sudden_death, versus_match.weapons, "".join(sides)]
 	versus_match.round_index = round_index
 	versus_match.begin_round(id)
 	Game.versus_match = versus_match
@@ -433,10 +457,20 @@ func play(spec: Dictionary, mix: bool = false) -> Dictionary:
 	var limit: int = intro + rule_limit + ROUND_LIMIT_TICKS
 	var t: int = 0
 	var gong_at: int = -1
+	var trace: Vector2i = spec.get("trace", Vector2i(-1, -1))
 	while t < limit:
 		Sim.step(1)
 		t += 1
+		# The referee's net at the arena's sides (VersusReferee._squeezed_out): a hero who was in play and is dead now,
+		# with his feet left or right of the view, was knocked out by it on this tick.
+		for slot: int in players:
+			var fallen: PlayerBase = _level.get_hero(slot)
+			if watch.alive[slot] != 0 and fallen.dead and referee.wrap != VersusArena.WRAP_LR \
+					and (fallen.sim_pos.x < view.position.x or fallen.sim_pos.x >= view.end.x):
+				result["squeezed"] = int(result["squeezed"]) + 1
 		_check_tick(referee, players, view, watch, found, tag, t)
+		if t >= trace.x and t <= trace.y:
+			_print_trace(referee, players, t)
 		for bot: HeroBot in bots:
 			var hero: PlayerBase = _level.get_hero(bot.slot)
 			if hero != null and not hero.dead and referee.is_in_play(hero) and hero.control_enabled:
@@ -456,6 +490,7 @@ func play(spec: Dictionary, mix: bool = false) -> Dictionary:
 		scores.append(referee.score_of(slot))
 	result["scores"] = scores
 	result["golden_ticks"] = referee.round_ticks - watch.golden_at if watch.golden_at >= 0 else 0
+	result["wedged"] = referee.clubball.wedged_resets if referee.mode == Defs.VersusMode.CLUBBALL else 0
 	if gong_at < 0:
 		found.append("ANOMALY kind=no_end %s tick=%d the round did not end: phase %d after %d ticks of play (limit %d)" % [
 			tag, t, referee.phase, referee.round_ticks, rule_limit + ROUND_LIMIT_TICKS])
@@ -470,11 +505,28 @@ func play(spec: Dictionary, mix: bool = false) -> Dictionary:
 			if versus_match.round_wins[slot] - wins_before[slot] != (1 if won else 0):
 				_say(watch, found, "score", tag, t, "the match recorded %s for winners %s" % [versus_match.round_wins,
 						referee.winner_slots])
+	result["tag"] = tag
 	if _errors.errors > 0:
 		found.append("ANOMALY kind=engine_error %s tick=%d %d engine error(s): %s" % [tag, t, _errors.errors,
 				" | ".join(_errors.lines)])
 	_cleanup_round(bots)
 	return result
+
+
+## One TRACE line: the tick, then per hero his feet, speed, state, what he stands on and the keys of his CPU.
+func _print_trace(referee: VersusReferee, players: int, tick: int) -> void:
+	var parts: PackedStringArray = PackedStringArray()
+	for slot: int in players:
+		var hero: PlayerBase = _level.get_hero(slot)
+		parts.append("P%d %s v(%d,%d) st%d%s%s%s%s%s keys=%s" % [slot + 1, hero.sim_pos, hero.xvel, hero.yvel, hero.state,
+				" ground" if hero.is_grounded() else "", " platform" if hero.on_platform else "",
+				" totem" if hero.is_riding_totem() else "", " DEAD" if hero.dead else "",
+				" OUT" if referee.is_out(slot) else "", NavGraph.flags_to_keys(GameInput.get_flags(slot))])
+	var ball: SimEntity = referee.ball() if referee.mode == Defs.VersusMode.CLUBBALL else null
+	if ball != null and is_instance_valid(ball):
+		parts.append("ball %s v(%d,%d)%s goals %d:%d" % [ball.sim_pos, ball.xvel, ball.yvel,
+				"" if bool(ball.call(&"in_play")) else " out of play", referee.goals_of(1), referee.goals_of(2)])
+	print("TRACE t=%d play=%d %s" % [tick, referee.round_ticks, " | ".join(parts)])
 
 
 func _cleanup_round(bots: Array) -> void:
@@ -698,12 +750,14 @@ func _check_tick(referee: VersusReferee, players: int, view: Rect2i, watch: Watc
 		watch.out[slot] = 1 if referee.is_out(slot) else 0
 		if phase != VersusReferee.PHASE_OVER:
 			watch.alive[slot] = 1 if in_play else 0
+			watch.standing[slot] = 0 if referee.is_out(slot) or (hero.dead and referee.knockouts_final) else 1
 	watch.phase = phase
 	watch.round_ticks = referee.round_ticks
 
 
-static func _is_outside(pos: Vector2i, view: Rect2i) -> bool:
-	return pos.x < view.position.x or pos.x >= view.end.x or pos.y < view.position.y - TOP_MARGIN_PX \
+## Outside the arena: left or right of the view, under it, or more than `top` px over it.
+static func _is_outside(pos: Vector2i, view: Rect2i, top: int = TOP_MARGIN_PX) -> bool:
+	return pos.x < view.position.x or pos.x >= view.end.x or pos.y < view.position.y - top \
 			or pos.y > view.end.y + BOTTOM_MARGIN_PX
 
 
@@ -731,6 +785,12 @@ func _check_gong(referee: VersusReferee, players: int, view: Rect2i, watch: Watc
 	for slot: int in players:
 		if not winners.has(slot) and sides.has(_side(referee, slot)):
 			_say(watch, found, "score", tag, tick, "half a side won: P%d is left out of %s" % [slot + 1, winners])
+	# A hero the gong's own tick took (a hazard in POST, after the WORLD step named the winners) changes what this
+	# check can read back - his stack is spilled, he no longer stands: the strict comparisons are left out then.
+	var died_now: bool = false
+	for slot: int in players:
+		var fallen: PlayerBase = _level.get_hero(slot)
+		died_now = died_now or (watch.alive[slot] != 0 and (fallen.dead or referee.is_out(slot)))
 	if referee.round_ticks > rule_limit and not watch.went_golden:
 		_say(watch, found, "clock", tag, tick, "too long: the gong at tick %d, the mode's rule ends it by %d" % [
 			referee.round_ticks, rule_limit])
@@ -755,24 +815,26 @@ func _check_gong(referee: VersusReferee, players: int, view: Rect2i, watch: Watc
 					best_sides += 1
 			if winners.is_empty():
 				_say(watch, found, "score", tag, tick, "no winner: a Grub Stack round always has one (totals %s)" % [totals])
-			elif not watch.went_golden:
+			elif not watch.went_golden and not died_now:
 				if best_sides != 1 or int(totals[_side(referee, winners[0])]) != best:
 					_say(watch, found, "score", tag, tick, "winner without the best score: %s with totals %s" % [winners,
 							totals])
 		Defs.VersusMode.LAST_CAVEMAN, Defs.VersusMode.HOT_ROCK:
-			for slot: int in winners:
-				if slot < players and watch.alive[slot] == 0:
-					_say(watch, found, "score", tag, tick, "winner who was out: P%d" % (slot + 1))
+			# A side wins by a member who stood as the gong's tick began (a team mate may be out).
+			var stood: Dictionary = {}
+			for slot: int in players:
+				if watch.standing[slot] != 0:
+					stood[_side(referee, slot)] = true
+			for side: int in sides:
+				if not stood.has(side):
+					_say(watch, found, "score", tag, tick, "winner who was out: %s" % [winners])
 			var by_cap: bool = mode == Defs.VersusMode.LAST_CAVEMAN and referee.cap_at >= 0 \
 					and referee.round_ticks >= referee.cap_at
 			var standing_sides: Dictionary = {}
-			var died_now: bool = false
 			for slot: int in players:
 				var hero: PlayerBase = _level.get_hero(slot)
-				var gone: bool = referee.is_out(slot) or (hero.dead and referee.knockouts_final)
-				if not gone:
+				if not (referee.is_out(slot) or (hero.dead and referee.knockouts_final)):
 					standing_sides[_side(referee, slot)] = true
-				died_now = died_now or (gone and watch.alive[slot] != 0)
 			if standing_sides.size() <= 1:
 				# The last one standing: everybody else is gone, and whoever stands has won.
 				for side: int in standing_sides:
@@ -784,7 +846,10 @@ func _check_gong(referee: VersusReferee, players: int, view: Rect2i, watch: Watc
 			elif not died_now:
 				# The hard cap (G78): more heroes standing, then more lives, then the fewest hurts; level sides draw.
 				var expected: PackedInt32Array = referee.cap_winners()
-				if Array(expected) != Array(winners):
+				var expected_sides: Dictionary = {}
+				for slot: int in expected:
+					expected_sides[_side(referee, slot)] = true
+				if expected_sides.keys() != sides.keys():
 					_say(watch, found, "score", tag, tick, "cap winners: %s, the rule says %s (hurts %s)" % [winners,
 							expected, _hurts(referee, players)])
 				var least: int = 1 << 30
@@ -825,7 +890,11 @@ func _check_gong(referee: VersusReferee, players: int, view: Rect2i, watch: Watc
 						referee.round_ticks, referee.round_total, one, two])
 	for slot: int in players:
 		var hero: PlayerBase = _level.get_hero(slot)
-		if hero != null and not hero.dead and not referee.is_out(slot) and _is_outside(hero.sim_pos, view):
+		# One sample, not a span: a bounce off a head with Jump held (-192 v16) arcs 130 px over the top tier and is
+		# back within a second, so here the top counts from a whole screen up - the line of the engine's own
+		# off-screen rule.
+		if hero != null and not hero.dead and not referee.is_out(slot) \
+				and _is_outside(hero.sim_pos, view, view.size.y):
 			_say(watch, found, "outside", tag, tick, "hero outside at the gong: P%d at %s" % [slot + 1, hero.sim_pos])
 
 

@@ -113,6 +113,11 @@ var _x_max: int = 0
 ## the stomp was counted against it, and until their boxes part nothing more happens between the two (it gives no lift
 ## and does not hurt him while he falls through it). Empty = none; more than one when bodies overlap.
 var _ward_heads: Array[EnemyBase] = []
+## Phase 4 ruling Q4 (DESIGN.md G87), THE GRACE IS SHORT: the clock of each head of [member _ward_heads] (same index;
+## PlayerBase.ward_grace_step) - WARD_FALLING while the fall of that stomp lasts, then the ticks since he first had
+## ground under him again. Past PartyTuning.WARD_GRACE_TICKS the head is forgotten although the boxes still overlap:
+## standing inside a keeper is no shelter ([method _ward_heads_check]).
+var _ward_since: PackedInt32Array = PackedInt32Array()
 ## R3: true when the club box of this tick's weapon pass was used up on an enemy (not on a hittable): the hit whose
 ## pogo a ward takes away - and that enemy (for the measurement trace only).
 var _club_hit_enemy: bool = false
@@ -409,6 +414,7 @@ func respawn_at(pos: Vector2i) -> void:
 	_stun_min = Tuning.HIT_STUN_MIN
 	wall_bumped = false
 	_ward_heads.clear()
+	_ward_since.clear()
 	handler = Defs.HeroState.IDLE
 	input_flags = 0
 	club_frame = Tuning.ClubFrame.NONE
@@ -1360,11 +1366,13 @@ func _bounce_on(enemy: EnemyBase, depth: int) -> void:
 ## NOTHING: his velocity and his position stay as they are (no small bounce, no Up bounce, no glider bump, no standing,
 ## no being carried: he falls on through the body). The stomp still counts against the enemy exactly as elsewhere -
 ## EnemyBase.on_bounced (the bounce ladder and its number, a `daze` record dazed, the Relay Bounce) or, in a glider
-## dive, on_glider_stomp - once: `enemy` joins [member _ward_heads], and until their boxes part ([method
-## _ward_heads_check]) the two do nothing more to each other, so it does not hurt him during that fall. The cue: a dust
-## puff at the head and the dull thud of a landing. No Events.hero_bounced / player_bounced: he did not bounce.
+## dive, on_glider_stomp - once: `enemy` joins [member _ward_heads], and until their boxes part or the grace runs out
+## ([method _ward_heads_check]: that fall and PartyTuning.WARD_GRACE_TICKS after it, phase 4 Q4) the two do nothing more
+## to each other, so it does not hurt him during that fall. The cue: a dust puff at the head and the dull thud of a
+## landing. No Events.hero_bounced / player_bounced: he did not bounce.
 func _ward_stomp(enemy: EnemyBase) -> void:
 	_ward_heads.append(enemy)
+	_ward_since.append(WARD_FALLING)
 	if (gate_rules_off & GATE_TRACE) != 0:
 		_ward_trace(Game.level, "no lift from", enemy)
 	if is_gliding():
@@ -1395,12 +1403,26 @@ func _in_ward(level: LevelBase) -> bool:
 
 ## R3: an enemy stays in [member _ward_heads] only while it is there to touch and its box still overlaps his - the
 ## fall through it. Parted, dead, asleep, gone, or he himself out of play: forgotten, and the next contact is a new one.
+## Phase 4 ruling Q4 (DESIGN.md G87), "the ward's grace is short": the pass also ends by the clock - it holds during
+## THAT FALL (while he has no ground, platform, carrier, vine or saddle under him: the list that ends a launch's hold)
+## and for PartyTuning.WARD_GRACE_TICKS ticks after the first tick on which he has one. On the tick after those - the
+## 13th after the landing - the head is forgotten while the boxes still overlap, and this very contact pass finds that
+## enemy's body as it finds any body: it hurts him (10.1). 12 ticks are 60 px at the walk cap: a hero who lands in a
+## body and walks on never pays, one who stays does. A new landing on it from above is a new ward stomp.
 func _ward_heads_check() -> void:
+	var landed: bool = grounded or on_platform or mount != null or totem_carrier != null \
+			or state == Defs.HeroState.CLIMB
 	for i: int in range(_ward_heads.size() - 1, -1, -1):
 		var enemy: EnemyBase = _ward_heads[i]
-		if dead or down or not is_instance_valid(enemy) or enemy.dead or not enemy.awake or not enemy.contact_hurts \
-				or not enemy.is_targetable() or not Overlap.body(self, enemy, self):
+		var forget: bool = dead or down or not is_instance_valid(enemy) or enemy.dead or not enemy.awake \
+				or not enemy.contact_hurts or not enemy.is_targetable() or not Overlap.body(self, enemy, self)
+		if not forget:
+			var since: int = ward_grace_step(_ward_since[i], landed)
+			_ward_since[i] = since
+			forget = ward_grace_over(since)
+		if forget:
 			_ward_heads.remove_at(i)
+			_ward_since.remove_at(i)
 
 
 ## 2.0 Brace Wall (PHYSICS.md C.10), before an enemy's contact would hurt this crouching hero: when he braces with a

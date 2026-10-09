@@ -95,13 +95,55 @@ function Find-Iscc {
     Stop-Build "Inno Setup's ISCC.exe was not found. Install it as described at the top of this script."
 }
 
-# Compile installer\club_and_grub.iss with the given defines; returns the compiler's exit code.
-function Invoke-Iscc([string]$Compiler, [string[]]$Defines, [string]$LogPath) {
-    $arguments = @($Defines | ForEach-Object { "/D$_" }) + @("/Q", $Script)
-    & $Compiler @arguments *> $LogPath
-    $exitCode = $LASTEXITCODE
-    Get-Content -LiteralPath $LogPath | Where-Object { $_ -match '(?i)error|warning' } |
-        ForEach-Object { Write-Host "    $_" }
+# Quote one command-line argument the way the Windows C runtime parses it.
+function ConvertTo-Argument([string]$Value) {
+    if ($Value -notmatch '[\s"]') {
+        return $Value
+    }
+    return '"' + ($Value -replace '(\\*)"', '$1$1\"' -replace '(\\+)$', '$1$1') + '"'
+}
+
+# Compile installer\club_and_grub.iss with the given defines and put the setup file into $OutputDir; returns the
+# compiler's exit code. The compiler's first step writes the icon and version resources into the new setup file,
+# and that fails ("EndUpdateResource failed") when another program opens the file at that moment - a virus scanner,
+# or anything that watches the project folder (seen on the development machine for every output folder inside the
+# project). So the compiler writes into a folder of its own under %TEMP%, the finished file is moved to $OutputDir,
+# and that one error is tried again.
+function Invoke-Iscc([string]$Compiler, [string[]]$Defines, [string]$OutputDir, [string]$LogPath) {
+    $staging = Join-Path ([IO.Path]::GetTempPath()) ("ClubAndGrub_setup_" + [guid]::NewGuid().ToString("N"))
+    New-Item -ItemType Directory -Force -Path $staging | Out-Null
+    $exitCode = 1
+    $text = ""
+    try {
+        $arguments = @($Defines | ForEach-Object { "/D$_" }) + @("/DOutputDir=$staging", "/Q", $Script)
+        $argLine = ($arguments | ForEach-Object { ConvertTo-Argument $_ }) -join " "
+        for ($attempt = 1; $attempt -le 4; $attempt++) {
+            $proc = Start-Process -FilePath $Compiler -ArgumentList $argLine -WorkingDirectory $Root -NoNewWindow -PassThru `
+                -RedirectStandardOutput "$LogPath.out" -RedirectStandardError "$LogPath.err"
+            $null = $proc.Handle  # keeps the exit code readable after the process ended
+            $proc.WaitForExit()
+            $exitCode = $proc.ExitCode
+            $text = ""
+            foreach ($part in @("$LogPath.out", "$LogPath.err")) {
+                if (Test-Path -LiteralPath $part) {
+                    $text += [IO.File]::ReadAllText($part)
+                    Remove-Item -LiteralPath $part -Force
+                }
+            }
+            [IO.File]::WriteAllText($LogPath, $text)
+            if ($exitCode -eq 0 -or $text -notmatch 'EndUpdateResource failed' -or $attempt -eq 4) { break }
+            Write-Host "    the setup file was held by another program while its resources were written; compiling again ($attempt of 3)" -ForegroundColor Yellow
+            Start-Sleep -Seconds 5
+        }
+        if ($exitCode -eq 0) {
+            foreach ($file in @(Get-ChildItem -LiteralPath $staging -File)) {
+                Move-Item -LiteralPath $file.FullName -Destination (Join-Path $OutputDir $file.Name) -Force
+            }
+        }
+    } finally {
+        Remove-Item -LiteralPath $staging -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    @($text -split "`r?`n" | Where-Object { $_ -match '(?i)error|warning' }) | ForEach-Object { Write-Host "    $_" }
     return $exitCode
 }
 
@@ -246,14 +288,17 @@ $compiler = Find-Iscc
 Write-Host "    $compiler"
 if (Test-Path -LiteralPath $Setup) { Remove-Item -LiteralPath $Setup -Force }
 $log = Join-Path $OutputRoot "installer_compile.log"
-$compileExit = Invoke-Iscc $compiler @("AppVersion=$Version", "BuildDir=$ExportDir", "OutputDir=$OutputRoot") $log
+$compileExit = Invoke-Iscc $compiler @("AppVersion=$Version", "BuildDir=$ExportDir") $OutputRoot $log
 if ($compileExit -ne 0 -or -not (Test-Path -LiteralPath $Setup)) { Stop-Build "ISCC exit code $compileExit (log: $log)" }
+# Inno Setup pads the version-info texts of the setup file with blanks.
 $signature = (Get-Item -LiteralPath $Setup).VersionInfo
-if ([string]$signature.ProductName -ne $RealName -or -not ([string]$signature.FileVersion).StartsWith($Version)) {
-    Stop-Build "the installer reports product '$($signature.ProductName)' version '$($signature.FileVersion)', expected '$RealName' $Version"
+$setupProduct = ([string]$signature.ProductName).Trim()
+$setupVersion = ([string]$signature.FileVersion).Trim()
+if ($setupProduct -ne $RealName -or -not $setupVersion.StartsWith($Version)) {
+    Stop-Build "the installer reports product '$setupProduct' version '$setupVersion', expected '$RealName' $Version"
 }
 Write-Host ("    {0} ({1:N1} MB), product {2}, file version {3}" -f $Setup, ((Get-Item -LiteralPath $Setup).Length / 1MB),
-    $signature.ProductName, $signature.FileVersion)
+    $setupProduct, $setupVersion)
 
 if ($TestInstall) {
     Write-Step "Test install of a throwaway twin, smoke check and uninstall"
@@ -285,12 +330,12 @@ if ($TestInstall) {
     if (Get-UserUninstallEntry $testAppId) { Stop-Build "the throwaway AppId $testAppId is already registered" }
     if (Test-Path -LiteralPath $testSetup) { Remove-Item -LiteralPath $testSetup -Force }
     $testLog = Join-Path $testRoot "installer_compile.log"
-    $compileExit = Invoke-Iscc $compiler @("AppVersion=$Version", "BuildDir=$ExportDir", "OutputDir=$testRoot",
-        "TestAppId=$testGuid") $testLog
+    $compileExit = Invoke-Iscc $compiler @("AppVersion=$Version", "BuildDir=$ExportDir", "TestAppId=$testGuid") `
+        $testRoot $testLog
     if ($compileExit -ne 0 -or -not (Test-Path -LiteralPath $testSetup)) {
         Stop-Build "ISCC exit code $compileExit for the test installer (log: $testLog)"
     }
-    $testProduct = [string](Get-Item -LiteralPath $testSetup).VersionInfo.ProductName
+    $testProduct = ([string](Get-Item -LiteralPath $testSetup).VersionInfo.ProductName).Trim()
     if ($testProduct -ne $testName) { Stop-Build "the test installer names itself '$testProduct', expected '$testName'" }
     Write-Host "    test twin: $testName, AppId $testAppId"
     Write-Host "    real game (AppId $RealAppId): $(Get-RealInstallSummary)"

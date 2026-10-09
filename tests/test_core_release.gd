@@ -125,6 +125,21 @@ func test_the_version_is_2_0_0_wherever_it_is_shown_or_packed() -> void:
 	assert_eq(Save.VERSION, 2, "save version 2 is the format of 2.0.0")
 
 
+func test_the_title_screen_shows_the_version() -> void:
+	var scene: PackedScene = load(Flow.SCREEN_DIR + "title.tscn") as PackedScene
+	assert_not_null(scene, "the title scene loads")
+	if scene == null:
+		return
+	var title: Node = add_node(scene.instantiate())
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var shown: PackedStringArray = PackedStringArray()
+	for label: Node in title.find_children("*", "Label", true, false):
+		if (label as Label).text.begins_with("v"):
+			shown.append((label as Label).text)
+	assert_true(shown.has("v" + VERSION), "the title screen prints v%s (labels that start with v: %s)" % [VERSION, str(shown)])
+
+
 func test_the_installer_test_mode_cannot_reach_a_real_installation() -> void:
 	var installer: String = FileAccess.get_file_as_string("res://installer/club_and_grub.iss")
 	var script: String = FileAccess.get_file_as_string("res://tools/build_installer.ps1")

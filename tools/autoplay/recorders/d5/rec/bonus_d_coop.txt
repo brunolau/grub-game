@@ -1,0 +1,35 @@
+header: # route: level=bonus_d_coop difficulty=both players=2 source=w5_l2_coop ends=warp after=tally expect=no_enemies:true,eggs:0,wipes:0,painting:17,secrets:1,min_spots:6
+header: # The two-stream route of Feast Land D "Honey Falls" in co-op (designer D5; P1|P2, recorded from closed-loop duo
+header: # macros, build/d5) on both difficulties: P1 opens the spots, P2 follows a few steps behind and takes each soda vent
+header: # after him; club only, no S (belt invariance).
+out: bonus_d_coop.inputs
+seg: Into the honey pool: wade and hop for the food
+p1: R?x>=210 RU*3 R?g R?x>=250 RU*3 R?g R?x>=300 RU*3 R?g R?x>=360;200 R?g
+p2: *8 R?x>=190 RU*3 R?g R?x>=230 RU*3 R?g R?x>=280 RU*3 R?g R?x>=340;200 R?g
+seg: P1 onto the step: three strikes at the spot in the mound's face; onto the mound, three low strikes at the big spot\nwhile P2 waits; then P2 over the mound
+p1: R?x>=404 ?vx==0 RU*4 U*8 ?g R?x>=446 ?vx==0 F*8 *8 F*8 *8 F*8 *8 RU*6 R?g ?vx==0 L*1 *2 DF*8 *8 DF*8 *8 DF*8 *8 *30
+p2: ?px>=520&&pg;300 *40 R?x>=404 ?vx==0 RU*4 U*8 ?g *7 RU*8 R?g ?vx==0
+seg: Down off the mound: P1 strikes the spots in the comb cliff's face, P2 waits by the soda vent
+p1: R?x>=806 ?vx==0 F*8 *8 F*8 *8 F*8 *8 F*8 *8 F*8 *8
+p2: *16 R?x>=740 ?vx==0
+seg: The vent fizzes and throws P1 up onto the cliff (checkpoint 1), then P2
+p1: L?x<=800 ?vx==0 ?vy<0;140 R?g&&y<=290;60 R?x>=920 ?vx==0
+p2: ?py<=290&&pg;300 @at:790 ?vy<0;140 R?g&&y<=290;60 ?vx==0
+seg: Across the comb cliff and its honey pool, hopping for the food; down the honey falls
+p1: R?x>=960 RU*3 R?g R?x>=1000 RU*3 R?g R?x>=1040 RU*3 R?g R?x>=1100;200 R?x>=1236;200 ?g&&y>=350;40 ?vx==0 L*1 *2 F*8 *8 F*8 *8 F*8 *8
+p2: *10 R?x>=940 RU*3 R?g R?x>=980 RU*3 R?g R?x>=1020 RU*3 R?g R?x>=1080;200 R?x>=1196;200 ?g;60 ?vx==0
+seg: To the honey pot and its two treats, then the spots in the tower's face
+p1: R?x>=1316 ?vx==0 F*8 *8 F*8 *8 R?x>=1456 ?vx==0 F*8 *8 F*8 *8 F*8 *8 F*8 *8 F*8 *8
+p2: *20 R?x>=1290 ?vx==0
+seg: The second vent throws P1 onto the comb tower; he breaks the wax wall of the nook; P2 waits by the vent
+p1: L?x<=1452 ?vx==0 ?vy<0;140 R?x>=1478;60 ?g;60 ?vx==0 F*8 *8 F*8 *8 F*8 *8
+p2: *20 @at:1420
+seg: P1 into the nook: the Cave Painting; the vent throws P2 onto the tower
+p1: R?x>=1536;60 ?vx==0
+p2: ?px>=1530;200 @at:1446 ?vy<0;140 R?x>=1478;60 ?g;60 ?vx==0
+seg: Both over the wax wall and the nook's roof
+p1: *4 L?x<=1500;60 ?vx==0 RU*12 R?g;40 R?x>=1556 ?vx==0
+p2: ?px>=1550&&pg&&py<=245;300 *4 RU*12 R?g;40 ?vx==0
+seg: Off the roof, through the last honey pool with hops for the food, onto the stand: the spiral staff
+p1: R?x>=1600;80 ?g;40 R?x>=1630 RU*3 R?g R?x>=1665 RU*3 R?g R?x>=1700 RU*3 R?g R?x>=1768;100 RU*8 R?x>=1806 ?g;40 R?x>=1850;40
+p2: *20 R?x>=1580;80 ?g;40 R?x>=1610 RU*3 R?g R?x>=1645 RU*3 R?g R?x>=1680 RU*3 R?g R?x>=1748;100 RU*8 R?x>=1790 ?g;40 R?x>=1830;40

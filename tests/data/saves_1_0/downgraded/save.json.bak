@@ -1,0 +1,116 @@
+{
+  "code_stones": [
+    "w1_l1:3",
+    "w1_l2:0",
+    "w1_l2:1",
+    "w2_l1:3",
+    "w2_l1:0",
+    "w2_l1:1",
+    "w2_l1:2",
+    "w1_l1:1"
+  ],
+  "high_score": 0.0,
+  "paintings": [
+    3
+  ],
+  "spaces": {
+    "coop/book1/beginner": {
+      "belt": [],
+      "completed": false,
+      "high_score": 0,
+      "results": {},
+      "unlocked": []
+    },
+    "coop/book1/expert": {
+      "belt": [],
+      "completed": false,
+      "high_score": 0,
+      "results": {},
+      "unlocked": []
+    },
+    "coop/book2/beginner": {
+      "belt": [],
+      "completed": false,
+      "high_score": 0,
+      "results": {},
+      "unlocked": []
+    },
+    "coop/book2/expert": {
+      "belt": [],
+      "completed": false,
+      "high_score": 0,
+      "results": {},
+      "unlocked": [
+        "w5_l2"
+      ]
+    },
+    "single/book1/beginner": {
+      "belt": [],
+      "completed": false,
+      "high_score": 0,
+      "results": {
+        "w1_l1": {
+          "clears": 1,
+          "percent": 57,
+          "score": 126300
+        }
+      },
+      "unlocked": [
+        "w1_l2"
+      ]
+    },
+    "single/book1/expert": {
+      "belt": [],
+      "completed": false,
+      "high_score": 0,
+      "results": {
+        "w1_l1": {
+          "clears": 1,
+          "percent": 54,
+          "score": 124400
+        },
+        "w1_l2": {
+          "clears": 1,
+          "percent": 51,
+          "score": 563100
+        },
+        "w2_l1": {
+          "clears": 1,
+          "percent": 92,
+          "score": 1018800
+        }
+      },
+      "unlocked": [
+        "w1_l2",
+        "w2_l1",
+        "w2_l2"
+      ]
+    },
+    "single/book2/beginner": {
+      "belt": [],
+      "completed": false,
+      "high_score": 0,
+      "results": {
+        "w5_l1": {
+          "clears": 1,
+          "percent": 66,
+          "score": 77000
+        }
+      },
+      "unlocked": []
+    },
+    "single/book2/expert": {
+      "belt": [],
+      "completed": false,
+      "high_score": 0,
+      "results": {},
+      "unlocked": []
+    }
+  },
+  "stats": {},
+  "unlocks": {
+    "all": false,
+    "rewards": []
+  },
+  "version": 2
+}

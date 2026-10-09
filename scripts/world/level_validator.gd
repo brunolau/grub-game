@@ -1789,17 +1789,17 @@ func _check_ledge_reach(data: LevelData, records: Array[Dictionary], tablets: Ar
 
 
 ## The ledge of a height gate: the run of floor cells the `far` cell stands on (the cells of row far.y + 1 that carry
-## a hero, joined side by side, at most REACH_COLS either way), as Vector2i(first column, last column); (-1, -1) when
-## the far cell has no floor.
-static func ledge_run(grid: TileGrid, far: Vector2i) -> Vector2i:
+## a hero, joined side by side, at most `reach` cells either way - REACH_COLS, the static reach around a ledge), as
+## Vector2i(first column, last column); (-1, -1) when the far cell has no floor.
+static func ledge_run(grid: TileGrid, far: Vector2i, reach: int = REACH_COLS) -> Vector2i:
 	if not grid.in_bounds(far.x, far.y + 1) or not TileGrid.is_ground(grid.floor_at(far.x, far.y + 1)):
 		return Vector2i(-1, -1)
 	var first: int = far.x
 	var last: int = far.x
-	while first - 1 >= maxi(far.x - REACH_COLS, 0) and TileGrid.is_ground(grid.floor_at(first - 1, far.y + 1)) \
+	while first - 1 >= maxi(far.x - reach, 0) and TileGrid.is_ground(grid.floor_at(first - 1, far.y + 1)) \
 			and grid.side_at(first - 1, far.y) != TileGrid.SIDE_WALL:
 		first -= 1
-	while last + 1 <= mini(far.x + REACH_COLS, grid.cols - 1) and TileGrid.is_ground(grid.floor_at(last + 1, far.y + 1)) \
+	while last + 1 <= mini(far.x + reach, grid.cols - 1) and TileGrid.is_ground(grid.floor_at(last + 1, far.y + 1)) \
 			and grid.side_at(last + 1, far.y) != TileGrid.SIDE_WALL:
 		last += 1
 	return Vector2i(first, last)
@@ -2104,7 +2104,7 @@ static func gap_under(grid: TileGrid, slab: Rect2i, floor_row: int) -> Vector2i:
 ## THE LONG DROP (a warning; DESIGN.md G74, LEVEL_DESIGN.md 15.7.3 "The long drop"): a running jump from a standing
 ## place `h` rows over a ledge carries 7.2 cells + about 0.44 a row, and a lone hero gets that high by a lift - a
 ## vine of any length, a blowhole, a spring, a moving platform (LONG_DROP_LIFTS; a rolled vine lifts nobody: its coil
-## opens from its own level). For every gate's ledge ([method ledge_run] of its far cell) and every lift on the
+## opens from its own level). For every gate's ledge (the whole floor its far cell stands on) and every lift on the
 ## tablet's side of the far cell, the places the lift brings him to - its own top, and the ends of every top (a run
 ## of standing cells) beside it - must lie MORE than 10 + h / 2 cells from the ledge (12 + 0.6 h in a file with a
 ## `wind` script), counted as the cells of air between the two; else a warning, unless the ledge is roofed: solid
@@ -2121,7 +2121,8 @@ func _check_long_drop(data: LevelData, records: Array[Dictionary], tablets: Arra
 			continue
 		var far: Vector2i = tablet["far"]
 		var cell: Vector2i = tablet["cell"]
-		var run: Vector2i = ledge_run(grid, far)
+		# The WHOLE floor the far cell stands on (a long shoulder's near end is where the drop lands).
+		var run: Vector2i = ledge_run(grid, far, grid.cols)
 		if run.x < 0 or ledge_roofed(grid, run, far.y + 1):
 			continue
 		var top: int = far.y + 1
@@ -2160,7 +2161,8 @@ func _check_long_drop(data: LevelData, records: Array[Dictionary], tablets: Arra
 				if h < 1:
 					continue
 				var between: int = maxi(maxi(run.x - place.x, place.x - run.y) - 1, 0)
-				if between * rule.z <= rule.x + h * rule.y and (best.x < 0 or between < best.x) 						and drop_path(grid, place, run, top):
+				if between * rule.z <= rule.x + h * rule.y and (best.x < 0 or between < best.x) \
+						and drop_path(grid, place, run, top):
 					best = Vector3i(between, h, place.x)
 			if best.x >= 0:
 				_add(data.path, int(record["line"]), WARNING,
@@ -2222,7 +2224,8 @@ static func drop_path(grid: TileGrid, place: Vector2i, run: Vector2i, top: int) 
 			steps.append(Vector2i(at.x - 1, at.y))
 			steps.append(Vector2i(at.x + 1, at.y))
 		for next: Vector2i in steps:
-			if next.x < first or next.x > last or next.y > low or seen.has(next) 					or grid.side_at(next.x, next.y) == TileGrid.SIDE_WALL:
+			if next.x < first or next.x > last or next.y > low or seen.has(next) \
+					or grid.side_at(next.x, next.y) == TileGrid.SIDE_WALL:
 				continue
 			# Falling into a cell that carries him ends the drop there (a floor between the place and the ledge).
 			if next.y > at.y and TileGrid.is_ground(grid.floor_at(next.x, next.y)):

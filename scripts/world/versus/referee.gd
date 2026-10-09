@@ -11,12 +11,19 @@ extends SimEntity
 ##    pushed 8 px apart; a charged box wins), deflect (a front box bats a rival's special back, owned by the striker,
 ##    +32 v16), hits (the C.14 knock-back table, hit_timer 43, hit-stop 2 / 4), curled victims (glance from above, a
 ##    front box from the side bats him), teammates (a hit only bumps).
-##  - PLAYER: after every hero moved: the lr / tb wrap of heroes and hero projectiles, the end of the immunity and of
-##    the spawn shield when a hero starts a strike or a throw, the body bump, the stomp chain reset on the ground, the
-##    weight caps of Grub Stack.
+##  - PLAYER: after every hero moved: the lr / tb wrap of heroes and hero projectiles, the knock-out of a hero the
+##    arena squeezed out of its side ([method _squeezed_out]), the end of the immunity and of the spawn shield when a
+##    hero starts a strike or a throw, the body bump, the stomp chain reset on the ground, the weight caps of Grub
+##    Stack.
 ##  - CONTACT_ENEMIES: stomps gathered then applied (the stomp ladder 1-2-3-4-6-8 since the stomper's last ground
 ##    tick, an 8-tick squash, 30 immune ticks; an immune, shielded, curled or teammate head is a free springboard),
-##    then the head bounces off the arena's neutral enemies (VersusSignatures.springboard_step).
+##    then the head bounces off the arena's neutral enemies (VersusSignatures.springboard_step). KNOWN, open after
+##    2.0.0 (found by the versus soak, tools/bots/soak.sh): the stomp test is the 1.0 body test - a fall of 8 px a
+##    tick into a body is a stomp whoever is on top - so two heroes falling side by side with their bodies
+##    overlapping stomp EACH OTHER on one tick, each lifted a body's height, both free springboards from then on:
+##    the pair climbs out of the top of the arena until the off-screen rule takes both (4 of 1 008 Grub Stack rounds
+##    of CPUs). The rule that ends it - a stomp comes from above: `stomper.sim_pos.y < victim.sim_pos.y` - was built,
+##    tested and withdrawn before the release, because it re-rolls every bot set of tests/test_versus_bots.gd.
 ##  - WORLD: the round: intro countdown, clock, Feast Rush, gong, the Golden Drumstick on a tie.
 ##  - POST: hazards (knock-outs: credit to the last hitter within 73 ticks), respawns after 48 ticks at the free spawn
 ##    farthest from the rivals with a 48-tick spawn shield, the referee's own counters (spawn shield, squash, hit-stop,
@@ -75,6 +82,8 @@ const COOKPOT_SCRIPT: String = "res://scripts/objects/cookpot.gd"
 const SFX_CLANG: StringName = Sfx.CLANG
 ## Node group of everything a round spawns (hazards, crates, Grudge Pterodactyls): freed when the next round begins.
 const ROUND_GROUP: StringName = &"versus_round"
+## Death cause of a hero the arena squeezed out of its side ([method _squeezed_out]): the Cave-in's crush.
+const CAUSE_SQUEEZED: StringName = &"crush"
 
 ## The level this referee runs (Game.level when it entered the tree).
 var level: LevelBase = null
@@ -1422,6 +1431,9 @@ func _player_step() -> void:
 		if hero.dead:
 			continue
 		_wrap_hero(hero)
+		if _squeezed_out(hero):
+			knock_out(hero, CAUSE_SQUEEZED)
+			continue
 		var slot: int = hero.slot
 		if hero.attack_gate:
 			# A strike or a throw ends the immunity and the spawn shield at once (C.14).
@@ -1462,6 +1474,22 @@ func _feast_touches(heroes: Array[PlayerBase]) -> void:
 ## The lr / tb wrap of an arena (VersusArena.wrap_step, after every hero moved).
 func _wrap_hero(hero: PlayerBase) -> void:
 	VersusArena.wrap_step(level, hero, wrap)
+
+
+## Nobody stays outside the arena's sides (phase 4, found by the versus soak): true for a hero in play whose feet
+## are left or right of the arena view while the round runs, on an arena whose sides do not wrap. His own step never
+## takes him there (the x commit rule) and no knock-back does ([method _commit_x]); what does is the 1.0 collision's
+## slide out of a wall he stands in - a Cave-in block that settled at the arena's edge beside him: one step into its
+## column and he slid through it, out of the map, 10 px beyond the edge, where the commit rule refuses every step
+## back. On a top-bottom wrap arena he then fell through the seam for the rest of the round, out of every threat's
+## reach (Echo Hollow, Grub Stack with the sudden-death event, three CPUs, seed 4001 round 0 of tools/bots/soak.sh
+## rules=mix; Last Caveman Standing always has that sudden death). The arena that squeezed him out has crushed him:
+## a hazard's knock-out ([constant CAUSE_SQUEEZED]).
+func _squeezed_out(hero: PlayerBase) -> bool:
+	if wrap == VersusArena.WRAP_LR or not _round_live() or not _in_play(hero):
+		return false
+	var view: Rect2i = VersusArena.view_rect()
+	return hero.sim_pos.x < view.position.x or hero.sim_pos.x >= view.end.x
 
 
 ## Thrown specials crossing a wrap edge wrap once and vanish VersusTuning.WRAP_SPECIAL_TICKS later.

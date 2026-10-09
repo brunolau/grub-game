@@ -1172,11 +1172,12 @@ msgstr "Clubs glance off the Colossus! Axe its head from the black slab."
 
 # 2.0 co-op, the ward mark (DESIGN.md G85): the sign at the first ward of co-op 1-1 (w1_l1_coop) and of co-op 5-1
 # (w5_l1_coop). Enemies inside the ward of a two-caveman gate wear chalk stripes and give no bounce there.
+# The short form of the ruled line ("... are no stepping stones - ...", which takes 4 board lines: a sign has 3).
 msgid "SIGN_COOP_W1_WARD"
-msgstr "Marked beasts are no stepping stones - use your partner's shoulders!"
+msgstr "Marked beasts are no steps - use your partner's shoulders!"
 
 msgid "SIGN_W5_COOP_WARD"
-msgstr "Marked beasts are no stepping stones - use your partner's shoulders!"
+msgstr "Marked beasts are no steps - use your partner's shoulders!"
 
 # --- Level texts of the development levels (levels/test_*.lvl, not shipped) ---
 msgid "SIGN_INTEGRATION_SPOTS"

@@ -20,7 +20,9 @@ extends Node
 ## file ([method migration_losses]); nothing is written. The first [method save_game] after it copies the file's
 ## bytes to `save.v<version>.json` next to it and reads the copy back ([method legacy_backup_path]); only then does
 ## it replace save.json, and while that copy cannot be made it writes nothing and returns an error. The game never
-## changes or removes the copy: a player who goes back to 1.0.0 puts it back as save.json.
+## changes or removes the copy: a player who goes back to 1.0.0 puts it back as save.json. (Should the check ever
+## name a loss, each one is logged as an error; the copy is still made before anything is written, so the 1.0 file
+## itself is never lost.)
 ##
 ## Layout of save.json, version 2:
 ##   {"version": 2, "high_score": int, "code_stones": [String], "stats": {String: int},

@@ -14,6 +14,13 @@ is never written over before an untouched copy of it exists (`save.v1.json`).
 | `mid_expert` | progress in both difficulties: Expert 1-1, 1-2 (through the warp and Feast Land A), 2-1; then Beginner 1-1; Options: master 0.8, smooth camera on, vibration off; strike rebound to **H**, jump to **Space** | `save.json`, `save.json.bak`, `settings.cfg` |
 | `finished` | finished the game: the whole Expert campaign to The End and the credits, then a Beginner run from the code `GR0T` to the expert wall | `save.json`, `save.json.bak`, `settings.cfg` |
 
+One more folder is the way back: **`downgraded`** is the `mid_expert` profile after 2.0 had migrated it and added
+2.0 progress (Cave Painting 3, the co-op unlock of 5-2, a Book II result) and after the 1.0.0 release then played
+on that 2.0 profile (`flows/expert_start.flow`, default settings, no `--fresh-user`). 1.0.0 warned "file version 2
+is newer than this build", showed no progress, cleared 1-1 on Expert and wrote `save.json` as version 1 with the
+2.0 keys still inside; `save.json.bak` is the 2.0 file it replaced, `save.v1.json` the copy 2.0 had made of the
+first 1.0 file. 2.0 must merge it: nothing of either version is lost.
+
 `flows/<profile>.flow` is the script that played each one (the 1.0.0 flow language, `scripts/core/dev/autoplay_flow.gd`
 of that tag); `finished.flow` is 1.0.0's own `tools/autoplay/campaign.flow` followed by its `campaign_beginner.flow`.
 `level_codes.txt` lists the 20 level codes of the 15 stages of 1.0.0.
@@ -38,7 +45,16 @@ done      # each must end with "Autoplay flow: RESULT PASS"; finished.flow takes
 git worktree remove --force build/release_prep/v1_0_0
 ```
 
-The runs are deterministic (the routes are replayed tick for tick), so a new run gives the same files.
+The runs are deterministic (the routes are replayed tick for tick), so a new run gives the same files: `finished`
+was played twice on 2026-10-09 and the three files of the second run were byte-identical to the first.
+
+`downgraded` needs 2.0 in between: copy `mid_expert/*` to a folder, let 2.0 load it there and add its own progress
+(`Save.set_storage_dir(<folder>)`, `Save.add_painting(3)`, `Save.unlock_level_in("coop/book2/expert", &"w5_l2")`,
+`Save.record_level_result_in("single/book2/beginner", &"w5_l1", 77000, 66)`, `Save.save_game()` - a five-line
+`-s` script through `bash .tools/gd.sh script`), copy `save.json`, `save.json.bak` and `save.v1.json` of that folder
+(not its `settings.cfg`: the smooth camera of `mid_expert` changes what the route meets) to
+`build/release_prep/v1_0_0/build/rp_users/down/`, and run the 1.0.0 line above with `expert_start.flow`,
+`--user-dir=res://build/rp_users/down` and without `--fresh-user`.
 
 The older pair `tests/fixtures/save_v1/campaign_*.json` (phase 0) holds save files only; these folders add the
 settings, the backups and the mid-game states.

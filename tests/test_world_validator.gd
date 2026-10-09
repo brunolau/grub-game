@@ -684,6 +684,134 @@ func test_gate_rules_of_the_g3b_round() -> void:
 	assert_true(cast.has_problem("'enemies/leaper' carries bond 'pits' but is a zone-spawner record"), _messages(cast))
 
 
+## `cols` x `rows` cells of air over two solid rows.
+func _tall_rows(cols: int, rows: int) -> PackedStringArray:
+	var lines: PackedStringArray = PackedStringArray()
+	for row: int in rows:
+		lines.append((TileGrid.CH_SOLID_A if row >= rows - 2 else TileGrid.CH_AIR).repeat(cols))
+	return lines
+
+
+func test_gate_rules_left_from_the_g3c_round() -> void:
+	# The four rules DESIGN.md G83 left for phase 4 (wf12): the clean foot of an x2 secret's ledge beside a coil, a
+	# plate out of the batted hero's reach, the long-drop warning, and the gate's own ledge at its ward's edge.
+	var bonus: String = _solo("solo_bonus", "bonus")
+	# (1) AN x2 SECRET'S LEDGE WITHIN ONE ROW OF A COIL needs the clean foot at both its ends (G81; 2-2 'lift').
+	var shelf: PackedStringArray = _coop_rows()
+	_paint(shelf, 6, 16, 19)       # the secret's ledge: far cell 17,5 - 8 rows over the floor, feet at columns 15 and 20
+	_paint(shelf, 5, 26, 39)       # the terrace the coiled vine hangs from, one row higher
+	var secret: String = "\n".join(PackedStringArray([
+		"objects/x2_tablet 14 13 secret far=17,5",
+		"objects/vine 26 5 length=8 rolled=true",
+		"objects/hidden_spot 12 13",
+		"objects/hidden_spot 23 13",
+		"objects/hidden_spot 30 13",
+	]))
+	var foot: LevelValidator = _validator({"solo_bonus": bonus, "sfoot_coop": _coop_text("sfoot_coop", secret, shelf,
+			"solo_bonus")})
+	assert_true(foot.has_problem("'objects/hidden_spot' at 12,13 lies on a floor 8 rows under the x2 secret's ledge at 17,5 (beginner), within 7 cells of its foot (column 15), and that ledge stands within one row of the coiled vine at 26,5"),
+			_messages(foot))
+	assert_true(foot.has_problem("'objects/hidden_spot' at 23,13 lies on a floor 8 rows under the x2 secret's ledge at 17,5 (beginner), within 7 cells of its foot (column 20)"),
+			"the other end of the ledge has a foot too: %s" % _messages(foot))
+	assert_false(foot.has_problem("'objects/hidden_spot' at 30,13 lies on a floor"), "10 cells from the nearer foot")
+	var no_coil: LevelValidator = _validator({"solo_bonus": bonus, "nocoil_coop": _coop_text("nocoil_coop",
+			secret.replace("rolled=true", ""), shelf, "solo_bonus")})
+	assert_false(no_coil.has_problem("x2 secret's ledge"), "a hanging vine is no coil: %s" % _messages(no_coil))
+	var low_coil: LevelValidator = _validator({"solo_bonus": bonus, "lowcoil_coop": _coop_text("lowcoil_coop",
+			secret.replace("objects/vine 26 5", "objects/vine 26 9"), shelf, "solo_bonus")})
+	assert_false(low_coil.has_problem("x2 secret's ledge"), "a coil 3 rows under the ledge: not its level")
+	assert_eq(LevelValidator.ledge_feet(TileGrid.from_rows(shelf), Vector2i(17, 5)), PackedInt32Array([15, 20]))
+	var walled: PackedStringArray = shelf.duplicate()
+	for row: int in range(0, 6):
+		_paint(walled, row, 20, 20)    # rock at the ledge's right end: no foot there
+	assert_eq(LevelValidator.ledge_feet(TileGrid.from_rows(walled), Vector2i(17, 5)), PackedInt32Array([15]))
+	assert_true(LevelValidator.is_rolled_vine({"id": &"objects/vine", "params": {"rolled": true}}))
+	assert_false(LevelValidator.is_rolled_vine({"id": &"objects/vine", "params": {"length": 8}}))
+	# (2) A PLATE OUT OF THE BATTED HERO'S REACH (G83): at most 17 cells from the near lip of the gap its column bridges.
+	var tar: PackedStringArray = _coop_rows()
+	_paint(tar, 14, 10, 22, TileGrid.CH_AIR)    # 13 cells without a floor: columns 10-22
+	_paint(tar, 15, 10, 22, TileGrid.CH_AIR)
+	var drive: String = "\n".join(PackedStringArray([
+		"objects/x2_tablet 4 13 gate=drive far=26,13",
+		"objects/plate 28 13 name=bridge mode=latch",
+		"objects/column 10 8 size=9,1 rise=5 sink_while=bridge",
+	]))
+	var reach: LevelValidator = _validator({"solo_bonus": bonus, "reach2_coop": _coop_text("reach2_coop", drive, tar,
+			"solo_bonus")})
+	assert_true(reach.has_problem("plate 'bridge' at 28,13 stands 18 cells from the near lip (column 10) of the gap its column bridges (columns 10-22"),
+			_messages(reach))
+	var near: LevelValidator = _validator({"solo_bonus": bonus, "reach3_coop": _coop_text("reach3_coop",
+			drive.replace("objects/plate 28 13", "objects/plate 27 13"), tar, "solo_bonus")})
+	assert_false(near.has_problem("of the gap its column bridges"), "17 cells: in reach (%s)" % _messages(near))
+	var same_bank: LevelValidator = _validator({"solo_bonus": bonus, "reach4_coop": _coop_text("reach4_coop",
+			drive.replace("objects/x2_tablet 4 13 gate=drive far=26,13", "objects/x2_tablet 34 13 gate=drive far=30,13"),
+			tar, "solo_bonus")})
+	assert_false(same_bank.has_problem("of the gap its column bridges"),
+			"the plate on the tablet's bank: nobody is sent over for it (%s)" % _messages(same_bank))
+	var grid: TileGrid = TileGrid.from_rows(tar)
+	assert_eq(LevelValidator.gap_under(grid, Rect2i(10, 8, 9, 1), 14), Vector2i(10, 22))
+	assert_eq(LevelValidator.gap_under(grid, Rect2i(30, 11, 1, 3), 14), Vector2i(-1, -1), "a door on its floor")
+	# (3) THE LONG DROP (G74, a warning): a lift's top h rows over a gate's ledge with 10 + h / 2 cells of air or fewer
+	# between (7-1 'stack': the warp stack's vine, 10 rows over the shoulder).
+	var beach: PackedStringArray = _tall_rows(60, 34)
+	for row: int in range(22, 32):
+		_paint(beach, row, 40, 59)     # the shoulder: its top is floor row 22 from column 40 to the map's edge
+	for row: int in range(12, 32):
+		_paint(beach, row, 26, 28)     # the stack: its top 10 rows over the shoulder, 11 cells of air from it
+	var stack: String = "objects/x2_tablet 30 31 gate=stack far=45,21\nobjects/vine 25 12 length=19"
+	var drop: LevelValidator = _validator({"solo_bonus": bonus, "drop_coop": _coop_text("drop_coop", stack, beach,
+			"solo_bonus")})
+	assert_true(drop.has_problem("the long drop onto the ledge of gate 'stack' (beginner): 'objects/vine' at 25,12 lifts a lone hero to a place 10 rows over that ledge (columns 40-59, row 22) with 11 cells of air between (from column 28)",
+			LevelValidator.WARNING), _messages(drop))
+	assert_true(drop.has_problem("every such place lies more than 15 cells away (10 + h / 2)", LevelValidator.WARNING))
+	var moved: PackedStringArray = _tall_rows(60, 34)
+	for row: int in range(22, 32):
+		_paint(moved, row, 40, 59)
+	for row: int in range(12, 32):
+		_paint(moved, row, 21, 23)     # 5 columns left: 16 cells of air, more than 15
+	var far_stack: LevelValidator = _validator({"solo_bonus": bonus, "moved_coop": _coop_text("moved_coop",
+			stack.replace("objects/vine 25 12", "objects/vine 20 12"), moved, "solo_bonus")})
+	assert_false(far_stack.has_problem("the long drop", LevelValidator.WARNING), _messages(far_stack))
+	var rolled: LevelValidator = _validator({"solo_bonus": bonus, "rolled_coop": _coop_text("rolled_coop",
+			stack + " rolled=true", beach, "solo_bonus")})
+	assert_false(rolled.has_problem("the long drop", LevelValidator.WARNING), "a coil lifts nobody from below (G81)")
+	var roofed: PackedStringArray = beach.duplicate()
+	_paint(roofed, 18, 40, 59)         # rock 3 rows of air over the whole shoulder
+	var roof: LevelValidator = _validator({"solo_bonus": bonus, "roof_coop": _coop_text("roof_coop", stack, roofed,
+			"solo_bonus")})
+	assert_false(roof.has_problem("the long drop", LevelValidator.WARNING), "a roofed ledge: %s" % _messages(roof))
+	assert_true(LevelValidator.ledge_roofed(TileGrid.from_rows(roofed), Vector2i(40, 59), 22))
+	assert_false(LevelValidator.ledge_roofed(TileGrid.from_rows(beach), Vector2i(40, 59), 22))
+	var shaft: PackedStringArray = beach.duplicate()
+	for row: int in range(0, 22):
+		_paint(shaft, row, 34, 34)     # a wall between the stack and the shoulder, from the sky down to its level
+	var wall: LevelValidator = _validator({"solo_bonus": bonus, "shaft_coop": _coop_text("shaft_coop", stack, shaft,
+			"solo_bonus")})
+	assert_false(wall.has_problem("the long drop", LevelValidator.WARNING), "rock between: no line of flight")
+	assert_true(LevelValidator.drop_path(TileGrid.from_rows(beach), Vector2i(28, 12), Vector2i(40, 59), 22))
+	assert_false(LevelValidator.drop_path(TileGrid.from_rows(shaft), Vector2i(28, 12), Vector2i(40, 59), 22))
+	var windy: LevelValidator = _validator({"solo_bonus": bonus, "wind_coop": _coop_text("wind_coop",
+			stack.replace("objects/vine 25 12", "objects/vine 20 12"), moved, "solo_bonus").replace(
+			"music = level_jungle\n", "music = level_jungle\nwind = 0:-112\n")})
+	assert_true(windy.has_problem("with 16 cells of air between (from column 23) - a running jump from there carries 7.2 cells + 0.44 a row and the file's tailwind 6 px a tick more; every such place lies more than 18 cells away (12 + 0.6 h)",
+			LevelValidator.WARNING), "a file with wind asks 12 + 0.6 h: %s" % _messages(windy))
+	# (4) THE GATE'S OWN LEDGE is no high ground at its ward's edge (1-2 'treehouse' with a narrow ward).
+	var tree: PackedStringArray = _tall_rows(60, 34)
+	_paint(tree, 22, 10, 27)           # the tree-house platform: the far cell 15,21 stands on it
+	var house: String = "objects/x2_tablet 34 31 gate=treehouse far=15,21 ward=12,2"
+	var own: LevelValidator = _validator({"solo_bonus": bonus, "own_coop": _coop_text("own_coop", house, tree,
+			"solo_bonus")})
+	assert_false(own.has_problem("high ground at the ward's edge", LevelValidator.WARNING),
+			"the far cell's own floor is reached through the gate: %s" % _messages(own))
+	var mound: PackedStringArray = tree.duplicate()
+	for row: int in range(24, 32):
+		_paint(mound, row, 38, 40)     # a block 8 rows high, 2 cells outside the ward's edge (column 36)
+	var other: LevelValidator = _validator({"solo_bonus": bonus, "mound_coop": _coop_text("mound_coop", house, mound,
+			"solo_bonus")})
+	assert_true(other.has_problem("high ground at the ward's edge of gate 'treehouse' (beginner): the top at columns 38-40, row 24",
+			LevelValidator.WARNING), "another top there is still named: %s" % _messages(other))
+
+
 func test_mechanisms_belong_to_a_gate() -> void:
 	var lonely: String = "objects/plate 2 13 name=p\nobjects/column 12 13 rise_while=p"
 	var far_off: String = "objects/x2_tablet 2 13 gate=near far=3,13\nobjects/seesaw 36 13"

@@ -1,0 +1,35 @@
+header: # route: level=w5_l2_coop difficulty=expert players=2 ends=exit after=level:w5_l2b_coop expect=hurts:0,eggs:0,wipes:0,x2_gates:2,letters:0,min_checkpoints:4
+header: # The Expert two-stream route of Rattlesnake Gulch in co-op (designer D5; P1|P2, recorded from closed-loop duo
+header: # macros, build/d5). Both heroes keep the club (no S): the belt-invariance runner sees the same digests whatever
+header: # special rides on either belt. Both co-op gates are crossed together: 'sandgate' (the vertical leapfrog of plates pa
+header: # and pb with the gift vine) and 'rattlers' (the bonded keepers of the hall, one hero at each).
+out: w5_l2_coop.expert.inputs
+seg: Band A: P1 jumps the shellback tortoise and clubs the rattler from outside its reach; P2 follows; up the first vine
+p1: R?x>=180 ?ex(12,18,"walker")-x<=70&&ex(12,18,"walker")>x;200 RU*10 R?g @strike:24,28,40,w,snapper R?x>=560 RU*10 R?g @strike:39,43,40,w,snapper @at:712 U?c;20 U?g;200 L?x<=650 ?vx==0
+p2: *30 R?x>=150 ?px>=380;300 R?x>=180 ?ex(12,18,"walker")-x<=70&&ex(12,18,"walker")>x;200 RU*10 R?g R?x>=520 RU*10 R?g ?ec(39,43,"snapper")==0;300 ?py<=1232;300 @at:712 U?c;20 U?g;200
+seg: Gate sandgate: P1 holds plate pa (the sand gate D1 rises), P2 walks through it to plate pb in the dead end
+p1: |b0 @at:496:12
+p2: |b0 L?x<=520 ?vx==0 ?px<=510&&px>=480;200 *10 L?x<=230;200 @at:208:12
+seg: The gate D2 at the top of the vine rises: P1 climbs the vine, walks through D2 and strikes the rolled vine down into
+the dead end (the gift), then on to the far end of band C; P2 climbs the gift
+p1: ?ent("pb").pressed;200 @at:424 U?c;20 U?g;200 L?x<=300;60 @at:252 L*1 *2 F*8 *8 L?x<=40;100 ?vx==0
+p2: ?px<=340&&py<=900;400 @at:232 U?c;60 U?g;200
+seg: Both up the third vine to band D (P1 first)
+p1: @at:88 U?c;20 U?g;200 R?x>=140 ?vx==0
+p2: L?x<=120 ?py<=848;300 @at:88 U?c;20 U?g;200
+seg: Band D: checkpoint 2, P1 takes the letter G, clubs the rattler and the tortoise
+p1: R?x>=290 ?vx==0 U*3 RU*4 U*5 ?g;40 ?vx==0 @at:346:4 ?ex(21,27,"walker")<=392&&exv(21,27,"walker")<0;300 RU*10 R?g&&y>=700;40 @strike:29,33,40,w,snapper @strike:36,44,34,w,walker R?x>=760 ?vx==0
+p2: *20 R?x>=200 ?px>=460;400 R?x>=290 ?vx==0 U*3 RU*4 U*5 ?g;40 ?vx==0 ?ex(21,27,"walker")<=392&&exv(21,27,"walker")<0;300 RU*10 R?g&&y>=700;40 ?ec(29,33,"snapper")==0;300 R?x>=520 ?vx==0 ?ec(36,44,"walker")==0;300 R?x>=720 ?vx==0
+seg: Both up the fourth vine to band E (P1 first): checkpoint 3
+p1: @at:808 U?c;20 U?g;250 L?x<=700 ?vx==0
+p2: ?py<=656;400 @at:808 U?c;20 U?g;250
+seg: Gate rattlers: both onto the step and the roof, down through its hole into the hall: P1 faces the left rattler,
+P2 the right one (18 columns apart); both strike in one window: the keeper door rises
+p1: L?x<=686 LU*10 L?g ?vx==0 *6 LU*10 L?g L?x<=500 ?g&&y>=478;60 ?vx==0 @at:382:2 |strike F*8 *8
+p2: L?x<=700 ?px<=520;300 L?x<=686 LU*10 L?g ?vx==0 *6 LU*10 L?g L?x<=500 ?g&&y>=478;60 ?vx==0 @at:592:2 |strike F*8 *8
+seg: Both out through the keeper door; P1 climbs the side vine to the Cave Painting and comes back; up the fifth vine
+p1: L?x<=240 @at:216 U?c;20 U?g;150 L?x<=168;40 ?vx==0 R?x>=216;40 ?g&&y>=478;60 L?x<=150 @at:120 U?c;20 U?g;200 R?x>=170 ?vx==0
+p2: L?x<=300 ?vx==0 ?px<=150&&pg&&py>=470;400 L?x<=150 ?py<=432;300 @at:120 U?c;20 U?g;200
+seg: Band F: both jump the shellback tortoise; P1 clubs the rattler from the mesa block; both to the exit totem
+p1: R?x>=200 ?ex(14,22,"walker")-x<=70&&ex(14,22,"walker")>x;300 RU*10 R?g R?x>=360 ?vx==0 U*3 RU*5 U*4 ?g;40 ?vx==0 R?x>=416 ?vx==0 *2 R*3 ?g&&y>=286;30 ?vx==0 @strike:28,32,40,w,snapper R?x>=560 RU*10 R?g R?x>=612 ?vx==0 U*3 RU*5 U*6 ?g;40 ?vx==0 R?x>=668 ?vx==0 ?g&&y>=286;40 ?vx==0 @strike:43,47,40,w,snapper @strike:47,53,34,w,walker R?x>=940;300
+p2: *30 R?x>=200 ?px>=330;300 ?ex(14,22,"walker")-x<=70&&ex(14,22,"walker")>x;300 RU*10 R?g ?ec(28,32,"snapper")==0;300 R?x>=350 RU*10 R?g R?x>=500 ?vx==0 ?ey(33,35,"dangler")<=160;300 R?x>=540 RU*10 R?g R?x>=600 RU*10 R?g ?ec(43,47,"snapper")==0;300 ?ec(47,53,"walker")==0;400 R?x>=930;300

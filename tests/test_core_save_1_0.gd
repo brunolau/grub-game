@@ -208,6 +208,33 @@ func test_every_1_0_profile_loads_without_losing_progress() -> void:
 	print("    1.0 profiles: %d facts (unlocks, results, completion, code stones, high scores) compared, none lost" % facts)
 
 
+## The check that stands between the migration and the first write (Save.migration_losses) is no formality: handed a
+## migration that carried nothing over, it names every unlocked stage, result, flag, code stone and the high score.
+func test_the_migration_check_names_what_a_bad_migration_would_lose() -> void:
+	var original: Dictionary = _original("finished")
+	var carried_nothing: Dictionary = {"spaces": {}, "code_stones": [], "stats": {}, "high_score": 0}
+	var losses: PackedStringArray = Save._v1_losses(original, carried_nothing)
+	var expected: int = 2  # the completion flag of Expert and the high score
+	for mode: String in ["beginner", "expert"]:
+		expected += (original["unlocked"][mode] as Array).size() + 3 * (original["results"][mode] as Dictionary).size()
+	expected += (original["code_stones"] as Array).size()
+	assert_eq(losses.size(), expected, "every fact of the file is named once: %s" % str(losses).left(300))
+	for loss: String in ["completed expert", "high score", "unlocked expert w1_l2", "result expert w4_l2 score",
+			"result beginner w3_l2 clears", "code stone w1_l1:3"]:
+		assert_true(losses.has(loss), "'%s' is reported" % loss)
+	# One stage short is one loss; the real migration of the same file has none.
+	_install("finished")
+	Save.load_game()
+	assert_eq(Save.migration_losses(), PackedStringArray())
+	var migrated: Dictionary = JSON.parse_string(JSON.stringify({"spaces": {
+		"single/book1/expert": {"unlocked": original["unlocked"]["expert"].slice(1), "results": original["results"]["expert"],
+			"completed": true},
+		"single/book1/beginner": {"unlocked": original["unlocked"]["beginner"], "results": original["results"]["beginner"],
+			"completed": false}},
+		"code_stones": original["code_stones"], "stats": original["stats"], "high_score": original["high_score"]}))
+	assert_eq(Save._v1_losses(original, migrated), PackedStringArray(["unlocked expert %s" % original["unlocked"]["expert"][0]]))
+
+
 func test_a_fresh_1_0_profile_starts_2_0_clean() -> void:
 	_install(FRESH)
 	Save.load_game()
@@ -353,6 +380,45 @@ func test_a_1_0_backup_is_migrated_when_the_save_is_damaged() -> void:
 	assert_eq(Save.save_game(), OK)
 	assert_eq(_bytes(_user_path("save.v1.json")), backup_bytes, "the file the progress came from is the one kept")
 	assert_eq(_stored_version("save.json"), 2)
+
+
+## The profile `downgraded` is a 2.0 profile (the migrated `mid_expert` with a Cave Painting, a co-op unlock and a
+## Book II result) that the REAL 1.0.0 then played: 1.0.0 showed no progress, cleared 1-1 on Expert and wrote a
+## version 1 file that still carries the 2.0 keys. Back in 2.0 nothing of either is lost.
+func test_a_2_0_profile_played_by_1_0_0_comes_back_whole() -> void:
+	_install("downgraded")
+	_write(_user_path("save.v1.json"), _bytes(DIR + "downgraded/save.v1.json"))
+	var written_by_1_0: PackedByteArray = _bytes(DIR + "downgraded/save.json")
+	var first_copy: PackedByteArray = _bytes(DIR + "downgraded/save.v1.json")
+	var original: Dictionary = JSON.parse_string(written_by_1_0.get_string_from_utf8())
+	assert_eq(int(original["version"]), 1, "1.0.0 wrote its own version")
+	assert_true(original.has("spaces") and original.has("unlocked"), "with the 2.0 keys beside its own")
+	Save.load_game()
+	assert_true(Save.was_migrated())
+	assert_eq(Save.migration_losses(), PackedStringArray())
+	var expert: String = Save.space(Defs.GameMode.SINGLE, 1, Defs.Difficulty.EXPERT)
+	# What 2.0 had before the detour ...
+	assert_eq(Save.get_unlocked_levels_in(expert), [&"w1_l2", &"w2_l1", &"w2_l2"] as Array[StringName])
+	assert_eq(int(Save.get_level_result_in(expert, &"w2_l1")["score"]), 1018800)
+	assert_true(Save.is_level_unlocked(&"w1_l2", Defs.Difficulty.BEGINNER))
+	assert_true(Save.is_level_unlocked_in(Save.space(Defs.GameMode.COOP, 2, Defs.Difficulty.EXPERT), &"w5_l2"), "co-op progress")
+	assert_eq(int(Save.get_level_result_in(Save.space(Defs.GameMode.SINGLE, 2, Defs.Difficulty.BEGINNER), &"w5_l1")["score"]),
+		77000, "a Book II result")
+	assert_true(Save.has_painting(3), "the Cave Painting")
+	assert_eq(Save.painting_count(), 1)
+	# ... and what 1.0.0 added (the same stage again: the best of both, not a second copy).
+	var again: Dictionary = Save.get_level_result_in(expert, &"w1_l1")
+	assert_eq([int(again["percent"]), int(again["score"]), int(again["clears"])], [54, 124400, 1])
+	for stone: Variant in original["code_stones"]:
+		assert_true(Save.has_code_stone(str(stone)))
+	# The first copy of the 1.0 file stays; the file of the detour gets its own.
+	assert_eq(Save.save_game(), OK)
+	assert_eq(_bytes(_user_path("save.v1.json")), first_copy)
+	assert_eq(_bytes(_user_path("save.v1.2.json")), written_by_1_0)
+	assert_eq(_stored_version("save.json"), 2)
+	var stored: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(_user_path("save.json")))
+	for key_1_0: String in ["unlocked", "results", "completed"]:
+		assert_false(stored.has(key_1_0), "the 1.0 key %s is inside the namespaces again" % key_1_0)
 
 
 ## A file of a NEWER build is kept the same way before this build writes its own version over it.

@@ -30,7 +30,9 @@ extends SimEntity
 ##    body that pops out of one.
 ##  - POST: rides whose rider or carrier left the tribe end; the leash (C.13: a hero off the authentic view becomes an egg after
 ##    PartyTuning.leash_egg_ticks); the egg drift, the owner's nudge, the clamp into the view and the Expert return
-##    (C.12); the team wipe of a party whose last hatched hero became an egg without a death toss.
+##    (C.12); the team wipe of a party whose last hatched hero became an egg without a death toss, and - phase 4 ruling
+##    Q3, DESIGN.md G86 - of a party at the dead end beside an idle partner (the egg of a hero whose player plays,
+##    every hatched hero IDLE) once that has lasted PartyTuning.IDLE_WIPE_TICKS ticks ([method _wipe_check]).
 ## Called by others (each only in a party; check `level.party_driver` and has_method):
 ##  - [method weapon_pass] from HeroParty.weapon_pass (player-A) at the start of a hero's WEAPONS pass: his projectiles
 ##    and his club box first hatch eggs and bat curled partners (Batter Up, C.11), and are consumed by it.
@@ -64,6 +66,10 @@ var active_mask: int = 0
 
 ## Sign of the wind the lee mask of the last tick was made for (0: no lee).
 var _lee_sign: int = 0
+## Phase 4 ruling Q3 (DESIGN.md G86), NO DEAD END BESIDE AN IDLE PARTNER: ticks in a row that ended with the party at
+## that dead end ([method _idle_dead_end]: the egg of a hero whose player plays, every hatched hero IDLE, no death
+## toss running). 0 on every tick that ends otherwise; at PartyTuning.IDLE_WIPE_TICKS the team is wiped.
+var idle_wipe_ticks: int = 0
 ## Bit per slot: that hero was an egg at the last wipe check ([method _wipe_check]: a fresh egg is a hero going down).
 var _egg_mask: int = 0
 ## Relay Bounce: enemy instance id -> slot of the hero who bounced on it last.
@@ -143,6 +149,7 @@ func _on_level_reset() -> void:
 	wipe_pending = false
 	active_mask = 0
 	_egg_mask = 0
+	idle_wipe_ticks = 0
 	_lee_sign = 0
 	var level: LevelBase = Game.level
 	if level != null:
@@ -539,10 +546,14 @@ static func clamp_egg(feet: Vector2i, frame: Rect2i) -> Vector2i:
 ## wf11 R6 (6), "the wipe when the last COUNTING hero goes down": on the tick a hero who COUNTED (not idle) becomes an
 ## egg, the team is wiped too when nobody is left who counts - every other hero an egg or IDLE (PlayerBase.idle).
 ## Before, a player who went down beside a hatched partner whose pad lay on the table was an egg nobody could hatch.
-## It is the going down of a hero who plays that wipes: an idle hero turning egg (the leash's catch) wipes nothing,
-## and neither does a hero who puts the pad down while his partner is an egg.
+## It is the going down of a hero who plays that wipes at once: an idle hero turning egg (the leash's catch) wipes
+## nothing, and a hero who puts the pad down while his partner is an egg wipes nothing on that tick.
+## Phase 4 ruling Q3 (DESIGN.md G86), "no dead end beside an idle partner": that last case was an egg that waited for
+## ever. Now a clock runs while the party is at that dead end ([method _idle_dead_end], [member idle_wipe_ticks]) and
+## after PartyTuning.IDLE_WIPE_TICKS such ticks in a row the team is wiped as when both are down.
 func _wipe_check(level: LevelBase, order: Array[PlayerBase]) -> void:
 	if wipe_pending or level.completed or order.is_empty():
+		idle_wipe_ticks = 0
 		return
 	var eggs: int = 0
 	var all_eggs: bool = true
@@ -554,20 +565,62 @@ func _wipe_check(level: LevelBase, order: Array[PlayerBase]) -> void:
 	var fresh: int = eggs & ~_egg_mask
 	_egg_mask = eggs
 	if not all_eggs:
-		if fresh == 0 or not _r6_on():
+		if not _r6_on():
+			idle_wipe_ticks = 0
 			return
-		var counted: bool = false
-		for hero: PlayerBase in order:
-			if hero.dead:
-				return  # a toss is running: LevelBase.hero_death_finished decides when it ends
-			if (fresh & (1 << hero.slot)) != 0:
-				counted = counted or not hero.idle
-			elif not hero.down and not hero.idle:
-				return  # somebody still plays
-		if not counted:
+		# The clock is counted on every tick (it falls to 0 on a tick that does not end at the dead end).
+		var stuck: bool = _idle_dead_end(order, eggs)
+		if not stuck and not (fresh != 0 and _last_counting_went_down(order, fresh)):
 			return
 	wipe_pending = true
+	idle_wipe_ticks = 0
 	level.team_wipe()
+
+
+## wf11 R6 (6): true when the heroes of `fresh` (bit per slot: they became eggs on this tick) include one who COUNTED
+## (not idle) and nobody is left who counts - every other hero an egg or IDLE - with no death toss running (a toss is
+## LevelBase.hero_death_finished's to decide when it ends).
+func _last_counting_went_down(order: Array[PlayerBase], fresh: int) -> bool:
+	var counted: bool = false
+	for hero: PlayerBase in order:
+		if hero.dead:
+			return false  # a toss is running: LevelBase.hero_death_finished decides when it ends
+		if (fresh & (1 << hero.slot)) != 0:
+			counted = counted or not hero.idle
+		elif not hero.down and not hero.idle:
+			return false  # somebody still plays
+	return counted
+
+
+## Phase 4 ruling Q3 (DESIGN.md G86): one tick of the dead-end clock; true on the tick it reaches
+## PartyTuning.IDLE_WIPE_TICKS (the caller wipes the team). THE DEAD END (`eggs`: bit per slot of the heroes who are
+## eggs at the end of this tick; the caller has seen that not every hero is one): some hero is an egg whose OWN PLAYER
+## PLAYS - his slot gave input within PlayerBase.IDLE_TICKS (PlayerBase.idle is false; an egg's nudge and any held key
+## are input) - while every hatched hero is IDLE, so nobody can hatch him, and no hero is in his death toss (the toss
+## decides first, as ever). Each such tick adds one to [member idle_wipe_ticks]; every other tick - a hatched hero's
+## key, a hatch, a toss, the egg's own player leaving his pad - puts it back to 0. Two pads on the table never start
+## it: an egg whose player is away is stuck for nobody, and the wipe is the stuck player's way out, not a fee for a
+## rest. PartyTuning.IDLE_WIPE_TICKS <= 0 switches the rule off. No picture, no sound: the "Zzz" over the dozing
+## hero is the warning (G58).
+func _idle_dead_end(order: Array[PlayerBase], eggs: int) -> bool:
+	var stuck: bool = eggs != 0 and PartyTuning.IDLE_WIPE_TICKS > 0
+	if stuck:
+		var plays: bool = false
+		for hero: PlayerBase in order:
+			if hero.dead:
+				stuck = false  # a death toss is running
+				break
+			if hero.down:
+				plays = plays or not hero.idle
+			elif not hero.idle:
+				stuck = false  # a hatched hero counts: he can hatch the egg
+				break
+		stuck = stuck and plays
+	if not stuck:
+		idle_wipe_ticks = 0
+		return false
+	idle_wipe_ticks += 1
+	return idle_wipe_ticks >= PartyTuning.IDLE_WIPE_TICKS
 
 
 ## `hero` becomes an egg at `at` clamped into the view (no toss; PHYSICS.md C.12, C.13).

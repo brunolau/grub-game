@@ -1,0 +1,34 @@
+header: # route: level=w5_l1_coop difficulty=beginner players=2 ends=exit after=tally expect=hurts:0,eggs:0,wipes:0,x2_gates:3,min_checkpoints:4,min_kills:7
+header: # The Beginner two-stream route of Red Mesa Trail in co-op (designer D5; one key set per player: P1|P2; recorded from
+header: # closed-loop duo macros, build/d5). Both heroes keep the club (no S), so the belt-invariance runner sees the same
+header: # digests whatever special rides on either belt. All three co-op gates are crossed together:
+header: # 'hop' (Shoulder Hop + the rolled vine), 'plates' (leapfrog plate doors), 'gully' (the bonded tortoises).
+header: # Re-recorded in wf11 (levels; build/levels/rec_d5, D5's macro recorder) on the rebuilt gully: its keepers are
+header: # two bonded tortoises (DESIGN G72: a bond is met only by two heroes) - P1 at the first, P2 at the second,
+header: # both strike on the same tick.
+out: w5_l1_coop.inputs
+seg: The beach, the tortoises, the rattler, checkpoint 1, the arch, the tortoise after it (side by side, P2 behind)
+raw: 77:R|R,8:F|F,2:|,6:R|R,8:RU|RU,12:R|R,6:|,10:R|R,6:|,6:R|R,8:F|F,2:|,16:R|R,8:F|F,2:|,60:R|R,12:R|R,8:F|F
+seg: Gate hop: P1 stands under the cliff, P2 jumps on his head holding Jump (Shoulder Hop) onto the cliff top and\nstrikes the rolled vine at its edge; P1 climbs it
+p1: R?x>=1350 *30 ?py<=180&&pg;300 *24 U?c;30 U?g&&y<=176;150
+p2: R?x>=1300 *4 ?x<=px-30;100 R?x>=px-34;60 RU*4 U*9 RU*14 R?g;60 L?x<=1408;40 ?vx==0;20 F*8 *8 R*6 *2
+seg: Checkpoint 2, both over the crevasse onto the plateau (P2 first)
+p1: *16 R?x>=1566 RU*10 R?g R?x>=1690 ?vx==0
+p2: R?x>=1566 RU*10 R?g R?x>=1744 ?vx==0
+seg: Gate plates: P1 holds plate A (the lower tunnel's door opens), P2 walks through to plate B (the upper tunnel's\ndoor opens), P1 jumps onto the step and walks through the upper tunnel
+p1: ?px>=1876&&pg;200 *6 U*12 ?g;30 *4 RU*6 U*6 R?g&&y<=130;60 R?x>=1904;80 R?g&&y>=190;60
+p2: *12 R?x>=1878;120 ?vx==0
+seg: P1 drops off the upper tunnel's ledge, both go down the long slope to the plain, P1 clubs the tortoise
+p1: R?x>=2180;200 R?ex(138,147)-x<=36;200 F*8 *8
+p2: *10 R?x>=2140;200 ?ec(138,147)==0;300
+seg: Gate gully: P1 drops into the gully through the first hole and walks up to the first tortoise; P2 runs over
+the crust, drops through the second hole onto the hatch, crouches through it and walks up to the second one;
+both strike on the same tick - the bond is met, the keeper door rises
+p1: R?x>=2404;100 ?g&&y>=350;60 ?vx==0;20 R?ex(152,158)-x<=44;60 ?vx==0;20 |hit F*8 *8 ?ec(152,167)==0;100
+p2: R?x>=2380;100 RU*8 R?g;40 R?x>=2552;100 ?g;60 D*12 ?g&&y>=350;30 ?vx==0;20 R?ex(161,167)-x<=44;60 ?vx==0;20 |hit F*8 *8 ?ec(152,167)==0;100
+seg: Through the keeper door, past checkpoint 4, both up the long slope: the Rollers roll down and are jumped
+p1: *6 @goto:3330:e
+p2: *20 @goto:3300:e
+seg: P1 clubs the last tortoise as it comes, both into the exit totem
+p1: @strike:208,216 R?x>=3456;120
+p2: ?ec(208,216)==0;200 R?x>=3440;160

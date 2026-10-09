@@ -237,6 +237,32 @@ static func _gate_rules_off_from_env() -> int:
 	return OS.get_environment("PRE2_GATE_RULES_OFF").to_int() if OS.is_debug_build() else 0
 
 
+# --- 2.0 phase 4 ruling Q4 (DESIGN.md G87): the ward's grace is short -------------------------------------------------
+## The clock of a ward stomp's pass while the fall of that stomp still lasts ([method ward_grace_step]).
+const WARD_FALLING: int = -1
+## How many ticks the pass of a stomp in a ward (Player._ward_heads, objects/mount) outlasts the fall: the value of
+## PartyTuning.WARD_GRACE_TICKS (12). A copy that can be written so that a TEST can measure the rule against the one
+## before it - a negative value is "until the boxes part", the pass as first built (G73), under which a hero standing
+## inside a keeper was sheltered for as long as he stood there. The game and the tools never write it.
+static var ward_grace_ticks: int = PartyTuning.WARD_GRACE_TICKS
+
+
+## One tick of the clock of a ward stomp's pass (the hero keeps one per stomped head, a ridden mount too): `since` is
+## [constant WARD_FALLING] while the fall of the stomp lasts, then the ticks since the first tick on which there was
+## ground, a platform, a carrier, a vine or a saddle under him (`landed`, as the contact pass of this tick finds
+## him) - 0 on that tick. Returns the clock after this tick.
+static func ward_grace_step(since: int, landed: bool) -> int:
+	if since >= 0:
+		return since + 1
+	return 0 if landed else WARD_FALLING
+
+
+## True when a pass whose clock reads `since` ([method ward_grace_step]) is over: more than [member ward_grace_ticks]
+## ticks after the landing. From that tick on the enemy's body is a body like any other.
+static func ward_grace_over(since: int) -> bool:
+	return ward_grace_ticks >= 0 and since > ward_grace_ticks
+
+
 # --- 2.0 wf11 ruling R1: a spring is a launch (co-op only; [method spring_bounce], [method hold_launch]) --------------
 ## True from the tick a spring (a pad, a cap, a pot spring) or any [method launch] (a geyser, a see-saw, a vine leap,
 ## a bat, a dismount, a hatch) threw this hero of a co-op party until he next has ground, a platform, a carrier, a

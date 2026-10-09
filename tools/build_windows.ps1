@@ -21,7 +21,8 @@
        do not allow, nothing the filters ship missing (the test gets the exe through CLUBANDGRUB_RELEASE_EXE),
     7. puts the licence texts next to the exe (build\windows\licenses\: CREDITS.md and every file of
        assets\licenses\, the same texts the game shows in Credits > Licences) and packs the release zip
-       build\ClubAndGrub-<version>-windows.zip (the exe plus that folder).
+       build\ClubAndGrub-<version>-windows.zip (the exe plus that folder); tools\audit_assets.py --shipped then
+       proves that the folder and the zip hold every licence text byte for byte and nothing else.
 
     Every failure stops the script with a message and exit code 1. Godot runs take turns with .tools/gd.sh through
     the lock directory build\.godot_lock (the import and the export alone, the tests beside other runs), so the
@@ -449,6 +450,17 @@ try {
 if ($entryNames.Count -ne $licenseFiles.Count + 1 -or $entryNames -notcontains $ExeName -or
         @($entryNames | Where-Object { $_.Contains("\") }).Count -gt 0) {
     Stop-Build "the release zip does not hold exactly $ExeName and licenses/ ($($entryNames.Count) entries)"
+}
+# The licence texts as shipped, against the project's own (the audit's second check): the folder next to the exe and
+# the licenses/ folder inside the zip hold CREDITS.md and every file of assets\licenses\ byte for byte, nothing else.
+foreach ($shipped in @($LicenseDir, $ZipPath)) {
+    $shippedCheck = Invoke-Program $python @((Join-Path $Root "tools\audit_assets.py"), "--shipped", $shipped) `
+        (Join-Path $LogDir "audit_shipped") 300
+    @($shippedCheck.Output -split "`r?`n" | Where-Object { $_ -match '^(GAP |LICENCE TEXTS SHIPPED:)' }) |
+        Select-Object -First 20 | ForEach-Object { Write-Host "    $_" }
+    if ($shippedCheck.ExitCode -ne 0 -or $shippedCheck.Output -notmatch '(?m)^LICENCE TEXTS SHIPPED: PASS') {
+        Stop-Build "the licence texts in $shipped are not the project's (exit code $($shippedCheck.ExitCode)); see $LogDir\audit_shipped.*.txt"
+    }
 }
 Write-Host ("    {0} licence file(s) in {1}" -f (@(Get-ChildItem -LiteralPath $LicenseDir -File)).Count, $LicenseDir)
 Write-Host ("    {0} ({1:N1} MB)" -f $ZipPath, ((Get-Item -LiteralPath $ZipPath).Length / 1MB))

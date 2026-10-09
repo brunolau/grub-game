@@ -1,0 +1,21 @@
+header: # route: level=w5_l2b_coop difficulty=expert players=2 ends=exit after=tally expect=eggs:0,wipes:0,painting:2,unlocked:true
+header: # The Expert two-stream route of Tusker's Wallow in co-op (designer D5; P1|P2, recorded from closed-loop duo macros
+header: # and a duo bot, build/d5). Club only, no S (belt invariance). The co-op Tusker (DESIGN.md B.1): while it lies open
+header: # it faces the nearer caveman, so one hero stands at its head and the other clubs its leafy rump; in phase 3 both
+header: # crouch side by side (a Brace Wall) and club it while it is dazed.
+out: w5_l2b_coop.expert.inputs
+seg: Both jump the shellback tortoise (Expert); onto the step and the mesa, off its far side; P1 breaks the\nwall of the painting's chamber and takes the Cave Painting
+p1: *4 R?x>=70 ?ex(8,14,"walker")-x<=70&&ex(8,14,"walker")>x;300 RU*10 R?g R?x>=186 RU*10 R?g R?x>=226 RU*12 R?g R?x>=346;200 *3 ?g&&y>=170 *6 L*1 *3 ?ed()<=40;200 UF*8 *8 L*1 *3 F*8 *8 F*8 *8 F*8 *8 F*8 *8 L?x<=286;80 *2 R?x>=300
+p2: *30 R?x>=60 ?px>=226;300 ?ex(8,14,"walker")-x<=92&&ex(8,14,"walker")>x&&exv(8,14,"walker")<0;300 RU*10 R?g R?x>=186 RU*10 R?g R?x>=226 RU*12 R?g ?px<=300&&py>=170;400 R?x>=330 ?vx==0
+seg: P1 clubs the rattler from outside its reach; both jump the shellback tortoise; checkpoint
+p1: @strike:26,30,40,w,snapper R?x>=420 ?ex(29,36,"walker")-x<=70&&ex(29,36,"walker")>x;300 RU*10 R?g R?x>=596 ?vx==0
+p2: ?ec(26,30,"snapper")==0;300 R?x>=410 ?px>=560;300 ?ex(29,36,"walker")-x<=70&&ex(29,36,"walker")>x;300 RU*10 R?g ?px>=590&&pvx==0;200 R?x>=640 ?vx==0
+seg: P2 drops down the shaft into Tusker's pit (the arena takes P1 along onto the left bank); P2 to the right bank
+p1: ?py>=280;100 ?g&&y>=300;60 ?vx==0
+p2: R?x>=722 R?g&&y>=340;80 R?x>=870;100 ?g;30 RU*10 R?g&&y<=306;40
+seg: The duo bot: rump pincers while the boar lies open, then the Brace Wall of phase 3
+p1: @tduo
+p2: @tduo
+seg: Both wait for the bonus burst to land; P1 picks up the fire-starter on the right bank; both into the exit totem
+p1: *2 ?np()==0;200 *40 R?x>=872 RU*10 R?g&&y<=306;40 R?x>=938;40 ?vx==0 L?x<=924;40
+p2: *2 ?np()==0;200 *60 R?x>=876 RU*10 R?g&&y<=306;40 R?x>=914;40

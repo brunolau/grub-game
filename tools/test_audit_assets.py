@@ -22,6 +22,7 @@ import zlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+sys.dont_write_bytecode = True  # no tools/__pycache__ file: .tools/gd.sh would re-import the project for it
 import audit_assets as A  # noqa: E402
 
 FEAST_SCRIPT = "docs/art/expansion/pipeline/build_feast_skins.py"
@@ -363,6 +364,13 @@ class Credits(TempProject):
         edit(self.root, "assets/licenses/README.md", "`tune_pack.txt`", "")
         self.assertEqual(codes(self.root), ["licence-index"])
 
+    def test_licence_index_lists_a_file_that_is_not_there(self) -> None:
+        edit(self.root, "assets/licenses/README.md", "# Licences\n",
+             "# Licences\n\n| File | Pack |\n|---|---|\n| `tune_pack.txt` | Tune Pack |\n| `gone_pack.txt` | Gone |\n")
+        found = [f.text for f in A.audit(self.root, use_git=False)[0]]
+        self.assertEqual(len(found), 1, found)
+        self.assertIn("`gone_pack.txt`", found[0])
+
     def test_credits_row_licence_differs(self) -> None:
         edit(self.root, "CREDITS.md", "| https://example.org/tunes | CC0 1.0 |",
              "| https://example.org/tunes | CC-BY 3.0 |")
@@ -460,7 +468,8 @@ class StrayFilesImportsFormats(TempProject):
         self.assertEqual(codes(self.root), [])
 
     def test_audio_table_names_a_missing_file(self) -> None:
-        edit(self.root, "scripts/core/audio_table.gd", '"files": ["jump_a.wav"]', '"files": ["jump_a.wav", "jump_b.wav"]')
+        edit(self.root, "scripts/core/audio_table.gd", '"files": ["jump_a.wav"]',
+             '"files": ["jump_a.wav", "jump_b.wav"]')
         self.assertEqual(codes(self.root), ["audio-table"])
 
     def test_sound_the_table_does_not_play(self) -> None:
@@ -472,6 +481,55 @@ class StrayFilesImportsFormats(TempProject):
         table = A.read_audio_table(self.root)
         self.assertEqual(table["jump_a.wav"], {"dir": "sfx", "db": -3.0, "loop": False, "names": ["JUMP"]})
         self.assertEqual(table["theme_a.ogg"], {"dir": "music", "db": -6.0, "loop": True, "names": ["MUSIC_THEME"]})
+
+
+class ShippedLicenceTexts(TempProject):
+    """--shipped: the licence folder beside a built exe, or the release zip."""
+
+    def build(self) -> str:
+        out = os.path.join(self.root, "build", "windows", "licenses")
+        os.makedirs(out)
+        shutil.copy(os.path.join(self.root, "CREDITS.md"), out)
+        source = os.path.join(self.root, "assets", "licenses")
+        for name in os.listdir(source):
+            shutil.copy(os.path.join(source, name), out)
+        return out
+
+    def test_complete_folder(self) -> None:
+        out = self.build()
+        findings, count = A.check_shipped(self.root, out)
+        self.assertEqual((findings, count), ([], 9))
+        stream = io.StringIO()
+        with contextlib.redirect_stdout(stream):
+            self.assertEqual(A.main(["--root", self.root, "--shipped", out]), 0)
+        self.assertIn("LICENCE TEXTS SHIPPED: PASS (9 files", stream.getvalue())
+
+    def test_missing_changed_and_foreign_files(self) -> None:
+        out = self.build()
+        os.remove(os.path.join(out, "blip_pack.txt"))
+        put(self.root, "build/windows/licenses/tune_pack.txt", "shortened\n")
+        put(self.root, "build/windows/licenses/notes.txt", "not a licence\n")
+        texts = sorted(f.text for f in A.check_shipped(self.root, out)[0])
+        self.assertEqual(texts, ["blip_pack.txt is missing", "notes.txt is not a licence text of the project",
+                                 "tune_pack.txt differs from the project's file"])
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(A.main(["--root", self.root, "--shipped", out]), 1)
+
+    def test_release_zip(self) -> None:
+        import zipfile
+
+        out = self.build()
+        archive = os.path.join(self.root, "build", "release.zip")
+        with zipfile.ZipFile(archive, "w") as handle:
+            handle.writestr("ClubAndGrub.exe", b"MZ")
+            for name in sorted(os.listdir(out)):
+                if name != "font_pack.txt":
+                    handle.write(os.path.join(out, name), "licenses/" + name)
+        texts = [f.text for f in A.check_shipped(self.root, archive)[0]]
+        self.assertEqual(texts, ["font_pack.txt is missing"])
+
+    def test_not_a_build(self) -> None:
+        self.assertEqual(len(A.check_shipped(self.root, os.path.join(self.root, "nowhere"))[0]), 1)
 
 
 def has_git() -> bool:

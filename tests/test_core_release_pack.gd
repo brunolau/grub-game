@@ -118,7 +118,9 @@ static func is_resource(path: String, resource_extensions: PackedStringArray) ->
 	if path.ends_with(".import") or path.ends_with(".uid"):
 		return false
 	if FileAccess.file_exists("res://" + path + ".import"):
-		return true
+		# A file the editor is told to skip (the sheets of the bitmap fonts: their pixels are inside the imported
+		# .fnt) is no resource and is not exported.
+		return not FileAccess.get_file_as_string("res://" + path + ".import").contains('importer="skip"')
 	return resource_extensions.has(path.get_extension().to_lower())
 
 

@@ -433,6 +433,55 @@ func test_a_stomp_is_a_landing() -> void:
 	assert_eq(referee.stack_of(0), 1, "and steals")
 
 
+func test_a_hero_squeezed_out_of_the_arenas_side_is_knocked_out() -> void:
+	# Phase 4, found by the versus soak (rules=mix: Echo Hollow, Grub Stack with the sudden-death event, seed 4001
+	# round 0): a Cave-in block settled at the arena's edge beside a hero; one step into its column and the 1.0
+	# collision slid him through it and out of the map, 10 px beyond the edge, where the x commit rule refuses every
+	# step back - on a top-bottom wrap arena he fell through the seam for the rest of the round. Nobody stays outside
+	# the arena's sides: the arena that squeezed him out has crushed him.
+	_arena(2, [100, 250])
+	_give(heroes[1], 6)
+	var view: Rect2i = VersusArena.view_rect()
+	heroes[1].teleport(Vector2i(-10, FLOOR_Y))
+	Sim.step(1)
+	assert_true(heroes[1].dead, "left of the arena: knocked out")
+	assert_eq(kos.size(), 1, "one knock-out")
+	if kos.size() == 1:
+		assert_eq(kos[0][0], heroes[1])
+		assert_eq(kos[0][2], VersusReferee.CAUSE_SQUEEZED, "the Cave-in's crush")
+	assert_eq(referee.stack_of(1), 0, "a hazard's knock-out: the stack is spilled")
+	Sim.step(VersusTuning.RESPAWN_TICKS + 1)
+	assert_false(heroes[1].dead, "Grub Stack: back after the respawn time")
+	assert_true(view.has_point(heroes[1].sim_pos - Vector2i(0, 1)), "inside the arena (%s)" % heroes[1].sim_pos)
+	# Inside the view nothing happens - also in the 8 px at the edge that no walker reaches by himself.
+	heroes[0].teleport(Vector2i(3, FLOOR_Y))
+	Sim.step(1)
+	assert_false(heroes[0].dead, "x 3 is inside the arena")
+	heroes[0].teleport(Vector2i(view.end.x - 1, FLOOR_Y))
+	Sim.step(1)
+	assert_false(heroes[0].dead, "so is the last pixel column")
+	heroes[0].teleport(Vector2i(view.end.x + 10, FLOOR_Y))
+	Sim.step(1)
+	assert_true(heroes[0].dead, "right of the arena: knocked out too")
+	# Last Caveman Standing: a hazard's knock-out is final - and the other one has won.
+	_mode(Defs.VersusMode.LAST_CAVEMAN)
+	ended.clear()
+	heroes[1].teleport(Vector2i(-10, FLOOR_Y))
+	Sim.step(2)
+	assert_true(referee.is_out(1), "out of the round")
+	assert_eq(ended.size(), 1, "the round is over")
+	if ended.size() == 1:
+		assert_eq(ended[0], PackedInt32Array([0]), "the last caveman standing")
+
+
+func test_an_arena_that_wraps_left_right_has_no_side_to_be_squeezed_out_of() -> void:
+	_arena(2, [100, 250], "lr")
+	heroes[1].teleport(Vector2i(-10, FLOOR_Y))
+	Sim.step(2)
+	assert_false(heroes[1].dead, "Totem Ring's sides are a seam, not an edge")
+	assert_eq(kos.size(), 0)
+
+
 func test_a_pair_ramming_each_other_is_knocked_once_not_lifted() -> void:
 	# core-B's floating pair: both hold toward each other; after a knock they are in the air and only nudged apart
 	# until they land - they never rise off the screen.
@@ -1520,6 +1569,56 @@ func test_clubball_sides_goal_pause_and_kickoff() -> void:
 	assert_true(coconut.in_play(), "back at its drop point")
 	assert_eq(heroes[0].sim_pos, Vector2i(64, FLOOR_Y), "kick-off: every hero at his side's spawn")
 	assert_eq(heroes[0].shield, VersusTuning.SPAWN_SHIELD_TICKS - 1, "shielded (counting)")
+
+
+func test_clubball_a_coconut_wedged_in_a_wall_is_lost_and_drops_in_again() -> void:
+	# Phase 4, found by the versus soak (tools/bots/soak.sh: Coconut Cove, seed 4075 round 2, three and four CPUs): a
+	# lob came down INSIDE the block over a goal mouth - the coconut at rest on the cell under it, its centre in a wall
+	# cell, where no strike reaches it - and the golden coconut, which has no clock, never ended. A coconut that lies
+	# so for VersusClubball.WEDGED_TICKS is lost: out of play, then in again at its drop point; nobody scores.
+	var coconut: Coconut = _clubball()
+	if coconut == null:
+		return
+	var drop: Vector2i = coconut.drop_point
+	# Inside the floor's upper row, at rest on its lower row (rows 10 and 11 are solid).
+	var inside: Vector2i = Vector2i(200, FLOOR_Y + Tuning.TILE)
+	heroes[0].teleport(Vector2i(150, FLOOR_Y))
+	coconut.teleport(inside)
+	coconut.xvel = 0
+	coconut.yvel = 0
+	Sim.step(1)
+	assert_eq(coconut.sim_pos, inside, "it rests there")
+	assert_eq(Vector2i(coconut.xvel, coconut.yvel), Vector2i.ZERO)
+	assert_eq(level.grid.side_at(coconut.center().x >> 4, coconut.center().y >> 4), TileGrid.SIDE_WALL,
+			"its centre is in a wall cell")
+	Sim.step(VersusClubball.WEDGED_TICKS - 2)
+	assert_true(coconut.in_play(), "one tick before: still wedged")
+	assert_eq(referee.clubball.wedged_ticks, VersusClubball.WEDGED_TICKS - 1)
+	Sim.step(1)
+	assert_false(coconut.in_play(), "lost: out of play")
+	assert_eq(referee.clubball.wedged_resets, 1)
+	assert_eq([referee.goals_of(1), referee.goals_of(2)], [0, 0], "nobody scores")
+	Sim.step(VersusTuning.BALL_RESET_TICKS)
+	assert_true(coconut.in_play(), "and in again")
+	assert_eq(coconut.sim_pos.x, drop.x, "over its drop point")
+	assert_true(coconut.sim_pos.y <= FLOOR_Y, "above the floor (%s)" % coconut.sim_pos)
+	assert_eq(heroes[0].sim_pos, Vector2i(150, FLOOR_Y), "no kick-off: the heroes stay where they are")
+	assert_eq(referee.phase, VersusReferee.PHASE_PLAY, "the game goes on")
+	# A coconut lying still on the floor is nobody's business.
+	coconut.teleport(Vector2i(200, FLOOR_Y))
+	coconut.xvel = 0
+	coconut.yvel = 0
+	Sim.step(VersusClubball.WEDGED_TICKS * 2)
+	assert_true(coconut.in_play(), "a coconut at rest on open ground stays in play")
+	assert_eq(referee.clubball.wedged_resets, 1)
+	# The golden coconut stays golden through it.
+	referee.clubball.start_golden()
+	coconut.teleport(inside)
+	coconut.xvel = 0
+	coconut.yvel = 0
+	Sim.step(VersusClubball.WEDGED_TICKS + VersusTuning.BALL_RESET_TICKS + 1)
+	assert_eq(referee.clubball.wedged_resets, 2)
+	assert_true(coconut.in_play() and coconut.golden, "the golden coconut drops in again, golden")
 
 
 func test_clubball_rallies_escalate_through_the_coconut() -> void:

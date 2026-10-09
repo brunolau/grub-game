@@ -1326,8 +1326,8 @@ sub-stage keeps its first half's music, a co-op file its solo file's.
   dull thud - instead of the ring and the boing - says the head gave nothing. **The enemy shows the ward** [G85]:
   in a co-op party every enemy whose feet column is in a ward wears the **ward mark**, chalk-white tribal stripes
   on its body (drawn only; on and off as it crosses the ward's edge; never on a boss, never in solo play), and a
-  sign at the first ward of co-op 1-1 and of co-op 5-1 says "Marked beasts are no stepping stones - use your
-  partner's shoulders!". A Snatcher does not seize there (its touch is the plain hurt) and lets go
+  sign at the first ward of co-op 1-1 and of co-op 5-1 says "Marked beasts are no steps - use your partner's
+  shoulders!". A Snatcher does not seize there (its touch is the plain hurt) and lets go
   of a hero it carries at the ward's edge. Keepers are enemies; bosses, the partner's shoulders, mounts, rafts,
   lifts, springs and everything that can be clubbed open are as everywhere. Near a gate an enemy is something to
   fight and never something to climb: one hero cannot lead a follower to a ledge and ride it up. Never in
@@ -1371,6 +1371,12 @@ of the enemy records carry a trait, and every enemy guarding a main-path chokepo
 | `leech` | it lands on a hero's back (instead of hurting) and drains one bone per 44 ticks; only the partner's weapon reaches it (the host's own boxes skip it); alone it falls off after 220 ticks | a hero cannot hit his own back |
 | `split` | the first hit splits it (no damage) into two halves of `hp` 0 that run apart at 48 v16 for 22 ticks *(tune)*, then go on at their archetype's own speed in the run's direction (the spawned half wears the other palette and shows `squash`); both must die within the window, or the dead half regrows next to the living one and they merge back into the whole. Under one hit per strike (13.9.4) the swing whose hit split the record never hurts that record's half again - it may still hit the spawned half once - so the record's half takes a new strike [G63]. The falling tar blobs of 6-1 are `enemies/dropper coop=split skin=slime` | the halves run in opposite directions, one swing no longer clears both, and the two halves must fall to two different heroes [G72] |
 
+- **What kills past a trait** [G92]: a `heavy` that no Brace Wall has dazed and the last member of a bond or a split
+  refuse every death that is no accepted weapon hit - a feast's touch, a kill-all, a grenade, a mount's bite, a
+  glider dive. A `shell` or a `daze` record does not: **as built in 2.0.0 a feasting hero kills it by touch**, a
+  keeper too (measured: with a kit carried in from 7-1, one hero opens the keeper door of 8-1 'hall'). Decided, not
+  built: in a co-op party every keeper and every `shell` and `daze` record dies only of a weapon hit its trait
+  accepts.
 - Keeper groups: enemies may carry `keeper=<name>` (a group tag; a door `objects/column trigger=keepers:<name>` opens
   when every enemy of the group is dead) [R10]. **A flying keeper holds its perch** [G66]: a Harrier with `keeper=`
   never takes off - a hero within its `range` makes it turn and screech (drawing and sound only), and it stays on its
@@ -1488,7 +1494,8 @@ The Beginner wall is unchanged in both books.
 Existing attacks (forward strike damaging from tick 5, high strike as anti-air, low strike, stomp, the crouch-charged
 strike, thrown specials) with the versus rules of P-C.14: hits knock away (+/-64, -128), a charged hit launches,
 clang, deflect, the stomp ladder 1-2-3-4-6-8 with an 8-tick squash (a stomp is a landing: a hero standing on a tier
-does not stomp a head that rises into his feet [G15]), the curl stance (and batting a curled rival into a hazard),
+does not stomp a head that rises into his feet [G15]; and it comes from above: the stomper's feet are higher than his
+victim's, so two heroes falling side by side at one height stomp nobody [G93]), the curl stance (and batting a curled rival into a hazard),
 12 stunned + 30 immune ticks, hit-stop 2 (4), body bump, 48-tick spawn shield. Thrown specials that hit a wall lie in
 front of its face, never inside it [G17]. Everyone starts every round with the club; specials come from pterodactyl
 crates straight onto the belt and are temporary. Spawns rotate every round (the physics is left-right asymmetric).
@@ -1543,7 +1550,9 @@ with Strike (one per 73 ticks, a 10-tick squawk first; a rock dazes 12 ticks and
 Among the sides still standing the one with more heroes standing wins (2v2), then the one with more lives (Stock),
 then the one with the **fewest hurts taken** this round (one per heart lost, a charged hit two; healing takes none
 back); sides still level share **a draw** - nobody scores the round. The mode shows no sundial until the cap is
-armed; from then the HUD's sundial counts its 60 s down (its number red from 10 s) and the round ends on the gong.
+armed; from then the HUD's sundial counts its 60 s down (its number red from 10 s) and the round ends on the gong;
+the round banner then reads **"TIME!"** with the result as its second line ("P1 wins the round!", "Draw!"), in the
+alarm colour of "SUDDEN DEATH!" (built in phase 4: `VersusReferee.ended_by_cap`, the string `UI_VS_TIME`).
 No round lasts for ever between two players who hide (rounds on Colossus Hall and Echo Hollow did, and on Totem
 Ring, where its stampede ran along the totem's top until the round's fix put it on the floor),
 and no match either: three drawn rounds in a row end the match on its standings - the most round wins, else a
@@ -1573,7 +1582,9 @@ picks a new holder among the rest with a new fuse. Last one standing wins; first
   component stays within +/-288. The striker is not knocked down by his own shot for 8 ticks. A curled hero flying as
   a ball passes his velocity to the coconut once per flight (credited to his batter); he flies on.
 - A coconut faster than 8 px/tick on either axis that touches a hero knocks him down (12 stunned ticks, no
-  immunity) and bounces back at half speed; a slower one passes through bodies.
+  immunity) and bounces back at half speed; a slower one passes through bodies. A coconut that comes to rest
+  inside a wall (a fast shot can end in the block over a goal mouth) for 24 ticks is lost and drops in again at
+  the drop point, as after a goal; nobody scores [G93].
 - **Goals** (`zones/goal team=1|2`): a goal mouth 3 rows high at each end; the coconut's centre inside the other
   team's goal scores; it is reset to the drop point 66 ticks later, heroes back at their spawns. First to 5 goals, or
   the most after 4 370 ticks (3 min); a tie plays on with a "golden coconut" (next goal wins).
@@ -1631,7 +1642,8 @@ outside Clubball, and Colossus Hall's neutral statue.
 | Rockslide (canyon) | rocks from the mesa rims every 33 ticks, dust 14 ticks ahead |
 | Lightning (sky) | a marked cell every 33 ticks, 22 ticks ahead |
 
-They start at 1 457 ticks in Last Caveman Standing and are an event toggle in the other modes.
+They start at 1 457 ticks in Last Caveman Standing and are an event toggle in the other modes. A hero whom a
+Cave-in block squeezes out of the arena's side (no left-right wrap) is knocked out as by a hazard [G93].
 
 #### 13.10.10 Bots
 
@@ -1692,7 +1704,7 @@ designer records every change in DESIGN.md D.12 first, then here and in PHYSICS 
 | Idle partner, its warning, the idle wipe [G33] [G58] [G86] | 243 ticks; "Zzz soon" from 170; an egg beside an idle partner wipes after 73 | HUMAN_CHECKS.md (a holder who waits, a pair that rests on a ride) |
 | Last Caveman Standing hard cap [G78] | 1 457 ticks (60 s) after the sudden death starts | bot soak, playtests |
 | Drawn rounds that end a match [G78] | 3 in a row | playtests |
-| Spawn fairness of an (arena, mode) [G80] | within +/-15 % per spawn, claimed on at least 384 rounds (the bot module's 48-round sets are the regression pin) | the bot soak; Sky Picnic's Grub Stack measured +17.7 and is P4's |
+| Spawn fairness of an (arena, mode) [G80] | within +/-15 % per spawn, claimed on at least 384 rounds (the bot module's 48-round sets are the regression pin) | the bot sets; Sky Picnic's Grub Stack measured +17.7 at G3 and +6.0 after phase 4 gave each lip of its hole a big spot of its own (before the stomp rule of [G93], which re-rolls every set) |
 
 ---
 

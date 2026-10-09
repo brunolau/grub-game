@@ -3,7 +3,9 @@
 They pin the decisions written into the specs after gate G1 and phase 2 (DESIGN.md "Appendix: G1 and phase-2
 resolutions") against the code that implements them, the phase-3 briefs (DESIGN.md A.6) against GAMEPLAY 13.2, the
 music table (LEVEL_DESIGN 15.2) against `Sfx` and the level files, the rulings of the round after G3b (G71-G79:
-the ward of every x2 tablet against the columns where the evidence routes took their lift), and the request files
+the ward of every x2 tablet against the columns where the evidence routes took their lift), the phase-4 rulings
+(G84-G91: the values 2.0 ships with against every tuning constant, the ward coverage against the level files,
+docs/expansion/HUMAN_CHECKS.md against the gates, arenas and music files of the tree), and the request files
 addressed to the lead designer against their replies. Standard library only, read-only. Run from the project root:
 
     python -m unittest discover -s docs/spec -p "test_*.py" -v
@@ -1383,7 +1385,7 @@ class CausesByRule(unittest.TestCase):
         party = _gd_consts("scripts/core/party_tuning.gd")
         _pending(self, "WARD_MARGIN_CELLS" in party, "party: PartyTuning.WARD_MARGIN_CELLS = 12 (wf11_lead_design_to_party.txt #1)")
         self.assertEqual(party["WARD_MARGIN_CELLS"], 12)
-        self.assertNotIn("WARD_PASS_TICKS", party, "the pass lasts until the boxes part: no clock [G73]")
+        self.assertNotIn("WARD_PASS_TICKS", party, "the pass's clock is WARD_GRACE_TICKS since phase 4 [G87]")
 
     def test_the_cap_in_code(self):
         versus = _gd_consts("scripts/core/versus_tuning.gd")
@@ -1534,6 +1536,467 @@ class G3cIntegration(unittest.TestCase):
             self.assertTrue(os.path.isfile(os.path.join(ROOT, tool)), tool)
 
 
+# ---------------------------------------------------------------------------------------------------------------------
+# Phase 4 (DESIGN.md G84-G91, 2026-10-09): the orchestrator's rulings Q1-Q7, the values 2.0 ships with, HUMAN_CHECKS.md
+# ---------------------------------------------------------------------------------------------------------------------
+
+COOP_ORDER = ["w1_l1", "w1_l2", "bonus_a", "w2_l1", "w2_l2", "w2_l2b", "bonus_b", "w3_l1", "w3_l1b", "w3_l2", "bonus_c",
+              "w4_l1", "w4_l2", "w4_l2b", "ending", "w5_l1", "w5_l2", "w5_l2b", "bonus_d", "w6_l1", "w6_l2", "w6_l2b",
+              "w7_l1", "bonus_e", "w7_l2", "w7_l2b", "w8_l1", "w8_l2", "w8_l2b", "w9_l1", "w9_l1b", "w9_l2", "w9_l2b",
+              "w9_l3", "ending_b"]
+
+
+def _gd_literals(rel):
+    """`const NAME: int = <int literal>` of a GDScript file whose value is that literal and nothing more (an
+    expression such as `4 * Tuning.TILE` is left out; `_gd_consts` reads its first number)."""
+    out = {}
+    for line in _read(rel).splitlines():
+        m = re.match(r"const (\w+)\s*:\s*int\s*=\s*(-?\d+)\s*(?:#.*)?$", line)
+        if m is None:
+            continue
+        out[m.group(1)] = int(m.group(2))
+    return out
+
+
+def _coop_tablets(level_id):
+    """Every x2 tablet of a co-op file: (gate name or "", secret, first warded column, last warded column), and the
+    file's width in columns."""
+    text = _read("levels/%s_coop.lvl" % level_id)
+    rows = [line for line in text[text.index("[tiles]"):text.index("[entities]")].splitlines()[1:] if line.strip()]
+    width = max(len(line) for line in rows)
+    margin = _gd_consts("scripts/core/party_tuning.gd")["WARD_MARGIN_CELLS"]
+    tablets = []
+    for m in re.finditer(r"(?m)^objects/x2_tablet (\d+) \d+ ([^\n]*)$", text):
+        col = int(m.group(1))
+        far = re.search(r"\bfar=(\d+),\d+", m.group(2))
+        far_col = int(far.group(1)) if far else col
+        ward = re.search(r"\bward=(\d+),(\d+)", m.group(2))
+        left, right = (int(ward.group(1)), int(ward.group(2))) if ward else (margin, margin)
+        gate = re.search(r"\bgate=(\w+)", m.group(2))
+        tablets.append((gate.group(1) if gate else "", re.search(r"\bsecret\b", m.group(2)) is not None,
+                        max(0, min(col, far_col) - left), min(width - 1, max(col, far_col) + right)))
+    return tablets, width
+
+
+class PhaseFour(unittest.TestCase):
+    """[G84]-[G91] the orchestrator's phase-4 rulings Q1-Q7 as recorded: the coil and the shield confirmed, the ward
+    mark, the idle wipe, the ward's grace, 2.0.0 for Windows, nothing public from an agent, the human checks; the
+    register of the values 2.0 ships with; and the main body of DESIGN D saying what G71-G83 built."""
+
+    APPENDIX = DESIGN[DESIGN.index("## Appendix: G1 and phase-2 resolutions"):]
+
+    def _row(self, n):
+        rows = [line for line in self.APPENDIX.splitlines() if line.startswith("| G%d |" % n)]
+        self.assertEqual(len(rows), 1, "one row G%d" % n)
+        self.assertEqual(rows[0].count(" | "), 3, "G%d is one table row of four cells" % n)
+        return rows[0]
+
+    def test_the_rows(self):
+        for n, texts in (
+                (84, ("orchestrator's Q1", "both are **confirmed**", "[G81]", "[G82]")),
+                (85, ("orchestrator's Q2", "**the enemy shows it**", "**ward mark**", "never in solo play",
+                      "**Pure presentation: no simulation value may change through it.**",
+                      "**The mark is the enemy's column, the rule is the hero's**",
+                      "Marked beasts are no stepping stones - use your partner's shoulders", "44.9 %")),
+                (86, ("orchestrator's Q3", "`PartyTuning.IDLE_WIPE_TICKS`", "**73**", "**no hatched hero counts**",
+                      "**whose player plays**", "two pads lying on the table never cost a life")),
+                (87, ("orchestrator's Q4", "`PartyTuning.WARD_GRACE_TICKS`", "**12**", "**that fall**",
+                      "standing inside a keeper is no shelter", "**Why 12**")),
+                (88, ("orchestrator's Q5", "**2.0.0**", "**Windows**", "Nothing is installed outside the project")),
+                (89, ("orchestrator's Q6", "no agent commits, tags, pushes or makes a GitHub release")),
+                (90, ("orchestrator's Q7", "`docs/expansion/HUMAN_CHECKS.md`", "one line per check",
+                      "the file and the value to change if it fails")),
+                (91, ("**D.12 is the register**", "`PartyTuning.IDLE_WIPE_TICKS` = 73",
+                      "`PartyTuning.WARD_GRACE_TICKS` = 12"))):
+            row = self._row(n)
+            for text in texts:
+                self.assertIn(text, row, "G%d" % n)
+        # What phase 4 changed is said in the rows it changed.
+        self.assertIn("**Changed in phase 4**", self._row(73))
+        self.assertIn("**Changed in phase 4**", self._row(76))
+
+    def test_the_main_body_of_d_says_what_was_built(self):
+        self.assertIn("**No dead end beside an idle partner** [G86]", _section(DESIGN, "### D.2"))
+        self.assertIn("waited 73 ticks beside a hatched partner who is idle [G86]", _section(DESIGN, "### D.3"))
+        d4 = _section(DESIGN, "### D.4")
+        self.assertIn("**Every window is slot-bound** [G72]", d4)
+        self.assertNotIn("and never longer than the\nmeasured solo minimum minus 4 ticks (D.8); a level record", d4)
+        d5 = _section(DESIGN, "### D.5")
+        for text in ("Slot-bound [G72]: the drums must be lit by two different heroes who both count",
+                     "by a hero who **stands** there", "`PartyTuning.WARD_GRACE_TICKS`",
+                     "**The enemy shows the ward** [G85]", "**A closed door passes nobody** [G75]",
+                     "As built nine tablets carry `ward=`"):
+            self.assertIn(text, d5)
+        d6 = _section(DESIGN, "### D.6")
+        for text in ("**Two rules lie over every trait**", "**Over a shield there is no behind** [G82]",
+                     "must be credited to two different heroes who both count",
+                     "Never in a ward [G73]", "a lone hero never clears a Tar Splitter"):
+            self.assertIn(text, d6)
+        self.assertNotIn("never where one thrown special hits two of them [G36] |", d6)
+        self.assertIn("**As built at G3** (the 35 co-op files)", _section(DESIGN, "### D.7"))
+        d8 = _section(DESIGN, "### D.8")
+        for text in ("**slot-bound** [G72] [G47]", "confirmed by the orchestrator for the release [G84]",
+                     "**As passed at G3c**: 45 gates in 76", "`HUMAN_CHECKS.md` [G90]"):
+            self.assertIn(text, d8)
+        self.assertIn("**The wards as built**", _section(DESIGN, "### D.9"))
+        d10 = _section(DESIGN, "### D.10")
+        for text in ("kept by a **bond** of two tortoises", "a **charged** Batter Up line drive over the final gap of "
+                     "13 cells of tar", "**After G3b and G3c**"):
+            self.assertIn(text, d10)
+        self.assertNotIn("a keeper gully of two Shellback guards |", d10)
+        self.assertNotIn("`ward=22,12` on 1-1's", d10)
+        d11 = _section(DESIGN, "### D.11")
+        self.assertIn("| Egg beside an idle partner |", d11)
+        self.assertNotIn("(or solo minimum - 4)", d11)
+        self.assertIn("**three drawn rounds in a row end the match**", _section(DESIGN, "### E.4"))
+        f5 = _section(DESIGN, "### F.5")
+        for text in ("**Version 2.0.0; Windows is the release target** [G88]",
+                     "**Nothing goes public from an agent** [G89]",
+                     "**What only a human can check is not faked** [G90]"):
+            self.assertIn(text, f5)
+
+    def test_the_specs_say_what_the_game_does(self):
+        c10 = _section(APPENDIX_C, "### C.10")
+        for text in ("- **The pass** (`Player._ward_heads`, its clock `Player._ward_since`;", "ward_grace_over`; a ridden mount",
+                     "`PartyTuning.WARD_GRACE_TICKS` = 12", "the hurt comes on the 13th tick after the\n    landing",
+                     "standing inside a keeper is no shelter", "- **The ward mark** (drawing only) [G85]"):
+            self.assertIn(text, c10)
+        c12 = _section(APPENDIX_C, "### C.12")
+        self.assertIn("- **The idle wipe** [G86]", c12)
+        self.assertIn("`PartyTuning.IDLE_WIPE_TICKS` = **73**", c12)
+        c16 = _section(APPENDIX_C, "### C.16")
+        self.assertIn("| Idle wipe | 73 (3 s)", c16)
+        self.assertIn("| Drawn rounds that end a match | 3 in a row", c16)
+        self.assertIn("**2.0.0 ships each at the value written here**", _section(APPENDIX_C, "### C.0"))
+        lives = _section(GAMEPLAY_13, "#### 13.9.2")
+        self.assertIn("- **No dead end beside an idle partner** [G86]", lives)
+        windows = _section(GAMEPLAY_13, "#### 13.9.3")
+        self.assertNotIn("and never longer than the measured solo minimum minus 4 ticks: `window = min(", windows)
+        self.assertNotIn("the pair\n  playtests of P4.5 may only shorten them", windows)
+        ward = _section(GAMEPLAY_13, "#### 13.9.4")
+        for text in ("fall, nor for 12 ticks after he lands**", "**The enemy shows the ward** [G85]"):
+            self.assertIn(text, ward)
+        self.assertNotIn("(or solo minimum - 4)", _section(GAMEPLAY_13, "#### 13.9.10"))
+        register = _section(GAMEPLAY_13, "### 13.11")
+        for text in ("**2.0.0 ships every value below as it stands here** [G91]", "| Value | 2.0 ships | Checked by |",
+                     "| Ward grace [G87] |", "| Idle partner, its warning, the idle wipe"):
+            self.assertIn(text, register)
+        tablets = _section(LEVEL_DESIGN_15, "#### 15.7.4")
+        self.assertIn("**The enemy shows it** [G85]", tablets)
+        self.assertIn("**The pass\nis short** [G87]", tablets)
+        self.assertIn("- **No dead end beside an idle partner** [G86]", _section(LEVEL_DESIGN_15, "#### 15.7.9"))
+        self.assertIn("- [ ] Co-op (phase 4):", _section(LEVEL_DESIGN_15, "### 15.10"))
+        self.assertIn("**The phase-4 record", PLAN)
+
+    FILES = {"PartyTuning": "scripts/core/party_tuning.gd", "VersusTuning": "scripts/core/versus_tuning.gd",
+             "Tuning": "scripts/core/tuning.gd", "EnemyTuning": "scripts/enemies/enemy_tuning.gd",
+             "MountTuning": "scripts/player/mount_tuning.gd", "ObjTuning": "scripts/objects/obj_tuning.gd"}
+    # Built by other owners in phase 4: skipped with the request named until the constant is in the tree.
+    NEW = {"PartyTuning.IDLE_WIPE_TICKS": "party: PartyTuning.IDLE_WIPE_TICKS = 73 (Q3, wf12_lead_design_to_all.txt)",
+           "PartyTuning.WARD_GRACE_TICKS": "party: PartyTuning.WARD_GRACE_TICKS = 12 (Q4, wf12_lead_design_to_all.txt)"}
+
+    def test_the_register_of_d12_equals_the_code(self):
+        """[G91] every `Class.NAME = n` of DESIGN D.12 is that constant's value in the tree."""
+        d12 = _section(DESIGN, "### D.12", r"\n---")
+        pairs = re.findall(r"`(\w+Tuning)\.([A-Z][A-Z0-9_]+) = (-?\d+)`", d12)
+        self.assertGreaterEqual(len(pairs), 60, "the register lists its constants as `Class.NAME = n`")
+        pending = []
+        for owner, name, value in pairs:
+            have = _gd_literals(self.FILES[owner])
+            key = "%s.%s" % (owner, name)
+            if name not in have and key in self.NEW:
+                pending.append(self.NEW[key])
+                continue
+            self.assertIn(name, have, "%s: no int constant %s" % (self.FILES[owner], name))
+            self.assertEqual(have[name], int(value), "%s is %d in the tree, D.12 says %s - record the change in "
+                             "DESIGN.md D.12 first (PLAN 2.5)" % (key, have[name], value))
+        for key in ("PartyTuning.IDLE_WIPE_TICKS", "PartyTuning.WARD_GRACE_TICKS", "PartyTuning.WARD_MARGIN_CELLS",
+                    "VersusTuning.SUDDEN_DEATH_CAP_TICKS", "VersusTuning.DRAW_ROUNDS_TO_END",
+                    "PartyTuning.WINDOW_TICKS_BEGINNER", "PartyTuning.WINDOW_TICKS_EXPERT",
+                    "PartyTuning.DAZE_TICKS_BEGINNER", "PartyTuning.DAZE_TICKS_EXPERT", "PartyTuning.IDLE_TICKS",
+                    "PartyTuning.IDLE_WARN_TICKS"):
+            self.assertIn(tuple(key.split(".")), [(o, n) for o, n, _v in pairs], "D.12 names %s" % key)
+        _pending(self, not pending, "; ".join(pending))
+
+    def test_the_rules_in_code(self):
+        party = _gd_consts("scripts/core/party_tuning.gd")
+        _pending(self, "IDLE_WIPE_TICKS" in party and "WARD_GRACE_TICKS" in party,
+                 "party: PartyTuning.IDLE_WIPE_TICKS and WARD_GRACE_TICKS (Q3, Q4, wf12_lead_design_to_all.txt)")
+        self.assertEqual((party["IDLE_WIPE_TICKS"], party["WARD_GRACE_TICKS"]), (73, 12))
+        _pending(self, "IDLE_WIPE_TICKS" in _read("scripts/world/party_driver.gd"),
+                 "party: the idle wipe clock in PartyDriver (Q3, wf12_lead_design_to_all.txt G86)")
+        _pending(self, "WARD_GRACE_TICKS" in _read("scripts/player/player.gd"),
+                 "party: the grace of a ward stomp in Player (Q4, wf12_lead_design_to_all.txt G87)")
+
+    def test_the_ward_mark_and_its_signs(self):
+        _pending(self, os.path.isfile(os.path.join(ROOT, "scripts", "fx", "ward_mark.gd")),
+                 "party: the ward mark (Q2, wf12_lead_design_to_all.txt G85)")
+        mark = _read("scripts/fx/ward_mark.gd")
+        self.assertIn("DRAWING ONLY", mark)
+        self.assertNotIn("_sim_tick", mark, "the mark is no simulation entity")
+        self.assertIn("ward_mark", _read("scripts/base/enemy_base.gd").lower())
+        catalogue = _read("locale/en.po")
+        for key in ("SIGN_COOP_W1_WARD", "SIGN_W5_COOP_WARD"):
+            m = re.search(r'msgid "%s"\s+msgstr "([^"]*)"' % key, catalogue)
+            _pending(self, m is not None, "party: the sign text %s in locale/en.po (Q2)" % key)
+            # As built the short form of [G85] (5): the ruled line takes four board lines, one over SignBoard.MAX_LINES.
+            self.assertEqual(m.group(1), "Marked beasts are no steps - use your partner's shoulders!", key)
+            self.assertLessEqual(len(m.group(1)), 60, "a sign text of about 60 characters at most [G27]")
+            self.assertIn(m.group(1), _section(GAMEPLAY_13, "#### 13.9.4").replace("\n  ", " "), key)
+            self.assertIn(m.group(1), _section(DESIGN, "### D.5"), key)
+        for level_id, key in (("w1_l1_coop", "SIGN_COOP_W1_WARD"), ("w5_l1_coop", "SIGN_W5_COOP_WARD")):
+            m = re.search(r"(?m)^objects/sign (\d+(?:\.\d+)?) \d+ text=%s\b" % key, _read("levels/%s.lvl" % level_id))
+            _pending(self, m is not None, "levels: the ward sign %s in %s (Q2, wf12_party_to_levels.txt)"
+                     % (key, level_id))
+            tablet = _tablet(level_id, "hop")
+            first = min(tablet[0], tablet[1]) - tablet[2]
+            self.assertGreaterEqual(float(m.group(1)), first - 12, "%s: the sign stands at the first ward (column %d)"
+                                    % (level_id, first))
+            self.assertLessEqual(float(m.group(1)), tablet[0], "%s: the sign stands before the gate" % level_id)
+
+    def test_a_feast_is_no_key_to_a_keeper_door(self):
+        """[G92] the lead designer's measurement: a feast kills a shell keeper, a carried kit opens 8-1 'hall' for one
+        hero. Decided: keepers refuse such a death; open until the rule is built or the piece of 8-1 is moved."""
+        row = self._row(92)
+        for text in ("**Measured on the real level**", "**dies only of a weapon hit its trait accepts**",
+                     "**Not built at the lead designer's close**", "`items/feast_piece 51 38 index=0`",
+                     "**The bar stands**"):
+            self.assertIn(text, row)
+        self.assertIn("- **What kills past a trait** [G92]", _section(GAMEPLAY_13, "#### 13.9.5"))
+        self.assertIn("**A feast's touch is no hit** [G92]", _section(APPENDIX_C, "### C.10"))
+        self.assertIn("- **A feast is no key - keep the pieces away** [G92]", _section(LEVEL_DESIGN_15, "#### 15.7.5"))
+        self.assertIn("**One opening outside the bar is known** [G92]", _section(DESIGN, "### D.8"))
+        traits = _read("scripts/enemies/coop_traits.gd")
+        body = traits[traits.index("func refuses_death()"):]
+        body = body[:body.index("func ", 10)]
+        ruled = "SHELL" in body or "keeper" in body
+        level = _read("levels/w8_l1_coop.lvl")
+        door = re.search(r"(?m)^objects/column (\d+) \d+ [^\n]*trigger=keepers:hall", level)
+        self.assertIsNotNone(door, "the keeper door of w8_l1_coop hall")
+        pieces = [float(c) for c in re.findall(r"(?m)^items/feast_piece (\d+(?:\.\d+)?) \d+", level)]
+        moved = all(c > int(door.group(1)) + 1 for c in pieces)
+        _pending(self, ruled or moved,
+                 "enemies: a keeper and every shell or daze record refuses a feast, a kill-all, a grenade, a bite and "
+                 "a dive (G92) - or levels: the first feast piece of w8_l1_coop behind the door of its hall "
+                 "(wf12_lead_design_to_orchestrator.txt)")
+
+    def test_no_sign_inside_a_ward_teaches_a_bounce_on_a_beast(self):
+        """[G85] (ruled on the mark's builder's finding) a hint sign copied from a solo file must not tell a pair to
+        bounce on a beast that wears the mark. A sign about a mount stays (no ward touches a mount)."""
+        self.assertIn("**No sign inside a ward tells a pair to bounce on a\nbeast** [G85]",
+                      _section(LEVEL_DESIGN_15, "#### 15.7.4"))
+        texts = {}
+        for path in [os.path.join(ROOT, "locale", "en.po")] + sorted(glob.glob(os.path.join(ROOT, "locale", "levels",
+                                                                                              "en", "*.po"))):
+            with open(path, encoding="utf-8") as f:
+                for key, text in re.findall(r'msgid "(SIGN_\w+)"\s+msgstr "([^"]*)"', f.read()):
+                    texts[key] = text
+        mounts = ("SIGN_W6_REX",)
+        found = []
+        inside = 0
+        for level_id in COOP_ORDER:
+            tablets, _width = _coop_tablets(level_id)
+            for m in re.finditer(r"(?m)^objects/sign (\d+(?:\.\d+)?) \d+(?:\.\d+)? [^\n]*\btext=(\w+)",
+                                 _read("levels/%s_coop.lvl" % level_id)):
+                col = int(float(m.group(1)))
+                if not any(first <= col <= last for _g, _s, first, last in tablets):
+                    continue
+                inside += 1
+                if m.group(2) not in mounts and re.search(r"(?i)\bbounce on\b", texts.get(m.group(2), "")):
+                    found.append("%s_coop column %d %s" % (level_id, col, m.group(2)))
+        self.assertGreaterEqual(inside, 50, "signs inside wards were read")
+        _pending(self, not found, "levels: drop the solo hint sign that teaches a bounce inside a ward - %s "
+                 "(wf12_lead_design_to_levels.txt #2)" % ", ".join(found))
+
+    def test_the_versus_soak_rules(self):
+        """[G93] the three rules the versus soak asked of the referee, accepted as built; [G78] the TIME banner;
+        [G80] Sky Picnic as rebuilt."""
+        row = self._row(93)
+        for text in ("**a stomp comes from above**", "**Nobody stays outside the arena's sides**",
+                     "**A wedged coconut is lost**", "4 020 rounds", "outside D.12"):
+            self.assertIn(text, row)
+        c14 = _section(APPENDIX_C, "### C.14")
+        for text in ("**A stomp comes from above** [G93]", "**Wedged** [G93]", "| Out of the arena's side [G93] |"):
+            self.assertIn(text, c14)
+        self.assertIn("**A stomp comes from above**\n  [G93]", _section(DESIGN, "### E.2"))
+        referee = _read("scripts/world/versus/referee.gd")
+        clubball = _read("scripts/world/versus/clubball.gd")
+        _pending(self, "func _squeezed_out" in referee and "WEDGED_TICKS" in clubball,
+                 "versus: the soak rules of the referee (wf12_versus_to_lead_design.txt A1-A3)")
+        self.assertRegex(clubball, r"(?m)^const WEDGED_TICKS: int = 24\b")
+        self.assertIn("func ended_by_cap", referee)
+        self.assertIn("**Changed in phase 4**", self._row(78))
+        self.assertIn("**Changed in phase 4**", self._row(80))
+        self.assertRegex(_read("locale/en.po"), r'msgid "UI_VS_TIME"\s+msgstr "TIME!"')
+        sky = _read("levels/arena_sky_picnic.lvl")
+        _pending(self, "#######*....*#######" in sky, "versus: the big spots of Sky Picnic in the lips of the hole (G80)")
+        self.assertIn("row 10   #######*....*#######", _section(DESIGN, "### E.5", r"\n### "))
+
+    def test_the_ward_keys_of_the_main_body_equal_the_files(self):
+        d5 = _section(DESIGN, "### D.5")
+        objects = _section(GAMEPLAY_13, "#### 13.9.7")
+        keyed = {}
+        for level_id in COOP_ORDER:
+            for m in re.finditer(r"(?m)^objects/x2_tablet \d+ \d+ [^\n]*\bgate=(\w+)[^\n]*\bward=(\d+),(\d+)",
+                                 _read("levels/%s_coop.lvl" % level_id)):
+                keyed[(level_id, m.group(1))] = "%s,%s" % (m.group(2), m.group(3))
+        self.assertEqual(len(keyed), 9, "nine tablets carry `ward=` [G83]: tell the lead designer when one changes")
+        for (level_id, gate), value in keyed.items():
+            stage = level_id[1:].replace("_l", "-")
+            for name, text in (("DESIGN D.5", d5), ("GAMEPLAY 13.9.7", objects)):
+                self.assertIn("'%s' %s" % (gate, value), text, "%s: %s '%s' ward=%s" % (name, stage, gate, value))
+                self.assertIn("%s '" % stage, text, "%s names the stage %s" % (name, stage))
+
+    def test_the_ward_coverage_is_as_recorded(self):
+        """DESIGN D.9 / [G85]: the wards cover 1 786 of the 3 977 columns of the 23 co-op files with tablets, 4-1 and
+        5-2 from end to end. A level owner who moves a tablet or a `ward=` changes these numbers: say so."""
+        gated = covered = columns = tablets_n = secrets = 0
+        whole = []
+        names = set()
+        for level_id in COOP_ORDER:
+            tablets, width = _coop_tablets(level_id)
+            if not tablets:
+                continue
+            gated += 1
+            cols = set()
+            for gate, secret, first, last in tablets:
+                cols.update(range(first, last + 1))
+                tablets_n += 1
+                secrets += 1 if secret else 0
+                if gate:
+                    names.add((level_id, gate))
+            covered += len(cols)
+            columns += width
+            if len(cols) == width:
+                whole.append(level_id)
+        self.assertEqual((gated, tablets_n, secrets, len(names)), (23, 53, 10, 45))
+        self.assertEqual((covered, columns), (1786, 3977), "the ward coverage of DESIGN D.9 and G85")
+        self.assertEqual(whole, ["w4_l1", "w5_l2"])
+        d9 = _section(DESIGN, "### D.9")
+        for text in ("**1 786 of 3 977 columns, 44.9 %**", "**4-1 and\n5-2 from end to end**", "53 of them: 43 gates and 10 x2"):
+            self.assertIn(text, d9)
+
+
+HUMAN_CHECKS_PATH = os.path.join(ROOT, "docs", "expansion", "HUMAN_CHECKS.md")
+
+
+@unittest.skipUnless(os.path.isfile(HUMAN_CHECKS_PATH), "docs/expansion/HUMAN_CHECKS.md is not written yet")
+class HumanChecks(unittest.TestCase):
+    """[G90] docs/expansion/HUMAN_CHECKS.md: every check one line a person can tick, with the file to change when it
+    fails; a line for every x2 gate of the co-op files, every arena, every music file; nothing claimed as done."""
+
+    TEXT = _read("docs/expansion/HUMAN_CHECKS.md") if os.path.isfile(HUMAN_CHECKS_PATH) else ""
+    CHECKS = [line for line in TEXT.splitlines() if line.startswith("- [")]
+
+    def test_every_check_is_one_open_line_with_a_number_and_a_fix(self):
+        self.assertGreaterEqual(len(self.CHECKS), 200)
+        seen = set()
+        for line in self.CHECKS:
+            m = re.match(r"- \[ \] \*\*([A-Z])-(\d\d+)\*\* ", line)
+            self.assertIsNotNone(m, "a check is `- [ ] **X-nn** ...`, unticked: %s" % line[:60])
+            self.assertNotIn(m.group(0), seen, "a number twice: %s" % m.group(0))
+            seen.add(m.group(0))
+            self.assertIn("**Look for:**", line, line[:40])
+            self.assertIn("**If it fails:**", line, line[:40])
+            fix = line[line.index("**If it fails:**"):]
+            self.assertRegex(fix, r"`[^`]+`|docs/|another pick|nothing in\s+2\.0\.0|a design decision",
+                             "the fix names a file, a value or a decision: %s" % line[:40])
+        for section in "PCXVKGMLDW":
+            self.assertTrue(any(line.startswith("- [ ] **%s-" % section) for line in self.CHECKS), section)
+        self.assertIn("**Nothing in this file has been done by a person yet.**", self.TEXT)
+        self.assertNotIn("- [x]", self.TEXT.lower())
+
+    def test_every_file_a_fix_names_exists(self):
+        missing = set()
+        for path in set(re.findall(r"`((?:scripts|levels|locale|tools|tests|resources|assets|installer)/[\w./-]+\.\w+)`",
+                                   self.TEXT)):
+            if "<" in path or "*" in path:
+                continue
+            if not os.path.exists(os.path.join(ROOT, path)):
+                missing.add(path)
+        self.assertEqual(sorted(missing), [], "files the check list names that are not in the tree")
+
+    def test_every_constant_a_fix_quotes_has_that_value(self):
+        """`NAME` (n) after a tuning file's name: the value in brackets is the constant's."""
+        files = {"scripts/core/party_tuning.gd": None, "scripts/core/versus_tuning.gd": None,
+                 "scripts/enemies/enemy_tuning.gd": None, "scripts/player/mount_tuning.gd": None,
+                 "scripts/fx/ward_mark.gd": None}
+        consts = {}
+        for rel in files:
+            if os.path.isfile(os.path.join(ROOT, rel)):
+                consts.update(_gd_literals(rel))
+        checked = 0
+        for name, value in re.findall(r"`([A-Z][A-Z0-9_]{3,})` \((-?\d+)[;)]", self.TEXT):
+            if name in consts:
+                checked += 1
+                self.assertEqual(consts[name], int(value), "HUMAN_CHECKS quotes %s (%s), the tree has %d"
+                                 % (name, value, consts[name]))
+        self.assertGreaterEqual(checked, 40)
+
+    def test_every_gate_of_the_coop_files_has_its_line(self):
+        want = set()
+        for level_id in COOP_ORDER:
+            for gate, _secret, _first, _last in _coop_tablets(level_id)[0]:
+                if gate:
+                    want.add(("%s_coop" % level_id, gate))
+        have = set(re.findall(r"- \[ \] \*\*C-\d+\*\* \*\*`(\w+)` '(\w+)'\*\*", self.TEXT))
+        self.assertEqual(len(want), 45)
+        self.assertEqual(sorted(want - have), [], "gates of the level files without a line")
+        self.assertEqual(sorted(have - want), [], "lines for gates no level file has")
+        for level_id in COOP_ORDER:
+            self.assertIn("(`%s_coop`;" % level_id, self.TEXT, "the stage %s" % level_id)
+            self.assertIn("**Play `%s_coop` through**" % level_id, self.TEXT)
+
+    def test_the_verifiers_list_is_in(self):
+        for text in ("arded from end to end", "The hopper fight at the crate", "a CHARGED line drive",
+                     "reaches into the Brute's den", "covers the left 9 columns of its chamber",
+                     "**The Beginner egg.**", "The lee (a comfort, no gate)", "**Batter Up.**", "the daze",
+                     "**The 9-1b glider.**", "**The 8-1 feast piece.**", "**Chest weapons.**",
+                     "**A weighted second pad.**", "**The reconnect dialog.**", "**Num Lock.**",
+                     "`--perf`"):
+            self.assertIn(text, self.TEXT)
+
+    def test_every_arena_mode_and_track_is_listed(self):
+        versus = self.TEXT[self.TEXT.index("## V. Versus"):self.TEXT.index("## K. Keyboards")]
+        modes = {"grub_stack": "**Grub Stack**", "last_caveman": "**Last Caveman Standing**",
+                 "hot_rock": "**Hot Rock**", "clubball": "**Clubball**"}
+        cells = 0
+        for path in sorted(glob.glob(os.path.join(ROOT, "levels", "arena_*.lvl"))):
+            text = _read("levels/" + os.path.basename(path))
+            name = re.search(r'(?m)^name = "([^"]+)"', text).group(1)
+            for mode in re.search(r"(?m)^modes = ([\w,]+)", text).group(1).split(","):
+                cells += 1
+                line = [l for l in versus.splitlines() if l.startswith("- [ ]") and modes[mode] + " on" in l]
+                self.assertEqual(len(line), 1, mode)
+                self.assertIn(name, line[0], "%s on %s" % (mode, name))
+        self.assertEqual(cells, 18)
+        self.assertIn("18 (arena, mode) cells", versus)
+        table = _read("scripts/core/audio_table.gd")
+        block = table[table.index("const MUSIC: Dictionary = {"):]
+        files = re.findall(r'"file": "([\w.]+\.ogg)"', block[:block.index("\n}")])
+        self.assertEqual(len(files), 51)
+        music = self.TEXT[self.TEXT.index("## M. The music"):self.TEXT.index("## L. The look-over")]
+        for name in files:
+            self.assertEqual(len(re.findall(r"- \[ \] \*\*M-\d+\*\* `%s` " % re.escape(name), music)), 1, name)
+
+    def test_the_keyboard_sets_use_the_classic_layout_of_the_code(self):
+        src = _read("scripts/core/input_slot.gd")
+        names = {"KEY_A": "A", "KEY_D": "D", "KEY_W": "W", "KEY_S": "S", "KEY_SPACE": "Space", "KEY_CTRL": "Left Ctrl",
+                 "KEY_E": "E", "KEY_Q": "Q", "KEY_KP_4": "Num 4", "KEY_KP_6": "Num 6", "KEY_KP_8": "Num 8",
+                 "KEY_KP_5": "Num 5", "KEY_KP_0": "Num 0", "KEY_KP_ENTER": "Num Enter", "KEY_KP_ADD": "Num +",
+                 "KEY_KP_PERIOD": "Num `.`"}
+        keys = self.TEXT[self.TEXT.index("## K. Keyboards"):self.TEXT.index("## G. Pads")]
+        first = [l for l in keys.splitlines() if l.startswith("- [ ] **K-01**")][0]
+        for table, actions in (("_LEFT_KEYS", ("move_left", "jump", "attack", "swap")),
+                               ("_RIGHT_KEYS", ("move_left", "jump", "attack", "swap"))):
+            block = src[src.index("const %s" % table):]
+            for action in actions:
+                m = re.search(r'&"%s":\s*\[\[(\w+)\]' % action, block)
+                self.assertIn(names[m.group(1)], first, "%s %s" % (table, action))
+        for key in names.values():
+            self.assertIn(key, keys, key)
+
+
 class SuiteBudget(unittest.TestCase):
     """PLAN 8 V7 names every slow module of tests/run_tests.gd and the rule of the single slow tests."""
 
@@ -1553,7 +2016,9 @@ class SuiteBudget(unittest.TestCase):
 class Hygiene(unittest.TestCase):
     def test_the_documents_are_plain_ascii(self):
         for rel in ("docs/expansion/DESIGN.md", "docs/expansion/PLAN.md", "docs/spec/PHYSICS.md",
-                    "docs/spec/GAMEPLAY.md", "docs/LEVEL_DESIGN.md"):
+                    "docs/spec/GAMEPLAY.md", "docs/LEVEL_DESIGN.md", "docs/expansion/HUMAN_CHECKS.md"):
+            if not os.path.isfile(os.path.join(ROOT, rel)):
+                continue
             text = _read(rel)
             bad = sorted({c for c in text if ord(c) > 126 or (ord(c) < 32 and c not in "\n\t")})
             self.assertEqual(bad, [], rel)

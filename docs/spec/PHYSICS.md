@@ -1524,7 +1524,8 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
   `ending_b` [G45]). The ride test must carry a railed rider over the whole fenced width (no strip at the bow where the
   halved-width overlap of 11.4 drops him into the liquid) and, once the fence is open towards a bank, over the whole
   deck up to the bank's edge: a rider standing anywhere over the deck is carried (content's wf10 finding: a 7 px
-  strip between the closed fence's line and the deck's end drowned a rider who stopped there; objects-B asked).
+  strip between the closed fence's line and the deck's end drowned a rider who stopped there; built in the G3
+  follow-up round - docked, the fence opens over the bank and he walks the deck's last 7 px, `Raft._docked_at`).
 - `dir = u|d` currents move only floating dropped items. Dropped items whose feet are in a current's `~` cell float
   at the surface and drift with it.
 - Water stays deadly (7.8); in co-op a fall is an egg (C.12).
@@ -1748,14 +1749,18 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
     (-224 / -64), no glider bump, no cut bounce [G54]. The enemy takes the stomp as anywhere, once:
     `on_bounced(hero)` (a `daze` record is dazed, the multiplier chain counts), `on_glider_stomp` for a dive, and
     the multiplier pop-up; `Events.hero_bounced` / `player_bounced` are not sent (he did not bounce).
-  - **The pass** (`Player._ward_heads`) [G87]: that enemy joins his list of heads that gave nothing, and
+  - **The pass** (`Player._ward_heads`, its clock `Player._ward_since`; `PlayerBase.ward_grace_step` /
+    `ward_grace_over`; a ridden mount keeps the same clock for its riders) [G87]: that enemy joins his list of
+    heads that gave nothing, and
     the contact test of this hero and that enemy is skipped - no hurt from its body, no second stomp - **during
     that fall and for at most `PartyTuning.WARD_GRACE_TICKS` = 12 ticks after it**. The fall ends on the first tick
     on which he has ground, a platform, a carrier, a vine or a saddle under him (the list of the launch hold, C.0
     #4); the pass ends 12 ticks later, or sooner: when their boxes no longer overlap, or it dies, sleeps or stops
     being targetable. From then the contact test of the two is the normal one - its body hurts him by 10.1, and a
     new landing on it from above is a new stomp in the ward (nothing given, `on_bounced` once more, a new pass):
-    standing inside a keeper is no shelter. Its projectiles and every other enemy are tested as always. (Until
+    standing inside a keeper is no shelter. As built the clock reads "falling" until the landing tick (0) and the
+    head is forgotten when it passes 12, in the contact pass itself: the hurt comes on the 13th tick after the
+    landing. Its projectiles and every other enemy are tested as always. (Until
     phase 4 the pass lasted for as long as the boxes overlapped; 12 ticks at the walk cap of 5 px are 60 px, more
     than the widest keeper's body.)
   - **No rest, no carry**: no enemy is ground, a platform or a carrier for him. The one enemy rule that carries a
@@ -1790,7 +1795,12 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
   by its own place and flight as before; a hit no hero made, by its flight. (Until G3c the flight alone decided for
   a thrown weapon: one hero standing on a keeper Shellback, or inside it in a ward, threw a special the way its
   shield looked and killed it - both keepers of 5-1's gully.) A party of one, single-player and versus: the plain
-  Guard, unchanged.
+  Guard, unchanged. **A feast's touch is no hit** [G92]: the contact pass kills an overlapping enemy while
+  `feast > 0` (10.1) before the stomp, the ward and every trait are asked, and `EnemyBase.kill` is refused only
+  by `CoopTraits.refuses_death` (a `heavy` not brace-dazed) and `refuses_kill` (the last member of a windowed
+  group) - so as built a `shell` or `daze` record, a keeper included, dies of a feast's touch (and of a kill-all,
+  a grenade, a mount's bite and a glider dive). Decided and not built: `refuses_death` holds for every record
+  with `keeper=` and every `shell` and `daze` record of a co-op party.
 - **A closed door passes nobody** (co-op only) [G75] (`Player._hold_the_side`, in the hero's `POST`, after every
   mover of the tick): his **body cell** is his feet column in the wall-probe row (the row above his feet row,
   11.2 #7); `_free_x` is his x at the end of the last tick on which the body cell was no SIDE-1 wall. A tick that
@@ -1876,10 +1886,13 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
   respawned hatched at the active checkpoint: slot `s` at the checkpoint x + `24 * s` px towards the side where the
   floor continues (the same x if both sides are blocked), energy 3, zero velocity, hand and belt kept, eggs gone; then
   the camera of 12.5 on P1 and the tribe rules (C.13).
-- **The idle wipe** [G86] (`PartyDriver._wipe_check`, `POST`; co-op only): one counter per party. At the end of a
-  tick it is raised by 1 when (a) some hero of the party is an egg whose own player plays - his `input_idle_ticks`
-  is under `IDLE_TICKS` (the egg's nudge and every held flag are input, C.10) - (b) no hero is in a death toss, and
-  (c) at least one hero is hatched and **every hatched hero is idle** (C.10); on every other tick it is set to 0.
+- **The idle wipe** [G86] (`PartyDriver._idle_dead_end` and `idle_wipe_ticks`, read by `_wipe_check` in `POST`;
+  co-op only): one counter per party. At the end of a
+  tick it is raised by 1 when (a) some hero of the party is an egg whose own player plays - his `idle` is false,
+  the idle rule's own verdict (C.10: his slot gave input within `IDLE_TICKS`, the egg's nudge and every held flag
+  included, and some input since he entered the level) - (b) no hero is in a death toss, and (c) at least one hero
+  is hatched and **every hatched hero is idle** (C.10); on every other tick it is set to 0. For a hatched hero who
+  simply puts the pad down the wipe comes on his 315th quiet tick (243 + 72).
   When it reaches `PartyTuning.IDLE_WIPE_TICKS` = **73** (3 s *(tune)*; 0 = the rule is off) the team is wiped
   exactly as above - the curtain, one life, the reset, both hatched at the checkpoint. It closes what the rule
   above left open: a hero who went idle beside an egg wiped nothing, and that egg waited for ever. An egg whose own
@@ -1941,17 +1954,18 @@ hero; with `|H| = 0` it holds still. With two heroes:
 | Hurt timing | `hit_timer = 43`, stunned (state 8) while `hit_timer >= 31`: **12 stunned ticks**, then **30 immune ticks** with control; hittable again 43 ticks after the hit. The immunity ends at once when the victim starts a strike or a throw |
 | Hit-stop | attacker and victim skip their `PLAYER` phase for 2 ticks (4 on a charged hit or the round's deciding hit); every other entity and the round clock run on |
 | Deflect | a rival's thrown special overlapping a **front** box reverses: `xvel = -xvel` plus 32 in the new direction (2 px/tick faster), owner = the striker; the box is consumed |
-| Stomp | A lands on rival B with the stomp flag (2.2), B neither immune nor shielded nor curled: A bounces as on an enemy (-224 with UP, else -64); B is **squashed 8 ticks** (UP and FIRE ignored, walking allowed), then immune 30 ticks; B pays the ladder value of A's stomp chain (paying stomps since A's last grounded tick: 1, 2, 3, 4, 6, 8, then 8). An immune or shielded head is a free springboard (bounce, nothing else); so is a teammate's. **A stomp is a landing** [G15]: A had no ground, platform or carrier under his feet at the end of the previous tick - a hero standing on a one-way tier does not stomp a head that rises into his feet (a rival pogoing under a bridge 3 rows up); the two only bump |
+| Stomp | A lands on rival B with the stomp flag (2.2), B neither immune nor shielded nor curled: A bounces as on an enemy (-224 with UP, else -64); B is **squashed 8 ticks** (UP and FIRE ignored, walking allowed), then immune 30 ticks; B pays the ladder value of A's stomp chain (paying stomps since A's last grounded tick: 1, 2, 3, 4, 6, 8, then 8). An immune or shielded head is a free springboard (bounce, nothing else); so is a teammate's. **A stomp is a landing** [G15]: A had no ground, platform or carrier under his feet at the end of the previous tick - a hero standing on a one-way tier does not stomp a head that rises into his feet (a rival pogoing under a bridge 3 rows up); the two only bump. **A stomp comes from above** [G93] (`VersusReferee._stomp_step`): A stomps B only when `A.sim_pos.y < B.sim_pos.y` - A's feet are higher than B's, by one pixel or more; with level feet neither stomps and neither bounces (the 1.0 body test alone made two heroes falling side by side stomp each other on one tick) |
 | Curl | a curled hero: stomps bounce the stomper with no effect; boxes from above (the attacker's feet 16+ px above his) glance; front boxes from the side bat him (C.11), costing him nothing by themselves |
 | Body bump | `PartyDriver` step c: two rivals whose body boxes overlap (body test, no stomp flag) each move 1 px apart per tick (commit rule); if both move towards each other at `abs(xvel) >= 64`, both get `xvel = +/-64` apart and `yvel = -64` (a 10 px hop), no damage, no stun *(tune)* |
 | Thrown specials | collide with tiles: a projectile (spear, axe, swirling axe) whose point enters a SIDE-1 or floor cell stops and lies there as a temporary pick-up (`items/weapon temp=true`): on the top of the cell it entered when the cell above is open (a floor, a wall's top row), else in the open cell in front of the wall's face, from where it drops to the floor - never inside a wall; a special thrown by a hero pressed against a wall drops at his feet [G17]. Spears still stick in bark boards (steps for anyone). Wrap arenas: a special crossing the wrap edge wraps once and vanishes 40 ticks later |
-| Coconut (Clubball) | `objects/coconut`, box 16 x 16, feet point at the bottom centre. Per tick (`ITEMS`): roll loss first (`abs(xvel)` falls by 2 when `yvel == 0` and it rests on a floor), the x step (a SIDE-1 cell or the level edge stops it flush and reflects `xvel` with `-(xvel * 3) >> 2`), the y step (a ceiling reflects at 3/4; landing: `yvel >= 32` bounces `-(yvel * 3) >> 2`, else it rests; `^` counts as a floor; `~` loses it), then gravity +16 (cap 192) whenever it did not land **or it bounced** - the bounce tick runs gravity too, so the bounces die within six [G19]; every component clamped to +/-288. Shots (`WEAPONS`, before the heroes): only **front** frames shoot; every front box on it in one tick adds up (opposite drives cancel); one shot per swing per hero (front boxes on consecutive ticks are one swing); the rally adds 16 to `abs(xvel)` per shot by anyone within 44 ticks of the last, up to 192 (a faster shot keeps its own speed); its striker is not knocked down by it for 8 ticks. Heads (`CONTACT_ITEMS`): a ball faster than 128 v16 on either axis knocks the hero down (versus hurt, 12 stunned ticks, then no immunity) and rebounds at half speed; a ball coming down on a head that it does not knock down (a slower ball, or an immune or shielded hero) bounces at 3/4, at least -96; otherwise a slow ball passes through bodies. A curled hero flying as a ball passes his `xvel` / `yvel` to the coconut once per flight |
+| Coconut (Clubball) | `objects/coconut`, box 16 x 16, feet point at the bottom centre. Per tick (`ITEMS`): roll loss first (`abs(xvel)` falls by 2 when `yvel == 0` and it rests on a floor), the x step (a SIDE-1 cell or the level edge stops it flush and reflects `xvel` with `-(xvel * 3) >> 2`), the y step (a ceiling reflects at 3/4; landing: `yvel >= 32` bounces `-(yvel * 3) >> 2`, else it rests; `^` counts as a floor; `~` loses it), then gravity +16 (cap 192) whenever it did not land **or it bounced** - the bounce tick runs gravity too, so the bounces die within six [G19]; every component clamped to +/-288. Shots (`WEAPONS`, before the heroes): only **front** frames shoot; every front box on it in one tick adds up (opposite drives cancel); one shot per swing per hero (front boxes on consecutive ticks are one swing); the rally adds 16 to `abs(xvel)` per shot by anyone within 44 ticks of the last, up to 192 (a faster shot keeps its own speed); its striker is not knocked down by it for 8 ticks. Heads (`CONTACT_ITEMS`): a ball faster than 128 v16 on either axis knocks the hero down (versus hurt, 12 stunned ticks, then no immunity) and rebounds at half speed; a ball coming down on a head that it does not knock down (a slower ball, or an immune or shielded hero) bounces at 3/4, at least -96; otherwise a slow ball passes through bodies. A curled hero flying as a ball passes his `xvel` / `yvel` to the coconut once per flight. **Wedged** [G93] (`VersusClubball._wedged_step`): a coconut at rest (`xvel = yvel = 0`) with its centre in a wall cell for `WEDGED_TICKS` = 24 ticks in a row leaves play and drops in again at its drop point after `VersusTuning.BALL_RESET_TICKS`, as one lost in the water; nobody scores, nobody is moved, a golden coconut stays golden |
 | Temporary specials | from crates, straight onto the belt; lost on a knock-out, after 3 axe / 2 swirling-axe / 3 spear throws, or at the round end; the hammer only on a knock-out or the round end |
 | Spawn shield | 48 ticks after every (re)spawn: no PvP hit, stomp or arena hazard box touches him (pits, liquids and the round's sudden death still do); it ends at once when he starts a strike or a throw |
 | Weight (Grub Stack) | stack of 10+ units: the `ACCEL` limit of the walk handler and of the airborne step is 64; 20+: 48, and every jump impulse is `(impulse * 3) >> 2`: -49, -39, -27, -15, -8, -4, -2, -1, 0 (apex 38 px instead of 60) *(tune)* |
 | Hot Rock holder | `ACCEL` limit 96 in the walk handler and the airborne step (6 px/tick: the holder is the faster one) [R7] |
 | King of the Feast carrier | `ACCEL` limit 64; no strikes |
 | Respawn | after a hazard (Grub Stack, Stock option): 48 ticks, at the free spawn point farthest from the rivals |
+| Out of the arena's side [G93] | `VersusReferee._squeezed_out`, in the `PLAYER` step after the wrap: on an arena whose sides do not wrap, a hero in play whose feet point is left or right of the arena view while the round runs is knocked out as by a hazard, cause `crush`. No step of his own and no knock-back takes him there (the x commit rule); a Cave-in block that settles beside him in the edge column can |
 | Hard cap (Last Caveman Standing) [G78] | armed once, on the tick the round's sudden death starts: `cap_at = round_ticks + VersusTuning.SUDDEN_DEATH_CAP_TICKS` (1 457 = 60 s *(tune)*; 0 = no cap). On the tick `round_ticks >= cap_at` the round ends whoever stands. Winner: among the sides still standing (a team in 2v2, else one hero) the side with more heroes standing, then with more lives left (Stock), then with the fewest hurts taken this round (one per heart lost - a charged hit is two; a healed heart takes none back; a handicap's extra hearts do not count; no hurt for a hit the leaf shield took, a Grudge rock's daze or a hazard's knock-out); sides still level: a draw (nobody scores the round). On the cap's own tick the last-one-standing rule is asked first. The HUD's sundial, absent in this mode until then, runs the cap's length (its number red from 10 s). **Drawn rounds** (`VersusMatch.ended_by_draws`): `VersusTuning.DRAW_ROUNDS_TO_END` = 3 *(tune; 0 = never)* drawn rounds in a row end the match on its standings, in every mode - the side with the most round wins, and nobody when no single side leads (a drawn match); a round with a winner resets the count |
 
 ### C.15 Doze with the new moves
@@ -1986,7 +2000,7 @@ Owner of each table: `Tuning` (core: hero and world rules), `PartyTuning` (core,
 | Totem | head 35 / rest 34 px; foot reach 16 px; jump-off 16 over the carry; impulses `>> 1`; drop lock 12 *(tune)* | | C.10 | PartyTuning |
 | Shoulder Hop | -224 (= `Tuning.BOUNCE_YVEL_UP`), active partner only | v16 | C.10 | PartyTuning |
 | Idle | 243 ticks without input of his own (or none since entering the level; a held flag is input every tick); "Zzz soon" bubble from 170, Zzz from 243 [G58] | ticks | C.10 | PartyTuning (`IDLE_TICKS`, `IDLE_WARN_TICKS`; `HeroParty.IDLE_WARN_TICKS` draws by the same value) |
-| Lee | 64 px downwind, 16 px vertical *(tune)* | px | C.6 | PartyDriver (PartyTuning asked) |
+| Lee | 64 px downwind, 16 px vertical *(tune)* | px | C.6 | PartyTuning (`LEE_REACH_PX`, `LEE_DY_PX`); PartyDriver holds the same two values as its own constants |
 | Brace | 16 px apart, heavy dazed 44 (hurt only then [G57]) | | C.10 | PartyTuning |
 | One hit per strike | co-op files: one hit per enemy per strike instance [G57] | | C.10 | enemies (`EnemyBase`) |
 | Curl | 66 ticks, box 24 x 20 *(tune)* | | C.11 | PartyTuning |

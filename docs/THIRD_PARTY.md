@@ -220,6 +220,7 @@ the asset staging area `.tools/asset_candidates` are ignored too and never pushe
   credits roll does not name, a sound / track / font outside `assets/`, an image outside `assets/`, `docs/` and
   `installer/`, a 1.0 art, sound or font file that differs from the tag `v1.0.0`, a ledger that is not what the
   pipeline registries give. Section 18 is written by `tools/audit_assets.py --write-ledger`, never by hand.
+  `tools/build_windows.ps1` runs the audit as its step 2b, after the import, and stops the build on any gap.
 - **Inventory (git diff against `v1.0.0`).** 869 files under `assets/` (the 819 `.import` files aside): 393 shipped in
   1.0.0, 476 added since - 388 PNG, 35 OGG, 30 WAV, 22 licence texts, 1 JSON. No 1.0 art, sound or font changed; the
   one changed 1.0 file is `assets/licenses/README.md`. Ledger: 803 rows CC0 1.0, 2 rows SIL OFL 1.1 (the two fonts),
@@ -266,7 +267,8 @@ the asset staging area `.tools/asset_candidates` are ignored too and never pushe
 - **Desktop downloads.** Distribute the release zip, not the bare exe: `tools/build_windows.ps1` puts `CREDITS.md`
   and every file of `assets/licenses/` into `licenses/` next to `ClubAndGrub.exe` and packs
   `build/ClubAndGrub-<version>-windows.zip` (Godot's "Complying with licenses" accepts an accompanying file; the
-  in-game licence view covers platforms without one).
+  in-game licence view covers platforms without one). `tools/audit_assets.py --shipped <that folder or the zip>`
+  fails unless it holds `CREDITS.md` and every file of `assets/licenses/`, byte for byte, and nothing else.
 - **2.0 pipeline.** `docs/art/expansion/pipeline/build_expansion.py` rebuilds art-A's 2.0 files, merges art-B's
   hand-over rows, writes the per-pack files of the 2.0 packs and the marked section 17 of `docs/ASSET_MANIFEST.md`
   (`build_manifest.py` keeps that section when it rewrites the file), and exits with status 1 when a pack a 2.0 file

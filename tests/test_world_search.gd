@@ -595,6 +595,42 @@ func test_route_files_seeds_and_keys_of_the_explore_tools() -> void:
 	assert_ne(key, str(harness.call(&"explore_key", &"w7_l1_coop", 0, "dune", first, 300)))
 
 
+func test_a_result_found_with_a_gate_rule_off_is_never_the_gates_own() -> void:
+	# wf12: PRE2_GATE_RULES_OFF (PlayerBase.gate_rules_off) is the measurement switch the evidence routes are found
+	# with. A search, a pass or a replay run with a rule off keys its result apart from the proof's - before, it wrote
+	# into the proof's own cache (and read the proof's result back as if the rule were off).
+	var harness: GDScript = load(HARNESS) as GDScript
+	var kept: int = PlayerBase.gate_rules_off
+	PlayerBase.gate_rules_off = 0
+	assert_eq(CoopSearch.rules_off_text(), "", "every rule on: the keys are the proof's")
+	var path: String = "res://levels/w7_l1_coop.lvl"
+	var data: LevelData = LevelData.load_file(path)
+	var search_key: String = CoopSearch.file_cache_key(path, data, Defs.Difficulty.EXPERT, "dune")
+	var seed_value: int = harness.call(&"row_seed", &"w7_l1_coop", 1, "dune", 0)
+	var pass_key: String = harness.call(&"explore_key", &"w7_l1_coop", 1, "dune", seed_value, 300)
+	var route: String = "res://tools/coop_explore/evidence/w7_l1_coop.dune.expert.txt"
+	var replay_key: String = harness.call(&"replay_key", route)
+	PlayerBase.gate_rules_off = PlayerBase.GATE_R3
+	assert_eq(CoopSearch.rules_off_text(), " rules-off-2")
+	assert_ne(CoopSearch.file_cache_key(path, data, Defs.Difficulty.EXPERT, "dune"), search_key, "the search's key")
+	assert_ne(str(harness.call(&"explore_key", &"w7_l1_coop", 1, "dune", seed_value, 300)), pass_key, "a pass's key")
+	assert_ne(str(harness.call(&"replay_key", route)), replay_key, "a replay's key")
+	PlayerBase.gate_rules_off = PlayerBase.GATE_TRACE
+	assert_eq(CoopSearch.rules_off_text(), "", "the trace bit switches no rule off")
+	assert_eq(CoopSearch.file_cache_key(path, data, Defs.Difficulty.EXPERT, "dune"), search_key)
+	PlayerBase.gate_rules_off = kept
+	# The gate job's plan asks before it starts a process (tools/coop_search.gd --plan): a kept result or none.
+	assert_false(CoopSearch.has_kept_result(&"no_such_level", Defs.Difficulty.EXPERT, "dune"))
+	# (Read only: a gate job may be filling the same cache beside this test.)
+	assert_eq(CoopSearch.has_kept_result(&"w7_l1_coop", Defs.Difficulty.EXPERT, "dune"),
+			not CoopSearch._file_cache_read(search_key).is_empty(), "kept exactly when the search would read it back")
+	PlayerBase.gate_rules_off = PlayerBase.GATE_R3
+	var off_key: String = CoopSearch.file_cache_key(path, data, Defs.Difficulty.EXPERT, "dune")
+	assert_eq(CoopSearch.has_kept_result(&"w7_l1_coop", Defs.Difficulty.EXPERT, "dune"),
+			not CoopSearch._file_cache_read(off_key).is_empty(), "with a rule off: the other key's result, not the proof's")
+	PlayerBase.gate_rules_off = kept
+
+
 func test_a_gate_row_is_green_only_with_all_three_proofs() -> void:
 	var gates: GDScript = load(GATES_TEST) as GDScript
 	var refused: Dictionary = {"verdict": "refused (exhaustive)", "evidence": "exhaustive, 100 resting points"}

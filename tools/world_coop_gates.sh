@@ -1,113 +1,102 @@
 #!/usr/bin/env bash
-# The co-op gate proofs in parallel: tests/test_coop_gates.gd (the solo-impossibility search of every x2 gate of every
-# co-op file on both difficulties, docs/expansion/PLAN.md 8 V3.c) on N processes at once.
+# THE GATE JOB: the three proofs of every x2 gate row of every co-op file on both difficulties, then
+# tests/test_coop_gates.gd, which reads them back (docs/expansion/PLAN.md 8 V3.c "The fixed bar", DESIGN.md G77).
 # Owner: world-B (PLAN.md 4.1, tools/world_*).
 #
-# THE ROW IS THREE PROOFS (wf11: the orchestrator's R7, docs/expansion/DESIGN.md G77 - the bar is fixed): (a) the solo
-# search refuses the gate, (b) every route of the evidence set says "not reached" in a fresh process, (c) the
-# continuous-play explorer opens it in none of two seeded passes of 300 s over the whole level. This script runs all
-# three on worker processes and then the test, which reads their kept results:
-#   step 1  the search workers (below)                        76 rows, 4.3 hours of search (wf11: the new probes,
-#                                                             the wind's phases): 31 minutes on 12 workers
-#   step 1b tools/coop_explore/replay_evidence.sh             24 routes, a fresh process each: under a minute
-#   step 1c tools/coop_explore/explore_gates.sh               76 rows x 2 passes x 300 s = 12.7 hours of play:
-#                                                             38 minutes on 20 processes, 63 on 12 (COOP_GATES_EXPLORERS,
-#                                                             default N); rows the search or a route already opened
-#                                                             are not explored (they are red)
-#   step 2  the test (reads everything back)                  seconds
-# One after another that is about 31 + 1 + 38 = 70 minutes on this 12-core / 24-thread desktop (`COOP_GATES_EXPLORERS=20
-# bash tools/world_coop_gates.sh 12`; the search step measured alone, 2026-10-09). THE WHOLE GATE JOB IN 51 MINUTES,
-# MEASURED (2026-10-09 07:16-08:07, nothing else running): the two long steps side by side -
-# `COOP_GATES_TOGETHER=1 COOP_GATES_EXPLORERS=18 bash tools/world_coop_gates.sh 6`: 18 explorer processes play every
-# row's two passes (152 passes in 2 540 s) WHILE 6 workers search (76 searches, 4.9 hours of search under that load,
-# done after 2 995 s), then the evidence (33 routes, 23 s) and the test (28 s). Every row is explored then, also one
-# that turns out red. "About 40 minutes" is not reached on 12 cores: the explorer's bar alone is 12.7 process-hours
-# of wall time and the search grew to 4.3 (the probes of wf11, the wind's phases); more cores bring it down - the
-# job is processes x wall time, nothing shared. With the results kept, a rerun on an unchanged tree is a few minutes.
-# A pass is 300 s of WALL time, so more processes than cores play fewer ticks per pass: each pass prints the ticks
-# it played and the row shows them (the silent passes of that run: 0.87 to 1.86 million ticks, median 1.27).
-#   --no-explore      skip step 1c (the rows then read "unproven: (c) ... NOT RUN" unless their passes are kept)
-#   COOP_GATES_EXPLORERS=20 bash tools/world_coop_gates.sh 12     12 search workers, then 20 explorer processes
-#   COOP_GATES_TOGETHER=1 COOP_GATES_EXPLORERS=18 bash tools/world_coop_gates.sh 6     both at once (about 45 minutes)
+# THE ROW IS THREE PROOFS (the orchestrator's R7 - the bar is fixed): (a) the solo search refuses the gate, (b) every
+# route of the evidence set (tools/coop_explore/evidence) says "not reached" in a fresh process, (c) the
+# continuous-play explorer opens it in none of two seeded passes of 300 s over the whole level. Every piece is ONE
+# Godot process and keeps its result under a key of everything it depends on - the level file and its solo base,
+# the gate and difficulty, the simulation's scripts, scenes and resources (CoopSearch.code_fingerprint), the search's
+# bounds, the pass's seed and seconds, the route file (CoopSearch.file_cache_key, tools/coop_explore/harness.gd
+# explore_key / replay_key; build/coop_search_cache, build/coop_explore_cache).
 #
-#   bash tools/world_coop_gates.sh                N workers = the CPU cores (Godot's thread count / 2, at most 16)
-#   bash tools/world_coop_gates.sh 8              8 workers
-#   bash tools/world_coop_gates.sh --fresh [N]    the UNCACHED proof run (DESIGN.md G59): round 1 searches every gate
-#                                                 again whatever the cache holds (tools/coop_search.gd --fresh) and
-#                                                 stores the results; the test then reads exactly those
+# HOW IT RUNS (wf12: one plan, one pool):
+#  1. THE PLAN - one process (`tools/coop_search.gd --plan`, a few seconds) asks every key: what is kept and still
+#     valid is not run again. AN UNCHANGED LEVEL FILE AND UNCHANGED SIMULATION SCRIPTS NEED NO NEW SEARCH, PASS OR
+#     REPLAY: on an unchanged tree the job is the plan and the test (under a minute); after an edit of one co-op
+#     file only that file's rows are made again. (Any change under scripts/, scenes/ or resources/ outside the
+#     screens, the versus referee, the bots and the development tools makes every row new: the search plays the
+#     real game's code.)
+#  2. THE POOL - every piece that is to do is a job; S of them run at once (S = the machine's threads, 24 here), the
+#     longest first: the searches by their last measured cost (the dearest takes 25 minutes), the explorer's passes
+#     (300 s of wall time each, whatever the machine does), the evidence replays (seconds) last. A slot that falls
+#     free takes the next job at once, so no process waits for a "step" to end - before wf12 the search workers
+#     and the explorer were two fixed groups (6 + 18) and a round of 76 processes only read the cache back.
+#  3. THE PLAN AGAIN - a file saved or a script edited while the pool ran (other agents work meanwhile) shows as
+#     pieces to do: another pool (COOP_GATES_ROUNDS, default 3), then
+#  4. THE TEST - `bash .tools/gd.sh test coop_gates` asserts every row from the kept results and prints its `R7` and
+#     `GATE` line. The test is the verdict; the pool only does the work early.
+#
+# TIME, MEASURED on this 12-core / 24-thread desktop: see the end of this header. The work is fixed by the bar -
+# 152 passes x 300 s of wall time (12.7 process-hours) and about 4.9 hours of search at that load - so the floor
+# on 24 processes is (45 600 + 152 x 6 s of start-up + 17 900) / 24 = 44.7 minutes; more processes than threads
+# would shorten it only by giving every pass fewer ticks (a pass is wall time), which weakens proof (c). Each pass
+# prints the ticks it played and the row shows them.
+#
+#   bash tools/world_coop_gates.sh                the whole job on S = `nproc` processes
+#   bash tools/world_coop_gates.sh 16             ... on 16 processes
+#   bash tools/world_coop_gates.sh --fresh [S]    the UNCACHED proof run (DESIGN.md G59): every search, pass and
+#                                                 replay again whatever is kept, and the results stored
+#   bash tools/world_coop_gates.sh --no-explore [S]   without proof (c) (its rows then read "unproven: (c) ... NOT
+#                                                 RUN" unless their passes are kept)
+#   bash tools/world_coop_gates.sh --plan         only say what is to do (exit 0 = nothing: the tree is proven as
+#                                                 far as the kept results go; the test is still the verdict)
 #   bash tools/world_coop_gates.sh --shards [N]   the old way: N shards of the test itself (COOP_GATES_SHARD=i/N)
-#   bash tools/world_coop_gates.sh --bench K [N]  the SCALE BENCH of the queue mode: the workers search every gate K
-#                                                 times (copies 1..K-1 afresh, no cache: tools/coop_search.gd --repeat=K),
-#                                                 then the test as usual - today's 45 gates x 3 cost what about 70 gates x
-#                                                 2 difficulties will (PLAN.md V7's 20-minute target)
-#   COOP_GATES_TIMEOUT=2400 bash tools/world_coop_gates.sh     each process's GD_TIMEOUT (default 3600 s)
-#   COOP_GATES_ROUNDS=3 bash tools/world_coop_gates.sh         most worker rounds of step 1 (default 3)
-#   COOP_GATES_OUT=build/my_gates bash tools/world_coop_gates.sh    another folder for the queue and the logs (two runs
-#                                                              at once must not share one: each empties its queue)
+#   bash tools/world_coop_gates.sh --bench K [S]  the SCALE BENCH: every gate searched K times afresh, nothing kept
+#   COOP_GATES_ONLY="w2_l2_coop w9_l2_coop:drive" bash tools/world_coop_gates.sh
+#                                                 A DESIGNER'S LOOP: only the rows of these files / gates (the
+#                                                 selectors of tools/coop_search.gd) - their searches and passes,
+#                                                 no evidence replay and NO TEST; prints their lines and exits 1
+#                                                 when a search or a pass opened one. Not a proof of the table.
+#   COOP_GATES_SLOTS=20 ...                       the pool's size (wins over the positional number)
+#   COOP_GATES_TOGETHER=1 COOP_GATES_EXPLORERS=18 bash tools/world_coop_gates.sh 6    as tools/g3.sh calls it since
+#                                                 wf11: read as one pool of 6 + 18 = 24 processes
+#   COOP_GATES_TIMEOUT=2400 ...                   each search process's GD_TIMEOUT (default 3600 s)
+#   COOP_GATES_ROUNDS=3 ...                       most pools (default 3)
+#   COOP_GATES_OUT=build/my_gates ...             another folder for the logs (two runs at once must not share one)
 #
-# QUEUE MODE (the default) - two steps:
-#  1. N workers share one work queue: each runs `bash .tools/gd.sh script res://tools/coop_search.gd --
-#     --queue=build/coop_gates/queue --max-gates=1` again and again - ONE GATE PER GODOT PROCESS, so an import another
-#     terminal needs gets its turn between two gates, and every gate starts with an empty engine message queue - and
-#     each process takes the dearest gate nobody claimed yet (the cost of its last search, CoopSearch.order_by_cost;
-#     CoopSearch.claim_gate: an atomic folder per gate), so no worker idles while another
-#     still has a long list (the fixed `index % N` split of --shards left shards 415-565 s apart). Every search lands
-#     in scripts/world/coop_search.gd's result cache (build/coop_search_cache: keyed by the level file, its base file,
-#     gate, difficulty, partner model and the md5 of the simulation's code). A round that searched anything is followed
-#     by another round (a fresh queue; the cached gates are read back in a moment): a level saved or a script edited
-#     while the round ran (other agents work meanwhile) is searched again in parallel there, not alone by the test.
-#     The rounds end with one that searched nothing (the cache is complete) or after COOP_GATES_ROUNDS.
-#  2. ONE run of the test (`bash .tools/gd.sh test coop_gates`) asserts every gate: it calls the same search, which
-#     reads each result back from the cache ("cached" in its line) - unless a file or the code changed since step 1,
-#     then it searches that gate again itself. The test is the verdict; the workers only do the work early.
-#  3. THE G59 TABLE: one verdict line per gate and difficulty - `GATE <level> <difficulty> <gate>: refused
-#     (exhaustive) | refused (bounded) | open | unproven (<evidence>)` - printed and kept in
-#     build/coop_gates/verdicts.txt, with the counts. "Refused" never means "stopped at the bound": an exhaustive
-#     refusal emptied the search's frontier; a bounded one expanded at least 660 resting points AND ran every
-#     continuous-play probe of the gate's kind (hop-over, charge-under, idle-bait, thrown-special, plates; egg
-#     placement besides); anything less is UNPROVEN and fails the test like an open gate.
-# Logs: build/coop_gates/worker_<i>.r<round>.log (per gate: the search and every probe family's counts),
-# build/coop_gates/test.log (or shard_<i>.log). Prints every gate line, the verdicts and the wall time; exit 0 when
-# the test passed.
+# Output folder (default build/coop_gates): plan.r<round>.txt, jobs.r<round>.txt, search/<row>.log,
+# passes/<row>.p<pass>.log (a found route: passes/found_<row>.p<pass>.txt), evidence/<route>.log, evidence.txt and
+# explore.txt (one line per route / per row and pass, and the count: what tools/g3.sh quotes), test.log,
+# verdicts.txt (`GATE <level> <difficulty> <gate>: refused (exhaustive) | refused (bounded) | open | unproven
+# (<evidence>)`), r7_rows.txt (the three proofs per row). Prints the rounds, the red rows, the verdicts and the wall
+# time; exit 0 when the test passed.
 #
-# Many processes share the machine: run it alone for the timing of PLAN.md V7 (target: about 70 gates x 2
-# difficulties in under 20 minutes on this 12-core desktop). The processes share Godot's import cache (gd.sh shared
-# runs). Measured 2026-10-08 (world-B, wf9; 12 workers, other agents' Godot runs beside them):
-#   08:00  --bench 3: 135 searches (45 gates x 3) in 688-713 s per worker (mean 62.6 s a search; 14.6 Godot
-#          processes and 85 % CPU on average), after 70 s waiting for another agent's exclusive gd.sh run;
-#   08:34  the default mode on the 72-gate table: round 1 72 searches in 360 s (mean 57.4 s), round 2 nothing new
-#          (14 s), the test 5 s (all 72 cached) - 6 min 19 s in all, every gate refused.
-# So about 140 gate searches took about 12 minutes on 12 workers - under the 220-point bound of phase 3.
-# Since the G59 search of wf10 (2026-10-09; raised bounds, the continuous-play probes, one gate per process):
-#   00:03  --fresh 12 on the 76-gate table: round 1 76 uncached searches in 799 s (2 h 34 min of search summed: mean
-#          122 s a gate, the dearest 315 s; 50.0 million ticks), round 2 nothing new (33 s), the test 4 s (all 76
-#          cached) - 13 min 56 s in all, other agents' Godot runs beside it. Verdicts of that tree: 40 refused
-#          (exhaustive), 27 refused (bounded), 9 open, 0 unproven.
+# One row by hand:
+#   bash .tools/gd.sh script res://tools/coop_search.gd -- <level>:<gate>:<beginner|expert> --no-cache      (a)
+#   bash tools/coop_explore/replay_evidence.sh                                                              (b)
+#   bash .tools/gd.sh script res://tools/coop_explore/main.gd -- explore <level> <gate> <0|1> pass=0        (c)
+#
+# MEASURED (world-B; the bar and the table are the same in every line: 76 rows, 33 routes until wf12):
+#   2026-10-09 07:16  wf11, two fixed groups (6 search workers + 18 explorer processes), nothing else running:
+#                     51 minutes (3 050 s: 76 searches 2 995 s, 152 passes 2 540 s, evidence 23 s, the test 28 s).
+#   2026-10-09 11:39  the G3c table (tools/g3.sh): 3 050 s the same way; 201.3 million explorer ticks, 0.88 to 1.93
+#                     million a pass (median 1.30).
+#   wf12, one plan and one pool: see docs/expansion/PLAN.md 7 "P4 gate job" for the run of the round.
 set -u
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-MODE=queue
+MODE=pool
 REPEAT=1
 FRESH=0
 EXPLORE=1
-if [ "${1:-}" = "--no-explore" ]; then
-	EXPLORE=0
-	shift
-fi
-if [ "${1:-}" = "--shards" ]; then
-	MODE=shards
-	shift
-elif [ "${1:-}" = "--bench" ]; then
-	REPEAT="${2:-3}"
-	shift
-	[ $# -gt 0 ] && shift
-elif [ "${1:-}" = "--fresh" ]; then
-	FRESH=1
-	shift
-fi
+PLAN_ONLY=0
+while [ $# -gt 0 ]; do
+	case "$1" in
+		--no-explore) EXPLORE=0; shift ;;
+		--fresh) FRESH=1; shift ;;
+		--plan) PLAN_ONLY=1; shift ;;
+		--shards) MODE=shards; shift ;;
+		--bench)
+			MODE=bench
+			REPEAT="${2:-3}"
+			shift
+			[ $# -gt 0 ] && shift
+			;;
+		*) break ;;
+	esac
+done
 THREADS="$(nproc 2>/dev/null || echo 4)"
-N="${1:-$(( THREADS / 2 ))}"
-[ "$N" -lt 1 ] && N=1
-[ "$N" -gt 16 ] && [ $# -eq 0 ] && N=16
 TMO="${COOP_GATES_TIMEOUT:-3600}"
 OUT="${COOP_GATES_OUT:-$ROOT/build/coop_gates}"
 case "$OUT" in
@@ -115,14 +104,11 @@ case "$OUT" in
 	*) OUT="$ROOT/$OUT" ;;
 esac
 mkdir -p "$OUT"
-# The queue folder as the workers get it: a res:// path inside the project, else the OS path.
-case "$OUT" in
-	"$ROOT"/*) QUEUE_ARG="res://${OUT#"$ROOT"/}/queue" ;;
-	*) QUEUE_ARG="$OUT/queue" ;;
-esac
 START=$(date +%s)
 
 if [ "$MODE" = "shards" ]; then
+	N="${1:-$(( THREADS / 2 ))}"
+	[ "$N" -lt 1 ] && N=1
 	rm -f "$OUT"/shard_*.log
 	pids=()
 	for ((i = 0; i < N; i++)); do
@@ -155,126 +141,201 @@ if [ "$MODE" = "shards" ]; then
 	exit $failed
 fi
 
-# Queue mode: worker rounds until a round searched nothing new (or ROUNDS_MAX rounds), then the test.
-QUEUE="$OUT/queue"
-rm -f "$OUT"/worker_*.log "$OUT"/worker_*.part "$OUT/test.log" "$OUT/verdicts.txt"
-ROUNDS_MAX="${COOP_GATES_ROUNDS:-3}"
-# R7 (c) side by side with the search (COOP_GATES_TOGETHER=1): the explorer's two passes on EVERY gate row start now,
-# on their own processes, and are waited for after the evidence step.
-REL_OUT="build/coop_gates"
-case "$OUT" in "$ROOT"/*) REL_OUT="${OUT#"$ROOT"/}" ;; esac
-EXPLORERS="${COOP_GATES_EXPLORERS:-$N}"
-TOGETHER="${COOP_GATES_TOGETHER:-0}"
-explore_pid=""
-if [ "$EXPLORE" -eq 1 ] && [ "$TOGETHER" = "1" ]; then
-	XSTART=$(date +%s)
-	( cd "$ROOT" && EXPLORE_OUT="$REL_OUT/passes" bash tools/coop_explore/explore_gates.sh all "$EXPLORERS" passes=0,1 \
-		> "$OUT/explore.txt" 2>&1 ) &
-	explore_pid=$!
+# --- The pool ----------------------------------------------------------------------------------------------------
+# S: COOP_GATES_SLOTS, else the positional number (with COOP_GATES_TOGETHER=1 plus COOP_GATES_EXPLORERS: the two
+# groups of wf11 as one pool), else every thread of the machine.
+if [ -n "${COOP_GATES_SLOTS:-}" ]; then
+	SLOTS="$COOP_GATES_SLOTS"
+elif [ $# -gt 0 ]; then
+	SLOTS="$1"
+	[ "${COOP_GATES_TOGETHER:-0}" = "1" ] && SLOTS=$(( SLOTS + ${COOP_GATES_EXPLORERS:-$1} ))
+else
+	SLOTS="$THREADS"
 fi
+[ "$SLOTS" -lt 1 ] && SLOTS=1
+ROUNDS_MAX="${COOP_GATES_ROUNDS:-3}"
+# The folders as Godot gets them: a res:// path inside the project, else the OS path.
+REL_OUT=""
+case "$OUT" in "$ROOT"/*) REL_OUT="${OUT#"$ROOT"/}" ;; esac
+if [ -z "$REL_OUT" ]; then
+	echo "world_coop_gates: COOP_GATES_OUT must be a folder inside the project ($ROOT): the explorer writes its found routes there" >&2
+	exit 2
+fi
+PASS_SECONDS=300
+gd() { ( cd "$ROOT" && bash .tools/gd.sh "$@" ); }
 
-# One worker of one round: ONE GATE PER GODOT PROCESS (tools/coop_search.gd --max-gates=1), again and again until a
-# process finds nothing left to claim. A process per gate costs a few seconds of start-up each, and buys two things:
-# an import that another terminal needs (gd.sh: exclusive, it waits for every running Godot) gets its turn after the
-# gates in flight instead of after the whole table, and Godot's message queue starts empty for every gate (a search
-# passes no frame; scripts/world/coop_search.gd SearchLevel.spawn).
-worker() {
-	local index="$1" round="$2" extra="$3"
-	local log="$OUT/worker_$index.r$round.log" part="$OUT/worker_$index.r$round.part"
-	local code=0 failed=0
-	: > "$log"
-	while :; do
-		( cd "$ROOT" && GD_TIMEOUT="$TMO" bash .tools/gd.sh script res://tools/coop_search.gd -- \
-			--queue="$QUEUE_ARG" --max-gates=1 $extra ) > "$part" 2>&1
-		code=$?
-		cat "$part" >> "$log"
-		if grep -q "^coop_search: 0 gate(s)" "$part"; then
-			break   # nothing left to claim
-		fi
-		if ! grep -q "^coop_search: 1 gate(s)" "$part"; then
-			# Killed or crashed: its gate stays claimed without a result - the next round searches it again.
-			failed=$((failed + 1))
-			echo "worker $index: a search process ended without a result (exit $code)" >> "$log"
-			[ "$failed" -ge 3 ] && break
-		fi
-	done
-	rm -f "$part"
-	echo "exit=$code" >> "$log"
+# One job of the pool: `<kind> <args...>` as the plan names it. Each is one Godot process with its own log.
+run_job() {
+	local kind="$1"
+	shift
+	case "$kind" in
+		search)
+			# search <level> <gate> <0|1>: ONE GATE PER PROCESS (an import another terminal needs gets its turn
+			# between two gates, and Godot's message queue starts empty for every gate).
+			local level="$1" gate="$2" diff="$3" name="beginner" extra=""
+			[ "$diff" = "1" ] && name="expert"
+			[ "$FRESH" -eq 1 ] && extra="--fresh"
+			[ "$MODE" = "bench" ] && extra="--no-cache"
+			GD_TIMEOUT="$TMO" gd script res://tools/coop_search.gd -- "$level:$gate:$name" $extra \
+				> "$OUT/search/${level}__${gate}__${diff}${4:+.b$4}.log" 2>&1
+			;;
+		explore)
+			# explore <level> <gate> <0|1> <pass>: R7's pass with the row's own seed; the result is kept.
+			local tag="${1}__${2}__${3}.p${4}" extra=""
+			[ "$FRESH" -eq 1 ] && extra="fresh=1"
+			GD_TIMEOUT=$(( PASS_SECONDS + 900 )) gd script res://tools/coop_explore/main.gd -- explore "$1" "$2" "$3" \
+				"pass=$4" "out=res://$REL_OUT/passes/found_$tag.txt" $extra > "$OUT/passes/$tag.log" 2>&1
+			echo "rc=$?" >> "$OUT/passes/$tag.log"
+			;;
+		replay)
+			# replay <route file>: one evidence route in a fresh process; the result is kept.
+			GD_TIMEOUT="${EVIDENCE_TIMEOUT:-900}" gd script res://tools/coop_explore/main.gd -- replay "res://$1" cache=1 \
+				> "$OUT/evidence/$(basename "$1" .txt).log" 2>&1
+			;;
+	esac
 }
 
+# The pool: the jobs of a list file (`<seconds> <kind> <args...>`, the longest first), S at once.
+run_pool() {
+	local list="$1" line running
+	while IFS= read -r line; do
+		[ -z "$line" ] && continue
+		while :; do
+			running="$(jobs -rp | wc -l)"
+			[ "$running" -lt "$SLOTS" ] && break
+			wait -n 2>/dev/null || sleep 1
+		done
+		# shellcheck disable=SC2086
+		run_job ${line#* } < /dev/null &
+		sleep 0.3   # (the runner's entry gate is a lock folder: a burst of starts would queue behind it)
+	done < "$list"
+	wait
+}
+
+ONLY="${COOP_GATES_ONLY:-}"
+plan() {
+	local file="$1" extra="$ONLY"
+	[ "$FRESH" -eq 1 ] && [ "$2" -eq 1 ] && extra="$extra --fresh"
+	[ "$EXPLORE" -eq 0 ] && extra="$extra --no-explore"
+	# shellcheck disable=SC2086
+	GD_TIMEOUT=900 gd script res://tools/coop_search.gd -- --plan $extra 2>&1 | grep -E "^(PLAN |coop_search: plan)" > "$file"
+	grep -q "^coop_search: plan" "$file"
+}
+
+if [ "$MODE" = "bench" ]; then
+	mkdir -p "$OUT/search"
+	plan "$OUT/plan.bench.txt" 0 || { echo "world_coop_gates: the plan did not run (see $OUT/plan.bench.txt)" >&2; exit 2; }
+	: > "$OUT/jobs.bench.txt"
+	for ((copy = 1; copy <= REPEAT; copy++)); do
+		awk -v copy="$copy" '$2 == "search" { print $6, "search", $3, $4, $5, copy }' "$OUT/plan.bench.txt" >> "$OUT/jobs.bench.txt"
+	done
+	sort -k1,1nr -o "$OUT/jobs.bench.txt" "$OUT/jobs.bench.txt"
+	run_pool "$OUT/jobs.bench.txt"
+	END=$(date +%s)
+	echo "== bench: $(grep -c . "$OUT/jobs.bench.txt") search(es) (every gate $REPEAT time(s), nothing kept) on $SLOTS process(es) in $((END - START)) s; $(cat "$OUT"/search/*.b*.log 2>/dev/null | grep -cE ' gate .*: (refused|REACHED|UNPROVEN) in ') with a result, $(cat "$OUT"/search/*.b*.log 2>/dev/null | grep -E ' gate .*: (refused|REACHED|UNPROVEN) in ' | sed -E 's/.* in ([0-9.]+) s.*/\1/' | awk '{s += $1} END {printf "%.0f", s}') s of search"
+	exit 0
+fi
+
+if [ "$PLAN_ONLY" -eq 1 ]; then
+	plan "$OUT/plan.txt" 1 || { echo "world_coop_gates: the plan did not run (see $OUT/plan.txt)" >&2; exit 2; }
+	grep " todo" "$OUT/plan.txt" | cut -c1-200
+	tail -1 "$OUT/plan.txt"
+	! grep -q " todo" "$OUT/plan.txt"
+	exit $?
+fi
+
+rm -rf "$OUT/search" "$OUT/passes" "$OUT/evidence" "$OUT/queue"
+rm -f "$OUT"/worker_*.log "$OUT"/plan.r*.txt "$OUT"/jobs.r*.txt "$OUT/test.log" "$OUT/verdicts.txt" "$OUT/r7_rows.txt" \
+	"$OUT/evidence.txt" "$OUT/explore.txt"
+mkdir -p "$OUT/search" "$OUT/passes" "$OUT/evidence"
 round=0
 searches=0
+passes=0
+replays=0
 while :; do
 	round=$((round + 1))
-	rm -rf "$QUEUE"
-	mkdir -p "$QUEUE"
-	# The bench's copies and the uncached proof run are the first round's (a later round only catches up with what
-	# changed meanwhile, from the cache).
-	extra=""
-	if [ "$round" -eq 1 ]; then
-		[ "$REPEAT" -gt 1 ] && extra="--repeat=$REPEAT"
-		[ "$FRESH" -eq 1 ] && extra="$extra --fresh"
-	fi
-	pids=()
-	for ((i = 0; i < N; i++)); do
-		worker "$i" "$round" "$extra" &
-		pids+=($!)
-		sleep 1   # stagger the starts (each process reads the gate table and the code fingerprint first)
-	done
-	for pid in "${pids[@]}"; do
-		wait "$pid"
-	done
-	fresh="$(cat "$OUT"/worker_*.r$round.log | grep -E ' gate .*: (refused|REACHED|UNPROVEN) in ' | grep -vc ', cached)')"
-	searches=$((searches + fresh))
-	echo "== round $round: $fresh gate search(es) ($(( $(date +%s) - START )) s so far)"
-	# A round that searched something may have raced a file edit (a designer saving a level, a code change): one
-	# more round finds every gate whose result is not in the cache any more, in parallel, before the test does it
-	# alone. A round that only read the cache is the proof that the cache is complete.
-	if [ "$fresh" -eq 0 ] || [ "$round" -ge "$ROUNDS_MAX" ]; then
+	PLAN="$OUT/plan.r$round.txt"
+	JOBS="$OUT/jobs.r$round.txt"
+	if ! plan "$PLAN" "$round"; then
+		echo "world_coop_gates: the plan did not run (see $PLAN)" >&2
 		break
 	fi
+	# The jobs, the longest first: a search by its last measured cost, a pass by its wall time and a little for the
+	# process, a replay last.
+	awk -v pass="$PASS_SECONDS" '$NF == "todo" && $2 == "search" { print $6, "search", $3, $4, $5 }
+		$2 == "explore" && $7 == "todo" { print pass + 8, "explore", $3, $4, $5, $6 }
+		$2 == "replay" && $4 == "todo" { print 5, "replay", $3 }' "$PLAN" | sort -k1,1nr > "$JOBS"
+	s="$(grep -c " search " "$JOBS")"; p="$(grep -c " explore " "$JOBS")"; r="$(grep -c " replay " "$JOBS")"
+	searches=$((searches + s)); passes=$((passes + p)); replays=$((replays + r))
+	echo "== round $round: $s gate search(es), $p explorer pass(es), $r evidence replay(s) to do on $SLOTS process(es) ($(( $(date +%s) - START )) s so far) - $(tail -1 "$PLAN" | sed 's/^coop_search: //')"
+	# A round with nothing to do is the proof that every result is kept and valid: on to the test.
+	if [ ! -s "$JOBS" ] || [ "$round" -gt "$ROUNDS_MAX" ]; then
+		[ -s "$JOBS" ] && echo "== $ROUNDS_MAX pool(s) and still something to do (a file or a script keeps changing, or a process dies: see $OUT): the test says which rows are unproven"
+		break
+	fi
+	run_pool "$JOBS"
+	echo "== pool $round done ($(( $(date +%s) - START )) s so far): $(cat "$OUT"/search/*.log 2>/dev/null | grep -cE ' gate .*: (refused|REACHED|UNPROVEN) in ') search result(s), $(cat "$OUT"/search/*.log 2>/dev/null | grep -E ' gate .*: (refused|REACHED|UNPROVEN) in ' | sed -E 's/.* in ([0-9.]+) s.*/\1/' | awk '{s += $1} END {printf "%.0f", s}') s of search"
 done
 MID=$(date +%s)
-echo "== workers ($N, $round round(s), $((MID - START)) s, $searches search(es)$([ "$REPEAT" -gt 1 ] && echo "; bench: every gate $REPEAT times in round 1")$([ "$FRESH" -eq 1 ] && echo "; round 1 uncached (--fresh)"))"
-for ((i = 0; i < N; i++)); do
-	log="$OUT/worker_$i.r1.log"
-	echo "worker $i (round 1): $(grep -cE ' gate .*: (refused|REACHED|UNPROVEN) in ' "$log") gate(s), $(grep -E ' gate .*: (refused|REACHED|UNPROVEN) in ' "$log" | sed -E 's/.* in ([0-9.]+) s.*/\1/' | awk '{s += $1} END {printf "%.0f", s}') s searching ($(grep -E '^exit=' "$log" | tail -1))"
-done
-# R7 (b): the evidence set, a fresh process per route (kept for the test).
-( cd "$ROOT" && EVIDENCE_OUT="$REL_OUT/evidence" bash tools/coop_explore/replay_evidence.sh "$N" > "$OUT/evidence.txt" 2>&1 )
-echo "== evidence (R7 b; $(( $(date +%s) - MID )) s): $(tail -1 "$OUT/evidence.txt")"
+
+# R7 (b) as a table: one line per route - this run's fresh process, or the kept result the plan read back.
+: > "$OUT/evidence.txt"
+reached=0; total=0; missing=0
+while read -r _ _ route state rest; do
+	[ -z "$route" ] && continue
+	name="$(basename "$route" .txt)"
+	line="$(grep -h "^REPLAY .*: \(REACHED\|DIED\|not reached\)" "$OUT/evidence/$name.log" 2>/dev/null | tail -1)"
+	[ -z "$line" ] && [ "$state" = "kept" ] && line="${rest#| }"
+	total=$((total + 1))
+	case "$line" in
+		*"REACHED the far cell"*) reached=$((reached + 1)) ;;
+		"") missing=$((missing + 1)) ;;
+	esac
+	printf '%-52s %s\n' "$name" "${line:-NO RESULT (see $OUT/evidence/$name.log)}" >> "$OUT/evidence.txt"
+done < <(grep "^PLAN replay " "$OUT/plan.r1.txt" 2>/dev/null)
+echo "replay_evidence: $reached of $total route(s) still REACH their far cell$([ "$missing" -gt 0 ] && echo "; $missing without a result")" >> "$OUT/evidence.txt"
+echo "== evidence (R7 b; $replays replayed in this run, a fresh process each): $(tail -1 "$OUT/evidence.txt")"
 grep "REACHED the far cell" "$OUT/evidence.txt" | sed 's/^/   /' | cut -c1-200
-# R7 (c): the explorer's two seeded passes of 300 s on every gate row that (a) and (b) leave closed.
-if [ -n "$explore_pid" ]; then
-	wait "$explore_pid"
-	echo "== explorer (R7 c; $(( $(date +%s) - XSTART )) s on $EXPLORERS process(es), side by side with the search; every row): $(tail -1 "$OUT/explore.txt")"
-	grep "REACHED the far cell" "$OUT/explore.txt" | sed 's/^/   /' | cut -c1-260
-elif [ "$EXPLORE" -eq 1 ]; then
-	XSTART=$(date +%s)
-	( cd "$ROOT" && GD_TIMEOUT=300 bash .tools/gd.sh script res://tools/coop_search.gd -- --list 2>/dev/null ) \
-		| awk '$1 ~ /^[0-9]+$/ { print $2, $4, ($3 == "Expert" ? 1 : 0) }' > "$OUT/rows_all.txt"
-	: > "$OUT/rows_explore.txt"
-	skipped=0
-	while read -r level gate diff; do
+
+# R7 (c) as a table: one line per row and pass.
+: > "$OUT/explore.txt"
+if [ "$EXPLORE" -eq 1 ]; then
+	reached=0; silent=0; missing=0; rows=0
+	while read -r _ _ level gate diff pass state rest; do
 		[ -z "$level" ] && continue
-		dname="beginner"; [ "$diff" = "1" ] && dname="expert"
-		if cat "$OUT"/worker_*.log 2>/dev/null | grep -qE "GATE $level $dname $gate: open" \
-				|| grep -qE "REPLAY $level d$diff $gate: REACHED" "$OUT/evidence.txt"; then
-			skipped=$((skipped + 1))   # red already: (a) or (b) opened it
-		else
-			echo "$level $gate $diff" >> "$OUT/rows_explore.txt"
-		fi
-	done < "$OUT/rows_all.txt"
-	if [ -s "$OUT/rows_explore.txt" ]; then
-		( cd "$ROOT" && EXPLORE_OUT="$REL_OUT/passes" bash tools/coop_explore/explore_gates.sh "$REL_OUT/rows_explore.txt" \
-			"$EXPLORERS" passes=0,1 > "$OUT/explore.txt" 2>&1 )
-	else
-		echo "explore_gates: no row to explore" > "$OUT/explore.txt"
-	fi
-	echo "== explorer (R7 c; $(( $(date +%s) - XSTART )) s on $EXPLORERS process(es); $skipped row(s) red already, not explored): $(tail -1 "$OUT/explore.txt")"
+		tag="${level}__${gate}__${diff}.p${pass}"
+		[ "$pass" = "0" ] && rows=$((rows + 1))
+		line="$(grep -h "^EXPLORE .*: \(REACHED\|NOT reached\)" "$OUT/passes/$tag.log" 2>/dev/null | tail -1)"
+		[ -z "$line" ] && [ "$state" = "kept" ] && line="EXPLORE $level d$diff $gate whole: ${rest#| }"
+		case "$line" in
+			*"REACHED the far cell"*) reached=$((reached + 1)); printf '%-40s %s\n' "$tag" "$(echo "$line" | cut -c1-210)  [$OUT/passes/found_$tag.txt]" >> "$OUT/explore.txt" ;;
+			*"NOT reached"*) silent=$((silent + 1)); printf '%-40s %s\n' "$tag" "$(echo "$line" | sed -E 's/^EXPLORE [^:]*: //' | cut -c1-170)" >> "$OUT/explore.txt" ;;
+			*) missing=$((missing + 1)); printf '%-40s %s\n' "$tag" "NO RESULT (see $OUT/passes/$tag.log)" >> "$OUT/explore.txt" ;;
+		esac
+	done < <(grep "^PLAN explore " "$OUT/plan.r1.txt" 2>/dev/null)
+	echo "explore_gates: $rows row(s), pass(es) 0 1: $reached REACHED, $silent not reached, $missing without a result; $passes pass(es) played in this run on $SLOTS process(es) ($OUT/passes)" >> "$OUT/explore.txt"
+	echo "== explorer (R7 c; every row): $(tail -1 "$OUT/explore.txt")"
 	grep "REACHED the far cell" "$OUT/explore.txt" | sed 's/^/   /' | cut -c1-260
+	# The ticks the passes of this run played (a pass is wall time: the load of the machine shows here).
+	played="$(grep -h "^EXPLORE .*: \(REACHED\|NOT reached\)" "$OUT"/passes/*.log 2>/dev/null | grep -v "\[cached\]" | sed -E 's/.* ([0-9]+) ticks played.*/\1/' | sort -n)"
+	if [ -n "$played" ]; then
+		echo "== explorer ticks of this run: $(echo "$played" | awk '{ v[NR] = $1; s += $1 } END { printf "%d pass(es), %.1f million ticks, %.2f to %.2f million a pass (median %.2f)", NR, s / 1e6, v[1] / 1e6, v[NR] / 1e6, v[int((NR + 1) / 2)] / 1e6 }')"
+	fi
 else
+	echo "explore_gates: skipped (--no-explore)" >> "$OUT/explore.txt"
 	echo "== explorer (R7 c): skipped (--no-explore) - a row without kept passes reads unproven"
+fi
+
+if [ -n "$ONLY" ]; then
+	# A designer's loop: the rows asked for, as their searches and passes say - no test, no proof of the table.
+	echo "== the rows of COOP_GATES_ONLY=\"$ONLY\" (no test: not a proof of the table)"
+	( cd "$ROOT" && GD_TIMEOUT="$TMO" bash .tools/gd.sh script res://tools/coop_search.gd -- --table $ONLY 2>&1 ) 		| grep -E "^(GATE |coop_search: )" | tee "$OUT/verdicts.txt" | cut -c1-300
+	cat "$OUT/explore.txt"
+	echo "== $(( $(date +%s) - START )) s ($searches search(es), $passes pass(es) on $SLOTS process(es))"
+	if grep -qE "^GATE [^:]*: (open|unproven)" "$OUT/verdicts.txt" || grep -q "REACHED the far cell\|NO RESULT" "$OUT/explore.txt"; then
+		exit 1
+	fi
+	exit 0
 fi
 TSTART=$(date +%s)
 ( cd "$ROOT" && GD_TIMEOUT="$TMO" bash .tools/gd.sh test coop_gates > "$OUT/test.log" 2>&1 )
@@ -283,7 +344,7 @@ END=$(date +%s)
 echo "== gates (the test, $((END - TSTART)) s)"
 grep -E "^\s+.* gate .*: (refused|REACHED) in |slot-bound" "$OUT/test.log" | sed 's/^ *//'
 # The G59 verdict of every gate (DESIGN.md G59, LEVEL_DESIGN.md 15.7.6): the test's own lines when it prints them
-# (CoopSearch.verdict_line), else the search tool's table from the cache the workers filled.
+# (CoopSearch.verdict_line), else the search tool's table from the kept results.
 grep -E "^\s*GATE " "$OUT/test.log" | sed 's/^ *//' > "$OUT/verdicts.txt"
 if [ ! -s "$OUT/verdicts.txt" ]; then
 	( cd "$ROOT" && GD_TIMEOUT="$TMO" bash .tools/gd.sh script res://tools/coop_search.gd -- --table 2>&1 ) \
@@ -299,6 +360,6 @@ echo "== $(count 'refused \(exhaustive\)') refused (exhaustive), $(count 'refuse
 $(count 'open') open, $(count 'unproven') unproven of $(grep -c '^GATE ' "$OUT/verdicts.txt") gate(s)"
 searched_again="$(grep -E "^\s+.* gate .*: (refused|REACHED) in " "$OUT/test.log" | grep -vc " cached$")"
 echo "== $(grep -E 'test_coop_gates.gd' "$OUT/test.log" | tail -1 | sed 's/^ *//')"
-echo "== $N worker(s) + the test in $((END - START)) s ($searched_again gate(s) searched again by the test): \
+echo "== the plan(s) and pool(s) $((MID - START)) s ($searches search(es), $passes pass(es), $replays replay(s) on $SLOTS process(es), $((round - 1)) pool(s)) + the test $((END - TSTART)) s = $((END - START)) s ($searched_again gate(s) searched again by the test): \
 $([ $code -eq 0 ] && echo "every gate refused, with its evidence" || echo "FAILURES (see $OUT/test.log)")"
 exit $code
