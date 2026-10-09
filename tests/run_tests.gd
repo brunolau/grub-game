@@ -67,8 +67,11 @@ const SLOW_FILES: PackedStringArray = ["test_book2_routes.gd", "test_campaign_ro
 const SLOW_TESTS: Dictionary = {
 	# The single-hero searches of the co-op boss forms that take seconds (V3.d; the Chieftains' with the idle partner
 	# placed everywhere) and the Colossus's rock fairness sweep (enemies-B / enemies-C). The quick ones stay.
+	# G3c (versus' measurement, wf11_versus_to_integration.txt #1): the hero bots' bodies on hero physics, 16.5 s alone
+	# - about 10 s are its own, 6 s the pyre's bot graph that the next hero-bot test then bakes instead.
 	"test_enemies_chieftain.gd": [
-		"test_the_single_hero_search_with_an_idle_partner_cannot_beat_the_coop_chieftains"],
+		"test_the_single_hero_search_with_an_idle_partner_cannot_beat_the_coop_chieftains",
+		"test_hero_bot_bodies_move_on_hero_physics"],
 	"test_enemies_colossus.gd": ["test_colossus_rocks_can_be_jumped",
 		"test_coop_the_single_hero_search_cannot_hurt_the_visor_colossus"],
 	"test_enemies_idols.gd": ["test_the_single_hero_search_cannot_crack_the_twin_idols"],
@@ -81,6 +84,7 @@ const SLOW_TESTS: Dictionary = {
 	"test_world_validator.gd": ["test_search_measures_the_windows_near_the_gate",
 		"test_search_partner_is_idle_and_parked_anywhere_counts_for_nothing",
 		"test_search_probes_and_carried_wounds_kill_what_one_move_cannot",
+		"test_search_hop_jump_reaches_six_rows_not_seven",
 		"test_search_refuses_a_high_ledge_and_finds_a_low_one",
 		"test_search_rides_on_an_idle_partner_only_as_the_engine_allows",
 		"test_search_settles_the_world_and_shares_changed_worlds",

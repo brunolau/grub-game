@@ -6,7 +6,7 @@
 #    and only a Brace Wall of two crouching heroes stops it (dazed 44 ticks, head open); it keeps the hall's door;
 #  - 'drive': the final gap is 13 cells of tar without its drop clouds (9 fell to a lone hero's gust jump, G79): a
 #    charged Batter Up line drive puts one hero across; he steps on the latch plate there and the cloud slab over
-#    the gap sinks into a bridge for his partner.
+#    the gap sinks into a bridge for his partner (9 cells of it; he hops the last 4).
 #    The slate stack over the cloud hall is 14 rows high here (5 more than in the solo file; DESIGN G67): from its
 #    top a lone hero stepped onto the raised slab, and he reached that top from the painting's cloud - 6 rows under
 #    it - by a hop jump, or by a pogo jump on the painting's spot (130 px). Now it stands 11 rows over that cloud.
@@ -70,7 +70,7 @@ T = objects/hidden_spot kind=big hits=3 contents=painting:14 look=inset tile=%
 ....................................#########.....................#####.............................#########...................................................................................%%%%%%%%%%%......................#####
 ....................................#########.....................#####..............................#######..............................#########.............................................%%%%%%%%%%%......................#####
 .....########........................#######......................#####...................................................................#########.............................................%%%%%%%%%%%......................#####
-.....########.....................................................#####....................................................................#######..............................................###########%%%%%%%%%%%%%.........#####
+.....########.....................................................#####....................................................................#######..............................................###########%%%%%%%%%.............#####
 ......######......................................................#####..........................%%%%%%%%%%%%%%%%%#.............................................................................###########......................#####
 .................................................................................................%%%%%%%%%%%%%%%%%#.............................................................................###########......................#####
 .................................................................................................##################...................................................................................................................
@@ -170,14 +170,18 @@ props/sky/icicle 196 31
 props/sky/icicle 201 31
 # co-op gate 'drive': 13 cells of tar from under the slate stack's edge (wf11, DESIGN G79: at 9 a lone hero's gust
 # jump - 162 px from the slide in the tailwind - crossed it; the rule is 12); a CHARGED line drive (325 px) carries
-# the ball over. The latch plate on the far bank sinks the slab into a bridge (the slab rests 7 rows over the
-# floor against the stack's face: nothing a lone hero can stand on may come within a jump of its top, G67).
+# the ball over. The latch plate on the far bank sinks the slab into a bridge over the first 9 cells; the batter
+# hops the last 4. (The plate stands 8 tiles from the slab and at most 270 px from the near lip: the shared view
+# lets the pair stand 290 px apart, so a slab over all 13 cells would put its plate out of the batted hero's
+# reach.) The slab rests 7 rows over the floor against the stack's face: nothing a lone hero can stand on may
+# come within a jump of its top (G67).
 objects/checkpoint 199 34
 objects/x2_tablet 197 34 gate=drive far=219,34
-objects/plate 223 34 name=bridge mode=latch
-objects/column 203 28 size=13,1 rise=7 sink_while=bridge
+objects/plate 219 34 name=bridge mode=latch
+objects/column 203 28 size=9,1 rise=7 sink_while=bridge
 objects/checkpoint 221 34
-enemies/roller 196 34 left=-2 right=2
+# The cloud hall's Roller (196,34 in the solo file) is left out (wf11, G22): its roll ends in the tar at the
+# gate's lip, 4 cells nearer since the gap grew, and it knocked the batter into the tar in the tailwind.
 items/food 211 32 index=14
 enemies/dart 219 25 skin=storm_ptero range=4 hp=10
 enemies/charger 222 34 skin=rival_tar hp=10 coop=lone

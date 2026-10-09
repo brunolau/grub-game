@@ -1,6 +1,9 @@
 # route: level=w1_l1_coop difficulty=beginner players=2 ends=exit after=tally expect=hurts:0,eggs:0,wipes:0,x2_gates:2,min_checkpoints:5,min_kills:10
 # w1_l1_coop "Vine Bridges" for two - beginner two-stream route proof (designer DB1; ticks:P1|P2, keys L R U D F K S;
 # docs/LEVEL_DESIGN.md 15.9). Written as duo segments: P2 often replays the keys of P1 a few ticks later.
+# Re-recorded in wf11 (levels; build/levels/rec_w11, the G2 recorder) for the ward of DESIGN G73: the canopy road
+# lies in gate 'plates's ward, so the club hit on the treetop hopper gives P1 no pogo - he lands sooner and takes
+# his place on plate pa by closed-loop macros; every other segment is DB1's, key for key.
 # P2 steps up beside P1 (their starts are a cell apart).
 4:|R,36:|
 # The first walker
@@ -34,7 +37,7 @@
 # Side by side, both climb the branches straight up (checkpoint 3 at the top)
 140:U|U,10:|
 # The canopy road leads back to the left: P1 clubs the hopper of the first treetop in the jump, P2 follows
-6:R|,8:|,8:L|,8:LU|,4:LU|R,2:LF|R,6:LF|,2:LU|,2:LU|L,10:|L,2:L|L,16:L|LU,8:|LU,52:|
+6:R|,8:|,8:L|,8:LU|,4:LU|R,2:LF|R,6:LF|,2:LU|,2:LU|L,12:L|L,8:L|LU,7:|LU,1:L|LU,8:|LU,52:|
 # Gate 2 (plates): P1 holds plate pa, door D1 of the lower corridor opens and P2 walks through to plate pb; door D2 of the upper corridor opens, P1 jumps into it and walks through; P2 steps aside before P1 drops down.
 66:|L,14:|,4:L|,10:LU|,4:L|,10:|,2:L|,30:L|L,8:L|,30:|
 # On along the vine bridge to the last treetop (the Shellback sign)

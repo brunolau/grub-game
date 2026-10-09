@@ -836,7 +836,21 @@ the 'stack' shoulder, 11 columns from it) broke it: its owner moves the stack or
 the flat, 15.7.2): **12 cells** of gap towards the side a tailwind blows, or the far lip raised 2 rows over the
 near lip for its first 3 cells, or the near lip roofed for its last 6 cells. 9-2's final gap ('drive', 9 cells of
 tar) fell to a lone hero's gust jump on both difficulties. Among the co-op files only `w9_l2_coop` and
-`w3_l1b_coop` carry wind.
+`w3_l1b_coop` carry wind. **A slab bridge over a gust gap spans at most 9 cells from the near lip** [G83]: the
+shared view lets a pair stand 290 px apart and a plate stands 8 tiles from its column, so a plate behind a longer
+slab is out of the batted hero's reach (a slab bridge with its plate on the far bank works up to a 10-cell gap).
+As rebuilt, 9-2 'drive' is 13 cells of tar (columns 203-215): the slab bridges 9 (203-211), the latch plate
+stands at 219-220, the last 4 cells are hopped in a lull, and the drive is a **charged** one (325 px; an uncharged
+one ends in the tar at 171 px).
+
+**A coil is opened by a hero who stands on its level** [G81]. A rolled vine's coil asks for the hitter's feet AND
+the ground he last stood on to be at most one row under its ledge (PHYSICS C.4): a jump, a bounce or a launch from
+a place below no longer meets it, nor does the special thrown at its top. A see-saw's drop ledge always stands
+within a jump of its target's level (the recipe above), and so does an x2 secret's ledge beside a gate: they need
+no roof for the coil's sake since G81 (the two roofs of 2-2 and 6-2 'seesaw', 3 rows over the cap ledges, were
+built before the rule and stay). The clean foot of a boost ledge [G67] holds for every ledge within one row of a
+gate's coil, an x2 secret's too (2-2 'lift': the bone ledge's foot was cleared) - the validator's rule still
+reads gate tablets only.
 
 #### 15.7.4 x2 tablets
 
@@ -864,8 +878,14 @@ the ward's edge" for every top that stands 6+ rows over the floor beside both it
 height gate's ledge, inside the ward within 12 cells of its edge or outside it within 8 - nine gates on the tree
 of the round. Clear it with `ward=` so that the top lies 12+ cells inside (1-1 'hop' `ward=22,12`, 2-2 'lift'
 `ward=16,12`, 8-1 'stairs' `ward=23,12`, 9-1 'pulley' `ward=12,17`, 4-1 'cliff' `ward=12,14`, 5-2 'sandgate'
-`ward=12,21`) or, where the top does not lead past the gate at all, with one comment line above the tablet saying
-why; either way the explorer's two passes are the proof (15.7.6). The same listing prints each gate's ward
+`ward=12,21` - the values first ruled). **As built: `ward=` until no top is named** [G83]. The validator reads no
+comment, and every widened edge may uncover the next top within its 12 cells, so a margin grows until
+`tools/validate_levels.gd -- --strict` names nothing: 1-1 'hop' `ward=34,12` (columns 66..129; at 22,12 the
+pool's one-way ledge 80-85 is named), 1-2 'treehouse' `ward=12,62` and 4-1 'cliff' `ward=12,29` (both to the
+map's edge), 2-2 'lift' `ward=26,12` and 'seesaw' `ward=45,12` (0..73: an Up bounce on the digger of columns 12-31
+lifts feet to the coil's level), 5-2 'sandgate' `ward=12,21`, 7-1 'stack' `ward=38,12`, 8-1 'stairs' `ward=23,12`,
+9-1 'pulley' `ward=12,17`. Say in a comment above the tablet what the wider ward costs the pair (which columns are
+new, whose head they lose); the explorer's two passes are the proof (15.7.6). The same listing prints each gate's ward
 columns, the enemy records inside it and the followers within two views of its edge; a hittable within 7 cells
 of a height gate's foot and a one-way ledge cell fewer than 7 rows over a standing place are errors.
 
@@ -885,6 +905,13 @@ of a height gate's foot and a one-way ledge cell fewer than 7 rows over a standi
 - **`grab`** in a ward [G73]: a Snatcher does not seize a hero inside a ward (its touch is the plain hurt) and lets
   go of one it carries at the ward's edge. Never put a `perch=` beyond a gate's barrier from where its Snatcher
   can seize.
+- **`shell`: over a shield there is no behind** [G82]: a `shell` record (a Shellback, a `coop=shell` walker or
+  Roller) is hurt only by a hero who stands clear of its body on the side its shield does not face - the striker's
+  place, or the thrower's for a thrown weapon. A hero on its head or inside its body (in a ward he falls through
+  it) is in front, whatever he throws. A shell keeper hall therefore needs no roof against a drop from above, and a
+  crust with holes over it (5-1, 3-1b) is no way in for one hero; it still needs both ends closed to a single hero
+  walking round (the hall rule above). 5-1 'gully' was rebuilt as a bond of two tortoises before the rule
+  (`coop=bond bond=gully keeper=gully`) and stays one.
 - **Bonds are slot-bound** [G72]: a bond, a keeper pair, a drum pair and a split are met only by two different
   heroes who both count; one hero's hit on the last member glances and the dead one regrows. The placing rules
   above that kept ONE hero from both members - out of one hero's reach within the window, never on one throw line

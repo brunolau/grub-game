@@ -1,12 +1,16 @@
 # route: level=ending_coop difficulty=expert players=2 ends=exit after=the_end expect=hurts:0,eggs:0,wipes:0,x2_gates:1,painting:29,min_checkpoints:3
 # The Expert two-stream route of the Way Home in co-op (designer DB3; P1|P2, keys L R U D F K S; recorded from
-# closed-loop duo macros, build/db3/bot_ending_coop.gd). P1 opens the spots of the path, P2 trails him; at the barred
+# closed-loop duo macros, build/db3/bot_ending_coop.gd). P1 opens the spots of the path - the inset tile, the road's
+# two hidden spots (columns 33-34) and the bush - and P2 trails him; at the barred
 # village gate P1 stands under the end of the lookout gallery and P2 Shoulder-Hops off his head onto it - onto the
 # latch plate: the gate rises for good - takes Cave Painting 29 by the watch hut and drops back to the road while P1
 # walks through the gate; P1 clubs the barrels and the pot of the village and both reach the exit totem
 # (the team exit). Club only, no S; nobody stands 243 ticks without input.
-4:|L,1:R|L,3:R|,15:R|R,3:|R,1:R|R,5:|R,8:DF|,6:|,8:DF|,6:|,8:DF|,6:|,3:R|,5:R|R,1:R|,1:R|R,1:R|,70:R|R,1:|R,1:|
-1:R|R,1:|,1:|R,4:|,1:L|,2:|,1:R|,8:F|,8:|,8:F|,8:|,8:F|,8:|,3:R|,5:R|R,1:R|,20:R|R,1:|R,1:|,1:R|R,1:|,1:|R,4:|
-1:L|R,1:|R,10:|,3:|RU,8:|U,1:|RU,6:|U,20:|RU,1:|R,22:R|R,15:R|,15:R|L,7:|L,8:F|L,4:|L,13:|,46:|R,2:|,1:|R,7:|
-1:R|,4:R|R,1:R|,1:R|R,1:R|,2:R|R,1:R|,1:R|R,1:R|,4:R|R,1:|R,1:|,1:|R,1:R|,1:|,1:|R,3:|,8:F|,12:|,3:R|,5:R|R
-1:R|,102:R|R,1:|R,1:|,1:|R,3:|,1:|R,8:F|,12:|,4:R|,117:R|R
+# Re-recorded in wf11 (levels; build/levels/bot_ending_coop.gd, DB3's bot with two more stops): the road's two
+# hidden spots moved to columns 33-34 at G70 (they lay under the tablet) and the old keys walked past them.
+4:|L,1:R|L,3:R|,15:R|R,3:|R,1:R|R,5:|R,8:DF|,6:|,8:DF|,6:|,8:DF|,6:|,3:R|,5:R|R,1:R|,1:R|R,1:R|,61:R|R,1:|R,1:|
+1:|R,1:R|,1:|,1:|R,3:|,8:DF|,6:|,8:DF|,6:|,3:R|,1:R|R,3:|R,3:|,1:L|,2:|,1:R|,8:DF|,6:|,8:DF|,6:|,3:R|,2:R|R
+3:|R,4:|,1:R|,2:|,8:F|,8:|,8:F|,8:|,8:F|,8:|,3:R|,5:R|R,1:R|,21:R|R,1:|R,1:|,1:|R,3:|,1:R|R,2:|,1:R|R,1:|R,1:|
+1:L|,8:|,3:|RU,15:|U,20:|RU,1:|R,22:R|R,6:R|,1:R|R,9:R|,14:R|L,3:|L,1:R|L,5:|L,8:F|L,2:|L,13:|,46:|R,2:|,1:|R
+6:|,1:|R,2:R|R,1:R|,1:R|R,1:R|,2:R|R,1:R|,1:R|R,1:R|,1:R|R,1:R|,5:R|R,1:|R,1:|,1:|R,3:|,1:|R,8:F|,12:|,4:R|
+107:R|R,1:|R,1:|,1:|R,1:R|,1:|,1:|R,3:|,8:F|,12:|,3:R|,5:R|R,1:R|,112:R|R

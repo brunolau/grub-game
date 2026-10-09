@@ -117,9 +117,67 @@ func test_shell_faces_the_nearer_hero_every_tick_and_only_its_back_can_be_hit() 
 	var into_face: ProjectileBase = _shot(Vector2i(200, 150), -208, 0)
 	shell.take_hit(20, into_face)
 	assert_eq(shell.hp, 50, "a thrown weapon flying into the shield glances")
+	_hero.teleport(Vector2i(120, 160))
 	var from_behind: ProjectileBase = _shot(Vector2i(120, 150), 208, 0)
 	shell.take_hit(20, from_behind)
-	assert_eq(shell.hp, 30, "one flying at its back counts")
+	assert_eq(shell.hp, 30, "one thrown at its back from behind it counts")
+
+
+## G82 (the G3c round, w5_l1_coop 'gully'): over a shield there is no behind. One hero who stands ON a keeper
+## Shellback (outside a ward its head is a rest) or IN its body (inside a ward he falls through it) and throws a
+## special the way its shield looks hit it "in the back" by the weapon's flight alone - both keepers of the gully fell
+## to him. The hit of a hero whose feet point lies within the columns of its body box glances, and so does the weapon
+## of a thrower who stands on the shield's side, however it flies. The partner behind it hits as ever.
+func test_a_shell_is_hurt_only_by_a_hero_who_is_behind_it() -> void:
+	for id: StringName in [&"enemies/walker", &"enemies/shellback"]:
+		var params: Dictionary = {"speed": 0, "hp": 100}
+		if id == &"enemies/walker":
+			params["coop"] = "shell"
+		var shell: EnemyBase = _enemy(id, Vector2i(160, 160), params)
+		var what: String = String(id).get_file()
+		# P2 dozes far away (the lone player's partner): the shield faces P1 wherever he is.
+		_p2.teleport(Vector2i(500, 160))
+		_p2.idle = true
+		# The body box spans 16 px to each side of its feet point for both forms here.
+		assert_true(shell.box_xo >= 8 and shell.box_w - shell.box_xo >= 8, what + ": the set-up - a body with a width")
+		for dx: int in [-(shell.box_xo), -5, 0, 3, 7, shell.box_w - shell.box_xo - 1]:
+			# On its head, in its body: the same columns.
+			for dy: int in [-shell.box_h, 0]:
+				_hero.teleport(Vector2i(160 + dx, 160 + dy))
+				Sim.step(2)
+				for xvel: int in [208, -208]:
+					var special: ProjectileBase = _shot(_hero.sim_pos + Vector2i(0, -10), xvel, 0)
+					assert_true(shell.take_hit(80, special), what + ": the special is used up ...")
+					assert_eq(shell.hp, 100, what + ": ... and glances - thrown from on or in it (dx %d, dy %d, flying %d)"
+							% [dx, dy, xvel])
+					_level.remove_child(special)
+					special.free()
+				shell.take_hit(25, _hero)
+				assert_eq(shell.hp, 100, what + ": his club from there glances too (dx %d, dy %d)" % [dx, dy])
+		# In front of it, outside its box: a weapon of his that comes at its back (a throw that bounced or came round)
+		# is still HIS hit from the front.
+		_hero.teleport(Vector2i(160 + 40, 160))
+		Sim.step(2)
+		assert_eq(shell.facing, 1)
+		var round_the_back: ProjectileBase = _shot(Vector2i(130, 150), 208, 0)
+		shell.take_hit(80, round_the_back)
+		assert_eq(shell.hp, 100, what + ": the thrower stands on the shield's side - his weapon glances however it flies")
+		# The pair: P1 baits in front, P2 behind it throws and clubs - the back is his.
+		_p2.idle = false
+		_p2.teleport(Vector2i(160 - 60, 160))
+		Sim.step(2)
+		assert_eq(shell.facing, 1, what + ": the shield faces the nearer hero, P1")
+		var partners: ProjectileBase = _shot(Vector2i(110, 150), 208, 1)
+		shell.take_hit(20, partners)
+		assert_eq(shell.hp, 80, what + ": the partner's special from behind counts")
+		shell.take_hit(25, _p2)
+		assert_eq(shell.hp, 55, what + ": and so does his club")
+		# A hit nobody's hero made (a tool, a test) is judged by its flight as before.
+		_level.remove_child(shell)
+		shell.free()
+		for shot: SimEntity in _level.get_kind(Defs.Kind.HERO_PROJECTILE):
+			_level.remove_child(shot)
+			shot.free()
 
 
 ## G33 (the IDLE-PARTNER rule): the shield faces the nearer hero who COUNTS - a dozing partner is no bait.
@@ -1084,6 +1142,57 @@ func test_grab_drops_its_catch_at_the_perch() -> void:
 	assert_eq(bat.sim_pos, perch, "dropped at the perch")
 	assert_true(_hero.control_enabled)
 	assert_eq(_hero.shield, 0, "no immunity for a drop")
+
+
+## G73 (the orchestrator's R3: at a co-op gate no enemy gives lift, rest or CARRY): a Snatcher does not seize a hero
+## whose feet column is in a ward - its touch there is the plain contact of his own pass - and a hero it carries is
+## let go on the tick his feet column enters one, with the 44 immune ticks of a freed hero. Outside every ward, and
+## for a party of one, nothing changed.
+func test_grab_never_seizes_in_a_ward_and_lets_go_at_its_edge() -> void:
+	# The ward: columns 12 .. 20 (192 .. 335 px). The bat hangs at x 160 (column 10), its perch is cell 15,6.
+	var owner: RefCounted = RefCounted.new()
+	_level.set_ward(owner, 12, 20)
+	assert_true(_level.in_ward(200) and not _level.in_ward(160), "the set-up")
+	var bat: EnemyBase = _grabber(Vector2i(200, 140))
+	var traits: CoopTraits = bat.coop_traits()
+	_p2.teleport(Vector2i(500, 160))
+	_hero.teleport(Vector2i(200, 160))
+	Sim.step(3)
+	assert_null(traits.held, "in the ward: a hero who touches it from below is not seized")
+	assert_eq(traits.carries, 0)
+	assert_true(bat.contact_hurts, "it stays a threat: its touch is the plain contact")
+	assert_true(_hero.control_enabled, "and he keeps his pad")
+	# The same touch one column outside the ward seizes him; the reel towards the perch (1 px a tick) carries him to
+	# the ward's edge, and there it lets go.
+	_level.remove_child(bat)
+	bat.free()
+	bat = _grabber(Vector2i(160, 140))
+	traits = bat.coop_traits()
+	_hero.teleport(Vector2i(160, 160))
+	Sim.step(2)
+	assert_eq(traits.held, _hero, "outside the ward the grab is the grab")
+	var freed: int = _step_until(func() -> bool: return traits.held == null, 80)
+	assert_true(freed > 0, "carried towards the perch it lets him go ...")
+	assert_eq(_hero.sim_pos.x, 192, "... on the tick his feet column enters the ward (x 192, column 12)")
+	assert_eq(traits.ward_drops, 1)
+	assert_true(bat.sim_pos != traits.perch, "long before the perch")
+	assert_true(_hero.control_enabled, "he has his pad back")
+	assert_true(_hero.shield > 0 and _hero.shield <= EnemyTuning.GRAB_FREE_SHIELD_TICKS,
+			"and falls with the immunity of a freed hero (%d)" % _hero.shield)
+	assert_true(bat.contact_hurts)
+	# The level without its ward: the carry runs to the perch as ever.
+	_level.clear_ward(owner)
+	_level.remove_child(bat)
+	bat.free()
+	bat = _grabber(Vector2i(160, 140))
+	traits = bat.coop_traits()
+	_hero.shield = 0
+	_hero.teleport(Vector2i(160, 160))
+	Sim.step(2)
+	assert_eq(traits.held, _hero)
+	_step_until(func() -> bool: return traits.held == null, 200)
+	assert_eq(bat.sim_pos, traits.perch, "no ward: dropped at the perch")
+	assert_eq(traits.ward_drops, 0)
 
 
 # =================================================================================================================

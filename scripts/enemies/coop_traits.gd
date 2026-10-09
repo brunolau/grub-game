@@ -84,6 +84,8 @@ var perch: Vector2i = Vector2i.ZERO
 var has_perch: bool = false
 ## `grab`: heroes seized since the level started (an archetype notices a carry by it: enemies/snatcher).
 var carries: int = 0
+## `grab`: carried heroes it let go at a ward's edge (G73; tests and tools read it).
+var ward_drops: int = 0
 ## `leech`: the hero on whose back it sits (null = none) and the ticks it has sat there.
 var host: PlayerBase = null
 var host_ticks: int = 0
@@ -277,7 +279,7 @@ func accepts_hit(source: SimEntity) -> bool:
 		return true
 	match kind:
 		Defs.CoopTrait.SHELL:
-			return not enemy._hit_from_front(source)
+			return not (enemy._hit_from_front(source) or _shell_faces_hitter(source))
 		Defs.CoopTrait.HEAVY:
 			# G57 (heavy keepers): hurt ONLY while a Brace Wall of two active heroes has it dazed - then from every
 			# side; every other hit glances, its back too, so a lone player (who can run under or hop over it) never
@@ -290,6 +292,24 @@ func accepts_hit(source: SimEntity) -> bool:
 			# R2: the windows are slot-bound - nobody's hit and the hit that could not meet the group glance.
 			return not _slot_glances(source)
 	return true
+
+
+## G82 (the G3c round; a `shell`: "one hero is always in front and only his partner can hit its back"): true when the
+## HERO a hit by `source` belongs to ([method credit_hero]: the striker, the thrower of a thrown weapon) is not behind
+## this record - his feet point lies within the columns of its body box (he stands ON it or IN it: over a shield there
+## is no behind), or on the side its shield faces. EnemyBase._hit_from_front alone reads a thrown weapon by its flight,
+## so a special thrown from on top of a keeper Shellback, or from inside its body in a ward, the way its shield looks
+## counted as a hit in the back: one hero killed both keepers of w5_l1_coop 'gully' that way
+## (tools/coop_explore/evidence/w5_l1_coop.gully.*.wf11_explorer.txt). A batted ball is judged by its own flight as
+## before (false here), and so is a hit no hero made.
+func _shell_faces_hitter(source: SimEntity) -> bool:
+	var hero: PlayerBase = credit_hero(source)
+	if hero == null or (hero == source and hero.is_curled()):
+		return false
+	var dx: int = hero.sim_pos.x - enemy.sim_pos.x
+	if dx >= -enemy.box_xo and dx < enemy.box_w - enemy.box_xo:
+		return true
+	return signi(dx) == enemy.facing
 
 
 ## R2: true when the slot rule turns a weapon hit by `source` away from this record: it is a windowed record (a named
@@ -757,12 +777,16 @@ func _grab_pre() -> bool:
 
 
 ## A hatched hero who touches it from below (his feet below its feet point) or whom it comes down on is seized.
+## Never in a ward ([method _warded], DESIGN.md G73): the carry is an enemy's, and at a co-op gate no enemy gives one -
+## its touch there is the plain contact of the hero's own pass (a hurt, or a stomp that lifts nobody).
 func _try_seize() -> void:
 	if not enemy.is_targetable():
 		return
 	for hero: PlayerBase in Game.level.contact_order():
 		# Helper mode (PHYSICS.md C.12): enemy contacts never harm the helper - a seize is that contact.
 		if not hero.is_party_targetable() or hero.is_immune() or hero.is_feasting() or hero.is_helper():
+			continue
+		if _warded(hero):
 			continue
 		if not Overlap.body(hero, enemy, hero):
 			continue
@@ -788,7 +812,9 @@ func _seize(hero: PlayerBase) -> void:
 	Audio.play_sfx(Sfx.ENEMY_VOICE)
 
 
-## The held hero hangs under it: no motion of his own, no strike.
+## The held hero hangs under it: no motion of his own, no strike. Carried into a ward he is let go on that tick
+## (DESIGN.md G73, PHYSICS.md C.10: the fall of a freed hero, with his 44 immune ticks) - a Snatcher lifts nobody
+## over a co-op gate.
 func _place_held() -> void:
 	if not _holdable(held):
 		_release(false)
@@ -798,10 +824,21 @@ func _place_held() -> void:
 	held.yvel = 0
 	held.attack_gate = false
 	held.club_box_active = false
+	if _warded(held):
+		ward_drops += 1
+		_release(true)
 
 
-## Let the held hero go: dropped at the perch (or after the hold ran out), or freed by his partner's hit (he falls with
-## EnemyTuning.GRAB_FREE_SHIELD_TICKS of immunity, the hatch shield of PlayerBase).
+## G73 (the orchestrator's R3, "no enemy gives lift, rest or carry"): true when `hero` is a hero of a co-op party
+## whose feet column lies in the ward of an x2 tablet (LevelBase.in_ward; the same test as the hero's own contact
+## pass, Player._in_ward, with its measurement switch PlayerBase.GATE_R3).
+func _warded(hero: PlayerBase) -> bool:
+	return hero.gate_rule(PlayerBase.GATE_R3) and Game.level.in_ward(hero.sim_pos.x)
+
+
+## Let the held hero go: dropped at the perch (or after the hold ran out), or freed by his partner's hit or by a
+## ward's edge (`by_partner`: he falls with EnemyTuning.GRAB_FREE_SHIELD_TICKS of immunity, the hatch shield of
+## PlayerBase).
 func _release(by_partner: bool) -> void:
 	var hero: PlayerBase = held
 	held = null

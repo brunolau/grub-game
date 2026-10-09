@@ -261,9 +261,10 @@ func test_in_a_coop_file_the_coil_unrolls_only_for_a_hit_from_its_own_level() ->
 	assert_false(vine.take_hit(25, axe), "his axe from the floor below passes too")
 	assert_false(vine.unroll(hero), "and so does he as a batted ball that is still under the ledge")
 	assert_false(vine.unrolled)
-	hero.teleport(Vector2i(152, vine.top + Vine.COIL_LEVEL_PX))
+	# (respawn_at: he STANDS there - the rule asks for the ground under him too, G81 below.)
+	hero.respawn_at(Vector2i(152, vine.top + Vine.COIL_LEVEL_PX))
 	assert_true(vine.hit_from_its_level(hero), "feet y <= top + 16: one row under the ledge still counts")
-	hero.teleport(Vector2i(152, vine.top))
+	hero.respawn_at(Vector2i(152, vine.top))
 	assert_true(vine.take_hit(25, axe), "thrown from the ledge the axe unrolls it")
 	assert_true(vine.unrolled)
 	axe.free()
@@ -271,6 +272,91 @@ func test_in_a_coop_file_the_coil_unrolls_only_for_a_hit_from_its_own_level() ->
 	var second: Vine = _spawn(&"objects/vine", 12, 6, {"rolled": true}) as Vine
 	assert_true(second.take_hit(25, null))
 	level.meta["kind"] = "test"
+
+
+## G81 (the seventh cause of the G3c round: the coil rule was met IN MID-AIR): "its own level" is where the hitter
+## STANDS. The top of a jump or of a bounce from a place under the coil's level brings his feet there for a few ticks -
+## a special thrown then unrolled the coil 8 columns away (w2_l2_coop and w6_l2_coop 'seesaw',
+## tools/coop_explore/evidence/*.coil_from_drop_ledge.txt, *.wf11_explorer.txt). The rule asks for the ground he last
+## had under his feet as well; a batted ball is its own delivery and must only count.
+func test_the_coil_asks_where_the_hitter_stands_not_where_a_jump_took_his_feet() -> void:
+	var vine: Vine = _vine_level({"length": 5, "rolled": true})
+	var shelf_y: int = vine.top + 3 * Tuning.TILE   # a place 3 rows under the coil's ledge: within a jump of its level
+	var hero: Player = _player(Vector2i(152, shelf_y))
+	var axe: ProjectileBase = ProjectileBase.new()
+	axe.from_hero = true
+	axe.owner_slot = 0
+	# The top of his jump: feet at the coil's level, the ground he left 3 rows under it.
+	hero.teleport(Vector2i(152, vine.top + 8))
+	assert_eq(hero.last_ground_y, shelf_y, "the set-up: in the air over the shelf")
+	assert_true(vine.hit_from_its_level(hero), "a solo file: the rule is off")
+	level.meta["kind"] = "coop"
+	assert_false(vine.hit_from_its_level(hero), "a co-op file: his feet are there, he does not stand there")
+	assert_false(vine.take_hit(25, hero), "his strike at the top of the jump passes the coil")
+	assert_false(vine.take_hit(25, axe), "and so does the special he throws then")
+	assert_false(vine.unrolled)
+	# A bounce carries him higher still - over the ledge: no better.
+	hero.teleport(Vector2i(152, vine.top - 40))
+	assert_false(vine.take_hit(25, axe), "over the coil's ledge at the top of a bounce: still not standing on its level")
+	# He lands on the ledge (the ground is his now) and jumps: the strike hop and the jump of a hero who stands there
+	# keep the coil.
+	hero.respawn_at(Vector2i(152, vine.top))
+	hero.teleport(Vector2i(152, vine.top - 30))
+	assert_true(vine.hit_from_its_level(hero), "a jump from the coil's own ledge is from its level")
+	# ... and falls past it: the feet rule of G67 still holds for him.
+	hero.teleport(Vector2i(152, vine.top + Vine.COIL_LEVEL_PX + 1))
+	assert_false(vine.hit_from_its_level(hero), "17 px under the ledge on the way down: not from its level")
+	# A batted ball is its own delivery (a lob lands him on the ledge): the ball's feet at the level are enough -
+	# when the batted hero counts.
+	hero.respawn_at(Vector2i(152, shelf_y))
+	hero.teleport(Vector2i(152, vine.top + 8))
+	hero.curl = PlayerBase.CURL_BALL
+	assert_true(vine.hit_from_its_level(hero), "the ball at the coil's level unrolls it, wherever it was batted from")
+	hero.idle = true
+	assert_false(vine.hit_from_its_level(hero), "a dozing partner batted at the coil counts for nobody")
+	hero.idle = false
+	assert_true(vine.unroll(hero), "the ball unrolls it")
+	hero.curl = PlayerBase.CURL_NONE
+	axe.free()
+	level.meta["kind"] = "test"
+
+
+## The same with the real hero's own jump: from a shelf 3 rows under the ledge he jumps with Up held; on every tick his
+## feet are within a row of the coil's ledge the coil is asked - never from its level in a co-op file, on some ticks
+## in a solo file (the 1.0 hittable pass asks nothing).
+func test_a_jump_from_three_rows_under_the_coil_never_meets_its_level_in_a_coop_file() -> void:
+	for coop: bool in [false, true]:
+		var rows: Array = []
+		for row: int in 12:
+			var line: String = "...................."
+			if row == 3:
+				line = "......####.........."   # the coil's ledge (top y 48)
+			elif row == 6:
+				line = "..............####.."   # the shelf, 3 rows under it (top y 96)
+			rows.append(line)
+		rows.append("####################")
+		_rows(rows)
+		level.meta["kind"] = "coop" if coop else "test"
+		var vine: Vine = _spawn(&"objects/vine", 10, 3, {"length": 8, "rolled": true}) as Vine
+		var hero: Player = _player(Vector2i(250, 96))
+		var at_level: Array[int] = [0]
+		var allowed: Array[int] = [0]
+		GameInput.set_scripted_slot(0, func(_tick: int) -> int: return Defs.IN_UP)
+		for _i: int in 40:
+			Sim.step(1)
+			if hero.sim_pos.y <= vine.top + Vine.COIL_LEVEL_PX:
+				at_level[0] += 1
+				if vine.hit_from_its_level(hero):
+					allowed[0] += 1
+		GameInput.clear_scripted()
+		assert_true(at_level[0] >= 3, "the set-up: the jump brings his feet to the coil's level for %d tick(s)" % at_level[0])
+		if coop:
+			assert_eq(allowed[0], 0, "a co-op file: on none of them is he a hitter from its level")
+		else:
+			assert_eq(allowed[0], at_level[0], "a solo file: any hit unrolls")
+		hero.free()
+		level.free()
+		level = null
 
 
 ## End to end with the real hero (DB1's probe of 1-2 'treehouse', G67): on the floor 8 rows under a boost ledge he
@@ -305,7 +391,7 @@ func test_a_hop_jump_strike_from_the_floor_below_opens_a_solo_coil_and_never_a_c
 					opened += 1
 				if coop and not vine.unrolled:
 					# The same coil from its own level: a hero standing on the ledge strikes it open.
-					hero.teleport(Vector2i(152, vine.top))
+					hero.respawn_at(Vector2i(152, vine.top))
 					assert_true(vine.take_hit(25, hero), "from the ledge the coil unrolls")
 				hero.free()
 				level.free()

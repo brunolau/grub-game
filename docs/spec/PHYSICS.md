@@ -1407,7 +1407,13 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
   `<= top + 16`, `top` being the top of the vine's anchor cell (a hero standing on its ledge has feet y = `top`);
   any other hit is not consumed and changes nothing. (A lone hero's hop jump - UP held from the 8th tick of a low
   strike, 8.2 - lifts his feet 73-80 px and his high strike reaches 123 px: the coil of an 8-row ledge, 112-128 px
-  up.) Solo files: any hit, as above.
+  up.) **By a hero who stands there** [G81] (`Vine.hit_from_its_level`): the ground he last had under his feet -
+  `last_ground_y`, written by every landing, on every tick he stands on a floor, a platform or a partner's head or
+  sits in a saddle, and by a respawn - must be `<= top + 16` too. The top of a jump, of a bounce or of a launch
+  from a place below is not the coil's level, although it carries his feet past it for some ticks: his strike and
+  the special he throws then pass the coil. A **batted ball** is its own delivery: the hero is curled, so the test
+  is the ball's feet y alone - and the batted hero must count (`counts_for_coop()`; a dozing partner batted at a
+  coil unrolls nothing). Solo files: any hit, as above.
 
 ### C.5 Tar floor and sticky liquids
 
@@ -1747,8 +1753,10 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
     are tested as always.
   - **No rest, no carry**: no enemy is ground, a platform or a carrier for him. The one enemy rule that carries a
     hero is the `grab` trait: a Snatcher does not seize a hero in a ward - its touch there is the plain hurt of
-    10.1 - and lets go of one it carries on the tick his feet column enters a ward (decided; the trait's owner
-    builds it). A ridden mount is its driver's: its stomp gives it no lift there, the ward tested at his feet.
+    10.1 - and lets go of one it carries on the tick his feet column enters a ward: the fall of a freed hero,
+    with his 44 immune ticks (`CoopTraits._warded`, asked in `_try_seize` and after `_place_held`; built by the
+    G3c integrator, `ward_drops` counts the drops). A ridden mount is its driver's: its stomp gives it no lift
+    there, the ward tested at his feet.
   - **No pogo off an enemy**: a club box of his that hits an enemy does not write his velocity (the pogo of 8.3 is
     skipped); damage, knock-back, the clank and "one target per box" are unchanged. A hittable still gives its
     pogo.
@@ -1757,6 +1765,18 @@ charged), `swing_lock` L = 6 (5 ignored-input ticks; FIRE held throws every 12 t
   Not warded: boss bodies (their stomp rules are their fight's, GAMEPLAY 13.6), a partner's head (above), mounts as
   mounts, platforms, rafts, lifts, see-saws, geysers, springs, vines. In single-player, a party of one and versus
   no ward exists.
+- **Over a shield there is no behind** (co-op only) [G82] (`CoopTraits._shell_faces_hitter`): a `shell` record is
+  hurt only by a hero who is **behind** it. The hero of a hit is its striker, or the thrower of a thrown weapon
+  for its whole flight (`CoopTraits.credit_hero`). The hit glances when his feet point lies within the columns of
+  the record's body box (`box_left <= x < box_left + box_w`: he stands on it, or in it - inside a ward he falls
+  through a body [G73]), or on the side its shield faces (`sign(x - enemy.x) == facing`) - whichever way the weapon
+  flies; and it still glances by the 1.0 front test of the Guard (a striker within 4 px of its feet point or on
+  the facing side, a thrown weapon flying into its face). So the partner who baits is in front, the hero on its
+  head is in front, and only a hero who stands clear of it on its far side hits its back. A batted ball is judged
+  by its own place and flight as before; a hit no hero made, by its flight. (Until G3c the flight alone decided for
+  a thrown weapon: one hero standing on a keeper Shellback, or inside it in a ward, threw a special the way its
+  shield looked and killed it - both keepers of 5-1's gully.) A party of one, single-player and versus: the plain
+  Guard, unchanged.
 - **A closed door passes nobody** (co-op only) [G75] (`Player._hold_the_side`, in the hero's `POST`, after every
   mover of the tick): his **body cell** is his feet column in the wall-probe row (the row above his feet row,
   11.2 #7); `_free_x` is his x at the end of the last tick on which the body cell was no SIDE-1 wall. A tick that

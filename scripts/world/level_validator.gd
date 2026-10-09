@@ -2018,8 +2018,10 @@ func _check_led_keepers(data: LevelData, records: Array[Dictionary]) -> void:
 			_add(data.path, int(record["line"]), ERROR,
 					"'%s' is a keeper ('%s') but a one-shot enemy: it despawns without a kill and its door counts it as dead - a keeper must not be one_shot" % [
 					id, str(params["keeper"])])
+		# (An ERROR since the G3c integration: w3_l2_coop 'pits', the one file that carried it, is clean - the lead
+		# designer's ruling in wf11_lead_design_to_world_b.txt #3.)
 		if params.has("bond") and SPAWNER_IDS.has(id):
-			_add(data.path, int(record["line"]), WARNING,
+			_add(data.path, int(record["line"]), ERROR,
 					"'%s' carries bond '%s' but is a zone-spawner record: the record never dies (its copies do), so nobody can ever meet the bond [G68, G72] - drop the bond or use an enemy that stands" % [
 					id, str(params["bond"])])
 

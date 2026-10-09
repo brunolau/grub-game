@@ -261,9 +261,9 @@ func test_the_design_lists_match_the_landed_files() -> void:
 								"%s is no Beginner stop" % missing)
 
 
-## tools/g3.sh is the gate's one command: it runs every slow module of tests/run_tests.gd SLOW_FILES (coop_gates
-## sharded), the default suite, sp_identity, the inventory and every campaign flow - a slow module added to the runner
-## and forgotten here would leave the G3 table silently short.
+## tools/g3.sh is the gate's one command: it runs every slow module of tests/run_tests.gd SLOW_FILES (coop_gates as
+## the three proofs of R7, through tools/world_coop_gates.sh), the default suite, sp_identity, the inventory and every
+## campaign flow - a slow module added to the runner and forgotten here would leave the G3 table silently short.
 func test_the_g3_command_runs_every_slow_module() -> void:
 	var text: String = FileAccess.get_file_as_string("res://tools/g3.sh")
 	assert_false(text.is_empty(), "tools/g3.sh exists")
@@ -274,24 +274,45 @@ func test_the_g3_command_runs_every_slow_module() -> void:
 		# versus_bots runs in shards through tools/g3_versus_bots.sh (each shard: `gd.sh test versus_bots`).
 		var wrapped: bool = module == "versus_bots" and text.contains("tools/g3_versus_bots.sh") \
 				and FileAccess.get_file_as_string("res://tools/g3_versus_bots.sh").contains("test versus_bots")
+		# coop_gates is the gate job: tools/world_coop_gates.sh ends with `gd.sh test coop_gates` (R7, below).
+		if module == "coop_gates":
+			wrapped = text.contains("bash tools/world_coop_gates.sh") 					and FileAccess.get_file_as_string("res://tools/world_coop_gates.sh").contains("test coop_gates")
 		# The slow modules that left the default suite for its budget run in a loop over the MORE_SLOW list.
 		var listed: bool = text.contains("bash $GD test $module\"") and _more_slow(text).has(module)
 		assert_true(wrapped or listed or text.contains("test %s\"" % module) or text.contains("test %s " % module) \
 				or text.contains("test %s\n" % module), "tools/g3.sh runs the slow module %s" % module)
 	# The slow TESTS of files that stay in the default run (SLOW_TESTS) have their own job.
 	assert_true(text.contains("bash $GD test --slow-tests\""), "tools/g3.sh runs the slow tests")
-	assert_true(text.contains("COOP_GATES_SHARD=$i/$SHARDS"), "coop_gates runs sharded")
-	# A co-op file landing mid-run shifts the shard partition (seen 03:42-04:10: shards on 28 and 29 gates, 26 searched,
-	# yet 29 "refused" lines): gates are counted once by name, and shards on different tables are no proof.
-	assert_true(text.contains("the gate table changed during the run"), "a shifted gate table is reported")
-	assert_true(text.contains("sort -u | wc -l"), "gates are counted once by name")
+	# THE FIXED BAR (the orchestrator's R7 after G3b, DESIGN.md G77, PLAN.md 8 V3.c): the coop_gates row is three
+	# proofs per gate row - the solo search, the evidence set, the explorer's two seeded passes of 300 s - made by
+	# tools/world_coop_gates.sh (search workers and explorer processes side by side), read back by the test, and the
+	# job runs before the others so that a pass of 300 s of wall time has its cores.
+	var gate_job: String = FileAccess.get_file_as_string("res://tools/world_coop_gates.sh")
+	assert_true(text.contains("COOP_GATES_TOGETHER=1") and text.contains("COOP_GATES_OUT=$RUN/coop_gates"),
+			"the gate job runs the search and the explorer side by side into the run's own folder")
+	for step: String in ["tools/coop_explore/replay_evidence.sh", "tools/coop_explore/explore_gates.sh", "passes=0,1"]:
+		assert_true(gate_job.contains(step), "tools/world_coop_gates.sh runs %s" % step)
+	for proof: String in ["=> GREEN", "=> RED", "=> OPEN WORK", "coop_gates_r7_rows.txt"]:
+		assert_true(text.contains(proof), "the G3 table reads the three proofs of a row ('%s')" % proof)
+	assert_true(text.contains("--gates-beside") and text.contains("run_job coop_gates"),
+			"the gate job has the machine to itself unless asked otherwise")
+	assert_true(text.contains("sed 's/: .*//' | sort -u"), "gate rows are counted once by name")
+	# V3.d: the eight co-op boss forms, each refused by the single-hero search with an idle partner.
+	assert_true(text.contains("co-op bosses (V3.d)"), "the G3 table has the co-op boss row")
+	for boss_file: String in ["brute", "tusker", "squid", "mangrove", "chieftain", "colossus", "idols", "roc"]:
+		assert_true(text.contains("test_enemies_%s.gd|test_" % boss_file), "the boss row names test_enemies_%s.gd" % boss_file)
+		assert_true(FileAccess.file_exists("res://tests/test_enemies_%s.gd" % boss_file))
 	# G50: human-only (arena, mode) cells are neither green nor red.
 	assert_true(text.contains("human-only (cut 4)"), "the G3 table lists human-only cells")
 	assert_true(text.contains("tools/sp_identity.sh"), "the single-player identity check (V1)")
 	assert_true(text.contains("test integration_g3"), "the content inventory")
-	for flow: String in ["campaign", "campaign_beginner", "campaign_b2", "campaign_coop", "harness_exit"]:
+	for flow: String in ["campaign", "campaign_beginner", "campaign_b2", "campaign_coop", "g3_versus", "harness_exit"]:
 		assert_true(FileAccess.file_exists("res://tools/autoplay/%s.flow" % flow), "%s.flow exists" % flow)
 		assert_true(text.contains(flow), "tools/g3.sh plays %s.flow headless" % flow)
+	# The five play flows also run windowed (a real window, off-screen and muted: gd.sh play).
+	assert_true(text.contains("WFLOWS=(campaign campaign_beginner campaign_b2 campaign_coop g3_versus)"),
+			"the windowed flows")
+	assert_true(text.contains("bash $GD play --flow=tools/autoplay/$flow.flow"), "tools/g3.sh plays them through gd.sh play")
 	# G59: the table is made of the verdict lines of tests/test_coop_gates.gd, and an unproven gate is never "refused".
 	assert_true(text.contains("coop_gates_verdicts.txt"), "the G3 table keeps every gate's verdict")
 	for verdict: String in ["refused (exhaustive)", "refused (bounded)", ": unproven ", ": open "]:

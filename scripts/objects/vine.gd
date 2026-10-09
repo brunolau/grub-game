@@ -13,12 +13,16 @@ extends HittableBase
 ## for the rest of the stage, through deaths and team wipes (like an opened spot). It is the solo shortcut opener and
 ## the co-op "way back" drop gift (DESIGN.md D.5).
 ##
-## **The coil rule** (DESIGN.md G67 (1), PHYSICS.md C.4): in a co-op file the coil unrolls only for a hit FROM ITS OWN
-## LEVEL - the hitting hero's feet y (the thrower's when a thrown weapon hits, the ball's for a batted hero) is
-## `<= top + COIL_LEVEL_PX`, `top` being the ledge the coil lies on. Any other hit passes the coil ([method take_hit]
-## returns false: the box is not consumed, nothing unrolls): a lone hero's hop jump with a high strike (reach 123 px)
-## or a thrown special from the floor below no longer opens the drop gift of a boost ledge. Solo files keep "any hit
-## unrolls" ([method coil_rule_on]; `w5_l2` holds the only solo rolled vine).
+## **The coil rule** (DESIGN.md G67 (1) and G81, PHYSICS.md C.4): in a co-op file the coil unrolls only for a hit FROM
+## ITS OWN LEVEL - the hitting hero's feet y (the thrower's when a thrown weapon hits, the ball's for a batted hero) is
+## `<= top + COIL_LEVEL_PX`, `top` being the ledge the coil lies on - BY A HERO WHO STANDS THERE [G81]: the level he
+## last had under his feet (PlayerBase.last_ground_y: every landing, a platform, a saddle) is no more than COIL_LEVEL_PX
+## under the ledge either. Any other hit passes the coil ([method take_hit] returns false: the box is not consumed,
+## nothing unrolls): a lone hero's hop jump with a high strike (reach 123 px), a thrown special from the floor below,
+## and - G81, the seventh cause of the G3c round - a special thrown at the top of a jump or of a bounce from a place
+## under the coil's level no longer open the drop gift of a boost ledge. A batted ball is its own delivery: it unrolls
+## the coil when the ball itself is at the coil's level and the batted hero counts (PlayerBase.counts_for_coop).
+## Solo files keep "any hit unrolls" ([method coil_rule_on]; `w5_l2` holds the only solo rolled vine).
 ##
 ## Owner: objects-B (docs/expansion/PLAN.md 4.1). Kind HITTABLE (so weapons find the coil); it never counts as a hidden
 ## spot (no completion count, no Events.hidden_spot_opened). Picture: sprites/objects/vine.png (ASSET_MANIFEST 17.3:
@@ -163,14 +167,23 @@ func _hitting_hero(source: SimEntity) -> PlayerBase:
 	return null
 
 
-## The coil rule [G67]: may a hit by `source` unroll the coil? Always outside [method coil_rule_on] and for a hit
+## The coil rule [G67, G81]: may a hit by `source` unroll the coil? Always outside [method coil_rule_on] and for a hit
 ## no hero made; under the rule only while the hitting hero's feet are at most COIL_LEVEL_PX under the coil's ledge
-## (`sim_pos.y <= top + COIL_LEVEL_PX`).
+## (`sim_pos.y <= top + COIL_LEVEL_PX`) AND he stands on that level [G81]: the ground he last had under his feet
+## (`last_ground_y`) is no lower. The top of a jump or of a bounce from a place below is not the coil's level. A
+## batted ball (he is curled: the flight is the delivery) needs only its own feet there, and a hero who counts.
 func hit_from_its_level(source: SimEntity) -> bool:
 	if not coil_rule_on():
 		return true
 	var hero: PlayerBase = _hitting_hero(source)
-	return hero == null or hero.sim_pos.y <= top + COIL_LEVEL_PX
+	if hero == null:
+		return true
+	var level_y: int = top + COIL_LEVEL_PX
+	if hero.sim_pos.y > level_y:
+		return false
+	if hero.is_curled():
+		return hero.counts_for_coop()
+	return hero.last_ground_y <= level_y
 
 
 ## Unroll a rolled vine (a weapon hit or a batted ball, `source` the hero or his weapon). True when it unrolled now;

@@ -3,12 +3,13 @@
 # macros, build/d5). Both heroes keep the club (no S): the belt-invariance runner sees the same digests whatever
 # special rides on either belt. Both co-op gates are crossed together: 'sandgate' (the vertical leapfrog of plates pa
 # and pb with the gift vine) and 'rattlers' (the bonded keepers of the hall, one hero at each).
+# Re-recorded in wf11 (levels; build/levels/rec_d5, D5's macro recorder and macros) for the ward of DESIGN G73:
+# both gates' wards cover the file's whole width, so no tortoise or rattler gives a hero lift or a pogo.
 # Band A: P1 jumps the shellback tortoise and clubs the rattler from outside its reach; P2 follows; up the first vine
 27:R|,3:|,24:|R,1:|,10:RU|,26:R|,7:|,1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,2:|
 1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,2:|,1:R|,2:|R,1:R|R,2:|R,1:R|R,2:|,1:R|,2:|,1:R|,6:F|,18:R|,10:R|RU
-13:R|R,10:RU|R,26:R|R,2:F|R,7:|R,1:L|R,3:|RU,1:L|RU,2:|RU,1:L|RU,2:|RU,1:L|RU,2:|R,1:L|R,2:|R,1:L|R
-2:|R,1:L|R,1:|R,1:|,1:L|,2:|,1:L|,2:|,1:L|,2:|,1:L|,2:|,1:L|,1:|,6:F|,1:R|,4:|,1:R|,2:|,1:R|,2:|
-25:U|,15:U|R,7:U|,1:U|R,2:U|,1:U|R,2:U|,1:U|R,2:U|,1:U|R,2:U|,1:U|R,2:U|,35:U|U,12:L|U,50:|U
+13:R|R,10:RU|R,13:R|R,2:F|R,12:R|R,7:|R,1:R|R,1:|R,1:|RU,1:R|RU,2:|RU,1:R|RU,2:|RU,3:U|RU,10:U|R
+12:U|,15:U|R,7:U|,1:U|R,2:U|,1:U|R,2:U|,1:U|R,2:U|,1:U|R,2:U|,1:U|R,2:U|,35:U|U,12:L|U,50:|U
 # Gate sandgate: P1 holds plate pa (the sand gate D1 rises), P2 walks through it to plate pb in the dead end
 1:|L,25:L|L,12:|L,17:|,57:|L,7:|
 # The gate D2 at the top of the vine rises: P1 climbs the vine, walks through D2 and strikes the rolled vine down into
@@ -30,9 +31,9 @@
 19:|R,7:|,1:|R,2:|,1:|R,2:|,1:|R,2:|,1:|R,2:|,1:|R,2:|,1:|R,2:|,1:|R,2:|,1:|R,2:|,1:|F,7:F|F,1:F|
 8:|
 # Both out through the keeper door; P1 climbs the side vine to the Cave Painting and comes back; up the fifth vine
-30:L|L,7:|L,23:U|L,42:U|,10:L|,7:|,16:R|,16:|,17:L|,2:L|L,7:|L,20:U|L,7:U|,1:U|L,2:U|,1:U|L,2:U|
-64:U|U,10:R|U,23:|U
+30:L|L,7:|L,1:L|L,2:|L,20:U|L,45:U|,10:L|,7:|,16:R|,16:|,17:L|,2:L|L,7:|L,19:U|L,7:U|,1:U|L,2:U|
+1:U|L,2:U|,1:U|L,2:U|,1:U|L,2:U|,59:U|U,10:R|U,28:|U
 # Band F: both jump the shellback tortoise; P1 clubs the rattler from the mesa block; both to the exit totem
-6:R|,10:RU|,14:R|,10:R|R,4:|R,2:U|R,1:U|,5:RU|,4:U|,7:|,6:R|,9:|,3:R|,7:|,3:F|,3:F|RU,7:R|RU,18:R|R
-3:RU|R,7:RU|RU,3:R|RU,5:R|R,7:|R,3:U|R,5:RU|R,2:U|R,4:U|,12:|,2:F|,7:|,20:R|,3:|,4:|R,1:R|R,1:|R
-2:F|R,4:F|RU,6:R|RU,13:R|R,10:R|RU,59:R|R
+6:R|,10:RU|,14:R|,10:R|R,4:|R,2:U|R,1:U|,5:RU|,4:U|,6:|,6:R|,9:|,3:R|,6:|,1:|RU,6:F|RU,3:R|RU,21:R|R
+2:R|RU,8:RU|RU,2:RU|R,8:R|R,7:|R,3:U|R,2:RU|R,3:RU|,6:U|,12:|,2:F|,7:|,20:R|,1:R|R,7:|R,1:R|RU,1:|RU
+6:F|RU,2:R|RU,13:R|R,10:R|RU,59:R|R

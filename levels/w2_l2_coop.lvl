@@ -340,7 +340,10 @@ objects/sign 31 19 text=SIGN_COOP_W2_SEESAW
 # are. A stalactite now hangs over the cap and the shelf (columns 46-49, down to 3 rows over the shelf): under
 # it nobody's feet rise above y 208 (the rule asks for 192), the cap still lands him on the shelf, and nobody
 # stands on a roof that reaches the ceiling.
-objects/x2_tablet 45 19 gate=seesaw far=61,19
+# ward=45,12 (columns 0..73, from the map's edge): the digger's zone (12-31) lies before the default ward, and an
+# Up bounce on it lifts a hero's feet to y 191 and higher - level with the coil for a thrown special, as the
+# shelf was.
+objects/x2_tablet 45 19 gate=seesaw far=61,19 ward=45,12
 objects/spring 46 19 skin=cap
 objects/seesaw 51 19 len=5 facing=l
 objects/vine 56 11 length=8 rolled=true

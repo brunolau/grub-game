@@ -681,8 +681,7 @@ func test_gate_rules_of_the_g3b_round() -> void:
 			"enemies/leaper 28 13 coop=bond bond=pits",
 		])), PackedStringArray(), "solo_bonus")})
 	assert_true(cast.has_problem("'enemies/charger' is a keeper ('k') but a one-shot enemy"), _messages(cast))
-	assert_true(cast.has_problem("'enemies/leaper' carries bond 'pits' but is a zone-spawner record",
-			LevelValidator.WARNING), _messages(cast))
+	assert_true(cast.has_problem("'enemies/leaper' carries bond 'pits' but is a zone-spawner record"), _messages(cast))
 
 
 func test_mechanisms_belong_to_a_gate() -> void:

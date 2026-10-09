@@ -7,6 +7,10 @@
 # head - the first strike, charged by the crouch, takes its 25 hp; its back counts for nobody), the cloud
 # hall's tribesman and Roller (P2 jumps the first valley gap once P1 left its landing), gate 'drive' (P2 curls
 # at the edge, P1 charges and bats him across; P2's latch plate sinks the slab bridge).
+# Re-recorded in wf11 (levels; build/levels/bot_w9_l2_coop.gd, the same bot with the gate's new columns) on the
+# rebuilt 'drive': 13 cells of tar (DESIGN G79, the gust jump), so P1 holds a full crouch charge before he bats
+# P2 across; the latch plate (219-220) sinks the slab over the first 9 cells and P1 hops the last 4 in a lull.
+# The cloud hall's Roller is left out of the co-op file (it rolled into the batter at the lip).
 24:R|,5:R|R,2:R|,4:R|UF,2:|UF,4:|,1:|R,9:RU|R,10:R|R,1:|R,4:L|R,8:R|R,7:R|,20:R|D,7:|D,67:D|D,9:RU|RU,14:R|R
 1:|R,3:R|R,6:R|UF,4:R|,32:R|R,4:R|,3:|,34:|D,25:D|D,6:UF|D,3:|D,32:D|D,9:|RU,10:|R,1:|,4:|L,40:|R,2:|,1:|R,7:|
 36:D|,66:D|D,9:RU|,7:R|,2:|,4:L|,2:|,1:R|,2:|,9:RU|,13:R|,2:|,9:RU|,14:R|,36:|D,66:D|D,9:|RU,9:|R,2:|,4:|L,3:|
@@ -15,13 +19,13 @@
 9:|RU,10:|R,2:|,3:|L,1:|R,77:R|R,4:RU|R,5:R|R,5:R|D,1:D|D,4:|,9:RU|,5:R|,2:|,4:L|,1:|,4:|RU,11:|R,5:|,9:|RU
 2:|R,1:|,1:|L,4:R|L,6:R|R,2:|R,1:L|R,2:L|,3:L|L,1:R|L,1:D|L,1:D|R,15:D|D,4:F|F,1:|R,32:R|R,1:F|R,4:F|F,2:RU|F
 1:RU|,4:RU|R,2:RU|D,1:R|D,6:R|R,1:F|R,3:|R,7:|RU,2:D|RU,2:D|R,1:D|,1:RU|,8:RU|L,2:R|L,2:R|,2:|,1:L|,3:L|RU
-4:|RU,2:RU|RU,7:RU|R,8:R|R,1:|R,5:L|R,1:|R,4:R|R,2:R|F,2:|F,2:L|F,1:L|,1:L|R,2:|R,2:R|R,6:R|L,3:R|R,1:R|,3:R|R
-32:R|,3:R|R,6:F|R,1:|R,2:R|R,1:D|R,9:RU|R,3:R|R,1:R|D,1:R|F,9:R|RU,1:R|R,2:D|R,2:R|R,1:D|R,12:R|R,5:R|F,2:R|
-3:R|R,1:L|R,2:F|D,3:F|R,1:F|D,1:|R,2:R|R,2:D|R,1:|R,13:R|R,6:F|R,1:|R,1:R|R,6:R|F,1:R|,4:R|R,3:|,3:R|R,7:|R
-5:RU|R,4:RU|,9:R|,2:|,4:L|,5:|,10:R|,3:R|D,3:|D,1:R|D,5:|D,79:D|D,9:RU|RU,10:R|R,1:|,1:L|,3:L|L,2:R|,5:R|R
-6:F|R,1:|,4:R|,1:|,1:|R,1:|,1:R|,2:R|RU,7:|RU,10:|R,2:|,3:|L,9:|R,1:|,19:R|,1:R|R,7:|R,17:D|R,52:D|D,9:RU|RU
-9:R|R,2:|,3:R|L,3:R|,6:|,1:R|,2:|,1:R|,2:|,8:UF|,16:|,8:UF|,16:|,8:UF|,16:|,50:D|D,13:L|D,1:|D,1:L|D,1:|D,4:|
-9:RU|,4:R|,1:|,5:L|,1:|,14:R|,7:|,9:R|,6:|,1:R|,2:|,22:|R,2:|,1:|R,7:|,15:R|,14:R|D,24:R|R,1:D|R,1:R|R,5:D|R
-1:R|R,4:D|R,1:R|R,4:D|R,1:R|R,4:D|R,1:R|R,4:D|R,1:R|R,4:|R,1:R|R,2:|R,10:D|R,6:|R,6:|,1:|R,2:|,1:|R,2:|,1:|DS
-1:D|DS,2:D|D,6:F|D,2:F|,6:|,2:R|,2:|,1:R|,3:|,2:|R,1:R|R,22:|R,24:|,15:D|D,42:R|D,1:D|D,1:R|D,7:D|D,1:|,8:R|
-13:R|R,1:|,5:|R,1:R|R,2:|R,4:R|R
+4:|RU,2:RU|RU,7:RU|R,8:R|R,1:|R,5:L|R,1:|R,4:R|R,2:R|F,2:|F,2:L|F,1:L|,1:L|R,2:|R,1:R|R,32:R|,6:F|,1:|,2:R|,3:|
+2:R|,12:R|R,6:F|R,1:|R,2:R|R,5:RU|R,2:RU|D,2:RU|F,9:R|RU,7:R|R,3:D|R,10:R|R,4:R|F,3:R|,4:R|R,1:R|D,11:R|R,5:F|R
+3:RU|R,6:RU|UF,4:R|,9:R|RU,4:R|R,6:L|R,3:R|R,1:F|R,2:|R,1:R|R,2:UF|R,4:UF|,4:|,3:L|,4:|,9:RU|,9:R|,2:|,4:L|,1:|
+2:R|,1:|,10:R|,2:R|D,2:|D,1:R|D,66:D|D,9:RU|RU,9:R|R,1:R|,1:|,4:L|L,5:R|,2:R|R,6:F|R,1:|R,4:R|R,3:R|,1:R|R,4:L|
+1:|,2:|RU,1:L|RU,6:|RU,10:|R,1:|,4:|L,10:|R,1:|,19:R|,3:R|R,2:|R,22:D|R,44:D|D,9:RU|RU,9:R|R,1:R|,1:|,3:R|L
+2:R|,2:|,1:R|,6:|,1:L|,2:|,8:UF|,16:|,8:UF|,16:|,8:UF|,17:|,49:D|D,13:L|D,1:|D,1:L|D,2:|D,3:|,9:RU|,4:R|,1:|
+5:L|,1:|,14:R|,7:|,9:R|,6:|,1:R|,2:|,22:|R,2:|,1:|R,7:|,16:R|,13:R|D,8:R|R,2:D|R,1:R|R,4:D|R,1:R|R,4:D|R,1:R|R
+4:D|R,1:R|R,4:D|R,1:R|R,4:D|R,1:R|R,4:D|R,1:R|R,4:D|R,1:R|R,4:D|R,1:R|R,2:D|R,2:|R,1:R|R,2:|R,4:D|R,6:D|,1:|
+1:|R,2:|,1:|DS,1:D|DS,43:D|D,6:F|D,2:F|,6:|,2:R|,2:|,1:R|,5:|,1:R|R,7:|R,14:|,16:D|D,24:R|D,1:D|D,1:R|D,8:D|D
+2:R|D,14:D|D,9:RU|,1:R|D,9:R|,2:|,3:L|,2:|,4:R|,6:R|R,3:|R,1:R|R,5:|R,10:R|R,1:R|,10:R|R,4:|R,1:R|R,4:|R,3:R|R
