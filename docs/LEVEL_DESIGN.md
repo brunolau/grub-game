@@ -1000,7 +1000,11 @@ world-B builds the probes and prints the verdict per gate (`tests/test_coop_gate
 one line `GATE <level> <difficulty> <gate>: <verdict> (<evidence>)`, `CoopSearch.gate_verdict`); the gate table of
 `tools/g3.sh` counts "n/N gates refused: e exhaustive, b bounded + probes", is green only when every gate is one of
 the two, lists unproven gates by name (the row stays open: G3 is not reached) and is red on an open gate. A designer
-whose gate is "unproven" asks world-B for its probes rather than raising the bound again.
+whose gate is "unproven" asks world-B for its probes rather than raising the bound again. Since the G3c
+integration that row is the three proofs of [G77] below, made by `bash tools/world_coop_gates.sh` (the gate job of
+`tools/g3.sh`): "n / 76 gate rows GREEN by the three proofs (R7)", with every red row's line and route file. A
+designer who changed one co-op file runs the same script: only that file's rows are searched and explored again,
+the others are read back.
 
 **The proof of a gate is three things** [G77] (orchestrator, after the G3b verifier put one hero past 19 of 76
 rows that the search had refused, also at three times its bound). Per gate row (gate x difficulty), and the bar is
@@ -1008,8 +1012,8 @@ rows that the search had refused, also at three times its bound). Per gate row (
 
 | Proof | What must hold |
 |---|---|
-| **(a) the search refuses** | the verdict table above - refused (exhaustive), or refused (bounded) with every probe of its kind - on an exact reset (tick base 0 and the total-tick clock put back per run; a run that missed replays is bounded and says so), with the lone hero's moves of [G67], the long climb (a hero at rest on a vine is a node [G74]) and, in a file with a `wind` script, the wind's phases [G79] |
-| **(b) the evidence set says "not reached"** | every route by which a gate once fell, replayed in a fresh process; the set is versioned under `tools/` and only grows - the G3b verifier's 21 routes, the two gust routes of [G79] and the 'hop' route under the default ward [G73]: 24 today. A route that still reaches `far` is its row's red |
+| **(a) the search refuses** | the verdict table above - refused (exhaustive), or refused (bounded) with every probe of its kind - on an exact reset (tick base 0 and the total-tick clock put back per run - as built the base is 17 952 in every run and process [G83]; a run that missed replays is bounded and says so), with the lone hero's moves of [G67], the long climb (a hero at rest on a vine is a node [G74]) and, in a file with a `wind` script, the wind's phases [G79] |
+| **(b) the evidence set says "not reached"** | every route by which a gate once fell, replayed in a fresh process; the set is versioned under `tools/` and only grows - the G3b verifier's 21 routes, the two gust routes of [G79] and the 'hop' route under the default ward [G73]: 24 at the lead designer's close, 33 at the round's (nine finds of its explorer, `tools/coop_explore/evidence/`). A route that still reaches `far` is its row's red |
 | **(c) the explorer stays out** | the continuous-play explorer (versioned under `tools/`: one hero in the search's world, inputs never reset between moves, the lure, ride, strike-on-spring, long-climb and second-throw moves, the exact reset) opens the row in none of **two seeded passes of 300 s** over the whole level |
 
 A replayable route is red whatever (a) says ("a replay wins", above); a find that does not replay from a fresh

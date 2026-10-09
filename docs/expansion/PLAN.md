@@ -453,7 +453,48 @@ did not run, and recorded as DESIGN.md **G81-G83**:
 The 57 co-op route runs replay unchanged with the three rules (`test_coop_routes` 10 / 10), and
 `tools/sp_identity.sh` is IDENTICAL.
 
-G3C_RUN_RECORD
+**Gate G3: REACHED** on the tree of 2026-10-09 (`G3_TAG=g3c_final1 bash tools/g3.sh --require`, exit 0; table
+`build/g3/run_g3c_final1/g3_table.txt`; its `validate` and `smoke` rows were added to the same run dir by a second
+call with `--only=validate,smoke`, after those two jobs had been written into the script, and `spec_docs` and
+`inventory` ran there once more after this record was written; the first call's table is kept as
+`g3_table.first.txt`). Content complete: 20
+Book II files, 35 co-op files, 31 / 31 solo and 57 / 57 co-op route cells, 6 featured routes, 20 paintings, 76 x2
+gate rows, 8 arenas, 21 of 22 versus cells with CPUs (Tar Pulleys' Last Caveman Standing human-only). Proofs:
+- **coop_gates: 76 / 76 gate rows GREEN by the three proofs**, every row searched and explored afresh on the final
+  tree (three scripts of the simulation had changed, so no kept result was valid): (a) 76 searches, 53 refused
+  (exhaustive) and 23 refused (bounded with every probe), none open, none unproven - 4.9 hours of search on 6
+  workers, the dearest row 1 550 s (9-2 'brace', a windy file: every move in each of the wind's 4 phases); (b) 0
+  of 33 evidence routes reach their far cell, each replayed in a fresh process; (c) 152 explorer passes of 300 s,
+  none reached - 201.3 million ticks, 0.88 to 1.93 million a pass (median 1.30), 332 994 replays with 0 off their
+  state. The job ran alone: 3 050 s (`coop_gates_verdicts.txt`, `coop_gates_r7_rows.txt` in the run dir);
+- **co-op bosses: 8 / 8 forms refuse one hero with an idle partner** (V3.d: four in the default suite, four among
+  the slow tests);
+- the default suite 1 740 / 1 740 in 234 s on its own clock beside the gate's other jobs, no test over 10 s on no
+  slow list; the slow tests 17 / 17; `test_campaign_routes` 18 / 18, `test_book2_routes` 8 / 8,
+  `test_coop_routes` 10 / 10 (57 route runs and the four campaign runs); `test_core_bots` 57 / 57,
+  `test_integration_totem_ring` 1 / 1, `test_levels_w4` 3 / 3;
+- the bot sets 48 / 48 over 21 cells in 8 shards (every Last Caveman Standing round inside the cap of G78);
+- `tools/sp_identity.sh` IDENTICAL; `docs/spec/test_spec_docs.py` 101 / 101 with no ruling pending its owner;
+  `tools/validate_levels.gd -- --strict` 120 files, 0 errors, 0 warnings; the headless boot check 0 errors, 0
+  warnings, 120 levels listed;
+- the flows, each with a clean exit: headless `campaign` 116 checks, `campaign_beginner` 14, `campaign_b2` 157
+  (Book II solo on both difficulties, both Feast Lands), `campaign_coop` 367 (co-op Books I and II, both
+  difficulties), `g3_versus` 108 (the 17 cells CPUs play), `harness_exit` 6; and the five play flows again
+  **windowed** (off-screen, muted) with the same check counts - 993 s, 89 s, 1 830 s, 3 840 s and 1 113 s, 862
+  screenshots under `build/screenshots/g3w_*_g3c_final1`.
+Beside the table: `tools/build_windows.ps1` - a clean import, the suite on the then idle machine (1 740 / 1 740 in 161 s; V7's
+5 minutes), the release exe exported and booted (0 errors, 0 warnings, 78 levels, no developer level, development switches ignored); the build is in `pre2_preview\2.0-g3`.
+**Still open after G3** (none of them a row of the gate; each for phase 4): Sky Picnic's Grub Stack spawn bias
+(+17.7 points over 384 rounds, G80: the arena file's); the validator has no rule for the clean foot of an x2
+secret's ledge beside a coil, nor for a plate out of the batted hero's reach, and names a gate's own ledge when a
+ward's edge comes close (G83); the evidence routes of the rebuilt gates (7-1 'stack', 9-2 'drive', the two
+see-saws) aim at the old geometry, so those rows stand on the search and the explorer; the bosses' twin rules and
+the giant roast credit a batted ball to its batter (not unified with G72); the wards of 2-2b and 6-2b reach into
+their boss arenas; a ward covers its columns on every floor of a tall file (the pair has no head bounce there:
+accepted without a playtest); the gate job takes 51 minutes on 12 cores, not the 40 asked for; the designers'
+route recorders of the round are unversioned under `build/levels/`; no "TIME!" banner at the cap of G78; R6 with
+an idle partner below a climber is proven on a real Level, not replayed through the game's screens; the human
+pair playtests of P4.5 (9-2's charged drive across the partial bridge among them).
 
 ---
 
