@@ -578,6 +578,142 @@ and a "TIME!" banner on a round the hard cap ends (G78).
   life (the cost of G86, a line of the check list); a weighted second pad makes one person a pair (G58 says a held
   key is input: a question for the owner, line X-05).
 
+**The phase as built by the other owners (2026-10-09; their reports, each re-proven in the release record below)**.
+Party built Q2, Q3 and Q4 (`scripts/fx/ward_mark.gd`: one shared material on the enemy's own sprite, drawing only;
+`PartyDriver._wipe_check`; `Player._ward_heads_check`) - no co-op route replays differently, two evidence routes end
+earlier and dead. The levels owner placed the two ward signs (the short text: the ruled line takes four board
+lines), replaced 5-1's Roller sign, played the expert's cheat list on the real game and closed the two gates that
+fell - 8-1 'hall' to a carried feast kit (G92) and 9-1b 'stormwall' to a glider over the map's top (G96). World-B
+built the four validator rules left in G83, made the gate job one plan and one pool (46 min 37 s alone, 51 before;
+"about 40" is not reachable without weakening proof (c)), grew the evidence set to 37 routes and versioned the
+recorders of every co-op route (`tools/autoplay/recorders/`: 41 of 52 re-record byte for byte, 8 record another
+finishing route, 3 of D5's no longer finish). Versus rebuilt Sky Picnic's spots (G80), added the "TIME!" banner, the
+soak (`tools/bots/soak.sh`) and two nets of the referee (G93). The audit made P4.4 a tool the build runs
+(`tools/audit_assets.py`, 67 tests: 869 files, 869 ledger rows - 803 CC0 1.0, 2 SIL OFL 1.1, 49 licence texts, 15
+own work - 45 source packs, 0 gaps; `tools/audit_assets.py --audio`: all 51 tracks at -18.0 LUFS as played). The
+release owner set 2.0.0, proved five real 1.0.0 profiles (`tests/data/saves_1_0/`: nothing lost, an untouched copy
+`save.v1.json` before the first write), kept five development files out of every export and prepared the installer
+and the release text. The performance engineer measured two and four heroes on the quiet machine (ARCHITECTURE
+11.5, `bash tools/perf.sh`: a tick of one hero 180-260 us on average, of two heroes 236-443, of four with three
+Hunters 353-532 plus 376-517 of the CPUs' thinking), made the bots' route search faster without a decision changing,
+and capped a versus match on a phone at two heroes (G94). The lead designer recorded Q1-Q7 as G84-G90, the register
+D.12 (G91), G92 and G93, and wrote `HUMAN_CHECKS.md`.
+
+**The release record (2026-10-10, the release integrator; after every other agent of the phase had closed)**.
+What the release round changed, and why:
+- **A 1.0 key binding is never shared with a new 2.0 action** (`Settings._drop_shared_defaults`): a real 1.0
+  profile that had put Jump on V and Look on pad LB loaded with those inputs on Swap as well; now the player's
+  binding wins and Swap keeps what is left of its defaults. The release owner's red test is green
+  (`tests/test_core_save_1_0.gd` 17 / 17).
+- **Three nets of the versus referee** (G95), after which both soak commands pass: two heroes clash heads once
+  per airtime (the stomp ladder that climbed out of the arena), a coconut nobody strikes for 15 s drops in again
+  (the game without an end on a goal's roof), and a Golden Drumstick nobody takes within the hard cap ends its
+  round drawn with "TIME!" (the tie-break the CPUs never decided under Mayhem). The first is no rare thing - a
+  second clash in 176 of 1 008 Grub Stack rounds of the soak - and re-rolled 14 of the 21 bot sets; every 48-round
+  pin holds and the 384-round claims were made again (Sky Picnic's Grub Stack +8.1 and +4.4, Totem Ring's +3.9).
+- **Echo Hollow's fairness was measured for the first time and is not inside the band** (G97, open): Grub Stack
+  gives the right floor spawn 40.1 % and 46.1 % of 384 rounds, Last Caveman Standing gives the left shelf 39.1 %
+  and 40.1 %; it was so before the release round (41.1 / 46.6 % with the head clash off), and seven variants of
+  the file - spawn numberings, the big spot moved - did not bring both modes inside. Not fixed.
+- **The versus lobby names the device's seat cap** (G94): "This device seats 2 players." instead of two cards
+  that did nothing.
+- **The glider flight over 9-1b's wall is evidence route 38** (G96): a real-game route file may name its
+  checkpoint (`checkpoint=`) and a carried feast kit (`kit=`); replayed, the flight ends on the roof today and in
+  the far cell on the file before the roof.
+- **A tool run no longer writes into the player's own folder** (`.tools/gd.sh`; found while the preview folder
+  was prepared, after the table): every run of the project rotated the engine's log into `%APPDATA%\ClubAndGrub`,
+  the boot check (`gd.sh smoke`, a row of `tools/g3.sh` - in this run too, at 00:58) loaded and saved the real
+  `settings.cfg` there, and two tests left a temporary file. `test`, `smoke`, `play` and `script` runs now get
+  `APPDATA` pointed at their own folder; proven on the suite (1 798 / 1 798), `test core_bots` (61 / 61), a windowed
+  flow, the validator and the boot check, with the real folder's files compared before and after (unchanged). The
+  saves there (`save.json`, last written 2026-10-09 03:19) were written by no tool run of the round.
+- **The shared runner no longer queues a pool behind an import that is done** (`.tools/gd.sh`: the gate first,
+  the question again, then the wait), and Python byte code and `.bak` fixtures ask for no import; the G3 test pins
+  the gate job's real shape; the documents say what the tree does (the withdrawn stomp rule is out of E.2, C.14
+  and G 13.10.2; the validator's rules, the signs and the two closed gates are in LEVEL_DESIGN 15.7; HUMAN_CHECKS
+  has 264 lines, with X-02, X-03, V-08, V-10 and W-02 rewritten, V-15 and V-16 new and the measured numbers of
+  section D); every `wf12` request has its reply (17 answered in the round;
+  `docs/spec/test_spec_docs.py` 120 / 120, no ruling pending an owner).
+
+**P4.1 on the final tree** - one call, `G3_TAG=p4_final1 bash tools/g3.sh --require` (2026-10-10 00:07 - 01:58,
+6 637 s; table `build/g3/run_p4_final1/g3_table.txt`; the wrapper shell of the call was stopped 20 s after its
+start to free it from the tool's one-hour limit - the script, its pool and every process of it ran on untouched),
+with the soak (made on the same scripts at 23:38 - 23:50, before the call), the audit and the build:
+- **Gate G3: REACHED**, every proof green, the content complete (20 Book II files, 35 co-op files, 31 / 31 solo and
+  57 / 57 co-op route cells, 6 featured routes, 20 paintings, 76 x2 gate rows, 8 arenas, 21 of 22 versus cells).
+- **coop_gates: 76 / 76 gate rows GREEN by the three proofs**, every row made afresh (two scripts of core changed):
+  (a) 53 refused (exhaustive), 23 refused (bounded with every probe), none open; (b) 0 of **38** evidence routes
+  reach their far cell, each replayed in a fresh process; (c) 152 explorer passes of 300 s, none reached - 198.5
+  million ticks, 0.88 to 1.94 million a pass (median 1.28: the strength of G3c). The job ran alone: 2 786 s.
+- **Book I solo, both difficulties**: `test_campaign_routes` 18 / 18 (the 72 route files of 1.0, frozen);
+  **Book II solo**: `test_book2_routes` 8 / 8; **co-op Books I and II, both difficulties**: `test_coop_routes`
+  10 / 10 (57 route runs and the four campaign runs, 601 s). `tools/sp_identity.sh`: **IDENTICAL**.
+- **Every campaign flow**, each with a clean exit: headless `campaign` 116 checks, `campaign_beginner` 14,
+  `campaign_b2` 157, `campaign_coop` 367, `g3_versus` 108, `harness_exit` 6; and the five play flows again
+  **windowed** (off-screen, muted) with the same check counts - 992 s, 90 s, 1 830 s, 3 841 s and 1 067 s.
+- The default suite **1 798 / 1 798** in 255 s on its own clock beside the table's other jobs (172 s alone: inside
+  V7's five minutes), no failure; the slow tests 17 / 17; `test_core_bots` 61 / 61, `test_integration_totem_ring`
+  1 / 1, `test_levels_w4` 3 / 3; the bot sets 56 / 56 in 8 shards; co-op bosses 8 / 8 refuse one hero;
+  `docs/spec/test_spec_docs.py` 120 / 120; `tools/validate_levels.gd -- --strict` 120 files, 0 errors, 0 warnings;
+  the headless boot check 0 errors, 0 warnings.
+- **The versus soak** (not a job of the table): `bash tools/bots/soak.sh p4 1000 16` - 4 020 rounds, 5 530 005
+  ticks, no anomaly, no engine error, **RESULT PASS**; `bash tools/bots/soak.sh mix 250 16 rules=mix` - 1 014
+  rounds, 1 555 998 ticks, **RESULT PASS** (at the versus builder's close the first failed by design with five
+  anomaly lines and the second with three).
+- **The asset audit**: `python tools/audit_assets.py` - ASSET AUDIT: PASS (0 gaps), 869 files; its 67 tests green.
+
+**The 2.0.0 build** (`tools\build_windows.ps1`, then `tools\build_installer.ps1 -SkipBuild -TestInstall`; 2026-10-10
+01:58 - 02:03, on the tree of commit ab50b07, the tree of the table above):
+the import clean; the asset audit PASS; the suite inside the script 1 798 / 1 798 in 172 s; the release exe `Club & Grub 2.0.0.0`
+exported and booted off-screen and muted (0 errors, 0 warnings, 78 levels, no developer level, development switches
+ignored); 2 591 files inside the exe, 1 368 of them project files, no development file; the zip holds the exe and the
+50 licence files, byte for byte (`tools/audit_assets.py --shipped`).
+The installer was compiled and its throwaway twin (its own AppId) installed for the current user, smoke-checked
+(`Club & Grub 2.0.0 (release build)`, 0 errors, 0 warnings) and uninstalled with nothing left; the game itself is
+not installed on this machine, and the script's 12 recorded facts about a real installation (registry, files, Start
+menu, desktop, the save and settings files in `%APPDATA%\ClubAndGrub` with their hashes) were the same before and
+after. SHA-256:
+- `build\windows\ClubAndGrub.exe` (192 123 344 bytes) `8f24637253bd120c69cb5b88995578612fd7c12f9b13df5e7d118b7743a6889a`
+- `build\ClubAndGrub-2.0.0-windows.zip` (116 585 816 bytes) `5a500667dcf0b72390f7cab0ed8c7d030e46eb588bcdd78d99ab540a2abed28c`
+- `build\ClubAndGrub-2.0.0-setup.exe` (104 627 713 bytes) `238ad100a7632cf843ed06d7ffee274c70c7b3912093defc4a28913bf9f68926`
+The player's preview folder `Desktop\pre2_preview` holds that build at its top level (the exe, `licenses\`, the
+setup, the zip, a `Play.cmd` that keeps its saves in `appdata\` beside it, `READ ME.txt`); the 1.0.0 files that lay
+there were moved into `1.0.0\`; `2.0-slice\` and `2.0-g3\` are as they were. **Nothing was committed, tagged,
+pushed or published by an agent** (G89): the release text is the end of `docs/RELEASE_NOTES_2.0.md`.
+
+**Open at the release** (none of them a row of the gate):
+- **No human check was done** (G90): `HUMAN_CHECKS.md`, 264 unticked lines - the pair playtests of P4.5, the music
+  listen-through, real keyboards, pads, an Android device, the install over a real 1.0.0.
+- **Echo Hollow's spawn fairness** (G97): Grub Stack outside the +/-15 band over 384 rounds, Last Caveman Standing on
+  its edge; the 384-round claims of the other 11 cells CPUs play were not made.
+- **Not built**: the engine's rule of G92 (a keeper refuses a feast's touch; 8-1 is closed by its level file); a
+  ceiling at the map's top and a validator rule for a glider behind a gate (G96; 9-1b is roofed); the causes under
+  the referee's five nets (the 1.0 body test between two heroes, the coconut's flight over a block's corner, the
+  Cave-in block that pushes a hero through the map's edge, bots that go for the Golden Drumstick first); a versus
+  lobby that draws only the seats a device has; per-row keys of the gate job (one saved simulation script still
+  makes all 76 rows new: 47 minutes).
+- **Left as they are, with the reason in their ruling**: 1-1 Beginner has no enemy record in its first ward before
+  the gate; 5-1 'gully' has one keeper three columns outside its ward, unmarked (G96); the mark follows the enemy's
+  column and the rule the hero's (G85); a ward covers its columns on every floor of a tall file; the weak cases of
+  the mark on pale sheets and one-band bodies (line L-06); nothing on the screen counts the 73 ticks of G86.
+- **Not measured**: any device (every Cortex-A53 figure is the desktop's times 10-15; the mobile cap of G94 is that
+  estimate); the 1.0 budget class on the proxy is not met (the tick is 1.2-1.7 times the 150 us proxy with one hero,
+  1.6-3.0 with two); the ticking-entity budget of 48 is exceeded in `w2_l1_coop` (49) and on Cinder Pit (60).
+  Android, macOS and iOS: the presets load and pack, nothing was exported or run (no toolchain in the project, G88).
+- **The real user folder**: `tools\build_windows.ps1`'s own import, test and export runs still write the engine's
+  log file into `%APPDATA%\ClubAndGrub\logs` (only the exported exe's smoke run is isolated there); the
+  `settings.cfg` in that folder holds the defaults, and whether it held more before the boot checks of the phase
+  loaded and saved it cannot be told from the tree.
+- **Tools and records**: three of D5's macro recorders no longer finish; `docs/art/pipeline/build_manifest.py` no
+  longer reproduces sections 1-16 of the manifest; two licence texts carry the title of their first page only; the
+  registry labels the project's 15 own files "CC0 1.0" where the ledger says "own work" (the owner's decision);
+  the upgrade over a real 1.0.0 installation and the all-users install were not exercised (no agent installs under
+  the real AppId).
+- Of the list "Still open after G3" in section 6: Sky Picnic's bias, the validator's three rules, the evidence
+  routes of the rebuilt gates, the unversioned recorders and the "TIME!" banner are closed; the bosses' twin rules
+  and the giant roast, the wards of 2-2b and 6-2b in their boss arenas, a ward on every floor of a tall file, the
+  gate job's 47 minutes and R6 replayed through the game's screens stand as they were.
+
 ---
 
 ## 8. Verification rules

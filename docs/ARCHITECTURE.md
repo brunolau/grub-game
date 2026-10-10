@@ -2277,4 +2277,11 @@ whoever ports the game.
   (`tools/coop_explore/harness.gd` `read_route`: `checkpoint=`, `kit=`). The shared runner `.tools/gd.sh` no longer
   queues a pool of runs behind an import that is already done (the gate is taken first, the question asked again,
   and only the run that really imports waits for the recent readers), and Python byte code and the `.bak` save
-  fixtures ask for no import.
+  fixtures ask for no import. **A run through `.tools/gd.sh` no longer writes into the player's own folder**
+  (Windows): `test`, `smoke`, `play` and `script` runs get `APPDATA` pointed at `build/run_users/<id>/appdata`, so
+  the engine's log files, the `settings.cfg` a smoke run loads and saves, and anything a test writes to `user://`
+  directly stay out of `%APPDATA%\ClubAndGrub`, where an installed game keeps its saves. Until then every such
+  run rotated its log into that folder, the boot check (`gd.sh smoke`, a row of `tools/g3.sh`) loaded and saved the
+  real `settings.cfg`, and `tests/test_core_bots.gd` and `tests/test_world_search.gd` left a temporary file there.
+  `tools/build_windows.ps1` isolates the exported exe's smoke run the same way; its own import, test and export
+  runs still write the engine's log file into that folder (open).

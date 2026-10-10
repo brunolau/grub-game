@@ -522,7 +522,18 @@ def git(root: str, *args: str) -> str | None:
 
 
 def release_files(root: str) -> set[str] | None:
-    """The files of assets/ at the 1.0.0 release (relative to assets/), or None without git or without the tag."""
+    """The files of assets/ at the 1.0.0 release (relative to assets/), or None without git or without the tag.
+
+    None also when `root` is not the top of the repository git finds: a copy of the project unpacked inside another
+    repository (a source archive in a work folder, the clean tree of the 2.0.0 release check under build/) would be
+    measured against that repository's tag - its listing of "<copy>/assets" is empty, and every 1.0 file read as 2.0.
+    """
+    top = git(root, "rev-parse", "--show-toplevel")
+    try:
+        if top is None or not os.path.samefile(top.strip(), root):
+            return None
+    except OSError:
+        return None
     if git(root, "rev-parse", "-q", "--verify", "refs/tags/" + RELEASE_TAG) is None:
         return None
     listing = git(root, "-c", "core.quotepath=off", "ls-tree", "-r", "--name-only", RELEASE_TAG, "--", "assets")
@@ -535,7 +546,7 @@ def check_since(root: str, files: list[str], rows: list[dict]) -> tuple[list[Fin
     """Compare the ledger's 'Since' column with the tag v1.0.0. Returns (findings, a note for the summary)."""
     released = release_files(root)
     if released is None:
-        return [], "not compared with %s (no git repository or no such tag here)" % RELEASE_TAG
+        return [], "not compared with %s (no git repository of its own or no such tag here)" % RELEASE_TAG
     findings = []
     since = {row["file"]: row["since"] for row in rows}
     present = set(files)

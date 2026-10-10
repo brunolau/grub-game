@@ -126,11 +126,14 @@ The script
 4. exports the `Windows Desktop` preset in release mode to `build\windows\ClubAndGrub.exe`, stops on any `ERROR:` /
    `WARNING:` in the export log and checks that the exe is the only file written (no `.pck`, no DLL), that it
    reports the version of `project.godot`, and that the export left `export_presets.cfg` as it was (if the editor
-   rewrote it, the file is put back and the build stops). One pair of lines is let through: the first export of a
+   rewrote it, the file is put back and the build stops). Three lines are let through: the first export of a
    fresh checkout converts every scene to binary (`.godot/exported/`) and the editor then reports
-   `WARNING: <n> ObjectDB instances were leaked at exit` and `ERROR: <n> resources still in use at exit` while it
-   shuts down, after the pack is written; later exports reuse the converted scenes and print neither. The script
-   lists them as "ignored editor shutdown report";
+   `WARNING: <n> ObjectDB instances were leaked at exit`, `ERROR: <n> resources still in use at exit` and (the
+   headless renderer, for the textures those resources held)
+   `ERROR: <n> RID allocations of type '...DummyTexture...' were leaked at exit` while it shuts down, after the pack
+   is written; later exports reuse the converted scenes and print none of them. The script lists them as "ignored
+   editor shutdown report" (the third line was added at the 2.0.0 release check: a clean copy of the repository
+   stopped on it at its first build and passed at its second);
 5. starts the exe for a smoke check (below) and stops unless it exits with code 0, its log is clean and it reports
    the version of `project.godot`;
 6. reads the file table of the pack inside the exe and lets `tests/test_core_release_pack.gd` judge it (section 2):

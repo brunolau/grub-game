@@ -296,9 +296,12 @@ if ([Convert]::ToBase64String($presetsBefore) -ne [Convert]::ToBase64String($pre
 }
 # The first export of a checkout converts every scene to binary (.godot\exported\), and the editor process then
 # reports the scripts it loaded for that as "leaked at exit" / "still in use at exit" while it shuts down, after the
-# pack is written. Later exports reuse the converted scenes and print nothing. These two shutdown lines say nothing
-# about the exported game (step 5 checks that), so they alone do not fail the build; every other line still does.
-$exitLeakPattern = 'ObjectDB instances were leaked at exit|resources still in use at exit'
+# pack is written - and, where those scripts still held a texture, the headless renderer adds "<n> RID allocations of
+# type '...DummyTexture...' were leaked at exit" (seen on the first export of a clean copy of the repository at the
+# 2.0.0 release check: the build stopped there and passed when run again). Later exports reuse the converted scenes
+# and print nothing. These three shutdown lines say nothing about the exported game (step 5 checks that), so they
+# alone do not fail the build; every other line still does.
+$exitLeakPattern = 'ObjectDB instances were leaked at exit|resources still in use at exit|RID allocations of type .* were leaked at exit'
 $exitLeaks = @(Get-ProblemLines $export.Output -IncludeWarnings | Where-Object { $_ -match $exitLeakPattern })
 $exitLeaks | ForEach-Object { Write-Host "    ignored editor shutdown report: $($_.Trim())" -ForegroundColor DarkGray }
 $problems = @(Get-ProblemLines $export.Output -IncludeWarnings | Where-Object { $_ -notmatch $exitLeakPattern })

@@ -170,5 +170,7 @@ An OpenGL 3.3 graphics driver is needed. The files are not code-signed, so Smart
 >
 > Full notes: `docs/RELEASE_NOTES_2.0.md`. All art and audio CC0, fonts OFL: `CREDITS.md`.
 >
-> SHA-256 (fill in from the build log of the released files):
-> `ClubAndGrub-2.0.0-setup.exe` ........  `ClubAndGrub-2.0.0-windows.zip` ........
+> SHA-256 (the build of 2026-10-10; if the files are built again before publishing, take the values of that
+> build's log instead):
+> `ClubAndGrub-2.0.0-setup.exe` `238ad100a7632cf843ed06d7ffee274c70c7b3912093defc4a28913bf9f68926`
+> `ClubAndGrub-2.0.0-windows.zip` `5a500667dcf0b72390f7cab0ed8c7d030e46eb588bcdd78d99ab540a2abed28c`

@@ -568,6 +568,17 @@ class SinceTheRelease(TempProject):
         self.assertEqual(findings, [])
         self.assertIn("not compared with v1.0.0", summary[3])
 
+    def test_a_copy_inside_another_repository_is_not_compared(self) -> None:
+        # The 2.0.0 release check built a clean copy of the project under build/, inside the project's own
+        # repository: git answered for the outer repository, whose tag has no "<copy>/assets", and all ten 1.0 files
+        # were reported as "the ledger says 1.0, the tag v1.0.0 says 2.0".
+        self.release()
+        copy = os.path.join(self.root, "work", "copy")
+        shutil.copytree(self.root, copy, ignore=shutil.ignore_patterns(".git", "work"))
+        findings, summary = A.audit(copy, use_git=True)
+        self.assertEqual([str(f) for f in findings], [])
+        self.assertIn("not compared with v1.0.0", summary[3])
+
     def test_new_file_must_say_2_0(self) -> None:
         self.release()
         edit_ledger_row(self.root, "audio/sfx/jump_a.wav", 1, "1.0")
