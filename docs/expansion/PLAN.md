@@ -882,6 +882,14 @@ nothing. He changed no shipped file: nothing is to be built again.
   set replayed afresh (0 of 38 reach), `sp_identity` IDENTICAL, the default suite 1 825 / 1 825 (192 s),
   `test_coop_routes` 10 / 10 (489 s), the spec docs 120 / 120, the asset audit PASS and its 68 tests.
 
+**Published** (2026-10-10, on the owner's instruction "push into the main, create release that can be
+installed"): the orchestrator created the GitHub release "Club & Grub 2.0.0 - The Far Shore" with the tag
+`v2.0.0` on commit 59d1a14 (the tree the second build was made from, plus records) and uploaded the two files of
+the second build, `ClubAndGrub-2.0.0-setup.exe` and `ClubAndGrub-2.0.0-windows.zip`. The SHA-256 values GitHub
+stores for both assets equal the build's (ca415db0... and 10c70ef7...). It is the latest release:
+https://github.com/brunolau/grub-game/releases/tag/v2.0.0. The sentences above that say no tag and no release of
+2.0 exist describe the state before this day's publishing.
+
 **Open at the release** (none of them a row of the gate):
 - **No human check was done** (G90): `HUMAN_CHECKS.md`, 264 unticked lines - the pair playtests of P4.5, the music
   listen-through, real keyboards, pads, an Android device, the install over a real 1.0.0.
