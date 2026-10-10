@@ -772,9 +772,14 @@ again.
 
 **The proofs of the release polish on the final tree** (2026-10-10 04:35 - 05:51; logs under
 `build/p4b_integrate/`, the table `build/g3/run_p4b/g3_table.txt`). **The whole table of `tools/g3.sh --require` was
-not repeated**: the windowed runs of `campaign`, `campaign_beginner`, `campaign_b2` and of Book II of
-`campaign_coop` were left out by the orchestrator's instruction (their headless twins ran; the table therefore
-ends "NOT YET - every proof that ran is green; open: not run: wflow_campaign ..."). Every other row was made again:
+not repeated in the round itself**: the windowed runs of `campaign`, `campaign_beginner`, `campaign_b2` and of
+Book II of `campaign_coop` were left out by the orchestrator's instruction (their headless twins ran; the table
+ended "NOT YET - every proof that ran is green; open: not run: wflow_campaign ..."). **The orchestrator ran the
+four after both verdicts**, on the same tree and into the same run folder (`G3_TAG=p4b bash tools/g3.sh --require
+--jobs=4 --only=wflow_campaign,wflow_campaign_beginner,wflow_campaign_b2,wflow_campaign_coop`, off-screen and
+muted): `campaign` 116 checks (979 s), `campaign_beginner` 14 (86 s), `campaign_b2` 157 (1 816 s) and the whole
+of `campaign_coop` 367 (3 827 s), each with 0 failures and a clean exit. The table of the second build now ends
+**"G3: REACHED - every proof green, the content complete"**. Every other row was made again in the round:
 - **The gate job, alone** (`bash tools/world_coop_gates.sh`, 04:35 - 05:22, 2 804 s; `save.gd`, `settings.gd`,
   `autoplay.gd` and `ward_mark.gd` are in its fingerprint, so its plan read "76 of 76 searches, 152 of 152 passes,
   38 of 38 replays to do"): **76 of 76 gate rows GREEN by the three proofs** - (a) 53 refused (exhaustive), 23
