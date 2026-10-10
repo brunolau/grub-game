@@ -8,6 +8,8 @@ extends Control
 ## The "P1".."P4" tags with their colour arrow (`ui/player_tags.png`, DESIGN.md D.1 / E.9) show over every hero for the
 ## first seconds of a stage, through a versus round's "3, 2, 1, GRUB!" and the first seconds of the round, and whenever
 ## two heroes overlap. In Grub Stack a tag stands on top of the hero's food tower (VersusStackDisplay), not in it.
+## Tags never print into each other: tags whose cells would overlap (two heroes in one column) stand side by side,
+## the heroes' order from left to right ([method spread_tags]).
 ## Tags and arrows wear the colour the player chose (UiPlayers.tag_cell / arrow_cell). A hero above the view without a
 ## countdown (versus) gets his head in a bubble under the arrow (ui/portrait_heads.png; DESIGN.md E.9 "bubbles for
 ## heroes above the view"). Every picture comes from [HudAtlas], the texture of the versus HUD, so the party HUD draws
@@ -29,6 +31,9 @@ const TEX_TAGS: String = "res://assets/ui/player_tags.png"
 const TAG_CELL: Vector2i = Vector2i(32, 48)
 const TAG_SECONDS: float = 3.0
 const TAG_GAP: float = 4.0
+## Two tags side by side change places only when one hero stands this far (screen px) on the other side of his
+## neighbour: two heroes on one spot do not swap their tags with every pixel they shift.
+const TAG_SWAP_PX: float = 12.0
 
 ## What was drawn last frame, for tests and previews: one Dictionary per marker {slot, side (UiPlayers.Side, -1 = over
 ## the hero), pos (Vector2, arrow centre or stone foot), digit (0 = no stone)}.
@@ -41,6 +46,8 @@ var level_override: LevelBase = null
 
 var _tags_until: int = 0
 var _atlas: Texture2D = null
+## The order of the tags that stood side by side last frame ([method spread_tags]).
+var _tag_order: Dictionary = {}
 
 
 func _init() -> void:
@@ -85,6 +92,7 @@ func update_markers() -> void:
 			if not marker.is_empty():
 				found.append(marker)
 		found_tags = _tags_for(level, view, found)
+	_tag_order = spread_tags(found_tags, _tag_order)
 	if found != markers or found_tags != tags:
 		markers = found
 		tags = found_tags
@@ -122,6 +130,77 @@ func _tags_for(level: LevelBase, view: Rect2, shown: Array[Dictionary]) -> Array
 			tip_y = maxf(tip_y, view.position.y + float(TAG_CELL.y))
 			result.append({"slot": hero.slot, "pos": Vector2(top.get_center().x, tip_y)})
 	return result
+
+
+## Lay tags that would print into each other side by side (the 2.0 release round's ruling F4: two heroes in one
+## column wore "P1" and "P2" on one spot - "P.21" - for as long as they stood there, hundreds of ticks of a boss
+## fight). Every group of tags whose cells overlap becomes a row around the group's middle, one cell apart, in the
+## order of the heroes from left to right; each tag keeps its own height (the tip stays over its hero's head or
+## tower). `order` is what the last call returned - for every two slots side by side (key: low slot * MAX_PLAYERS +
+## high slot) true when the lower slot stood left: heroes closer than TAG_SWAP_PX keep their sides (the lower slot left
+## when they meet on one spot). Changes the `pos` of the entries of `list` in place; returns the order to keep.
+static func spread_tags(list: Array[Dictionary], order: Dictionary = {}) -> Dictionary:
+	var kept: Dictionary = {}
+	var count: int = list.size()
+	if count < 2:
+		return kept
+	var own_x: PackedFloat32Array = PackedFloat32Array()
+	var group: PackedInt32Array = PackedInt32Array()
+	for i: int in count:
+		own_x.append((list[i]["pos"] as Vector2).x)
+		group.append(i)
+	var cell: Vector2 = Vector2(TAG_CELL)
+	# A row can reach a tag that stood clear of it: look again until no tag joins a group (a pass per tag at most).
+	for _pass: int in count:
+		var joined: bool = false
+		for a: int in count:
+			for b: int in range(a + 1, count):
+				if group[a] == group[b]:
+					continue
+				var apart: Vector2 = ((list[a]["pos"] as Vector2) - (list[b]["pos"] as Vector2)).abs()
+				if apart.x < cell.x and apart.y < cell.y:
+					var old: int = group[b]
+					for i: int in count:
+						if group[i] == old:
+							group[i] = group[a]
+					joined = true
+		if not joined:
+			break
+		for leader: int in count:
+			var row: Array[int] = []
+			var middle: float = 0.0
+			for i: int in count:
+				if group[i] != leader:
+					continue
+				# Insertion by the heroes' order (the kept order for heroes too close to tell).
+				var at: int = row.size()
+				while at > 0 and _tag_stands_left(list, own_x, order, i, row[at - 1]):
+					at -= 1
+				row.insert(at, i)
+				middle += own_x[i]
+			if row.size() < 2:
+				continue
+			middle /= float(row.size())
+			for k: int in row.size():
+				var pos: Vector2 = list[row[k]]["pos"]
+				list[row[k]]["pos"] = Vector2(roundf(middle + (float(k) - float(row.size() - 1) * 0.5) * cell.x), pos.y)
+				for later: int in range(k + 1, row.size()):
+					var left_slot: int = int(list[row[k]]["slot"])
+					var right_slot: int = int(list[row[later]]["slot"])
+					kept[mini(left_slot, right_slot) * Defs.MAX_PLAYERS + maxi(left_slot, right_slot)] = left_slot < right_slot
+	return kept
+
+
+## True when the tag of entry `a` stands left of the tag of entry `b` in a row: by their heroes' places, or - heroes
+## closer than TAG_SWAP_PX - as they stood before (`order`), the lower slot left when they never stood side by side.
+static func _tag_stands_left(list: Array[Dictionary], own_x: PackedFloat32Array, order: Dictionary, a: int, b: int) -> bool:
+	var ahead: float = own_x[b] - own_x[a]
+	if absf(ahead) > TAG_SWAP_PX:
+		return ahead > 0.0
+	var slot_a: int = int(list[a]["slot"])
+	var slot_b: int = int(list[b]["slot"])
+	var low_left: bool = bool(order.get(mini(slot_a, slot_b) * Defs.MAX_PLAYERS + maxi(slot_a, slot_b), true))
+	return low_left == (slot_a < slot_b)
 
 
 ## Height (art px) of the Grub Stack food tower over `hero`'s head (VersusStackDisplay), 0 without one: the referee

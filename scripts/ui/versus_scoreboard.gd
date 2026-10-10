@@ -6,6 +6,8 @@ extends UiScreen
 ## - with his team pennant in a 2 v 2 match, the wins that win the match, and what comes next ("Next: Hot Rock on
 ## Echo Hollow" with Party Mix or a random arena). Then the next round starts by itself (Flow.next_round); a confirm
 ## skips the wait. Args: {"round_index": int, "winners": PackedInt32Array}.
+## A round the hard cap ended (DESIGN.md G78 / G95) says why: "TIME!" in the HUD's alarm colour stands before the
+## result line ("TIME!  Draw!"), as it stood over the round's banner (HudVersus.time_called).
 
 ## Seconds the scoreboard shows before the next round (about 5 s).
 const SHOW_SECONDS: float = float(VersusTuning.SCOREBOARD_TICKS) * Tuning.TICK_DT
@@ -18,6 +20,7 @@ var countdown: float = SHOW_SECONDS
 var _age: float = 0.0
 var _columns: Array[VersusResultsScreen.PlayerColumn] = []
 var _headline: Label = null
+var _reason: Label = null
 var _played: Label = null
 var _next: Label = null
 
@@ -46,7 +49,20 @@ func _build_screen() -> void:
 	if not winners.is_empty():
 		_headline.add_theme_color_override(&"font_color",
 				JoinScreen.text_colour(VersusResultsScreen.look_of(winners[0])[0]))
-	column.add_child(_headline)
+	if HudVersus.time_called(int(Flow.args.get("round_index", 0))):
+		# The hard cap ended the round: the reason before the result, on one line (the board keeps its height).
+		var line: HBoxContainer = HBoxContainer.new()
+		line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		line.alignment = BoxContainer.ALIGNMENT_CENTER
+		line.add_theme_constant_override(&"separation", 12)
+		_reason = UiKit.label(TranslationServer.translate("UI_VS_TIME"), UiKit.Style.HUD, HORIZONTAL_ALIGNMENT_CENTER)
+		_reason.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+		_reason.add_theme_color_override(&"font_color", HudVersus.COL_RUSH)
+		line.add_child(_reason)
+		line.add_child(_headline)
+		column.add_child(line)
+	else:
+		column.add_child(_headline)
 	var versus_match: VersusMatch = Game.versus_match
 	_played = UiKit.label(played_text(versus_match), UiKit.Style.SMALL, HORIZONTAL_ALIGNMENT_CENTER)
 	_played.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
@@ -148,6 +164,16 @@ static func mode_on_arena(mode: int, arena_id: StringName) -> String:
 ## The player columns (tests).
 func get_columns() -> Array[VersusResultsScreen.PlayerColumn]:
 	return _columns
+
+
+## The reason before the result line: "TIME!" when the hard cap ended the round, else "" (tests, flows).
+func get_reason_text() -> String:
+	return _reason.text if _reason != null else ""
+
+
+## The result line: who took the round, or "Draw!" (tests, flows).
+func get_headline_text() -> String:
+	return _headline.text
 
 
 ## The line of what was played, and of what comes next (tests).

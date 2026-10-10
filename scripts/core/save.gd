@@ -24,6 +24,14 @@ extends Node
 ## name a loss, each one is logged as an error; the copy is still made before anything is written, so the 1.0 file
 ## itself is never lost.)
 ##
+## A good backup is never thrown away for a bad file (2.0.0): a save.json or save.json.bak that is there and cannot
+## be read - garbage, a write that was cut off, an empty or zero-filled file, JSON that is no object - is reported
+## and remembered by [method load_game], which still writes nothing. The first [method save_game] after it writes the
+## new file and reads it back, then SETS THE UNREADABLE FILE ASIDE under [method bad_file_name] ("save.bad.json";
+## "save.bad.2.json" ... when that name holds other bytes) instead of rotating it into save.json.bak: the readable
+## backup the progress came from stays where it is until the save after that one, when the new, read-back save.json
+## takes its place. The game never deletes an unreadable file it has not kept byte for byte.
+##
 ## Layout of save.json, version 2:
 ##   {"version": 2, "high_score": int, "code_stones": [String], "stats": {String: int},
 ##    "paintings": [int], "unlocks": {"all": bool, "rewards": [String]},
@@ -49,6 +57,11 @@ const LEGACY_BACKUP_NAME: String = "save.v%d.json"
 ## A later file of the same old version with other content (the player went back to 1.0.0 and returned) gets a
 ## number instead of replacing the first copy: "save.v1.2.json" ... up to this many.
 const LEGACY_BACKUP_MAX: int = 99
+## Where an unreadable save.json or save.json.bak is set aside, byte for byte, by the first save after it was found
+## (see [method bad_file_name]): "save.bad.json", then "save.bad.2.json" ... up to this many; the last name is used
+## again when every one holds other bytes, so a folder full of them never stops the game from saving.
+const BAD_NAME: String = "save.bad.json"
+const BAD_MAX: int = 99
 
 ## Modes that keep campaign progress (Defs.GameMode); a namespace exists for each with both books and difficulties.
 const SPACE_MODES: Array[int] = [Defs.GameMode.SINGLE, Defs.GameMode.COOP]
@@ -96,6 +109,8 @@ var _migrated: bool = false
 var _legacy_backup: String = ""
 ## What the last migration did not carry over (empty = nothing lost, or no file was migrated).
 var _migration_losses: PackedStringArray = PackedStringArray()
+## The save files (FILE_NAME, BACKUP_NAME) the last load_game found but could not read: save_game sets them aside.
+var _unreadable: PackedStringArray = PackedStringArray()
 
 
 func _ready() -> void:
@@ -111,18 +126,20 @@ func set_storage_dir(dir_path: String) -> void:
 
 ## Read the save file. A missing file yields a fresh save; a damaged file falls back to the backup, then to a
 ## fresh save (never crashes, never blocks the game). A file of another version (a 1.0 save) is migrated in
-## memory and checked; reading writes nothing (see [method save_game]).
+## memory and checked; reading writes nothing (see [method save_game]), also when a file cannot be read: that one
+## is named in a warning and set aside by the next save ([method unreadable_files]).
 func load_game() -> void:
 	_legacy_source = ""
 	_legacy_version = 0
 	_migrated = false
 	_legacy_backup = ""
 	_migration_losses = PackedStringArray()
+	_unreadable = PackedStringArray()
 	var source: String = FILE_NAME
-	_data = _read(storage_dir + FILE_NAME)
+	_data = _read(FILE_NAME)
 	if _data.is_empty():
 		source = BACKUP_NAME
-		_data = _read(storage_dir + BACKUP_NAME)
+		_data = _read(BACKUP_NAME)
 	if _data.is_empty():
 		_data = _fresh()
 	else:
@@ -143,26 +160,41 @@ func load_game() -> void:
 	loaded.emit()
 
 
-## Write the save file atomically (temp file, then rename; the previous file becomes the backup). When the data
-## came from a file of another version, that file is first copied untouched to [method legacy_backup_path]; if the
-## copy cannot be made, nothing is written and ERR_FILE_CANT_WRITE is returned: a 1.0 save is never replaced before
-## it is safe.
+## Write the save file atomically (temp file, read back, then rename; the previous file becomes the backup). When
+## the data came from a file of another version, that file is first copied untouched to
+## [method legacy_backup_path]; if the copy cannot be made, nothing is written and ERR_FILE_CANT_WRITE is returned: a
+## 1.0 save is never replaced before it is safe. A file the last [method load_game] could not read is set aside
+## ([method bad_file_name]) and never becomes the backup: the readable backup beside it stays. No file is touched
+## before the new one has been written whole (ERR_FILE_CORRUPT when its read-back differs) and while an unreadable
+## one is still in the way (ERR_FILE_CANT_WRITE).
 func save_game() -> Error:
 	if not _legacy_source.is_empty() and not _keep_legacy_copy():
 		push_error("Save: %s (version %d) is not written over: its copy %s could not be made" % [
 				storage_dir + _legacy_source, _legacy_version, legacy_backup_name(_legacy_version)])
 		return ERR_FILE_CANT_WRITE
 	_data["version"] = VERSION
+	var bytes: PackedByteArray = JSON.stringify(_data, "  ", true).to_utf8_buffer()
 	var file: FileAccess = FileAccess.open(storage_dir + TEMP_NAME, FileAccess.WRITE)
 	if file == null:
 		var open_err: Error = FileAccess.get_open_error()
 		push_error("Save: cannot open %s (error %d)" % [storage_dir + TEMP_NAME, open_err])
 		return open_err
-	file.store_string(JSON.stringify(_data, "  ", true))
+	file.store_buffer(bytes)
 	file.close()
+	# Read back, byte for byte, before anything it replaces is touched: a write that a full disk cut off must not
+	# push the last good file out of the backup's place one save later.
+	if FileAccess.get_file_as_bytes(storage_dir + TEMP_NAME) != bytes:
+		push_error("Save: %s was not written whole; the save files are left as they were" % [storage_dir + TEMP_NAME])
+		return ERR_FILE_CORRUPT
 	var dir: DirAccess = DirAccess.open(storage_dir)
 	if dir == null:
 		return ERR_CANT_OPEN
+	for unreadable: String in _unreadable:
+		if dir.file_exists(unreadable) and not _set_aside(dir, unreadable):
+			push_error("Save: the unreadable %s could not be set aside as %s; nothing was replaced" % [
+					storage_dir + unreadable, BAD_NAME])
+			return ERR_FILE_CANT_WRITE
+	_unreadable = PackedStringArray()
 	if dir.file_exists(FILE_NAME):
 		if dir.file_exists(BACKUP_NAME):
 			dir.remove(BACKUP_NAME)
@@ -199,6 +231,18 @@ func legacy_backup_path() -> String:
 ## True when the last [method load_game] read a file of another version (and migrated it).
 func was_migrated() -> bool:
 	return _migrated
+
+
+## Name of the file an unreadable save file is set aside as: "save.bad.json"; `number` > 1 names a later one with
+## other bytes ("save.bad.2.json").
+static func bad_file_name(number: int = 1) -> String:
+	return BAD_NAME if number <= 1 else "%s.%d.json" % [BAD_NAME.get_basename(), number]
+
+
+## The save files (FILE_NAME, BACKUP_NAME) the last [method load_game] found and could not read, while they wait
+## for the next [method save_game] to set them aside; empty after it.
+func unreadable_files() -> PackedStringArray:
+	return _unreadable.duplicate()
 
 
 ## What the last migration did not carry into the namespaces, one text per item ("unlocked beginner w1_l2"); empty
@@ -670,6 +714,23 @@ func _keep_legacy_copy() -> bool:
 	return false
 
 
+# Move an unreadable save file out of the way, byte for byte (a rename), to the first "save.bad" name that is free
+# ([method bad_file_name]); a file whose bytes one of those names already keeps is removed instead of kept twice.
+# When all BAD_MAX names hold other bytes the last one is replaced. False when the file is still in the way.
+func _set_aside(dir: DirAccess, file_name: String) -> bool:
+	var bytes: PackedByteArray = FileAccess.get_file_as_bytes(storage_dir + file_name)
+	for number: int in range(1, BAD_MAX + 1):
+		var bad: String = bad_file_name(number)
+		if dir.file_exists(bad):
+			if FileAccess.get_file_as_bytes(storage_dir + bad) == bytes:
+				return dir.remove(file_name) == OK
+			if number < BAD_MAX:
+				continue
+			dir.remove(bad)
+		return dir.rename(file_name, bad) == OK
+	return false
+
+
 static func _v1_entry(data: Dictionary, section: String, difficulty_name: String) -> Variant:
 	var by_difficulty: Variant = data.get(section)
 	if by_difficulty is Dictionary:
@@ -722,15 +783,27 @@ func _write_space(space_key: String) -> Dictionary:
 	return spaces[space_key]
 
 
-func _read(path: String) -> Dictionary:
+# The data of a save file of storage_dir; {} when it is missing or cannot be read. A file that is there and holds no
+# save - garbage, a write that was cut off, an empty or zero-filled file, JSON that is no object or an empty one -
+# is unreadable: it is named in a warning and remembered, so that save_game sets it aside.
+func _read(file_name: String) -> Dictionary:
+	var path: String = storage_dir + file_name
 	if not FileAccess.file_exists(path):
 		return {}
 	var text: String = FileAccess.get_file_as_string(path)
-	if text.is_empty():
-		return {}
 	var json: JSON = JSON.new()
-	if json.parse(text) != OK or not json.data is Dictionary:
-		if report_damage:
-			push_warning("Save: %s is damaged (%s)" % [path, json.get_error_message()])
-		return {}
-	return json.data
+	var reason: String = ""
+	if text.is_empty():
+		reason = "no text in its %d byte(s)" % FileAccess.get_file_as_bytes(path).size()
+	elif json.parse(text) != OK:
+		reason = json.get_error_message()
+	elif not json.data is Dictionary:
+		reason = "not a JSON object"
+	elif (json.data as Dictionary).is_empty():
+		reason = "an empty JSON object"
+	if reason.is_empty():
+		return json.data
+	_unreadable.append(file_name)
+	if report_damage:
+		push_warning("Save: %s is damaged (%s)" % [path, reason])
+	return {}

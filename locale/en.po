@@ -680,8 +680,9 @@ msgstr "{players} win the round!"
 msgid "UI_VS_DRAW"
 msgstr "Draw!"
 
-# Versus HUD: the round banner when the hard cap ends a Last Caveman Standing round (DESIGN.md G78); the result line
-# ("P2 wins the round!", "Draw!") stands under it.
+# Versus HUD: the reason line of the round banner when the hard cap ends a round - Last Caveman Standing (DESIGN.md
+# G78) or a Golden Drumstick nobody took (G95). It stands over the result line ("P2 wins the round!", "Draw!") at
+# the gong, over "The deciding moment" through that round's replay, and before the result line of the scoreboard.
 msgid "UI_VS_TIME"
 msgstr "TIME!"
 

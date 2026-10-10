@@ -54,7 +54,9 @@ func _clear_user_folder() -> void:
 	if dir == null:
 		return
 	for file: String in dir.get_files():
-		if USER_FILES.has(file) or file.begins_with("save.v"):
+		# Also what a save or a settings file that could not be read was set aside as (tests/test_core_save_damage.gd).
+		var set_aside: bool = file.begins_with("save.bad") or file.begins_with("settings.bad")
+		if USER_FILES.has(file) or file.begins_with("save.v") or set_aside:
 			dir.remove(file)
 	# A folder a test put in the way of the copy.
 	if dir.dir_exists(Save.legacy_backup_name(1)):

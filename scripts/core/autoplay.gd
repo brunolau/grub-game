@@ -33,7 +33,8 @@ extends Node
 ##   --fresh-user              start that folder empty (no save, default settings)
 ##   --transitions             keep the timed transitions (default: instant)
 ##   --smoke=<seconds>         boot check: run the game normally for that long (0.1 .. 120), then quit cleanly.
-##                             Exit code 0 only when no error and no warning was logged (works with --headless)
+##                             Exit code 0 only when no error and no warning was logged (works with --headless).
+##                             Counted from the start of the run, see THE BOOT CHECK below
 ##   --perf[=layers]           with --autoplay or --flow: sample frame time, draw calls, tick cost, entity counts,
 ##                             memory and level load times per screen / level against the budget of
 ##                             ARCHITECTURE.md 11; prints "Perf:" lines and writes <out>/perf.json
@@ -55,6 +56,16 @@ extends Node
 ## `--smoke`, the boot check of the build scripts: it only shortens the session and reads nothing but the log.
 ## In an exported build the smoke run also verifies the package itself (no development file inside).
 ##   ClubAndGrub.exe --log-file smoke.log -- --smoke=3      (exit code 0 = clean boot)
+##
+## THE BOOT CHECK SEES THE BOOT (2.0.0). Its counter is attached in [method _init]: the engine makes every autoload
+## before it adds the first one to the tree, so the counter - although this is the last autoload - exists before
+## Settings and Save load their files, and a damaged save or an unreadable settings file is counted (it was attached
+## in _ready, after both had loaded, and such a boot reported "0 error(s), 0 warning(s)"). What the engine logged
+## before any script ran is read from the engine's own log file, from its first line ([method count_log_problems]),
+## when that file can be found: the default one of the project (user://logs/godot.log). A run started with
+## --log-file writes its log where the game cannot know, so whoever starts it that way reads the log's WARNING and
+## ERROR lines as well - tools/build_windows.ps1 and tools/build_installer.ps1 do. The line "Smoke: counted ..." says
+## which of the two this run did.
 
 ## Emitted when the script has been played completely (just before the application quits).
 signal finished(exit_code: int)
@@ -68,6 +79,11 @@ const SETTLE_FRAMES: int = 4
 const RELEASE_SWITCHES: PackedStringArray = ["smoke"]
 const SMOKE_MIN_SECONDS: float = 0.1
 const SMOKE_MAX_SECONDS: float = 120.0
+## The project setting that names the engine's own log file (the boot check reads it from its first line).
+const ENGINE_LOG_SETTING: String = "debug/file_logging/log_path"
+## How a line of the engine's log starts (after blanks) when it reports an error / a warning.
+const LOG_ERROR_PREFIXES: PackedStringArray = ["ERROR:", "SCRIPT ERROR:", "USER ERROR:", "USER SCRIPT ERROR:"]
+const LOG_WARNING_PREFIXES: PackedStringArray = ["WARNING:", "USER WARNING:"]
 ## Development files and folders that must never be inside an exported build (export_presets.cfg excludes them).
 const DEVELOPMENT_PATHS: PackedStringArray = [
 	"res://tests", "res://tools", "res://docs", "res://scenes/core/debug_level.tscn",
@@ -168,6 +184,16 @@ var _stage: int = 0
 ## then left nothing behind (the same scripts held in a member of a node, released a moment earlier with the scene
 ## tree, leaked as before).
 static var _session_scripts: Dictionary = {}
+## The counter of the boot check, attached in _init (null in every run that is no boot check).
+var _boot_counter: LogCounter = null
+
+
+## The boot check counts from here: every autoload is made before the first one enters the tree, so this runs before
+## Settings and Save load (their _ready) - see THE BOOT CHECK at the top of this file.
+func _init() -> void:
+	if parse_args(OS.get_cmdline_user_args()).has("smoke"):
+		_boot_counter = LogCounter.new()
+		OS.add_logger(_boot_counter)
 
 
 func _ready() -> void:
@@ -542,14 +568,60 @@ func _weapon_from_name(weapon_name: String) -> int:
 	return -1
 
 
+## How many lines of an engine log report an error and how many a warning: Vector2i(errors, warnings). Such a line
+## starts, after blanks, with one of LOG_ERROR_PREFIXES / LOG_WARNING_PREFIXES ("ERROR: ...", "WARNING: ..."); the
+## "at:" and backtrace lines under it are not counted, nor is a prefix in the middle of a line.
+func count_log_problems(text: String) -> Vector2i:
+	var counts: Vector2i = Vector2i.ZERO
+	for raw: String in text.split("\n"):
+		var line: String = raw.strip_edges()
+		for prefix: String in LOG_ERROR_PREFIXES:
+			if line.begins_with(prefix):
+				counts.x += 1
+				break
+		for prefix: String in LOG_WARNING_PREFIXES:
+			if line.begins_with(prefix):
+				counts.y += 1
+				break
+	return counts
+
+
+## The problems in the engine's own log of THIS run, counted from its first line: Vector2i(errors, warnings), or
+## Vector2i(-1, -1) when that log cannot be read - no file at the project's log path (file logging is off, or the
+## run was started with --log-file) or a file another run wrote. The log is this run's when it holds the mark this
+## method prints first (through printerr: an error-level line is written to the file at once, a print() of a release
+## build only when the engine next flushes).
+func own_log_problems() -> Vector2i:
+	var path: String = str(ProjectSettings.get_setting(ENGINE_LOG_SETTING, ""))
+	if path.is_empty() or not FileAccess.file_exists(path):
+		return Vector2i(-1, -1)
+	var mark: String = "Smoke: reading the log of run %d-%d" % [OS.get_process_id(), Time.get_ticks_usec()]
+	printerr(mark)
+	var text: String = FileAccess.get_file_as_string(path)
+	if not text.contains(mark):
+		return Vector2i(-1, -1)
+	return count_log_problems(text)
+
+
 func _smoke(seconds: float) -> void:
-	var counter: LogCounter = LogCounter.new()
-	OS.add_logger(counter)
+	var counter: LogCounter = _boot_counter
+	if counter == null:
+		# Not attached in _init (a node made by hand): count from here.
+		counter = LogCounter.new()
+		OS.add_logger(counter)
 	if OS.has_feature("template"):
 		for path: String in find_development_files():
 			push_error("Smoke: development file %s is inside this export" % path)
 	await get_tree().create_timer(seconds, true, false, true).timeout
 	OS.remove_logger(counter)
+	_boot_counter = null
+	# The larger of the two counts: the log file also holds what the engine wrote before any script ran.
+	var errors: int = counter.errors
+	var warnings: int = counter.warnings
+	var logged: Vector2i = own_log_problems()
+	if logged.x >= 0:
+		errors = maxi(errors, logged.x)
+		warnings = maxi(warnings, logged.y)
 	print("Smoke: %s %s (%s build), %d level(s), screen '%s'" % [
 		ProjectSettings.get_setting("application/config/name"),
 		ProjectSettings.get_setting("application/config/version"),
@@ -562,8 +634,14 @@ func _smoke(seconds: float) -> void:
 	print("Smoke: campaign beginner %s; expert %s" % [
 		",".join(PackedStringArray(Levels.get_campaign(Defs.Difficulty.BEGINNER))),
 		",".join(PackedStringArray(Levels.get_campaign(Defs.Difficulty.EXPERT)))])
-	print("Smoke: ran %.1f s, %d error(s), %d warning(s) logged" % [seconds, counter.errors, counter.warnings])
-	Flow.shutdown_and_quit(0 if counter.errors + counter.warnings == 0 else 1)
+	if logged.x >= 0:
+		print("Smoke: counted from the first line of the engine's log (%s)" % ProjectSettings.get_setting(
+				ENGINE_LOG_SETTING))
+	else:
+		print("Smoke: counted since the autoloads were made, before Settings and Save loaded (no log file of this run ",
+				"at the project's log path: read the log's lines too)")
+	print("Smoke: ran %.1f s, %d error(s), %d warning(s) logged" % [seconds, errors, warnings])
+	Flow.shutdown_and_quit(0 if errors + warnings == 0 else 1)
 
 
 func _configure(options: Dictionary) -> void:

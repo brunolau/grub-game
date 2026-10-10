@@ -44,6 +44,7 @@ class BookCard:
 
 	var _body: Control = null
 	var _caption: Label = null
+	var _foot: Label = null
 	var _lift: Tween = null
 	# The backdrop layers drawn on the picture, held while the card shows (UiKit.tex keeps no cache).
 	var _layers: Array[Texture2D] = []
@@ -90,9 +91,14 @@ class BookCard:
 			foot.text = TranslationServer.translate("UI_BOOK_MISSING")
 			foot.add_theme_color_override(&"font_color", UiKit.COL_BAD)
 		column.add_child(foot)
+		_foot = foot
 		focus_entered.connect(_on_focus_changed.bind(true))
 		focus_exited.connect(_on_focus_changed.bind(false))
 		gui_input.connect(_on_gui_input)
+
+	## The card's last line as it reads: "HI 0012300", or that the book is not in this build (tests, flows).
+	func get_foot_text() -> String:
+		return _foot.text
 
 	## The picture: the book's first world (its backdrop layers) with the heroes standing in front.
 	func _picture(entry: Array, heroes: Array[Array]) -> Control:
@@ -216,13 +222,29 @@ static func is_available(book: int) -> bool:
 	return Levels.first_level(book) != &""
 
 
-## The best score of `book` in the mode being prepared, over both difficulties.
+## The best score of `book` in the mode being prepared, over both difficulties. Solo, Book I: also the high score a
+## returning 1.0 player brought along ([method legacy_score]) - his card read 0000000 beside the title's "HI 3069500".
 static func best_score(book: int) -> int:
 	var mode: int = Defs.GameMode.COOP if is_coop() else Defs.GameMode.SINGLE
 	var best: int = 0
 	for difficulty: int in [Defs.Difficulty.BEGINNER, Defs.Difficulty.EXPERT]:
 		best = maxi(best, Save.get_high_score_in(Save.space(mode, book, difficulty)))
+	if mode == Defs.GameMode.SINGLE and book == 1:
+		best = maxi(best, legacy_score())
 	return best
+
+
+## The high score of 1.0.0 in a profile that 2.0 took over, 0 when there is none. 1.0.0 kept one record without its
+## difficulty; the migration keeps it as the profile record only (Save.get_high_score; no namespace's table gets it,
+## Save.get_high_score_in). Every score of 2.0 goes into its namespace's table AND the profile record
+## (Save.submit_score_in), so a profile record above every table can only be that 1.0 score - made in Solo, Book I,
+## the one game 1.0.0 had. (Once a 2.0 run of any mode or book beats it, the save holds the 1.0 number no longer.)
+static func legacy_score() -> int:
+	var record: int = Save.get_high_score()
+	for space_key: String in Save.get_spaces():
+		if Save.get_high_score_in(space_key) >= record:
+			return 0
+	return record
 
 
 ## The looks of the heroes the pictures show: [colour, pattern] of P1 (Solo), of both joined players (Co-op).

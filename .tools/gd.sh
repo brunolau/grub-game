@@ -21,9 +21,13 @@
 # %APPDATA%\ClubAndGrub - where the saves and settings of an installed game live - and a run of the project writes
 # there by itself: the engine's log files (logs\godot*.log) on every run, settings.cfg on a smoke run (the boot check
 # does not redirect its user data: it is the release exe's check), and whatever a test or tool writes to user://
-# directly. So test, smoke, play and script runs get APPDATA pointed at their own folder (build/run_users/<id>/appdata,
-# deleted afterwards), as tools\build_windows.ps1 does for the exported exe. import and raw keep the real APPDATA:
-# they need the editor's data (the export templates). On Linux and macOS nothing is redirected.
+# directly; the editor (an import) makes and removes an entry there on every run, which moves the folder's write
+# time. So test, smoke, play, script AND import runs - the automatic import in front of a command too - get APPDATA
+# pointed at their own folder (build/run_users/<id>/appdata, deleted afterwards), as every Godot run of
+# tools\build_windows.ps1 does. An import needs nothing from the real folder (measured: a clean import with an
+# empty one). ONLY raw keeps the real APPDATA - it is Godot exactly as called, and an export needs the editor's
+# export templates under %APPDATA%\Godot: a raw run of the project does write into the player's folder. On Linux
+# and macOS nothing is redirected.
 #
 # GD_TIMEOUT=<seconds> (default 300) limits each Godot run; on timeout only that run's processes are killed.
 # Windowed runs (play) are muted (--audio-driver Dummy) and placed far off-screen (--position 30000,30000) so
@@ -206,15 +210,16 @@ case "$cmd" in
 esac
 case "$cmd" in
 	import)
+		isolate_user_data
 		acquire_exclusive
 		do_import
 		ungate
 		echo "gd.sh: import done"
 		;;
 	test)
+		isolate_user_data
 		import_if_needed
 		acquire_shared
-		isolate_user_data
 		filter=()
 		if [ $# -gt 0 ] && [ "${1#--}" = "$1" ]; then
 			filter=(--filter="$1")
@@ -223,15 +228,15 @@ case "$cmd" in
 		run --headless --path "$ROOT" -s res://tests/run_tests.gd -- "${filter[@]}" --user-dir="res://$RUN_USER" "$@"
 		;;
 	smoke)
+		isolate_user_data
 		import_if_needed
 		acquire_shared
-		isolate_user_data
 		run --headless --path "$ROOT" -- --smoke="${1:-3}"
 		;;
 	play)
+		isolate_user_data
 		import_if_needed
 		acquire_shared
-		isolate_user_data
 		quiet=(--audio-driver Dummy --position 30000,30000)
 		[ "${GD_VISIBLE:-0}" = "1" ] && quiet=()
 		if has_user_dir "$@"; then
@@ -241,9 +246,9 @@ case "$cmd" in
 		fi
 		;;
 	script)
+		isolate_user_data
 		import_if_needed
 		acquire_shared
-		isolate_user_data
 		script="$1"
 		shift
 		run --headless --path "$ROOT" -s "$script" "$@"

@@ -23,12 +23,23 @@ extends Node
 ## single-player profile (`[bindings]`, the unprefixed actions) is untouched by them. The `*_slot_*` methods work
 ## like their single-player twins; `changed` reports a slot's binding as BINDINGS_KEY with the generated action
 ## name ("p2_jump") as value.
+##
+## An unreadable file is kept (2.0.0): a settings.cfg that is there and cannot be read - a parse error, or bytes that
+## hold no section at all (zero-filled, some other file) - is reported by [method load_settings], which uses the
+## defaults and writes nothing. The first [method save] after it sets that file aside, byte for byte, as
+## "settings.bad.cfg" ("settings.bad.2.cfg" ... when that name holds other bytes; [method bad_file_name]) before the
+## new file takes its place, and writes nothing while it cannot.
 
 ## A value changed (also emitted for every key after [method load_settings] and [method reset]). Bindings
 ## report the pseudo key BINDINGS_KEY with the action name as value ("" = all actions).
 signal changed(key: String, value: Variant)
 
 const FILE_NAME: String = "settings.cfg"
+## Where an unreadable settings.cfg is set aside by the first save after it was found ([method bad_file_name]):
+## "settings.bad.cfg", then "settings.bad.2.cfg" ... up to BAD_MAX; the last name is used again when every one holds
+## other bytes.
+const BAD_NAME: String = "settings.bad.cfg"
+const BAD_MAX: int = 99
 ## Bump when a key changes meaning; add a step to _migrate().
 const VERSION: int = 1
 ## Key reported by [signal changed] when the bindings of an action change.
@@ -92,6 +103,8 @@ var storage_dir: String = "user://"
 var _values: Dictionary = {}
 var _bindings: Dictionary = {}  # action (String) -> Array of InputEvent
 var _slot_bindings: Array[Dictionary] = _empty_slot_profiles()  # per slot: action (String) -> Array of InputEvent
+## True when the last load_settings found a settings file it could not read: save() sets it aside first.
+var _unreadable: bool = false
 
 
 func _ready() -> void:
@@ -521,15 +534,21 @@ func reset() -> void:
 		changed.emit(key, DEFAULTS[key])
 
 
-## Read the file (missing or damaged files yield the defaults) and apply everything.
+## Read the file (missing or damaged files yield the defaults) and apply everything. Reading writes nothing; a file
+## that cannot be read is named in a warning and set aside by the next [method save] ([method has_unreadable_file]).
 func load_settings() -> void:
 	_values.clear()
 	_bindings.clear()
 	_slot_bindings = _empty_slot_profiles()
+	_unreadable = false
 	InputMap.load_from_project_settings()
 	var file: ConfigFile = ConfigFile.new()
 	var err: Error = file.load(storage_dir + FILE_NAME)
-	if err == OK:
+	if err == OK and file.get_sections().is_empty():
+		# Whatever this is, the game did not write it (its file always has [meta]): zeros, a cut-off write, another file.
+		_unreadable = true
+		push_warning("Settings: %s holds no settings, using defaults" % [storage_dir + FILE_NAME])
+	elif err == OK:
 		var version: int = int(file.get_value("meta", "version", 0))
 		for section: String in file.get_sections():
 			if section == "meta" or section == BINDINGS_SECTION or _slot_of_section(section) >= 0:
@@ -548,6 +567,7 @@ func load_settings() -> void:
 		if version != VERSION:
 			_migrate(version)
 	elif err != ERR_FILE_NOT_FOUND:
+		_unreadable = true
 		push_warning("Settings: could not read %s (error %d), using defaults" % [storage_dir + FILE_NAME, err])
 	for key: String in DEFAULTS:
 		_apply(key)
@@ -555,8 +575,15 @@ func load_settings() -> void:
 	changed.emit(BINDINGS_KEY, "")
 
 
-## Write the current values to disk. Returns OK or the error.
+## Write the current values to disk. Returns OK or the error. A file the last [method load_settings] could not read
+## is first set aside as [method bad_file_name]; while that cannot be done nothing is written (ERR_FILE_CANT_WRITE):
+## the defaults never replace a file that has not been kept.
 func save() -> Error:
+	if _unreadable and not _set_unreadable_aside():
+		push_error("Settings: the unreadable %s could not be set aside as %s; it is not written over" % [
+				storage_dir + FILE_NAME, BAD_NAME])
+		return ERR_FILE_CANT_WRITE
+	_unreadable = false
 	var file: ConfigFile = ConfigFile.new()
 	file.set_value("meta", "version", VERSION)
 	for key: String in _values:
@@ -578,6 +605,40 @@ func save() -> Error:
 	if err != OK:
 		push_error("Settings: could not write %s (error %d)" % [storage_dir + FILE_NAME, err])
 	return err
+
+
+## Name of the file an unreadable settings file is set aside as: "settings.bad.cfg"; `number` > 1 names a later one
+## with other bytes ("settings.bad.2.cfg").
+static func bad_file_name(number: int = 1) -> String:
+	return BAD_NAME if number <= 1 else "%s.%d.cfg" % [BAD_NAME.get_basename(), number]
+
+
+## True while a settings file the last [method load_settings] could not read waits for [method save] to set it aside.
+func has_unreadable_file() -> bool:
+	return _unreadable
+
+
+# Move the unreadable settings file out of the way, byte for byte (a rename), to the first "settings.bad" name that
+# is free; a file whose bytes one of those names already keeps is not kept twice (save() writes over it). When all
+# BAD_MAX names hold other bytes the last one is replaced. True when the file is kept or gone.
+func _set_unreadable_aside() -> bool:
+	var path: String = storage_dir + FILE_NAME
+	if not FileAccess.file_exists(path):
+		return true
+	var dir: DirAccess = DirAccess.open(storage_dir)
+	if dir == null:
+		return false
+	var bytes: PackedByteArray = FileAccess.get_file_as_bytes(path)
+	for number: int in range(1, BAD_MAX + 1):
+		var bad: String = bad_file_name(number)
+		if dir.file_exists(bad):
+			if FileAccess.get_file_as_bytes(storage_dir + bad) == bytes:
+				return true
+			if number < BAD_MAX:
+				continue
+			dir.remove(bad)
+		return dir.rename(FILE_NAME, bad) == OK
+	return false
 
 
 func _migrate(_from_version: int) -> void:

@@ -157,7 +157,10 @@ The development scripts expect the console binary in `.tools/godot/` (on Windows
 `.tools/godot/Godot_v4.7.2-stable_win64_console.exe`), or the path in the `GODOT` environment variable;
 `bash .tools/gd.sh` explains what to download when it cannot find it. User data (`settings.cfg`, `save.json` with
 its backup `save.json.bak`, and `save.v1.json`, the untouched copy of a 1.0 save) lives in `%APPDATA%/ClubAndGrub/`
-on Windows, `~/Library/Application Support/ClubAndGrub/` on macOS and in the app sandbox on phones.
+on Windows, `~/Library/Application Support/ClubAndGrub/` on macOS and in the app sandbox on phones. A save or
+settings file the game could not read is never deleted: the next save sets it aside there as `save.bad.json` /
+`settings.bad.cfg` (numbered when one exists), and a readable `save.json.bak` is kept until a new save has been
+written and read back.
 
 ## Tests and development tools
 

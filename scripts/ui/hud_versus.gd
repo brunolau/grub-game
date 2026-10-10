@@ -13,6 +13,16 @@ extends Control
 ## top row cannot hold both top panels, their crowns and the sundial (three-digit counts on a 640 px view) the panels
 ## leave out the tag text: the head in the player's colour still says who is who.
 ##
+## "TIME!" (DESIGN.md G78 / G95; the 2.0 release round's ruling F1): a round the hard cap ended says so in a line of
+## its own over the banner ([member banner_reason], the alarm colour of "SUDDEN DEATH!") - over the result at the
+## gong, over "The deciding moment" all through that round's replay, over the result again when the replay ends - so
+## the reason is on the screen from the gong until the scoreboard, which says it too (VersusScoreboardScreen). The
+## round's own level, referee and HUD are gone the moment the gong hands over to Flow (the replay loads the arena
+## again with a new HUD, the scoreboard is another scene), so the HUD that hears the gong notes the round on the match
+## ([method note_time]) and whoever shows the round afterwards asks ([method time_called]). While a deciding moment
+## plays, the banner is the replay's: the banners of what happens in it again (the countdown, the Feast Rush, the
+## sudden death, the Golden Drumstick that lies there) do not replace it.
+##
 ## Never over a hero: every panel is one arena row tall (32 art px). The top panels and the sundial sit in row 0, which
 ## holds nothing to stand on (LEVEL_DESIGN.md 15.8); the bottom panels sit under the arena's floor line (the floor
 ## tiles of row 10 and the fill below), so a hero walking on the floor is never behind one. Wherever a hero still
@@ -97,6 +107,9 @@ const SUDDEN_DEATH_KEYS: Dictionary = {
 }
 ## Seconds the banner of the tie's golden item stays.
 const GOLDEN_SECONDS: float = 3.0
+## The note on the match (Object metadata of Game.versus_match: it ends with the match) of the round the hard cap
+## ended last - the round's index ([method note_time], [method time_called]).
+const TIME_META: StringName = &"hud_time_round"
 
 ## What a corner panel counts, by the round's mode.
 enum Content {
@@ -218,6 +231,10 @@ var ticks_left: int = -1
 ## Text of the banner on screen ("" = none), and its second line ("" = none).
 var banner_text: String = ""
 var banner_hint: String = ""
+## The reason line over the banner's text ("" = none): "TIME!" from the gong of a round the hard cap ended, through
+## its deciding moment, until a new round counts down. It is drawn with the banner ([method get_reason_text] is what
+## the screen shows).
+var banner_reason: String = ""
 ## True while Flow replays a round's deciding moment.
 var replaying: bool = false
 ## Draw batches of the last frame drawn: one per change of texture in the draw order (the atlas, the HUD face, a
@@ -346,7 +363,10 @@ func refresh(delta: float = 0.0) -> void:
 	_dial.rush = feast_rush
 	if golden and not _golden_shown:
 		_golden_shown = true
-		if content == Content.GOALS:
+		if replaying:
+			# A deciding moment that plays while the golden item lies there keeps the replay's banner and skip hint.
+			pass
+		elif content == Content.GOALS:
 			show_banner(tr("UI_VS_GOLDEN_COCONUT"), UiKit.COL_FOCUS, UiKit.Style.HUD, GOLDEN_SECONDS,
 					tr("UI_VS_GOLDEN_COCONUT_HINT"))
 		else:
@@ -387,6 +407,33 @@ func is_banner_visible() -> bool:
 ## Screen rectangle of the banner (empty while none shows).
 func get_banner_rect() -> Rect2:
 	return _banner_rect if banner_text != "" else Rect2()
+
+
+## The reason line the screen shows over the banner's text now ("TIME!"; "" when there is none or no banner shows).
+func get_reason_text() -> String:
+	return banner_reason if banner_text != "" else ""
+
+
+## Note on the match whether the hard cap ended round `p_round_index` (the versus HUD at that round's gong; nothing
+## without a match).
+static func note_time(p_round_index: int, capped: bool) -> void:
+	var versus_match: VersusMatch = Game.versus_match
+	if versus_match == null:
+		return
+	if capped:
+		versus_match.set_meta(TIME_META, p_round_index)
+	elif time_called(p_round_index):
+		versus_match.remove_meta(TIME_META)
+
+
+## True when the hard cap ended round `p_round_index` of the match being played ([method note_time]) - asked by who
+## shows that round after its gong: the HUD of its deciding moment, the scoreboard.
+static func time_called(p_round_index: int) -> bool:
+	var versus_match: VersusMatch = Game.versus_match
+	if versus_match == null or not versus_match.has_meta(TIME_META):
+		return false
+	var noted: Variant = versus_match.get_meta(TIME_META)
+	return noted is int and int(noted) == p_round_index
 
 
 ## Show `text` in the middle (UiKit.Style TITLE or HUD); it fades after `seconds` (0 = stays until replaced). `hint`
@@ -476,9 +523,11 @@ func _layout() -> void:
 	_dial.rect = Rect2(Vector2(roundf((view.x - dial_w) * 0.5), top), Vector2(dial_w, PANEL_H))
 	if banner_text != "":
 		var text: Vector2 = _banner_font.get_string_size(banner_text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, _banner_size)
-		if banner_hint != "":
-			var hint: Vector2 = _font.get_string_size(banner_hint, HORIZONTAL_ALIGNMENT_LEFT, -1.0, UiKit.SIZE_HUD)
-			text = Vector2(maxf(text.x, hint.x), text.y + hint.y)
+		# The reason line over the text and the hint under it: each one more line in the HUD face.
+		for line: String in [banner_reason, banner_hint]:
+			if line != "":
+				var extra: Vector2 = _font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1.0, UiKit.SIZE_HUD)
+				text = Vector2(maxf(text.x, extra.x), text.y + extra.y)
 		var box: Vector2 = (text + BANNER_PAD * 2.0).ceil()
 		_banner_rect = Rect2(((view - box) * 0.5 - Vector2(0.0, 24.0)).round(), box)
 		if _skip_button != null:
@@ -543,7 +592,7 @@ static func _covers(rect: Rect2, bodies: Array[Rect2]) -> bool:
 
 ## Everything a frame shows, to redraw only on a change.
 func _state_key() -> Array:
-	var key: Array = [banner_text, banner_hint, _banner_rect, snappedf(_banner_alpha(), 0.02), _dial.rect,
+	var key: Array = [banner_text, banner_hint, banner_reason, _banner_rect, snappedf(_banner_alpha(), 0.02), _dial.rect,
 			HudAtlas.dial_index(_dial.elapsed), _dial.seconds, _dial.rush, _dial.visible, snappedf(_dial.alpha, 0.02)]
 	for panel: CornerPanel in _panels:
 		key.append_array([panel.rect, panel.content, panel.stack, panel.banked, panel.wins, panel.wins_needed,
@@ -577,14 +626,21 @@ func _draw() -> void:
 		var hint_at: Vector2 = Vector2(_banner_rect.get_center().x - hint_w * 0.5,
 				_banner_rect.end.y - BANNER_PAD.y - _font.get_descent(UiKit.SIZE_HUD))
 		_text(banner_hint, hint_at, Color(UiKit.COL_CREAM, _banner_alpha()))
+	var line_h: float = _font.get_height(UiKit.SIZE_HUD)
+	var reason_h: float = line_h if banner_reason != "" else 0.0
+	if banner_reason != "" and banner_text != "":
+		# The reason line ("TIME!"): the first line of the plate, in the alarm colour.
+		var reason_at: Vector2 = Vector2(_banner_rect.get_center().x - _text_width(banner_reason) * 0.5,
+				_banner_rect.position.y + BANNER_PAD.y + _font.get_ascent(UiKit.SIZE_HUD))
+		_text(banner_reason, reason_at, Color(COL_RUSH, _banner_alpha()))
 	# 3. The banner's text (the title face for the countdown).
 	if banner_text != "":
 		var ascent: float = _banner_font.get_ascent(_banner_size)
 		var height: float = _banner_font.get_height(_banner_size)
-		var room: float = _banner_rect.size.y - (_font.get_height(UiKit.SIZE_HUD) if banner_hint != "" else 0.0)
+		var room: float = _banner_rect.size.y - reason_h - (line_h if banner_hint != "" else 0.0)
 		var width: float = _banner_font.get_string_size(banner_text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, _banner_size).x
 		var at: Vector2 = Vector2(roundf(_banner_rect.get_center().x - width * 0.5),
-				_banner_rect.position.y + roundf((room - height) * 0.5 + ascent))
+				_banner_rect.position.y + reason_h + roundf((room - height) * 0.5 + ascent))
 		_note_batch(_banner_font)
 		draw_string(_banner_font, at, banner_text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, _banner_size,
 				Color(_banner_color, _banner_color.a * _banner_alpha()))
@@ -758,8 +814,10 @@ static func touch_in_use() -> bool:
 	return false
 
 
-func _on_replay_started(_round_index: int, _first: int, _last: int, steal: bool) -> void:
+func _on_replay_started(p_round_index: int, _first: int, _last: int, steal: bool) -> void:
 	replaying = true
+	# This HUD came with the arena the replay loaded: the round's own HUD noted at the gong whether the cap ended it.
+	banner_reason = tr("UI_VS_TIME") if time_called(p_round_index) else ""
 	show_banner(tr("UI_VS_REPLAY_STEAL" if steal else "UI_VS_REPLAY_MOMENT"), UiKit.COL_FOCUS, UiKit.Style.HUD, 0.0,
 			tr("UI_VS_REPLAY_SKIP"))
 	if touch_in_use() and _skip_button == null:
@@ -772,7 +830,11 @@ func _on_replay_started(_round_index: int, _first: int, _last: int, steal: bool)
 
 func _on_replay_finished(_skipped: bool) -> void:
 	replaying = false
-	_hide_banner()
+	if banner_reason != "":
+		# The cap ended the round shown: "TIME!" stays, over the round's result, until the scoreboard takes the screen.
+		_show_result(_recorded_winners())
+	else:
+		_hide_banner()
 	if _skip_button != null:
 		_skip_button.queue_free()
 		_skip_button = null
@@ -891,6 +953,9 @@ func _on_round_countdown(p_round_index: int, count: int) -> void:
 	round_index = p_round_index
 	_round_over = false
 	_golden_shown = false
+	if replaying:
+		return
+	banner_reason = ""
 	if count > 0:
 		show_banner(str(count), UiKit.COL_CREAM, UiKit.Style.TITLE, 0.0)
 	else:
@@ -905,21 +970,29 @@ func _on_round_started(p_round_index: int) -> void:
 	_golden_shown = false
 	_round_start_tick = Sim.tick
 	_round_length = _round_ticks()
+	if replaying:
+		return
+	banner_reason = ""
 	if banner_text != "" and banner_text != tr("UI_VS_GO"):
 		show_banner(tr("UI_VS_GO"), UiKit.COL_FOCUS, UiKit.Style.TITLE, 0.7)
 
 
 func _on_feast_rush(_round_index: int) -> void:
 	feast_rush = true
-	show_banner(tr("UI_VS_FEAST_RUSH"), COL_RUSH, UiKit.Style.HUD, BANNER_SECONDS)
+	if not replaying:
+		show_banner(tr("UI_VS_FEAST_RUSH"), COL_RUSH, UiKit.Style.HUD, BANNER_SECONDS)
 
 
 ## "SUDDEN DEATH!" and, under it, which one the arena throws in (VersusSuddenDeath's theme: "Stampede!").
 func _on_sudden_death(_round_index: int, kind: StringName) -> void:
+	if replaying:
+		return
 	var theme: String = tr(str(SUDDEN_DEATH_KEYS[kind])) if SUDDEN_DEATH_KEYS.has(kind) else ""
 	show_banner(tr("UI_VS_SUDDEN_DEATH"), COL_RUSH, UiKit.Style.HUD, BANNER_SECONDS * 1.5, theme)
 
 
+## The gong: the result, and over it "TIME!" when the hard cap ended the round (the referee's ended_by_cap(), true
+## from the gong on). The round is noted on the match for who shows it next ([method note_time]).
 func _on_round_ended(p_round_index: int, winner_slots: PackedInt32Array) -> void:
 	round_index = p_round_index
 	round_running = false
@@ -928,5 +1001,22 @@ func _on_round_ended(p_round_index: int, winner_slots: PackedInt32Array) -> void
 	var provider: Object = _provider()
 	if provider == null or not provider.has_method(&"round_ticks_left"):
 		ticks_left = 0
+	var capped: bool = provider != null and provider.has_method(&"ended_by_cap") and bool(provider.call(&"ended_by_cap"))
+	note_time(p_round_index, capped)
+	banner_reason = tr("UI_VS_TIME") if capped else ""
+	_show_result(winner_slots)
+
+
+## The result banner of a round: who won it, or "Draw!" (under [member banner_reason] when there is one).
+func _show_result(winner_slots: PackedInt32Array) -> void:
 	var color: Color = UiPlayers.text_colour(winner_slots[0]) if winner_slots.size() == 1 else UiKit.COL_FOCUS
 	show_banner(result_text(winner_slots), color, UiKit.Style.HUD, RESULT_SECONDS)
+
+
+## The winners of the round the match recorded last (none without a match or a recorded round).
+static func _recorded_winners() -> PackedInt32Array:
+	var versus_match: VersusMatch = Game.versus_match
+	if versus_match == null or versus_match.history.is_empty():
+		return PackedInt32Array()
+	var winners: Variant = versus_match.history[-1].get("winners")
+	return winners if winners is PackedInt32Array else PackedInt32Array()

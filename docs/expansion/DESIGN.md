@@ -1722,7 +1722,8 @@ Syrup flood (feast, slows only), Stalactite storm (keep), Rockslide (canyon), Li
 ticks ahead. They start at 60 s in Last Caveman Standing and are available as an event toggle in the other modes.
 No sudden death is the round's end by itself: two players who keep out of its reach never ended a Colossus Hall
 round, so Last Caveman Standing has the hard cap of E.4 [G78] and the HUD's sundial counts its 60 s down; the
-round banner of a round the cap ended reads "TIME!" over its result. **Nobody stays outside the arena's sides**
+round banner of a round the cap ended reads "TIME!" over its result - at the gong, through that round's deciding
+moment and before the result on the scoreboard. **Nobody stays outside the arena's sides**
 [G93]: a hero whom a Cave-in block squeezes out of the map's side on an arena without a left-right wrap is knocked
 out as by a hazard.
 

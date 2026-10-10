@@ -33,8 +33,10 @@ carry over.
   every key rebindable per player.
 - New music for every new world, boss, arena and menu; all art and audio CC0, fonts OFL (CREDITS.md).
 - In co-op, beasts near a two-player gate wear chalk-white marks: marked beasts are no stepping stones.
-- Every versus round ends: Last Caveman Standing has a hard cap ("TIME!"), a Golden Drumstick nobody takes within a
-  minute ends its round drawn, and a coconut nobody has struck for 15 seconds drops in at the middle again.
+- Every versus round ends: Last Caveman Standing has a hard cap, a Golden Drumstick nobody takes within a minute
+  ends its round drawn, and a coconut nobody has struck for 15 seconds drops in at the middle again. A round the
+  cap ended says why: "TIME!" stands over the result at the gong, through the deciding-moment replay and before
+  the result on the scoreboard.
 
 ### Changed
 
@@ -42,6 +44,11 @@ carry over.
 - **Save format version 2**: progress is kept per mode (solo, co-op), book and difficulty. A 1.0 save becomes
   Solo > Book I, with nothing lost; before the first 2.0 save is written the 1.0 file is copied untouched to
   `save.v1.json` in the same folder, and it stays there.
+- **A file the game cannot read is never deleted**: a damaged `save.json` is set aside as `save.bad.json`
+  (numbered when one exists) by the next save, and the good backup `save.json.bak` it loaded from stays until a
+  new save has been written and read back; an unreadable `settings.cfg` is kept as `settings.bad.cfg` before
+  the defaults replace it.
+- The Book I card of **Play > Solo** shows the high score a 1.0 profile brought along.
 - Settings keep their format; options and key bindings of 1.0.0 are used as they are. A key or button a 1.0
   player had bound that 2.0 gives to the new Swap (V, `;`, pad LB) stays his: Swap gives it up.
 - Alt+Enter and F11 switch fullscreen on every screen.
@@ -64,6 +71,12 @@ carry over.
 - `tools/bots/soak.sh` (4 x 1 000 seeded versus rounds with CPUs, every rule checked on every tick),
   `tools/perf.sh` (the tick's cost with one, two and four heroes) and `tools/audit_assets.py` (every asset, its
   manifest row and its licence) are part of the release checklist (docs/BUILD.md 7).
+- The boot check (`-- --smoke=<seconds>`) counts every warning and error from the start of the run, also those
+  of `Settings` and `Save` loading; `tools/build_windows.ps1` and `tools/build_installer.ps1` read the log's own
+  lines as well (`-CheckBootLog <file>` judges any boot log by the same rule).
+- No tool run writes into the folder of an installed game (`%APPDATA%\ClubAndGrub`): every Godot run of
+  `tools/build_windows.ps1` and every `test`, `smoke`, `play`, `script` and `import` run of `.tools/gd.sh` gets an
+  `APPDATA` of its own (`gd.sh raw` is Godot exactly as called and keeps the real one).
 
 ### Known
 
@@ -71,6 +84,10 @@ carry over.
   (measured over 384 rounds; the places rotate every round). See docs/expansion/DESIGN.md G97.
 - What only people can judge - pair playtests of the co-op stages, the music by ear, key combinations on real
   keyboards, pads, an Android device - has not been done: docs/expansion/HUMAN_CHECKS.md lists every check.
+- Cosmetic: the results screen of a match whose last round the cap ended does not repeat "TIME!"; the co-op
+  ward mark is faint on the palest beasts (its dark edges carry it); the tags of two heroes on one spot stand
+  side by side and can change sides late; the row label "SHARED.." on Options > Buttons is cut short and Pause
+  shows "-" for both players there; the Book I card shows the 1.0 high score only until a 2.0 run beats it.
 
 ## 1.0.0
 

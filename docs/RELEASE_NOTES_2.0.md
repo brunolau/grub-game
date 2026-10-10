@@ -76,8 +76,10 @@ Two options make it kinder or meaner: **Helper mode** (player 2 cannot be hurt -
 Arenas: Totem Ring, Echo Hollow, Floe Rink, Cinder Pit, Tar Pulleys, Coconut Cove, Sky Picnic and Colossus Hall.
 
 Every round ends: a Last Caveman Standing round has a hard cap a minute after the arena turns on you, a tied Grub
-Stack round is decided by the Golden Drumstick - grab it within a minute or the round is drawn ("TIME!") - and a
-coconut nobody has struck for 15 seconds drops in at the middle again.
+Stack round is decided by the Golden Drumstick - grab it within a minute or the round is drawn - and a coconut
+nobody has struck for 15 seconds drops in at the middle again. When the cap ends a round the banner says so:
+**TIME!** stands over the result at the gong, through the replay of the deciding moment and before the result on
+the scoreboard.
 
 ## Controls for two on one keyboard
 
@@ -114,6 +116,10 @@ Playing alone, the controls are those of 1.0, plus **Swap on V or `;`** (pad LB)
   never changes that copy. If you ever want to go back to 1.0.0: close the game, rename `save.v1.json` to
   `save.json`, install 1.0.0. (1.0.0 does not read a 2.0 save: it shows no progress. If you play it anyway and
   return to 2.0, nothing is lost - 2.0 merges what both versions wrote.)
+- The game never deletes a file it cannot read. If `save.json` is damaged (a crash, a full disk), 2.0 goes on
+  with the backup `save.json.bak`, sets the damaged file aside as `save.bad.json` at its next save, and keeps
+  the good backup until a new save has been written and read back. A `settings.cfg` it cannot read is kept as
+  `settings.bad.cfg` before the default options take its place.
 
 ## Exactly the old game where it should be
 
@@ -137,6 +143,12 @@ An OpenGL 3.3 graphics driver is needed. The files are not code-signed, so Smart
   rounds the right floor wins more than its share of Grub Stack and the left shelf of Last Caveman Standing. The
   starting places rotate every round, so over a match everybody stands on each of them; a rebuild of the arena is
   planned for the next version.
+- **Small things known in 2.0.0**: when a capped round is the last of a match, the results screen does not repeat
+  "TIME!" (the gong and the replay said it); the chalk marks of co-op are faint on the palest beasts (gulls,
+  ghosts, snow turtles: the dark edges carry them); two heroes standing on one spot wear their "P1" / "P2" tags
+  side by side, and for a moment a tag can stand on the far side of its hero; under *Options > Buttons* one row
+  label is cut short ("SHARED..") and Pause shows "-" for both players (Esc and P pause for everyone); the
+  Book I card of the book select shows your 1.0 high score until a 2.0 run beats it, then Book I's own best.
 - Every co-op gate was proven by machine to need two heroes, and every stage has a recorded play-through that the
   test suite replays. What only people can judge - how the co-op stages feel to a mixed pair, the versus modes with a
   full sofa, key combinations on many keyboards, the music by ear - is listed step by step in
@@ -170,7 +182,7 @@ An OpenGL 3.3 graphics driver is needed. The files are not code-signed, so Smart
 >
 > Full notes: `docs/RELEASE_NOTES_2.0.md`. All art and audio CC0, fonts OFL: `CREDITS.md`.
 >
-> SHA-256 (the build of 2026-10-10; if the files are built again before publishing, take the values of that
-> build's log instead):
-> `ClubAndGrub-2.0.0-setup.exe` `238ad100a7632cf843ed06d7ffee274c70c7b3912093defc4a28913bf9f68926`
-> `ClubAndGrub-2.0.0-windows.zip` `5a500667dcf0b72390f7cab0ed8c7d030e46eb588bcdd78d99ab540a2abed28c`
+> SHA-256 (the second build of 2026-10-10, after the release polish; if the files are built again before
+> publishing, take the values of that build's log instead):
+> `ClubAndGrub-2.0.0-setup.exe` `@@SETUP_SHA@@`
+> `ClubAndGrub-2.0.0-windows.zip` `@@ZIP_SHA@@`

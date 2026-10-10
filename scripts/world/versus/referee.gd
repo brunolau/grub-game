@@ -34,8 +34,9 @@ extends SimEntity
 ##  - WORLD: the round: intro countdown, clock, Feast Rush, gong, the Golden Drumstick on a tie - and the drumstick's
 ##    own hard cap (the release round of phase 4, DESIGN.md G95, ruling R8 "no round lasts for ever"): nobody took
 ##    it within VersusTuning.SUDDEN_DEATH_CAP_TICKS of its fall - under Mayhem on Tar Pulleys the CPUs never fetched
-##    it from the top of the pulley block - so the round ends DRAWN, with the "TIME!" banner; the HUD's sundial
-##    counts the cap down ([member cap_at], [method round_ticks_left]).
+##    it from the top of the pulley block - so the round ends DRAWN, with the "TIME!" banner (the HUD's, which asks
+##    [method ended_by_cap] at the gong); the HUD's sundial counts the cap down ([member cap_at],
+##    [method round_ticks_left]).
 ##  - POST: hazards (knock-outs: credit to the last hitter within 73 ticks), respawns after 48 ticks at the free spawn
 ##    farthest from the rivals with a 48-tick spawn shield, the referee's own counters (spawn shield, squash, hit-stop,
 ##    stomp immunity) written to the heroes.
@@ -858,26 +859,13 @@ func cap_winners() -> PackedInt32Array:
 ## True when the hard cap ended this round (ruling R8, DESIGN.md G78) - the gong fell on the cap's tick with more
 ## than one side standing, or (G95) on the cap of a Golden Drumstick nobody took - and false for every other gong
 ## (the last one standing, also on the cap's own tick; a clock; a drumstick taken; a goal) and while a round runs.
-## True from the gong on, so a listener of Events.round_ended may ask.
+## True from the gong on, so a listener of Events.round_ended may ask - the versus HUD does, and writes "TIME!" over
+## the round's result (HudVersus._on_round_ended; the orchestrator's phase-4 ruling - G78 had left the reason unsaid).
+## The referee shows nothing itself: until the 2.0 release round it called the HUD's banner deferred from the cap's
+## tick, which reached only the HUD of a level Flow was already replacing (the deciding moment's arena and the
+## scoreboard never heard of it), so the word was on no frame a player saw.
 func ended_by_cap() -> bool:
 	return phase == PHASE_OVER and _capped
-
-
-## "TIME!" - the round banner of a round the hard cap ended (the orchestrator's phase-4 ruling; G78 had left the
-## reason unsaid). Presentation only, and nothing without a HUD (headless tests, the bot tools): the versus HUD's own
-## banner (HudVersus.show_banner, reached as a sign board reaches the HUD: by its group and a method's name) shows
-## "TIME!" in the alarm colour of "SUDDEN DEATH!" with the result line the HUD wrote at the gong - the winner, or its
-## "Draw!" - as the second line, for as long as that line would have stayed. Called deferred from the cap's tick.
-func _call_time() -> void:
-	if not is_inside_tree() or not ended_by_cap():
-		return
-	var hud: Node = get_tree().get_first_node_in_group(Defs.GROUP_HUD)
-	var banner: Object = hud.call(&"get_versus") as Object if hud != null and hud.has_method(&"get_versus") else null
-	if banner == null or not banner.has_method(&"show_banner"):
-		return
-	var result: Variant = banner.get(&"banner_text")
-	banner.call(&"show_banner", tr("UI_VS_TIME"), HudAtlas.COL_RUSH, UiKit.Style.HUD, HudVersus.RESULT_SECONDS,
-			str(result) if result is String else "")
 
 
 ## [method time_left_ticks] by the bots' name (core-B).
@@ -1733,11 +1721,10 @@ func _round_step() -> void:
 				if _team_count(standing) <= 1 and level.hero_count() > 1:
 					_finish(standing)
 				elif cap_at >= 0 and round_ticks >= cap_at:
-					# Ruling R8: the hard cap. Nobody outlasts the sudden death by hiding from it.
+					# Ruling R8: the hard cap. Nobody outlasts the sudden death by hiding from it. (Set before the gong:
+					# the HUD asks ended_by_cap() there and says "TIME!".)
 					_capped = true
 					_finish(cap_winners())
-					# "TIME!" (phase 4): after every listener of the gong, so the HUD's result line is there to keep.
-					_call_time.call_deferred()
 		PHASE_GOLDEN:
 			round_ticks += 1
 			signatures.wind_step()
@@ -1749,7 +1736,6 @@ func _round_step() -> void:
 				# G95: the Golden Drumstick nobody took. The tie stands: the round is drawn, with "TIME!".
 				_capped = true
 				_finish(PackedInt32Array())
-				_call_time.call_deferred()
 
 
 ## The WORLD part of the mode modules and the round's rules: Hot Rock's ember, Clubball's goals, the variants on a

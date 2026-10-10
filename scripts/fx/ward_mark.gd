@@ -14,7 +14,11 @@ extends RefCounted
 ##
 ## What is drawn: slanted bands of chalk across the body, the same slant on every beast - one band every BAND_PERIOD
 ## art px, CHALK_PX of chalk white between two EDGE_PX lines of dark ink (the ink keeps the bands readable on pale
-## sheets: gulls, ghosts, snow turtles, the light half of a slime; the chalk on dark ones). The bands are cut in the
+## sheets: gulls, ghosts, snow turtles, the light half of a slime; the chalk on dark ones). The ink lines are as
+## heavy as the sheets' own outlines (the 2.0 release round's ruling F4): at 2 px along a row they came out one pixel
+## thin across the slant, and on a pale body - the pale blue hopper of co-op 1-1 is the first marked beast a pair
+## meets - the chalk between them hardly stood out from the hide; at 3 px the band is a shape with an outline of its
+## own on every hide. The bands are cut in the
 ## sprite's own space (art px from the enemy's feet point), whole pixels, only where the sheet's texel is opaque and
 ## RIM_PX inside the silhouette - so they lie on the body like paint, the sheet's own outline stays whole, and nothing
 ## is drawn on the air around it. The hit flash still shows through (the bands take the sprite's modulate), the feast
@@ -24,7 +28,7 @@ extends RefCounted
 ## along a row), CHALK_PX of chalk between two EDGE_PX lines of ink, the first band BAND_SHIFT px from the feet point.
 const BAND_PERIOD: int = 26
 const CHALK_PX: int = 5
-const EDGE_PX: int = 2
+const EDGE_PX: int = 3
 const BAND_SHIFT: int = 9
 ## The paint keeps this many art px off the edge of the silhouette (the sheet's own outline stays whole).
 const RIM_PX: int = 2

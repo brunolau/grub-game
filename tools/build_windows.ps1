@@ -13,7 +13,9 @@
        (game data embedded, no .pck or DLL next to it) and fails on any export error, when the exe does not carry
        the version of project.godot, or when the export changed export_presets.cfg (it is put back),
     5. starts the exported exe with the release smoke switch (-- --smoke=<seconds>) and fails unless it exits with
-       code 0, its log is clean and it reports the version of project.godot. The smoke run gets its own APPDATA
+       code 0, its log is clean and it reports the version of project.godot. The script does not take the game's
+       word for a clean log: it reads the log's own lines and fails on every WARNING and ERROR line (none is
+       tolerated in a boot log), also one the game's counter did not see. The smoke run gets its own APPDATA
        under build\windows\smoke, so it never reads or writes the user data of a real installation. It also passes
        a development switch (--autoplay) and checks that the release build ignores it.
     6. reads the list of files packed inside the exe and lets tests\test_core_release_pack.gd judge it: no
@@ -27,6 +29,16 @@
     Every failure stops the script with a message and exit code 1. Godot runs take turns with .tools/gd.sh through
     the lock directory build\.godot_lock (the import and the export alone, the tests beside other runs), so the
     script can run while other tools use the project.
+
+    NO RUN OF THIS SCRIPT WRITES INTO THE PLAYER'S OWN FOLDER. The game's user:// is %APPDATA%\ClubAndGrub, where an
+    installed game keeps its saves and settings, and a Godot run of the project goes there by itself: a test run
+    rotates the engine's log into logs\ and writes whatever a test puts into user://, and the editor (import,
+    export) makes the folder and objectdb_snapshots\ in it when they are missing. So every Godot run of this script
+    gets APPDATA pointed at the build's own folder, build\run_users\build_windows_<PID>\appdata (removed when the
+    script ends), as the runs of .tools/gd.sh do. The export finds its templates there: the script copies the
+    Windows release template (and version.txt) from the real %APPDATA%\Godot\export_templates into that folder
+    first - about 110 MB, read only; the exe exported that way is byte for byte the one exported with the real
+    APPDATA (measured for 2.0.0).
 
 .PARAMETER Godot
     Godot 4.7.2 console binary. Default: $env:GODOT, else .tools\godot\Godot_v4.7.2-stable_win64_console.exe,
@@ -47,6 +59,11 @@
     <OutputRoot>\ClubAndGrub-<version>-windows.zip. Use another folder (for example build\trial) to try the script
     without replacing the release files in build\.
 
+.PARAMETER CheckBootLog
+    Build nothing: judge this boot log (the --log-file of a "-- --smoke=<seconds>" run) by the rules of step 5 -
+    no WARNING or ERROR line, and the line "Smoke: ran ... 0 error(s), 0 warning(s) logged" - print the lines that
+    fail it and exit with 0 (clean) or 1. tools\build_installer.ps1 judges the boot of its installed twin with it.
+
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File tools\build_windows.ps1
 #>
@@ -56,7 +73,8 @@ param(
     [ValidateRange(1, 120)][int]$SmokeSeconds = 4,
     [switch]$HeadlessSmoke,
     [switch]$SkipTests,
-    [string]$OutputRoot = ""
+    [string]$OutputRoot = "",
+    [string]$CheckBootLog = ""
 )
 
 Set-StrictMode -Version Latest
@@ -73,6 +91,57 @@ $LockStaleMinutes = 12
 # .tools/gd.sh does.
 $ReaderWaitMinutes = 3
 
+# The WARNING and ERROR lines a boot log may hold without failing the build: none. (The export of step 4 has such a
+# list, three editor shutdown lines; a line belongs here only with its reason, as there.)
+$BootLogTolerated = @()
+
+# Lines of Godot output that report a problem.
+function Get-ProblemLines([string]$Text, [switch]$IncludeWarnings) {
+    $pattern = if ($IncludeWarnings) { '(^|\s)(ERROR|SCRIPT ERROR|WARNING|USER ERROR|USER WARNING):' } `
+        else { '(^|\s)(ERROR|SCRIPT ERROR|USER ERROR):' }
+    return @($Text -split "`r?`n" | Where-Object { $_ -match $pattern })
+}
+
+# The WARNING and ERROR lines of a boot log that are not on $BootLogTolerated. The game's own count ("Smoke: ran ...
+# 0 error(s), 0 warning(s) logged") starts when its autoloads are made and ends with its verdict: what the engine
+# logs before the first script runs and while it shuts down is only here, in the lines.
+function Get-BootLogProblems([string]$LogText) {
+    $lines = @(Get-ProblemLines $LogText -IncludeWarnings)
+    foreach ($tolerated in $BootLogTolerated) {
+        $lines = @($lines | Where-Object { $_ -notmatch $tolerated })
+    }
+    return $lines
+}
+
+# Why a boot log is not the log of a clean boot ("" when it is): a problem line, or no clean verdict of the game.
+function Get-BootLogFailure([string]$LogText) {
+    $problems = @(Get-BootLogProblems $LogText)
+    if ($problems.Count -gt 0) {
+        return "the boot log holds $($problems.Count) WARNING / ERROR line(s)"
+    }
+    if ($LogText -notmatch 'Smoke: ran [0-9.]+ s, 0 error\(s\), 0 warning\(s\) logged') {
+        return "the smoke check did not report a clean run"
+    }
+    return ""
+}
+
+if ($CheckBootLog) {
+    if (-not (Test-Path -LiteralPath $CheckBootLog -PathType Leaf)) {
+        Write-Host "BOOT LOG FAILED: $CheckBootLog is missing" -ForegroundColor Red
+        exit 1
+    }
+    $checkedText = [IO.File]::ReadAllText((Resolve-Path -LiteralPath $CheckBootLog).Path)
+    $checkedFailure = Get-BootLogFailure $checkedText
+    if ($checkedFailure) {
+        @(Get-BootLogProblems $checkedText) | Select-Object -First 40 |
+            ForEach-Object { Write-Host "    $_" -ForegroundColor Red }
+        Write-Host "BOOT LOG FAILED: $checkedFailure; see $CheckBootLog" -ForegroundColor Red
+        exit 1
+    }
+    Write-Host "BOOT LOG OK: $CheckBootLog" -ForegroundColor Green
+    exit 0
+}
+
 $Root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $BuildDir = Join-Path $Root "build"
 if (-not $OutputRoot) { $OutputRoot = $BuildDir }
@@ -87,16 +156,32 @@ $LicenseDir = Join-Path $OutDir "licenses"
 $LockDir = Join-Path $BuildDir ".godot_lock"
 $ReadersDir = Join-Path $BuildDir ".godot_readers"
 $PresetsPath = Join-Path $Root "export_presets.cfg"
+# The folder of this build's own Godot runs (see the header): the test runs' saves and settings, and in appdata\ the
+# APPDATA every Godot run of the script gets instead of the player's.
+$RunUserName = "build_windows_$PID"
+$RunUserDir = Join-Path $BuildDir "run_users\$RunUserName"
+$RunAppData = Join-Path $RunUserDir "appdata"
 
 function Write-Step([string]$Text) {
     Write-Host ""
     Write-Host "==> $Text" -ForegroundColor Cyan
 }
 
+function Remove-RunUser {
+    Remove-Item -LiteralPath $RunUserDir -Recurse -Force -ErrorAction SilentlyContinue
+}
+
 function Stop-Build([string]$Text) {
+    Remove-RunUser
     Write-Host ""
     Write-Host "BUILD FAILED: $Text" -ForegroundColor Red
     exit 1
+}
+
+# An error nobody caught must not leave the build's folder (and the copied export template) behind.
+trap {
+    if (Test-Path -LiteralPath variable:RunUserDir) { Remove-RunUser }
+    break
 }
 
 # Quote one command-line argument the way the Windows C runtime parses it.
@@ -108,14 +193,25 @@ function ConvertTo-Argument([string]$Value) {
 }
 
 # Run a program with a time limit; stdout and stderr go to "<LogBase>.out.txt" / ".err.txt".
-# Returns @{ ExitCode; Output } where Output holds both streams.
-function Invoke-Program([string]$Program, [string[]]$Arguments, [string]$LogBase, [int]$TimeoutSeconds) {
+# Returns @{ ExitCode; Output } where Output holds both streams. With $AppData the program is started with APPDATA
+# pointed at that folder (made when missing): the engine and the game then keep their user data there.
+function Invoke-Program([string]$Program, [string[]]$Arguments, [string]$LogBase, [int]$TimeoutSeconds,
+        [string]$AppData = "") {
     $outFile = "$LogBase.out.txt"
     $errFile = "$LogBase.err.txt"
     $argLine = ($Arguments | ForEach-Object { ConvertTo-Argument $_ }) -join " "
     Write-Host "    $([IO.Path]::GetFileName($Program)) $argLine" -ForegroundColor DarkGray
-    $proc = Start-Process -FilePath $Program -ArgumentList $argLine -WorkingDirectory $Root -NoNewWindow -PassThru `
-        -RedirectStandardOutput $outFile -RedirectStandardError $errFile
+    $realAppData = $env:APPDATA
+    try {
+        if ($AppData) {
+            New-Item -ItemType Directory -Force -Path $AppData | Out-Null
+            $env:APPDATA = $AppData
+        }
+        $proc = Start-Process -FilePath $Program -ArgumentList $argLine -WorkingDirectory $Root -NoNewWindow -PassThru `
+            -RedirectStandardOutput $outFile -RedirectStandardError $errFile
+    } finally {
+        $env:APPDATA = $realAppData
+    }
     $null = $proc.Handle  # keeps the exit code readable after the process ended
     if (-not $proc.WaitForExit($TimeoutSeconds * 1000)) {
         & taskkill.exe /T /F /PID $proc.Id 2>&1 | Out-Null
@@ -129,13 +225,6 @@ function Invoke-Program([string]$Program, [string[]]$Arguments, [string]$LogBase
         }
     }
     return @{ ExitCode = $proc.ExitCode; Output = $text }
-}
-
-# Lines of Godot output that report a problem.
-function Get-ProblemLines([string]$Text, [switch]$IncludeWarnings) {
-    $pattern = if ($IncludeWarnings) { '(^|\s)(ERROR|SCRIPT ERROR|WARNING|USER ERROR|USER WARNING):' } `
-        else { '(^|\s)(ERROR|SCRIPT ERROR|USER ERROR):' }
-    return @($Text -split "`r?`n" | Where-Object { $_ -match $pattern })
 }
 
 function Enter-GodotLock {
@@ -175,7 +264,7 @@ function Invoke-Godot([string[]]$Arguments, [string]$LogName) {
             if ($recent.Count -eq 0) { break }
             Start-Sleep -Seconds 1
         }
-        return Invoke-Program $script:GodotExe $Arguments (Join-Path $LogDir $LogName) $RunTimeoutSeconds
+        return Invoke-Program $script:GodotExe $Arguments (Join-Path $LogDir $LogName) $RunTimeoutSeconds $RunAppData
     } finally {
         Exit-GodotLock
     }
@@ -192,21 +281,20 @@ function Invoke-GodotShared([string[]]$Arguments, [string]$LogName, [int]$Timeou
         Exit-GodotLock
     }
     try {
-        return Invoke-Program $script:GodotExe $Arguments (Join-Path $LogDir $LogName) $TimeoutSeconds
+        return Invoke-Program $script:GodotExe $Arguments (Join-Path $LogDir $LogName) $TimeoutSeconds $RunAppData
     } finally {
         Remove-Item -LiteralPath $marker -Force -ErrorAction SilentlyContinue
     }
 }
 
-# The test suite with its own user folder (saves and settings of the run), removed afterwards.
+# The test suite with its own user folder (saves and settings of the run; the engine's log and what a test writes
+# to user:// go to appdata\ inside it), removed afterwards.
 function Invoke-Tests([string[]]$TestArguments, [string]$LogName) {
-    $userName = "build_windows_$PID"
-    $userDir = Join-Path $BuildDir "run_users\$userName"
     try {
         return Invoke-GodotShared (@("--headless", "--path", $Root, "-s", "res://tests/run_tests.gd", "--",
-            "--user-dir=res://build/run_users/$userName") + $TestArguments) $LogName $TestTimeoutSeconds
+            "--user-dir=res://build/run_users/$RunUserName") + $TestArguments) $LogName $TestTimeoutSeconds
     } finally {
-        Remove-Item -LiteralPath $userDir -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-RunUser
     }
 }
 
@@ -222,7 +310,7 @@ if (-not $script:GodotExe) {
     $script:GodotExe = $onPath.Source
 }
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
-$versionRun = Invoke-Program $script:GodotExe @("--version") (Join-Path $LogDir "version") 60
+$versionRun = Invoke-Program $script:GodotExe @("--version") (Join-Path $LogDir "version") 60 $RunAppData
 $versionText = $versionRun.Output.Trim()
 if (-not $versionText.StartsWith("$GodotVersion.stable")) {
     Stop-Build "$($script:GodotExe) is version '$versionText', this project needs $GodotVersion.stable"
@@ -285,8 +373,21 @@ if (Test-Path -LiteralPath $OutDir) {
 if (Test-Path -LiteralPath $LicenseDir) {
     Remove-Item -LiteralPath $LicenseDir -Recurse -Force
 }
+# The export runs with the build's own APPDATA like every Godot run here (see the header), and the editor looks for
+# the export templates under APPDATA: the Windows release template is copied there first (read from the real folder).
+$ownTemplates = Join-Path $RunAppData "Godot\export_templates\$GodotVersion.stable"
+New-Item -ItemType Directory -Force -Path $ownTemplates | Out-Null
+foreach ($name in @("version.txt", "windows_release_x86_64.exe", "windows_release_x86_64_console.exe")) {
+    if (Test-Path -LiteralPath (Join-Path $templates $name) -PathType Leaf) {
+        Copy-Item -LiteralPath (Join-Path $templates $name) -Destination $ownTemplates
+    }
+}
 $presetsBefore = [IO.File]::ReadAllBytes($PresetsPath)
-$export = Invoke-Godot @("--headless", "--path", $Root, "--export-release", $PresetName, $ExePath) "export"
+try {
+    $export = Invoke-Godot @("--headless", "--path", $Root, "--export-release", $PresetName, $ExePath) "export"
+} finally {
+    Remove-RunUser
+}
 # The editor may write the preset file back (the export path of this run, options in its own order): the file in
 # the repository is the truth, so it is put back and the build stops.
 $presetsAfter = [IO.File]::ReadAllBytes($PresetsPath)
@@ -343,25 +444,18 @@ if ($HeadlessSmoke) {
 }
 # A development switch rides along: the release build must ignore it.
 $smokeArgs += @("--", "--smoke=$SmokeSeconds", "--autoplay=w1_l1")
-$realAppData = $env:APPDATA
-try {
-    $env:APPDATA = $smokeAppData
-    $smoke = Invoke-Program $ExePath $smokeArgs (Join-Path $SmokeDir "console") ($SmokeSeconds + 60)
-} finally {
-    $env:APPDATA = $realAppData
-}
+$smoke = Invoke-Program $ExePath $smokeArgs (Join-Path $SmokeDir "console") ($SmokeSeconds + 60) $smokeAppData
 if (-not (Test-Path -LiteralPath $smokeLog)) {
     Stop-Build "the exported game wrote no log (exit code $($smoke.ExitCode))"
 }
 $logText = [IO.File]::ReadAllText($smokeLog)
-$problems = @(Get-ProblemLines $logText -IncludeWarnings)
 $logText -split "`r?`n" | Where-Object { $_ -match '^(Smoke|Autoplay):' } | ForEach-Object { Write-Host "    $_" }
-if ($smoke.ExitCode -ne 0 -or $problems.Count -gt 0) {
-    $problems | Select-Object -First 40 | ForEach-Object { Write-Host "    $_" -ForegroundColor Red }
-    Stop-Build "the exported game did not boot cleanly (exit code $($smoke.ExitCode)); see $smokeLog"
-}
-if ($logText -notmatch 'Smoke: ran [0-9.]+ s, 0 error\(s\), 0 warning\(s\) logged') {
-    Stop-Build "the smoke check did not report a clean run; see $smokeLog"
+# Neither the exit code nor the game's own count is taken on trust: the log's lines are read (Get-BootLogFailure).
+$bootFailure = Get-BootLogFailure $logText
+if ($smoke.ExitCode -ne 0 -or $bootFailure) {
+    @(Get-BootLogProblems $logText) | Select-Object -First 40 | ForEach-Object { Write-Host "    $_" -ForegroundColor Red }
+    if (-not $bootFailure) { $bootFailure = "no WARNING or ERROR line in its log" }
+    Stop-Build "the exported game did not boot cleanly (exit code $($smoke.ExitCode); $bootFailure); see $smokeLog"
 }
 if ($logText -notmatch '\(release build\)') {
     Stop-Build "the exported game is not a release build; see $smokeLog"
@@ -470,6 +564,7 @@ Write-Host ("    {0} ({1:N1} MB)" -f $ZipPath, ((Get-Item -LiteralPath $ZipPath)
 
 $hash = (Get-FileHash -LiteralPath $ExePath -Algorithm SHA256).Hash
 $zipHash = (Get-FileHash -LiteralPath $ZipPath -Algorithm SHA256).Hash
+Remove-RunUser
 Write-Host ""
 Write-Host "BUILD OK: $ExePath" -ForegroundColor Green
 Write-Host "    SHA-256 $hash"

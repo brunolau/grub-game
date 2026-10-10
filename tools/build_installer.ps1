@@ -12,6 +12,9 @@
        running game or asks about saved games - installs THAT one silently for the current user into
        <output root>\installer_test\app, checks the files, the uninstall entry and the Start menu shortcut, runs the
        installed game's smoke check with its own APPDATA, uninstalls it silently and checks that nothing is left.
+       The boot of the installed game is judged like the one of tools\build_windows.ps1, by that script's own rule
+       (its -CheckBootLog): exit code 0, the game's clean verdict AND no WARNING or ERROR line in the log - the
+       game's count alone is not trusted.
 
     SAFE ON A MACHINE WHERE THE GAME IS INSTALLED. The test installer is another application for Windows, so step 4
     cannot upgrade, change or remove a real installation of Club & Grub, its Start menu entry, its desktop shortcut
@@ -41,6 +44,10 @@
 .PARAMETER TestInstall
     Install, smoke-check and uninstall a throwaway twin of the installer (step 4).
 
+.PARAMETER CheckBootLog
+    Build nothing: judge this boot log as step 4 judges the boot of the installed twin (tools\build_windows.ps1
+    -CheckBootLog: no WARNING or ERROR line, and the game's own clean verdict) and exit with 0 (clean) or 1.
+
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File tools\build_installer.ps1 -TestInstall
 #>
@@ -49,11 +56,26 @@ param(
     [string]$Iscc = "",
     [string]$OutputRoot = "",
     [switch]$SkipBuild,
-    [switch]$TestInstall
+    [switch]$TestInstall,
+    [string]$CheckBootLog = ""
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+
+# Judge a boot log by the rule of tools\build_windows.ps1 (one rule for both scripts): no WARNING or ERROR line that
+# is not on that script's tolerated list (it is empty), and the game's own "0 error(s), 0 warning(s)" verdict. The
+# lines that fail it are printed; $true when the log is the log of a clean boot.
+function Test-BootLog([string]$LogPath) {
+    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "build_windows.ps1") `
+        -CheckBootLog $LogPath | ForEach-Object { Write-Host "    $_" }
+    return $LASTEXITCODE -eq 0
+}
+
+if ($CheckBootLog) {
+    if (Test-BootLog $CheckBootLog) { exit 0 }
+    exit 1
+}
 
 $ExeName = "ClubAndGrub.exe"
 # The AppId of every released installer (installer\club_and_grub.iss). Step 4 only READS what belongs to it.
@@ -210,7 +232,7 @@ function Get-RealInstallState {
             }
         }
     }
-    foreach ($line in (Get-FileLines "saves" (Join-Path $env:APPDATA $UserDataName) -Hash -Include @("save*", "settings.cfg"))) {
+    foreach ($line in (Get-FileLines "saves" (Join-Path $env:APPDATA $UserDataName) -Hash -Include @("save*", "settings*"))) {
         $lines.Add($line)
     }
     return $lines
@@ -375,7 +397,9 @@ if ($TestInstall) {
         $game = [System.Diagnostics.Process]::Start($info)
         if (-not $game.WaitForExit(120000)) { $game.Kill(); throw "the installed game did not finish its smoke check" }
         $smokeText = Get-Content -LiteralPath $smokeLog -Raw
-        if ($game.ExitCode -ne 0 -or $smokeText -notmatch "Smoke: ran .* 0 error\(s\), 0 warning\(s\)") {
+        # Neither the exit code nor the game's own count is taken on trust: the log's lines are read as well.
+        $bootLogClean = Test-BootLog $smokeLog
+        if ($game.ExitCode -ne 0 -or -not $bootLogClean) {
             throw "the installed game's smoke check failed (exit $($game.ExitCode), log $smokeLog)"
         }
         if ($smokeText -notmatch [regex]::Escape("$RealName $Version (release build)")) {

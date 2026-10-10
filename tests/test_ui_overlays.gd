@@ -1151,6 +1151,112 @@ func _tag_y(arrows: HudEdgeArrows, slot: int) -> float:
 	return NAN
 
 
+func _tag_x(arrows: HudEdgeArrows, slot: int) -> float:
+	for tag: Dictionary in arrows.tags:
+		if int(tag["slot"]) == slot:
+			return (tag["pos"] as Vector2).x
+	return NAN
+
+
+## The cell a tag is drawn into (its tip is the bottom centre).
+static func _tag_cell(tip: Vector2) -> Rect2:
+	var cell: Vector2 = Vector2(HudEdgeArrows.TAG_CELL)
+	return Rect2(tip - Vector2(cell.x * 0.5, cell.y), cell)
+
+
+## The 2.0 release round's ruling F4 (found by the release verifier in co-op 2-2b's fight): two heroes in one column
+## wore their tags on one spot - "P1" and "P2" printed into each other ("P.21") for as long as they stood there. Tags
+## whose cells would overlap stand side by side now, the heroes' order from left to right, and two heroes on one spot
+## do not swap their tags with every pixel.
+func test_hud_tags_of_heroes_in_one_column_stand_side_by_side() -> void:
+	Game.start_run(Defs.Difficulty.BEGINNER, Defs.GameMode.COOP, 2)
+	var level: LevelBase = make_flat_level(80, 30, 20)
+	var p1: PlayerBase = PlayerBase.new()
+	place(level, p1, Vector2i(100, 160), {"slot": 0})
+	var p2: PlayerBase = PlayerBase.new()
+	place(level, p2, Vector2i(100, 160), {"slot": 1})
+	var hud: Hud = await _overlay(Flow.HUD_SCENE) as Hud
+	var arrows: HudEdgeArrows = hud.get_edge_arrows()
+	arrows.level_override = level
+	await get_tree().process_frame
+	arrows.show_tags(0.0)
+	arrows.update_markers()
+	var cell_w: float = float(HudEdgeArrows.TAG_CELL.x)
+	var column: float = p1.get_global_transform_with_canvas().origin.x
+	assert_eq(arrows.tags.size(), 2, "the set-up: two heroes on one spot wear their tags")
+	if arrows.tags.size() != 2:
+		return
+	assert_almost_eq(_tag_x(arrows, 1) - _tag_x(arrows, 0), cell_w, 0.5, "one cell apart, P1 left of P2 (they printed into each other)")
+	assert_almost_eq((_tag_x(arrows, 0) + _tag_x(arrows, 1)) * 0.5, column, 1.0, "around the column both stand in")
+	assert_false(_tag_cell(arrows.tags[0]["pos"]).intersects(_tag_cell(arrows.tags[1]["pos"])), "the two cells do not overlap")
+	assert_almost_eq(_tag_y(arrows, 0), _tag_y(arrows, 1), 0.5, "each at its own height: the same here")
+	# P2 a little to the left (6 screen px): the tags keep their sides - no swap with every pixel.
+	p2.teleport(p1.sim_pos + Vector2i(-3, 0))
+	await get_tree().process_frame
+	arrows.update_markers()
+	assert_true(_tag_x(arrows, 0) < _tag_x(arrows, 1), "6 px past each other: the tags stay as they stood")
+	assert_almost_eq(_tag_x(arrows, 1) - _tag_x(arrows, 0), cell_w, 0.5)
+	# P2 clearly left of P1 (20 px): his tag is the left one.
+	p2.teleport(p1.sim_pos + Vector2i(-10, 0))
+	await get_tree().process_frame
+	arrows.update_markers()
+	assert_true(_tag_x(arrows, 1) < _tag_x(arrows, 0), "20 px left of P1: P2's tag stands left")
+	assert_almost_eq(_tag_x(arrows, 0) - _tag_x(arrows, 1), cell_w, 0.5)
+	# Back to 6 px left, then 6 px right: still as they stood - until he is clearly on the other side.
+	for dx: int in [-3, 3]:
+		p2.teleport(p1.sim_pos + Vector2i(dx, 0))
+		await get_tree().process_frame
+		arrows.update_markers()
+		assert_true(_tag_x(arrows, 1) < _tag_x(arrows, 0), "%d px beside P1: P2's tag keeps its side" % (dx * Tuning.ART_SCALE))
+	p2.teleport(p1.sim_pos + Vector2i(10, 0))
+	await get_tree().process_frame
+	arrows.update_markers()
+	assert_true(_tag_x(arrows, 0) < _tag_x(arrows, 1), "20 px right of P1: P2's tag stands right")
+	# A cell apart or more: every tag over its own hero, nothing moved.
+	arrows.show_tags(HudEdgeArrows.TAG_SECONDS)
+	p2.teleport(p1.sim_pos + Vector2i(20, 0))
+	await get_tree().process_frame
+	arrows.update_markers()
+	assert_almost_eq(_tag_x(arrows, 0), p1.get_global_transform_with_canvas().origin.x, 0.5, "40 px apart: P1's tag over P1")
+	assert_almost_eq(_tag_x(arrows, 1), p2.get_global_transform_with_canvas().origin.x, 0.5, "and P2's over P2")
+
+
+## HudEdgeArrows.spread_tags on its own: tags at different heights (a food tower) are left alone, three or four tags
+## make one row, and a row that reaches a further tag takes it in.
+func test_hud_tag_rows() -> void:
+	var cell: Vector2 = Vector2(HudEdgeArrows.TAG_CELL)
+	var apart: Array[Dictionary] = [{"slot": 0, "pos": Vector2(100.0, 200.0)}, {"slot": 1, "pos": Vector2(100.0, 200.0 - cell.y)}]
+	assert_eq(HudEdgeArrows.spread_tags(apart), {}, "one tag a cell above the other (a tower): they do not overlap")
+	assert_eq(apart[0]["pos"], Vector2(100.0, 200.0))
+	assert_eq(apart[1]["pos"], Vector2(100.0, 200.0 - cell.y))
+	var one: Array[Dictionary] = [{"slot": 2, "pos": Vector2(50.0, 60.0)}]
+	assert_eq(HudEdgeArrows.spread_tags(one), {})
+	assert_eq(one[0]["pos"], Vector2(50.0, 60.0), "a single tag stays")
+	# Four heroes in one column (a versus pile-up), at slightly different heights.
+	var pile: Array[Dictionary] = []
+	for slot: int in 4:
+		pile.append({"slot": slot, "pos": Vector2(300.0 + float(slot), 150.0 - float(slot) * 5.0)})
+	var order: Dictionary = HudEdgeArrows.spread_tags(pile)
+	assert_eq(order.size(), 6, "every pair of the row is remembered")
+	for slot: int in 4:
+		assert_almost_eq((pile[slot]["pos"] as Vector2).x, 301.5 + (float(slot) - 1.5) * cell.x, 0.6, "P%d's place in the row" % (slot + 1))
+		assert_eq((pile[slot]["pos"] as Vector2).y, 150.0 - float(slot) * 5.0, "its own height")
+		for other: int in range(slot + 1, 4):
+			assert_false(_tag_cell(pile[slot]["pos"]).intersects(_tag_cell(pile[other]["pos"])), "P%d and P%d do not overlap" % [slot + 1, other + 1])
+	# A row that reaches a third tag: 100 and 120 make a row (84, 116 would do), which would print into the tag at 150.
+	var chain: Array[Dictionary] = [{"slot": 0, "pos": Vector2(100.0, 90.0)}, {"slot": 1, "pos": Vector2(120.0, 90.0)},
+			{"slot": 2, "pos": Vector2(155.0, 90.0)}]
+	HudEdgeArrows.spread_tags(chain)
+	assert_almost_eq((chain[1]["pos"] as Vector2).x - (chain[0]["pos"] as Vector2).x, cell.x, 0.5, "the row takes the third tag in")
+	assert_almost_eq((chain[2]["pos"] as Vector2).x - (chain[1]["pos"] as Vector2).x, cell.x, 0.5)
+	assert_almost_eq((chain[1]["pos"] as Vector2).x, 125.0, 0.5, "around the middle of the three heroes")
+	# The kept order: slot 1 stood left, and the heroes are on one spot.
+	var kept: Array[Dictionary] = [{"slot": 0, "pos": Vector2(200.0, 90.0)}, {"slot": 1, "pos": Vector2(202.0, 90.0)}]
+	var again: Dictionary = HudEdgeArrows.spread_tags(kept, {1: false})
+	assert_true((kept[1]["pos"] as Vector2).x < (kept[0]["pos"] as Vector2).x, "they keep the sides they had")
+	assert_eq(again, {1: false})
+
+
 ## Co-op with the Rival score option (DESIGN.md D.11): the score counter shows P1's own score in his colour, P2's panel
 ## his own under his hearts; off, the tribe score as in 1.0.
 func test_hud_rival_score_shows_each_players_own_score() -> void:

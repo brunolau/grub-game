@@ -362,6 +362,20 @@ shortened list is saved like a changed binding (1.0.0 ignores the key).
 `get_high_score`, `submit_score`, `is_game_completed`, `set_game_completed`, `add_code_stone`, `has_code_stone`,
 `add_stat`, `get_stat`, `set_storage_dir()`. There are no mid-level saves and no continues (GAMEPLAY.md 12.4).
 
+**A good backup is never thrown away for a bad file** (2.0.0, the release polish; `tests/test_core_save_damage.gd`).
+`Save.load_game()` writes nothing; a `save.json` or `save.json.bak` that is there and cannot be read (garbage, a
+cut-off write, an empty or zero-filled file, JSON that is no object) is named in a warning and remembered
+(`unreadable_files()`). The first `save_game()` after it writes the new file, reads it back byte for byte
+(`ERR_FILE_CORRUPT` and nothing touched when it differs), then sets the unreadable file aside as `save.bad.json`
+(`Save.bad_file_name(n)`: `save.bad.2.json` ... when that name holds other bytes; identical bytes are kept once)
+instead of rotating it into the backup's place - the readable `save.json.bak` stays until the save after that
+one. While the unreadable file cannot be set aside nothing is replaced (`ERR_FILE_CANT_WRITE`). `Settings` does
+the same with a `settings.cfg` it cannot parse or that holds no section: `load_settings()` uses the defaults and
+writes nothing (`has_unreadable_file()`), and the first `save()` keeps the file as `settings.bad.cfg`
+(`Settings.bad_file_name(n)`) before the new one takes its place. Two warnings are new in a log: "Save: ... is
+damaged (no text in its N byte(s))" for an empty, zero-filled or binary save file, which was skipped silently
+before, and "Settings: ... holds no settings, using defaults".
+
 2.0 Settings: per-slot binding profiles in `[bindings_p1]`..`[bindings_p4]` (same tokens and exchange rules as
 `[bindings]`; `SLOT_BINDINGS_SECTION`, `slot_bindings_section(slot)`), `get_slot_bindings(slot, action, device = -1,
 half = -1)`, `rebind_slot`, `set_slot_binding(slot, action, event, index = 0, half = -1) -> StringName`,
@@ -1769,7 +1783,15 @@ godot --path . -- --autoplay-scene=res://scenes/ui/title.tscn --inputs=60: --sho
 ```
 
 Boot check (works headless): `godot --headless --path . -- --smoke=3` runs the game normally for 3 seconds and
-exits with code 0 only when no error and no warning was logged.
+exits with code 0 only when no error and no warning was logged. **It counts from the start of the run** (2.0.0, the
+release polish; `tests/test_core_boot_check.gd`): the counter is attached in `Autoplay._init` - the engine makes
+every autoload before the first one is ready, so the last autoload's counter exists before `Settings` and `Save`
+load their files (attached in `_ready` it saw neither, and a boot on a damaged save reported 0 warnings) - and
+where the game finds its own log (the project's default `user://logs/godot.log`) it also reads it from the first
+line and takes the larger count (`Autoplay.count_log_problems`, `own_log_problems`). A run started with
+`--log-file` writes its log where the game cannot know: the line "Smoke: counted ..." says which of the two a run
+did, and whoever starts it that way reads the log's `WARNING` / `ERROR` lines too - `tools/build_windows.ps1`
+(step 5 and `-CheckBootLog <file>`) and `tools/build_installer.ps1` (its twin's boot) do.
 
 Release builds: every switch above is a development tool and works only in debug builds (editor binary, debug
 templates). A release export ignores all of them except `--smoke`, the boot check of the build scripts, which only
@@ -2283,5 +2305,16 @@ whoever ports the game.
   directly stay out of `%APPDATA%\ClubAndGrub`, where an installed game keeps its saves. Until then every such
   run rotated its log into that folder, the boot check (`gd.sh smoke`, a row of `tools/g3.sh`) loaded and saved the
   real `settings.cfg`, and `tests/test_core_bots.gd` and `tests/test_world_search.gd` left a temporary file there.
-  `tools/build_windows.ps1` isolates the exported exe's smoke run the same way; its own import, test and export
-  runs still write the engine's log file into that folder (open).
+  `tools/build_windows.ps1` isolates the exported exe's smoke run the same way.
+- 2.0 the release polish (after the release verifier; PLAN.md 7 "Release polish"): **no tool run writes into the
+  player's own folder** - every Godot run of `tools/build_windows.ps1` (the version check, the import, both test
+  runs, the export) gets its own `APPDATA` (`build/run_users/build_windows_<PID>/appdata`, with the three files
+  of the Windows release export template copied in from `%APPDATA%\Godot`, read only), and `.tools/gd.sh` gives
+  an import its own `APPDATA` as well (the automatic import in front of a command and `gd.sh import`; only `raw`
+  keeps the real one - it is Godot exactly as called). `Save` and `Settings` set an unreadable file aside (3.6);
+  the boot check counts from `Autoplay._init` and both build scripts read the log's lines (9.2); the versus HUD
+  says "TIME!" from the gong of a capped round to the scoreboard (`HudVersus.banner_reason`, `note_time` /
+  `time_called`; the referee's deferred `_call_time` is gone), a replay that plays while the Golden Drumstick
+  lies there keeps the replay's banner, overlapping player tags stand side by side
+  (`HudEdgeArrows.spread_tags`), the Book I card of Solo reads a 1.0 profile's high score
+  (`BookSelectScreen.legacy_score`), and the ward mark's ink lines are 3 px (`WardMark.EDGE_PX`).

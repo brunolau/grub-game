@@ -13,6 +13,10 @@ func after_each() -> void:
 		Input.action_release(action)
 	Settings.reset()
 	Save.report_damage = true
+	# What the save after a test's damaged files set aside (tests/test_core_save_damage.gd is the test of that).
+	for file: String in DirAccess.get_files_at(Save.storage_dir):
+		if file.begins_with("save.bad"):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(Save.storage_dir + file))
 
 
 func test_storage_is_redirected_for_tests() -> void:

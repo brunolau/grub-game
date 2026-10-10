@@ -1553,8 +1553,12 @@ Among the sides still standing the one with more heroes standing wins (2v2), the
 then the one with the **fewest hurts taken** this round (one per heart lost, a charged hit two; healing takes none
 back); sides still level share **a draw** - nobody scores the round. The mode shows no sundial until the cap is
 armed; from then the HUD's sundial counts its 60 s down (its number red from 10 s) and the round ends on the gong;
-the round banner then reads **"TIME!"** with the result as its second line ("P1 wins the round!", "Draw!"), in the
-alarm colour of "SUDDEN DEATH!" (built in phase 4: `VersusReferee.ended_by_cap`, the string `UI_VS_TIME`).
+the round banner then reads **"TIME!"**, a line of its own in the alarm colour of "SUDDEN DEATH!", over the result
+("P1 wins the round!", "Draw!"). The word stays until the scoreboard: over "The deciding moment" all through that
+round's replay, over the result again when the replay ends, and before the result line of the scoreboard (the
+versus HUD asks `VersusReferee.ended_by_cap` at the gong and notes the round on the match, `HudVersus.note_time` /
+`time_called`; the string `UI_VS_TIME`. As first built in phase 4 the referee called the banner deferred from the
+cap's tick, and the word was on no frame of the windowed game: the 2.0 release polish, PLAN.md 7).
 No round lasts for ever between two players who hide (rounds on Colossus Hall and Echo Hollow did, and on Totem
 Ring, where its stampede ran along the totem's top until the round's fix put it on the floor),
 and no match either: three drawn rounds in a row end the match on its standings - the most round wins, else a

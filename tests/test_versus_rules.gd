@@ -1243,8 +1243,10 @@ func test_only_the_gong_of_the_hard_cap_is_ended_by_cap() -> void:
 
 
 func test_time_banner_stands_over_the_result_when_the_cap_ends_a_round() -> void:
-	# The versus HUD's own round banner, with the real HUD in the tree: at the cap "TIME!" is the banner and the result
-	# line the HUD wrote at the gong - the winner, or its "Draw!" - stands under it; any other gong keeps its result.
+	# The versus HUD's own round banner, with the real HUD in the tree: at the cap's gong "TIME!" is the reason line over
+	# the result the HUD writes - the winner, or its "Draw!" - on the gong's own tick (the game replaces the level in
+	# that frame: nothing may wait for a deferred call); any other gong keeps its result alone. What the game does with
+	# the gong - Flow's hand-over to the deciding moment and the scoreboard - is tests/test_ui_versus_time.gd.
 	assert_true(FileAccess.get_file_as_string("res://locale/en.po").contains("msgid \"UI_VS_TIME\"\nmsgstr \"TIME!\""),
 			"the catalogue has the string")
 	_lcs_no_kill(2, [100, 125])
@@ -1265,19 +1267,23 @@ func test_time_banner_stands_over_the_result_when_the_cap_ends_a_round() -> void
 	assert_true(referee.ended_by_cap())
 	var p1_wins: String = HudVersus.result_text(PackedInt32Array([0]))
 	assert_eq(banner.banner_text, p1_wins, "the HUD's result line on the gong's tick")
-	await get_tree().process_frame
-	assert_eq(banner.banner_text, tr("UI_VS_TIME"), "then \"TIME!\" is the banner")
-	assert_eq(banner.banner_hint, p1_wins, "with the result under it")
+	assert_eq(banner.banner_reason, tr("UI_VS_TIME"), "and \"TIME!\" over it on the same tick")
+	assert_eq(banner.get_reason_text(), tr("UI_VS_TIME"), "... on the screen")
+	assert_eq(banner.banner_hint, "")
 	assert_true(banner.is_banner_visible())
-	# 2. Nobody hurt: "TIME!" over "Draw!".
+	var one_line: float = banner.get_banner_rect().size.y
+	await get_tree().process_frame
+	assert_eq(banner.get_reason_text(), tr("UI_VS_TIME"), "and it stays with the result")
+	assert_eq(banner.banner_text, p1_wins)
+	# 2. Nobody hurt: "TIME!" over "Draw!". (The new round began without it.)
 	_mode(Defs.VersusMode.LAST_CAVEMAN)
+	assert_eq(banner.banner_reason, "", "a new round has no reason yet")
 	_to_sudden_death()
 	referee.round_ticks = referee.cap_at - 1
 	Sim.step(1)
 	assert_eq(referee.winner_slots, PackedInt32Array(), "a draw")
-	await get_tree().process_frame
-	assert_eq(banner.banner_text, tr("UI_VS_TIME"))
-	assert_eq(banner.banner_hint, tr("UI_VS_DRAW"))
+	assert_eq(banner.get_reason_text(), tr("UI_VS_TIME"))
+	assert_eq(banner.banner_text, tr("UI_VS_DRAW"))
 	# 3. A round that the last one standing ends says who won, as ever - also late in the sudden death.
 	_mode(Defs.VersusMode.LAST_CAVEMAN)
 	_to_sudden_death()
@@ -1286,7 +1292,9 @@ func test_time_banner_stands_over_the_result_when_the_cap_ends_a_round() -> void
 	assert_eq(referee.phase, VersusReferee.PHASE_OVER)
 	await get_tree().process_frame
 	assert_eq(banner.banner_text, p1_wins, "no \"TIME!\" without the cap")
+	assert_eq(banner.get_reason_text(), "")
 	assert_eq(banner.banner_hint, "")
+	assert_true(banner.get_banner_rect().size.y < one_line, "the plate is one line lower without the reason line")
 
 
 ## Every arena file that lists Last Caveman Standing (the shipped ones and the developer arena), real heroes, the

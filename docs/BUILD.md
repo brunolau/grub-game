@@ -4,7 +4,9 @@ Exact steps to produce the release builds. All commands run from the project roo
 4.7.2 console binary. The engine is not part of the repository: download it (section 1) and unpack it to
 `.tools/godot/` (`Godot_v4.7.2-stable_win64_console.exe` on Windows), or point the `GODOT` environment variable at
 it. Inside this repository prefer `bash .tools/gd.sh raw <arguments>`, which waits until no other Godot uses the
-project; `gd.sh` says how to install the engine when it cannot find it.
+project; `gd.sh` says how to install the engine when it cannot find it. (`raw` is Godot exactly as called and keeps
+the real `APPDATA`, so a raw run of the project writes into `%APPDATA%\ClubAndGrub`, the folder of an installed
+game; the `test`, `smoke`, `play`, `script` and `import` commands of `gd.sh` get a folder of their own.)
 
 ## 1. Prerequisites (every platform)
 
@@ -25,7 +27,7 @@ project; `gd.sh` says how to install the engine when it cannot find it.
    ```
 
    Godot exits with code 0 even when an export logs errors, so always read the log: a release log has no
-   `ERROR:` and no `WARNING:` line (the Windows script below checks this for you), apart from the two "at exit"
+   `ERROR:` and no `WARNING:` line (the Windows script below checks this for you), apart from the three "at exit"
    shutdown lines of the first export of a fresh checkout (3.1, step 4).
 
 ## 2. The presets (`export_presets.cfg`)
@@ -135,7 +137,9 @@ The script
    editor shutdown report" (the third line was added at the 2.0.0 release check: a clean copy of the repository
    stopped on it at its first build and passed at its second);
 5. starts the exe for a smoke check (below) and stops unless it exits with code 0, its log is clean and it reports
-   the version of `project.godot`;
+   the version of `project.godot`. "Clean" is read from the log itself, not taken from the game: the script stops on
+   every `WARNING:` and `ERROR:` line of the boot log (none is tolerated: `$BootLogTolerated` is empty), also one
+   the game's own count did not see, and on a log without the game's `0 error(s), 0 warning(s)` verdict;
 6. reads the file table of the pack inside the exe and lets `tests/test_core_release_pack.gd` judge it (section 2):
    no developer level, test, tool or recorder, every asset in the manifest, exactly the files the filters ship.
    The script prints the test's `pack:` line, for example
@@ -151,11 +155,28 @@ The script
 Options: `-Godot <path>` (else `$env:GODOT`, else `.tools\godot\...`, else `godot` on the PATH), `-SmokeSeconds <n>`
 (default 4), `-HeadlessSmoke` (build machines without a GPU), `-SkipTests` (packaging experiments only - never
 ship such a build), `-OutputRoot <folder>` (default `build`: the exe goes to `<folder>\windows`, the zip to
-`<folder>`; use another folder, for example `build\trial`, to try the script without replacing the release files).
+`<folder>`; use another folder, for example `build\trial`, to try the script without replacing the release files),
+`-CheckBootLog <file>` (builds nothing: judges an existing boot log by the rule of step 5, prints the lines that
+fail it and `BOOT LOG OK` / `BOOT LOG FAILED`, exit code 0 / 1).
 Logs: `build\windows\logs\` (import, audit, tests, export, pack check) and `build\windows\smoke\smoke.log`.
 
 The script shares the project with other Godot runs through `build\.godot_lock`, as `.tools/gd.sh` does: the
 import and the export run alone, the tests run beside other test runs.
+
+**No run of the script writes into the player's own folder.** The game's `user://` is `%APPDATA%\ClubAndGrub`, where
+an installed game keeps its saves and settings, and a Godot run of the project goes there by itself: a test run
+rotates the engine's log into `logs\` and writes what a test puts into `user://`, and the editor (import, export)
+makes the folder and `objectdb_snapshots\` in it when they are missing. So every Godot run of the script - the
+version check, the import, both test runs and the export - is started with `APPDATA` pointed at the build's own
+folder `build\run_users\build_windows_<PID>\appdata` (removed when the script ends, also when it fails), like the
+runs of `.tools/gd.sh`; the exported game's smoke check has its own (3.2). The editor looks for the export
+templates under `APPDATA`, so before the export the script copies `windows_release_x86_64.exe` (with its console
+twin and `version.txt`) from the real `%APPDATA%\Godot\export_templates\4.7.2.stable\` into that folder - about
+110 MB, read only. Measured for 2.0.0: an export made that way, with fresh editor settings and nothing but those
+three files, is byte for byte the exe exported with the real `APPDATA`; and the files of the real
+`%APPDATA%\ClubAndGrub` have the same times and sizes before and after a whole run of the script.
+`tests/test_core_boot_check.gd` keeps the rule in the script (every start of the Godot binary carries the build's
+`APPDATA`).
 
 ### 3.2 The smoke check of a release build
 
@@ -174,8 +195,23 @@ finds inside the package. The log ends with lines such as
 Smoke: Club & Grub 2.0.0 (release build), 78 level(s), screen 'title'
 Smoke: levels arena_cinder_pit,arena_coconut_cove,...,bonus_a,bonus_a_coop,...,w9_l3,w9_l3_coop
 Smoke: campaign beginner w1_l1,w1_l2,w2_l1,w2_l2,w3_l1,w3_l2; expert w1_l1,w1_l2,w2_l1,w2_l2,w3_l1,w3_l2,w4_l1,w4_l2
+Smoke: counted since the autoloads were made, before Settings and Save loaded (no log file of this run at the project's log path: read the log's lines too)
 Smoke: ran 3.0 s, 0 error(s), 0 warning(s) logged
 ```
+
+**What the boot check counts.** Its counter is attached when the engine makes the game's autoloads - before the
+first of them is ready, so before `Settings` reads `settings.cfg` and `Save` reads `save.json`: a damaged save or
+an unreadable settings file is a counted warning and the exit code is 1 (until the 2.0.0 release round the counter
+was attached after both had loaded, and such a boot ended `0 error(s), 0 warning(s)` with exit code 0). What the
+engine logs before any script runs is read from the engine's own log, from its first line, when the game can find
+that log: the project's default `user://logs/godot.log` - the line then reads `Smoke: counted from the first line
+of the engine's log (...)` and the game takes the larger of the two counts. A run started with `--log-file`, as
+above, writes its log where the game cannot know, and nothing in the game sees what the engine logs after the
+verdict, while it shuts down. So **whoever trusts a boot check also reads the lines of its log**: both build
+scripts do (`tools\build_windows.ps1` step 5 and the installer's twin, by one rule;
+`tools\build_windows.ps1 -CheckBootLog <file>` applies it to any log). `tests/test_core_boot_check.gd` boots the
+project on an empty folder, on a cut-off `save.json` and on an unreadable `settings.cfg` beside it, and runs both
+scripts on the logs of `tests/data/boot_logs/`.
 
 The script runs the exe with `APPDATA` pointed at `build\windows\smoke\appdata`, so the check never reads or writes
 the settings and saves of a real installation, and it adds `--autoplay=w1_l1`, which the log must report as
@@ -236,7 +272,9 @@ another application for Windows - its own AppId, the name "Club & Grub installer
 group and uninstall entry, no desktop shortcut, no "close the running game", and none of the code that offers to
 delete saved games. The twin is installed silently for the current user into `<folder>\installer_test\app`, its
 files, uninstall entry and Start menu shortcut are checked, the installed game runs its smoke check with its own
-`APPDATA` and must report the version, then the twin is uninstalled through its own uninstaller and the script
+`APPDATA` and must report the version - its boot log is judged by the rule of the Windows script (exit code 0, no
+`WARNING:` or `ERROR:` line, the game's clean verdict; `tools\build_installer.ps1 -CheckBootLog <file>` applies it
+to any log) - then the twin is uninstalled through its own uninstaller and the script
 checks that no file, no uninstall entry and no Start menu folder of it is left. A failed check still uninstalls
 the twin; a run that was killed leaves a record (`installer_test\test_install.json`) and the next run removes that
 twin first. The file `...-setup-TEST-ONLY.exe` is deleted after a good run; never publish one.
@@ -273,11 +311,25 @@ reads the 1.0 save (section 3.5).
 - Going back: 1.0.0 does not read a version 2 save (it warns and shows no progress). If it is played anyway it
   writes a version 1 file that still carries the 2.0 data; 2.0 merges both when it reads that file. To restore the
   old state exactly, put `save.v1.json` back as `save.json`.
+- A file that cannot be read is kept, and a good backup is never thrown away for it. A `save.json` (or
+  `save.json.bak`) that is there and holds no save - garbage, a write that was cut off, an empty or zero-filled
+  file, JSON that is no object - is named in a warning; the game plays on with `save.json.bak`, and reading still
+  writes nothing. The first save after it writes the new file and reads it back, then sets the unreadable file
+  aside, byte for byte, as `save.bad.json` (`save.bad.2.json` ... when that name holds other bytes) instead of
+  making it the backup: the readable `save.json.bak` stays where it is until the save after that one. Beside a 1.0
+  backup the copy `save.v1.json` is still made first. An unreadable `settings.cfg` (a parse error, or bytes without
+  any section) is set aside the same way as `settings.bad.cfg` before the defaults replace it. While a file cannot
+  be set aside nothing is written over it. The game never reads the `.bad` files again; they are for a person to
+  look at, and may be deleted.
 - Proof: `bash .tools/gd.sh test core_save` - `tests/test_core_save_1_0.gd` loads real profiles written by the
   1.0.0 release (`tests/data/saves_1_0/`: a fresh one, mid Book I on both difficulties with a level code, changed
   options and rebound keys, a finished game, and a 2.0 profile that 1.0.0 then played) and checks every unlocked
   stage, result, completion flag, code stone, high score, option and binding, the 20 level codes, and that no 2.0
-  save is written before the copy exists.
+  save is written before the copy exists; `tests/test_core_save_damage.gd` puts five kinds of an unreadable
+  `save.json` (garbage, half-written, empty, the wrong JSON type, zero-filled) beside a good backup - a 2.0 one and
+  the `save.json.bak` of three of those 1.0 profiles - and checks after the first save that nothing of the backup is
+  missing from the new file and that the backup, the copy `save.v1.json` and the file set aside are all there, byte
+  for byte; the same for four kinds of an unreadable `settings.cfg`.
 
 ### 3.6 Two players on one PC (what a tester needs to know)
 
