@@ -184,5 +184,5 @@ An OpenGL 3.3 graphics driver is needed. The files are not code-signed, so Smart
 >
 > SHA-256 (the second build of 2026-10-10, after the release polish; if the files are built again before
 > publishing, take the values of that build's log instead):
-> `ClubAndGrub-2.0.0-setup.exe` `@@SETUP_SHA@@`
-> `ClubAndGrub-2.0.0-windows.zip` `@@ZIP_SHA@@`
+> `ClubAndGrub-2.0.0-setup.exe` `ca415db076769d082f4b74a4d21f715fa8eb7469b077a4aa5e2600225062dbc4`
+> `ClubAndGrub-2.0.0-windows.zip` `10c70ef7041684fc984d5314b60fc19e050afc58e7e8dc7901385644313f987e`

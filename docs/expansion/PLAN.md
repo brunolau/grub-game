@@ -662,8 +662,9 @@ with the soak (made on the same scripts at 23:38 - 23:50, before the call), the 
   anomaly lines and the second with three).
 - **The asset audit**: `python tools/audit_assets.py` - ASSET AUDIT: PASS (0 gaps), 869 files; its 67 tests green.
 
-**The 2.0.0 build** (`tools\build_windows.ps1`, then `tools\build_installer.ps1 -SkipBuild -TestInstall`; 2026-10-10
-01:58 - 02:03, on the tree of commit ab50b07, the tree of the table above):
+**The first 2.0.0 build** (`tools\build_windows.ps1`, then `tools\build_installer.ps1 -SkipBuild -TestInstall`;
+2026-10-10 01:58 - 02:03, on the tree of commit ab50b07, the tree of the table above; SUPERSEDED by the build of
+the release polish below - its three files were replaced and their SHA-256 values name nothing that ships):
 the import clean; the asset audit PASS; the suite inside the script 1 798 / 1 798 in 172 s; the release exe `Club & Grub 2.0.0.0`
 exported and booted off-screen and muted (0 errors, 0 warnings, 78 levels, no developer level, development switches
 ignored); 2 591 files inside the exe, 1 368 of them project files, no development file; the zip holds the exe and the
@@ -678,8 +679,203 @@ after. SHA-256:
 - `build\ClubAndGrub-2.0.0-setup.exe` (104 627 713 bytes) `238ad100a7632cf843ed06d7ffee274c70c7b3912093defc4a28913bf9f68926`
 The player's preview folder `Desktop\pre2_preview` holds that build at its top level (the exe, `licenses\`, the
 setup, the zip, a `Play.cmd` that keeps its saves in `appdata\` beside it, `READ ME.txt`); the 1.0.0 files that lay
-there were moved into `1.0.0\`; `2.0-slice\` and `2.0-g3\` are as they were. **Nothing was committed, tagged,
-pushed or published by an agent** (G89): the release text is the end of `docs/RELEASE_NOTES_2.0.md`.
+there were moved into `1.0.0\`; `2.0-slice\` and `2.0-g3\` are as they were. **No tag and no release of 2.0
+exist; the source is public.** By the owner's standing instruction the work in progress is committed and pushed
+to the main branch of the public repository github.com/brunolau/grub-game as it is made - every WIP state of
+phase 4 within a second of its commit (the release verifier read it from the reflog), so the 2.0 source has been
+public on main since G3. What no agent did (G89) is tag, publish or upload: `v1.0.0` is the only tag and "Club &
+Grub 1.0.0" the only release (`git ls-remote --tags origin`, `gh release list`, read again on 2026-10-10 after
+the second build). The WIP commits and their pushes are the orchestrator's; the integrator of the release polish
+ran no git write command. The release itself is the owner's decision; its text is the end of
+`docs/RELEASE_NOTES_2.0.md`.
+
+**Release polish (2026-10-10; the second release round: the release verifier, two fixers - presentation and core -
+and the release integrator again)**. The release verifier read the build of 02:03 on the tree of dac9d7e
+(`build/engine_requests/wf12_p4_verify_to_orchestrator.txt`; his scratch is `build/p4_verify/`) and judged it release
+ready with issues: no crash, no lost save, no licence gap, no red proof, an installer test mode that harms nothing.
+His own four edits needed no rebuild and are in dac9d7e - the third tolerated shutdown line of a fresh checkout's
+first export, the audit's comparison with the tag only at the top of its own repository (a 68th test), BUILD.md -
+and the stray `grep.exe.stackdump` left the repository with 967ee90. What he found in SHIPPED scripts the
+orchestrator ruled on as F1-F5; this round fixed what was named and nothing else, built 2.0.0 again and proved it
+again.
+- **F1 - "TIME!" is seen.** In the windowed game he had found the word on 0 of 150 frames from the cap to the
+  scoreboard with the deciding moment on, on 0 of 110 with it off, and on 0 of 1 700 samples of a Golden Drumstick
+  nobody takes. The cause: the referee called the HUD's banner deferred from the cap's tick, when `Flow.end_round`
+  already had the round - with instant transitions the level and its HUD were gone in that frame, with real ones the
+  word stood only under the closing curtain; the deciding moment loads the arena again with a new HUD and the
+  scoreboard is another scene, and neither was ever told. Now the versus HUD asks `VersusReferee.ended_by_cap()` at
+  the gong, writes "TIME!" as a red line of its own over the result and notes the round on the match
+  (`HudVersus.note_time` / `time_called`); the replay's HUD and the scoreboard ask. The word stands over the result
+  at the gong, over "The deciding moment / Jump or Strike skips" all through the replay, over the result again
+  while the iris closes, and before the result line of the scoreboard ("TIME!  DRAW!"). The referee's deferred call
+  is gone; no rule line changed. `tests/test_ui_versus_time.gd` (5 tests) starts every match through
+  `Flow.start_versus` and lets Flow hand the round over at the gong. The fixer's windowed flows - two humans who
+  never press a key, through the lobby, the rules and the arena screen, every frame from the gong to the end of
+  the scoreboard logged (`build/wf13_presentation/flows/*.frames.txt`): Last Caveman Standing on Colossus Hall 161
+  of 163 frames with the replay and 105 of 105 without, the Golden Drumstick on Floe Rink 161 of 163 (`--fast`);
+  233 of 236, 141 of 142 and 231 of 234 with the game's real transitions; 358 of 360 in real time. Every frame
+  without the word is wholly covered by the curtain while a scene loads. The integrator played the
+  last one again on the final tree, in real time with real transitions and beside the table's other jobs: 334
+  of 336 frames, the 2 without the word wholly covered by the curtain (`build/p4b_integrate/
+  time_lcs_replay_realtime.frames.txt`), and looked at the pictures - "TIME! / DRAW!" at the gong, "TIME! / THE
+  DECIDING MOMENT / JUMP OR STRIKE SKIPS" in the replay, "TIME! DRAW!" under "ROUND 1" on the scoreboard
+  (`build/screenshots/p4b_time_lcs_replay_realtime/`).
+- **F2 - a good backup is never thrown away for a bad file.** He had found that the first save after an unreadable
+  `save.json` removed the good `save.json.bak` and made the unreadable file the backup (5 of 5 prepared folders;
+  nothing was lost at that moment, but no good older copy was left). Now `Save.load_game` names every unreadable
+  `save.json` / `save.json.bak` in a warning and still writes nothing; the first `save_game` writes the new file,
+  reads it back byte for byte, then sets the unreadable file aside as `save.bad.json` (`save.bad.2.json` ... when
+  that name holds other bytes; identical bytes are kept once), and the readable backup stays until the save after
+  that one. Beside a 1.0 backup `save.v1.json` is still made first, byte-identical. `Settings` keeps an unreadable
+  `settings.cfg` (a parse error, or bytes without any section) as `settings.bad.cfg` before the defaults replace
+  it. While a file cannot be set aside nothing is written over it. `tests/test_core_save_damage.gd`, 11 tests: five
+  kinds of an unreadable `save.json` beside a good 2.0 backup and beside the backups of three real 1.0 profiles,
+  four kinds of an unreadable `settings.cfg`.
+- **F3 - the boot check sees the boot.** The counter of `--smoke` was attached in `Autoplay._ready`, after
+  `Settings` and `Save` had loaded: the installed exe on a damaged save printed "0 error(s), 0 warning(s)" and left
+  with code 0 (6 of 6 such boots). It is attached in `Autoplay._init` now - the engine makes every autoload before
+  the first one is ready - and where the game can find its own log (the default `user://logs/godot.log`) it reads
+  it from the first line and takes the larger count; with `--log-file` it cannot know the path and says so in a new
+  "Smoke: counted ..." line. Both build scripts judge a boot log by one rule - exit code 0, the game's clean
+  verdict AND no `WARNING` / `ERROR` line in the log (`tools\build_windows.ps1 -CheckBootLog <file>`; the installer's
+  twin calls it). `tests/test_core_boot_check.gd`, 5 tests: the project booted on an empty folder, on a cut-off
+  `save.json` and on an unreadable `settings.cfg`, and both scripts on the five logs of `tests/data/boot_logs/`.
+- **F4 - small things a player meets.** The Book I card of Solo shows a 1.0 profile's high score (it read
+  0000000 beside the title's "HI 3069500"; `BookSelectScreen.legacy_score`, `tests/test_ui_book_score.gd`, 4
+  tests). The "P1" / "P2" tags of two heroes in one column stand side by side, the heroes' order from left to right
+  (`HudEdgeArrows.spread_tags`; they printed into one "P.21" for hundreds of ticks of co-op 2-2b's fight). The ward
+  mark's ink lines are 3 px along a row instead of 2 (`WardMark.EDGE_PX`: as heavy as the sheets' own outlines;
+  the census made again - 55 sheets, 25.0-39.4 % of the body painted where it was 21.4-32.2, the verdicts
+  unchanged because they are measured on the chalk); presentation only - no route replays differently
+  (`sp_identity`, the route modules and the gate rows below). A replay that plays while a Golden Drumstick lies in
+  the arena reads "The deciding moment / Jump or Strike skips" as every replay does.
+- **F5 - no tool run writes into the player's own folder.** Every Godot run of `tools\build_windows.ps1` - the
+  version check, the import, both test runs, the export - gets `APPDATA` pointed at
+  `build\run_users\build_windows_<PID>\appdata`; the export finds its templates there because the script copies the
+  three files of the Windows release template in from `%APPDATA%\Godot` (read only). Core's trial run: the 51
+  entries of the real folder had the same names, sizes and times before and after, and an export made that way is
+  byte for byte the exe of the first build. The integrator closed what core found on the way and could not change:
+  `.tools/gd.sh` gave an import the real `APPDATA` (the editor makes and removes an entry in the folder on every
+  run: no file is left, the folder's write time moves) - the automatic import in front of a command and
+  `gd.sh import` now get the run's own folder as every other command does; only `raw` keeps the real one, and its
+  header and BUILD.md say that it writes there. Measured without reading anything inside the player's folder:
+  the write time of the entry `%APPDATA%\ClubAndGrub` itself, 04:03:09 when core read it at 04:03:49, was
+  04:03:09.304 at 04:41 (after the first suite run of this round and the start of the gate job), at 05:51
+  (after every proof below and one `gd.sh import`) and at 05:58 (after the build and the installer's test;
+  `build/p4b_integrate/real_folder_times.txt`) - until this round every import moved it. The installer's own
+  before / after record of a real installation (`-TestInstall`) hashes `save*` and `settings*` there, read
+  only: 12 facts, the same after the test.
+- **The integrator's own, beside the records**: one string literal of `scripts/core/autoplay.gd` that held a raw
+  line break is written as `"\n"`, and `scripts/core/settings.gd` is back to the LF line endings the repository
+  stores (the working copy had CRLF: the exe would have packed other bytes than a fresh checkout's). No other
+  script line was touched by the integrator.
+
+**The proofs of the release polish on the final tree** (2026-10-10 04:35 - 05:51; logs under
+`build/p4b_integrate/`, the table `build/g3/run_p4b/g3_table.txt`). **The whole table of `tools/g3.sh --require` was
+not repeated**: the windowed runs of `campaign`, `campaign_beginner`, `campaign_b2` and of Book II of
+`campaign_coop` were left out by the orchestrator's instruction (their headless twins ran; the table therefore
+ends "NOT YET - every proof that ran is green; open: not run: wflow_campaign ..."). Every other row was made again:
+- **The gate job, alone** (`bash tools/world_coop_gates.sh`, 04:35 - 05:22, 2 804 s; `save.gd`, `settings.gd`,
+  `autoplay.gd` and `ward_mark.gd` are in its fingerprint, so its plan read "76 of 76 searches, 152 of 152 passes,
+  38 of 38 replays to do"): **76 of 76 gate rows GREEN by the three proofs** - (a) 53 refused (exhaustive), 23
+  refused (bounded with every probe), none open; (b) 0 of 38 evidence routes reach their far cell; (c) 152 explorer
+  passes of 300 s, none reached, 193.2 million ticks, 0.82 to 1.90 million a pass, median 1.24 (198.5 million in the
+  first table: one Godot process of another project of this desktop ran beside the job the whole time). The table
+  then read the kept results back: 0 of 76 / 152 / 38 to do, the test green.
+- `tools/sp_identity.sh`: **IDENTICAL**. `test_campaign_routes` 18 / 18 (the 72 route files of 1.0),
+  `test_book2_routes` 8 / 8, `test_coop_routes` 10 / 10 (851 s beside the other jobs).
+- The default suite **1 825 / 1 825** (27 tests more than the first table: the four new test files and the two
+  new overlay tests; 192 s alone inside the build, 294 s on its own clock beside the table's other jobs), the
+  slow tests 17 / 17, `test_core_bots` 61 / 61, `test_integration_totem_ring` 1 / 1, `test_levels_w4` 3 / 3, the
+  inventory 7 / 7 with every content row complete, the co-op bosses 8 / 8.
+- The bot sets 56 / 56 in 8 shards (`bash tools/g3_versus_bots.sh 8`). **Both soak commands PASS** with the
+  numbers of the first table (no file of theirs changed): `bash tools/bots/soak.sh p4b 1000 16` - 4 020 rounds,
+  5 530 005 ticks, no anomaly, no engine error; `bash tools/bots/soak.sh p4bmix 250 16 rules=mix` - 1 014 rounds,
+  1 555 998 ticks (the tags only name the logs).
+- `tools/validate_levels.gd -- --strict`: 120 files, 0 errors, 0 warnings. `python tools/audit_assets.py`: ASSET
+  AUDIT: PASS (0 gaps), 869 files; its 68 tests green with the project's Python (`.tools/venv`; the system Python
+  skips the 4 audio tests for want of the audio libraries). `docs/spec/test_spec_docs.py` 120 / 120 with the
+  records of this round. The headless boot check: 0 errors, 0 warnings, "counted from the first line of the
+  engine's log".
+- The flows, headless, each with a clean exit: `campaign` 116 checks, `campaign_beginner` 14, `campaign_b2` 157,
+  `campaign_coop` 367, `g3_versus` 108, `harness_exit` 6. **Windowed** (off-screen, muted): `g3_versus` 108 checks
+  (1 096 s) and Co-op Book I of `campaign_coop`, both difficulties (its lines 1-687 as a scratch flow):
+  162 checks, 0 failures, a clean exit (1 703 s).
+
+**The 2.0.0 build, made again** (`tools\build_windows.ps1`, then `tools\build_installer.ps1 -SkipBuild -TestInstall`;
+2026-10-10 05:51 - 05:57, **on the tree of commit 77a6473** - the orchestrator's WIP commit of 04:47, which took
+every script change of this round; the scripts were last changed at 04:35, before the gate job started, and the
+working tree was clean (`git status`) while the proofs and the build ran): the import clean; the asset audit
+PASS; the suite inside the script 1 825 / 1 825 in 192 s; the release exe `Club & Grub 2.0.0.0` exported and
+booted off-screen and muted (0 errors and 0 warnings by the game's count and no WARNING or ERROR line in its log,
+78 levels, no developer level, development switches ignored); 2 591 files inside the exe, 1 368 of them project
+files, no development file; the zip holds the exe and the 50 licence files (`tools/audit_assets.py --shipped`).
+The installer was compiled and its throwaway twin (its own AppId) installed for the current user, booted
+(`Club & Grub 2.0.0 (release build)`, BOOT LOG OK: the rule that reads the log's lines ran inside the twin's check
+for the first time) and uninstalled with nothing left; the game itself is not installed on this machine, and the
+script's 12 recorded facts about a real installation were the same before and after. **F2 and F3 in the shipped
+exe** (`build/p4b_integrate/f23_exe/`; its own `APPDATA`, muted, off-screen): on a folder with a cut-off
+`save.json` beside a good 1.0 backup and an unreadable `settings.cfg` it leaves with code 1 and "0 error(s), 2
+warning(s) logged" (the first build said 0 and left with code 0), both scripts' rule says BOOT LOG FAILED, the two
+save files are byte for byte what they were (loading writes nothing) and `settings.bad.cfg` holds the bytes of
+the unreadable file; on an empty folder it leaves with code 0 and BOOT LOG OK. (Commit 77a6473 itself
+carries the records as they stood at 04:47, in the middle of the round: no "Release polish" record in this file
+and two unfilled hash placeholders in the release text of `docs/RELEASE_NOTES_2.0.md`. The records of this
+round are not in the exe - `docs/`, `CHANGELOG.md` and `README.md` are in no export - and go into the next
+commit.)
+SHA-256:
+- `build\windows\ClubAndGrub.exe` (192 132 176 bytes) `f8ec99d6554a7c5391307e52e9209f06c86fb980d9986e00af4330b03ce0a478`
+- `build\ClubAndGrub-2.0.0-windows.zip` (116 594 363 bytes) `10c70ef7041684fc984d5314b60fc19e050afc58e7e8dc7901385644313f987e`
+- `build\ClubAndGrub-2.0.0-setup.exe` (104 630 804 bytes) `ca415db076769d082f4b74a4d21f715fa8eb7469b077a4aa5e2600225062dbc4`
+
+The preview folder `Desktop\pre2_preview` holds this build at its top level: `ClubAndGrub.exe`, `licenses\`, the
+zip and the setup were replaced (the files of the first build lie in `build\p4b_integrate\first_build\`), the
+three SHA-256 values, the build line and the sentence about publishing of `READ ME.txt` corrected; `Play.cmd`,
+`1.0.0\`, `2.0-slice\` and `2.0-g3\` are as they were.
+
+**The second verification** (2026-10-10 06:02 - 06:30, the release verifier on the second build; his scratch and
+every log `build/p4b_verify/`, his notes `build/engine_requests/wf13_p4b_verify_to_orchestrator.txt`): **release
+ready with issues** - no crash, no lost save, no licence gap, no red proof, an installer test mode that harms
+nothing. He changed no shipped file: nothing is to be built again.
+- **F1**, measured as the first time - through the lobby and `Flow.start_versus`, windowed, the game's real
+  transitions, two humans who never press a key: the Last Caveman cap and the Golden Drumstick cap, each with the
+  deciding moment on and off (one tick a frame, every frame shot), and two of the four again in real time. The
+  counts of the fixer and the integrator above are of the HUD's and the scoreboard's TEXT. He also counted the
+  word's red ink in every shot (`time_pixels.py`): the whole word is in the PICTURE for 6-8 frames at the gong, all
+  through the replay (87-88 frames; 2.6 s in real time) and for 115-117 frames on the scoreboard (2.3-2.5 s in real
+  time); it is hidden for about 17 frames (0.3 s) while the iris closes over the banner before the scoreboard.
+  With the deciding moment off (no player can switch it off) the gong's 6-8 frames and the scoreboard are all.
+- **F2 / F3** in the installed twin of the new exe: 36 boots on the 18 prepared folders - no crash, every save file
+  byte-identical afterwards; a boot on an unreadable save or settings file leaves with code 1, counts its warnings
+  and fails `-CheckBootLog` (with `--log-file` and with the engine's own log), a clean one 0 / 0 and BOOT LOG OK.
+  The settings half in the shipped exe on seven folders with an unreadable `settings.cfg` (garbage, empty,
+  zero-filled, cut off, binary): the bytes kept as `settings.bad.cfg` (`settings.bad.2.cfg` beside an older one
+  with other bytes, kept once for identical bytes). The save path in the project build: after the first save all
+  five kinds of a bad `save.json` beside a good backup (and the 1.0 one) keep the backup byte for byte and the bad
+  file as `save.bad.json`, 198 of 198 items in the written files of the 15 folders that held a readable save;
+  after the second save the backup is the first new file.
+- **F4** looked at: "Hi 3069500" on the Book I card of the 1.0 profile "finished"; in the 366 shots of 2-2b's
+  fight that show both tags their arrows never overlap (in 198 of them they stand within 40 px, never closer than
+  32); the hopper of co-op 1-1 beside the first build's shot (the dark edge heavier); "TIME! / THE DECIDING MOMENT
+  / JUMP OR STRIKE SKIPS" in the Golden Drumstick's replay. Seen on the way, not of F4: while the pair drops into
+  2-2b's den the countdown stone of P2's edge arrow covers the "P1" label for about 12 ticks.
+  **F5**: the real `%APPDATA%\ClubAndGrub` listed at the start and the end (names, sizes,
+  times; nothing opened): its own write time and all 50 entries the same - across one build of a fresh copy with
+  the real `APPDATA` in its environment, 9 windowed runs of the project, 48 boots of the release exe, the suite,
+  the routes and the twin's install and removal.
+- **Six behaviour mutations, each in a scratch copy of the tree, turn the new tests red** (the round's open point):
+  the cap not noted, the scoreboard not asking (`test_ui_versus_time` 4 of 5 red each), the bad file not set
+  aside (`test_core_save_damage` 6 of 11), the counter not made in `_init` (`test_core_boot_check` 1 of 5), the
+  card's score 0 (`test_ui_book_score` 3 of 4), the tags not spread (`test_ui_overlays` 2 of 45).
+- **The build**: a fresh copy of the tree (`git ls-files -co`, 3 427 files) built at its first run, BUILD OK, the
+  suite 1 825 / 0; its pack against the integrator's exe: the same 2 591 paths, every script, level, texture and
+  sound byte-identical, 142 `.scn` differing in the node ids an export makes anew (1 015 bytes in all) and
+  `uid_cache.bin` (the same 143 files as in the first verification); against the first build exactly the nine
+  scripts and
+  `locale/en.po` differ. His own compile of the installer from `build\windows` is byte for byte the setup exe.
+  The proofs again: the gate job's plan 0 of 76 / 152 / 38 to do and the 76 rows read back GREEN, the evidence
+  set replayed afresh (0 of 38 reach), `sp_identity` IDENTICAL, the default suite 1 825 / 1 825 (192 s),
+  `test_coop_routes` 10 / 10 (489 s), the spec docs 120 / 120, the asset audit PASS and its 68 tests.
 
 **Open at the release** (none of them a row of the gate):
 - **No human check was done** (G90): `HUMAN_CHECKS.md`, 264 unticked lines - the pair playtests of P4.5, the music
@@ -700,17 +896,34 @@ pushed or published by an agent** (G89): the release text is the end of `docs/RE
   estimate); the 1.0 budget class on the proxy is not met (the tick is 1.2-1.7 times the 150 us proxy with one hero,
   1.6-3.0 with two); the ticking-entity budget of 48 is exceeded in `w2_l1_coop` (49) and on Cinder Pit (60).
   Android, macOS and iOS: the presets load and pack, nothing was exported or run (no toolchain in the project, G88).
-- **The real user folder**: `tools\build_windows.ps1`'s own import, test and export runs still write the engine's
-  log file into `%APPDATA%\ClubAndGrub\logs` (only the exported exe's smoke run is isolated there); the
-  `settings.cfg` in that folder holds the defaults, and whether it held more before the boot checks of the phase
-  loaded and saved it cannot be told from the tree.
+- **The real user folder**: closed for the tools by the release polish (F5; only `gd.sh raw` keeps the real
+  `APPDATA`, by design). The `settings.cfg` in that folder holds the defaults, and whether it held more before the
+  boot checks of the phase loaded and saved it cannot be told from the tree.
+- **Left by the release polish** (known, none of them ruled on): the results screen of a match whose last round
+  the cap ended does not say "TIME!" (the gong and the whole replay do), and players have no option that
+  switches the deciding moment off; the Book I card shows the 1.0 record only until a 2.0 run of any mode or book
+  beats it (the save keeps one profile record: keeping the 1.0 number apart is a save-format change); two heroes
+  within 12 px keep the sides their tags had, so a tag can stand on the far side of its hero; of the ward mark
+  only the ink is heavier - the chalk on a white hide is as pale as it was (3 sheets ink only, 2 thin: P-08,
+  L-06); the verifier's look-over items outside F4 stand - the row label "SHARED.." on Options > Buttons, Pause
+  showing "-" for both players there - and so does his line for the music listen-through (the ledger row of
+  `boss_chieftains_a.ogg` names "passes 3 + 4 (two different variations)" of a master that fits every whole pass
+  equally; not a licence matter); nobody has run 1.0.0 on a `settings.cfg` written by 2.0.
+- **Not tested in the release polish**: no test makes `Save.save_game`'s read-back differ (the
+  `ERR_FILE_CORRUPT` branch) or fills all 99 `save.bad` / `settings.bad` names (the reuse of the last one); F2's
+  save path was run in the project build, not in the release exe (no switch makes a release build save; its
+  settings path was: core's release exe made a `settings.bad.cfg`); the read of the engine's log from its first
+  line is proven on real logs and in-process, not by a real engine warning raised before the first script;
+  `--fresh-user` and `tests/run_tests.gd` empty a kept user folder by a fixed list of names that holds neither
+  `save.bad*.json` nor `settings.bad*.cfg` (such a file never changes what is loaded).
 - **Tools and records**: three of D5's macro recorders no longer finish; `docs/art/pipeline/build_manifest.py` no
   longer reproduces sections 1-16 of the manifest; two licence texts carry the title of their first page only; the
   registry labels the project's 15 own files "CC0 1.0" where the ledger says "own work" (the owner's decision);
   the upgrade over a real 1.0.0 installation and the all-users install were not exercised (no agent installs under
   the real AppId).
 - Of the list "Still open after G3" in section 6: Sky Picnic's bias, the validator's three rules, the evidence
-  routes of the rebuilt gates, the unversioned recorders and the "TIME!" banner are closed; the bosses' twin rules
+  routes of the rebuilt gates, the unversioned recorders and the "TIME!" banner are closed (the banner only since
+  the release polish: as first built it was on no frame of the windowed game); the bosses' twin rules
   and the giant roast, the wards of 2-2b and 6-2b in their boss arenas, a ward on every floor of a tall file, the
   gate job's 47 minutes and R6 replayed through the game's screens stand as they were.
 
